@@ -6,6 +6,7 @@ export function createTourPlayer(root, input, options = {}) {
   let { tour } = input;
   const { labels } = input;
   const lifetime = new AbortController();
+  delete root.dataset.slideId;
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
   const scene = query('scene');
@@ -30,7 +31,7 @@ export function createTourPlayer(root, input, options = {}) {
     go(target, recordHistory);
   }
   function act(action) {
-    if (options.authoring) return;
+    if (options.authoring || options.preview) return;
     if (action.kind !== 'none') playback?.interact();
     if (action.kind === 'next') go(index + 1);
     else if (action.kind === 'previous') go(index - 1);
@@ -88,7 +89,7 @@ export function createTourPlayer(root, input, options = {}) {
   root.ownerDocument.addEventListener(
     'keydown',
     (event) =>
-      handleTourKeyboard(event, navigation.open || Boolean(options.authoring), {
+      handleTourKeyboard(event, navigation.open || Boolean(options.authoring || options.preview), {
         ArrowRight: () => manualGo(index + 1),
         ArrowLeft: back,
         Home: () => manualGo(0),

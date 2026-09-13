@@ -109,7 +109,7 @@ it('keeps a branching tour local even when its autoplay default follows physical
 it('counts destination entrance separately and removes it for reduced motion', () => {
   const { tour, slide } = fixture();
   tour.transition = { kind: 'fade', durationMs: 200, hotspotTravelMs: 300 };
-  expect(tourEntranceTiming(tour, slide)).toEqual({ switchMs: 200, travelMs: 0, total: 200 });
+  expect(tourEntranceTiming(tour, slide)).toMatchObject({ switchMs: 200, travelMs: 0, total: 200 });
   const image = tour.slides[1]!;
   if (image.kind !== 'image') throw new Error('Expected image');
   image.hotspots = [

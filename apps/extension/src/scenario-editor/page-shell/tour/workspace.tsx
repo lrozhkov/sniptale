@@ -16,7 +16,7 @@ import { ScenarioWorkspaceFrame } from '../workspace';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideResourceDrawer } from '../resource-drawer';
 import { GuideImageUpload } from '../image-upload';
-import { TourStage } from './stage';
+import { TourCameraTools } from './camera-tools';
 import { TourInspector } from './inspector';
 import { TourGeneration } from './generation';
 import { TourImageDropZone } from './image-drop';
@@ -261,14 +261,21 @@ function TourCanvas({
         />
       ) : project.tour && state.selection ? (
         <>
-          <TourStage
+          <TourCameraTools
             disabled={disabled}
-            key={t('scenario.editor.tourMode')}
+            key={`${state.slide?.id}:${t('scenario.editor.tourMode')}`}
             tour={project.tour}
             images={images}
             selection={state.selection}
             t={t}
             onSelectObject={selectObject}
+            onFrameCamera={(camera) => {
+              if (state.slide?.kind === 'image')
+                state.changeSlide({
+                  ...state.slide,
+                  camera: { ...state.slide.camera, ...camera, mode: 'manual' },
+                });
+            }}
             onResizeObject={(id, rect) => {
               if (state.slide?.kind === 'image')
                 state.changeSlide({

@@ -15,7 +15,8 @@ export function resolveTourCamera(
   autoZoom: boolean
 ): TourImageProjection | null;
 
-export function createTourCameraSession(authoring: boolean): {
-  resolve: typeof resolveTourCamera;
-  reset(): void;
-};
+export function resolveTourEditingCamera(
+  slide: TourImageSlide,
+  viewport: { stageWidth: number; stageHeight: number }
+): TourImageProjection | null;
+export function tourCameraEnabled(slide: TourImageSlide | null, autoZoom: boolean): boolean;

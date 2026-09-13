@@ -13,12 +13,17 @@ export function createTourPlayer(
   root: HTMLElement,
   input: TourPlayerInput,
   options?: {
-    authoring?: {
-      canEdit?(): boolean;
-      onSelectObject(objectId: string | null): void;
-      onResizeObject?(objectId: string, rect: TourRect): void;
-      onMoveObject(objectId: string, point: { x: number; y: number }): void;
-    };
+    preview?: boolean;
+    authoring?:
+      | {
+          cameraFrame?: boolean;
+          onFrameCamera?(camera: { center: { x: number; y: number }; zoom: number }): void;
+          canEdit?(): boolean;
+          onSelectObject(objectId: string | null): void;
+          onResizeObject?(objectId: string, rect: TourRect): void;
+          onMoveObject(objectId: string, point: { x: number; y: number }): void;
+        }
+      | undefined;
   }
 ): {
   update(input: TourPlayerInput): void;

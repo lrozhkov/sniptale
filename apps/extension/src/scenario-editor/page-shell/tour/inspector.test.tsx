@@ -332,14 +332,20 @@ it('removes a navigation background without changing its buttons or source slide
   expect(current().image).not.toBeNull();
 });
 
-it('edits camera mode and normalized center without changing image source', async () => {
+it('edits camera entrance percentage and timing without cropping image source', async () => {
   const source = current().image!.source;
   expect(host.textContent).toContain('exactly one hotspot');
   await choose('Camera mode', 'Manual');
-  await fill('Zoom', '2');
-  await fill('X', '75');
-  await fill('Y', '25');
-  expect(current().camera).toEqual({ mode: 'manual', zoom: 2, center: { x: 0.75, y: 0.25 } });
+  await fill('Zoom', '200');
+  expect(host.querySelector('[aria-label="X"]')).toBeNull();
+  await fill('Zoom delay', '0.5');
+  await fill('Duration', '1.2');
+  expect(current().camera).toMatchObject({
+    mode: 'manual',
+    zoom: 2,
+    delayMs: 500,
+    durationMs: 1200,
+  });
   expect(current().image!.source).toEqual(source);
   await choose('Camera mode', 'Full view');
   expect(current().camera.mode).toBe('off');

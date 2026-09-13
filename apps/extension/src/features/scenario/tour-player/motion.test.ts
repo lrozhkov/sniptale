@@ -89,10 +89,12 @@ it('projects camera motion on the image and masks plane and settles exactly', ()
   f.motion.frame(0);
   const plane = f.scene.querySelector<HTMLElement>('.tour-image-plane')!;
   expect(plane.style.transform).toContain('scale(0.25)');
-  f.motion.frame(250);
+  f.motion.frame(499);
+  expect(plane.style.transform).toContain('scale(0.25)');
+  f.motion.frame(850);
   expect(plane.style.transform).toContain('scale(0.625)');
   expect(plane.querySelector('.tour-mask')).not.toBeNull();
-  f.motion.frame(500);
+  f.motion.frame(1200);
   expect(plane.style.transform).toBe('');
 });
 it('settles reduced motion and cancellation without retaining executable old links or blocked controls', () => {
@@ -113,4 +115,24 @@ it('settles reduced motion and cancellation without retaining executable old lin
   f.motion.frame(100);
   expect(f.scene.inert).toBe(false);
   expect(f.root.querySelector('.tour-motion-previous')).toBeNull();
+});
+
+it('animates manual camera only after its delay, through the same entrance clock', () => {
+  const f = fixture();
+  f.slide.camera = {
+    mode: 'manual',
+    center: { x: 0.5, y: 0.5 },
+    zoom: 2,
+    delayMs: 400,
+    durationMs: 600,
+  };
+  f.prepare();
+  f.motion.ready();
+  const plane = f.scene.querySelector<HTMLElement>('.tour-image-plane')!;
+  f.motion.frame(599);
+  expect(plane.style.transform).toContain('scale(0.5)');
+  f.motion.frame(900);
+  expect(plane.style.transform).toContain('scale(0.75)');
+  f.motion.frame(1200);
+  expect(plane.style.transform).toBe('');
 });

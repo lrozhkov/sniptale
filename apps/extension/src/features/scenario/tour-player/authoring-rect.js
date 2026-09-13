@@ -1,5 +1,5 @@
 /** Resizes a source-coordinate rectangle, keeping its opposite edge fixed and inside the image. */
-export function resizeTourRect(rect, edge, dx, dy) {
+export function resizeTourRect(rect, edge, dx, dy, aspect = null) {
   const min = 0.001;
   let left = rect.x,
     top = rect.y;
@@ -9,7 +9,8 @@ export function resizeTourRect(rect, edge, dx, dy) {
   if (edge.includes('e')) right = Math.min(1, Math.max(left + min, right + dx));
   if (edge.includes('n')) top = Math.max(0, Math.min(bottom - min, top + dy));
   if (edge.includes('s')) bottom = Math.min(1, Math.max(top + min, bottom + dy));
-  return { x: left, y: top, width: right - left, height: bottom - top };
+  const resized = { x: left, y: top, width: right - left, height: bottom - top };
+  return aspect ? constrainRectAspect(rect, resized, edge, aspect) : resized;
 }
 
 /** Handles own pointer capture, preview rollback and a single commit; no document mutation on move. */
@@ -38,7 +39,8 @@ export function bindTourRectResize(node, object, box, callbacks, lifetime, label
         (event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0) / box.width;
       const dy =
         (event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0) / box.height;
-      callbacks.onResizeObject?.(object.id, resizeTourRect(object.rect, edge, dx, dy));
+      const next = resizeTourRect(object.rect, edge, dx, dy, object.aspect);
+      callbacks.onResizeObject?.(object.id, object.constrainRect?.(next) ?? next);
     });
     handle.addEventListener('pointerdown', (event) => {
       event.stopPropagation();
@@ -68,7 +70,8 @@ export function bindTourRectResize(node, object, box, callbacks, lifetime, label
             dy = next.clientY - event.clientY;
           if (!moved && Math.hypot(dx, dy) < 3) return;
           moved = true;
-          rect = resizeTourRect(object.rect, edge, dx / box.width, dy / box.height);
+          rect = resizeTourRect(object.rect, edge, dx / box.width, dy / box.height, object.aspect);
+          rect = object.constrainRect?.(rect) ?? rect;
           project(rect);
           if (scene) scene.dataset.resizing = edge;
         },
@@ -101,4 +104,38 @@ export function bindTourRectResize(node, object, box, callbacks, lifetime, label
     });
     node.append(handle);
   }
+}
+
+function constrainRectAspect(original, resized, edge, aspect) {
+  const horizontal = edge.includes('w') ? -1 : edge.includes('e') ? 1 : 0;
+  const vertical = edge.includes('n') ? -1 : edge.includes('s') ? 1 : 0;
+  const anchorX = original.x + (original.width * (1 - horizontal)) / 2;
+  const anchorY = original.y + (original.height * (1 - vertical)) / 2;
+  const maxWidth = horizontal
+    ? horizontal > 0
+      ? 1 - anchorX
+      : anchorX
+    : 2 * Math.min(anchorX, 1 - anchorX);
+  const maxHeight = vertical
+    ? vertical > 0
+      ? 1 - anchorY
+      : anchorY
+    : 2 * Math.min(anchorY, 1 - anchorY);
+  const fromHeight =
+    !horizontal ||
+    (vertical &&
+      Math.abs(resized.height - original.height) * aspect >
+        Math.abs(resized.width - original.width));
+  const width = Math.min(
+    maxWidth,
+    maxHeight * aspect,
+    Math.max(0.001, fromHeight ? resized.height * aspect : resized.width)
+  );
+  const height = width / aspect;
+  return {
+    x: anchorX - (width * (1 - horizontal)) / 2,
+    y: anchorY - (height * (1 - vertical)) / 2,
+    width,
+    height,
+  };
 }

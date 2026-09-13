@@ -376,3 +376,25 @@ it('offers visual blur without overwriting highlight opacity or numeric canvas g
   if (resized.kind !== 'image') throw new Error('Expected image');
   expect(resized.masks[0]!.rect.width).toBeGreaterThan(0.3);
 });
+
+it('separates camera framing and replay from project edits and returns to base view', async () => {
+  const project = fixture();
+  const slide = project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.camera = { mode: 'manual', center: { x: 0.5, y: 0.5 }, zoom: 2 };
+  await render(project);
+  const stage = () => host.querySelector<HTMLElement>('.tour-stage-host')!;
+  const width = () => stage().shadowRoot!.querySelector<HTMLElement>('.tour-image')!.style.width;
+  const base = width();
+  await click('Camera area');
+  expect(stage().dataset['view']).toBe('frame');
+  expect(stage().shadowRoot!.querySelector('.tour-camera-frame')).not.toBeNull();
+  await click('Play animation');
+  expect(stage().dataset['view']).toBe('preview');
+  expect(stage().hasAttribute('inert')).toBe(true);
+  await click('Replay animation');
+  await click('Editing');
+  expect(width()).toBe(base);
+  expect(stage().hasAttribute('inert')).toBe(false);
+  expect(changed).not.toHaveBeenCalled();
+});

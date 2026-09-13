@@ -37,6 +37,7 @@ export function bindTourObjectDrag(node, object, box, callbacks, lifetime) {
         x: Math.max(0, Math.min(object.maxX ?? 1, object.point.x + dx / box.width)),
         y: Math.max(0, Math.min(object.maxY ?? 1, object.point.y + dy / box.height)),
       };
+      point = object.constrainPoint?.(point) ?? point;
       node.style.left = `${box.x + point.x * box.width}px`;
       node.style.top = `${box.y + point.y * box.height}px`;
       if (scene) scene.dataset.dragging = 'true';

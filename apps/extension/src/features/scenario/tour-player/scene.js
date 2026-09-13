@@ -1,4 +1,3 @@
-import { createTourCameraSession } from './camera.js';
 import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
@@ -13,7 +12,6 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   const viewport = query('viewport');
   const stage = query('stage');
   const scene = query('scene');
-  const camera = createTourCameraSession(Boolean(authoring));
   const motion = authoring ? null : createTourMotion(root, signal);
   const reducedMotion = () =>
     Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
@@ -68,12 +66,10 @@ export function createTourScene(root, input, onAction, signal, authoring) {
           authoring,
           signal,
           autoZoom: tour.playback.autoZoom,
-          camera,
         }
       );
       hints = slide.image ? [...slide.hotspots, ...slide.annotations] : [];
     } else if (slide) {
-      camera.reset();
       const rendered = navigationController.render(slide, stageWidth, stageHeight);
       scene.append(rendered.panel);
       hints = rendered.hints;
@@ -208,6 +204,10 @@ function measureScene(root, viewport, aspect) {
 function markTourSelection(scene, selectedObjectId, focused) {
   for (const node of scene.querySelectorAll('[data-tour-object-id]'))
     node.dataset.selected = String(node.dataset.tourObjectId === selectedObjectId);
+  if (focused?.classList.contains('tour-camera-frame')) {
+    scene.querySelector('.tour-camera-frame')?.focus({ preventScroll: true });
+    return;
+  }
   if (!focused?.classList.contains('tour-resize-handle')) return;
   const objectId = focused.parentElement?.dataset.tourObjectId;
   const handle = [

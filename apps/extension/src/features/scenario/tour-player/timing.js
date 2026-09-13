@@ -1,3 +1,4 @@
+import { tourCameraEnabled } from './camera.js';
 /** Reading and narration use authored source data; returned duration is milliseconds. */
 export function tourSlideDuration(tour, slide) {
   const texts =
@@ -77,5 +78,14 @@ export function tourEntranceTiming(tour, slide, reducedMotion = false) {
     !reducedMotion && slide?.kind === 'image' && slide.hotspots.length === 1
       ? tour.transition.hotspotTravelMs
       : 0;
-  return { switchMs, travelMs, total: switchMs + travelMs };
+  const camera = !reducedMotion && tourCameraEnabled(slide, tour.playback.autoZoom);
+  const cameraStartMs = camera ? switchMs + (slide.camera.delayMs ?? 300) : 0;
+  const cameraMs = camera ? (slide.camera.durationMs ?? 700) : 0;
+  return {
+    switchMs,
+    travelMs,
+    cameraStartMs,
+    cameraMs,
+    total: Math.max(switchMs + travelMs, cameraStartMs + cameraMs),
+  };
 }

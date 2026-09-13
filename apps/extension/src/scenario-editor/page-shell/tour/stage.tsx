@@ -16,8 +16,14 @@ export function TourStage({
   onSelectObject,
   onMoveObject,
   onResizeObject,
+  onFrameCamera,
+  view = 'edit',
+  previewKey = 0,
   t,
 }: {
+  view?: 'edit' | 'frame' | 'preview';
+  previewKey?: number;
+  onFrameCamera?: (camera: { center: { x: number; y: number }; zoom: number }) => void;
   tour: TourDocument;
   images: Record<string, string | null>;
   selection: TourSelection | null;
@@ -30,8 +36,14 @@ export function TourStage({
   const [shadow, setShadow] = useState<ShadowRoot | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const controller = useRef<ReturnType<typeof createTourPlayer> | null>(null);
-  const callbacks = useRef({ onSelectObject, onMoveObject, onResizeObject, disabled });
-  callbacks.current = { onSelectObject, onMoveObject, onResizeObject, disabled };
+  const callbacks = useRef({
+    onSelectObject,
+    onMoveObject,
+    onResizeObject,
+    onFrameCamera,
+    disabled,
+  });
+  callbacks.current = { onSelectObject, onMoveObject, onResizeObject, onFrameCamera, disabled };
   const labels = useRef<TourPlayerLabels>({
     resize: t('scenario.editor.tourResizeArea'),
     expand: t('scenario.editor.tourExpandCaption'),
@@ -54,7 +66,7 @@ export function TourStage({
     choose: t('scenario.editor.tourChooseDestination'),
   }).current;
   const input = {
-    tour,
+    tour: view === 'preview' ? cameraPreviewTour(tour, selection) : tour,
     labels,
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
@@ -63,12 +75,18 @@ export function TourStage({
   useLayoutEffect(() => {
     if (!root.current) return;
     const player = createTourPlayer(root.current, latest.current.input, {
-      authoring: {
-        canEdit: () => !callbacks.current.disabled,
-        onSelectObject: (id) => callbacks.current.onSelectObject(id),
-        onResizeObject: (id, rect) => callbacks.current.onResizeObject?.(id, rect),
-        onMoveObject: (id, point) => callbacks.current.onMoveObject(id, point),
-      },
+      preview: view === 'preview',
+      authoring:
+        view === 'preview'
+          ? undefined
+          : {
+              cameraFrame: view === 'frame',
+              onFrameCamera: (camera) => callbacks.current.onFrameCamera?.(camera),
+              canEdit: () => !callbacks.current.disabled,
+              onSelectObject: (id) => callbacks.current.onSelectObject(id),
+              onResizeObject: (id, rect) => callbacks.current.onResizeObject?.(id, rect),
+              onMoveObject: (id, point) => callbacks.current.onMoveObject(id, point),
+            },
     });
     controller.current = player;
     restoreSelection(player, latest.current.selection);
@@ -76,7 +94,7 @@ export function TourStage({
       player.dispose();
       controller.current = null;
     };
-  }, [shadow]);
+  }, [shadow, view, previewKey]);
   useLayoutEffect(() => {
     if (!controller.current) return;
     controller.current.update(latest.current.input);
@@ -91,6 +109,8 @@ export function TourStage({
   return (
     <div
       className="tour-stage-host"
+      data-view={view}
+      inert={view === 'preview'}
       onDragStart={(event) => event.preventDefault()}
       ref={(node) => {
         if (node && !node.shadowRoot) setShadow(node.attachShadow({ mode: 'open' }));
@@ -105,6 +125,10 @@ export function TourStage({
               #tour-player { height: 100%; background: transparent; }
               .tour-toolbar, .tour-transport { display: none; }
               .tour-scene[data-dragging=true], .tour-scene[data-dragging=true] * { cursor: grabbing !important; }
+              :host([data-view=frame]) .tour-hint,
+              :host([data-view=frame]) .tour-hotspot,
+              :host([data-view=frame]) .tour-mask:not(.tour-camera-frame) { display: none; }
+              .tour-camera-frame { box-shadow: 0 0 0 100vmax #11182766; z-index: 5; }
               .tour-mask { border: 0; padding: 0; }
               .tour-mask[data-selected=true] { outline: 2px solid var(--tour-accent); outline-offset: 2px; }
               .tour-hotspot[data-selected=true], .tour-button[data-selected=true] {
@@ -181,4 +205,16 @@ function TourStageScaffold({
       <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
     </div>
   );
+}
+
+function cameraPreviewTour(tour: TourDocument, selection: TourSelection | null): TourDocument {
+  const slide = tour.slides.find(
+    (entry) => entry.id === (selection?.kind === 'slide' ? selection.slideId : null)
+  );
+  return {
+    ...tour,
+    slides: slide ? [slide] : [],
+    playback: { ...tour.playback, autoplay: false, loop: false },
+    endScreen: { ...tour.endScreen, enabled: false },
+  };
 }

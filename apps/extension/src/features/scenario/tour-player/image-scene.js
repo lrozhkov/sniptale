@@ -1,3 +1,5 @@
+import { renderTourCameraFrame } from './camera-frame.js';
+import { resolveTourCamera, resolveTourEditingCamera } from './camera.js';
 import { renderTourMask } from './image-mask.js';
 import { bindTourObjectDrag } from './authoring.js';
 
@@ -20,14 +22,15 @@ export function renderTourImage(
     authoring,
     signal,
     autoZoom,
-    camera,
   }
 ) {
   if (!slide.image) {
     scene.append(element('p', 'tour-empty', labels.empty));
     return null;
   }
-  const imageBox = camera.resolve(slide, { stageWidth, stageHeight }, autoZoom);
+  const imageBox = authoring
+    ? resolveTourEditingCamera(slide, { stageWidth, stageHeight })
+    : resolveTourCamera(slide, { stageWidth, stageHeight }, autoZoom);
   if (!imageBox) return null;
   const plane = element('div', 'tour-image-plane');
   scene.append(plane);
@@ -97,5 +100,14 @@ export function renderTourImage(
       bindTourObjectDrag(marker, { id: annotation.id, point: anchor }, imageBox, authoring, signal);
       scene.append(marker);
     }
+  if (authoring?.cameraFrame && slide.camera.mode === 'manual') {
+    const frame = renderTourCameraFrame(slide, { stageWidth, stageHeight }, imageBox, {
+      element,
+      labels,
+      authoring,
+      signal,
+    });
+    if (frame) scene.append(frame);
+  }
   return imageBox;
 }

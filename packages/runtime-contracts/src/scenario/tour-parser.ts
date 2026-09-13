@@ -150,6 +150,9 @@ const imageSlide = z
     camera: z
       .object({
         mode: z.enum(['inherit', 'off', 'auto', 'manual']),
+        targetZoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom).optional(),
+        delayMs: z.number().finite().min(0).max(5000).optional(),
+        durationMs: z.number().finite().min(100).max(5000).optional(),
         center: point,
         zoom: z.number().finite().min(1).max(TOUR_LIMITS.maxZoom),
       })

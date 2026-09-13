@@ -408,3 +408,21 @@ it('validates independent mask effect parameters for editor and generated AI ope
     ]).success
   ).toBe(false);
 });
+
+it('bounds the camera entrance duration, delay and explicit automatic zoom', () => {
+  const slide = imageSlide();
+  slide.camera = { ...slide.camera, targetZoom: 2.5, delayMs: 300, durationMs: 700 };
+  expect(tourDocumentSchema.shape.slides.safeParse([slide]).success).toBe(true);
+  for (const invalid of [
+    { targetZoom: 9 },
+    { delayMs: -1 },
+    { durationMs: 0 },
+    { durationMs: Infinity },
+  ]) {
+    expect(
+      tourDocumentSchema.shape.slides.safeParse([
+        { ...slide, camera: { ...slide.camera, ...invalid } },
+      ]).success
+    ).toBe(false);
+  }
+});

@@ -1,4 +1,4 @@
-import { resolveTourCamera } from './camera.js';
+import { resolveTourCamera, resolveTourEditingCamera, tourCameraEnabled } from './camera.js';
 import { tourEntranceTiming } from './timing.js';
 const bounded = (value) => Math.max(0, Math.min(1, value));
 const ease = (value) => value * value * (3 - 2 * value);
@@ -90,14 +90,9 @@ function pointOf(node) {
 function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
   const phases = tourEntranceTiming(tour, slide, reducedMotion);
   const image = slide?.kind === 'image' && slide.image ? slide : null;
-  const automatic =
-    image &&
-    image.hotspots.length === 1 &&
-    !image.requiresTargetReview &&
-    (image.camera.mode === 'auto' || (image.camera.mode === 'inherit' && tour.playback.autoZoom));
   const final = image ? resolveTourCamera(image, viewport, tour.playback.autoZoom) : null;
-  const base = automatic
-    ? resolveTourCamera({ ...image, camera: { ...image.camera, mode: 'off' } }, viewport, false)
+  const base = tourCameraEnabled(image, tour.playback.autoZoom)
+    ? resolveTourEditingCamera(image, viewport)
     : final;
   const targets = scene.querySelectorAll('.tour-hotspot');
   const target = targets.length === 1 && !targets[0].hidden ? targets[0] : null;
@@ -118,6 +113,7 @@ function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
     base,
     final,
     target,
+    targets,
     marker,
     image,
   };
@@ -139,7 +135,9 @@ function applyMotionFrame(state, scene, stage, elapsed) {
   }
   let box = state.final;
   if (state.plane && state.base && state.final) {
-    const progress = ease(bounded(elapsed / state.phases.total));
+    const progress = state.phases.cameraMs
+      ? ease(bounded((elapsed - state.phases.cameraStartMs) / state.phases.cameraMs))
+      : 1;
     box = {
       x: between(state.base.x, state.final.x, progress),
       y: between(state.base.y, state.final.y, progress),
@@ -151,6 +149,10 @@ function applyMotionFrame(state, scene, stage, elapsed) {
     const offsetY = box.y - state.final.y * scale;
     state.plane.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
   }
+  if (!state.target)
+    state.targets.forEach((node) => {
+      node.style.visibility = 'hidden';
+    });
   if (state.target && state.marker) {
     state.target.style.visibility = 'hidden';
     const point = state.image?.hotspots[0]?.point;
@@ -168,7 +170,9 @@ function applyMotionFrame(state, scene, stage, elapsed) {
 function settleMotion(state, scene, hint, stage) {
   state.previous?.pixels.remove();
   state.marker?.remove();
-  if (state.target) state.target.style.visibility = '';
+  state.targets.forEach((node) => {
+    node.style.visibility = '';
+  });
   if (state.plane) state.plane.style.transform = '';
   scene.style.opacity = '';
   scene.style.transform = '';

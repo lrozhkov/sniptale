@@ -119,6 +119,10 @@ export interface TourTiming {
 }
 
 export interface TourCamera {
+  /** Optional explicit automatic target; otherwise fit the recorded target. */
+  targetZoom?: number | undefined;
+  delayMs?: number | undefined;
+  durationMs?: number | undefined;
   mode: 'inherit' | 'off' | 'auto' | 'manual';
   center: TourPoint;
   zoom: number;

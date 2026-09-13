@@ -213,3 +213,103 @@ it('renders independent neutral spotlight and visual blur; locked resize stays i
   expect(effect().style.backdropFilter).toBe(`blur(${(20 * imageWidth) / 100}px)`);
   expect(effect().style.opacity).toBe('');
 });
+
+it('frames the manual destination on the unzoomed image and commits camera geometry once', () => {
+  const props = fixture();
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.image!.width = 640;
+  slide.image!.height = 360;
+  slide.camera = { mode: 'manual', center: { x: 0.5, y: 0.5 }, zoom: 2 };
+  const onFrameCamera = vi.fn();
+  act(() => root.render(<TourStage {...props} view="frame" onFrameCamera={onFrameCamera} />));
+  expect(shadow().querySelector<HTMLElement>('.tour-image')!.style.width).toBe('640px');
+  const frame = shadow().querySelector<HTMLElement>('.tour-camera-frame')!;
+  expect(frame.style.width).toBe('320px');
+  const handle = frame.querySelector('[data-edge=e]')!;
+  act(() =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+  );
+  expect(onFrameCamera).toHaveBeenCalledTimes(1);
+  expect(onFrameCamera.mock.calls[0]![0].zoom).toBeGreaterThan(2);
+  expect(props.onMoveObject).not.toHaveBeenCalled();
+});
+
+it('keeps a letterboxed camera frame identical across preview and commit', () => {
+  const props = fixture();
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.camera = { mode: 'manual', center: { x: 0.5, y: 0.5 }, zoom: 1 };
+  const onFrameCamera = vi.fn();
+  act(() => root.render(<TourStage {...props} view="frame" onFrameCamera={onFrameCamera} />));
+  const frame = () => shadow().querySelector<HTMLElement>('.tour-camera-frame')!;
+  expect(frame().style.width).toBe('640px');
+  expect(frame().style.height).toBe('360px');
+  const handle = frame().querySelector('[data-edge=e]')!;
+  const pointer = (name: string, x: number) => {
+    const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x, clientY: 0 });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    act(() => handle.dispatchEvent(event));
+  };
+  pointer('pointerdown', 640);
+  pointer('pointermove', 320);
+  const preview = frame().getAttribute('style');
+  expect(frame().style.width).toBe('320px');
+  expect(frame().style.height).toBe('180px');
+  pointer('pointerup', 320);
+  expect(onFrameCamera).toHaveBeenCalledTimes(1);
+  slide.camera = { ...slide.camera, ...onFrameCamera.mock.calls[0]![0] };
+  act(() =>
+    root.render(
+      <TourStage
+        {...props}
+        tour={structuredClone(props.tour)}
+        view="frame"
+        onFrameCamera={onFrameCamera}
+      />
+    )
+  );
+  expect(frame().getAttribute('style')).toBe(preview);
+});
+
+it('moves the camera with arrows at fixed zoom and preserves focus after commit', () => {
+  const props = fixture();
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.image!.width = 640;
+  slide.image!.height = 360;
+  slide.camera = { mode: 'manual', center: { x: 0.5, y: 0.5 }, zoom: 2 };
+  const onFrameCamera = vi.fn();
+  const render = (disabled = false) =>
+    act(() =>
+      root.render(
+        <TourStage
+          {...props}
+          tour={structuredClone(props.tour)}
+          view="frame"
+          disabled={disabled}
+          onFrameCamera={onFrameCamera}
+        />
+      )
+    );
+  render();
+  const frame = () => shadow().querySelector<HTMLElement>('.tour-camera-frame')!;
+  frame().focus();
+  act(() =>
+    frame().dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', shiftKey: true, bubbles: true })
+    )
+  );
+  expect(onFrameCamera).toHaveBeenCalledExactlyOnceWith({
+    center: { x: 0.5 + 10 / 640, y: 0.5 },
+    zoom: 2,
+  });
+  slide.camera = { ...slide.camera, ...onFrameCamera.mock.calls[0]![0] };
+  render();
+  expect(shadow().activeElement).toBe(frame());
+  render(true);
+  act(() =>
+    frame().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+  );
+  expect(onFrameCamera).toHaveBeenCalledTimes(1);
+});

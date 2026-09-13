@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createTourImageSlide } from '../project/factories';
-import { resolveTourCamera, createTourCameraSession } from './camera';
+import { resolveTourCamera, resolveTourEditingCamera } from './camera';
 
 const viewport = { stageWidth: 500, stageHeight: 250 };
 function fixture() {
@@ -101,21 +101,6 @@ it('fits a large recorded target and separately authored point together', () => 
   expect(resolveTourCamera(slide, viewport, true)).toBeNull();
 });
 
-it('holds authoring camera across target moves and refits only on deliberate camera/navigation changes', () => {
-  const slide = fixture();
-  const camera = createTourCameraSession(true);
-  const original = camera.resolve(slide, viewport, true);
-  const moved = { ...slide, hotspots: [{ ...slide.hotspots[0]!, point: { x: 0.7, y: 0.7 } }] };
-  expect(camera.resolve(moved, viewport, true)).toEqual(original);
-  camera.reset();
-  expect(camera.resolve(moved, viewport, true)).not.toEqual(original);
-  const reader = createTourCameraSession(false);
-  expect(reader.resolve(moved, viewport, true)).toEqual(resolveTourCamera(moved, viewport, true));
-  expect(
-    camera.resolve({ ...moved, camera: { ...moved.camera, mode: 'off' } }, viewport, true)?.zoom
-  ).toBe(1);
-});
-
 it('backs out of cover cropping to include the recorded rectangle and separate click', () => {
   const slide = fixture();
   slide.fit = 'cover';
@@ -136,4 +121,18 @@ it('backs out of cover cropping to include the recorded rectangle and separate c
     expect(y).toBeGreaterThanOrEqual(0);
     expect(y).toBeLessThanOrEqual(viewport.stageHeight);
   }
+});
+
+it('keeps the authoring image unzoomed even when the final camera focuses a hotspot', () => {
+  const slide = fixture();
+  slide.camera = { mode: 'manual', zoom: 3, center: { x: 0.3, y: 0.4 } };
+  expect(resolveTourEditingCamera(slide, viewport)?.zoom).toBe(1);
+});
+
+it('uses the authored auto zoom percentage without changing source or hotspot coordinates', () => {
+  const slide = fixture();
+  slide.camera.targetZoom = 2.5;
+  expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(2.5);
+  expect(resolveTourEditingCamera(slide, viewport)?.zoom).toBe(1);
+  expect(slide.hotspots[0]!.point).toEqual({ x: 0.5, y: 0.5 });
 });
