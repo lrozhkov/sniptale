@@ -21,6 +21,7 @@ const io = vi.hoisted(() => ({
   select: vi.fn(),
   mount: vi.fn(),
   tourEdit: vi.fn(),
+  narration: vi.fn(),
 }));
 vi.mock('../../workflows/scenario-capture-edit/tour-edits', () => ({
   applyTourImageEdit: io.tourEdit,
@@ -69,6 +70,8 @@ vi.mock('../../composition/persistence/scenario/store/public', () => ({
   deleteScenarioProjectRecord: io.remove,
   saveScenarioProjectRecord: io.save,
   importScenarioImages: io.importImages,
+  importScenarioNarration: io.narration,
+  getScenarioAssetBlob: io.asset,
 }));
 vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: io.select }));
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -339,4 +342,36 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   await act(async () => finish());
   await settleAutosave();
   expect(io.save.mock.calls.at(-1)?.[0].tour.slides[0].camera.mode).toBe('manual');
+});
+
+it('imports narration from the mounted tour inspector through the source-bound page command', async () => {
+  const project = createGuideProject('Tour', 'guide', 100);
+  const slide = createTourImageSlide('voice-slide');
+  project.tour = { ...createTourDocument(), slides: [slide] };
+  io.load.mockResolvedValue(project);
+  io.narration.mockResolvedValue({ ...project, updatedAt: 101 });
+  await render();
+  await click('Scenario view');
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (node) => node.textContent === 'Interactive tour'
+  );
+  await act(async () => option?.click());
+  await act(async () => container.querySelector<HTMLButtonElement>('.tour-slide-select')?.click());
+  await click('Inspector');
+  const input = container.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
+  expect(input).not.toBeNull();
+  const blob = new File(['voice'], 'narration.wav', { type: 'audio/wav' });
+  Object.defineProperty(input, 'files', { value: [blob] });
+  await act(async () => input?.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(io.narration).toHaveBeenCalledOnce();
+  expect(io.narration).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project,
+      baseUpdatedAt: 100,
+      slideId: 'voice-slide',
+      expectedNarration: null,
+      blob,
+      signal: expect.any(AbortSignal),
+    })
+  );
 });

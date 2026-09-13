@@ -116,6 +116,7 @@ export function ScenarioEditorPage() {
           importDisabled={importDisabled}
           onChange={state.update}
           onImport={imports.resources}
+          onImportNarration={(input) => state.commitChange({ kind: 'narration', input })}
           initialSlideId={imageEditor.returnSlideId}
           onEditImage={(slideId) => {
             state.sealEdit();

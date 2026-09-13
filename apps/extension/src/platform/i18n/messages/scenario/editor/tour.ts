@@ -1,4 +1,47 @@
 export const scenarioTourMessages = {
+  tourNarration: { ru: 'Озвучка', en: 'Narration' },
+  tourRecordAudio: { ru: 'Запись озвучки', en: 'Record narration' },
+  tourRecord: { ru: 'Записать', en: 'Record' },
+  tourAudioUpload: { ru: 'Загрузить аудио', en: 'Upload audio' },
+  tourAudioLoading: { ru: 'Загрузка озвучки…', en: 'Loading narration\u2026' },
+  tourAudioFailed: {
+    ru: 'Не удалось воспроизвести озвучку. Попробуйте ещё раз.',
+    en: 'Narration could not play. Try again.',
+  },
+  tourAudioSaveFailed: {
+    ru: 'Не удалось сохранить озвучку. Запись доступна для повторной попытки.',
+    en: 'Narration could not be saved. Your recording is available to retry.',
+  },
+  tourAudioImportFailed: {
+    ru: 'Не удалось добавить аудио. Проверьте формат и длительность до 60 минут.',
+    en: 'Could not add audio. Check its format and duration of up to 60 minutes.',
+  },
+  tourRecordStart: { ru: 'Начать запись', en: 'Start recording' },
+  tourRecordStop: { ru: 'Остановить', en: 'Stop recording' },
+  tourRecordAgain: { ru: 'Записать заново', en: 'Record again' },
+  tourRecordDenied: {
+    ru: 'Нет доступа к микрофону. Разрешите доступ и попробуйте ещё раз.',
+    en: 'Microphone access was denied. Allow access and try again.',
+  },
+  tourRecordUnsupported: {
+    ru: 'Запись звука недоступна в этом браузере.',
+    en: 'Audio recording is unavailable in this browser.',
+  },
+  tourRecordFailed: {
+    ru: 'Не удалось начать запись. Проверьте микрофон.',
+    en: 'Recording could not start. Check your microphone.',
+  },
+  tourAudioApply: { ru: 'Применить озвучку', en: 'Apply narration' },
+  tourAudioStart: { ru: 'Начало, с', en: 'Start, s' },
+  tourAudioEnd: { ru: 'Конец, с', en: 'End, s' },
+  tourAudioGain: { ru: 'Громкость', en: 'Volume' },
+  tourAudioTranscript: { ru: 'Текст озвучки', en: 'Narration text' },
+  tourAudioRemove: { ru: 'Удалить озвучку', en: 'Remove narration' },
+  tourAudioHint: {
+    ru: 'Запишите голос или загрузите локальный аудиофайл.',
+    en: 'Record your voice or upload a local audio file.',
+  },
+
   tourTransitions: { ru: 'Переходы', en: 'Transitions' },
   tourTransitionKind: { ru: 'Смена изображения', en: 'Image transition' },
   tourTransitionNone: { ru: 'Без анимации смены', en: 'No image animation' },

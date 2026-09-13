@@ -3,7 +3,7 @@ import type React from 'react';
 import { translate } from '../../../platform/i18n';
 import { ProductModal, ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { useAudioRecordingFocus } from './focus';
+import { useAudioRecordingFocus } from '../../../composition/audio-recording/dialog-focus';
 import { useAudioRecordingDialogSession } from './controller';
 import {
   AudioRecordingDeviceSelect,

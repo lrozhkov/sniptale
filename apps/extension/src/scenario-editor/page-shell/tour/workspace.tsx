@@ -1,8 +1,12 @@
+import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
 import { useState, type ReactNode } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
-import type { importScenarioImages } from '../../../composition/persistence/scenario/store/public';
+import type {
+  importScenarioImages,
+  importScenarioNarration,
+} from '../../../composition/persistence/scenario/store/public';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -20,6 +24,9 @@ import type { Translate } from '../../../platform/i18n';
 import './tour.css';
 
 type TourWorkspaceProps = {
+  onImportNarration?: (
+    input: Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>
+  ) => Promise<boolean>;
   initialSlideId?: string | null;
   onEditImage?: (slideId: string) => void;
   project: GuideProject;
@@ -107,6 +114,7 @@ function TourSettingsPanel({
   t,
   onImport,
   onEditImage,
+  onImportNarration,
   images,
   state,
   onSelectObject: selectObject,
@@ -158,6 +166,22 @@ function TourSettingsPanel({
             onSelectObject={selectObject}
           />
         )}
+        {panels.rightOpen &&
+          panels.rightScope === 'selection' &&
+          state.selection?.kind === 'slide' &&
+          !state.selection.objectId &&
+          state.slide &&
+          onImportNarration && (
+            <TourNarrationSettings
+              key={`${project.id}:${state.slide.id}`}
+              slide={state.slide}
+              disabled={disabled}
+              importDisabled={importDisabled}
+              onImport={onImportNarration}
+              onChange={state.changeSlide}
+              t={t}
+            />
+          )}
       </div>
       {imageDestination &&
         panels.rightScope === 'selection' &&
