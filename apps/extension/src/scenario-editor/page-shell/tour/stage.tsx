@@ -87,6 +87,7 @@ export function TourStage({
   return (
     <div
       className="tour-stage-host"
+      onDragStart={(event) => event.preventDefault()}
       ref={(node) => {
         if (node && !node.shadowRoot) setShadow(node.attachShadow({ mode: 'open' }));
       }}

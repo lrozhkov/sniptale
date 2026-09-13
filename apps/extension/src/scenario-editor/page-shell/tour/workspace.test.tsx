@@ -338,3 +338,14 @@ it('uses the header presentation switch and keeps narration in playback, objects
     'true'
   );
 });
+
+it('cancels native image drags from the stage before they can become image imports', async () => {
+  await render();
+  const image = host.querySelector('.tour-stage-host')!.shadowRoot!.querySelector('.tour-image')!;
+  const drag = new Event('dragstart', { bubbles: true, cancelable: true, composed: true });
+  await act(async () => image.dispatchEvent(drag));
+  expect(drag.defaultPrevented).toBe(true);
+  expect(imported).not.toHaveBeenCalled();
+  expect(changed).not.toHaveBeenCalled();
+  expect(current.tour!.slides).toHaveLength(2);
+});
