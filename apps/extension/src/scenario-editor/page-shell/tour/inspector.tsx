@@ -1,7 +1,8 @@
 import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
 import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import type { ReactNode } from 'react';
+import { useTourInspectorSections } from './settings-sections';
 import type {
   TourDocument,
   TourImageSlide,
@@ -15,6 +16,11 @@ import {
   Image,
   ArrowLeft,
   Trash2,
+  ScanSearch,
+  Play,
+  Layers,
+  LayoutPanelTop,
+  List,
 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
@@ -29,6 +35,8 @@ import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
 
 type InspectorProps = {
+  presentation?: 'all' | 'sections';
+  narration?: ReactNode;
   tour: TourDocument;
   slide: TourSlide | null;
   selection: TourSelection | null;
@@ -43,77 +51,113 @@ type InspectorProps = {
 /** The inspector edits exactly one scope: whole tour, end screen, slide or selected object. */
 export function TourInspector(props: InspectorProps) {
   const { tour, slide, selection, disabled, t, onSelectObject } = props;
+  const renderSections = useTourInspectorSections(props.presentation ?? 'all', t);
+  const documentSettings = { tour, disabled, onChange: props.onChangeTour, t };
   if (props.scope === 'document')
-    return (
-      <>
-        <TourDocumentSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />
-        <TourPlaybackSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />
-        <TourTransitionSettings
-          tour={tour}
-          disabled={disabled}
-          onChange={props.onChangeTour}
-          t={t}
-        />
-      </>
-    );
+    return renderSections('document', [
+      {
+        id: 'appearance',
+        icon: Palette,
+        label: t('scenario.editor.appearance'),
+        content: <TourDocumentSettings {...documentSettings} section="appearance" />,
+      },
+      {
+        id: 'explanations',
+        icon: MessageSquare,
+        label: t('scenario.editor.tourTextPresentation'),
+        content: <TourDocumentSettings {...documentSettings} section="explanations" />,
+      },
+      {
+        id: 'playback',
+        icon: Play,
+        label: t('scenario.editor.tourPlayback'),
+        content: <TourPlaybackSettings {...documentSettings} />,
+      },
+      {
+        id: 'transitions',
+        icon: Layers,
+        label: t('scenario.editor.tourTransitions'),
+        content: <TourTransitionSettings {...documentSettings} />,
+      },
+    ]);
   if (selection?.kind === 'end')
     return <TourEndSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />;
   if (!slide)
     return <p className="guide-inspector-hint">{t('scenario.editor.guideSelectForSettings')}</p>;
   const objectId = selection?.kind === 'slide' ? selection.objectId : null;
-  return (
-    <>
-      {objectId && (
+  const settings = (section: string) =>
+    slide.kind === 'navigation' ? (
+      <TourNavigationSettings
+        key={JSON.stringify([slide.id, objectId])}
+        section={section}
+        slide={slide}
+        tour={tour}
+        objectId={objectId}
+        disabled={disabled}
+        onChange={props.onChangeSlide}
+        onSelect={onSelectObject}
+        t={t}
+      />
+    ) : (
+      <TourImageSettings
+        key={JSON.stringify([slide.id, objectId])}
+        section={section}
+        slide={slide}
+        tour={tour}
+        objectId={objectId}
+        disabled={disabled}
+        onChange={props.onChangeSlide}
+        onSelect={onSelectObject}
+        t={t}
+      />
+    );
+  if (objectId)
+    return (
+      <>
         <ProductActionButton compact tone="secondary" onClick={() => onSelectObject(null)}>
           <ArrowLeft size={15} />
           {t('scenario.editor.tourBackToSlide')}
         </ProductActionButton>
-      )}
-      {slide.kind === 'navigation' ? (
-        <TourNavigationSettings
-          key={JSON.stringify([slide.id, objectId])}
-          slide={slide}
-          tour={tour}
-          objectId={objectId}
-          disabled={disabled}
-          onChange={props.onChangeSlide}
-          onSelect={onSelectObject}
-          t={t}
-        />
-      ) : (
-        <TourImageSettings
-          key={JSON.stringify([slide.id, objectId])}
-          slide={slide}
-          tour={tour}
-          objectId={objectId}
-          disabled={disabled}
-          onChange={props.onChangeSlide}
-          onSelect={onSelectObject}
-          t={t}
-        />
-      )}
-      {!objectId && (
-        <TourTimingSettings
-          tour={tour}
-          slide={slide}
-          disabled={disabled}
-          onChange={props.onChangeSlide}
-          t={t}
-        />
-      )}
-    </>
-  );
+        {settings('object')}
+        {props.narration}
+      </>
+    );
+  const categories =
+    slide.kind === 'image'
+      ? [
+          { id: 'content', icon: Image, label: t('scenario.editor.tourSlide') },
+          { id: 'camera', icon: ScanSearch, label: t('scenario.editor.tourCamera') },
+          { id: 'objects', icon: Crosshair, label: t('scenario.editor.tourObjects') },
+        ]
+      : [
+          { id: 'content', icon: Image, label: t('scenario.editor.tourAddNavigation') },
+          { id: 'layout', icon: LayoutPanelTop, label: t('scenario.editor.tourComposition') },
+          { id: 'buttons', icon: List, label: t('scenario.editor.tourContentsLinks') },
+        ];
+  return renderSections(slide.kind, [
+    ...categories.map((section) => ({ ...section, content: settings(section.id) })),
+    {
+      id: 'playback',
+      icon: Play,
+      label: t('scenario.editor.tourPlayback'),
+      content: (
+        <>
+          <TourTimingSettings
+            tour={tour}
+            slide={slide}
+            disabled={disabled}
+            onChange={props.onChangeSlide}
+            t={t}
+          />
+          {props.narration}
+        </>
+      ),
+    },
+  ]);
 }
 
-function TourImageSettings({
-  slide,
-  tour,
-  objectId,
-  disabled,
-  onChange,
-  onSelect,
-  t,
-}: {
+type ImageSettingsProps = {
+  section: string;
   slide: TourImageSlide;
   tour: TourDocument;
   objectId: string | null;
@@ -121,7 +165,89 @@ function TourImageSettings({
   onChange: (slide: TourImageSlide, group?: string | null) => boolean;
   onSelect: (id: string | null) => void;
   t: Translate;
-}) {
+};
+
+/** Slide categories edit the bitmap and camera; selected-object controls are a separate scope. */
+function TourImageSettings(props: ImageSettingsProps) {
+  const { section, slide, tour, objectId, disabled, onChange, onSelect, t } = props;
+  if (objectId) return <TourImageObjectSettings {...props} />;
+  return (
+    <>
+      {section === 'content' && (
+        <GuideInspectorGroup icon={Image} title={t('scenario.editor.tourSlide')}>
+          <TourTextField
+            label={t('scenario.editor.guideStepTitle')}
+            singleLine
+            value={slide.title}
+            disabled={disabled}
+            onChange={(title) => onChange({ ...slide, title })}
+          />
+          <CompactSelect
+            aria-label={t('scenario.editor.tourFit')}
+            value={slide.fit}
+            disabled={disabled}
+            options={[
+              { value: 'contain', label: t('scenario.editor.tourContain') },
+              { value: 'cover', label: t('scenario.editor.tourCover') },
+            ]}
+            onChange={(fit) => onChange({ ...slide, fit })}
+          />
+          {slide.image && (
+            <TourTextField
+              label={t('scenario.editor.tourAlt')}
+              value={slide.image.alt}
+              disabled={disabled}
+              onChange={(alt) =>
+                onChange({ ...slide, image: slide.image ? { ...slide.image, alt } : null })
+              }
+            />
+          )}
+          {slide.requiresTargetReview && (
+            <div className="tour-review-notice">
+              <p>{t('scenario.editor.tourTargetReview')}</p>
+              <ProductActionButton
+                compact
+                tone="secondary"
+                disabled={disabled}
+                onClick={() => onChange({ ...slide, requiresTargetReview: false })}
+              >
+                {t('scenario.editor.tourTargetsReviewed')}
+              </ProductActionButton>
+            </div>
+          )}
+        </GuideInspectorGroup>
+      )}
+      {section === 'camera' && (
+        <TourCameraSettings
+          slide={slide}
+          tour={tour}
+          disabled={disabled}
+          onChange={onChange}
+          t={t}
+        />
+      )}
+      {section === 'objects' && (
+        <TourImageObjects
+          slide={slide}
+          disabled={disabled}
+          onChange={onChange}
+          onSelect={onSelect}
+          t={t}
+        />
+      )}
+    </>
+  );
+}
+
+function TourImageObjectSettings({
+  slide,
+  tour,
+  objectId,
+  disabled,
+  onChange,
+  onSelect,
+  t,
+}: ImageSettingsProps) {
   const hotspot = slide.hotspots.find((entry) => entry.id === objectId);
   const annotation = slide.annotations.find((entry) => entry.id === objectId);
   const mask = slide.masks.find((entry) => entry.id === objectId);
@@ -193,60 +319,7 @@ function TourImageSettings({
         </ProductActionButton>
       </>
     );
-  return (
-    <>
-      <GuideInspectorGroup icon={Image} title={t('scenario.editor.tourSlide')}>
-        <TourTextField
-          label={t('scenario.editor.guideStepTitle')}
-          singleLine
-          value={slide.title}
-          disabled={disabled}
-          onChange={(title) => onChange({ ...slide, title })}
-        />
-        <CompactSelect
-          aria-label={t('scenario.editor.tourFit')}
-          value={slide.fit}
-          disabled={disabled}
-          options={[
-            { value: 'contain', label: t('scenario.editor.tourContain') },
-            { value: 'cover', label: t('scenario.editor.tourCover') },
-          ]}
-          onChange={(fit) => onChange({ ...slide, fit })}
-        />
-        {slide.image && (
-          <TourTextField
-            label={t('scenario.editor.tourAlt')}
-            value={slide.image.alt}
-            disabled={disabled}
-            onChange={(alt) =>
-              onChange({ ...slide, image: slide.image ? { ...slide.image, alt } : null })
-            }
-          />
-        )}
-        {slide.requiresTargetReview && (
-          <div className="tour-review-notice">
-            <p>{t('scenario.editor.tourTargetReview')}</p>
-            <ProductActionButton
-              compact
-              tone="secondary"
-              disabled={disabled}
-              onClick={() => onChange({ ...slide, requiresTargetReview: false })}
-            >
-              {t('scenario.editor.tourTargetsReviewed')}
-            </ProductActionButton>
-          </div>
-        )}
-      </GuideInspectorGroup>
-      <TourCameraSettings slide={slide} tour={tour} disabled={disabled} onChange={onChange} t={t} />
-      <TourImageObjects
-        slide={slide}
-        disabled={disabled}
-        onChange={onChange}
-        onSelect={onSelect}
-        t={t}
-      />
-    </>
-  );
+  return null;
 }
 
 function TourImageObjects({
@@ -362,77 +435,80 @@ function TourImageObjects({
 }
 
 function TourDocumentSettings({
+  section,
   tour,
   disabled,
   onChange,
   t,
 }: {
+  section: 'appearance' | 'explanations';
   tour: TourDocument;
   disabled: boolean;
   onChange: (tour: TourDocument) => boolean;
   t: Translate;
 }) {
   return (
-    <GuideInspectorGroup icon={Palette} title={t('scenario.editor.tourSettings')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourAspect')}
-        value={tour.stage.aspect}
-        disabled={disabled}
-        options={[
-          { value: '16:9', label: '16:9' },
-          { value: '4:3', label: '4:3' },
-          { value: '9:16', label: '9:16' },
-        ]}
-        onChange={(aspect) => onChange({ ...tour, stage: { ...tour.stage, aspect } })}
-      />
-      <ColorField
-        label={t('scenario.editor.tourBackground')}
-        title={t('scenario.editor.tourBackground')}
-        value={tour.stage.background}
-        disabled={disabled}
-        allowAlpha={false}
-        allowTransparent={false}
-        onChange={(background) => onChange({ ...tour, stage: { ...tour.stage, background } })}
-      />
-      {(
-        [
-          { key: 'accent', label: t('scenario.editor.appearanceAccent') },
-          { key: 'text', label: t('scenario.editor.tourSceneTextColor') },
-        ] as const
-      ).map(({ key, label }) => (
-        <ColorField
-          key={key}
-          label={label}
-          title={label}
-          value={tour.style[key]}
+    <GuideInspectorGroup
+      icon={section === 'appearance' ? Palette : MessageSquare}
+      title={t(
+        section === 'appearance'
+          ? 'scenario.editor.appearance'
+          : 'scenario.editor.tourTextPresentation'
+      )}
+    >
+      {section === 'appearance' && (
+        <>
+          <CompactSelect
+            aria-label={t('scenario.editor.tourAspect')}
+            value={tour.stage.aspect}
+            disabled={disabled}
+            options={[
+              { value: '16:9', label: '16:9' },
+              { value: '4:3', label: '4:3' },
+              { value: '9:16', label: '9:16' },
+            ]}
+            onChange={(aspect) => onChange({ ...tour, stage: { ...tour.stage, aspect } })}
+          />
+          <ColorField
+            label={t('scenario.editor.tourBackground')}
+            title={t('scenario.editor.tourBackground')}
+            value={tour.stage.background}
+            disabled={disabled}
+            allowAlpha={false}
+            allowTransparent={false}
+            onChange={(background) => onChange({ ...tour, stage: { ...tour.stage, background } })}
+          />
+          {(
+            [
+              { key: 'accent', label: t('scenario.editor.appearanceAccent') },
+              { key: 'text', label: t('scenario.editor.tourSceneTextColor') },
+            ] as const
+          ).map(({ key, label }) => (
+            <ColorField
+              key={key}
+              label={label}
+              title={label}
+              value={tour.style[key]}
+              disabled={disabled}
+              allowAlpha={false}
+              allowTransparent={false}
+              onChange={(value) => onChange({ ...tour, style: { ...tour.style, [key]: value } })}
+            />
+          ))}
+        </>
+      )}
+      {section === 'explanations' && (
+        <TourTextPresentation
+          inherit={false}
+          value={tour.style.textAppearance}
+          defaults={tour.style.textAppearance}
           disabled={disabled}
-          allowAlpha={false}
-          allowTransparent={false}
-          onChange={(value) => onChange({ ...tour, style: { ...tour.style, [key]: value } })}
+          t={t}
+          onChange={(textAppearance) => {
+            if (textAppearance) onChange({ ...tour, style: { ...tour.style, textAppearance } });
+          }}
         />
-      ))}
-      <label className="guide-number-toggle">
-        <ProductToggle
-          size="sm"
-          disabled={disabled}
-          checked={tour.playback.autoZoom}
-          aria-label={t('scenario.editor.tourAutoZoom')}
-          onClick={() =>
-            onChange({ ...tour, playback: { ...tour.playback, autoZoom: !tour.playback.autoZoom } })
-          }
-        />
-        {t('scenario.editor.tourAutoZoom')}
-      </label>
-      <TourTextPresentation
-        inherit={false}
-        value={tour.style.textAppearance}
-        defaults={tour.style.textAppearance}
-        disabled={disabled}
-        t={t}
-        onChange={(textAppearance) => {
-          if (textAppearance) onChange({ ...tour, style: { ...tour.style, textAppearance } });
-        }}
-      />
+      )}
     </GuideInspectorGroup>
   );
 }

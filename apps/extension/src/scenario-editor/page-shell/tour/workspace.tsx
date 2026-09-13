@@ -11,7 +11,7 @@ import type {
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { X, Settings2, Image } from 'lucide-react';
+import { X, Settings2, Image, List, PanelLeft } from 'lucide-react';
 import { ScenarioWorkspaceFrame } from '../workspace';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideResourceDrawer } from '../resource-drawer';
@@ -131,6 +131,9 @@ function TourSettingsPanel({
             state.selection?.kind === 'slide' ? state.selection.objectId : null,
             t
           );
+  const grouped =
+    panels.rightScope === 'document' ||
+    (state.selection?.kind === 'slide' && !state.selection.objectId);
   return (
     <FloatingChromePanel
       role="complementary"
@@ -142,6 +145,23 @@ function TourSettingsPanel({
       <div className="guide-panel-heading">
         <Settings2 size={16} />
         <h2 title={inspectorTitle}>{inspectorTitle}</h2>
+        {grouped && (
+          <ContentToolbarButton
+            title={t(
+              panels.presentation === 'all'
+                ? 'scenario.editor.inspectorShowSections'
+                : 'scenario.editor.inspectorShowAll'
+            )}
+            aria-pressed={panels.presentation === 'all'}
+            onClick={panels.togglePresentation}
+          >
+            {panels.presentation === 'all' ? (
+              <List size={16} aria-hidden="true" />
+            ) : (
+              <PanelLeft size={16} aria-hidden="true" />
+            )}
+          </ContentToolbarButton>
+        )}
         <ContentToolbarButton title={t('scenario.editor.close')} onClick={panels.toggleRight}>
           <X size={16} />
         </ContentToolbarButton>
@@ -149,6 +169,7 @@ function TourSettingsPanel({
       <div className="guide-panel-scroll">
         {project.tour && (
           <TourInspector
+            presentation={panels.presentation}
             tour={project.tour}
             slide={state.slide}
             selection={state.selection}
@@ -157,26 +178,28 @@ function TourSettingsPanel({
             t={t}
             onChangeTour={state.changeTour}
             onChangeSlide={state.changeSlide}
+            narration={
+              panels.rightOpen &&
+              panels.rightScope === 'selection' &&
+              state.selection?.kind === 'slide' &&
+              state.slide &&
+              onImportNarration && (
+                <TourNarrationSettings
+                  key={`${project.id}:${state.slide.id}:${state.selection.objectId ?? 'slide'}`}
+                  slide={state.slide}
+                  objectId={state.selection.objectId}
+                  resources={project.tour ? getTourAudioResources(project.tour) : []}
+                  disabled={disabled}
+                  importDisabled={importDisabled}
+                  onImport={onImportNarration}
+                  onChange={state.changeSlide}
+                  t={t}
+                />
+              )
+            }
             onSelectObject={selectObject}
           />
         )}
-        {panels.rightOpen &&
-          panels.rightScope === 'selection' &&
-          state.selection?.kind === 'slide' &&
-          state.slide &&
-          onImportNarration && (
-            <TourNarrationSettings
-              key={`${project.id}:${state.slide.id}:${state.selection.objectId ?? 'slide'}`}
-              slide={state.slide}
-              objectId={state.selection.objectId}
-              resources={project.tour ? getTourAudioResources(project.tour) : []}
-              disabled={disabled}
-              importDisabled={importDisabled}
-              onImport={onImportNarration}
-              onChange={state.changeSlide}
-              t={t}
-            />
-          )}
       </div>
       {selectedImage &&
         onEditImage &&

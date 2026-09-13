@@ -13,6 +13,7 @@ import { TourActionField, TourTextField } from './fields';
 import type { Translate } from '../../../platform/i18n';
 
 export function TourNavigationSettings({
+  section,
   slide,
   tour,
   objectId,
@@ -21,6 +22,7 @@ export function TourNavigationSettings({
   onSelect,
   t,
 }: {
+  section: string;
   slide: TourNavigationSlide;
   tour: TourDocument;
   objectId: string | null;
@@ -80,67 +82,75 @@ export function TourNavigationSettings({
     );
   return (
     <>
-      <GuideInspectorGroup icon={List} title={t('scenario.editor.tourAddNavigation')}>
-        <TourTextField
-          label={t('scenario.editor.tourNavigationTitle')}
-          singleLine
-          value={slide.title}
-          disabled={disabled}
-          onChange={(title) => onChange({ ...slide, title })}
-        />
-        <TourTextField
-          label={t('scenario.editor.tourPrimaryText')}
-          value={slide.description}
-          disabled={disabled}
-          onChange={(description) => onChange({ ...slide, description })}
-        />
-        <CompactPaintSelector
-          label={t('scenario.editor.tourBackground')}
-          title={t('scenario.editor.tourBackground')}
-          value={slide.background.paint ?? createSolidPaint(slide.background.color)}
-          disabled={disabled}
-          palette={[
-            '#111827',
-            '#f8fafc',
-            '#f97316',
-            '#2563eb',
-            '#16a34a',
-            '#ef4444',
-            '#8b5cf6',
-            '#facc15',
-          ]}
-          recentColors={[slide.background.color]}
-          onChange={(paint) =>
-            onChange({
-              ...slide,
-              background: {
-                ...slide.background,
-                paint,
-                color: getRepresentativeColor(paint).slice(0, 7),
-              },
-            })
-          }
-        />
-        {slide.background.image && (
-          <ProductActionButton
-            compact
-            tone="secondary"
+      {section === 'content' && (
+        <GuideInspectorGroup icon={List} title={t('scenario.editor.tourAddNavigation')}>
+          <TourTextField
+            label={t('scenario.editor.tourNavigationTitle')}
+            singleLine
+            value={slide.title}
             disabled={disabled}
-            onClick={() => onChange({ ...slide, background: { ...slide.background, image: null } })}
-          >
-            {t('scenario.editor.tourRemoveBackground')}
-          </ProductActionButton>
-        )}
-      </GuideInspectorGroup>
-      <TourNavigationLayoutSettings slide={slide} disabled={disabled} onChange={onChange} t={t} />
-      <TourNavigationButtons
-        slide={slide}
-        tour={tour}
-        disabled={disabled}
-        onChange={onChange}
-        onSelect={onSelect}
-        t={t}
-      />
+            onChange={(title) => onChange({ ...slide, title })}
+          />
+          <TourTextField
+            label={t('scenario.editor.tourPrimaryText')}
+            value={slide.description}
+            disabled={disabled}
+            onChange={(description) => onChange({ ...slide, description })}
+          />
+          <CompactPaintSelector
+            label={t('scenario.editor.tourBackground')}
+            title={t('scenario.editor.tourBackground')}
+            value={slide.background.paint ?? createSolidPaint(slide.background.color)}
+            disabled={disabled}
+            palette={[
+              '#111827',
+              '#f8fafc',
+              '#f97316',
+              '#2563eb',
+              '#16a34a',
+              '#ef4444',
+              '#8b5cf6',
+              '#facc15',
+            ]}
+            recentColors={[slide.background.color]}
+            onChange={(paint) =>
+              onChange({
+                ...slide,
+                background: {
+                  ...slide.background,
+                  paint,
+                  color: getRepresentativeColor(paint).slice(0, 7),
+                },
+              })
+            }
+          />
+          {slide.background.image && (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              disabled={disabled}
+              onClick={() =>
+                onChange({ ...slide, background: { ...slide.background, image: null } })
+              }
+            >
+              {t('scenario.editor.tourRemoveBackground')}
+            </ProductActionButton>
+          )}
+        </GuideInspectorGroup>
+      )}
+      {section === 'layout' && (
+        <TourNavigationLayoutSettings slide={slide} disabled={disabled} onChange={onChange} t={t} />
+      )}
+      {section === 'buttons' && (
+        <TourNavigationButtons
+          slide={slide}
+          tour={tour}
+          disabled={disabled}
+          onChange={onChange}
+          onSelect={onSelect}
+          t={t}
+        />
+      )}
     </>
   );
 }

@@ -19,6 +19,7 @@ let project: GuideProject;
 let selected: TourSelection | null;
 let scope: 'selection' | 'document';
 let disabled: boolean;
+let presentation: 'all' | 'sections';
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
@@ -52,6 +53,7 @@ beforeEach(() => {
   selected = { kind: 'slide', slideId: 'image', objectId: null };
   scope = 'selection';
   disabled = false;
+  presentation = 'all';
   draw();
 });
 afterEach(() => {
@@ -64,6 +66,8 @@ function draw() {
   act(() =>
     root.render(
       <TourInspector
+        presentation={presentation}
+        narration={<div data-testid="narration-slot" />}
         tour={project.tour!}
         slide={project.tour!.slides.find((s) => s.id === slideId) ?? null}
         selection={selected}
@@ -446,4 +450,54 @@ it('creates a local explanation style override from inherited settings', async (
   await act(async () => apply.click());
   expect(current().hotspots[0]?.appearance?.surface?.surfaceCss).toContain('box-shadow');
   expect(project.tour!.style.textAppearance.surface).toBeUndefined();
+});
+
+it('preserves image categories through All and object drill-down without editing the tour', async () => {
+  presentation = 'sections';
+  draw();
+  const before = JSON.stringify(project);
+  expect(host.querySelector('nav')).not.toBeNull();
+  expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
+  await click('Playback');
+  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
+  presentation = 'all';
+  draw();
+  expect(host.querySelector('nav')).toBeNull();
+  expect(host.querySelector('input[aria-label="Step title"]')).not.toBeNull();
+  presentation = 'sections';
+  draw();
+  expect(host.querySelector('button[aria-label="Playback"]')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  expect(JSON.stringify(project)).toBe(before);
+  await click('Slide objects');
+  await click('Hotspot');
+  expect(host.querySelector('nav')).toBeNull();
+  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
+  await click('Back to slide settings');
+  expect(
+    host.querySelector('button[aria-label="Slide objects"]')?.getAttribute('aria-pressed')
+  ).toBe('true');
+});
+
+it('separates document defaults from slide settings and exposes every category', async () => {
+  presentation = 'sections';
+  scope = 'document';
+  draw();
+  expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).toBeNull();
+  await click('Explanations');
+  await fill('Explanation width', '300');
+  expect(project.tour!.style.textAppearance.surface?.width).toBe(300);
+  await click('Playback');
+  expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).not.toBeNull();
+  await click('Transitions');
+  expect(host.querySelector('section[aria-label="Transitions"]')).not.toBeNull();
+  scope = 'selection';
+  selected = { kind: 'slide', slideId: 'nav', objectId: null };
+  draw();
+  await click('Composition');
+  expect(host.querySelector('input[aria-label="Content width"]')).not.toBeNull();
+  selected = { kind: 'end' };
+  draw();
+  expect(host.querySelector('nav')).toBeNull();
 });

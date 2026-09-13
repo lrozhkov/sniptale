@@ -26,6 +26,7 @@ export function TourPlaybackSettings({
         [
           ['autoplay', t('scenario.editor.tourAutoplay')],
           ['loop', t('scenario.editor.tourLoop')],
+          ['autoZoom', t('scenario.editor.tourAutoZoom')],
         ] as const
       ).map(([key, label]) => (
         <label className="guide-number-toggle" key={key}>

@@ -309,10 +309,32 @@ it('lists each affected navigation source before clearing links to a removed sli
 it('offers narration for the exact selected hotspot', async () => {
   await render();
   await click('2Second');
+  await click('Slide objects', host.querySelector('#guide-inspector-panel')!);
   await click('Go first');
   const inspector = host.querySelector('#guide-inspector-panel')!;
   expect(inspector.textContent).toContain('Object narration');
   expect([...inspector.querySelectorAll('button')].some((b) => b.textContent === 'Record')).toBe(
     true
+  );
+});
+
+it('uses the header presentation switch and keeps narration in playback, objects flat', async () => {
+  await render();
+  const panel = () => host.querySelector('#guide-inspector-panel')!;
+  await click('Show all settings', panel());
+  expect(panel().querySelector('nav')).toBeNull();
+  expect(panel().textContent).toContain('Slide narration');
+  await click('Show settings sections', panel());
+  expect(panel().textContent).not.toContain('Slide narration');
+  await click('Playback', panel());
+  expect(panel().textContent).toContain('Slide narration');
+  await click('Slide objects', panel());
+  await click('Hotspot', panel());
+  expect(panel().querySelector('nav')).toBeNull();
+  expect(panel().querySelector('[title="Show all settings"]')).toBeNull();
+  expect(panel().textContent).toContain('Object narration');
+  await click('Back to slide settings', panel());
+  expect(panel().querySelector('[aria-label="Slide objects"]')?.getAttribute('aria-pressed')).toBe(
+    'true'
   );
 });
