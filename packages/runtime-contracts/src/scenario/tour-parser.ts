@@ -1,3 +1,4 @@
+import { tourPaintSchema } from './tour-paint-schema';
 import { z } from 'zod';
 import { isPlainRecord } from '../validation/primitives';
 import { isBoundedScenarioInput } from './input-bounds';
@@ -151,7 +152,20 @@ const navigationSlide = z
     id,
     title: label,
     description: text,
-    background: z.object({ color, image: image.nullable() }).strict(),
+    background: z
+      .object({ color, image: image.nullable(), paint: tourPaintSchema.optional() })
+      .strict(),
+    layout: z
+      .object({
+        width: z.number().finite().min(30).max(100),
+        align: z.enum(['start', 'center', 'end']),
+        vertical: z.enum(['start', 'center', 'end']),
+        padding: z.number().finite().min(0).max(12),
+        gap: z.number().finite().min(0).max(32),
+        columns: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+      })
+      .strict()
+      .optional(),
     buttons: z.array(tourObjectSchemas.button).max(TOUR_LIMITS.maxButtons),
     narration: narration.nullable(),
     timing,

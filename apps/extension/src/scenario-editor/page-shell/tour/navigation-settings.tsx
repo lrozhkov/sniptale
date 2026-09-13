@@ -6,7 +6,9 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { List, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ColorField } from '../../../ui/compact-inspector-controls/controls';
+import { CompactPaintSelector } from '../../../ui/paint-selector';
+import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
+import { TourNavigationLayoutSettings } from './navigation-layout';
 import { TourActionField, TourTextField } from './fields';
 import type { Translate } from '../../../platform/i18n';
 
@@ -80,26 +82,44 @@ export function TourNavigationSettings({
     <>
       <GuideInspectorGroup icon={List} title={t('scenario.editor.tourAddNavigation')}>
         <TourTextField
-          label={t('scenario.editor.guideStepTitle')}
+          label={t('scenario.editor.tourNavigationTitle')}
           singleLine
           value={slide.title}
           disabled={disabled}
           onChange={(title) => onChange({ ...slide, title })}
         />
         <TourTextField
-          label={t('scenario.editor.textLabel')}
+          label={t('scenario.editor.tourPrimaryText')}
           value={slide.description}
           disabled={disabled}
           onChange={(description) => onChange({ ...slide, description })}
         />
-        <ColorField
+        <CompactPaintSelector
           label={t('scenario.editor.tourBackground')}
           title={t('scenario.editor.tourBackground')}
-          value={slide.background.color}
+          value={slide.background.paint ?? createSolidPaint(slide.background.color)}
           disabled={disabled}
-          allowAlpha={false}
-          allowTransparent={false}
-          onChange={(color) => onChange({ ...slide, background: { ...slide.background, color } })}
+          palette={[
+            '#111827',
+            '#f8fafc',
+            '#f97316',
+            '#2563eb',
+            '#16a34a',
+            '#ef4444',
+            '#8b5cf6',
+            '#facc15',
+          ]}
+          recentColors={[slide.background.color]}
+          onChange={(paint) =>
+            onChange({
+              ...slide,
+              background: {
+                ...slide.background,
+                paint,
+                color: getRepresentativeColor(paint).slice(0, 7),
+              },
+            })
+          }
         />
         {slide.background.image && (
           <ProductActionButton
@@ -112,6 +132,7 @@ export function TourNavigationSettings({
           </ProductActionButton>
         )}
       </GuideInspectorGroup>
+      <TourNavigationLayoutSettings slide={slide} disabled={disabled} onChange={onChange} t={t} />
       <TourNavigationButtons
         slide={slide}
         tour={tour}
@@ -158,7 +179,7 @@ function TourNavigationButtons({
   return (
     <GuideInspectorGroup
       icon={List}
-      title={t('scenario.editor.tourObjects')}
+      title={t('scenario.editor.tourContentsLinks')}
       action={
         <ContentToolbarButton
           disabled={disabled || slide.buttons.length >= 120}
@@ -202,7 +223,17 @@ function TourNavigationButtons({
         }
       >
         {t('scenario.editor.tourBuildContents')}
+        {destinations.length > 0 && ` (${destinations.length})`}
       </ProductActionButton>
+      <p className="guide-inspector-hint">
+        {t(
+          destinations.length
+            ? 'scenario.editor.tourContentsHelp'
+            : tour.slides.some((entry) => entry.kind === 'image')
+              ? 'scenario.editor.tourContentsComplete'
+              : 'scenario.editor.tourContentsEmpty'
+        )}
+      </p>
       {slide.buttons.map((entry, index) => (
         <div key={entry.id} className="tour-slide-row">
           <button

@@ -27,7 +27,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   const hintController = createTourHints(root, tour.style.textAppearance, {
     signal,
     keyboardScope: authoring ? root : null,
-    onClose: () => navigationController.closeDetails(),
+    onClose: () => {},
     focusTrigger: (activeIndex) => {
       const trigger =
         scene.querySelectorAll('.tour-hotspot')[activeIndex] ??
@@ -42,7 +42,6 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     media,
     element,
     actionButton,
-    hintController,
     redraw: render,
   });
 
@@ -133,7 +132,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
       current = slide;
       ended = isEnd;
       hintController.reset();
-      navigationController.reset(ended);
+      navigationController.reset();
       render();
       motion?.prepare(
         previous,

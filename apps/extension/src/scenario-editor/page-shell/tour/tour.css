@@ -430,3 +430,32 @@ html[data-tour-reordering] .tour-slide-row .tour-slide-select > span:last-child 
   max-height: 220px;
   overflow-y: auto;
 }
+
+.tour-audio-acquisition {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.tour-layout-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.tour-layout-setting > div {
+  display: flex;
+  gap: 0.25rem;
+}
+.tour-layout-setting button[aria-pressed='true'] {
+  color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-surface-hover);
+}
+
+.tour-layout-setting button {
+  width: 2rem;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0.25rem;
+}

@@ -345,3 +345,33 @@ it('roundtrips narration on all object kinds and rejects conflicting resources o
   };
   expect(parseTourDocument(invalid).status).toBe('invalid');
 });
+
+it('retains bounded navigation composition and structured paint in the published schema', () => {
+  const tour = document();
+  const slide = tour.slides.find((entry) => entry.kind === 'navigation')!;
+  if (slide.kind !== 'navigation') throw new Error('navigation fixture');
+  slide.layout = { width: 60, align: 'end', vertical: 'start', padding: 8, gap: 16, columns: 2 };
+  slide.background.paint = {
+    kind: 'gradient',
+    gradient: {
+      type: 'linear',
+      angle: 45,
+      interpolation: 'srgb',
+      repeat: { enabled: false, span: 1 },
+      stops: [
+        { id: 'one', color: '#111827ff', position: 0, midpoint: 0.5 },
+        { id: 'two', color: '#2563ebff', position: 1, midpoint: 0.5 },
+      ],
+    },
+  };
+  expect(parseTourDocument(tour)).toEqual({ status: 'ok', document: tour });
+  expect(JSON.stringify(z.toJSONSchema(tourDocumentSchema))).toContain('midpoint');
+  const invalid = structuredClone(tour);
+  const candidate = invalid.slides.find((entry) => entry.kind === 'navigation')!;
+  if (candidate.kind !== 'navigation' || !candidate.layout) throw new Error('navigation fixture');
+  candidate.layout.width = 101;
+  expect(parseTourDocument(invalid).status).toBe('invalid');
+  candidate.layout.width = 60;
+  candidate.background.paint = { kind: 'solid', color: 'url(https://example.com)' };
+  expect(parseTourDocument(invalid).status).toBe('invalid');
+});

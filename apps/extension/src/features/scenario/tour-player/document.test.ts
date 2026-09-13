@@ -190,17 +190,21 @@ it('paginates navigation and uses native safe links for authored URLs', async ()
   ];
   const dom = open(await buildTourPlayerHtml(args));
   const document = dom.window.document;
-  expect(document.querySelectorAll('.tour-navigation-buttons a')).toHaveLength(12);
   const link = document.querySelector<HTMLAnchorElement>('.tour-navigation-buttons a')!;
   expect(link.rel).toBe('noopener noreferrer');
   expect(link.target).toBe('_blank');
-  const pager = document.querySelectorAll<HTMLButtonElement>('.tour-navigation-pager button');
-  pager[1]!.click();
-  expect(document.querySelectorAll('.tour-navigation-buttons a')).toHaveLength(1);
-  document.querySelector<HTMLButtonElement>('.tour-details')!.click();
-  expect(document.querySelector('[data-tour-hint-text]')?.textContent).toBe('Details text');
-  document.querySelector<HTMLButtonElement>('[data-tour-hint-close]')!.click();
-  expect(document.querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(true);
+  const visited = new Set<string>();
+  for (let page = 0; page < 20; page += 1) {
+    document
+      .querySelectorAll('.tour-navigation-buttons a')
+      .forEach((node) => visited.add(node.textContent ?? ''));
+    expect(document.querySelector('.tour-navigation-text')?.textContent).toBe('Details text');
+    const next = document.querySelectorAll<HTMLButtonElement>('.tour-navigation-pager button')[1]!;
+    if (next.disabled) break;
+    next.click();
+  }
+  expect(visited.size).toBe(13);
+  expect(document.querySelector('.tour-details')).toBeNull();
   dom.close();
 });
 

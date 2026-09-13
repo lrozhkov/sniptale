@@ -410,3 +410,39 @@ a:focus-visible {
 .tour-motion-hotspot {
   pointer-events: none;
 }
+
+.tour-navigation-content {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+}
+.tour-navigation-content h1 {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: clamp(1rem, 3vw, 2rem);
+}
+.tour-navigation-text {
+  margin: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  font-size: clamp(0.75rem, 1.7vw, 1rem);
+}
+.tour-navigation-content .tour-navigation-buttons .tour-button {
+  min-width: 0;
+  padding: 4px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-navigation-content .tour-navigation-pager {
+  justify-content: center;
+  align-items: center;
+  font-size: 0.75rem;
+}
+.tour-navigation-pager .tour-button {
+  padding: 4px 8px;
+}

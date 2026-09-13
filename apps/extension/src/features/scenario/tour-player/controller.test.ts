@@ -713,3 +713,71 @@ it.each(['loading', 'error'])(
     expect(root.querySelector<HTMLElement>('[data-tour-hint]')!.inert).toBe(true);
   }
 );
+
+it('shows navigation primary text directly in a compact centered composition', async () => {
+  const { player, root } = await mount();
+  const tour = createTourDocument('tour');
+  tour.slides = [
+    {
+      kind: 'navigation',
+      id: 'menu',
+      title: 'Start here',
+      description: 'Choose your next task.',
+      background: { color: '#111827', image: null },
+      buttons: [{ id: 'begin', label: 'Begin', action: { kind: 'end' } }],
+      narration: null,
+      timing: createTourImageSlide('unused').timing,
+    },
+  ];
+  player.update({ tour, labels, assets: [] });
+  expect(root.querySelector('.tour-navigation-text')?.textContent).toBe('Choose your next task.');
+  expect(root.querySelector('.tour-navigation-scene .tour-details')).toBeNull();
+  const content = root.querySelector<HTMLElement>('.tour-navigation-content');
+  expect(content?.style.textAlign).toBe('center');
+  expect(
+    root.querySelector<HTMLElement>('.tour-navigation-buttons')?.style.gridTemplateColumns
+  ).toBe('repeat(1, minmax(0, 1fr))');
+});
+
+it('keeps every navigation link reachable across unequal text page heights', async () => {
+  const { player, root } = await mount();
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      const text = this.querySelector<HTMLElement>('.tour-navigation-text');
+      const textHeight = text?.style.height
+        ? parseFloat(text.style.height)
+        : (text?.textContent?.length ?? 0) > 80
+          ? 96
+          : 20;
+      return new DOMRect(0, 0, 400, this.matches('.tour-navigation-content') ? 40 + textHeight : 0);
+    }
+  );
+  const tour = createTourDocument('tour');
+  tour.slides = [
+    {
+      kind: 'navigation',
+      id: 'menu',
+      title: 'Menu',
+      description: 'A'.repeat(170),
+      background: { color: '#111827', image: null },
+      narration: null,
+      timing: createTourImageSlide('unused').timing,
+      buttons: Array.from({ length: 13 }, (_, index) => ({
+        id: `item-${index}`,
+        label: `Item ${index}`,
+        action: { kind: 'end' },
+      })),
+    },
+  ];
+  player.update({ tour, labels, assets: [] });
+  const visited = new Set<string>();
+  for (let page = 0; page < 20; page += 1) {
+    root
+      .querySelectorAll('.tour-navigation-buttons button')
+      .forEach((node) => visited.add(node.textContent ?? ''));
+    const next = root.querySelectorAll<HTMLButtonElement>('.tour-navigation-pager button')[1];
+    if (!next || next.disabled) break;
+    next.click();
+  }
+  expect(visited.size).toBe(13);
+});

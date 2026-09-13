@@ -184,8 +184,8 @@ it('edits annotations and masks, keeping their geometry bounded and supports del
 it('edits navigation and end screen in independent scopes', async () => {
   selected = { kind: 'slide', slideId: 'nav', objectId: null };
   draw();
-  await fill('Step title', 'Contents');
-  await fill('Text', 'Choose a route');
+  await fill('Title', 'Contents');
+  await fill('Main text', 'Choose a route');
   await click('Add button');
   await fill('Text', 'Start');
   await choose('On click', 'Restart');
@@ -296,7 +296,7 @@ it('exposes global and local text alignment with placement only for callouts', a
 it('builds contents without duplicate destinations and reorders buttons atomically', async () => {
   selected = { kind: 'slide', slideId: 'nav', objectId: null };
   draw();
-  await click('Add contents');
+  await click('Add slide links (1)');
   const navigation = () => {
     const slide = project.tour!.slides[1]!;
     if (slide.kind !== 'navigation') throw new Error('Missing navigation');
@@ -304,7 +304,7 @@ it('builds contents without duplicate destinations and reorders buttons atomical
   };
   expect(navigation().buttons).toHaveLength(1);
   expect(navigation().buttons[0]?.action).toEqual({ kind: 'slide', slideId: 'image' });
-  await click('Add contents');
+  await click('Add slide links');
   expect(navigation().buttons).toHaveLength(1);
   await click('Add button');
   await click('Back to slide settings');
@@ -390,4 +390,25 @@ it('keeps transition settings at document scope and edits their bounded duration
   await choose('Image transition', 'No image animation');
   expect(host.querySelector('[aria-label="Switch, ms"]')).toBeNull();
   expect(project.tour!.transition.kind).toBe('none');
+});
+
+it('edits navigation composition independently from its text and links', async () => {
+  selected = { kind: 'slide', slideId: 'nav', objectId: null };
+  draw();
+  await click('Right');
+  await click('Top');
+  await click('Button columns: 2');
+  await fill('Content width', '75');
+  await fill('Edge padding', '8');
+  await fill('Spacing', '20');
+  const slide = project.tour!.slides[1]!;
+  expect(slide.kind === 'navigation' && slide.layout).toEqual({
+    width: 75,
+    align: 'end',
+    vertical: 'start',
+    padding: 8,
+    gap: 20,
+    columns: 2,
+  });
+  expect(host.querySelector('[aria-label="Main text"]')).not.toBeNull();
 });

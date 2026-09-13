@@ -1,4 +1,5 @@
-function measureHintPages(hintText, fullText) {
+/** Measures bounded text pages for captions and primary navigation copy. */
+export function measureHintPages(hintText, fullText) {
   const characters = globalThis.Intl?.Segmenter
     ? [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(fullText)].map(
         (part) => part.segment

@@ -1,3 +1,4 @@
+import type { Paint } from '@sniptale/foundation/paint';
 import type { GuideImageSource } from './image-source';
 
 /** Interactive scenes have bounded authored content; media bytes belong to persistence. */
@@ -133,12 +134,30 @@ export interface TourNavigationButton {
   label: string;
   action: TourAction;
 }
+/** Authored composition overrides; dimensions are percentages except the reference-pixel gap. */
+export interface TourNavigationLayout {
+  width: number;
+  align: 'start' | 'center' | 'end';
+  vertical: 'start' | 'center' | 'end';
+  padding: number;
+  gap: number;
+  columns: 1 | 2 | 3;
+}
+export const TOUR_NAVIGATION_LAYOUT: TourNavigationLayout = {
+  width: 64,
+  align: 'center',
+  vertical: 'center',
+  padding: 6,
+  gap: 12,
+  columns: 1,
+};
 export interface TourNavigationSlide {
   kind: 'navigation';
   id: string;
   title: string;
   description: string;
-  background: { color: string; image: TourImage | null };
+  background: { color: string; image: TourImage | null; paint?: Paint | undefined };
+  layout?: TourNavigationLayout | undefined;
   buttons: TourNavigationButton[];
   narration: TourNarration | null;
   timing: TourTiming;
