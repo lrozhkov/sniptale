@@ -1,4 +1,14 @@
 export const scenarioTourMessages = {
+  tourImageReviewTitle: {
+    ru: 'Проверить точки после изменения',
+    en: 'Review targets after editing',
+  },
+  tourImageReviewHint: {
+    ru: 'Кадрирование изменило расположение изображения. После применения проверьте точки, подписи и маски на слайде. До проверки экспорт будет недоступен.',
+    en: 'Cropping changed the image geometry. After applying, review hotspots, annotations and masks on this slide. Export remains unavailable until review.',
+  },
+  tourImageKeepEditing: { ru: 'Продолжить редактирование', en: 'Keep editing' },
+  tourImageApplyReview: { ru: 'Применить и проверить', en: 'Apply and review' },
   representation: { ru: 'Представление сценария', en: 'Scenario view' },
   referenceMode: { ru: 'Руководство', en: 'Guide' },
   tourMode: { ru: 'Интерактивный тур', en: 'Interactive tour' },

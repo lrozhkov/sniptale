@@ -15,8 +15,16 @@ let root: Root;
 let host: HTMLDivElement;
 let selection: ReturnType<typeof useTourSelection> | null = null;
 const changed = vi.fn<(project: GuideProject, group?: string | null) => void>();
-function Probe({ project, disabled }: { project: GuideProject; disabled: boolean }) {
-  selection = useTourSelection(project, disabled, changed);
+function Probe({
+  project,
+  disabled,
+  initialSlideId,
+}: {
+  project: GuideProject;
+  disabled: boolean;
+  initialSlideId?: string;
+}) {
+  selection = useTourSelection(project, disabled, changed, initialSlideId);
   return null;
 }
 beforeEach(() => {
@@ -106,5 +114,17 @@ it('returns to slide settings when the selected object is removed', () => {
   expect(state().selection).toEqual({ kind: 'slide', slideId: slide.id, objectId: 'note' });
   render({ ...project, tour: { ...project.tour, slides: [{ ...slide, annotations: [] }] } });
   expect(state().selection).toEqual({ kind: 'slide', slideId: slide.id, objectId: null });
+  expect(changed).not.toHaveBeenCalled();
+});
+
+it('restores the edited slide once and falls back safely if it was removed', () => {
+  const project = createGuideProject('Project');
+  project.tour = createTourDocument();
+  project.tour.slides = [createTourImageSlide('first'), createTourImageSlide('edited')];
+  act(() => root.render(<Probe project={project} disabled={false} initialSlideId="edited" />));
+  expect(state().slide?.id).toBe('edited');
+  act(() => state().select({ kind: 'slide', slideId: 'first', objectId: null }));
+  act(() => root.render(<Probe project={project} disabled={false} initialSlideId="edited" />));
+  expect(state().slide?.id).toBe('first');
   expect(changed).not.toHaveBeenCalled();
 });

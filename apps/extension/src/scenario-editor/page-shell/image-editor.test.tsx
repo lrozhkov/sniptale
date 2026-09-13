@@ -15,7 +15,10 @@ vi.mock('../../workflows/scenario-capture-edit/source', () => ({
 vi.mock('../../platform/navigation/extension-pages', () => ({
   buildScenarioImageEditorUrl: (id: string) => `/editor?embed=scenario&embedSession=${id}`,
 }));
-import { GuideImageEditor } from './image-editor';
+vi.mock('../../workflows/scenario-capture-edit/tour-source', () => ({
+  prepareTourImageEditorPayload: io.prepare,
+}));
+import { GuideImageEditor, TourImageEditor } from './image-editor';
 let root: Root;
 let host: HTMLDivElement;
 const target = {
@@ -182,4 +185,68 @@ it('offers retry if the iframe never initializes and ignores its late response',
   } finally {
     vi.useRealTimers();
   }
+});
+
+async function renderTour() {
+  await act(async () =>
+    root.render(
+      <TourImageEditor
+        project={createGuideProject('Guide', 'guide', 100)}
+        slideId="slide"
+        onApply={io.apply}
+        onClose={io.close}
+        t={createTranslator('en')}
+      />
+    )
+  );
+  await send('scenario-ready');
+}
+it('requires host confirmation for ambiguous tour geometry and retains the same editor on cancellation', async () => {
+  await renderTour();
+  const original = frame().element;
+  io.apply.mockResolvedValueOnce('requires-target-review');
+  await send('scenario-apply', {
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+    allowTargetReview: true,
+  });
+  expect(io.apply).toHaveBeenLastCalledWith({
+    target,
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+    allowTargetReview: false,
+  });
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+  await send('scenario-close');
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  expect(io.apply).toHaveBeenCalledOnce();
+  expect(io.close).not.toHaveBeenCalled();
+  const cancel = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Keep editing'
+  );
+  await act(async () => cancel?.click());
+  expect(frame().element).toBe(original);
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  io.apply.mockResolvedValueOnce('requires-target-review');
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  const confirm = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Apply and review'
+  );
+  await act(async () => confirm?.click());
+  expect(io.apply).toHaveBeenLastCalledWith({
+    target,
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+    allowTargetReview: true,
+  });
+  expect(io.close).toHaveBeenCalledOnce();
+});
+it('disposes a pending tour review when leaving the image session', async () => {
+  await renderTour();
+  io.apply.mockResolvedValueOnce('requires-target-review');
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  await act(async () => root.render(null));
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(io.close).not.toHaveBeenCalled();
+  expect(io.apply).toHaveBeenCalledOnce();
 });

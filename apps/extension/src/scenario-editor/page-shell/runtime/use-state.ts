@@ -21,6 +21,7 @@ import { useGuideAutosave } from './autosave';
 import { useGuideResourceSession } from './resource-session';
 
 import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
+import { applyTourImageEdit } from '../../../workflows/scenario-capture-edit/tour-edits';
 
 type GuidePageStatus =
   | 'loading'
@@ -49,6 +50,11 @@ type GuideCommitCommand =
       kind: 'edit';
       input: Omit<Parameters<typeof applyScenarioImageEdit>[0], 'project' | 'baseUpdatedAt'>;
     };
+
+type TourImageEditCommand = {
+  kind: 'tour-edit';
+  input: Omit<Parameters<typeof applyTourImageEdit>[0], 'project' | 'baseUpdatedAt'>;
+};
 
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
@@ -157,19 +163,16 @@ export function useGuidePageState() {
       () => rejectAction('delete')
     );
   };
-  const commitChange = async (command: GuideCommitCommand) => {
-    const base = saved.current;
-    if (!project || !base || status === 'conflict') return false;
-    return mutate(
-      () => runGuideCommitCommand(command, project, base.updatedAt),
-      (result) => acceptProject(result, true),
-      (error) => {
-        if (isRevisionConflict(error)) setStatus('conflict');
-        else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
-        else rejectAction(command.kind);
-      }
-    );
-  };
+  const commitChange = createGuideCommitDispatcher({
+    project,
+    saved,
+    status,
+    mutate,
+    setStatus,
+    acceptProject,
+    rejectAction,
+  });
+
   return {
     commitChange,
     saveTemplate,
@@ -310,4 +313,53 @@ function createGuideMutationRunner({
       busy.current = false;
     }
   };
+}
+
+/** Adapts committed workflow outcomes to the page's existing revision/history admission. */
+function createGuideCommitDispatcher({
+  project,
+  saved,
+  status,
+  mutate,
+  setStatus,
+  acceptProject,
+  rejectAction,
+}: {
+  project: GuideProject | null;
+  saved: { current: GuideProject | null };
+  status: GuidePageStatus;
+  mutate: ReturnType<typeof createGuideMutationRunner>;
+  setStatus: (status: GuidePageStatus) => void;
+  acceptProject: (project: GuideProject, addHistory: boolean) => void;
+  rejectAction: (kind: Exclude<GuideActionError, 'structure'>) => void;
+}) {
+  function commitChange(command: TourImageEditCommand): Promise<boolean | 'requires-target-review'>;
+  function commitChange(command: GuideCommitCommand): Promise<boolean>;
+  async function commitChange(command: GuideCommitCommand | TourImageEditCommand) {
+    const base = saved.current;
+    if (!project || !base || status === 'conflict') return false;
+    let targetReview = false;
+    const accepted = await mutate<GuideProject | Awaited<ReturnType<typeof applyTourImageEdit>>>(
+      () =>
+        command.kind === 'tour-edit'
+          ? applyTourImageEdit({ ...command.input, project, baseUpdatedAt: base.updatedAt })
+          : runGuideCommitCommand(command, project, base.updatedAt),
+      (result) => {
+        if ('status' in result) {
+          if (result.status === 'requires-target-review') {
+            targetReview = true;
+            setStatus(status);
+          } else acceptProject(result.project, true);
+        } else acceptProject(result, true);
+      },
+      (error) => {
+        if (isRevisionConflict(error)) setStatus('conflict');
+        else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
+        else rejectAction(command.kind === 'tour-edit' ? 'edit' : command.kind);
+      }
+    );
+    return targetReview ? 'requires-target-review' : accepted;
+  }
+
+  return commitChange;
 }

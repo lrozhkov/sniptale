@@ -1,23 +1,45 @@
+import {
+  ProductModal,
+  ProductModalHeader,
+  ProductModalBody,
+  ProductModalFooter,
+} from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
-  createScenarioEditorEmbedInitMessage,
-  isEditorEmbedMessage,
-} from '../../features/editor/contracts/embed';
+  connectScenarioImageEditor,
+  type ImageEditorPhase,
+  type ImageEditorApplyInput,
+  type ImageEditorApplyResult,
+} from './image-editor-session';
+import { prepareTourImageEditorPayload } from '../../workflows/scenario-capture-edit/tour-source';
+import type { applyTourImageEdit } from '../../workflows/scenario-capture-edit/tour-edits';
+import type { EditorBootstrapPayload } from '../../features/editor/contracts/bootstrap';
 import { buildScenarioImageEditorUrl } from '../../platform/navigation/extension-pages';
 import { prepareScenarioImageEditorPayload } from '../../workflows/scenario-capture-edit/source';
 import type { applyScenarioImageEdit } from '../../workflows/scenario-capture-edit/edits';
 import type { Translate } from '../../platform/i18n';
 
 type EditInput = Omit<Parameters<typeof applyScenarioImageEdit>[0], 'project' | 'baseUpdatedAt'>;
-type ImageEditorPhase = 'loading' | 'ready' | 'load-failed' | 'applying' | 'apply-failed';
-type Prepared = Awaited<ReturnType<typeof prepareScenarioImageEditorPayload>>;
+type TourEditInput = Omit<Parameters<typeof applyTourImageEdit>[0], 'project' | 'baseUpdatedAt'>;
 
 /** Owns entering/leaving image mode and returning focus after the new image URL becomes available. */
 export function useGuideImageEditorMode(images: Record<string, string | null>) {
   const [selection, setSelection] = useState<{ itemId: string; blockId: string } | null>(null);
   const returnBlock = useRef<string | null>(null);
+  const [tourSlideId, setTourSlideId] = useState<string | null>(null);
+  const [returnSlideId, setReturnSlideId] = useState<string | null>(null);
+  const returnTourFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (tourSlideId || !returnTourFocus.current) return;
+    const button = [...document.querySelectorAll<HTMLButtonElement>('[data-tour-edit-image]')].find(
+      (entry) => entry.dataset['tourEditImage'] === returnSlideId
+    );
+    if (!button || button.disabled) return;
+    button.focus({ preventScroll: true });
+    returnTourFocus.current = false;
+  }, [tourSlideId, returnSlideId, images]);
   useLayoutEffect(() => {
     if (selection || !returnBlock.current) return;
     const block = [...document.querySelectorAll<HTMLElement>('[data-block-id]')].find(
@@ -30,6 +52,14 @@ export function useGuideImageEditorMode(images: Record<string, string | null>) {
   }, [selection, images]);
   return {
     selection,
+    tourSlideId,
+    returnSlideId,
+    openTour: (slideId: string) => setTourSlideId(slideId),
+    closeTour: () => {
+      setReturnSlideId(tourSlideId);
+      returnTourFocus.current = true;
+      setTourSlideId(null);
+    },
     open: (itemId: string, blockId: string) => setSelection({ itemId, blockId }),
     close: () => {
       returnBlock.current = selection?.blockId ?? null;
@@ -38,7 +68,7 @@ export function useGuideImageEditorMode(images: Record<string, string | null>) {
   };
 }
 
-/** Owns one disposable iframe session bound to its source window, origin, and image identity. */
+/** Both representations use the same source-window/session admission and Apply lifecycle. */
 export function GuideImageEditor({
   project,
   itemId,
@@ -54,19 +84,68 @@ export function GuideImageEditor({
   onClose: () => void;
   t: Translate;
 }) {
+  return (
+    <ScenarioImageEditor
+      prepare={() => prepareScenarioImageEditorPayload(project, itemId, blockId)}
+      onApply={({ target, dataUrl, document }) => onApply({ target, dataUrl, document })}
+      onClose={onClose}
+      t={t}
+    />
+  );
+}
+
+export function TourImageEditor({
+  project,
+  slideId,
+  onApply,
+  onClose,
+  t,
+}: {
+  project: GuideProject;
+  slideId: string;
+  onApply: (input: TourEditInput) => Promise<ImageEditorApplyResult>;
+  onClose: () => void;
+  t: Translate;
+}) {
+  return (
+    <ScenarioImageEditor
+      prepare={() => prepareTourImageEditorPayload(project, slideId)}
+      onApply={onApply}
+      onClose={onClose}
+      t={t}
+    />
+  );
+}
+
+/** Owns preparation/retry and presentation; the disposable controller owns message admission. */
+function ScenarioImageEditor<Target>({
+  prepare,
+  onApply,
+  onClose,
+  t,
+}: {
+  prepare: () => Promise<{ target: Target; payload: EditorBootstrapPayload }>;
+  onApply: (input: ImageEditorApplyInput<Target>) => Promise<ImageEditorApplyResult>;
+  onClose: () => void;
+  t: Translate;
+}) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const [attempt, setAttempt] = useState(0);
-  const [session, setSession] = useState<{ id: string; prepared: Prepared } | null>(null);
+  const [session, setSession] = useState<{
+    id: string;
+    prepared: Awaited<ReturnType<typeof prepare>>;
+  } | null>(null);
   const [phase, setPhase] = useState<ImageEditorPhase>('loading');
   const callbacks = useRef({ onApply, onClose });
   callbacks.current = { onApply, onClose };
-  const source = useRef({ project, itemId, blockId });
+  const source = useRef(prepare);
+  const connection = useRef<ReturnType<typeof connectScenarioImageEditor<Target>> | null>(null);
   useEffect(() => {
     let active = true;
     setSession(null);
     setPhase('loading');
-    const input = source.current;
-    void prepareScenarioImageEditorPayload(input.project, input.itemId, input.blockId)
+    void source
+      .current()
       .then((prepared) => {
         if (active) setSession({ id: crypto.randomUUID(), prepared });
       })
@@ -78,88 +157,64 @@ export function GuideImageEditor({
     };
   }, [attempt]);
   useEffect(() => {
-    if (!session) return;
-    let active = true;
-    let initialized = false;
-    let applying = false;
-    let failed = false;
-    const timeout = window.setTimeout(() => {
-      if (!initialized) {
-        failed = true;
-        setPhase('load-failed');
-      }
-    }, 15_000);
-    const receive = (event: MessageEvent<unknown>) => {
-      const child = iframe.current?.contentWindow;
-      if (
-        !active ||
-        !child ||
-        event.source !== child ||
-        event.origin !== window.location.origin ||
-        !isEditorEmbedMessage(event.data) ||
-        event.data.sessionId !== session.id
-      )
-        return;
-      const message = event.data;
-      if (message.type === 'scenario-ready' && !initialized && !failed) {
-        initialized = true;
-        window.clearTimeout(timeout);
-        child.postMessage(
-          createScenarioEditorEmbedInitMessage(session.id, session.prepared.payload),
-          window.location.origin
-        );
-        setPhase('ready');
-      } else if (message.type === 'scenario-error') {
-        failed = true;
-        setPhase('load-failed');
-      } else if (message.type === 'scenario-close' && !applying) callbacks.current.onClose();
-      else if (message.type === 'scenario-apply' && initialized && !applying && !failed) {
-        applying = true;
-        setPhase('applying');
-        void callbacks.current
-          .onApply({
-            target: session.prepared.target,
-            dataUrl: message.dataUrl,
-            document: message.document,
-          })
-          .then((accepted) => {
-            if (!active) return;
-            if (accepted) callbacks.current.onClose();
-            else {
-              applying = false;
-              setPhase('apply-failed');
-            }
-          })
-          .catch(() => {
-            if (active) {
-              applying = false;
-              setPhase('apply-failed');
-            }
-          });
-      }
-    };
-    window.addEventListener('message', receive);
+    if (!session || !iframe.current) return;
+    const controller = connectScenarioImageEditor({
+      frame: iframe.current,
+      session,
+      callbacks,
+      onPhase: setPhase,
+    });
+    connection.current = controller;
     return () => {
-      active = false;
-      window.clearTimeout(timeout);
-      window.removeEventListener('message', receive);
+      controller.dispose();
+      connection.current = null;
     };
   }, [session]);
   return (
     <main className="guide-page guide-image-editor">
-      <GuideImageEditorFeedback
-        phase={phase}
-        t={t}
-        onClose={onClose}
-        onRetry={() => setAttempt((current) => current + 1)}
-      />
+      {phase === 'review' ? (
+        <ProductModal
+          role="alertdialog"
+          onClose={() => connection.current?.cancelReview()}
+          maxWidth={480}
+        >
+          <ProductModalHeader title={t('scenario.editor.tourImageReviewTitle')} />
+          <ProductModalBody>
+            <p>{t('scenario.editor.tourImageReviewHint')}</p>
+          </ProductModalBody>
+          <ProductModalFooter>
+            <ProductActionButton
+              compact
+              tone="secondary"
+              autoFocus
+              onClick={() => connection.current?.cancelReview()}
+            >
+              {t('scenario.editor.tourImageKeepEditing')}
+            </ProductActionButton>
+            <ProductActionButton
+              compact
+              tone="primary"
+              onClick={() => connection.current?.confirmReview()}
+            >
+              {t('scenario.editor.tourImageApplyReview')}
+            </ProductActionButton>
+          </ProductModalFooter>
+        </ProductModal>
+      ) : (
+        <GuideImageEditorFeedback
+          phase={phase}
+          t={t}
+          onClose={onClose}
+          onRetry={() => setAttempt((current) => current + 1)}
+        />
+      )}
       {session && (
         <iframe
           ref={iframe}
           key={session.id}
           title={t('scenario.editor.guideEditImage')}
           src={buildScenarioImageEditorUrl(session.id)}
-          inert={phase === 'applying' || phase === 'load-failed'}
+          inert={phase === 'applying' || phase === 'load-failed' || phase === 'review'}
         />
       )}
     </main>

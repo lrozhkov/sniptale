@@ -20,6 +20,8 @@ import type { Translate } from '../../../platform/i18n';
 import './tour.css';
 
 type TourWorkspaceProps = {
+  initialSlideId?: string | null;
+  onEditImage?: (slideId: string) => void;
   project: GuideProject;
   images: Record<string, string | null>;
   panels: ReturnType<typeof useGuidePanels>;
@@ -35,7 +37,7 @@ type TourWorkspaceProps = {
 /** Tour editing uses the page's existing buffer, resource drawer and panel frame. */
 export function TourWorkspace(props: TourWorkspaceProps) {
   const { project, panels, disabled, t, onChange, onImport } = props;
-  const state = useTourSelection(project, disabled, onChange);
+  const state = useTourSelection(project, disabled, onChange, props.initialSlideId);
   const [generating, setGenerating] = useState(false);
   const selectSlide = (slideId: string) => {
     state.select({ kind: 'slide', slideId, objectId: null });
@@ -102,6 +104,8 @@ function TourSettingsPanel({
   disabled,
   t,
   onImport,
+  onEditImage,
+  images,
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
@@ -111,6 +115,8 @@ function TourSettingsPanel({
         slideId: state.slide.id,
       }
     : null;
+  const selectedImage =
+    state.slide?.kind === 'image' ? state.slide.image : state.slide?.background.image;
   const inspectorTitle =
     panels.rightScope === 'document'
       ? t('scenario.editor.tourSettings')
@@ -156,6 +162,19 @@ function TourSettingsPanel({
         state.selection?.kind === 'slide' &&
         !state.selection.objectId && (
           <footer className="guide-resource-footer">
+            {selectedImage && onEditImage && (
+              <ProductActionButton
+                compact
+                tone="secondary"
+                data-tour-edit-image={state.slide?.id}
+                disabled={disabled || !images[selectedImage.assetId]}
+                onClick={() => {
+                  if (state.slide) onEditImage(state.slide.id);
+                }}
+              >
+                {t('scenario.editor.guideEditImage')}
+              </ProductActionButton>
+            )}
             <GuideImageUpload
               compact
               placement={imageDestination}

@@ -17,12 +17,20 @@ export type TourSelection =
 export function useTourSelection(
   project: GuideProject,
   disabled: boolean,
-  onChange: (project: GuideProject, group?: string | null) => void
+  onChange: (project: GuideProject, group?: string | null) => void,
+  initialSlideId?: string | null
 ) {
   const [requested, setRequested] = useState<{
     projectId: string;
     selection: TourSelection;
-  } | null>(null);
+  } | null>(() =>
+    initialSlideId
+      ? {
+          projectId: project.id,
+          selection: { kind: 'slide', slideId: initialSlideId, objectId: null },
+        }
+      : null
+  );
   const [failed, setFailed] = useState(false);
   const tour = project.tour;
   const remembered = requested?.projectId === project.id ? requested.selection : null;

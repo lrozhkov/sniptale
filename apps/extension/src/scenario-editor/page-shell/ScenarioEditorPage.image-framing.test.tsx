@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createTourDocument, createTourImageSlide } from '../../features/scenario/project/public';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -19,6 +20,29 @@ const io = vi.hoisted(() => ({
   importImages: vi.fn(),
   select: vi.fn(),
   mount: vi.fn(),
+  tourEdit: vi.fn(),
+}));
+vi.mock('../../workflows/scenario-capture-edit/tour-edits', () => ({
+  applyTourImageEdit: io.tourEdit,
+}));
+vi.mock('./image-editor', async (original) => ({
+  ...(await original<typeof import('./image-editor')>()),
+  TourImageEditor: ({
+    slideId,
+    onApply,
+    onClose,
+  }: {
+    slideId: string;
+    onApply: (input: unknown) => Promise<unknown>;
+    onClose: () => void;
+  }) => (
+    <button
+      data-embedded-slide={slideId}
+      onClick={() => void onApply({ target: { slideId } }).then(onClose)}
+    >
+      Apply tour image
+    </button>
+  ),
 }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
@@ -212,4 +236,52 @@ it('selects text and note settings from focus, preserves edits and returns to st
   await click('Undo');
   expect(container.querySelector('[data-block-id="text"]')).not.toBeNull();
   expect(inspector.textContent).toContain('Step layout');
+});
+
+it('opens the selected tour image and restores its selection and focus after Apply', async () => {
+  const project = createGuideProject('Tour', 'guide', 100);
+  const first = createTourImageSlide('first');
+  const second = createTourImageSlide('second');
+  second.image = {
+    assetId: 'image',
+    width: 100,
+    height: 100,
+    alt: '',
+    galleryAssetId: null,
+    editDocumentId: null,
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  project.tour = { ...createTourDocument(), slides: [first, second] };
+  io.load.mockResolvedValue(project);
+  io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  io.tourEdit.mockResolvedValue({ status: 'applied', project: { ...project, updatedAt: 101 } });
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:guide-image');
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  await render();
+  await click('Scenario view');
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (node) => node.textContent === 'Interactive tour'
+  );
+  await act(async () => option?.click());
+  await act(async () =>
+    container.querySelectorAll<HTMLButtonElement>('.tour-slide-select')[1]?.click()
+  );
+  const trigger = container.querySelector<HTMLButtonElement>('[data-tour-edit-image]');
+  expect(trigger?.disabled).toBe(false);
+  await act(async () => trigger?.click());
+  expect(
+    container.querySelector('[data-embedded-slide]')?.getAttribute('data-embedded-slide')
+  ).toBe('second');
+  await click('Apply tour image');
+  expect(io.tourEdit).toHaveBeenCalledWith(
+    expect.objectContaining({ target: { slideId: 'second' }, baseUpdatedAt: 100 })
+  );
+  const returned = container.querySelector<HTMLButtonElement>('[data-tour-edit-image]');
+  expect(returned?.dataset['tourEditImage']).toBe('second');
+  expect(document.activeElement).toBe(returned);
 });

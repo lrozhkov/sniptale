@@ -20,7 +20,7 @@ import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
-import { GuideImageEditor, useGuideImageEditorMode } from './image-editor';
+import { GuideImageEditor, TourImageEditor, useGuideImageEditorMode } from './image-editor';
 import { GuideDocument, type GuideFocusRequest } from './guide-document';
 import { GuideWorkspace, GuidePanelControls } from './workspace';
 import { useGuidePanels } from './panel-layout';
@@ -49,6 +49,16 @@ export function ScenarioEditorPage() {
       t={t}
     />
   );
+  if (imageEditor.tourSlideId && project)
+    return (
+      <TourImageEditor
+        project={project}
+        slideId={imageEditor.tourSlideId}
+        t={t}
+        onApply={(input) => state.commitChange({ kind: 'tour-edit', input })}
+        onClose={imageEditor.closeTour}
+      />
+    );
   if (imageEditor.selection && project)
     return (
       <GuideImageEditor
@@ -105,6 +115,11 @@ export function ScenarioEditorPage() {
           disabled={importDisabled}
           onChange={state.update}
           onImport={imports.resources}
+          initialSlideId={imageEditor.returnSlideId}
+          onEditImage={(slideId) => {
+            state.sealEdit();
+            imageEditor.openTour(slideId);
+          }}
           t={t}
         />
       )}
