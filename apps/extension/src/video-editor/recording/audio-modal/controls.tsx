@@ -5,7 +5,7 @@ import { Mic, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
-import type { AudioRecordingStatus } from './shared';
+import type { AudioRecordingStatus } from '../../../composition/audio-recording/session-types';
 
 export function RecordingActionButton(props: {
   disabled?: boolean;

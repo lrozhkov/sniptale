@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
-import { createTrimmedRecordingFile } from './trim-file';
+import { createTrimmedRecordingFile } from '../../../composition/audio-recording/trim-file';
 import type { AudioRecordingModalProps } from './shared';
 import { usePlaybackSpaceShortcut } from '../../../composition/library-preview/shortcuts';
-import { useAudioRecordingSession } from './session';
-export type { AudioRecordingControllerState } from './session-types';
+import { useAudioRecordingSession } from '../../../composition/audio-recording/session';
+export type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
 
 export function useAudioRecordingController(
   isOpen: boolean,
@@ -12,7 +12,17 @@ export function useAudioRecordingController(
   deviceId = '',
   timeline?: AudioRecordingModalProps['timeline']
 ) {
-  const controller = useAudioRecordingSession(isOpen, deviceId, timeline);
+  const controller = useAudioRecordingSession(
+    isOpen,
+    {
+      noSupport: translate('videoEditor.app.recordAudioNoSupport'),
+      permissionDenied: translate('videoEditor.app.recordAudioPermissionDenied'),
+      startFailed: translate('videoEditor.app.recordAudioStartFailed'),
+      playFailed: translate('videoEditor.app.sourcePlayFailed'),
+    },
+    deviceId,
+    timeline
+  );
   usePlaybackSpaceShortcut(() => {
     if (playbackDisabled || !controller.trim) return;
     if (controller.trim.audioRef.current?.paused === false) controller.trim.pauseSelection();

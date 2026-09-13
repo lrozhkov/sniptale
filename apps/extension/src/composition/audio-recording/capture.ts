@@ -1,4 +1,3 @@
-import { translate } from '../../../platform/i18n';
 import type {
   AudioRecordingRefs,
   AudioRecordingState,
@@ -127,12 +126,6 @@ export async function beginRecordingSession(args: RecordingSessionArgs) {
     if (sessionId !== args.refs.sessionRef.current) return;
     args.timeline?.onStop();
     args.resetSession();
-    args.state.setError(
-      translate(
-        microphoneReady
-          ? 'videoEditor.app.recordAudioStartFailed'
-          : 'videoEditor.app.recordAudioPermissionDenied'
-      )
-    );
+    args.state.setError(microphoneReady ? args.errors.startFailed : args.errors.permissionDenied);
   }
 }

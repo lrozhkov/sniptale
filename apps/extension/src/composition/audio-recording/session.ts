@@ -1,10 +1,11 @@
-import type { AudioRecordingModalProps } from './shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { translate } from '../../../platform/i18n';
 import { beginRecordingSession } from './capture';
-import { formatDurationLabel, resolveRecordingMimeType, type AudioRecordingStatus } from './shared';
+import { formatDurationLabel, resolveRecordingMimeType } from './format';
 import type {
   AudioRecordingControllerState,
+  AudioRecordingStatus,
+  AudioRecordingTimeline,
+  AudioRecordingErrors,
   AudioRecordingRefs,
   AudioRecordingState,
 } from './session-types';
@@ -152,7 +153,7 @@ function useRecordingLifecycle(
   useTrimPlaybackLifecycle(state);
 }
 
-function useRecordingPlaybackControls(state: AudioRecordingState) {
+function useRecordingPlaybackControls(state: AudioRecordingState, errors: AudioRecordingErrors) {
   const playSelection = useCallback(async () => {
     const audio = state.audioRef.current;
     if (!audio || !state.audioUrl) {
@@ -166,10 +167,9 @@ function useRecordingPlaybackControls(state: AudioRecordingState) {
       await audio.play();
       if (state.audioRef.current === audio) state.setIsPlayingSelection(!audio.paused);
     } catch {
-      if (state.audioRef.current === audio)
-        state.setError(translate('videoEditor.app.sourcePlayFailed'));
+      if (state.audioRef.current === audio) state.setError(errors.playFailed);
     }
-  }, [state]);
+  }, [state, errors.playFailed]);
 
   const pauseSelection = useCallback(() => {
     state.audioRef.current?.pause();
@@ -198,7 +198,8 @@ function useRecordingCaptureControls(
   refs: AudioRecordingRefs,
   resetSession: () => void,
   deviceId: string,
-  timeline?: AudioRecordingModalProps['timeline']
+  errors: AudioRecordingErrors,
+  timeline?: AudioRecordingTimeline
 ) {
   const clearTimer = useCallback(() => clearRecordingTimer(refs.timerRef), [refs.timerRef]);
   const stopStream = useCallback(() => stopRecordingStream(refs.streamRef), [refs.streamRef]);
@@ -206,13 +207,14 @@ function useRecordingCaptureControls(
   const startRecording = useCallback(async () => {
     const mimeType = resolveRecordingMimeType();
     if (mimeType === null) {
-      state.setError(translate('videoEditor.app.recordAudioNoSupport'));
+      state.setError(errors.noSupport);
       return;
     }
 
     resetSession();
     await beginRecordingSession({
       deviceId,
+      errors,
       timeline,
       clearTimer,
       mimeType,
@@ -221,7 +223,7 @@ function useRecordingCaptureControls(
       state,
       stopStream,
     });
-  }, [clearTimer, refs, resetSession, state, stopStream, deviceId, timeline]);
+  }, [clearTimer, refs, resetSession, state, stopStream, deviceId, errors, timeline]);
 
   const stopRecording = useCallback(() => {
     const recorder = refs.mediaRecorderRef.current;
@@ -237,20 +239,22 @@ function useRecordingCaptureControls(
 
 export function useAudioRecordingSession(
   isOpen: boolean,
+  errors: AudioRecordingErrors,
   deviceId = '',
-  timeline?: AudioRecordingModalProps['timeline']
+  timeline?: AudioRecordingTimeline
 ): AudioRecordingControllerState {
   const state = useAudioRecordingState();
   const refs = useAudioRecordingRefs();
   const resetSession = useRecordingReset(state, refs);
   useRecordingLifecycle(isOpen, resetSession, state);
-  const playbackControls = useRecordingPlaybackControls(state);
+  const playbackControls = useRecordingPlaybackControls(state, errors);
   const rangeControls = createRecordingRangeControls(state, timeline?.duration);
   const captureControls = useRecordingCaptureControls(
     state,
     refs,
     resetSession,
     deviceId,
+    errors,
     timeline
   );
   const recordedDuration = Math.max(0, state.recordedDuration || state.durationSeconds);

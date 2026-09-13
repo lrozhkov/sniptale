@@ -38,6 +38,7 @@ The catalog owns control membership, order, scope, engine decision, normalized r
 This inventory is projected from the live source tree. It is navigation data, not an allowlist or path gate.
 
 - `apps/extension/src/composition/archive-transfer`
+- `apps/extension/src/composition/audio-recording`
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
 - `apps/extension/src/composition/gradient-preset-resources`

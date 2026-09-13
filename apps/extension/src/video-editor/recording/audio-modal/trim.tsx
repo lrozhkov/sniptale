@@ -6,7 +6,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
 import { useRecordedAudioPeaks } from './waveform';
 import { formatPreciseTime } from '../../contracts/time-format';
-import type { AudioRecordingTrimController } from './session-types';
+import type { AudioRecordingTrimController } from '../../../composition/audio-recording/session-types';
 
 function AudioRecordingTrimPanel(
   props: AudioRecordingTrimController & {

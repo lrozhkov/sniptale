@@ -2,11 +2,13 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { AudioRecordingControllerState } from './session-types';
+import type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
 import { useAudioRecordingController } from './controller';
 
 const session = vi.hoisted(() => vi.fn());
-vi.mock('./session', () => ({ useAudioRecordingSession: session }));
+vi.mock('../../../composition/audio-recording/session', () => ({
+  useAudioRecordingSession: session,
+}));
 
 it('pauses native playback before playing state is published, blocks busy playback, and releases Space', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

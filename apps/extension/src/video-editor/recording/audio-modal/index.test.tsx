@@ -5,14 +5,14 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { AudioRecordingModal } from './index';
 import { TimelineRecordingPanel } from './timeline-panel';
 
-vi.mock('./trim-file', () => ({
+vi.mock('../../../composition/audio-recording/trim-file', () => ({
   createTrimmedRecordingFile: vi.fn(
     async () => new File(['audio'], 'take.wav', { type: 'audio/wav' })
   ),
 }));
 
 const controller = vi.hoisted(() => ({ reset: vi.fn() }));
-vi.mock('./session', () => ({
+vi.mock('../../../composition/audio-recording/session', () => ({
   useAudioRecordingSession: () => {
     return {
       transport: {
