@@ -28,6 +28,8 @@ export function renderTourImage(
   }
   const imageBox = camera.resolve(slide, { stageWidth, stageHeight }, autoZoom);
   if (!imageBox) return null;
+  const plane = element('div', 'tour-image-plane');
+  scene.append(plane);
   const image = element('img', 'tour-image');
   image.src = media.get(slide.image.assetId);
   image.alt = slide.image.alt;
@@ -37,7 +39,7 @@ export function renderTourImage(
     width: `${imageBox.width}px`,
     height: `${imageBox.height}px`,
   });
-  scene.append(image);
+  plane.append(image);
   for (const mask of slide.masks) {
     const box = element(authoring ? 'button' : 'div', `tour-mask tour-mask-${mask.kind}`);
     const position = projectImagePoint(imageBox, mask.rect);
@@ -63,7 +65,7 @@ export function renderTourImage(
         signal
       );
     }
-    scene.append(box);
+    plane.append(box);
   }
   slide.hotspots.forEach((hotspot, number) => {
     const button = actionButton(

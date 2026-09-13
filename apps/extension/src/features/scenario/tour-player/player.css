@@ -336,6 +336,7 @@ a:focus-visible {
 }
 
 .tour-transport {
+  position: relative;
   flex-wrap: wrap;
 }
 .tour-playback {
@@ -370,9 +371,21 @@ a:focus-visible {
   outline-offset: 2px;
 }
 .tour-playback-status {
-  grid-column: 1 / -1;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 8px;
+  right: 8px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin-inline: auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--tour-surface);
+  box-shadow: 0 2px 12px #0004;
   font-size: 0.8rem;
   overflow-wrap: anywhere;
+  pointer-events: none;
+  z-index: 4;
 }
 @media (max-width: 480px) {
   .tour-playback {
@@ -386,4 +399,14 @@ a:focus-visible {
     grid-column: 1 / -1;
     grid-row: 2;
   }
+}
+
+.tour-image-plane {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+.tour-motion-previous,
+.tour-motion-hotspot {
+  pointer-events: none;
 }

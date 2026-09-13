@@ -21,7 +21,7 @@ export function createTourPlayer(root, input, options = {}) {
   const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
   const playback = options.authoring
     ? null
-    : createTourPlayback(root, input, lifetime.signal, (target, restart = false) => {
+    : createTourPlayback(root, input, lifetime.signal, view.motion, (target, restart = false) => {
         if (restart) history.length = 0;
         go(target, !restart);
       });
@@ -99,8 +99,8 @@ export function createTourPlayer(root, input, options = {}) {
   const observer = globalThis.ResizeObserver ? new globalThis.ResizeObserver(view.resize) : null;
   if (observer) observer.observe(viewport);
   else globalThis.addEventListener('resize', view.resize, { signal: lifetime.signal });
-  render();
   view.resize();
+  render();
   return {
     update(nextInput) {
       if (lifetime.signal.aborted) return;
@@ -113,8 +113,8 @@ export function createTourPlayer(root, input, options = {}) {
       );
       if (!tour.endScreen.enabled) ended = false;
       view.update(nextInput);
-      render();
       view.resize();
+      render();
     },
     selectObject: view.selectObject,
     selectEnd() {

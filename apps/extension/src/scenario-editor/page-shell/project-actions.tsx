@@ -42,10 +42,10 @@ export function GuideProjectActions({
       <GuideActionMenu
         label={t('scenario.editor.projectLabel')}
         icon={<MoreHorizontal size={16} aria-hidden="true" />}
-        disabled={disabled}
         items={[
           {
             label: t('scenario.editor.guideDuplicate'),
+            disabled,
             icon: <Copy size={15} aria-hidden="true" />,
             onSelect: copy,
           },
@@ -58,6 +58,7 @@ export function GuideProjectActions({
             ? [
                 {
                   label: t('scenario.editor.guideReload'),
+                  disabled,
                   icon: <FolderOpen size={15} aria-hidden="true" />,
                   onSelect: () => {
                     if (hasUnsavedChanges) setConfirmation('reload');
@@ -68,6 +69,7 @@ export function GuideProjectActions({
             : []),
           {
             label: t('scenario.editor.guideDelete'),
+            disabled,
             icon: <Trash2 size={15} aria-hidden="true" />,
             danger: true,
             onSelect: () => setConfirmation('delete'),

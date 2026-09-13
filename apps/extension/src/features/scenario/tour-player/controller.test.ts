@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
 import { buildTourPlayerHtml } from './document';
 import { createTourPlayer } from './controller';
@@ -23,6 +23,9 @@ const labels = {
   choose: 'Choose a destination',
 };
 const mounted: { player: ReturnType<typeof createTourPlayer>; root: HTMLElement }[] = [];
+beforeEach(() => {
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+});
 afterEach(() => {
   mounted.splice(0).forEach(({ player, root }) => {
     player.dispose();
@@ -339,6 +342,7 @@ function playbackFrames() {
 }
 function shortTour() {
   const tour = createTourDocument('timed');
+  tour.transition = { kind: 'none', durationMs: 0, hotspotTravelMs: 0 };
   tour.slides = ['first', 'second', 'third'].map((id) => {
     const slide = createTourImageSlide(id);
     slide.timing = { ...slide.timing, mode: 'manual', holdSeconds: 0.1 };
@@ -452,6 +456,10 @@ it('gates playback on decoded current media, ignores stale loads and permits ret
   if (first.kind !== 'image') throw new Error('Expected image');
   first.hotspots[0]!.action = { kind: 'next' };
   player.update(input);
+  const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
+  Object.defineProperty(viewport, 'clientWidth', { value: 500, configurable: true });
+  window.dispatchEvent(new Event('resize'));
+  expect(root.querySelector<HTMLElement>('[data-tour-scene]')!.inert).toBe(true);
   const stale = pending[0]!.onload!;
   const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
   play.click();
@@ -467,6 +475,10 @@ it('gates playback on decoded current media, ignores stale loads and permits ret
   pending.at(-1)!.onerror!();
   await tick(0);
   expect(play.textContent).toBe('Retry');
+  Object.defineProperty(viewport, 'clientWidth', { value: 400, configurable: true });
+  window.dispatchEvent(new Event('resize'));
+  expect(root.querySelector<HTMLElement>('[data-tour-hint]')!.inert).toBe(true);
+  expect(root.querySelector<HTMLElement>('[data-tour-scene]')!.inert).toBe(true);
   play.click();
   pending.at(-1)!.onload!();
   await tick(0);
@@ -551,3 +563,153 @@ it('keeps seek local on a branch with an explicit default while autoplay still f
   await tick(0);
   expect(seek.value).toBe('0');
 });
+
+it('animates manual entrance and pauses or resumes it through the transport clock', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  const tick = playbackFrames();
+  const { player, root } = await mount();
+  const tour = shortTour();
+  tour.transition = { kind: 'fade', durationMs: 100, hotspotTravelMs: 0 };
+  player.update({ tour, labels, assets: [] });
+  await tick(0);
+  const scene = root.querySelector<HTMLElement>('[data-tour-scene]')!;
+  const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
+  await tick(50);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
+  expect(play.textContent).toBe('Pause');
+  play.click();
+  await tick(1000);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
+  play.click();
+  await tick(50);
+  expect(scene.inert).toBe(false);
+  await tick(100);
+  expect(root.dataset['slideId']).toBe('second');
+  player.select('third');
+  await tick(0);
+  await tick(100);
+  await tick(1000);
+  expect(root.dataset['slideId']).toBe('third');
+  expect(play.textContent).toBe('Play');
+});
+it('seeks a stable paused entrance frame and cancels transient geometry on actual resize', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  const tick = playbackFrames();
+  const { player, root } = await mount();
+  const tour = shortTour();
+  tour.transition = { kind: 'slide', durationMs: 100, hotspotTravelMs: 0 };
+  player.update({ tour, labels, assets: [] });
+  await tick(0);
+  await tick(100);
+  const seek = root.querySelector<HTMLInputElement>('[data-tour-seek]')!;
+  seek.value = '0';
+  seek.dispatchEvent(new Event('input', { bubbles: true }));
+  const scene = root.querySelector<HTMLElement>('[data-tour-scene]')!;
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('1');
+  expect(scene.inert).toBe(true);
+  await tick(1000);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('1');
+  const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
+  Object.defineProperty(viewport, 'clientWidth', { value: 500, configurable: true });
+  window.dispatchEvent(new Event('resize'));
+  expect(scene.inert).toBe(false);
+  expect(scene.style.opacity).toBe('');
+  expect(root.querySelector('.tour-motion-previous')).toBeNull();
+  player.select('second');
+  player.select('third');
+  await tick(0);
+  await tick(100);
+  expect(root.dataset['slideId']).toBe('third');
+  expect(scene.inert).toBe(false);
+  player.dispose();
+  await tick(1000);
+  expect(root.querySelector('.tour-motion-previous')).toBeNull();
+});
+
+it('repaginates explanations when text size changes without changing the stage dimensions', async () => {
+  const { player, root } = await mount({
+    authoring: { onSelectObject: vi.fn(), onMoveObject: vi.fn() },
+  });
+  player.update(authoringInput());
+  const scene = root.querySelector('[data-tour-scene]')!;
+  const previous = scene.firstElementChild;
+  root.style.fontSize = '32px';
+  window.dispatchEvent(new Event('resize'));
+  expect(scene.firstElementChild).not.toBe(previous);
+});
+it('settles a live reduced-motion change without silently starting continuous playback', async () => {
+  let change = () => {};
+  const preference = {
+    matches: false,
+    addEventListener(_name: string, listener: () => void) {
+      change = listener;
+    },
+  };
+  vi.stubGlobal('matchMedia', () => preference);
+  const tick = playbackFrames();
+  const { player, root } = await mount();
+  const tour = shortTour();
+  tour.transition = { kind: 'fade', durationMs: 100, hotspotTravelMs: 0 };
+  player.update({ tour, labels, assets: [] });
+  await tick(0);
+  await tick(50);
+  preference.matches = true;
+  change();
+  await tick(0);
+  const scene = root.querySelector<HTMLElement>('[data-tour-scene]')!;
+  expect(scene.inert).toBe(false);
+  expect(scene.style.opacity).toBe('');
+  expect(root.querySelector<HTMLInputElement>('[data-tour-seek]')!.max).toBe('300');
+  expect(root.querySelector('[data-tour-play]')!.textContent).toBe('Play');
+  player.dispose();
+  change();
+  await tick(1000);
+  expect(scene.children).toHaveLength(0);
+});
+
+it('keeps manual navigation paused when an entrance frame overshoots the entire slide', async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  const tick = playbackFrames();
+  const { player, root } = await mount();
+  const tour = shortTour();
+  tour.transition = { kind: 'fade', durationMs: 100, hotspotTravelMs: 0 };
+  player.update({ tour, labels, assets: [] });
+  await tick(0);
+  await tick(250);
+  expect(root.dataset['slideId']).toBe('first');
+  expect(root.querySelector('[data-tour-play]')!.textContent).toBe('Play');
+  expect(root.querySelector<HTMLInputElement>('[data-tour-seek]')!.value).toBe('100');
+});
+
+it.each(['loading', 'error'])(
+  'preserves %s admission through a live motion preference change',
+  async (status) => {
+    let change = () => {};
+    const preference = {
+      matches: false,
+      addEventListener(_name: string, listener: () => void) {
+        change = listener;
+      },
+    };
+    vi.stubGlobal('matchMedia', () => preference);
+    const tick = playbackFrames();
+    const { player, root } = await mount();
+    const images: { onerror: (() => void) | null }[] = [];
+    vi.stubGlobal(
+      'Image',
+      class {
+        onerror = null;
+        constructor() {
+          images.push(this);
+        }
+      }
+    );
+    player.update(authoringInput());
+    if (status === 'error') images.at(-1)!.onerror!();
+    await tick(0);
+    preference.matches = true;
+    change();
+    expect(root.querySelector<HTMLElement>('[data-tour-scene]')!.inert).toBe(true);
+    expect(root.querySelector<HTMLElement>('[data-tour-hint]')!.inert).toBe(true);
+  }
+);

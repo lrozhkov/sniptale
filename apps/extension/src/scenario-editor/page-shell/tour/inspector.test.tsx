@@ -374,3 +374,20 @@ it('edits slide timing and a default branch separately from document playback de
   await choose('Slide duration', 'From text and narration');
   expect(project.tour!.slides[1]!.timing.mode).toBe('auto');
 });
+
+it('keeps transition settings at document scope and edits their bounded durations', async () => {
+  expect(host.textContent).not.toContain('Image transition');
+  scope = 'document';
+  draw();
+  await choose('Image transition', 'Slide');
+  await fill('Switch, ms', '500');
+  await fill('Hotspot, ms', '750');
+  expect(project.tour!.transition).toEqual({
+    kind: 'slide',
+    durationMs: 500,
+    hotspotTravelMs: 750,
+  });
+  await choose('Image transition', 'No image animation');
+  expect(host.querySelector('[aria-label="Switch, ms"]')).toBeNull();
+  expect(project.tour!.transition.kind).toBe('none');
+});

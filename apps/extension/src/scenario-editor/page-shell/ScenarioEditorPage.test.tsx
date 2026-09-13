@@ -421,11 +421,7 @@ it('prevents duplicate copy submissions and ignores page state updates after unm
   );
   await render();
   await click('Duplicate project');
-  const trigger = container.querySelector<HTMLButtonElement>(
-    '.guide-page-header .guide-action-menu-anchor button'
-  );
-  expect(trigger?.disabled).toBe(true);
-  await act(async () => trigger?.click());
+  await click('Duplicate project');
   expect(io.duplicate).toHaveBeenCalledTimes(1);
   expect(container.querySelector('input')?.disabled).toBe(true);
   await act(async () => root.render(null));

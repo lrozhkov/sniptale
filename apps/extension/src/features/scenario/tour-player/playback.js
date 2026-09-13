@@ -1,138 +1,135 @@
-import { createTourClock } from './clock.js';
-import { tourSlideDuration, tourAutoplayDestination, tourLinearTimeline } from './timing.js';
+import { createTourPlaybackSession } from './playback-session.js';
+import {
+  tourSlideDuration,
+  tourAutoplayDestination,
+  tourLinearTimeline,
+  tourEntranceTiming,
+} from './timing.js';
 import { createTourTransport } from './transport.js';
-import { waitForTourImage } from './media.js';
 
-/** Binds one clock to current media and requests navigation from the existing controller. */
-export function createTourPlayback(root, input, signal, navigate) {
+/** Projects transport and route policy; the session owns media readiness and the single clock. */
+export function createTourPlayback(root, input, signal, motion, navigate) {
   let tour = input.tour;
   let index = 0;
   let ended = false;
-  let wanted = tour.playback.autoplay && !root.ownerDocument.hidden;
-  let state = 'empty';
   let duration = 0;
+  let entrance = 0;
+  let assets = input.assets;
   let timeline = null;
-  let generation = 0;
-  let loading = null;
+  let choice = false;
   const visited = new Set();
+  const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const reduced = () => Boolean(motionPreference?.matches);
   const update = createTourTransport(root, input.labels, signal, toggle, seek);
-  const clock = createTourClock({
-    now: () => performance.now(),
-    requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
-    cancelFrame: (id) => globalThis.cancelAnimationFrame(id),
-    onChange: (elapsed) => paint(elapsed),
-    onComplete: advance,
+  const session = createTourPlaybackSession({
+    signal,
+    motion,
+    hidden: () => root.ownerDocument.hidden,
+    autoplay: tour.playback.autoplay && !root.ownerDocument.hidden,
+    changed(elapsed, playing, state) {
+      update({
+        elapsed: ended
+          ? (timeline?.duration ?? duration)
+          : (timeline?.offsets[index] ?? 0) + elapsed,
+        duration: timeline?.duration ?? duration,
+        playing,
+        state: choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state,
+      });
+    },
+    complete: advance,
   });
-  function paint(elapsed = clock.elapsed) {
-    update({
-      elapsed: ended ? (timeline?.duration ?? duration) : (timeline?.offsets[index] ?? 0) + elapsed,
-      duration: timeline?.duration ?? duration,
-      playing: wanted,
-      state,
-    });
-  }
-  function pause() {
-    wanted = false;
-    clock.pause();
-  }
   function advance() {
+    if (ended) {
+      session.pause();
+      return;
+    }
     let target = tourAutoplayDestination(tour, index);
     if (target === tour.slides.length && tour.playback.loop) target = 0;
     if (target === null || (!tour.playback.loop && visited.has(tour.slides[target]?.id))) {
-      state = 'choice';
-      pause();
+      choice = true;
+      session.pause();
       return;
     }
     if (target === tour.slides.length && !tour.endScreen.enabled) {
-      pause();
+      session.pause();
       return;
     }
     navigate(target);
   }
   function toggle() {
-    if (wanted) {
-      pause();
+    if (session.playing) {
+      session.pause();
       return;
     }
     visited.clear();
     if (tour.slides[index]) visited.add(tour.slides[index].id);
-    wanted = true;
+    choice = false;
     if (ended) navigate(0, true);
-    else if (state === 'error') show(tour, index, false, input.assets);
-    else {
-      if (clock.elapsed >= duration) clock.seek(0);
-      if (state === 'choice') state = 'ready';
-      if (state === 'ready') clock.play();
-      else paint();
-    }
+    session.play();
   }
   function seek(value) {
-    pause();
+    session.pause();
     if (timeline) {
-      let target = timeline.offsets.findLastIndex((offset) => offset <= value);
-      target = Math.max(0, target);
+      const target = Math.max(
+        0,
+        timeline.offsets.findLastIndex((offset) => offset <= value)
+      );
       const offset = timeline.offsets[target];
       if (target !== index || ended) navigate(target);
-      clock.seek(value - offset);
+      session.seek(value - offset);
     } else {
       if (ended) navigate(index);
-      clock.seek(value);
+      session.seek(value);
     }
   }
-  function show(nextTour, nextIndex, isEnd, assets) {
+  function show(nextTour, nextIndex, isEnd, nextAssets) {
+    assets = nextAssets;
     tour = nextTour;
     index = nextIndex;
     ended = isEnd;
-    input = { ...input, assets };
-    loading?.abort();
-    const token = ++generation;
+    choice = false;
     const slide = tour.slides[index];
-    timeline = tourLinearTimeline(tour);
-    duration = slide ? tourSlideDuration(tour, slide) : 0;
-    state = !slide ? 'empty' : ended ? 'ended' : 'loading';
-    if (ended || !slide) wanted = false;
-    clock.reset(duration);
-    if (ended || !slide) {
-      paint();
+    timeline = tourLinearTimeline(tour, reduced());
+    entrance = tourEntranceTiming(tour, ended ? null : slide, reduced()).total;
+    duration = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
+    if (!slide) {
+      session.clear();
       return;
     }
+    if (ended) session.pause();
     visited.add(slide.id);
-    const image = slide.kind === 'image' ? slide.image : slide.background.image;
-    const source = assets.find((asset) => asset.id === image?.assetId)?.src;
-    loading = new AbortController();
-    const ready =
-      image && !source
-        ? Promise.reject(new Error('Missing image.'))
-        : waitForTourImage(source, loading.signal);
-    ready
-      .then(() => {
-        if (signal.aborted || token !== generation) return;
-        state = 'ready';
-        if (wanted) clock.play();
-        else paint();
-      })
-      .catch(() => {
-        if (signal.aborted || token !== generation) return;
-        state = 'error';
-        pause();
-      });
+    const image = ended ? null : slide.kind === 'image' ? slide.image : slide.background.image;
+    session.load({
+      duration,
+      entrance,
+      source: assets.find((asset) => asset.id === image?.assetId)?.src,
+      required: Boolean(image),
+    });
   }
-  bindPlaybackLifetime(root, signal, pause, () => {
-    generation += 1;
-    loading?.abort();
-    clock.dispose();
-  });
+  motionPreference?.addEventListener?.(
+    'change',
+    () => {
+      if (signal.aborted) return;
+      const holdElapsed = Math.max(0, session.elapsed - entrance);
+      const resume = session.continuous;
+      motion.cancel({ preserveMediaGate: true });
+      show(tour, index, ended, assets);
+      session.seek(entrance + holdElapsed);
+      if (resume) session.play();
+    },
+    { signal }
+  );
+  bindPlaybackLifetime(root, signal, session.pause);
   return {
     show,
-    pause,
+    pause: session.pause,
     interact() {
       visited.clear();
-      pause();
+      session.pause();
     },
   };
 }
-
-function bindPlaybackLifetime(root, signal, pause, dispose) {
+function bindPlaybackLifetime(root, signal, pause) {
   root.ownerDocument.addEventListener(
     'visibilitychange',
     () => {
@@ -147,5 +144,4 @@ function bindPlaybackLifetime(root, signal, pause, dispose) {
     },
     { signal, capture: true }
   );
-  signal.addEventListener('abort', dispose, { once: true });
 }

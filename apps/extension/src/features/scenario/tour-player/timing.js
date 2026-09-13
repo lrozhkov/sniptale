@@ -48,7 +48,7 @@ function actionDestination(action, tour, index) {
 }
 
 /** A branched or looping tour has no truthful global remaining-time estimate. */
-export function tourLinearTimeline(tour) {
+export function tourLinearTimeline(tour, reducedMotion = false) {
   if (tour.playback.loop || !tour.slides.length) return null;
   const offsets = [];
   let duration = 0;
@@ -63,7 +63,19 @@ export function tourLinearTimeline(tour) {
     )
       return null;
     offsets.push(duration);
-    duration += tourSlideDuration(tour, slide);
+    duration +=
+      tourEntranceTiming(tour, slide, reducedMotion).total + tourSlideDuration(tour, slide);
   }
   return { offsets, duration };
+}
+
+/** Destination-only phase budgets keep seeking stable across different incoming routes. */
+export function tourEntranceTiming(tour, slide, reducedMotion = false) {
+  const switchMs =
+    reducedMotion || tour.transition.kind === 'none' ? 0 : tour.transition.durationMs;
+  const travelMs =
+    !reducedMotion && slide?.kind === 'image' && slide.hotspots.length === 1
+      ? tour.transition.hotspotTravelMs
+      : 0;
+  return { switchMs, travelMs, total: switchMs + travelMs };
 }

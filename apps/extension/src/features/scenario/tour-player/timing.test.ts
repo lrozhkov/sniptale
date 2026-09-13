@@ -1,12 +1,18 @@
 import { expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { tourAutoplayDestination, tourLinearTimeline, tourSlideDuration } from './timing';
+import {
+  tourAutoplayDestination,
+  tourLinearTimeline,
+  tourSlideDuration,
+  tourEntranceTiming,
+} from './timing';
 import type {
   TourAction,
   TourNavigationSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 function fixture(actions: TourAction[] = []) {
   const tour = createTourDocument('tour');
+  tour.transition = { kind: 'none', durationMs: 0, hotspotTravelMs: 0 };
   const slide: TourNavigationSlide = {
     kind: 'navigation',
     id: 'first',
@@ -98,4 +104,30 @@ it('keeps a branching tour local even when its autoplay default follows physical
     { id: 'none', label: '', action: { kind: 'none' } },
   ];
   expect(tourLinearTimeline(tour)).not.toBeNull();
+});
+
+it('counts destination entrance separately and removes it for reduced motion', () => {
+  const { tour, slide } = fixture();
+  tour.transition = { kind: 'fade', durationMs: 200, hotspotTravelMs: 300 };
+  expect(tourEntranceTiming(tour, slide)).toEqual({ switchMs: 200, travelMs: 0, total: 200 });
+  const image = tour.slides[1]!;
+  if (image.kind !== 'image') throw new Error('Expected image');
+  image.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: '',
+      text: '',
+      action: { kind: 'none' },
+      appearance: null,
+      pulse: true,
+    },
+  ];
+  expect(tourEntranceTiming(tour, image).total).toBe(500);
+  expect(tourLinearTimeline(tour)?.duration).toBe(12900);
+  expect(tourLinearTimeline(tour, true)?.duration).toBe(12000);
+  expect(tourEntranceTiming(tour, image, true).total).toBe(0);
+  tour.transition.kind = 'none';
+  expect(tourEntranceTiming(tour, image).total).toBe(300);
 });

@@ -1,4 +1,5 @@
 import { createTourCameraSession } from './camera.js';
+import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
 import { createTourHints } from './hints.js';
@@ -13,9 +14,13 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   const stage = query('stage');
   const scene = query('scene');
   const camera = createTourCameraSession(Boolean(authoring));
+  const motion = authoring ? null : createTourMotion(root, signal);
+  const reducedMotion = () =>
+    Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   let current = null;
   let ended = false;
   let selectedObjectId = null;
+  let lastFontSize = '';
   let stageWidth = 640;
   let stageHeight = 360;
   const { element, actionButton } = sceneElements(root.ownerDocument, onAction, authoring);
@@ -81,11 +86,22 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   }
   function resize() {
     if (signal.aborted) return;
-    const [width, height] = tour.stage.aspect.split(':').map(Number);
-    const availableWidth = viewport.clientWidth || 640;
-    const availableHeight = viewport.clientHeight || 360;
-    stageWidth = Math.min(availableWidth, (availableHeight * width) / height);
-    stageHeight = (stageWidth * height) / width;
+    const {
+      width: nextWidth,
+      height: nextHeight,
+      fontSize,
+    } = measureScene(root, viewport, tour.stage.aspect);
+    if (
+      nextWidth === stageWidth &&
+      nextHeight === stageHeight &&
+      fontSize === lastFontSize &&
+      stage.style.width
+    )
+      return;
+    lastFontSize = fontSize;
+    motion?.cancel({ preserveMediaGate: true });
+    stageWidth = nextWidth;
+    stageHeight = nextHeight;
     stage.style.width = `${stageWidth}px`;
     stage.style.height = `${stageHeight}px`;
     render();
@@ -109,14 +125,23 @@ export function createTourScene(root, input, onAction, signal, authoring) {
       if (hintIndex >= 0) hintController.select(hintIndex);
     },
     resize,
+    motion,
     openContents: navigationController.openContents,
     show(slide, isEnd) {
       if (signal.aborted) return;
+      const previous = motion?.capture() ?? null;
       current = slide;
       ended = isEnd;
       hintController.reset();
       navigationController.reset(ended);
       render();
+      motion?.prepare(
+        previous,
+        ended ? null : slide,
+        tour,
+        { stageWidth, stageHeight },
+        reducedMotion()
+      );
     },
   };
 }
@@ -168,4 +193,17 @@ function applySceneStyle(root, stage, tour) {
   root.style.setProperty('--tour-text', tour.style.text);
   root.style.setProperty('--tour-surface', tour.style.surface);
   stage.style.background = tour.stage.background;
+}
+
+/** Viewport geometry and font metrics jointly determine scene and explanation layout. */
+function measureScene(root, viewport, aspect) {
+  const [width, height] = aspect.split(':').map(Number);
+  const availableWidth = viewport.clientWidth || 640;
+  const availableHeight = viewport.clientHeight || 360;
+  const stageWidth = Math.min(availableWidth, (availableHeight * width) / height);
+  return {
+    width: stageWidth,
+    height: (stageWidth * height) / width,
+    fontSize: globalThis.getComputedStyle(root).fontSize,
+  };
 }

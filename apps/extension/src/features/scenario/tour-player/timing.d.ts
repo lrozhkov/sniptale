@@ -2,5 +2,12 @@ import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenar
 export function tourSlideDuration(tour: TourDocument, slide: TourSlide): number;
 export function tourAutoplayDestination(tour: TourDocument, index: number): number | null;
 export function tourLinearTimeline(
-  tour: TourDocument
+  tour: TourDocument,
+  reducedMotion?: boolean
 ): { offsets: number[]; duration: number } | null;
+
+export function tourEntranceTiming(
+  tour: TourDocument,
+  slide: TourSlide | null,
+  reducedMotion?: boolean
+): { switchMs: number; travelMs: number; total: number };
