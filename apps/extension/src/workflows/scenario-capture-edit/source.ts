@@ -28,16 +28,7 @@ export async function prepareScenarioImageEditorPayload(
   const item = parsed.project.items.find((entry) => entry.id === itemId);
   const block = item?.kind === 'step' ? item.blocks.find((entry) => entry.id === blockId) : null;
   if (block?.kind !== 'image') throw new Error('The guide image is unavailable.');
-  const asset = await getScenarioAsset(block.assetId);
-  if (!asset || asset.projectId !== project.id) throw new Error('The image is unavailable.');
-  const document = block.editDocumentId
-    ? await getScenarioStepEditorDocumentForTransfer(block.editDocumentId)
-    : undefined;
-  if (block.editDocumentId && (!document || document.projectId !== project.id))
-    throw new Error('The annotation document is unavailable.');
-  const dataUrl = await asEditorRaster(
-    asset.file.type ? asset.file : asset.file.slice(0, asset.file.size, asset.mimeType)
-  );
+  const { dataUrl, document } = await loadScenarioImageEditorSource(project.id, block);
   return {
     target: {
       projectId: project.id,
@@ -52,6 +43,24 @@ export async function prepareScenarioImageEditorPayload(
       ...(document ? { document: document.document } : {}),
     },
   };
+}
+
+/** Shared byte/document ownership admission for guide and tour image editor sessions. */
+export async function loadScenarioImageEditorSource(
+  projectId: string,
+  image: { assetId: string; editDocumentId: string | null }
+) {
+  const asset = await getScenarioAsset(image.assetId);
+  if (!asset || asset.projectId !== projectId) throw new Error('The image is unavailable.');
+  const document = image.editDocumentId
+    ? await getScenarioStepEditorDocumentForTransfer(image.editDocumentId)
+    : undefined;
+  if (image.editDocumentId && (!document || document.projectId !== projectId))
+    throw new Error('The annotation document is unavailable.');
+  const dataUrl = await asEditorRaster(
+    asset.file.type ? asset.file : asset.file.slice(0, asset.file.size, asset.mimeType)
+  );
+  return { dataUrl, document, width: asset.width, height: asset.height };
 }
 
 async function asEditorRaster(blob: Blob): Promise<string> {
