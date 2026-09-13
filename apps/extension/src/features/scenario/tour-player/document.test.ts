@@ -153,7 +153,7 @@ it('rejects missing, duplicate, conflicting media and unprepared redaction', asy
     gain: 1,
     transcript: '',
   };
-  await expect(buildTourPlayerHtml(args)).rejects.toThrow('Conflicting');
+  await expect(buildTourPlayerHtml(args)).rejects.toThrow('Invalid tour');
 });
 
 it('supports document keyboard navigation while leaving input arrows alone', async () => {
@@ -211,7 +211,10 @@ it('keeps a dismissed explanation closed on resize and reopens it through its ho
   document.querySelector<HTMLButtonElement>('[data-tour-hint-close]')!.click();
   dom.window.dispatchEvent(new Event('resize'));
   expect(hint.hidden).toBe(true);
-  document.querySelector<HTMLButtonElement>('.tour-hotspot')!.focus();
+  const hotspot = document.querySelector<HTMLButtonElement>('.tour-hotspot')!;
+  expect(document.activeElement).toBe(hotspot);
+  hotspot.blur();
+  hotspot.focus();
   expect(hint.hidden).toBe(false);
   dom.close();
 });
@@ -250,4 +253,28 @@ it('refuses to publish unreviewed image positions after geometry changes', async
   await expect(buildTourPlayerHtml(args)).rejects.toThrow('targets require review');
   slide.requiresTargetReview = false;
   await expect(buildTourPlayerHtml(args)).resolves.toContain('tour-player');
+});
+
+it('requires object narration bytes and omits unused audio material metadata from the viewer', async () => {
+  const args = fixture();
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw Error('image');
+  slide.hotspots[0]!.narration = {
+    assetId: 'voice',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: 'Voice',
+    trigger: 'activation',
+  };
+  args.tour.audioResources = [{ assetId: 'unused', duration: 2, name: 'Private unused take.wav' }];
+  await expect(buildTourPlayerHtml(args)).rejects.toThrow('Missing tour media');
+  const html = await buildTourPlayerHtml({
+    ...args,
+    assets: [...args.assets, { id: 'voice', mime: 'audio/wav', base64: 'YQ==' }],
+  });
+  expect(html).not.toContain('Private unused take.wav');
+  expect(html).not.toContain('"audioResources"');
+  expect(html).toContain('"trigger":"activation"');
 });

@@ -9,6 +9,7 @@ import {
   applyTourCommands,
   generateTourFromMaterials,
   getTourImages,
+  getTourAudioResources,
   remapTourImageGeometry,
   type TourCommand,
 } from '../../../features/scenario/project/public';
@@ -193,10 +194,6 @@ function placeLocalResource(
   }
   return applyTourCommands(project, [command], {
     images: getTourImages(project.tour),
-    audio: project.tour.slides.flatMap((slide) =>
-      slide.narration
-        ? [{ assetId: slide.narration.assetId, duration: slide.narration.duration }]
-        : []
-    ),
+    audio: getTourAudioResources(project.tour),
   });
 }

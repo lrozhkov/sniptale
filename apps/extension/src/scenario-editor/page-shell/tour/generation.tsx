@@ -3,6 +3,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import {
   applyTourCommands,
   getTourImages,
+  getTourAudioResources,
   type TourGenerationProposal,
 } from '../../../features/scenario/project/public';
 import { prepareTourFromGuide } from '../../../workflows/scenario-capture-edit/tour-materials';
@@ -173,12 +174,7 @@ function useTourGenerationSession(
     try {
       const next = applyTourCommands(current, [{ kind: 'replace-tour', tour }], {
         images: [...getTourImages(generated), ...(current.tour ? getTourImages(current.tour) : [])],
-        audio:
-          current.tour?.slides.flatMap((slide) =>
-            slide.narration
-              ? [{ assetId: slide.narration.assetId, duration: slide.narration.duration }]
-              : []
-          ) ?? [],
+        audio: current.tour ? getTourAudioResources(current.tour) : [],
       });
       latest.current.onChange(next);
       latest.current.onClose();

@@ -4,8 +4,15 @@ import type {
   TourDocument,
   TourImage,
   TourSlide,
+  TourNarration,
+  TourObjectNarration,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { getTourImages } from './tour-resources';
+import {
+  getTourImages,
+  getTourAudioResources,
+  getTourNarrationTarget,
+  getTourNarrationTargets,
+} from './tour-resources';
 
 /** Capabilities supplied by the owning project session, never by an AI response. */
 export interface TourResourceCatalog {
@@ -16,6 +23,13 @@ export interface TourResourceCatalog {
 /** Whole-slide edits cover nested authored objects through the canonical document schema. */
 export type TourCommand =
   | { kind: 'replace-tour'; tour: TourDocument }
+  | {
+      kind: 'set-narration';
+      slideId: string;
+      objectId: string | null;
+      narration: TourNarration | TourObjectNarration | null;
+    }
+  | { kind: 'remove-audio-resource'; assetId: string }
   | { kind: 'insert-slide'; slide: TourSlide; beforeId?: string }
   | { kind: 'replace-slide'; slideId: string; slide: TourSlide }
   | { kind: 'move-slide'; slideId: string; beforeId?: string }
@@ -76,9 +90,36 @@ function duplicateSlide(slide: TourSlide, id: string, nextId: () => string): Tou
   return copy;
 }
 
+function setNarration(
+  slide: TourSlide,
+  command: Extract<TourCommand, { kind: 'set-narration' }>
+): void {
+  const target = getTourNarrationTarget(slide, command.objectId);
+  if (!target) throw new Error('Tour narration target is unavailable.');
+  if (command.objectId === null) {
+    slide.narration = structuredClone(command.narration);
+    return;
+  }
+  const voice = command.narration;
+  target.narration = voice
+    ? { ...voice, trigger: 'trigger' in voice ? voice.trigger : 'activation' }
+    : null;
+}
+
+/** Removing a material clears its attachment graph; it never deletes immutable bytes directly. */
+function removeAudioResource(tour: TourDocument, assetId: string): void {
+  const resources = getTourAudioResources(tour);
+  if (!resources.some((resource) => resource.assetId === assetId))
+    throw new Error('Tour audio resource is unavailable.');
+  tour.audioResources = resources.filter((resource) => resource.assetId !== assetId);
+  for (const target of tour.slides.flatMap(getTourNarrationTargets)) {
+    if (target.narration?.assetId === assetId) target.narration = null;
+  }
+}
+
 function applySlideCommand(
   tour: TourDocument,
-  command: Exclude<TourCommand, { kind: 'replace-tour' }>,
+  command: Exclude<TourCommand, { kind: 'replace-tour' | 'remove-audio-resource' }>,
   nextId: () => string
 ): void {
   if (command.kind === 'insert-slide') {
@@ -91,6 +132,9 @@ function applySlideCommand(
   }
   const index = indexOf(tour.slides, command.slideId);
   switch (command.kind) {
+    case 'set-narration':
+      setNarration(tour.slides[index]!, command);
+      return;
     case 'replace-slide':
       if (command.slide.id !== command.slideId)
         throw new Error('A slide edit cannot change identity.');
@@ -140,12 +184,10 @@ function assertResources(tour: TourDocument, catalog: TourResourceCatalog): void
   for (const image of getTourImages(tour))
     if (!images.has(immutableImage(image)))
       throw new Error('Tour image is outside the project resource catalog.');
-  for (const slide of tour.slides) {
-    const narration = slide.narration;
+  for (const resource of getTourAudioResources(tour)) {
     if (
-      narration &&
       !catalog.audio.some(
-        (audio) => audio.assetId === narration.assetId && audio.duration === narration.duration
+        (audio) => audio.assetId === resource.assetId && audio.duration === resource.duration
       )
     )
       throw new Error('Tour narration is outside the project resource catalog.');
@@ -164,11 +206,17 @@ export function applyTourCommands(
   if (commands.length === 0 || commands.length > 1000)
     throw new Error('Invalid tour command count.');
   const next = structuredClone(project);
+  if (next.tour && getTourAudioResources(next.tour).length)
+    next.tour.audioResources = getTourAudioResources(next.tour);
   for (const command of commands) {
-    if (command.kind === 'replace-tour') next.tour = structuredClone(command.tour);
-    else {
+    if (command.kind === 'replace-tour') {
+      const retained = next.tour ? getTourAudioResources(next.tour) : [];
+      next.tour = structuredClone(command.tour);
+      if (retained.length) next.tour.audioResources ??= retained;
+    } else {
       if (!next.tour) throw new Error('Tour is unavailable.');
-      applySlideCommand(next.tour, command, nextId);
+      if (command.kind === 'remove-audio-resource') removeAudioResource(next.tour, command.assetId);
+      else applySlideCommand(next.tour, command, nextId);
     }
   }
   const parsed = parseGuideProject(next);

@@ -62,6 +62,10 @@ const narration = z
   })
   .strict()
   .refine((value) => value.trimStart < value.trimEnd && value.trimEnd <= value.duration);
+const objectNarration = narration
+  .safeExtend({ trigger: z.enum(['activation', 'enter']) })
+  .nullable()
+  .optional();
 const timing = z
   .object({
     mode: z.enum(['inherit', 'manual', 'auto']),
@@ -94,10 +98,17 @@ export const tourObjectSchemas = {
       action: tourActionSchema,
       appearance: textAppearance.nullable(),
       pulse: z.boolean(),
+      narration: objectNarration,
     })
     .strict(),
   annotation: z
-    .object({ id, text, anchor: point.nullable(), appearance: textAppearance.nullable() })
+    .object({
+      id,
+      text,
+      anchor: point.nullable(),
+      appearance: textAppearance.nullable(),
+      narration: objectNarration,
+    })
     .strict(),
   mask: z
     .object({
@@ -106,9 +117,10 @@ export const tourObjectSchemas = {
       kind: z.enum(['spotlight', 'highlight', 'redact']),
       color,
       opacity: fraction,
+      narration: objectNarration,
     })
     .strict(),
-  button: z.object({ id, label, action: tourActionSchema }).strict(),
+  button: z.object({ id, label, action: tourActionSchema, narration: objectNarration }).strict(),
 };
 const imageSlide = z
   .object({
@@ -150,6 +162,10 @@ const navigationSlide = z
 export const tourDocumentSchema = z
   .object({
     version: z.literal(1),
+    audioResources: z
+      .array(z.object({ assetId: id, duration, name: label }).strict())
+      .max(TOUR_LIMITS.maxAudioResources)
+      .optional(),
     id,
     stage: z.object({ aspect: z.enum(['16:9', '4:3', '9:16']), background: color }).strict(),
     style: z.object({ accent: color, text: color, surface: color, textAppearance }).strict(),
@@ -201,6 +217,27 @@ export function parseTourDocument(value: unknown): TourParseResult {
 }
 
 function validReferences(document: TourDocument): boolean {
+  const audio = new Map<string, number>();
+  for (const resource of document.audioResources ?? []) {
+    if (audio.has(resource.assetId)) return false;
+    audio.set(resource.assetId, resource.duration);
+  }
+  for (const slide of document.slides) {
+    const objects =
+      slide.kind === 'image'
+        ? [...slide.hotspots, ...slide.annotations, ...slide.masks]
+        : slide.buttons;
+    for (const target of [slide, ...objects]) {
+      const voice = target.narration;
+      if (!voice) continue;
+      if (audio.has(voice.assetId) && audio.get(voice.assetId) !== voice.duration) return false;
+      audio.set(voice.assetId, voice.duration);
+    }
+  }
+  for (const slide of document.slides) {
+    const image = slide.kind === 'image' ? slide.image : slide.background.image;
+    if (image && audio.has(image.assetId)) return false;
+  }
   const ids = new Set([document.id]);
   const slides = new Set(document.slides.map((slide) => slide.id));
   const claim = (value: string) => {

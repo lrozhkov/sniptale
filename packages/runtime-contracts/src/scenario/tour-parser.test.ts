@@ -291,3 +291,57 @@ it('preserves explicit target-review state and rejects non-boolean values', () =
     parseTourDocument({ ...tour, slides: [{ ...slide, requiresTargetReview: 'false' }] }).status
   ).toBe('invalid');
 });
+
+it('admits independent audio materials and preserves per-object activation semantics', () => {
+  const tour = document();
+  const slide = imageSlide();
+  const voice = { ...slide.narration!, trigger: 'activation' };
+  const value = {
+    ...tour,
+    audioResources: [{ assetId: 'audio', duration: 12, name: 'Voice.wav' }],
+    slides: [{ ...slide, hotspots: slide.hotspots.map((h) => ({ ...h, narration: voice })) }],
+  };
+  expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+  expect(
+    parseTourDocument({
+      ...value,
+      audioResources: [{ assetId: 'audio', duration: -1, name: 'Bad' }],
+    }).status
+  ).toBe('invalid');
+});
+
+it('roundtrips narration on all object kinds and rejects conflicting resources or invalid triggers', () => {
+  const value = document();
+  const slide = value.slides[0]!;
+  const menu = value.slides[1]!;
+  if (slide.kind !== 'image' || menu.kind !== 'navigation') throw Error('fixture');
+  const voice = { ...slide.narration!, trigger: 'enter' as const };
+  for (const object of [...slide.hotspots, ...slide.annotations, ...slide.masks, ...menu.buttons])
+    object.narration = voice;
+  expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+  expect(
+    parseTourDocument({
+      ...value,
+      audioResources: [{ assetId: 'audio', duration: 9, name: 'Mismatch' }],
+    }).status
+  ).toBe('invalid');
+  expect(
+    parseTourDocument({
+      ...value,
+      audioResources: [
+        { assetId: 'audio', duration: 12, name: 'A' },
+        { assetId: 'audio', duration: 12, name: 'B' },
+      ],
+    }).status
+  ).toBe('invalid');
+  const invalid = {
+    ...value,
+    slides: [
+      {
+        ...slide,
+        annotations: [{ ...slide.annotations[0], narration: { ...voice, trigger: 'hover' } }],
+      },
+    ],
+  };
+  expect(parseTourDocument(invalid).status).toBe('invalid');
+});

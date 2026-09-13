@@ -26,6 +26,10 @@ export { fitGuideRowInsertion, type GuideBlockPlacement } from './spatial-placem
 
 export {
   getTourImages,
+  getTourAudioResources,
+  getTourNarrationTargets,
+  getTourNarrationTarget,
+  getTourNarrationCues,
   getScenarioResourceReferences,
   remapTourIdentities,
 } from './tour-resources';

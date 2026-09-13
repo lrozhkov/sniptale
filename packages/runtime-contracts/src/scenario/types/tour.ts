@@ -3,6 +3,7 @@ import type { GuideImageSource } from './image-source';
 /** Interactive scenes have bounded authored content; media bytes belong to persistence. */
 export const TOUR_LIMITS = {
   maxSlides: 300,
+  maxAudioResources: 1000,
   maxHotspots: 20,
   maxAnnotations: 20,
   maxMasks: 20,
@@ -35,6 +36,7 @@ export interface TourTextAppearance {
 }
 
 export interface TourHotspot {
+  narration?: TourObjectNarration | null | undefined;
   id: string;
   point: TourPoint;
   targetRect: TourRect | null;
@@ -46,6 +48,7 @@ export interface TourHotspot {
 }
 
 export interface TourAnnotation {
+  narration?: TourObjectNarration | null | undefined;
   id: string;
   text: string;
   anchor: TourPoint | null;
@@ -54,6 +57,7 @@ export interface TourAnnotation {
 
 /** Spotlight is presentation; redact requires irreversible raster preparation at export. */
 export interface TourMask {
+  narration?: TourObjectNarration | null | undefined;
   id: string;
   rect: TourRect;
   kind: 'spotlight' | 'highlight' | 'redact';
@@ -69,6 +73,17 @@ export interface TourNarration {
   trimEnd: number;
   gain: number;
   transcript: string;
+}
+
+/** A stored material outlives any individual slide/object attachment. */
+export interface TourAudioResource {
+  assetId: string;
+  duration: number;
+  name: string;
+}
+/** Activation is an explicit click/keyboard activation, never hover. */
+export interface TourObjectNarration extends TourNarration {
+  trigger: 'activation' | 'enter';
 }
 
 export interface TourTiming {
@@ -113,6 +128,7 @@ export interface TourImageSlide {
 }
 
 export interface TourNavigationButton {
+  narration?: TourObjectNarration | null | undefined;
   id: string;
   label: string;
   action: TourAction;
@@ -131,6 +147,7 @@ export type TourSlide = TourImageSlide | TourNavigationSlide;
 
 /** Separate interactive document, sharing only media provenance with a reference guide. */
 export interface TourDocument {
+  audioResources?: TourAudioResource[] | undefined;
   version: 1;
   id: string;
   stage: { aspect: '16:9' | '4:3' | '9:16'; background: string };

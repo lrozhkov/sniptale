@@ -1,3 +1,4 @@
+import { getTourNarrationTargets } from '../project/tour-resources';
 import script from './runtime.js?tour-player-script';
 import styles from './player.css?raw';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
@@ -57,10 +58,11 @@ function embedAssets(tour: TourDocument, inputAssets: readonly TourPlayerAsset[]
       if (required.get(image.assetId) === 'audio') throw new Error('Conflicting tour media roles.');
       required.set(image.assetId, 'image');
     }
-    if (slide.narration) {
-      if (required.get(slide.narration.assetId) === 'image')
+    for (const target of getTourNarrationTargets(slide)) {
+      if (!target.narration) continue;
+      if (required.get(target.narration.assetId) === 'image')
         throw new Error('Conflicting tour media roles.');
-      required.set(slide.narration.assetId, 'audio');
+      required.set(target.narration.assetId, 'audio');
     }
     if (slide.kind === 'image' && slide.masks.some((mask) => mask.kind === 'redact'))
       throw new Error('Tour redaction must be rasterized before export.');
@@ -94,9 +96,10 @@ export async function buildTourPlayerHtml(args: {
   if (parsed.status !== 'ok') throw new Error('Invalid tour.');
   const tour = parsed.document;
   const assets = embedAssets(tour, args.assets);
+  const { audioResources: _materials, ...viewerTour } = tour;
   const payload = {
     tour: {
-      ...tour,
+      ...viewerTour,
       slides: tour.slides.map((slide) => {
         if (slide.kind === 'navigation')
           return {

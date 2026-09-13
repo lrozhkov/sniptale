@@ -96,3 +96,69 @@ it('remaps all authored IDs and destinations while preserving source evidence', 
   expect(first.timing.autoplayTarget).toBe(second.id);
   expect(parseTourDocument(tour).status).toBe('ok');
 });
+
+it('retains detached audio materials and audio bound only to objects', () => {
+  const project = createGuideProject('Audio', 'project');
+  const slide = createTourImageSlide('slide');
+  const voice = {
+    assetId: 'object-audio',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+    trigger: 'activation' as const,
+  };
+  project.tour = {
+    ...createTourDocument('tour'),
+    audioResources: [{ assetId: 'detached', duration: 2, name: 'Take.wav' }],
+    slides: [
+      {
+        ...slide,
+        annotations: [
+          { id: 'hint', text: 'hint', anchor: null, appearance: null, narration: voice },
+        ],
+      },
+    ],
+  };
+  expect([...getScenarioResourceReferences(project).assets]).toEqual(['detached', 'object-audio']);
+});
+
+it('projects ordered entry cues and only the explicitly activated object', async () => {
+  const { getTourNarrationCues } = await import('./tour-resources');
+  const slide = createTourImageSlide('slide');
+  const narration = {
+    assetId: 'voice',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+  };
+  slide.narration = narration;
+  slide.annotations = [
+    {
+      id: 'intro',
+      text: 'Intro',
+      anchor: null,
+      appearance: null,
+      narration: { ...narration, trigger: 'enter' },
+    },
+    {
+      id: 'detail',
+      text: 'Detail',
+      anchor: null,
+      appearance: null,
+      narration: { ...narration, trigger: 'activation' },
+    },
+    { id: 'silent', text: 'Silent', anchor: null, appearance: null },
+  ];
+  expect(getTourNarrationCues(slide, { kind: 'enter' }).map((c) => c.objectId)).toEqual([
+    null,
+    'intro',
+  ]);
+  expect(
+    getTourNarrationCues(slide, { kind: 'activation', objectId: 'detail' }).map((c) => c.objectId)
+  ).toEqual(['detail']);
+  expect(getTourNarrationCues(slide, { kind: 'activation', objectId: 'missing' })).toEqual([]);
+});

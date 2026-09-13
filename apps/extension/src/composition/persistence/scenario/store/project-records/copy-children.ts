@@ -1,5 +1,7 @@
 import {
   getTourImages,
+  getTourAudioResources,
+  getTourNarrationTargets,
   remapTourIdentities,
 } from '../../../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -88,8 +90,12 @@ export async function remapCopyReferences(
       if (image.editDocumentId)
         image.editDocumentId = await children.copyDocument(image.editDocumentId);
     }
+    project.tour.audioResources = getTourAudioResources(project.tour);
+    for (const resource of project.tour.audioResources)
+      resource.assetId = await children.copyAsset(resource.assetId);
     for (const slide of project.tour.slides)
-      if (slide.narration)
-        slide.narration.assetId = await children.copyAsset(slide.narration.assetId);
+      for (const target of getTourNarrationTargets(slide))
+        if (target.narration)
+          target.narration.assetId = await children.copyAsset(target.narration.assetId);
   }
 }

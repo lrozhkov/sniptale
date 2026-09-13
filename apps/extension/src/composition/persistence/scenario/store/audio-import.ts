@@ -1,7 +1,15 @@
-import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { TourNarration } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type {
+  TourNarration,
+  TourObjectNarration,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
-import { applyTourCommands, getTourImages } from '../../../../features/scenario/project/public';
+import {
+  applyTourCommands,
+  getTourImages,
+  getTourAudioResources,
+  getTourNarrationTarget,
+} from '../../../../features/scenario/project/public';
 import { publishMediaHubLibraryChanged } from '../../../../features/media-hub/events';
 import {
   assertSafeScenarioAssetStorageInput,
@@ -16,8 +24,9 @@ import { createScenarioAudioAssetEntry } from './capture-step/asset-entry';
 export async function importScenarioNarration(args: {
   project: GuideProject;
   baseUpdatedAt: number;
-  slideId: string;
-  expectedNarration: TourNarration | null;
+  slideId: string | null;
+  objectId?: string | null;
+  expectedNarration: TourNarration | TourObjectNarration | null;
   blob: Blob;
   signal: AbortSignal;
 }): Promise<GuideProject> {
@@ -27,11 +36,14 @@ export async function importScenarioNarration(args: {
   const project = parsed.project;
   const tour = project.tour;
   const slide = tour?.slides.find((entry) => entry.id === args.slideId);
+  const target = slide ? getTourNarrationTarget(slide, args.objectId ?? null) : undefined;
   if (
     !tour ||
-    !slide ||
     project.purpose === 'step-template' ||
-    narrationIdentity(slide.narration) !== narrationIdentity(args.expectedNarration)
+    (args.slideId === null
+      ? args.objectId != null || args.expectedNarration !== null
+      : !target ||
+        narrationIdentity(target.narration ?? null) !== narrationIdentity(args.expectedNarration))
   )
     throw new Error('The narration target has changed.');
   assertSafeScenarioAssetStorageInput(args.blob, args.blob.type);
@@ -58,13 +70,38 @@ export async function importScenarioNarration(args: {
     };
     const next = applyTourCommands(
       project,
-      [{ kind: 'replace-slide', slideId: slide.id, slide: { ...slide, narration } }],
+      [
+        {
+          kind: 'replace-tour',
+          tour: {
+            ...tour,
+            audioResources: [
+              ...getTourAudioResources(tour),
+              {
+                assetId: narration.assetId,
+                duration,
+                name:
+                  args.blob instanceof File
+                    ? args.blob.name.slice(0, GUIDE_LIMITS.maxLabelLength)
+                    : narration.assetId,
+              },
+            ],
+          },
+        },
+        ...(slide
+          ? [
+              {
+                kind: 'set-narration' as const,
+                slideId: slide.id,
+                objectId: args.objectId ?? null,
+                narration,
+              },
+            ]
+          : []),
+      ],
       {
         images: getTourImages(tour),
-        audio: [
-          ...tour.slides.flatMap((entry) => (entry.narration ? [entry.narration] : [])),
-          narration,
-        ],
+        audio: [...getTourAudioResources(tour), narration],
       }
     );
     args.signal.throwIfAborted();
@@ -80,7 +117,7 @@ export async function importScenarioNarration(args: {
     throw error;
   }
 }
-function narrationIdentity(value: TourNarration | null): string {
+function narrationIdentity(value: TourNarration | TourObjectNarration | null): string {
   return JSON.stringify(
     value && [
       value.assetId,
@@ -89,6 +126,7 @@ function narrationIdentity(value: TourNarration | null): string {
       value.trimEnd,
       value.gain,
       value.transcript,
+      'trigger' in value ? value.trigger : null,
     ]
   );
 }

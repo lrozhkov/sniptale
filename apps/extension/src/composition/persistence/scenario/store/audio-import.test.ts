@@ -186,3 +186,35 @@ it('rejects malformed project input before resource acquisition', async () => {
   expect(io.decode).not.toHaveBeenCalled();
   expect(io.write).not.toHaveBeenCalled();
 });
+
+it('attaches a recorded resource to the exact annotation, leaving the slide narration alone', async () => {
+  const args = input();
+  const slide = args.project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw Error('image');
+  slide.annotations = [{ id: 'hint', text: 'Hint', anchor: null, appearance: null }];
+  const result = await importScenarioNarration({ ...args, objectId: 'hint' });
+  expect(result.tour!.slides[0]!.narration).toBeNull();
+  expect(result.tour).toMatchObject({
+    audioResources: [{ duration: 4 }],
+    slides: [
+      { annotations: [{ id: 'hint', narration: { duration: 4, trigger: 'activation' } }] },
+      {},
+    ],
+  });
+});
+it('rejects an unavailable object before acquiring any bytes', async () => {
+  await expect(importScenarioNarration({ ...input(), objectId: 'missing' })).rejects.toThrow();
+  expect(io.decode).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('imports to resources without attaching to a slide', async () => {
+  const args = input();
+  const result = await importScenarioNarration({
+    ...args,
+    slideId: null,
+    blob: new File(['voice'], 'Take.wav', { type: 'audio/wav' }),
+  });
+  expect(result.tour!.slides).toEqual(args.project.tour!.slides);
+  expect(result.tour).toMatchObject({ audioResources: [{ name: 'Take.wav', duration: 4 }] });
+});

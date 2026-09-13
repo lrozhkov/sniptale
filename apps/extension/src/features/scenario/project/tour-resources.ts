@@ -1,5 +1,10 @@
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
+import type {
+  TourAudioResource,
+  TourDocument,
+  TourImage,
+  TourSlide,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 
 /** Includes navigation backgrounds; occurrence identity stays independent of shared media. */
 export function getTourImages(tour: TourDocument): TourImage[] {
@@ -20,8 +25,8 @@ export function getScenarioResourceReferences(project: GuideProject) {
     assets.add(image.assetId);
     if (image.editDocumentId) documents.add(image.editDocumentId);
   }
-  for (const slide of project.tour?.slides ?? [])
-    if (slide.narration) assets.add(slide.narration.assetId);
+  for (const resource of project.tour ? getTourAudioResources(project.tour) : [])
+    assets.add(resource.assetId);
   return { assets, documents };
 }
 
@@ -52,4 +57,55 @@ export function remapTourIdentities(
       };
     }
   }
+}
+
+/** Slide first, followed by authored objects; returned targets belong to the supplied document. */
+export function getTourNarrationTargets(slide: TourSlide) {
+  return [
+    slide,
+    ...(slide.kind === 'image'
+      ? [...slide.hotspots, ...slide.annotations, ...slide.masks]
+      : slide.buttons),
+  ];
+}
+
+/** Exact attachment lookup; missing objects are never redirected to the slide. */
+export function getTourNarrationTarget(slide: TourSlide, objectId: string | null) {
+  return objectId === null
+    ? slide
+    : getTourNarrationTargets(slide).find((target) => target !== slide && target.id === objectId);
+}
+
+/** Projects current bindings and detached materials without mutating a read. */
+export function getTourAudioResources(tour: TourDocument): TourAudioResource[] {
+  const resources = new Map(
+    (tour.audioResources ?? []).map((resource) => [resource.assetId, { ...resource }])
+  );
+  for (const slide of tour.slides)
+    for (const target of getTourNarrationTargets(slide)) {
+      const voice = target.narration;
+      if (voice && !resources.has(voice.assetId))
+        resources.set(voice.assetId, {
+          assetId: voice.assetId,
+          duration: voice.duration,
+          name: voice.assetId,
+        });
+    }
+  return [...resources.values()];
+}
+
+/** One cue per attachment. Entry cues are ordered; activation only addresses the requested object. */
+export function getTourNarrationCues(
+  slide: TourSlide,
+  event: { kind: 'enter' } | { kind: 'activation'; objectId: string }
+) {
+  return getTourNarrationTargets(slide).flatMap((target) => {
+    const narration = target.narration;
+    if (!narration) return [];
+    const objectId = target === slide ? null : target.id;
+    const trigger = 'trigger' in narration ? narration.trigger : 'enter';
+    if (event.kind !== trigger || (event.kind === 'activation' && event.objectId !== objectId))
+      return [];
+    return [{ slideId: slide.id, objectId, narration }];
+  });
 }

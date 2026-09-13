@@ -285,10 +285,12 @@ it('copies tour images once across representations and independently copies narr
       pulse: true,
     },
   ];
+  slide.hotspots[0]!.narration = { ...slide.narration, trigger: 'activation' };
+  source.tour.audioResources = [{ assetId: 'detached-audio', duration: 3, name: 'Unused.wav' }];
   source.tour.slides = [slide];
   const image = await io.asset('source-image');
   io.asset.mockImplementation(async (id) =>
-    id === 'source-audio'
+    id === 'source-audio' || id === 'detached-audio'
       ? {
           id,
           assetId: 'physical-audio',
@@ -310,6 +312,10 @@ it('copies tour images once across representations and independently copies narr
   expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);
   expect(copied.narration?.assetId).not.toBe('source-audio');
   expect(copied.hotspots[0]?.action).toEqual({ kind: 'slide', slideId: copied.id });
-  expect(io.write).toHaveBeenCalledTimes(2);
+  expect(copied.hotspots[0]!.narration?.assetId).toBe(copied.narration?.assetId);
+  expect(copied.hotspots[0]!.narration?.trigger).toBe('activation');
+  expect(result.tour!.audioResources).toHaveLength(2);
+  expect(result.tour!.audioResources![0]!.assetId).not.toBe('detached-audio');
+  expect(io.write).toHaveBeenCalledTimes(3);
   expect(source.tour.slides[0]?.id).toBe('slide');
 });

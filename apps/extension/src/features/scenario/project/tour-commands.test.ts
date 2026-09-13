@@ -297,3 +297,72 @@ it('rejects template ownership and foreign media, and accepts equivalent provena
     applyTourCommands(original, [{ kind: 'replace-tour', tour: replacement }], resources)
   ).toThrow('catalog');
 });
+
+it('keeps a reusable material after unlink and clears every attachment on material deletion', () => {
+  const original = project();
+  const slide = original.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw Error('image');
+  slide.annotations = [{ id: 'hint', text: 'Read', anchor: null, appearance: null }];
+  const narration = {
+    assetId: 'audio',
+    duration: 5,
+    trimStart: 1,
+    trimEnd: 4,
+    gain: 1,
+    transcript: '',
+  };
+  original.tour!.audioResources = [{ assetId: 'audio', duration: 5, name: 'Take.wav' }];
+  const attached = applyTourCommands(
+    original,
+    [
+      { kind: 'set-narration', slideId: 'first', objectId: null, narration },
+      { kind: 'set-narration', slideId: 'first', objectId: 'hint', narration },
+    ],
+    resources
+  );
+  const unlinked = applyTourCommands(
+    attached,
+    [{ kind: 'set-narration', slideId: 'first', objectId: 'hint', narration: null }],
+    resources
+  );
+  expect(unlinked.tour!.audioResources).toEqual(original.tour!.audioResources);
+  expect(unlinked.tour!.slides[0]!.narration).toEqual(narration);
+  const deleted = applyTourCommands(
+    attached,
+    [{ kind: 'remove-audio-resource', assetId: 'audio' }],
+    resources
+  );
+  expect(deleted.tour!.audioResources).toEqual([]);
+  expect(deleted.tour!.slides[0]).toMatchObject({
+    narration: null,
+    annotations: [{ narration: null }],
+  });
+  expect(attached.tour!.slides[0]).toMatchObject({
+    narration,
+    annotations: [{ narration: { ...narration, trigger: 'activation' } }],
+  });
+  expect(() =>
+    applyTourCommands(
+      original,
+      [{ kind: 'set-narration', slideId: 'first', objectId: 'missing', narration }],
+      resources
+    )
+  ).toThrow('unavailable');
+  expect(() =>
+    applyTourCommands(
+      original,
+      [
+        {
+          kind: 'set-narration',
+          slideId: 'first',
+          objectId: 'hint',
+          narration: { ...narration, assetId: 'foreign' },
+        },
+      ],
+      resources
+    )
+  ).toThrow('catalog');
+  expect(() =>
+    applyTourCommands(original, [{ kind: 'remove-audio-resource', assetId: 'missing' }], resources)
+  ).toThrow('unavailable');
+});

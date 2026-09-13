@@ -6,6 +6,7 @@ import {
   createTourDocument,
   createTourImageSlide,
   getTourImages,
+  getTourAudioResources,
   type TourCommand,
 } from '../../../features/scenario/project/public';
 
@@ -63,12 +64,7 @@ export function useTourSelection(
     try {
       const next = applyTourCommands(base, [operation], {
         images: tour ? getTourImages(tour) : [],
-        audio:
-          tour?.slides.flatMap((entry) =>
-            entry.narration
-              ? [{ assetId: entry.narration.assetId, duration: entry.narration.duration }]
-              : []
-          ) ?? [],
+        audio: tour ? getTourAudioResources(tour) : [],
       });
       onChange(next, group);
       setFailed(false);
