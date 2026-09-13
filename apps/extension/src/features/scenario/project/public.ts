@@ -36,3 +36,11 @@ export {
   type TourCommand,
   type TourResourceCatalog,
 } from './tour-commands';
+export {
+  generateTourFromMaterials,
+  generateTourFromGuide,
+  type TourMaterial,
+  type TourGenerationProposal,
+  type TourGenerationIssue,
+} from './tour-generation';
+export { mapTourCapturePoint, mapTourCaptureRect, type TourCaptureMapping } from './tour-geometry';
