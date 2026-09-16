@@ -5,27 +5,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const transportMocks = vi.hoisted(() => ({
   deleteScenarioStepMock: vi.fn(),
   moveScenarioStepMock: vi.fn(),
-  restoreScenarioStepMock: vi.fn(),
 }));
 
 vi.mock('../runtime/transport/steps', () => ({
   deleteScenarioStep: transportMocks.deleteScenarioStepMock,
   moveScenarioStep: transportMocks.moveScenarioStepMock,
-  restoreScenarioStep: transportMocks.restoreScenarioStepMock,
   saveScenarioCaptureStep: vi.fn(),
 }));
 
-import {
-  applyScenarioDeleteRecentStep,
-  applyScenarioMoveRecentStep,
-  applyScenarioRestoreRecentStep,
-} from './step';
+import { applyScenarioDeleteRecentStep, applyScenarioMoveRecentStep } from './step';
 
 beforeEach(() => {
   vi.clearAllMocks();
   transportMocks.deleteScenarioStepMock.mockResolvedValue({ success: true });
   transportMocks.moveScenarioStepMock.mockResolvedValue({ success: true });
-  transportMocks.restoreScenarioStepMock.mockResolvedValue({ success: true });
 });
 
 describe('scenario-controller-step-actions', () => {
@@ -43,11 +36,6 @@ describe('scenario-controller-step-actions', () => {
       stepId: 'step-1',
       toIndex: 4,
     });
-    await applyScenarioRestoreRecentStep({
-      applyScenarioResponse,
-      projectId: 'project-9',
-      stepId: 'step-1',
-    });
 
     expect(transportMocks.deleteScenarioStepMock).toHaveBeenCalledWith({
       projectId: 'project-9',
@@ -58,10 +46,6 @@ describe('scenario-controller-step-actions', () => {
       stepId: 'step-1',
       toIndex: 4,
     });
-    expect(transportMocks.restoreScenarioStepMock).toHaveBeenCalledWith({
-      projectId: 'project-9',
-      stepId: 'step-1',
-    });
-    expect(applyScenarioResponse).toHaveBeenCalledTimes(3);
+    expect(applyScenarioResponse).toHaveBeenCalledTimes(2);
   });
 });

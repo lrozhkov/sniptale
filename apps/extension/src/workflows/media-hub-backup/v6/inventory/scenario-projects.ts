@@ -1,3 +1,4 @@
+import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
@@ -12,6 +13,7 @@ import {
   parseScenarioAssetEntry,
   parseScenarioExportEntry,
   parseScenarioProjectEntry,
+  parseScenarioProjectSummary,
 } from '../../../../composition/persistence/scenario/read-guards';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import type { ScenarioProjectEntry } from '../../../../composition/persistence/scenario/contracts';
@@ -39,14 +41,17 @@ function readSelectedScenarioProjects(
   options: MediaHubBackupExportOptions
 ): ScenarioProjectEntry[] {
   return rows
-    .map(parseScenarioProjectEntry)
-    .filter((entry): entry is NonNullable<typeof entry> =>
-      Boolean(
-        entry &&
-        (entry.lifecycle?.storageClass !== 'temporary' || options.includeDrafts) &&
-        (options.scope === 'all' || options.selected?.scenarioProjectIds.includes(entry.id))
-      )
-    )
+    .flatMap((raw) => {
+      const summary = parseScenarioProjectSummary(raw);
+      const id = summary?.id ?? (isRecord(raw) && typeof raw['id'] === 'string' ? raw['id'] : null);
+      if (options.scope !== 'all' && (!id || !options.selected?.scenarioProjectIds.includes(id)))
+        return [];
+      if (summary?.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return [];
+      const entry = parseScenarioProjectEntry(raw);
+      if (!entry)
+        throw new Error('A selected scenario project is unavailable and cannot be exported.');
+      return [entry];
+    })
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -197,9 +202,20 @@ async function buildScenarioProjectRoot(args: {
     aggregateKind: 'scenario',
     db: args.db,
   });
+  const { history, ...portableEntry } = encodePortableScenarioProjectEntry(
+    projectScenarioPrivacy(args.entry, args.options)
+  );
+  const historyObjectId = history?.length
+    ? collector.addObject(
+        new Blob([JSON.stringify(history)], { type: 'application/json' }),
+        'saved-versions.json',
+        'application/json'
+      )
+    : undefined;
   const metadata: PortableScenarioProjectMetadata = {
     assets,
-    entry: encodePortableScenarioProjectEntry(projectScenarioPrivacy(args.entry, args.options)),
+    entry: portableEntry,
+    ...(historyObjectId ? { historyObjectId } : {}),
     exportThumbnails,
     exports,
     stepDocuments,

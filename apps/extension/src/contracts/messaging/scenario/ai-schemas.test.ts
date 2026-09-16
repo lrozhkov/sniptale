@@ -9,7 +9,10 @@ import { parseRuntimeResponseForMessage } from '../parsers/boundary';
 function createScenarioAiMessage(overrides: Record<string, unknown> = {}) {
   return {
     attachments: [],
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Update the selected slide',
     llmSessionToken: 'llm-session-token-1',
     projectSnapshotJson: '{"steps":[]}',
@@ -18,44 +21,53 @@ function createScenarioAiMessage(overrides: Record<string, unknown> = {}) {
   };
 }
 
-it('accepts v3 scenario editor operation request and response payloads', () => {
+it('accepts guide editor operation request and response payloads', () => {
   expect(
     processScenarioEditorWithLlmMessageSchema.parse(
       createScenarioAiMessage({
-        contractVersion: 3,
+        contractVersion: 4 as const,
+        projectId: 'project-1',
+        baseRevision: 1,
+        scope: { stepIds: ['step-1'], blockIds: [] },
         projectOutlineJson: '{"slides":[]}',
         projectSnapshotJson: '{"outline":{"version":3}}',
-        selectedSlideCodeJson: '{"id":"slide-1"}',
-        toolManifestJson: '{"operations":["setSlideTitle"]}',
+        selectedStepJson: '{"id":"slide-1"}',
+        toolManifestJson: '{"operations":["setStepTitle"]}',
       })
     )
-  ).toMatchObject({ contractVersion: 3 });
+  ).toMatchObject({ contractVersion: 4 });
 
   expect(
     processScenarioEditorWithLlmResponseSchema.parse({
-      operations: [{ slideId: 'slide-1', title: 'AI title', type: 'setSlideTitle' }],
+      operations: [{ stepId: 'slide-1', title: 'AI title', type: 'setStepTitle' }],
       success: true,
     })
   ).toMatchObject({
-    operations: [{ slideId: 'slide-1', title: 'AI title', type: 'setSlideTitle' }],
+    operations: [{ stepId: 'slide-1', title: 'AI title', type: 'setStepTitle' }],
   });
 });
 
-it('accepts bounded v3 scenario editor request payloads', () => {
+it('accepts bounded guide editor request payloads', () => {
   expect(processScenarioEditorWithLlmMessageSchema.parse(createScenarioAiMessage())).toMatchObject({
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     projectSnapshotJson: '{"steps":[]}',
   });
   expect(
     processScenarioEditorWithLlmMessageSchema.parse(
       createScenarioAiMessage({
-        contractVersion: 3,
+        contractVersion: 4 as const,
+        projectId: 'project-1',
+        baseRevision: 1,
+        scope: { stepIds: ['step-1'], blockIds: [] },
         projectOutlineJson: '{"slides":[]}',
-        selectedSlideCodeJson: '{"id":"slide-1"}',
-        toolManifestJson: '{"operations":["setSlideTitle"]}',
+        selectedStepJson: '{"id":"slide-1"}',
+        toolManifestJson: '{"operations":["setStepTitle"]}',
       })
     )
-  ).toMatchObject({ contractVersion: 3 });
+  ).toMatchObject({ contractVersion: 4 });
 });
 
 it('rejects missing or v2 scenario editor contract versions', () => {
@@ -105,7 +117,7 @@ it('rejects oversized scenario editor AI request text fields', () => {
   ).toThrow();
   expect(() =>
     processScenarioEditorWithLlmMessageSchema.parse(
-      createScenarioAiMessage({ selectedSlideCodeJson: 'x'.repeat(1_000_001) })
+      createScenarioAiMessage({ selectedStepJson: 'x'.repeat(1_000_001) })
     )
   ).toThrow();
 });
@@ -149,4 +161,22 @@ it('rejects unsafe or oversized scenario editor AI attachments', () => {
       })
     )
   ).toThrow();
+});
+
+it('admits empty document scope and rejects block/document scope combinations', () => {
+  expect(
+    processScenarioEditorWithLlmMessageSchema.safeParse(
+      createScenarioAiMessage({ scope: { stepIds: [], blockIds: [], document: true } })
+    ).success
+  ).toBe(true);
+  expect(
+    processScenarioEditorWithLlmMessageSchema.safeParse(
+      createScenarioAiMessage({ scope: { stepIds: [], blockIds: [] } })
+    ).success
+  ).toBe(false);
+  expect(
+    processScenarioEditorWithLlmMessageSchema.safeParse(
+      createScenarioAiMessage({ scope: { stepIds: ['step'], blockIds: ['block'], document: true } })
+    ).success
+  ).toBe(false);
 });

@@ -1,7 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createGuideProject } from '../../../features/scenario/project/factories';
 
 const persistenceMocks = vi.hoisted(() => ({
   listMediaLibrary: vi.fn(),
@@ -239,12 +239,13 @@ it('commits expired linked and standalone draft cleanup through current transact
       projectAssetId: 'project-asset-shared',
     },
   };
-  const scenarioProject = createScenarioProject('Scenario');
+  const scenarioProject = createGuideProject('Scenario');
   const scenario = {
     createdAt: 1,
     id: scenarioProject.id,
     lifecycle,
     project: scenarioProject,
+    workspaceRevision: 1,
     updatedAt: 1,
   };
   const scenarioAsset = {

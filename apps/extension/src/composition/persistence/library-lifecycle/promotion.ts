@@ -75,12 +75,11 @@ async function promoteScenarioAggregate(projectId: string): Promise<void> {
         .get(createAggregatePresentationKey({ id: projectId, kind: 'scenario' })),
       workspaceRevision: project.workspaceRevision ?? 0,
     });
-    const referencedAssetIds =
-      project.project.version === 3
-        ? project.project.slides.flatMap((slide) =>
-            slide.source?.kind === 'capture' ? [slide.source.assetId] : []
-          )
-        : project.project.steps.flatMap((step) => (step.kind === 'capture' ? [step.assetId] : []));
+    const referencedAssetIds = project.project.items.flatMap((item) =>
+      item.kind === 'step'
+        ? item.blocks.flatMap((block) => (block.kind === 'image' ? [block.assetId] : []))
+        : []
+    );
     const assetStore = tx.objectStore(SCENARIO_ASSETS_STORE);
     for (const assetId of new Set(referencedAssetIds)) {
       const asset = parseScenarioAssetEntry(await assetStore.get(assetId));

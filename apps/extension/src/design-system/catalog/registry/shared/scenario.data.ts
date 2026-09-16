@@ -50,14 +50,6 @@ export const SHARED_DESIGN_SYSTEM_SCENARIO_REGISTRY: DesignSystemRegistryEntry[]
         'Content > Scenario recorder > Project menu',
         ['apps/extension/src/content/overlay/toolbar/scenario/project-menu/index.tsx']
       ),
-      usage(
-        'scenario.editor.project-sidebar',
-        'Редактор сценариев > Sidebar > Picker проекта',
-        'Scenario editor > Sidebar > Project picker',
-        [
-          'apps/extension/src/scenario-editor/page-shell/slide-navigator/ScenarioSlideNavigatorProjectsView.tsx',
-        ]
-      ),
     ],
     status: 'active',
     previewFidelity: 'canonical',

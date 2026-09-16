@@ -1,11 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
-  createScenarioProjectRecordV3Mock,
+  createScenarioProjectRecordMock,
   deleteScenarioStepFromProjectMock,
   moveScenarioStepInProjectMock,
-  restoreScenarioStepFromProjectMock,
-  recordScenarioSuggestedEventMock,
   saveScenarioCaptureStepToProjectMock,
   openScenarioEditorMock,
   buildPendingCaptureMock,
@@ -15,11 +13,9 @@ const {
   resolveProjectSelectionMock,
   translateMock,
 } = vi.hoisted(() => ({
-  createScenarioProjectRecordV3Mock: vi.fn(),
+  createScenarioProjectRecordMock: vi.fn(),
   deleteScenarioStepFromProjectMock: vi.fn(),
   moveScenarioStepInProjectMock: vi.fn(),
-  restoreScenarioStepFromProjectMock: vi.fn(),
-  recordScenarioSuggestedEventMock: vi.fn(),
   saveScenarioCaptureStepToProjectMock: vi.fn(),
   openScenarioEditorMock: vi.fn(),
   buildPendingCaptureMock: vi.fn(() => ({ id: 'pending-1' })),
@@ -42,9 +38,11 @@ vi.mock('../../../platform/runtime-messaging/index', async (importOriginal) => (
   getErrorMessage: getErrorMessageMock,
 }));
 
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  createScenarioProjectRecordV3: createScenarioProjectRecordV3Mock,
+vi.mock('../../../composition/persistence/scenario/store/public', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/public')
+  >()),
+  createScenarioProjectRecord: createScenarioProjectRecordMock,
 }));
 
 vi.mock(
@@ -55,17 +53,10 @@ vi.mock(
     >()),
     deleteScenarioStepFromProject: deleteScenarioStepFromProjectMock,
     moveScenarioStepInProject: moveScenarioStepInProjectMock,
-    restoreScenarioStepFromProject: restoreScenarioStepFromProjectMock,
   })
 );
 
-vi.mock('../../../composition/persistence/scenario/store/suggested-events', () => ({
-  recordScenarioSuggestedEvent: recordScenarioSuggestedEventMock,
-}));
-
-vi.mock('../../../composition/persistence/scenario/store/capture-step', () => ({
-  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
-}));
+vi.mock('../../../composition/persistence/scenario/store/capture-step', () => ({}));
 
 vi.mock('../editor', () => ({
   openScenarioEditor: openScenarioEditorMock,
@@ -86,7 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   buildScenarioSessionPayloadMock.mockResolvedValue(createScenarioPayloadResponse());
   flushPendingCaptureIfNeededMock.mockResolvedValue({});
-  createScenarioProjectRecordV3Mock.mockResolvedValue({
+  createScenarioProjectRecordMock.mockResolvedValue({
     id: 'project-created',
     name: 'Created project',
     updatedAt: 20,
@@ -102,10 +93,6 @@ beforeEach(() => {
   moveScenarioStepInProjectMock.mockResolvedValue({
     id: 'project-1',
     updatedAt: 50,
-  });
-  restoreScenarioStepFromProjectMock.mockResolvedValue({
-    id: 'project-1',
-    updatedAt: 60,
   });
 });
 
@@ -200,7 +187,7 @@ it('creates a new scenario project and falls back to the localized default name'
   );
 
   expect(translateMock).toHaveBeenCalledWith('scenario.common.defaultProjectName');
-  expect(createScenarioProjectRecordV3Mock).toHaveBeenCalledWith('New scenario');
+  expect(createScenarioProjectRecordMock).toHaveBeenCalledWith('New scenario');
   expect(sendResponse).toHaveBeenCalledWith(
     expect.objectContaining({
       success: true,
@@ -209,7 +196,7 @@ it('creates a new scenario project and falls back to the localized default name'
   );
 });
 
-it('routes step delete, move, restore, and editor-open messages through shared seams', async () => {
+it('routes step delete, move, and editor-open messages through shared seams', async () => {
   const scenarioSessionService = createScenarioSessionServiceStub();
   vi.mocked(scenarioSessionService.getSession).mockResolvedValue(createBaseScenarioSession());
 
@@ -230,14 +217,6 @@ it('routes step delete, move, restore, and editor-open messages through shared s
     },
     scenarioSessionService
   );
-  const restoreStep = await routeScenarioTestMessage(
-    {
-      type: MessageType.SCENARIO_RESTORE_STEP,
-      projectId: 'project-1',
-      stepId: 'step-1',
-    },
-    scenarioSessionService
-  );
   const openEditor = await routeScenarioTestMessage(
     {
       type: MessageType.SCENARIO_OPEN_EDITOR,
@@ -249,14 +228,11 @@ it('routes step delete, move, restore, and editor-open messages through shared s
 
   expect(deleteScenarioStepFromProjectMock).toHaveBeenCalledWith('project-1', 'step-1');
   expect(moveScenarioStepInProjectMock).toHaveBeenCalledWith('project-1', 'step-1', 2);
-  expect(restoreScenarioStepFromProjectMock).toHaveBeenCalledWith('project-1', 'step-1');
   expect(openScenarioEditorMock).toHaveBeenCalledWith('project-1', 'step-1');
   expect(scenarioSessionService.bumpProjectRevision).toHaveBeenNthCalledWith(1, 9);
   expect(scenarioSessionService.bumpProjectRevision).toHaveBeenNthCalledWith(2, 9);
-  expect(scenarioSessionService.bumpProjectRevision).toHaveBeenNthCalledWith(3, 9);
   expect(deleteStep.sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   expect(moveStep.sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
-  expect(restoreStep.sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
   expect(openEditor.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 });
 
@@ -280,3 +256,10 @@ it('routes step-action failures through the shared error responder', async () =>
     error: 'boom',
   });
 });
+
+vi.mock('../../../composition/persistence/scenario/store/capture-step', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/capture-step')
+  >()),
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
+}));

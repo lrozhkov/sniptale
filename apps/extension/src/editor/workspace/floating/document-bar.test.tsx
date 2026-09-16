@@ -596,7 +596,7 @@ it('hides the copy quick action for export formats that cannot be copied to clip
   ).toBeNull();
 });
 
-it('moves scenario apply and close actions into the top document bar after copy', async () => {
+it('places visible scenario cancel and apply before local export actions', async () => {
   const controller = createController();
   const onApply = vi.fn(async () => undefined);
   const onClose = vi.fn();
@@ -610,21 +610,28 @@ it('moves scenario apply and close actions into the top document bar after copy'
   const actionIds = Array.from(container?.querySelectorAll('button') ?? []).map((button) =>
     button.getAttribute('data-ui')
   );
-  expect(actionIds.indexOf('editor.floating.document-bar.copy-button')).toBeLessThan(
-    actionIds.indexOf('editor.floating.document-bar.save-for-slide-button')
+  expect(actionIds.indexOf('editor.floating.document-bar.cancel-scenario-button')).toBeLessThan(
+    actionIds.indexOf('editor.floating.document-bar.apply-scenario-button')
   );
-  expect(actionIds.indexOf('editor.floating.document-bar.save-for-slide-button')).toBeLessThan(
-    actionIds.indexOf('editor.floating.document-bar.close-scenario-button')
+  expect(actionIds.indexOf('editor.floating.document-bar.apply-scenario-button')).toBeLessThan(
+    actionIds.indexOf('editor.floating.document-bar.save-button')
   );
+  expect(getButton('editor.floating.document-bar.apply-scenario-button').textContent).toContain(
+    translate('editor.documentActions.applyToScenario')
+  );
+  expect(getButton('editor.floating.document-bar.cancel-scenario-button').textContent).toContain(
+    translate('editor.documentActions.returnToScenario')
+  );
+  expect(container?.querySelector('[data-state]')).toBeNull();
   expect(actionIds).not.toContain('editor.floating.document-bar.promote-button');
   expect(actionIds).not.toContain('editor.floating.document-bar.save-to-folder-button');
   expect(actionIds).not.toContain('editor.floating.document-bar.close-file-button');
 
   await act(async () => {
-    getButton('editor.floating.document-bar.save-for-slide-button').click();
+    getButton('editor.floating.document-bar.apply-scenario-button').click();
   });
   act(() => {
-    getButton('editor.floating.document-bar.close-scenario-button').click();
+    getButton('editor.floating.document-bar.cancel-scenario-button').click();
   });
 
   expect(onBeforeSelectionAwareAction).toHaveBeenCalledOnce();
@@ -679,4 +686,30 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
     { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'idle', sessionId: 'asset-1' },
     translate('common.states.dirty')
   );
+});
+
+it('keeps apply disabled before loading and blocks duplicate apply or cancel during rendering', async () => {
+  let finish!: () => void;
+  const apply = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  mocks.embed.mode = 'scenario';
+  mocks.embed.onApply = apply;
+  mocks.embed.onClose = vi.fn();
+  renderDocumentBar(createProps({ hasImage: false }));
+  expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(true);
+  act(() => root?.render(<EditorFloatingDocumentBar {...createProps()} />));
+  act(() => {
+    getButton('editor.floating.document-bar.apply-scenario-button').click();
+    getButton('editor.floating.document-bar.apply-scenario-button').click();
+  });
+  expect(apply).toHaveBeenCalledOnce();
+  expect(getButton('editor.floating.document-bar.cancel-scenario-button').disabled).toBe(true);
+  expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(true);
+  await act(async () => finish());
+  expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(false);
+  expect(getButton('editor.floating.document-bar.cancel-scenario-button').disabled).toBe(false);
 });

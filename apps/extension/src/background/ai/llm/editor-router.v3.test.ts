@@ -75,7 +75,7 @@ function createSender(): chrome.runtime.MessageSender {
 it('routes v3 scenario editor requests through operation payloads', async () => {
   const sendResponse = vi.fn();
   requestMultimodalChatCompletionMock.mockResolvedValue(
-    '{"operations":[{"slideId":"slide-1","title":"AI title","type":"setSlideTitle"}]}'
+    '{"operations":[{"stepId":"slide-1","title":"AI title","type":"setStepTitle"}]}'
   );
 
   expect(routeScenarioEditorLlmMessage(createV3Message(), sendResponse, createSender())).toBe(true);
@@ -83,13 +83,14 @@ it('routes v3 scenario editor requests through operation payloads', async () => 
   await vi.waitFor(() => {
     expect(sendResponse).toHaveBeenCalledWith(
       expect.objectContaining({
-        operations: [{ slideId: 'slide-1', title: 'AI title', type: 'setSlideTitle' }],
+        operations: [{ stepId: 'slide-1', title: 'AI title', type: 'setStepTitle' }],
         success: true,
       })
     );
   });
   expect(requestMultimodalChatCompletionMock).toHaveBeenCalledWith(
     expect.objectContaining({
+      systemPrompt: expect.stringContaining('Authoritative editor contract'),
       userContent: [
         expect.objectContaining({
           text: expect.stringContaining('Return ONLY strict JSON with the shape {"operations"'),
@@ -136,7 +137,7 @@ it('fills missing optional v3 prompt sections with empty objects', async () => {
       {
         ...createV3Message(),
         projectOutlineJson: undefined,
-        selectedSlideCodeJson: undefined,
+        selectedStepJson: undefined,
         toolManifestJson: undefined,
       },
       sendResponse,
@@ -168,7 +169,7 @@ it('redacts sensitive v3 prompt sections before provider egress', async () => {
         instruction: 'Use Authorization: Basic v3-secret',
         projectOutlineJson: '{"csrf":"csrf-secret"}',
         projectSnapshotJson: '{"sessionId":"session-secret","safe":"Display name"}',
-        selectedSlideCodeJson: '{"apiKey":"api-secret"}',
+        selectedStepJson: '{"apiKey":"api-secret"}',
         toolManifestJson: '{"token":"tool-secret"}',
       },
       sendResponse,
@@ -219,13 +220,36 @@ it('ignores messages outside the scenario editor LLM route', () => {
 function createV3Message() {
   return {
     attachments: [],
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Edit slide',
     llmSessionToken: 'llm-token-1',
     projectOutlineJson: '{"slides":[]}',
     projectSnapshotJson: '{"outline":{"version":3}}',
-    selectedSlideCodeJson: '{"id":"slide-1"}',
-    toolManifestJson: '{"operations":["setSlideTitle"]}',
+    selectedStepJson: '{"id":"slide-1"}',
+    toolManifestJson: '{"operations":["setStepTitle"]}',
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
   } as const;
 }
+
+it('does not send the expanded editor contract without a preauthorized request', () => {
+  hasPreauthorizedScenarioEditorLlmRouteMessageMock.mockReturnValue(false);
+  const sendResponse = vi.fn();
+  expect(routeScenarioEditorLlmMessage(createV3Message(), sendResponse, createSender())).toBe(true);
+  expect(sendResponse).toHaveBeenCalledWith({ success: false, error: 'Unauthorized LLM request' });
+  expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
+});
+it('rejects malformed context before sending the system contract or user content', () => {
+  const sendResponse = vi.fn();
+  expect(
+    routeScenarioEditorLlmMessage(
+      { ...createV3Message(), projectSnapshotJson: 'invalid' },
+      sendResponse,
+      createSender()
+    )
+  ).toBe(true);
+  expect(sendResponse).toHaveBeenCalledWith({ success: false, error: expect.any(String) });
+  expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
+});

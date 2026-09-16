@@ -3,14 +3,14 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 
 const {
   buildScenarioPayloadResponseMock,
-  createScenarioProjectRecordV3Mock,
+  createScenarioProjectRecordMock,
   flushScenarioProjectCaptureMock,
   resolveProjectSelectionMock,
   setScenarioProjectSelectionMock,
   translateMock,
 } = vi.hoisted(() => ({
   buildScenarioPayloadResponseMock: vi.fn(),
-  createScenarioProjectRecordV3Mock: vi.fn(),
+  createScenarioProjectRecordMock: vi.fn(),
   flushScenarioProjectCaptureMock: vi.fn(),
   resolveProjectSelectionMock: vi.fn(),
   setScenarioProjectSelectionMock: vi.fn(),
@@ -22,9 +22,11 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: translateMock,
 }));
 
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  createScenarioProjectRecordV3: createScenarioProjectRecordV3Mock,
+vi.mock('../../../composition/persistence/scenario/store/public', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/public')
+  >()),
+  createScenarioProjectRecord: createScenarioProjectRecordMock,
 }));
 
 vi.mock('../router/helpers', async (importOriginal) => ({
@@ -46,7 +48,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   buildScenarioPayloadResponseMock.mockResolvedValue({ success: true });
   flushScenarioProjectCaptureMock.mockResolvedValue({});
-  createScenarioProjectRecordV3Mock.mockResolvedValue({
+  createScenarioProjectRecordMock.mockResolvedValue({
     id: 'project-created',
     name: 'Created project',
   });
@@ -161,7 +163,7 @@ it('creates a new project with the localized fallback name', async () => {
   });
 
   expect(translateMock).toHaveBeenCalledWith('scenario.common.defaultProjectName');
-  expect(createScenarioProjectRecordV3Mock).toHaveBeenCalledWith('New scenario');
+  expect(createScenarioProjectRecordMock).toHaveBeenCalledWith('New scenario');
   expect(scenarioSessionService.bumpProjectRevision).toHaveBeenCalledWith(9);
   expect(setScenarioProjectSelectionMock).toHaveBeenCalledWith(
     expect.objectContaining({

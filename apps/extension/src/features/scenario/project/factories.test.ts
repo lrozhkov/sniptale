@@ -1,91 +1,70 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import {
-  appendScenarioStep,
-  appendScenarioSuggestedEvent,
-  createScenarioCaptureStep,
-  createScenarioDividerStep,
-  createScenarioNoteStep,
-  createScenarioProject,
-  createScenarioSectionStep,
+  createGuideImageBlock,
+  createGuideParagraphs,
+  createGuideProject,
+  createGuideStep,
 } from './factories';
-import { createDefaultScenarioPageDescriptor } from './defaults';
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  vi.spyOn(Date, 'now').mockReturnValue(500);
-  vi.spyOn(crypto, 'randomUUID').mockImplementation(
-    (() => {
-      let index = 0;
-      return () => `00000000-0000-4000-8000-${String(++index).padStart(12, '0')}`;
-    })()
-  );
+it('creates independently editable projects with empty optional content', () => {
+  const first = createGuideProject('First', 'first', 10);
+  const second = createGuideProject('Second', 'second', 20);
+  first.style.theme = 'graphite';
+  first.items.push(createGuideStep('', 'step'));
+  expect(second.items).toEqual([]);
+  expect(second.style.theme).toBe('paper');
+  expect(parseGuideProject(first).status).toBe('ok');
+  expect(parseGuideProject(second).status).toBe('ok');
 });
 
-it('creates a project with defaults', () => {
-  const project = createScenarioProject('Onboarding');
-
-  expect(project).toEqual({
-    version: 2,
-    id: '00000000-0000-4000-8000-000000000001',
-    name: 'Onboarding',
-    createdAt: 500,
-    updatedAt: 500,
-    steps: [],
-    trash: [],
-    suggestedEvents: [],
-    tags: [],
-  });
-});
-
-it('creates the default page descriptor and capture step defaults', () => {
-  const step = createScenarioCaptureStep({
-    assetId: 'asset-1',
-  });
-
-  expect(createDefaultScenarioPageDescriptor()).toEqual({
-    title: null,
-    url: null,
-    viewport: { x: 0, y: 0, width: 720, height: 420 },
-    scrollX: 0,
-    scrollY: 0,
-    devicePixelRatio: 1,
-  });
-  expect(step).toEqual(
-    expect.objectContaining({
-      id: '00000000-0000-4000-8000-000000000001',
-      kind: 'capture',
-      assetId: 'asset-1',
-      captureSurface: 'visible',
-      sourceKind: 'manual',
-      overlays: [],
-      imageTransform: { scale: 1, x: 0, y: 0 },
-      viewportTransform: { x: 0, y: 0, width: 720, height: 420 },
+it('supports multiple independent images and repeated text blocks within one step', () => {
+  const project = createGuideProject('Guide', 'guide', 10);
+  const step = createGuideStep('', 'step');
+  step.blocks.push(
+    {
+      kind: 'text',
+      id: 'text',
+      paragraphs: createGuideParagraphs('<script>literal</script>\nSecond paragraph'),
+    },
+    createGuideImageBlock({
+      id: 'image-1',
+      assetId: 'logical-asset',
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: 'first.png' },
+    }),
+    createGuideImageBlock({
+      id: 'image-2',
+      assetId: 'logical-asset',
+      width: 400,
+      height: 300,
+      source: { kind: 'import', filename: 'second.png' },
     })
   );
+  project.items.push(step);
+  expect(parseGuideProject(project).status).toBe('ok');
+  expect(step.blocks[0]).toMatchObject({
+    paragraphs: [
+      { runs: [{ text: '<script>literal</script>', href: null }] },
+      { runs: [{ text: 'Second paragraph', href: null }] },
+    ],
+  });
 });
 
-it('creates text steps and immutable append operations', () => {
-  const project = createScenarioProject('Guide');
-  const section = createScenarioSectionStep({ title: 'Section' });
-  const note = createScenarioNoteStep({ title: 'Note', tone: 'warning' });
-  const divider = createScenarioDividerStep();
-  const updatedProject = appendScenarioStep(project, section);
-  const suggestedProject = appendScenarioSuggestedEvent(updatedProject, {
-    id: 'event-1',
-    kind: 'click',
-    status: 'pending',
-    createdAt: 501,
-    message: 'Clicked',
-    sourceStepId: null,
-    target: null,
-    data: {},
+it('fits tall captures into valid frames without changing their stored asset', () => {
+  const project = createGuideProject('Long page', 'long-project', 1);
+  const step = createGuideStep('', 'long-step');
+  const image = createGuideImageBlock({
+    id: 'long-image',
+    assetId: 'original-tall-asset',
+    width: 1000,
+    height: 20000,
+    source: { kind: 'import', filename: 'long.png' },
   });
-
-  expect(note.tone).toBe('warning');
-  expect(divider.kind).toBe('divider');
-  expect(updatedProject.steps).toEqual([section]);
-  expect(project.steps).toEqual([]);
-  expect(suggestedProject.suggestedEvents).toEqual([
-    expect.objectContaining({ id: 'event-1', kind: 'click' }),
-  ]);
+  step.blocks.push(image);
+  project.items.push(step);
+  expect(parseGuideProject(project).status).toBe('ok');
+  expect(image.frame.width / image.frame.height).toBe(0.05);
+  expect(image.assetId).toBe('original-tall-asset');
 });

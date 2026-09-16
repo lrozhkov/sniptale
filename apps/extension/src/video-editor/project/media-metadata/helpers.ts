@@ -1,5 +1,5 @@
 import { translate } from '../../../platform/i18n';
-export { loadAudioPeaks } from './audio-peaks';
+export { loadAudioPeaks } from '../../../composition/library-preview/audio-peaks';
 
 interface MediaDurationResult {
   duration: number;

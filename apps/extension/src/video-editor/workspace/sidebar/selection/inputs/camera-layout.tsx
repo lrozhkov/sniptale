@@ -3,7 +3,7 @@ import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/select
 import { MediaFitModeSelect, MediaFitScaleControls } from './media-frame';
 import { useState, type ReactNode } from 'react';
 import { CompactSelect } from '../../../../../ui/compact-inspector-controls';
-import { formatPreciseTime } from '../../../../contracts/time-format';
+import { formatPreciseTime } from '../../../../../composition/library-preview/time-format';
 import { Plus, Trash2, Maximize, EyeOff, Scan } from 'lucide-react';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
 import { SelectInput } from '../shared/controls';

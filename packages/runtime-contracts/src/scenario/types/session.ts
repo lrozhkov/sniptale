@@ -37,6 +37,8 @@ export interface ScenarioExportResult {
 }
 
 export interface ScenarioAssetEntry extends ScenarioAssetMetadata {
+  /** Present only for audio; audio has zero spatial dimensions. */
+  duration?: number | undefined;
   id: string;
   projectId: string;
   galleryAssetId: string | null;

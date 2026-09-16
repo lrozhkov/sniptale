@@ -1,0 +1,47 @@
+import { defineMessageSource } from '../../source';
+export const scenarioEditorHtmlImageMessages = defineMessageSource({
+  htmlImages: { ru: 'Изображения в HTML', en: 'HTML images' },
+  htmlImageOpen: { ru: 'Открыть изображение', en: 'Open image' },
+  htmlContent: { ru: 'Что сохранять', en: 'Saved content' },
+  htmlFull: { ru: 'Полное изображение', en: 'Full image' },
+  htmlFrame: { ru: 'Видимый фрагмент', en: 'Visible frame' },
+  htmlOptimize: { ru: 'Оптимизировать размер', en: 'Optimize size' },
+  htmlOptimizeHint: {
+    ru: 'WebP с потерями. Мелкий текст может стать менее чётким.',
+    en: 'Lossy WebP. Small text may become less sharp.',
+  },
+  htmlMaxEdge: { ru: 'Максимальная сторона', en: 'Maximum edge' },
+  htmlQuality: { ru: 'Качество WebP', en: 'WebP quality' },
+  htmlViewer: { ru: 'Просмотр по нажатию', en: 'Click to view' },
+  htmlViewerHint: {
+    ru: 'Открывается сохранённая версия. При сохранении фрагмента остальная часть изображения не попадёт в файл.',
+    en: 'Opens the saved version. Frame-only export excludes pixels outside the frame.',
+  },
+  htmlInherit: { ru: 'Настройки сценария', en: 'Guide defaults' },
+  htmlCommon: { ru: 'Для сценария', en: 'Guide defaults' },
+  htmlSelected: { ru: 'Выбранные', en: 'Selected images' },
+  htmlMixed: {
+    ru: 'Настройки различаются. Изменится только выбранный параметр.',
+    en: 'Settings differ. Only the edited property will change.',
+  },
+  htmlReset: { ru: 'Вернуть общие настройки', en: 'Restore guide defaults' },
+  htmlResetAll: { ru: 'Сбросить все исключения', en: 'Reset all overrides' },
+  htmlSelectAll: { ru: 'Выбрать все', en: 'Select all images' },
+  htmlSelect: { ru: 'Выбрать изображение', en: 'Select image' },
+  htmlMeasure: { ru: 'Рассчитать размер', en: 'Calculate size' },
+  htmlSave: { ru: 'Сохранить HTML', en: 'Save HTML' },
+  htmlBack: { ru: 'К просмотру сценария', en: 'Back to guide preview' },
+  htmlPreviewLoading: { ru: 'Подготовка изображения…', en: 'Preparing image…' },
+  htmlPreviewFailed: {
+    ru: 'Не удалось подготовить изображение. Выберите его повторно.',
+    en: 'Could not prepare the image. Select it again to retry.',
+  },
+  htmlPreview: { ru: 'Сохранённое изображение', en: 'Saved image preview' },
+  htmlFit: { ru: 'Вписать', en: 'Fit' },
+  htmlEmpty: { ru: 'В сценарии нет изображений', en: 'This guide has no images' },
+  htmlMeasureHint: {
+    ru: 'Размер включает изображения, шрифты и просмотрщик. Изменения настроек сохраняются автоматически.',
+    en: 'Size includes images, fonts and viewer. Settings are saved automatically.',
+  },
+  htmlException: { ru: 'Свои настройки', en: 'Override' },
+});

@@ -32,8 +32,20 @@ it('renders recent scenario projects with project-scoped editor links', () => {
   const markup = renderToStaticMarkup(
     <GalleryScenarioProjectsCard
       scenarioProjects={[
-        { id: 'project-1', name: 'Scenario one', createdAt: 1, updatedAt: 2 },
-        { id: 'project-2', name: 'Scenario two', createdAt: 3, updatedAt: 4 },
+        {
+          availability: 'available' as const,
+          id: 'project-1',
+          name: 'Scenario one',
+          createdAt: 1,
+          updatedAt: 2,
+        },
+        {
+          availability: 'available' as const,
+          id: 'project-2',
+          name: 'Scenario two',
+          createdAt: 3,
+          updatedAt: 4,
+        },
       ]}
     />
   );

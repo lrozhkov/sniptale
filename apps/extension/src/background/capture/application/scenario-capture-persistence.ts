@@ -1,5 +1,5 @@
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
-import { saveScenarioCaptureSlideToProject } from '../../../composition/persistence/scenario/store/v3';
+import { saveScenarioCaptureStepToProject } from '../../../composition/persistence/scenario/store/capture-step';
 import type { ScenarioSessionService } from '../../scenario/session-service/index';
 import { ensureScenarioCaptureProject } from '../../scenario/router/project-selection';
 
@@ -60,7 +60,7 @@ export async function persistScenarioCaptureFromBackground(args: {
     return;
   }
 
-  await saveScenarioCaptureSlideToProject(
+  await saveScenarioCaptureStepToProject(
     buildScenarioSaveArgs({
       dataUrl: args.dataUrl,
       galleryAssetId: args.galleryAssetId,

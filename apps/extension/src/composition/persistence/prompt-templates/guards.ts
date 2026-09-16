@@ -16,6 +16,7 @@ interface ParsedTemplateOrderStorageValue {
 function isPromptTemplate(value: unknown): value is PromptTemplate {
   return (
     isRecord(value) &&
+    (value['scope'] === undefined || value['scope'] === 'page' || value['scope'] === 'scenario') &&
     isString(value['id']) &&
     isString(value['name']) &&
     isString(value['content']) &&

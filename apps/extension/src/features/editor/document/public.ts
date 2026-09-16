@@ -10,3 +10,4 @@ export {
   resolveDefaultBorderPreset,
   resolveDefaultBorderPresetVisual,
 } from './highlighter-projection';
+export { hasSameEditorImageGeometry } from './image-geometry';

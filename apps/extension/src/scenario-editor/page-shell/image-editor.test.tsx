@@ -1,202 +1,252 @@
 // @vitest-environment jsdom
-
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { EditorDocument } from '../../features/editor/document/types';
+import { createGuideProject } from '../../features/scenario/project/public';
+import { createTranslator } from '../../platform/i18n';
 import {
-  createScenarioImageElement,
-  createScenarioProjectV3,
-} from '../../features/scenario/project/v3';
-import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import { ScenarioImageElementEditorMount } from './image-editor';
-import type { useScenarioV3EditorState } from './state';
-
-type ScenarioV3EditorState = ReturnType<typeof useScenarioV3EditorState>;
-
-const editedAssetMock = vi.hoisted(() => ({
-  prepareScenarioEditedCaptureAsset: vi.fn(),
-  prepareScenarioStepEditorDocumentRecord: vi.fn(),
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+  DEFAULT_BROWSER_FRAME_STATE,
+} from '../../features/editor/document/constants';
+const io = vi.hoisted(() => ({ prepare: vi.fn(), apply: vi.fn(), close: vi.fn() }));
+vi.mock('../../workflows/scenario-capture-edit/source', () => ({
+  prepareScenarioImageEditorPayload: io.prepare,
 }));
-const hostMock = vi.hoisted(() => ({
-  lastApply: null as
-    | null
-    | ((payload: { dataUrl: string; document: EditorDocument }) => Promise<void>),
+vi.mock('../../platform/navigation/extension-pages', () => ({
+  buildScenarioImageEditorUrl: (id: string) => `/editor?embed=scenario&embedSession=${id}`,
 }));
-
-vi.mock('../../workflows/scenario-capture-edit/edits', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../workflows/scenario-capture-edit/edits')>()),
-  prepareScenarioEditedCaptureAsset: editedAssetMock.prepareScenarioEditedCaptureAsset,
+vi.mock('../../workflows/scenario-capture-edit/tour-source', () => ({
+  prepareTourImageEditorPayload: io.prepare,
 }));
-vi.mock(
-  '../../composition/persistence/scenario/store/step-editor-documents',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../composition/persistence/scenario/store/step-editor-documents')
-    >()),
-    prepareScenarioStepEditorDocumentRecord:
-      editedAssetMock.prepareScenarioStepEditorDocumentRecord,
-  })
-);
-vi.mock('../workspace/embedded-editor-host/ScenarioImageElementEditorHost', () => ({
-  ScenarioImageElementEditorHost: (props: {
-    onApply: (payload: { dataUrl: string; document: EditorDocument }) => Promise<void>;
-    onClose: () => void;
-  }) => {
-    hostMock.lastApply = props.onApply;
-    return <button onClick={props.onClose}>image host</button>;
-  },
-}));
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-function createEditor(): ScenarioV3EditorState {
-  const image = {
-    ...createScenarioImageElement({
-      assetRef: { assetId: 'asset-1', galleryAssetId: 'gallery-1' },
-      editDocumentId: 'doc-1',
-    }),
-    id: 'image-1',
-  };
-  const project: ScenarioProjectV3 = {
-    ...createScenarioProjectV3('Image deck'),
-    id: 'project-1',
-    slides: [{ ...createScenarioProjectV3('Image deck').slides[0]!, elements: [image] }],
-  };
-
-  return {
-    elementActions: { updateElement: vi.fn() },
-    elements: [image],
-    project,
-    projectActions: {
-      applyProject: vi.fn(),
-      commitAggregateMutation: vi.fn().mockResolvedValue(undefined),
-      getCurrentProject: () => project,
-    },
-  } as unknown as ScenarioV3EditorState;
-}
-
-function renderMount(editor = createEditor(), elementId: string | null = 'image-1') {
-  const onClose = vi.fn();
-
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
-  act(() => {
-    root?.render(
-      <ScenarioImageElementEditorMount editor={editor} elementId={elementId} onClose={onClose} />
-    );
-  });
-
-  return { editor, onClose };
-}
-
+import { GuideImageEditor, TourImageEditor } from './image-editor';
+let root: Root;
+let host: HTMLDivElement;
+const target = {
+  projectId: 'guide',
+  itemId: 'step',
+  blockId: 'image',
+  assetId: 'asset',
+  editDocumentId: null,
+};
+const payload = { dataUrl: 'data:image/png;base64,abc', title: 'Image' };
+const editorDocument = {
+  version: 2 as const,
+  sourceImageData: payload.dataUrl,
+  sourceName: null,
+  sourceWidth: 320,
+  sourceHeight: 180,
+  canvasWidth: 320,
+  canvasHeight: 180,
+  sourceLeft: 0,
+  sourceTop: 0,
+  sourceDisplayWidth: 320,
+  sourceDisplayHeight: 180,
+  frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+  browserFrame: DEFAULT_BROWSER_FRAME_STATE,
+  canvasJson: '{"version":"7.2.0","objects":[]}',
+};
 beforeEach(() => {
   vi.clearAllMocks();
-  hostMock.lastApply = null;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  editedAssetMock.prepareScenarioEditedCaptureAsset.mockResolvedValue({
-    asset: { galleryAssetId: 'gallery-edited', id: 'asset-edited' },
-    entry: { id: 'asset-edited', projectId: 'project-1' },
-  });
-  editedAssetMock.prepareScenarioStepEditorDocumentRecord.mockImplementation((value) => value);
+  io.prepare.mockResolvedValue({ target, payload });
+  io.apply.mockResolvedValue(true);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
 });
-
 afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  root = null;
-  container?.remove();
-  container = null;
+  act(() => root.unmount());
+  host.remove();
   vi.unstubAllGlobals();
 });
-
-it('applies embedded image edits atomically to the selected image element', async () => {
-  const { editor } = renderMount();
-
-  await act(async () => {
-    await hostMock.lastApply?.({
-      dataUrl: 'data:image/png;base64,edited',
-      document: createEditorDocument(),
-    });
-  });
-
-  expect(editedAssetMock.prepareScenarioEditedCaptureAsset).toHaveBeenCalledWith({
-    dataUrl: 'data:image/png;base64,edited',
-    galleryAssetId: 'gallery-1',
-    projectId: 'project-1',
-  });
-  expect(editedAssetMock.prepareScenarioStepEditorDocumentRecord).toHaveBeenCalledWith({
-    document: createEditorDocument(),
-    projectId: 'project-1',
-    stepId: 'doc-1',
-  });
-  expect(editor.projectActions.commitAggregateMutation).toHaveBeenCalledWith(expect.any(Function), {
-    assetPuts: [expect.objectContaining({ id: 'asset-edited' })],
-    editorDocumentPuts: [expect.objectContaining({ stepId: 'doc-1' })],
-  });
-});
-
-it('does not mount the host when no selected image element exists', () => {
-  renderMount(createEditor(), null);
-
-  expect(container?.textContent).toBe('');
-  expect(hostMock.lastApply).toBeNull();
-});
-
-it('does not mutate the editor when aggregate persistence fails', async () => {
-  const editor = createEditor();
-  const error = new Error('document failed');
-  renderMount(editor);
-  vi.mocked(editor.projectActions.commitAggregateMutation).mockRejectedValue(error);
-
-  await expect(
-    act(async () => {
-      await hostMock.lastApply?.({
-        dataUrl: 'data:image/png;base64,edited',
-        document: createEditorDocument(),
-      });
-    })
-  ).rejects.toThrow('document failed');
-
-  expect(editor.elementActions.updateElement).not.toHaveBeenCalled();
-});
-
-function createEditorDocument(): EditorDocument {
+async function render() {
+  await act(async () =>
+    root.render(
+      <GuideImageEditor
+        project={createGuideProject('Guide', 'guide', 100)}
+        itemId="step"
+        blockId="image"
+        onApply={io.apply}
+        onClose={io.close}
+        t={createTranslator('en')}
+      />
+    )
+  );
+}
+function frame() {
+  const element = host.querySelector('iframe');
+  if (!element?.contentWindow) throw new Error('Missing iframe');
   return {
-    browserFrame: { canvasMode: 'resize', contentMode: 'fit-content', title: '', url: '' },
-    canvasHeight: 1,
-    canvasJson: '{}',
-    canvasWidth: 1,
-    frame: {
-      backgroundBlurAmount: 0,
-      backgroundColor: '#fff',
-      backgroundGradientAngle: 90,
-      backgroundGradientFrom: '#fff',
-      backgroundGradientTo: '#000',
-      backgroundImageData: null,
-      backgroundImageFit: 'cover',
-      backgroundMode: 'color',
-      browserMode: false,
-      browserTitle: '',
-      browserUrl: '',
-      layoutMode: 'fit-image',
-      paddingBottom: 0,
-      paddingLeft: 0,
-      paddingRight: 0,
-      paddingTop: 0,
-    },
-    sourceDisplayHeight: 1,
-    sourceDisplayWidth: 1,
-    sourceHeight: 1,
-    sourceImageData: 'data:image/png;base64,source',
-    sourceLeft: 0,
-    sourceName: null,
-    sourceTop: 0,
-    sourceWidth: 1,
-    version: 2,
+    element,
+    child: element.contentWindow,
+    id: new URL(element.src).searchParams.get('embedSession'),
   };
 }
+async function send(
+  type: string,
+  fields: Record<string, unknown> = {},
+  source?: Window,
+  origin = window.location.origin
+) {
+  const current = frame();
+  await act(async () =>
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: source ?? current.child,
+        origin,
+        data: { source: 'sniptale-editor-embed', sessionId: current.id, type, ...fields },
+      })
+    )
+  );
+}
+it('binds initialization and apply to the exact iframe session and suppresses duplicate application', async () => {
+  await render();
+  const childPost = vi.spyOn(frame().child, 'postMessage').mockImplementation(() => undefined);
+  await send('scenario-ready', {}, window);
+  await send('scenario-ready', {}, undefined, 'https://foreign.test');
+  await send('scenario-ready', { sessionId: 'stale' });
+  expect(childPost).not.toHaveBeenCalled();
+  await send('scenario-ready');
+  expect(host.querySelector('header')).toBeNull();
+  expect(host.querySelector('.guide-image-editor-feedback')).toBeNull();
+  await send('scenario-ready');
+  expect(childPost).toHaveBeenCalledOnce();
+  expect(childPost).toHaveBeenCalledWith(
+    expect.objectContaining({ type: 'scenario-init', payload }),
+    window.location.origin
+  );
+  let accept!: (value: boolean) => void;
+  io.apply.mockReturnValue(
+    new Promise<boolean>((resolve) => {
+      accept = resolve;
+    })
+  );
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  await send('scenario-close');
+  expect(io.apply).toHaveBeenCalledOnce();
+  expect(io.apply).toHaveBeenCalledWith({
+    target,
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+  });
+  expect(io.close).not.toHaveBeenCalled();
+  await act(async () => accept(true));
+  expect(io.close).toHaveBeenCalledOnce();
+});
+it('keeps the same editor on apply failure and permits an explicit retry', async () => {
+  await render();
+  const original = frame().element;
+  await send('scenario-ready');
+  io.apply.mockResolvedValueOnce(false);
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  expect(frame().element).toBe(original);
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Your edits remain');
+  expect(io.close).not.toHaveBeenCalled();
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  expect(io.close).toHaveBeenCalledOnce();
+});
+it('cancels without publication and drops a late source acquisition', async () => {
+  let resolve!: (value: unknown) => void;
+  io.prepare.mockReturnValue(
+    new Promise((accept) => {
+      resolve = accept;
+    })
+  );
+  await render();
+  await act(async () => host.querySelector('button')?.click());
+  expect(io.close).toHaveBeenCalledOnce();
+  expect(io.apply).not.toHaveBeenCalled();
+  await act(async () => root.render(null));
+  await act(async () => resolve({ target, payload }));
+  expect(host.querySelector('iframe')).toBeNull();
+});
+it('retries source load failures with a new disposable session', async () => {
+  io.prepare.mockRejectedValueOnce(new Error('private storage error'));
+  await render();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not open');
+  expect(host.textContent).not.toContain('private storage');
+  const retry = [...host.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Retry loading'
+  );
+  await act(async () => retry?.click());
+  expect(host.querySelector('iframe')).not.toBeNull();
+  expect(io.apply).not.toHaveBeenCalled();
+});
+it('offers retry if the iframe never initializes and ignores its late response', async () => {
+  vi.useFakeTimers();
+  try {
+    await render();
+    await act(async () => vi.advanceTimersByTime(15_000));
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not open');
+    await send('scenario-ready');
+    await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+    expect(io.apply).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+async function renderTour() {
+  await act(async () =>
+    root.render(
+      <TourImageEditor
+        project={createGuideProject('Guide', 'guide', 100)}
+        slideId="slide"
+        onApply={io.apply}
+        onClose={io.close}
+        t={createTranslator('en')}
+      />
+    )
+  );
+  await send('scenario-ready');
+}
+it('requires host confirmation for ambiguous tour geometry and retains the same editor on cancellation', async () => {
+  await renderTour();
+  const original = frame().element;
+  io.apply.mockResolvedValueOnce('requires-target-review');
+  await send('scenario-apply', {
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+    allowTargetReview: true,
+  });
+  expect(io.apply).toHaveBeenLastCalledWith({
+    target,
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+    allowTargetReview: false,
+  });
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+  await send('scenario-close');
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  expect(io.apply).toHaveBeenCalledOnce();
+  expect(io.close).not.toHaveBeenCalled();
+  const cancel = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Keep editing'
+  );
+  await act(async () => cancel?.click());
+  expect(frame().element).toBe(original);
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  io.apply.mockResolvedValueOnce('requires-target-review');
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  const confirm = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Apply and review'
+  );
+  await act(async () => confirm?.click());
+  expect(io.apply).toHaveBeenLastCalledWith({
+    target,
+    dataUrl: payload.dataUrl,
+    document: editorDocument,
+    allowTargetReview: true,
+  });
+  expect(io.close).toHaveBeenCalledOnce();
+});
+it('disposes a pending tour review when leaving the image session', async () => {
+  await renderTour();
+  io.apply.mockResolvedValueOnce('requires-target-review');
+  await send('scenario-apply', { dataUrl: payload.dataUrl, document: editorDocument });
+  await act(async () => root.render(null));
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(io.close).not.toHaveBeenCalled();
+  expect(io.apply).toHaveBeenCalledOnce();
+});

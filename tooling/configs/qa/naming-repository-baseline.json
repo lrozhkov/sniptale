@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.naming",
-  "findingCount": 20,
-  "findingDigest": "sha256:24398fa9b46ced714068e10ac0e59126e016b8f678919bae7c63d0bc5df45cd1",
+  "findingCount": 19,
+  "findingDigest": "sha256:0cbfe5260647626d7f50cca43ec2c8938c6c3e5d4fa4ef5a0d826e829415516e",
   "rationales": [
     {
       "id": "noise.naming.reviewed-owner-context",
@@ -71,11 +71,6 @@
     {
       "file": "apps/extension/src/offscreen/project-export/media/audio.ts",
       "rule": "repeated-child-prefix-topology",
-      "noiseId": "noise.naming.reviewed-owner-context"
-    },
-    {
-      "file": "apps/extension/src/scenario-editor/project/ai/attachments/render/render.ts",
-      "rule": "repeated-prefix-naming",
       "noiseId": "noise.naming.reviewed-owner-context"
     },
     {

@@ -1,3 +1,4 @@
+import { createGuideProject } from '../../../../features/scenario/project/factories';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('../../assets', async (importOriginal) => ({
@@ -48,19 +49,10 @@ import {
 function createProjectRecord(id: string, name: string, createdAt: number, updatedAt: number) {
   return {
     id,
-    project: {
-      version: 2 as const,
-      id,
-      name,
-      createdAt,
-      updatedAt,
-      steps: [],
-      trash: [],
-      suggestedEvents: [],
-      tags: [],
-    },
+    project: { ...createGuideProject(name, id, createdAt), updatedAt },
     createdAt,
     updatedAt,
+    workspaceRevision: 1,
   };
 }
 
@@ -92,6 +84,8 @@ function createScenarioExportRecord(id: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dbGetMock.mockReset();
+  txGetMock.mockReset();
   initDBMock.mockResolvedValue({
     get: dbGetMock,
     getAll: dbGetAllMock,
@@ -111,24 +105,17 @@ beforeEach(() => {
 });
 
 it('stores scenario projects with refreshed timestamps and parses reads', async () => {
-  txGetMock.mockResolvedValueOnce({
-    id: 'project-1',
-    project: { id: 'project-1', name: 'Existing', createdAt: 10, updatedAt: 10 },
-    createdAt: 10,
-    updatedAt: 10,
-  });
+  txGetMock.mockResolvedValueOnce(createProjectRecord('project-1', 'Existing', 10, 10));
   dbGetMock.mockResolvedValueOnce(createProjectRecord('project-1', 'Existing', 10, 12345));
 
   await expect(
     saveScenarioProject({
-      version: 2,
+      ...createGuideProject('', 'fixture', 0),
+      version: 4,
       id: 'project-1',
-      name: 'Existing',
+      name: 'Updated',
       createdAt: 10,
       updatedAt: 10,
-      steps: [],
-      trash: [],
-      suggestedEvents: [],
       tags: [],
     })
   ).resolves.toEqual(
@@ -171,22 +158,24 @@ it('lists and cascade-deletes stored scenario projects', async () => {
 
   await expect(listScenarioProjects()).resolves.toEqual([
     {
+      availability: 'available' as const,
       id: 'project-1',
       name: 'Existing',
       createdAt: 10,
       updatedAt: 12345,
       tags: [],
       lifecycle: { savedAt: 12345, storageClass: 'library', updatedAt: 12345 },
-      workspaceRevision: 0,
+      workspaceRevision: 1,
     },
     {
+      availability: 'available' as const,
       id: 'project-2',
       name: 'Older',
       createdAt: 5,
       updatedAt: 20,
       tags: [],
       lifecycle: { savedAt: 20, storageClass: 'library', updatedAt: 20 },
-      workspaceRevision: 0,
+      workspaceRevision: 1,
     },
   ]);
   await deleteScenarioProject('project-1');
@@ -206,14 +195,12 @@ it('handles missing project records and guarded fresh project timestamps', async
 
   await saveScenarioProject(
     {
-      version: 2,
+      ...createGuideProject('', 'fixture', 0),
+      version: 4,
       id: 'project-new',
       name: 'Fresh',
       createdAt: 77,
       updatedAt: 77,
-      steps: [],
-      trash: [],
-      suggestedEvents: [],
       tags: [],
     },
     { baseUpdatedAt: null }
@@ -236,26 +223,16 @@ it('returns raw scenario project entries for restore ownership checks', async ()
   await expect(getScenarioProjectEntry('project-raw')).resolves.toEqual({
     ...record,
     lifecycle: { savedAt: record.updatedAt, storageClass: 'library', updatedAt: record.updatedAt },
-    workspaceRevision: 0,
+    workspaceRevision: 1,
   });
   expect(dbGetMock).toHaveBeenCalledWith('scenario_projects', 'project-raw');
 });
 
-it('uses now as createdAt fallback for fresh projects', async () => {
-  txGetMock.mockResolvedValueOnce(undefined);
-  const projectWithoutCreatedAt = createProjectRecord('project-now', 'Fresh now', 123, 0).project;
-  Reflect.deleteProperty(projectWithoutCreatedAt, 'createdAt');
-
-  await saveScenarioProject(projectWithoutCreatedAt);
-
-  expect(txPutMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      id: 'project-now',
-      createdAt: 12345,
-      updatedAt: 12345,
-    })
-  );
-  expect(txPutMock).toHaveBeenCalledTimes(1);
+it('rejects malformed project data before writing instead of inventing timestamps', async () => {
+  const invalid = createProjectRecord('project-now', 'Invalid', 123, 0).project;
+  Reflect.deleteProperty(invalid, 'createdAt');
+  await expect(saveScenarioProject(invalid)).rejects.toThrow('Invalid guide project');
+  expect(txPutMock).not.toHaveBeenCalled();
 });
 
 it('rejects stale scenario project saves inside the write transaction before writing', async () => {
@@ -265,14 +242,12 @@ it('rejects stale scenario project saves inside the write transaction before wri
   await expect(
     saveScenarioProject(
       {
-        version: 2,
+        ...createGuideProject('', 'fixture', 0),
+        version: 4,
         id: 'project-1',
         name: 'Stale',
         createdAt: 10,
         updatedAt: 100,
-        steps: [],
-        trash: [],
-        suggestedEvents: [],
         tags: [],
       },
       { baseUpdatedAt: 100 }

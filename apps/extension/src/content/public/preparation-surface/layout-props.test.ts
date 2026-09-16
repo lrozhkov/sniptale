@@ -15,6 +15,7 @@ function createScenarioController(): PreparationSurfaceControllers['scenarioCont
     pendingProjectSelection: false,
     projects: [
       {
+        availability: 'available' as const,
         id: 'project-1',
         name: 'Project 1',
         createdAt: 1,
@@ -25,7 +26,6 @@ function createScenarioController(): PreparationSurfaceControllers['scenarioCont
     recentSteps: [],
     rememberProjectSelection: true,
     refreshSession: vi.fn(),
-    restoreRecentStep: vi.fn(),
     saveSelectionCapture: vi.fn(),
     scenarioCaptureMode: 'manual',
     scenarioEnabled: true,
@@ -37,7 +37,6 @@ function createScenarioController(): PreparationSurfaceControllers['scenarioCont
     setRememberProjectSelection: vi.fn(),
     setSidebarVisible: vi.fn(),
     sidebarVisible: true,
-    trashedSteps: [],
   };
 }
 

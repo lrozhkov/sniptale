@@ -7,7 +7,6 @@ import {
   assertScenarioProjectMatchesSession,
   deleteScenarioStepUseCase,
   moveScenarioStepUseCase,
-  restoreScenarioStepUseCase,
 } from './use-case';
 
 function createActiveSession(projectId = 'project-1'): ScenarioSessionState {
@@ -32,7 +31,6 @@ function createPorts(): ScenarioStepMutationPorts {
     repository: {
       deleteStepFromProject: vi.fn(async () => ({ id: 'project-1', updatedAt: 10 })),
       moveStepInProject: vi.fn(async () => ({ id: 'project-1', updatedAt: 20 })),
-      restoreStepFromProject: vi.fn(async () => ({ id: 'project-1', updatedAt: 30 })),
     },
   };
 }
@@ -43,31 +41,24 @@ beforeEach(() => {
   ports = createPorts();
 });
 
-it('runs delete, move, and restore through repository ports and bumps revision after changes', async () => {
+it('runs delete and move through repository ports and bumps revision after changes', async () => {
   await deleteScenarioStepUseCase({
     ports,
     projectId: 'project-1',
     stepId: 'step-1',
     tabId: 7,
   });
-  await moveScenarioStepUseCase({
+  const response = await moveScenarioStepUseCase({
     ports,
     projectId: 'project-1',
     stepId: 'step-1',
     tabId: 7,
     toIndex: 2,
   });
-  const response = await restoreScenarioStepUseCase({
-    ports,
-    projectId: 'project-1',
-    stepId: 'step-1',
-    tabId: 7,
-  });
 
   expect(ports.repository.deleteStepFromProject).toHaveBeenCalledWith('project-1', 'step-1');
   expect(ports.repository.moveStepInProject).toHaveBeenCalledWith('project-1', 'step-1', 2);
-  expect(ports.repository.restoreStepFromProject).toHaveBeenCalledWith('project-1', 'step-1');
-  expect(ports.bumpProjectRevision).toHaveBeenCalledTimes(3);
+  expect(ports.bumpProjectRevision).toHaveBeenCalledTimes(2);
   expect(ports.buildSessionPayload).toHaveBeenLastCalledWith(7);
   expect(response).toEqual({ success: true, session: createActiveSession() });
 });

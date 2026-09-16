@@ -48,6 +48,7 @@ it('parses scenario session responses with projects and step metadata', () => {
     },
     projects: [
       {
+        availability: 'available' as const,
         id: 'project-1',
         name: 'Project 1',
         createdAt: 10,
@@ -58,17 +59,9 @@ it('parses scenario session responses with projects and step metadata', () => {
       {
         id: 'step-1',
         position: 0,
+        numberLabel: '1',
         previewDataUrl: 'data:image/png;base64,1',
         title: 'Step 1',
-      },
-    ],
-    trashedSteps: [
-      {
-        id: 'step-2',
-        deletedAt: 20,
-        kind: 'capture',
-        originalIndex: 1,
-        title: 'Step 2',
       },
     ],
     projectId: 'project-1',
@@ -79,12 +72,11 @@ it('parses scenario session responses with projects and step metadata', () => {
   expect(response.session?.projectId).toBe('project-1');
   expect(response.projects?.[0]?.name).toBe('Project 1');
   expect(response.recentSteps?.[0]?.title).toBe('Step 1');
-  expect(response.trashedSteps?.[0]?.id).toBe('step-2');
   expect(response.stepId).toBe('step-1');
   expect(response.recentSteps?.[0]?.previewDataUrl).toBe('data:image/png;base64,1');
 });
 
-it('parses scenario editor, delete-step, move-step, and restore-step requests', () => {
+it('parses scenario editor, delete-step and move-step requests', () => {
   const openEditorMessage = parseBackgroundRuntimeMessage({
     type: MessageType.SCENARIO_OPEN_EDITOR,
     projectId: 'project-1',
@@ -101,12 +93,6 @@ it('parses scenario editor, delete-step, move-step, and restore-step requests', 
     stepId: 'step-2',
     toIndex: 3,
   });
-  const restoreStepMessage = parseBackgroundRuntimeMessage({
-    type: MessageType.SCENARIO_RESTORE_STEP,
-    projectId: 'project-1',
-    stepId: 'step-2',
-  });
-
   expect(openEditorMessage).toMatchObject({
     type: MessageType.SCENARIO_OPEN_EDITOR,
     projectId: 'project-1',
@@ -120,11 +106,6 @@ it('parses scenario editor, delete-step, move-step, and restore-step requests', 
   expect(moveStepMessage).toMatchObject({
     type: MessageType.SCENARIO_MOVE_STEP,
     toIndex: 3,
-  });
-  expect(restoreStepMessage).toMatchObject({
-    type: MessageType.SCENARIO_RESTORE_STEP,
-    projectId: 'project-1',
-    stepId: 'step-2',
   });
 });
 

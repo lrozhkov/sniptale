@@ -1,6 +1,6 @@
 import { translate } from '../../../platform/i18n';
-import { createScenarioProjectRecordV3 } from '../../../composition/persistence/scenario/store/v3';
-import type { ScenarioPageDescriptor } from '@sniptale/runtime-contracts/scenario/types/v3';
+import { createScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
+import type { ScenarioPageDescriptor } from '@sniptale/runtime-contracts/scenario/types/geometry';
 import type { ScenarioSessionService } from '../session-service';
 
 function formatScenarioProjectTimestamp(createdAt: number): string {
@@ -33,7 +33,7 @@ export async function ensureScenarioCaptureProject(args: {
     };
   }
 
-  const project = await createScenarioProjectRecordV3(
+  const project = await createScenarioProjectRecord(
     createAutoScenarioProjectName({
       ...(args.createdAt !== undefined ? { createdAt: args.createdAt } : {}),
       page: args.page,

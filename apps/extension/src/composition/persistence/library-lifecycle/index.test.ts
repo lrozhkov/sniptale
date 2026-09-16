@@ -4,7 +4,7 @@ import {
   createVideoProjectEntryWithMediaClip,
 } from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createGuideProject } from '../../../features/scenario/project/factories';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 
 const persistenceMocks = vi.hoisted(() => ({
@@ -217,7 +217,7 @@ describe('library lifecycle cleanup and usage', () => {
       updatedAt: 1,
     };
     const legacyVideoProject = createVideoProjectEntry({ id: 'usage-video-legacy' });
-    const scenarioProject = createScenarioProject('Usage scenario');
+    const scenarioProject = createGuideProject('Usage scenario');
     const scenario = {
       createdAt: 1,
       id: scenarioProject.id,

@@ -14,11 +14,7 @@ import type {
   ScenarioProjectEntry,
   StoredScenarioStepEditorDocumentEntry,
 } from './contracts';
-import {
-  parseScenarioAssetEntry,
-  parseScenarioExportEntry,
-  parseScenarioProjectEntry,
-} from './read-guards';
+import { parseScenarioAssetEntry, parseScenarioExportEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents';
 
 interface Store<T = unknown> {
@@ -75,7 +71,7 @@ async function deleteExisting(args: {
   projectId: string;
   stores: ScenarioBackupRestoreStores;
 }) {
-  if (!parseScenarioProjectEntry(await args.stores.projects.get(args.projectId))) return;
+  if ((await args.stores.projects.get(args.projectId)) === undefined) return;
   for (const raw of await args.stores.assets.index('projectId').getAll(args.projectId)) {
     const asset = parseScenarioAssetEntry(raw);
     if (!asset) continue;
@@ -199,7 +195,7 @@ export async function putScenarioProjectBackupRestore(args: {
   strategy: ArchiveRestoreStrategy;
   stores: ScenarioBackupRestoreStores;
 }): Promise<{ conflicted: boolean; imported: boolean }> {
-  const existing = parseScenarioProjectEntry(await args.stores.projects.get(args.root.entry.id));
+  const existing = (await args.stores.projects.get(args.root.entry.id)) !== undefined;
   const childConflict = await hasScenarioChildConflict(args);
   const conflicted = Boolean(existing || childConflict);
   if (conflicted && args.strategy === 'skip') return { conflicted, imported: false };

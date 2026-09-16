@@ -120,5 +120,15 @@
       "apps/extension/src/web-snapshot-viewer/index.tsx",
       "apps/extension/src/web-snapshot-viewer/index.html"
     ]
+  },
+  {
+    "id": "tour-preview-sandbox",
+    "root": "apps/extension/src/tour-preview-sandbox",
+    "manifestOwned": true,
+    "featureRoot": false,
+    "entrypointFiles": [
+      "apps/extension/src/tour-preview-sandbox/index.ts",
+      "apps/extension/src/tour-preview-sandbox/index.html"
+    ]
   }
 ]

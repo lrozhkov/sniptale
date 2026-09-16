@@ -39,26 +39,32 @@ export type ScenarioEditorAiEgressAuthority = {
   contractVersion: typeof AI_EGRESS_AUTHORITY_CONTRACT_VERSION;
   payloadHash: string;
   purpose: 'scenario-editor';
-  scenarioContractVersion: 3;
+  scenarioContractVersion: 4;
 };
 
 export type AiEgressAuthority = ContentAiEgressAuthority | ScenarioEditorAiEgressAuthority;
 
 export type ScenarioEditorCanonicalEgressPayload = {
   attachments: ScenarioAIAttachment[];
-  contractVersion: 3;
+  contractVersion: 4;
+  projectId: string;
+  baseRevision: number;
+  scope: { stepIds: string[]; blockIds: string[]; document?: boolean | undefined };
   projectOutlineJson: string;
   projectSnapshotJson: string;
-  selectedSlideCodeJson: string;
+  selectedStepJson: string;
   toolManifestJson: string;
 };
 
 export type ScenarioEditorEgressPayloadInput = {
   attachments: ScenarioAIAttachment[];
-  contractVersion: 3;
+  contractVersion: 4;
+  projectId: string;
+  baseRevision: number;
+  scope: { stepIds: string[]; blockIds: string[]; document?: boolean | undefined };
   projectOutlineJson?: string | undefined;
   projectSnapshotJson: string;
-  selectedSlideCodeJson?: string | undefined;
+  selectedStepJson?: string | undefined;
   toolManifestJson?: string | undefined;
 };
 
@@ -99,7 +105,7 @@ export const aiEgressAuthoritySchema: z.ZodType<AiEgressAuthority> = z.discrimin
         contractVersion: z.literal(AI_EGRESS_AUTHORITY_CONTRACT_VERSION),
         payloadHash: z.string().regex(SHA256_DIGEST_PATTERN),
         purpose: z.literal('scenario-editor'),
-        scenarioContractVersion: z.literal(3),
+        scenarioContractVersion: z.literal(4),
       })
       .strict(),
   ]

@@ -127,7 +127,14 @@ it('renders scenario items inside the shared grid flow', () => {
   const scenarioItem = createScenarioItem({
     createdAt: 1,
     id: 'scenario:project-1',
-    project: { id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2, tags: ['flow'] },
+    project: {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Scenario',
+      createdAt: 1,
+      updatedAt: 2,
+      tags: ['flow'],
+    },
     tags: ['flow'],
     updatedAt: 2,
   });

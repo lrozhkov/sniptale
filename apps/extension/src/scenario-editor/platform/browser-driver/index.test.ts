@@ -10,17 +10,6 @@ vi.mock('../../../platform/navigation/extension-pages/scenario-editor', () => ({
   buildScenarioEditorUrl: buildScenarioEditorUrlMock,
 }));
 
-vi.mock('@sniptale/runtime-contracts/scenario-editor/session', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/runtime-contracts/scenario-editor/session')>()),
-  readScenarioEditorPresentationSessionId: vi.fn((search: string) =>
-    new URLSearchParams(search).get('presentationSessionId')
-  ),
-  readScenarioEditorPresentationView: vi.fn((search: string) => {
-    const value = new URLSearchParams(search).get('presentationView');
-    return value === 'audience' ? value : null;
-  }),
-}));
-
 import { downloadScenarioEditorBlob, replaceScenarioEditorSelectionInUrl } from '.';
 
 describe('scenario editor browser driver', () => {
@@ -32,6 +21,7 @@ describe('scenario editor browser driver', () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    window.history.replaceState({}, '', '/');
   });
 
   registerDownloadTests();
@@ -72,8 +62,6 @@ function registerSelectionUrlTests() {
     });
 
     expect(buildScenarioEditorUrlMock).toHaveBeenCalledWith({
-      presentationSessionId: null,
-      presentationView: null,
       projectId: 'project-1',
       stepId: 'step-2',
     });
@@ -88,16 +76,10 @@ function registerSelectionUrlTests() {
     });
 
     expect(buildScenarioEditorUrlMock).toHaveBeenLastCalledWith({
-      presentationSessionId: null,
-      presentationView: null,
       projectId: 'project-1',
     });
   });
-  registerPresentationSelectionUrlTests();
-}
-
-function registerPresentationSelectionUrlTests() {
-  it('preserves audience presentation query fields while replacing project selection', () => {
+  it('does not carry obsolete presentation parameters into the selection URL', () => {
     window.history.pushState(
       {},
       '',
@@ -110,8 +92,6 @@ function registerPresentationSelectionUrlTests() {
     });
 
     expect(buildScenarioEditorUrlMock).toHaveBeenLastCalledWith({
-      presentationSessionId: 'session-1',
-      presentationView: 'audience',
       projectId: 'project-1',
     });
   });

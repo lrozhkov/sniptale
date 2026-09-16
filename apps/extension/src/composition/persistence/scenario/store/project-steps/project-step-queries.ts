@@ -1,12 +1,12 @@
 import { getScenarioProject } from '../../projects';
 import type {
   ScenarioRecentStep,
-  ScenarioTrashedStep,
+  ScenarioPreviewStep,
 } from '../../../../../features/scenario/contracts/types/project';
 import { getScenarioAssetBlob } from '../project-records/assets';
 import {
   buildRecentScenarioSteps,
-  buildTrashedScenarioSteps,
+  buildGuidePreviewSteps,
 } from '../../../../../features/scenario/project/step-projections';
 
 /** Lists recent capture steps with preview data. */
@@ -26,12 +26,8 @@ export async function listRecentScenarioSteps(
   });
 }
 
-/** Lists trashed steps for restore-capable recorder surfaces. */
-export async function listScenarioTrashedSteps(projectId: string): Promise<ScenarioTrashedStep[]> {
+/** Returns complete library preview metadata without acquiring image bytes. */
+export async function listScenarioPreviewSteps(projectId: string): Promise<ScenarioPreviewStep[]> {
   const project = await getScenarioProject(projectId);
-  if (!project) {
-    return [];
-  }
-
-  return buildTrashedScenarioSteps(project);
+  return project ? buildGuidePreviewSteps({ project }) : [];
 }

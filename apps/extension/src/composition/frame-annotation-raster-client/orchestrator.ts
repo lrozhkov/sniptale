@@ -7,6 +7,7 @@ import {
   type FrameAnnotationRasterOutputMetadata,
 } from '../persistence/frame-annotation-raster-jobs';
 import type { RuntimeMessagingTransport } from '../../platform/runtime-messaging';
+import { initDB } from '../persistence/infrastructure/indexed-db/core';
 import { runWithPersistenceMutationTransition } from '../persistence/infrastructure/mutation-barrier';
 
 let nextRasterRevision = 1;
@@ -28,6 +29,8 @@ export type FrameAnnotationRasterTransitionOptions = {
 export async function runFrameAnnotationRasterTransition(
   options: FrameAnnotationRasterTransitionOptions
 ): Promise<{ blob: Blob; metadata: FrameAnnotationRasterOutputMetadata }> {
+  // Cold database admission needs the exclusive transition gate before we hold it shared.
+  await initDB();
   const leaseId = crypto.randomUUID();
   try {
     const prepare = await withTimeout(

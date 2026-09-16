@@ -3,9 +3,9 @@ import { BlobReader, ZipReader } from '@zip.js/zip.js';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
-import { createScenarioProjectV3 } from '../../../../apps/extension/src/features/scenario/project/v3';
+import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { betaV2Fixture as betaV2PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v2';
+import { betaV3Fixture as currentPersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v3';
 import { test } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 import {
@@ -44,7 +44,7 @@ const GALLERY_INCLUDE_DRAFTS_DESCRIPTION = translate(
 );
 
 browserTest(
-  'beta-v1 upgrades to beta-v2 and preserves real IndexedDB and OPFS data through reload',
+  'beta-v1 upgrades to current beta and preserves real IndexedDB and OPFS data through reload',
   async ({ page }) => {
     const host = await startHostServer();
     try {
@@ -159,9 +159,9 @@ browserTest(
         };
       }, betaV1PersistenceFixture);
 
-      expect(snapshot.databaseVersion).toBe(betaV2PersistenceFixture.databaseVersion);
-      expect(snapshot.stores).toEqual([...betaV2PersistenceFixture.stores].sort());
-      expect(snapshot.contracts).toEqual(betaV2PersistenceFixture.domainVersions);
+      expect(snapshot.databaseVersion).toBe(currentPersistenceFixture.databaseVersion);
+      expect(snapshot.stores).toEqual([...currentPersistenceFixture.stores].sort());
+      expect(snapshot.contracts).toEqual(currentPersistenceFixture.domainVersions);
       expect(snapshot.objectText).toBe(betaV1PersistenceFixture.opfsObjects[0]?.text);
       expect(snapshot.recordKeys).toMatchObject({
         asset_owners: [['recording', 'beta-v1-recording', 'body']],
@@ -189,7 +189,10 @@ browserTest(
         database.close();
         return { remaining, version: database.version };
       });
-      expect(reopened).toEqual({ remaining: 1, version: betaV2PersistenceFixture.databaseVersion });
+      expect(reopened).toEqual({
+        remaining: 1,
+        version: currentPersistenceFixture.databaseVersion,
+      });
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
@@ -419,7 +422,7 @@ test('gallery backup restores draft media and projects to a fresh Drafts retenti
     updatedAt: createdAt,
   });
   const scenarioProject = {
-    ...createScenarioProjectV3('Draft scenario'),
+    ...createGuideProject('Draft scenario'),
     createdAt,
     id: 'draft-scenario-project',
     updatedAt: createdAt,
@@ -559,7 +562,7 @@ async function readArchivePaths(bytes: number[]): Promise<string[]> {
 async function seedDraftProjectEntries(
   page: Page,
   videoProject: ReturnType<typeof createVideoProject>,
-  scenarioProject: ReturnType<typeof createScenarioProjectV3>,
+  scenarioProject: ReturnType<typeof createGuideProject>,
   updatedAt: number
 ) {
   await page.evaluate(

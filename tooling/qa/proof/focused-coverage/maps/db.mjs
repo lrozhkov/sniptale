@@ -83,9 +83,9 @@ export const FOCUSED_COVERAGE_DB_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/composition/persistence/scenario/aggregate-mutations.ts',
     reason: 'Scenario suites cover aggregate CAS, rollback, and graph deletion.',
     testFiles: [
-      'apps/extension/src/composition/persistence/scenario/store/v3/capture.test.ts',
       'apps/extension/src/composition/persistence/scenario/store/project-records/delete.test.ts',
-      'apps/extension/src/scenario-editor/project/mutation/actions/steps/index.test.ts',
+      'apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts',
+      'apps/extension/src/composition/persistence/scenario/store/capture-step/artifact-persistence.test.ts',
     ],
   },
   {

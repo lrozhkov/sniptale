@@ -87,17 +87,3 @@ export function moveScenarioStepUseCase(args: {
     tabId: args.tabId,
   });
 }
-
-export function restoreScenarioStepUseCase(args: {
-  ports: ScenarioStepMutationPorts;
-  projectId: string;
-  stepId: string;
-  tabId: number;
-}): Promise<ScenarioSessionResponse> {
-  return runAuthorizedStepMutation({
-    mutateProject: () => args.ports.repository.restoreStepFromProject(args.projectId, args.stepId),
-    ports: args.ports,
-    projectId: args.projectId,
-    tabId: args.tabId,
-  });
-}

@@ -46,3 +46,21 @@ it('maps export entries into public facades', () => {
     size: 300,
   });
 });
+
+it('exposes narration duration without exposing physical storage identity', () => {
+  const entry = mapScenarioAssetEntry({
+    assetId: 'physical-audio',
+    id: 'narration',
+    projectId: 'project',
+    galleryAssetId: null,
+    mimeType: 'audio/webm',
+    width: 0,
+    height: 0,
+    duration: 3.5,
+    createdAt: 10,
+    size: 200,
+  });
+  expect(entry.duration).toBe(3.5);
+  expect(entry).not.toHaveProperty('assetId');
+  expect(entry).toMatchObject({ id: 'narration', width: 0, height: 0, mimeType: 'audio/webm' });
+});

@@ -415,3 +415,24 @@ it('filters document names and restores the catalog after an empty search', () =
   search('');
   expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(3);
 });
+
+it('rejects a stale drop for an individually disabled effect', async () => {
+  const catalog = createCatalog();
+  catalog.documents = catalog.documents.map((document) => ({ ...document, enabled: false }));
+  const onApplyEffectDocument = vi.fn(async () => null);
+  const operations: EffectLibraryOperations = {
+    run: vi.fn(async () => {}),
+    disabled: false,
+    operationError: null,
+  };
+  await applyDroppedEffectDocument({
+    catalogs: [{ status: 'ready', catalog }],
+    onApplyEffectDocument,
+    operations,
+    payload: { documentId: 'standalone', kind: 'standalone', packId: catalog.packId },
+    startTime: 0,
+    target: { kind: 'scene' },
+  });
+  expect(operations.run).not.toHaveBeenCalled();
+  expect(onApplyEffectDocument).not.toHaveBeenCalled();
+});

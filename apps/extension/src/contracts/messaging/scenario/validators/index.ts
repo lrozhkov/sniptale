@@ -5,7 +5,6 @@ export {
   isScenarioCaptureSurface,
   isScenarioFramePadding,
   isScenarioStringDataRecord,
-  isScenarioSuggestedEventKind,
   isScenarioPageDescriptor,
   isScenarioTargetDescriptor,
   isScenarioPoint,

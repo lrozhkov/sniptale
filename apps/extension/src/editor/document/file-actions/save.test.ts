@@ -152,14 +152,15 @@ it('passes the requested export output size into the render contract', async () 
 
 it('posts an apply message to the scenario host in embed mode', async () => {
   const postMessageSpy = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
-  window.history.replaceState({}, '', '/editor?embed=scenario');
+  window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session-test');
 
-  await editorFileSave.saveEditorRenderedImage(controller);
+  await editorFileSave.applyEditorRenderedImageToScenario(controller);
 
   expect(postMessageSpy).toHaveBeenCalledWith(
     {
       source: 'sniptale-editor-embed',
       type: 'scenario-apply',
+      sessionId: 'session-test',
       dataUrl: 'data:image/png;base64,abc',
       document: createEditorDocument(),
     },
@@ -182,3 +183,31 @@ it('loads editor save options from enabled presets only and keeps null defaults 
     presets: [{ enabled: true, id: 'preset-default', name: 'Team', order: 0, path: 'team' }],
   });
 });
+
+it.each(['download_default', 'ask_system'] as const)(
+  'keeps %s as a local export in scenario embed mode',
+  async (actionType) => {
+    window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session-test');
+    const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    await editorFileSave.saveEditorRenderedImage(controller, { actionType });
+    expect(mockSendRuntimeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageType.EXECUTE_SAVE,
+        actionType,
+      })
+    );
+    expect(post).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['/editor', '/editor?embed=scenario'])(
+  'rejects explicit apply without a scenario session at %s',
+  async (url) => {
+    window.history.replaceState({}, '', url);
+    const post = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
+    await expect(editorFileSave.applyEditorRenderedImageToScenario(controller)).rejects.toThrow();
+    expect(post).not.toHaveBeenCalled();
+    expect(mockRenderToDataUrl).not.toHaveBeenCalled();
+    expect(mockSendRuntimeMessage).not.toHaveBeenCalled();
+  }
+);

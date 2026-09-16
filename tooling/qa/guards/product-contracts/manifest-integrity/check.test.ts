@@ -59,7 +59,12 @@ function createBaseManifest() {
       16: 'icons/icon-16.png',
     },
     web_accessible_resources: [],
-    sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+    sandbox: {
+      pages: [
+        'apps/extension/src/effect-runtime-sandbox/index.html',
+        'apps/extension/src/tour-preview-sandbox/index.html',
+      ],
+    },
   };
 }
 
@@ -67,6 +72,7 @@ function writeStandardManifestFiles(root: string) {
   writeFile(root, 'apps/extension/src/background/index.ts', 'export {};\n');
   writeFile(root, 'apps/extension/src/popup/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/src/effect-runtime-sandbox/index.html', '<!doctype html>\n');
+  writeFile(root, 'apps/extension/src/tour-preview-sandbox/index.html', '<!doctype html>\n');
   writeFile(
     root,
     'apps/extension/src/background/offscreen-document/create-options.ts',
@@ -90,6 +96,7 @@ function verifiesMissingIconViolation() {
   writeFile(root, 'apps/extension/src/content/index.tsx', 'export {};\n');
   writeFile(root, 'apps/extension/src/popup/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/src/effect-runtime-sandbox/index.html', '<!doctype html>\n');
+  writeFile(root, 'apps/extension/src/tour-preview-sandbox/index.html', '<!doctype html>\n');
   writeFile(
     root,
     'apps/extension/src/background/offscreen-document/create-options.ts',
@@ -112,6 +119,7 @@ function verifiesRootOnlyIconViolation() {
   writeFile(root, 'apps/extension/src/content/index.tsx', 'export {};\n');
   writeFile(root, 'apps/extension/src/popup/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/src/effect-runtime-sandbox/index.html', '<!doctype html>\n');
+  writeFile(root, 'apps/extension/src/tour-preview-sandbox/index.html', '<!doctype html>\n');
   writeFile(root, 'icons/icon-16.png', 'png');
   writeFile(
     root,
@@ -135,6 +143,7 @@ function verifiesMissingEntryViolation() {
   writeManifest(root, manifest);
   writeFile(root, 'apps/extension/src/popup/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/src/effect-runtime-sandbox/index.html', '<!doctype html>\n');
+  writeFile(root, 'apps/extension/src/tour-preview-sandbox/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/public/icons/icon-16.png', 'png');
   writeFile(
     root,

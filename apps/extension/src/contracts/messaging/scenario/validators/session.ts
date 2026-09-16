@@ -1,7 +1,7 @@
+import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../../features/scenario/contracts/types/project';
 import type {
   ScenarioRecorderSurfaceState,
@@ -32,6 +32,9 @@ function isScenarioProjectSummary(value: unknown): value is ScenarioProjectSumma
     isRecord(value) &&
     isString(value['id']) &&
     isString(value['name']) &&
+    (value['availability'] === 'available' ||
+      value['availability'] === 'unsupported' ||
+      value['availability'] === 'invalid') &&
     isNumber(value['createdAt']) &&
     isNumber(value['updatedAt']) &&
     hasOptionalField(value, 'tags', (tags) => Array.isArray(tags) && tags.every(isString))
@@ -55,18 +58,11 @@ function isScenarioRecentStep(value: unknown): value is ScenarioRecentStep {
       );
     }) &&
     isNumber(value['position']) &&
+    (value['numberLabel'] === null ||
+      (isString(value['numberLabel']) &&
+        value['numberLabel'].trim().length > 0 &&
+        value['numberLabel'].length <= GUIDE_LIMITS.maxNumberLabelLength)) &&
     isString(value['previewDataUrl']) &&
-    isString(value['title'])
-  );
-}
-
-function isScenarioTrashedStep(value: unknown): value is ScenarioTrashedStep {
-  return (
-    isRecord(value) &&
-    isString(value['id']) &&
-    isNumber(value['deletedAt']) &&
-    isNumber(value['originalIndex']) &&
-    isString(value['kind']) &&
     isString(value['title'])
   );
 }
@@ -118,11 +114,6 @@ export function isScenarioSessionPayload(value: unknown): value is ScenarioSessi
       value,
       'recentSteps',
       (recentSteps) => Array.isArray(recentSteps) && recentSteps.every(isScenarioRecentStep)
-    ) &&
-    hasOptionalField(
-      value,
-      'trashedSteps',
-      (trashedSteps) => Array.isArray(trashedSteps) && trashedSteps.every(isScenarioTrashedStep)
     ) &&
     hasOptionalField(value, 'projectRevision', isNumber) &&
     hasOptionalField(value, 'snapshot', isScenarioRestoreSnapshot)

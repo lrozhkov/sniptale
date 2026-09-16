@@ -1,156 +1,324 @@
-import type { ScenarioSlideRenderAssetMap } from '../project/stage-render/slide';
-import type { ScenarioCanvasViewportController } from '../canvas/viewport-state';
-import { useScenarioDrawingDocument, type ScenarioDrawingDocument } from '../drawing';
-import { useScenarioV3RenderAssetState } from './assets';
-import { ScenarioV3EditSurface } from './workspace-edit-surface';
-import {
-  advanceScenarioPresentation,
-  getScenarioPresentationSlideIndex,
-  rewindScenarioPresentation,
-} from './presentation/actions';
-import { SCENARIO_EDITOR_MODES, type ScenarioEditorMode } from './presentation/mode';
-import { ScenarioDeckPlaySurface } from './presentation/play-surface';
-import { ScenarioV3FloatingChrome } from './floating-chrome';
-import type { useScenarioV3EditorState } from './state';
-import type { ScenarioV3EditorSaveStatus } from './types';
+import { useGuideHoverIntent } from './hover-intent';
+import { GuideImageUpload } from './image-upload';
+import { resolveGuideNumbering } from '../../features/scenario/project/public';
+import { GuideResources } from './resource-list';
+import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { type ReactNode } from 'react';
+import { FileText, Image, PanelRight, Settings2, X, List, PanelLeft } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { GuidePanelDivider, type useGuidePanels } from './panel-layout';
+import type { GuideProject, GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type { Translate } from '../../platform/i18n';
+import './workspace.css';
+import './inspector.css';
 
-type ScenarioV3EditorState = ReturnType<typeof useScenarioV3EditorState>;
-type ScenarioV3WorkspaceAssetState = ReturnType<typeof useScenarioV3RenderAssetState>;
-
-type ScenarioV3WorkspaceProps = {
-  canvasViewport: ScenarioCanvasViewportController;
-  aiPanelOpen?: boolean;
-  clickIndex: number;
-  editor: ScenarioV3EditorState;
-  inspectorTool: 'export' | null;
-  mode: ScenarioEditorMode;
-  saveStatus?: ScenarioV3EditorSaveStatus | undefined;
-  onClickIndexChange: (clickIndex: number) => void;
-  onClearInspectorTool: () => void;
-  onEditImageElement: (elementId: string) => void;
-  onModeChange: (mode: ScenarioEditorMode) => void;
-  onOpenExport: () => void;
-  onToggleAi: () => void;
+type WorkspaceProps = {
+  panels: ReturnType<typeof useGuidePanels>;
+  project: GuideProject;
+  selectedId: string | null;
+  images: Record<string, string | null>;
+  header: ReactNode;
+  onUploadFile: (file: File, signal: AbortSignal) => Promise<boolean>;
+  disabled: boolean;
+  onSelect: (id: string) => void;
+  onAddStep: () => void;
+  itemActions: ReactNode;
+  inspectedBlockKind?: GuideBlock['kind'] | undefined;
+  children: ReactNode;
+  t: Translate;
 };
 
-export function ScenarioV3Workspace(props: ScenarioV3WorkspaceProps) {
-  const assetState = useScenarioV3RenderAssetState(props.editor.project);
-  const drawingDocument = useScenarioDrawingDocument(props.editor.selectedSlide.id);
-  const rightPanelHidden = props.aiPanelOpen === true;
-
-  if (props.mode !== SCENARIO_EDITOR_MODES.edit) {
-    return (
-      <main className="relative min-h-0 flex-1 overflow-hidden">
-        <ScenarioV3CenterSurface {...props} assetState={assetState} />
-        {renderScenarioFloatingChrome({
-          assetState,
-          props,
-          rightPanelHidden,
-        })}
-      </main>
-    );
-  }
-
+/** Composes the guide-specific outline and content inside the common scenario frame. */
+export function GuideWorkspace(props: WorkspaceProps) {
+  const { project, t } = props;
   return (
-    <main className="relative min-h-0 flex-1 overflow-hidden">
-      <div className="absolute inset-0 min-h-0 min-w-0" data-ui="scenario.canvas.layer">
-        <ScenarioV3CenterSurface
-          {...props}
-          assetState={assetState}
-          drawingDocument={drawingDocument}
-        />
+    <ScenarioWorkspaceFrame
+      panels={props.panels}
+      header={props.header}
+      t={t}
+      left={<GuideWorkspaceLibrary {...props} />}
+      right={<GuideInspector {...props} open={props.panels.rightOpen} />}
+    >
+      <div
+        className="guide-document-scroll"
+        tabIndex={0}
+        aria-label={t('scenario.editor.guideDocument')}
+      >
+        {project.items.length === 0 && (
+          <div className="guide-document-empty">
+            <FileText size={32} aria-hidden="true" />
+            <h2>{t('scenario.editor.guideFirstStep')}</h2>
+            <GuideImageUpload
+              placement={{ kind: 'steps' }}
+              disabled={props.disabled}
+              onUpload={props.onUploadFile}
+              t={t}
+            />
+            <ProductActionButton
+              tone="secondary"
+              compact
+              type="button"
+              disabled={props.disabled}
+              onClick={props.onAddStep}
+            >
+              {t('scenario.editor.guideAddStep')}
+            </ProductActionButton>
+          </div>
+        )}
+        {props.children}
       </div>
-      {renderScenarioFloatingChrome({
-        assetState,
-        props,
-        rightPanelHidden,
+    </ScenarioWorkspaceFrame>
+  );
+}
+
+function GuideWorkspaceLibrary(props: WorkspaceProps) {
+  const { project, selectedId, onSelect, t } = props;
+  return (
+    <FloatingChromePanel
+      role="complementary"
+      id="guide-library-panel"
+      className="guide-library-panel"
+      hidden={!props.panels.leftOpen}
+      aria-label={t('scenario.editor.guideNavigation')}
+    >
+      <div className="guide-panel-heading">
+        <div
+          className="guide-left-navigation"
+          role="group"
+          aria-label={t('scenario.editor.guideNavigation')}
+        >
+          {(
+            [
+              { id: 'structure', Icon: FileText, label: t('scenario.editor.outline') },
+              { id: 'resources', Icon: Image, label: t('scenario.editor.guideResources') },
+            ] as const
+          ).map(({ id, Icon, label }) => (
+            <ContentToolbarButton
+              key={id}
+              title={label}
+              aria-pressed={props.panels.leftSection === id}
+              className="guide-section-tab"
+              onClick={() => props.panels.openLeft(id)}
+            >
+              <Icon size={16} aria-hidden="true" />
+              {props.panels.leftSection === id && <span>{label}</span>}
+            </ContentToolbarButton>
+          ))}
+        </div>
+        <ContentToolbarButton
+          title={t('scenario.editor.close')}
+          aria-controls="guide-library-panel"
+          aria-expanded={true}
+          onClick={props.panels.toggleLeft}
+        >
+          <X size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      <div className="guide-panel-scroll">
+        {props.panels.leftSection === 'structure' ? (
+          <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
+        ) : (
+          <GuideResources {...props} />
+        )}
+      </div>
+      {props.panels.leftSection === 'resources' && (
+        <footer className="guide-resource-footer">
+          <GuideImageUpload
+            compact
+            placement={{ kind: 'steps' }}
+            disabled={props.disabled}
+            onUpload={props.onUploadFile}
+            t={t}
+          />
+        </footer>
+      )}
+    </FloatingChromePanel>
+  );
+}
+
+/** Both representations share the same panel geometry, header position and resize gutters. */
+export function ScenarioWorkspaceFrame({
+  panels,
+  header,
+  left,
+  right,
+  children,
+  t,
+}: {
+  panels: ReturnType<typeof useGuidePanels>;
+  header: ReactNode;
+  left: ReactNode;
+  right: ReactNode;
+  children: ReactNode;
+  t: Translate;
+}) {
+  const hoverIntent = useGuideHoverIntent();
+  return (
+    <div
+      className="guide-workspace"
+      style={panels.style}
+      data-left-open={panels.leftOpen}
+      data-right-open={panels.rightOpen}
+    >
+      {left}
+      {panels.leftOpen && (
+        <GuidePanelDivider side="left" panels={panels} label={t('scenario.editor.outline')} />
+      )}
+      <div ref={hoverIntent} className="guide-center-panel">
+        {header}
+        {children}
+      </div>
+      {panels.rightOpen && (
+        <GuidePanelDivider
+          side="right"
+          panels={panels}
+          label={t('scenario.editor.guideInspector')}
+        />
+      )}
+      {right}
+    </div>
+  );
+}
+
+function GuideOutline({
+  project,
+  selectedId,
+  onSelect,
+  t,
+}: Pick<WorkspaceProps, 'project' | 'selectedId' | 'onSelect' | 't'>) {
+  const numbers = resolveGuideNumbering(project.items);
+  return (
+    <nav aria-label={t('scenario.editor.outline')} className="guide-outline">
+      {project.items.map((item) => {
+        return (
+          <a
+            key={item.id}
+            href={`#${encodeURIComponent(item.id)}`}
+            className={item.kind === 'section' ? 'guide-outline-section' : 'guide-outline-step'}
+            aria-current={selectedId === item.id ? 'step' : undefined}
+            onClick={(event) => {
+              event.preventDefault();
+              onSelect(item.id);
+            }}
+          >
+            <span className="guide-outline-number" aria-hidden="true">
+              {item.kind === 'step' ? numbers.get(item.id)?.label : <FileText size={14} />}
+            </span>
+            <span>{item.title || t('scenario.editor.untitledStep')}</span>
+          </a>
+        );
       })}
-    </main>
+    </nav>
   );
 }
 
-function renderScenarioFloatingChrome(args: {
-  assetState: ScenarioV3WorkspaceAssetState;
-  props: ScenarioV3WorkspaceProps;
-  rightPanelHidden: boolean;
-}) {
-  const { props } = args;
-  return (
-    <ScenarioV3FloatingChrome
-      assets={args.assetState.assets}
-      canvasControls={props.canvasViewport.controls}
-      editor={props.editor}
-      inspectorTool={props.inspectorTool}
-      mode={props.mode}
-      rightPanelHidden={args.rightPanelHidden}
-      saveStatus={props.saveStatus}
-      onClearInspectorTool={props.onClearInspectorTool}
-      onEditImageElement={props.onEditImageElement}
-      onModeChange={props.onModeChange}
-      onOpenExport={props.onOpenExport}
-      onToggleAi={props.onToggleAi}
-    />
-  );
-}
-
-function ScenarioV3CenterSurface(props: {
-  assetState: { assets: ScenarioSlideRenderAssetMap; loading: boolean };
-  canvasViewport: ScenarioCanvasViewportController;
-  clickIndex: number;
-  drawingDocument?: ScenarioDrawingDocument;
-  editor: ScenarioV3EditorState;
-  mode: ScenarioEditorMode;
-  onClickIndexChange: (clickIndex: number) => void;
-  onClearInspectorTool: () => void;
-  onEditImageElement: (elementId: string) => void;
-  onModeChange: (mode: ScenarioEditorMode) => void;
-}) {
-  if (props.mode === SCENARIO_EDITOR_MODES.play) {
-    return <PlaySurface {...props} assets={props.assetState.assets} />;
+/** The fixed panel header names only the object its controls currently edit. */
+function inspectorTitle(props: WorkspaceProps): string {
+  const { t, inspectedBlockKind } = props;
+  if (props.panels.rightScope === 'document') return t('scenario.editor.guideEntireDocument');
+  if (inspectedBlockKind) {
+    const labels = {
+      image: 'scenario.editor.guideAddImage',
+      'image-slot': 'scenario.editor.guideAddImage',
+      text: 'scenario.editor.guideAddText',
+      heading: 'scenario.editor.guideHeading',
+      note: 'scenario.editor.guideAddNote',
+    } as const;
+    return t(labels[inspectedBlockKind]);
   }
+  const selected = props.project.items.find((item) => item.id === props.selectedId);
+  return selected
+    ? selected.title || t('scenario.editor.untitledStep')
+    : t('scenario.editor.guideInspector');
+}
+
+/** Selected-item details and project tools use one scrollable app panel. */
+function GuideInspector(props: WorkspaceProps & { open: boolean }) {
+  const { t } = props;
+  const grouped =
+    props.panels.rightScope === 'selection' &&
+    !props.inspectedBlockKind &&
+    props.project.items.some((item) => item.id === props.selectedId && item.kind === 'step');
   return (
-    <ScenarioV3EditSurface
-      {...props}
-      {...(props.drawingDocument ? { drawingDocument: props.drawingDocument } : {})}
-    />
+    <FloatingChromePanel
+      role="complementary"
+      id="guide-inspector-panel"
+      className="guide-inspector-panel"
+      hidden={!props.open}
+      aria-label={t('scenario.editor.guideInspector')}
+    >
+      <div className="guide-panel-heading">
+        <Settings2 size={16} aria-hidden="true" />
+        <h2 title={inspectorTitle(props)}>{inspectorTitle(props)}</h2>
+        {grouped && (
+          <ContentToolbarButton
+            title={t(
+              props.panels.presentation === 'all'
+                ? 'scenario.editor.inspectorShowSections'
+                : 'scenario.editor.inspectorShowAll'
+            )}
+            aria-pressed={props.panels.presentation === 'all'}
+            onClick={props.panels.togglePresentation}
+          >
+            {props.panels.presentation === 'all' ? (
+              <List size={16} aria-hidden="true" />
+            ) : (
+              <PanelLeft size={16} aria-hidden="true" />
+            )}
+          </ContentToolbarButton>
+        )}
+        <ContentToolbarButton
+          title={t('scenario.editor.close')}
+          aria-controls="guide-inspector-panel"
+          aria-expanded={true}
+          onClick={props.panels.toggleRight}
+        >
+          <X size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      <div className="guide-panel-scroll">{props.itemActions}</div>
+    </FloatingChromePanel>
   );
 }
 
-function PlaySurface(props: {
-  assets: ScenarioSlideRenderAssetMap;
-  clickIndex: number;
-  editor: ScenarioV3EditorState;
-  onClickIndexChange: (clickIndex: number) => void;
-  onModeChange: (mode: ScenarioEditorMode) => void;
+/** Collapsed sections reopen directly into the requested inspector content. */
+export function GuidePanelControls({
+  panels,
+  t,
+  side,
+}: {
+  panels: ReturnType<typeof useGuidePanels>;
+  t: Translate;
+  side: 'left' | 'right';
 }) {
-  const slideIndex = getScenarioPresentationSlideIndex(
-    props.editor.project,
-    props.editor.selectedSlide.id
-  );
+  if (side === 'right')
+    return panels.rightOpen ? null : (
+      <ContentToolbarButton
+        title={t('scenario.editor.guideInspector')}
+        aria-controls="guide-inspector-panel"
+        onClick={panels.toggleRight}
+      >
+        <PanelRight size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+    );
+  if (panels.leftOpen) return null;
   return (
-    <ScenarioDeckPlaySurface
-      assets={props.assets}
-      clickIndex={props.clickIndex}
-      onNext={() => advanceScenarioPresentation(createPresentationActionController(props))}
-      onPrevious={() => rewindScenarioPresentation(createPresentationActionController(props))}
-      onExit={() => props.onModeChange(SCENARIO_EDITOR_MODES.edit)}
-      slide={props.editor.selectedSlide}
-      slideIndex={slideIndex}
-      slideTotal={props.editor.project.slides.length}
-    />
+    <div className="guide-collapsed-sections">
+      <ContentToolbarButton
+        title={t('scenario.editor.outline')}
+        aria-controls="guide-library-panel"
+        onClick={() => panels.openLeft('structure')}
+      >
+        <FileText size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        title={t('scenario.editor.guideResources')}
+        aria-controls="guide-library-panel"
+        onClick={() => panels.openLeft('resources')}
+      >
+        <Image size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+    </div>
   );
-}
-
-function createPresentationActionController(props: {
-  clickIndex: number;
-  editor: ScenarioV3EditorState;
-  onClickIndexChange: (clickIndex: number) => void;
-}) {
-  return {
-    clickIndex: props.clickIndex,
-    onClickIndexChange: props.onClickIndexChange,
-    project: props.editor.project,
-    selectedSlideId: props.editor.selectedSlide.id,
-    selectSlide: props.editor.slideActions.selectSlide,
-  };
 }

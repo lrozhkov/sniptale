@@ -58,7 +58,10 @@ async function withPrivacyProof<TPayload extends LlmPrivacyPayload>(
 function createScenarioLlmAuthority() {
   return createScenarioEditorEgressAuthority({
     attachments: [],
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     projectSnapshotJson: '{"steps":[]}',
   });
 }
@@ -166,7 +169,10 @@ it('preauthorizes scenario editor LLM messages with sender-bound one-shot tokens
   });
   const message = {
     attachments: [],
-    contractVersion: 3 as const,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Rewrite',
     llmSessionToken: token ?? '',
     projectSnapshotJson: '{"steps":[]}',
@@ -192,7 +198,10 @@ it('rejects scenario editor LLM messages when attachments differ from the issued
           stepNumber: 1,
         },
       ],
-      contractVersion: 3,
+      contractVersion: 4 as const,
+      projectId: 'project-1',
+      baseRevision: 1,
+      scope: { stepIds: ['step-1'], blockIds: [] },
       projectSnapshotJson: '{"steps":[]}',
     }),
     purpose: 'scenario-editor',
@@ -212,7 +221,10 @@ it('rejects scenario editor LLM messages when attachments differ from the issued
             stepNumber: 1,
           },
         ],
-        contractVersion: 3 as const,
+        contractVersion: 4 as const,
+        projectId: 'project-1',
+        baseRevision: 1,
+        scope: { stepIds: ['step-1'], blockIds: [] },
         instruction: 'Rewrite',
         llmSessionToken: token ?? '',
         projectSnapshotJson: '{"steps":[]}',

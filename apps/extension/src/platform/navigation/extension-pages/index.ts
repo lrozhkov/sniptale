@@ -2,6 +2,7 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import { buildEditorUrl } from './editor';
+import { EDITOR_EMBED_SESSION_QUERY_PARAM } from '../../../features/editor/contracts/embed';
 import { buildScenarioEditorUrl } from './scenario-editor';
 import {
   buildSettingsRouteUrl,
@@ -97,14 +98,6 @@ function buildScenarioEditorPageUrl(projectId?: string | null, stepId?: string |
   });
 }
 
-function buildScenarioAudiencePageUrl(projectId: string, presentationSessionId: string): string {
-  return buildScenarioEditorUrl({
-    presentationSessionId,
-    presentationView: 'audience',
-    projectId,
-  });
-}
-
 async function openSettingsUrl(url: string): Promise<void> {
   const [existing] = await browserTabs.query({ url: `${buildSettingsPageUrl()}*` });
   if (typeof existing?.id === 'number') {
@@ -187,19 +180,9 @@ export async function openScenarioEditorPage(
   await browserTabs.create({ url: buildScenarioEditorPageUrl(projectId, stepId) });
 }
 
-export async function openScenarioAudiencePage(
-  projectId: string,
-  presentationSessionId: string
-): Promise<void> {
-  const url = buildScenarioAudiencePageUrl(projectId, presentationSessionId);
-
-  try {
-    await browserWindows.create({
-      state: 'maximized',
-      type: 'popup',
-      url,
-    });
-  } catch {
-    await browserTabs.create({ url });
-  }
+/** Builds the fixed same-extension iframe endpoint for one disposable guide image session. */
+export function buildScenarioImageEditorUrl(sessionId: string): string {
+  const url = new URL(buildEditorUrl({ embedMode: 'scenario' }));
+  url.searchParams.set(EDITOR_EMBED_SESSION_QUERY_PARAM, sessionId);
+  return url.toString();
 }

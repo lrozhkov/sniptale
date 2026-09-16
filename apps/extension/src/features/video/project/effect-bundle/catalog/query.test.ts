@@ -120,3 +120,16 @@ it('does not parse the same graph again when playback rerenders catalog variants
     parse.mockRestore();
   }
 });
+
+it('hides all styles of disabled documents while Settings can still query and enable them', () => {
+  const disabled = {
+    ...catalog,
+    documents: catalog.documents.map((document) => ({ ...document, enabled: false })),
+  };
+  const filter = { query: '', kind: 'all' as const, theme: 'all' };
+  expect(queryEffectCatalog(disabled, filter, 'en')).toEqual([]);
+  expect(getEffectCatalogThemes([disabled])).toEqual([]);
+  expect(queryEffectCatalog(disabled, filter, 'en', { includeDisabled: true })).toHaveLength(2);
+  expect(getEffectCatalogThemes([disabled], 'en', { includeDisabled: true })).toHaveLength(3);
+  expect(queryEffectCatalog(catalog, filter, 'en')).toHaveLength(2);
+});

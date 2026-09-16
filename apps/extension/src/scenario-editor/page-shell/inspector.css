@@ -1,0 +1,204 @@
+.guide-inspector-panel {
+  container-type: inline-size;
+}
+
+.guide-inspector-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-block: 4px 12px;
+  font-size: 12px;
+}
+.guide-inspector-context > svg {
+  flex: none;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-inspector-context strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.guide-inspector-group {
+  min-width: 0;
+  padding-block: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-inspector-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 8px;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-inspector-group-heading > svg {
+  flex: none;
+}
+.guide-inspector-group-heading h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.guide-inspector-group-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.guide-inspector-choice {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-size: 12px;
+}
+.guide-inspector-number {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  min-width: 0;
+}
+.guide-inspector-number > span {
+  min-width: 0;
+}
+.guide-inspector-panel .guide-number-toggle {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+.guide-inspector-panel .guide-number-toggle > button {
+  flex: none;
+}
+.guide-inspector-panel .guide-numbering-field {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.guide-inspector-panel .guide-numbering-field input {
+  width: 100%;
+}
+.guide-inspector-panel .guide-numbering-fields {
+  margin: 0;
+}
+.guide-inspector-panel .guide-image-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.guide-inspector-panel .guide-image-controls input {
+  width: 100%;
+  min-width: 0;
+}
+.guide-inspector-panel .guide-image-controls .guide-inspector-number input {
+  width: 0;
+}
+.guide-inspector-panel .guide-image-controls label {
+  display: grid;
+  gap: 5px;
+  font-size: 12px;
+}
+.guide-inspector-panel .guide-image-controls .guide-inspector-number {
+  grid-template-columns: none;
+}
+.guide-inspector-panel .guide-inspector-hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-inspector-bulk {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-inspector-panel .guide-appearance-heading {
+  margin-top: 8px;
+}
+.guide-inspector-panel .guide-block-inspector {
+  gap: 0;
+}
+.guide-inspector-panel .guide-style-fields {
+  gap: 0;
+}
+.guide-inspector-panel .guide-image-reset-actions {
+  padding-block: 8px;
+}
+.guide-template-controls,
+.guide-template-controls form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.guide-template-controls p {
+  margin: 0;
+  font-size: 12px;
+}
+.guide-template-controls button {
+  max-width: 100%;
+  white-space: normal;
+}
+.guide-template-save-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guide-template-mode {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-template-controls > button[hidden] {
+  display: none;
+}
+
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
+  flex: 1;
+}
+.guide-inspector-reset {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-inspector-reset button {
+  max-width: 100%;
+  white-space: normal;
+}
+.guide-inspector-group-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.guide-style-accent {
+  min-width: 0;
+}
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] > span {
+  white-space: normal;
+  overflow: visible;
+  flex: none;
+}
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] > div {
+  width: 100% !important;
+  max-width: 100%;
+  margin-left: 0;
+}
+.guide-inspector-choice [role='group'] button {
+  padding-inline: 4px;
+}
+
+.guide-inspector-panel .guide-panel-heading h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

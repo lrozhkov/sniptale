@@ -493,7 +493,8 @@ export async function applyDroppedEffectDocument(
   );
   const catalog = item?.status === 'ready' ? item.catalog : null;
   const document = catalog?.documents.find(
-    ({ id, kind }) => id === args.payload.documentId && kind === args.payload.kind
+    ({ id, kind, enabled }) =>
+      enabled !== false && id === args.payload.documentId && kind === args.payload.kind
   );
   if (!catalog || !document || !doesEffectKindMatchTarget(document.kind, args.target)) return;
   await args.operations.run('apply', () =>

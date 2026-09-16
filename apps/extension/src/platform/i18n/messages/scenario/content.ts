@@ -85,6 +85,10 @@ export const scenarioContentMessages = defineMessageSource({
     ru: 'Удалить шаг',
     en: 'Delete step',
   },
+  deleteStepMessage: {
+    ru: 'Удалить шаг вместе с его текстом и связями с изображениями? Это действие нельзя отменить.',
+    en: 'Delete this step, including its text and image associations? This action cannot be undone.',
+  },
   restoreStep: {
     ru: 'Восстановить шаг',
     en: 'Restore step',

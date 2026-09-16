@@ -1,10 +1,8 @@
-import { createScenarioProject } from '../../../../../features/scenario/project/public';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { createGuideProject } from '../../../../../features/scenario/project/public';
 import { getScenarioProject, listScenarioProjects, saveScenarioProject } from '../../projects';
 import type { SaveScenarioProjectOptions } from '../../projects/project';
-import type {
-  ScenarioProject,
-  ScenarioProjectSummary,
-} from '../../../../../features/scenario/contracts/types/project';
+import type { ScenarioProjectSummary } from '../../../../../features/scenario/contracts/types/project';
 import { publishMediaHubLibraryChanged } from '../../../../../features/media-hub/events';
 import { createScenarioStoreMutationQueue } from '../mutation-queue';
 import { loadSettings } from '../../../settings';
@@ -15,9 +13,9 @@ const enqueueProjectRecordMutation = createScenarioStoreMutationQueue();
 /**
  * Creates and persists a new scenario project.
  */
-export async function createScenarioProjectRecord(name: string): Promise<ScenarioProject> {
+export async function createScenarioProjectRecord(name: string): Promise<GuideProject> {
   return enqueueProjectRecordMutation(async () => {
-    const project = createScenarioProject(name);
+    const project = createGuideProject(name);
     const settings = await loadSettings().catch(() => null);
     const savedProject = await saveScenarioProject(project, {
       baseUpdatedAt: null,
@@ -33,7 +31,7 @@ export async function createScenarioProjectRecord(name: string): Promise<Scenari
 /**
  * Loads a scenario project by id.
  */
-export function getScenarioProjectRecord(id: string): Promise<ScenarioProject | undefined> {
+export function getScenarioProjectRecord(id: string): Promise<GuideProject | undefined> {
   return getScenarioProject(id);
 }
 
@@ -41,9 +39,9 @@ export function getScenarioProjectRecord(id: string): Promise<ScenarioProject | 
  * Persists the provided scenario project document.
  */
 export async function saveScenarioProjectRecord(
-  project: ScenarioProject,
+  project: GuideProject,
   options: SaveScenarioProjectOptions = {}
-): Promise<ScenarioProject> {
+): Promise<GuideProject> {
   return enqueueProjectRecordMutation(async () => {
     const savedProject = await saveScenarioProject(project, options);
     publishMediaHubLibraryChanged('update', [`scenario:${project.id}`]);
@@ -57,7 +55,7 @@ export async function saveScenarioProjectRecord(
 export async function renameScenarioProjectRecord(
   projectId: string,
   name: string
-): Promise<ScenarioProject | undefined> {
+): Promise<GuideProject | undefined> {
   return updateScenarioProjectRecordMetadata(projectId, {
     name,
   });
@@ -69,14 +67,14 @@ export async function updateScenarioProjectRecordMetadata(
     name?: string;
     tags?: string[];
   }
-): Promise<ScenarioProject | undefined> {
+): Promise<GuideProject | undefined> {
   return enqueueProjectRecordMutation(async () => {
     const project = await getScenarioProject(projectId);
     if (!project) {
       return undefined;
     }
 
-    const updatedProject: ScenarioProject = {
+    const updatedProject: GuideProject = {
       ...project,
       name: patch.name ?? project.name,
       tags: patch.tags ?? project.tags ?? [],
@@ -94,6 +92,6 @@ export async function updateScenarioProjectRecordMetadata(
 /**
  * Lists stored scenario projects in recency order.
  */
-export function listScenarioProjectSummaries(): Promise<ScenarioProjectSummary[]> {
-  return listScenarioProjects();
+export async function listScenarioProjectSummaries(): Promise<ScenarioProjectSummary[]> {
+  return (await listScenarioProjects()).filter((project) => project.purpose !== 'step-template');
 }

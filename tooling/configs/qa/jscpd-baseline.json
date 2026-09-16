@@ -2542,21 +2542,21 @@
       }
     },
     {
-      "id": "d8d8c9bc72e2a2a297b0e91c908f0c1876cc45f3512495807a3de13e9ef37446",
+      "id": "c9c7ff8199fe9082aa8306852b5d9bb4ba34f6abf04686899aff02f01cde8043",
       "classification": "tool-noise",
       "owner": "video timeline surfaces across gallery and editor",
       "reason": "Gallery review and editor source-range timelines own separate viewport refs and lifecycles; the ResizeObserver setup is platform boilerplate.",
       "removalCondition": "Remove when both surfaces adopt one established viewport measurement owner or when the exact detector pair disappears.",
       "reviewBy": "2027-09-01",
       "firstFile": {
+        "path": "apps/extension/src/composition/library-preview/source-range-timeline.tsx",
+        "start": 132,
+        "end": 139
+      },
+      "secondFile": {
         "path": "apps/extension/src/gallery/video-review/timeline.tsx",
         "start": 62,
         "end": 69
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/chrome/source-range-timeline.tsx",
-        "start": 132,
-        "end": 139
       }
     },
     {

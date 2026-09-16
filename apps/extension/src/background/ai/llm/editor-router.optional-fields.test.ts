@@ -60,13 +60,16 @@ vi.mock('./authorization/preauthorization', async (importOriginal) => ({
 import { routeScenarioEditorLlmMessage } from './editor-router';
 
 const populatedOperationResponse = {
-  operations: [{ slideId: 'slide-1', title: 'Updated title', type: 'setSlideTitle' }],
+  operations: [{ stepId: 'slide-1', title: 'Updated title', type: 'setStepTitle' }],
 } as const;
 
 function createMessage() {
   return {
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     llmSessionToken: 'llm-token-1',
     instruction: 'Rewrite step titles',
     projectSnapshotJson: '{"steps":[]}',

@@ -8,7 +8,7 @@ import '@sniptale/ui/styles/overlays';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
 import { GalleryApp } from '../../../apps/extension/src/gallery/shell/app-shell';
 
-initializeAppTheme('light');
+initializeAppTheme(new URLSearchParams(location.search).get('theme') === 'dark' ? 'dark' : 'light');
 
 void harnessReady.then(() => {
   createRoot(document.getElementById('root')!).render(<GalleryApp />);

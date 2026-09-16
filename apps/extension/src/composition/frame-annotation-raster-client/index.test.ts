@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   consume: vi.fn(),
+  initDB: vi.fn(async () => undefined),
   deleteJob: vi.fn(async () => undefined),
   send: vi.fn(),
   stage: vi.fn(),
@@ -14,6 +15,11 @@ vi.mock('../persistence/frame-annotation-raster-jobs', async (importOriginal) =>
   stageFrameAnnotationRasterJob: mocks.stage,
 }));
 
+vi.mock('../persistence/infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../persistence/infrastructure/indexed-db/core')>()),
+  initDB: mocks.initDB,
+}));
+
 import { rasterizeFrameAnnotations } from '.';
 import { runWithPersistentDataErasureBarrier } from '../persistence/infrastructure/mutation-barrier';
 
@@ -22,6 +28,7 @@ const input = { baseImage: new Blob(['base']), height: 10, snapshots: [], width:
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.initDB.mockReset().mockResolvedValue(undefined);
   mocks.stage.mockResolvedValue(reference);
   mocks.send.mockImplementation(async (message: { leaseId?: string; operation?: string }) =>
     message.operation === 'prepare' || message.operation === 'confirm'
@@ -260,6 +267,34 @@ it('does not stage payload after the background lease is lost across a worker re
   await expect(
     rasterizeFrameAnnotations({ input, transport: { sendRuntimeMessage: mocks.send } })
   ).rejects.toThrow('lease is no longer active');
+  expect(mocks.stage).not.toHaveBeenCalled();
+  expect(mocks.deleteJob).not.toHaveBeenCalled();
+});
+
+it('completes cold client database admission before the raster transition and staging', async () => {
+  let ready = false;
+  mocks.initDB.mockImplementationOnce(() =>
+    runWithPersistentDataErasureBarrier(async () => {
+      ready = true;
+      return undefined;
+    })
+  );
+  mocks.stage.mockImplementationOnce(async () => {
+    if (!ready) throw new Error('Cold database would request an exclusive transition');
+    return reference;
+  });
+  await expect(
+    rasterizeFrameAnnotations({ input, transport: { sendRuntimeMessage: mocks.send } })
+  ).resolves.toMatchObject({ metadata: { outputWidth: 20 } });
+  expect(mocks.initDB).toHaveBeenCalledOnce();
+});
+
+it('does not acquire a raster lease or stage input if client database admission fails', async () => {
+  mocks.initDB.mockRejectedValueOnce(new Error('Database admission failed'));
+  await expect(
+    rasterizeFrameAnnotations({ input, transport: { sendRuntimeMessage: mocks.send } })
+  ).rejects.toThrow('Database admission failed');
+  expect(mocks.send).not.toHaveBeenCalled();
   expect(mocks.stage).not.toHaveBeenCalled();
   expect(mocks.deleteJob).not.toHaveBeenCalled();
 });

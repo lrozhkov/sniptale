@@ -16,7 +16,7 @@ import {
   type EditorPageServices,
 } from './runtime';
 import { useEditorStore } from '../../state/useEditorStore';
-import { createEditorPageEmbedProviderValue } from './embed';
+import { createEditorPageEmbedProviderValue, startScenarioEditorEmbed } from './embed';
 import { EditorPageLayout } from './layout';
 import { useEditorDrawingPreferencesSynchronization } from '../../drawing/preferences';
 
@@ -55,6 +55,9 @@ function useEditorPageBootstrapEffects(
   services: EditorPageServices
 ) {
   useEffect(() => {
+    if (readEditorEmbedMode(window.location.search) === 'scenario') {
+      return startScenarioEditorEmbed({ controller: services.controller, setPageTitle });
+    }
     const lifecycle = createEditorPageBootstrapLifecycle({ services, setPageTitle });
 
     window.addEventListener(EDITOR_BOOTSTRAP_EVENT, lifecycle.handleBootstrap);
@@ -116,9 +119,10 @@ function useEditorPageServiceDisposal(services: EditorPageServices) {
 export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterLayout }) => {
   usePageLocaleMetadata('editor.page.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const embedMode = readEditorEmbedMode(window.location.search);
   const servicesRef = useRef<EditorPageServices | null>(null);
   if (!servicesRef.current) {
-    servicesRef.current = createEditorPageServices();
+    servicesRef.current = createEditorPageServices(embedMode);
   }
   const services = servicesRef.current;
 
@@ -127,7 +131,6 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   const hasImage = Boolean(imageData);
   const hasImageRef = useRef(hasImage);
   hasImageRef.current = hasImage;
-  const embedMode = readEditorEmbedMode(window.location.search);
   const embedProps = createEditorPageEmbedProviderValue(embedMode, services.controller);
 
   useCommandPaletteHotkey({

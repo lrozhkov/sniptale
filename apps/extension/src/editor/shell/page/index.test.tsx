@@ -147,6 +147,7 @@ async function renderEditorPage() {
 function useEditorPageTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.replaceState({}, '', '/editor');
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   });
 
@@ -239,6 +240,20 @@ async function verifiesBootstrapEventRoutingAndDispose() {
 
 describe('EditorPage', () => {
   useEditorPageTestScope();
+
+  it('does not restore standalone storage or accept bootstrap DOM events in scenario embed mode', async () => {
+    window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session');
+    const services = createServices();
+    createEditorPageServicesMock.mockReturnValue(services);
+    loadEditorPageDefaultsMock.mockResolvedValue(undefined);
+    applyEditorStoreState(createEditorStoreState());
+    await renderEditorPage();
+    window.dispatchEvent(
+      new CustomEvent(EDITOR_BOOTSTRAP_EVENT, { detail: { dataUrl: 'data:image/png;base64,abc' } })
+    );
+    expect(bootstrapEditorPageSessionMock).not.toHaveBeenCalled();
+    expect(openEditorBootstrapPayloadMock).not.toHaveBeenCalled();
+  });
 
   it(
     'bootstraps the page shell with shared services and renders image-owned UI',

@@ -11,13 +11,12 @@ function createCollectionsArgs() {
     setHighlightToken: vi.fn(),
     setProjects: vi.fn(),
     setRecentSteps: vi.fn(),
-    setTrashedSteps: vi.fn(),
   };
 }
 
 describe('scenario-response-collections', () => {
   it(
-    'applies project/recent/trashed collections and increments highlight for a new leading step',
+    'applies project/recent collections and increments highlight for a new leading step',
     expectCollectionApplyAndHighlight
   );
 });
@@ -26,12 +25,19 @@ function expectCollectionApplyAndHighlight() {
   const args = createCollectionsArgs();
   const applyCollections = createScenarioCollectionsApplier(args);
   const response = {
-    projects: [{ createdAt: 1, id: 'project-1', name: 'Project 1', updatedAt: 1 }],
-    recentSteps: [{ id: 'step-2', position: 0, previewDataUrl: 'data:2', title: 'Step 2' }],
-    success: true,
-    trashedSteps: [
-      { deletedAt: 10, id: 'trash-1', kind: 'capture' as const, originalIndex: 0, title: 'T' },
+    projects: [
+      {
+        availability: 'available' as const,
+        createdAt: 1,
+        id: 'project-1',
+        name: 'Project 1',
+        updatedAt: 1,
+      },
     ],
+    recentSteps: [
+      { id: 'step-2', position: 0, numberLabel: '1', previewDataUrl: 'data:2', title: 'Step 2' },
+    ],
+    success: true,
   };
 
   applyCollections(response);
@@ -41,6 +47,5 @@ function expectCollectionApplyAndHighlight() {
 
   expect(args.setProjects).toHaveBeenCalledWith(response.projects);
   expect(args.setRecentSteps).toHaveBeenCalledWith(response.recentSteps);
-  expect(args.setTrashedSteps).toHaveBeenCalledWith(response.trashedSteps);
   expect(args.setHighlightToken).toHaveBeenCalledTimes(1);
 }

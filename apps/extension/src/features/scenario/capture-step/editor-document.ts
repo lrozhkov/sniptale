@@ -3,12 +3,8 @@ import {
   DEFAULT_EDITOR_FRAME_SETTINGS,
   type EditorDocument,
 } from '../../editor/document/public';
-import type { ScenarioCaptureStep } from '../contracts/types/project';
 import type { ScenarioOverlay } from '../contracts/types/overlays';
 import { buildScenarioEditorCanvasJson } from './editor-canvas';
-import { buildScenarioEditorCanvasDocument } from './editor-canvas-document';
-import { parseScenarioEditorCanvasJson } from './editor-canvas-json';
-import { projectCompatOverlaysFromEditorDocument } from './editor-document-projection';
 
 export function createScenarioCaptureEditorDocument(args: {
   dataUrl: string;
@@ -40,45 +36,4 @@ export function createScenarioCaptureEditorDocument(args: {
   };
 }
 
-export { projectCompatOverlaysFromEditorDocument };
 export { buildAutoScenarioCaptureOverlays } from './auto-overlays';
-
-function isCompatOverlayCanvasObject(object: Record<string, unknown>): boolean {
-  return (
-    object['sniptaleMetaKind'] === 'scenario-focus-rect' ||
-    object['sniptaleMetaKind'] === 'scenario-click-ring' ||
-    object['sniptaleMetaKind'] === 'scenario-cursor' ||
-    object['sniptaleMetaKind'] === 'scenario-blur-rect' ||
-    object['sniptaleType'] === 'blur'
-  );
-}
-
-export function syncScenarioCaptureEditorDocumentOverlays(
-  document: EditorDocument,
-  overlays: ScenarioOverlay[]
-): EditorDocument {
-  const parsed = parseScenarioEditorCanvasJson(document.canvasJson);
-  if (!parsed) {
-    return document;
-  }
-
-  const preservedObjects = parsed.objects.filter((object) => !isCompatOverlayCanvasObject(object));
-  const compatObjects = buildScenarioEditorCanvasDocument({
-    assetDataUrl: document.sourceImageData,
-    overlays,
-    sourceHeight: document.sourceDisplayHeight,
-    sourceWidth: document.sourceDisplayWidth,
-  }).objects.filter(isCompatOverlayCanvasObject);
-
-  return {
-    ...document,
-    canvasJson: JSON.stringify({
-      version: parsed.version ?? '7.2.0',
-      objects: [...preservedObjects, ...compatObjects],
-    }),
-  };
-}
-
-export function shouldRenderScenarioStepOverlays(step: ScenarioCaptureStep): boolean {
-  return step.annotationRenderMode !== 'asset';
-}

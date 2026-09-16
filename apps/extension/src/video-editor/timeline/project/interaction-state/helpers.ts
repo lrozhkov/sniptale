@@ -1,5 +1,5 @@
 import { translate } from '../../../../platform/i18n';
-import { formatPreciseTime, formatTime } from '../../../contracts/time-format';
+import { formatPreciseTime, formatTime } from '../../../../composition/library-preview/time-format';
 
 export { formatPreciseTime, formatTime };
 

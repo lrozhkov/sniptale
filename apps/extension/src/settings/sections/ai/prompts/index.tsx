@@ -19,19 +19,25 @@ function PromptsSubpage() {
 }
 
 export function AIPromptsSection(props: { onViewChange?: (view: string) => void; view?: string }) {
-  const view = props.view === 'prompts' ? 'prompts' : 'templates';
+  const view =
+    props.view === 'prompts' || props.view === 'scenario-templates' ? props.view : 'templates';
   return (
     <div className="space-y-5">
       <SettingsSubpageTabs
         activeId={view}
         ariaLabel={translate('settings.navigation.aiPrompts')}
         items={[
-          { id: 'templates', label: translate('settings.navigation.views.templates') },
+          { id: 'templates', label: translate('scenario.editor.guidePageTemplates') },
+          { id: 'scenario-templates', label: translate('scenario.editor.guideScenarioTemplates') },
           { id: 'prompts', label: translate('settings.navigation.views.prompts') },
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'prompts' ? <PromptsSubpage /> : <TemplatesSection />}
+      {view === 'prompts' ? (
+        <PromptsSubpage />
+      ) : (
+        <TemplatesSection key={view} scope={view === 'scenario-templates' ? 'scenario' : 'page'} />
+      )}
     </div>
   );
 }

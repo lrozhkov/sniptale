@@ -133,7 +133,11 @@ it('keeps presets attached to imported copies and preserves unrelated builtin pr
     await createEffectCatalogEntry(await readValidBundleArtifact(), 1)
   );
   const local = { packId: 'builtin:base', enabled: false, documents: {} };
-  const importedPreference = { packId: portable.id, documents: { missing: { presets: [] } } };
+  const importedPreference = {
+    packId: portable.id,
+    documentEnabled: { missing: false },
+    documents: { missing: { presets: [] } },
+  };
   const domain = (item: unknown, preferences: unknown[]) => ({
     'styles.video-effects': {
       schemaVersion: 1,

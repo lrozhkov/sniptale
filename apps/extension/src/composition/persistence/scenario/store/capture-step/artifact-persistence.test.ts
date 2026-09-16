@@ -95,6 +95,7 @@ function createStoredProjectEntry(project: ReturnType<typeof createScenarioStore
   return {
     id: project.id,
     project,
+    workspaceRevision: 0,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -182,6 +183,7 @@ async function verifyArtifactPersistenceWithDocument() {
     },
     updatedAt: 11,
     workspaceRevision: 1,
+    history: [{ revision: 0, savedAt: project.updatedAt, project }],
   });
   expect(txPutMock).toHaveBeenCalledWith({
     stepId: 'step-1',

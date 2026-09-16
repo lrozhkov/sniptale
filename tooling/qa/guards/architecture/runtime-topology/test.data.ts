@@ -102,6 +102,16 @@ export const DEFAULT_RUNTIME_TOPOLOGY = [
     ],
   },
   {
+    id: 'tour-preview-sandbox',
+    root: 'apps/extension/src/tour-preview-sandbox',
+    manifestOwned: true,
+    featureRoot: false,
+    entrypointFiles: [
+      'apps/extension/src/tour-preview-sandbox/index.ts',
+      'apps/extension/src/tour-preview-sandbox/index.html',
+    ],
+  },
+  {
     id: 'scenario-editor',
     root: 'apps/extension/src/scenario-editor',
     manifestOwned: true,
@@ -137,6 +147,7 @@ export const DEFAULT_BUILD_HTML_INPUTS = [
   ['offscreen/offscreen', 'always'],
   ['popup', 'manifest'],
   ['effect-runtime-sandbox', 'manifest'],
+  ['tour-preview-sandbox', 'manifest'],
 ].map(([runtimePath, mode]) => ({
   mode,
   outputPath: `apps/extension/src/${runtimePath}/index.html`.replace(

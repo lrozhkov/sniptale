@@ -27,7 +27,7 @@ import {
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import { TimelineIconButton } from '../controls/icon-button';
-import { formatPreciseTime } from '../../../contracts/time-format';
+import { formatPreciseTime } from '../../../../composition/library-preview/time-format';
 import { clusterHistoryMarkers, clusterHistoryIntervals } from './history-clusters';
 import { useMemo, useContext, type CSSProperties, type ReactNode } from 'react';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';

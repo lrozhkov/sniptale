@@ -53,15 +53,18 @@ it('rejects scenario attachment payloads by decoded byte budget before provider 
   expect(() =>
     assertScenarioEditorAiPayloadLimits({
       attachments: [attachment],
-      contractVersion: 3,
+      contractVersion: 4 as const,
       instruction: 'summarize',
       projectSnapshotJson: '{}',
     })
   ).toThrow('attachments[].dataUrl exceeds 7000000 decoded bytes');
   expect(() =>
     assertScenarioEditorLlmPayloadLimits({
+      projectId: 'project-1',
+      baseRevision: 1,
+      scope: { stepIds: ['step-1'], blockIds: [] },
       attachments: [attachment],
-      contractVersion: 3,
+      contractVersion: 4 as const,
       instruction: 'summarize',
       llmSessionToken: 'session-token',
       projectSnapshotJson: '{}',
@@ -93,7 +96,7 @@ it('rejects unsafe scenario attachment data URLs before provider work', () => {
     expect(() =>
       assertScenarioEditorAiPayloadLimits({
         attachments: [attachment],
-        contractVersion: 3,
+        contractVersion: 4 as const,
         instruction: 'summarize',
         projectSnapshotJson: '{}',
       })

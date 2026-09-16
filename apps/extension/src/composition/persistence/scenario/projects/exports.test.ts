@@ -45,13 +45,17 @@ it('stores and deletes scenario export audit entries', async () => {
   dbGetAllFromIndexMock.mockResolvedValueOnce([
     exportRecord,
     { ...exportRecord, id: 'export-2', format: 'pdf' },
+    { ...exportRecord, id: 'retired-svg', format: 'svg' },
     { ...exportRecord, id: 'export-3', size: Number.NaN },
   ]);
 
   await saveScenarioExport(exportRecord);
 
   expect(dbPutMock).toHaveBeenCalledTimes(1);
-  await expect(listScenarioExports('project-1')).resolves.toEqual([exportRecord]);
+  await expect(listScenarioExports('project-1')).resolves.toEqual([
+    exportRecord,
+    { ...exportRecord, id: 'export-2', format: 'pdf' },
+  ]);
   await deleteScenarioExport('export-1');
   expect(dbDeleteMock).toHaveBeenCalledWith('scenario_exports', 'export-1');
 });

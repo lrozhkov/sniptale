@@ -72,12 +72,6 @@ export const ARCHIVE_PACKAGE_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/background/media-hub/web-snapshot.test.ts'],
   },
   {
-    owner: 'scenario-project-v3-guards',
-    productionFile: 'apps/extension/src/features/scenario/project/v3/guards.ts',
-    reason: 'Scenario v3 project guard boundaries are covered by focused guard tests.',
-    testFiles: ['apps/extension/src/features/scenario/project/v3/guards.test.ts'],
-  },
-  {
     owner: 'db-video-project-read-guards',
     productionFile: 'apps/extension/src/composition/persistence/projects/read-guards.ts',
     reason: 'Video project read guard behavior is covered by focused read-guard tests.',

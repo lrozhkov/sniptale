@@ -95,6 +95,7 @@ export interface ProviderFormData extends z.infer<typeof ProviderFormSchema> {
 export type ModelFormData = z.infer<typeof ModelFormSchema>;
 
 export const PromptTemplateSchema = z.object({
+  scope: z.enum(['page', 'scenario']).optional(),
   id: z.string().min(1, schemaMessageKey('validation.schemas.templateIdRequired')),
   name: z
     .string()

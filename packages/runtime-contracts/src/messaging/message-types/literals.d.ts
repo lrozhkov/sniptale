@@ -93,10 +93,7 @@ declare module './' {
     type SCENARIO_CREATE_PROJECT = typeof import('./').MessageType.SCENARIO_CREATE_PROJECT;
     type SCENARIO_SAVE_CAPTURE_STEP = typeof import('./').MessageType.SCENARIO_SAVE_CAPTURE_STEP;
     type SCENARIO_DELETE_STEP = typeof import('./').MessageType.SCENARIO_DELETE_STEP;
-    type SCENARIO_RESTORE_STEP = typeof import('./').MessageType.SCENARIO_RESTORE_STEP;
     type SCENARIO_MOVE_STEP = typeof import('./').MessageType.SCENARIO_MOVE_STEP;
-    type SCENARIO_RECORD_SUGGESTED_EVENT =
-      typeof import('./').MessageType.SCENARIO_RECORD_SUGGESTED_EVENT;
     type SCENARIO_OPEN_EDITOR = typeof import('./').MessageType.SCENARIO_OPEN_EDITOR;
     type SCENARIO_GET_RESTORE_SNAPSHOT =
       typeof import('./').MessageType.SCENARIO_GET_RESTORE_SNAPSHOT;

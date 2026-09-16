@@ -1,3 +1,4 @@
+import { tourPlayerScript } from './apps/extension/build/tour-player-script.ts';
 import { defineConfig } from 'vitest/config';
 
 import { collectProductTestInventory } from './tooling/test/harness/product-test-inventory.mjs';
@@ -144,6 +145,7 @@ function resolveCoverageInclude() {
 }
 
 export default defineConfig({
+  plugins: [tourPlayerScript()],
   test: {
     include: resolveSuiteInclude(),
     exclude: ['cases/**', 'tooling/test/e2e/**/*.spec.ts', 'dist/**', '**/node_modules/**'],

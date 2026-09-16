@@ -1,8 +1,4 @@
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
-import {
-  readScenarioEditorPresentationSessionId,
-  readScenarioEditorPresentationView,
-} from '@sniptale/runtime-contracts/scenario-editor/session';
 import type { ScenarioEditorBrowserDriverPort } from '../../application/ports/browser-driver';
 
 const OBJECT_URL_REVOKE_DELAY_MS = 1500;
@@ -18,8 +14,6 @@ export function replaceScenarioEditorSelectionInUrl(args: {
     {},
     '',
     buildScenarioEditorUrl({
-      presentationSessionId: readScenarioEditorPresentationSessionId(window.location.search),
-      presentationView: readScenarioEditorPresentationView(window.location.search),
       projectId: args.projectId,
       ...(args.stepId === undefined ? {} : { stepId: args.stepId }),
     })

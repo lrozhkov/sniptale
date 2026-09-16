@@ -1,16 +1,16 @@
 import type { EditorDocument } from '../../../../../features/editor/document/types';
-import type { ScenarioProject } from '../../../../../features/scenario/contracts/types/project';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { PreparedScenarioAssetEntry } from '../../contracts';
 import { commitScenarioAggregateMutation } from '../../aggregate-mutations';
 
 export async function persistScenarioCaptureArtifacts(args: {
   assetEntry: PreparedScenarioAssetEntry;
   baseUpdatedAt: number;
-  project: ScenarioProject;
+  project: GuideProject;
   projectId: string;
   stepId: string;
   stepDocument: EditorDocument | null;
-}): Promise<ScenarioProject> {
+}): Promise<GuideProject> {
   const result = await commitScenarioAggregateMutation(args.project, {
     children: {
       assetPuts: [args.assetEntry],

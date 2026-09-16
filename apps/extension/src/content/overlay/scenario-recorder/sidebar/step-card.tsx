@@ -40,7 +40,6 @@ export function ScenarioRecorderSidebarStepCard(props: {
     onMoveStep: props.onMoveStep,
     setDragStepId: props.setDragStepId,
   });
-  const stepNumber = props.step.position + 1;
 
   return (
     <article
@@ -58,7 +57,6 @@ export function ScenarioRecorderSidebarStepCard(props: {
         onDeleteStep={props.onDeleteStep}
         onInspectStep={props.onInspectStep}
         step={props.step}
-        stepNumber={stepNumber}
       />
       <ScenarioRecorderStepBody onPreviewOpen={props.onPreviewOpen} step={props.step} />
     </article>

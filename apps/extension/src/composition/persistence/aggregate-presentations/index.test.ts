@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntry } from '../projects/index.test-support';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createGuideProject } from '../../../features/scenario/project/factories';
 
 const mocks = vi.hoisted(() => ({
   delete: vi.fn(),
@@ -101,7 +101,7 @@ it('deletes the exact compound presentation key through the mutation owner', asy
 });
 
 it('writes scenario preview and thumbnail blobs against the scenario root revision', async () => {
-  const project = createScenarioProject('Scenario');
+  const project = createGuideProject('Scenario');
   const root = {
     createdAt: 1,
     id: project.id,

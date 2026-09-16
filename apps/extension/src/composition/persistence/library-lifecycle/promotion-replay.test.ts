@@ -4,8 +4,8 @@ import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../projects/index.test-support';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
-import { createScenarioCaptureStep } from '../../../features/scenario/project/public';
+import { createGuideProject } from '../../../features/scenario/project/factories';
+import { createGuideStep, createGuideImageBlock } from '../../../features/scenario/project/public';
 
 const persistenceMocks = vi.hoisted(() => ({
   runWithIndexedDbMutation: vi.fn(),
@@ -48,7 +48,7 @@ function presentation(args: {
 
 describe('aggregate lifecycle promotion replay', () => {
   it('promotes a scenario only when its presentation matches the root revision', async () => {
-    const scenario = createScenarioProject('Scenario');
+    const scenario = createGuideProject('Scenario');
     const root = {
       createdAt: 10,
       id: scenario.id,
@@ -84,8 +84,18 @@ describe('aggregate lifecycle promotion replay', () => {
   });
 
   it('rejects scenario promotion when a referenced capture asset is unavailable', async () => {
-    const scenario = createScenarioProject('Scenario');
-    scenario.steps = [createScenarioCaptureStep({ assetId: 'asset-missing' })];
+    const scenario = createGuideProject('Scenario');
+    const step = createGuideStep('Image');
+    step.blocks.push(
+      createGuideImageBlock({
+        id: 'image',
+        assetId: 'asset-missing',
+        width: 100,
+        height: 50,
+        source: { kind: 'import', filename: 'image.png' },
+      })
+    );
+    scenario.items = [step];
     const root = {
       createdAt: 10,
       id: scenario.id,

@@ -32,7 +32,13 @@ it('stays as a null-render compatibility shim', () => {
     root?.render(
       <GalleryScenarioGrid
         filteredScenarioProjects={[
-          { id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2 },
+          {
+            availability: 'available' as const,
+            id: 'project-1',
+            name: 'Scenario',
+            createdAt: 1,
+            updatedAt: 2,
+          },
         ]}
         onScenarioPreviewOpen={vi.fn()}
         viewMode="list"

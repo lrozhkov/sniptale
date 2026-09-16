@@ -1,3 +1,4 @@
+import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -66,7 +67,10 @@ import { routeScenarioEditorLlmMessage } from './editor-router';
 function createMessage() {
   return {
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     llmSessionToken: 'llm-token-1',
     instruction: 'Rewrite step titles',
     projectSnapshotJson: '{"steps":[]}',
@@ -133,7 +137,7 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
     baseUrl: 'https://api.openai.com/v1',
     modelCode: 'gpt-4.1',
     providerErrorLabel: 'provider-1',
-    systemPrompt: 'Scenario editor system prompt',
+    systemPrompt: buildScenarioAiSystemPrompt('Scenario editor system prompt'),
     userContent: [
       {
         type: 'text',
@@ -144,16 +148,13 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
           'Project outline JSON:',
           '{}',
           '',
-          'Selected slide code JSON:',
-          '{}',
-          '',
-          'Tool manifest JSON:',
+          'Selected guide step JSON:',
           '{}',
           '',
           'Project snapshot JSON:',
           '{"steps":[]}',
           '',
-          'Return ONLY strict JSON with the shape {"operations":[...]} using the tool manifest.',
+          'Return ONLY strict JSON with the shape {"operations":[...]} using the system contract.',
         ].join('\n'),
       },
       {

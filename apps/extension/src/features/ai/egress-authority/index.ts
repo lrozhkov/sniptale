@@ -50,7 +50,14 @@ export function canonicalizeScenarioEditorEgressPayload(
 ): ScenarioEditorCanonicalEgressPayload {
   return {
     attachments: input.attachments,
-    contractVersion: 3,
+    contractVersion: 4,
+    projectId: input.projectId,
+    baseRevision: input.baseRevision,
+    scope: {
+      stepIds: [...input.scope.stepIds],
+      blockIds: [...input.scope.blockIds],
+      ...(input.scope.document ? { document: true } : {}),
+    },
     projectOutlineJson: canonicalizeScenarioJsonObjectField(
       'projectOutlineJson',
       input.projectOutlineJson ?? '{}'
@@ -59,9 +66,9 @@ export function canonicalizeScenarioEditorEgressPayload(
       'projectSnapshotJson',
       input.projectSnapshotJson
     ),
-    selectedSlideCodeJson: canonicalizeScenarioJsonObjectField(
-      'selectedSlideCodeJson',
-      input.selectedSlideCodeJson ?? '{}'
+    selectedStepJson: canonicalizeScenarioJsonObjectField(
+      'selectedStepJson',
+      input.selectedStepJson ?? '{}'
     ),
     toolManifestJson: canonicalizeScenarioJsonObjectField(
       'toolManifestJson',
@@ -88,9 +95,12 @@ export async function createScenarioEditorEgressAuthorityFromCanonical(
     payloadHash: await createAiEgressPayloadHash({
       attachmentSummary,
       contractVersion: canonicalPayload.contractVersion,
+      projectId: canonicalPayload.projectId,
+      baseRevision: canonicalPayload.baseRevision,
+      scope: canonicalPayload.scope,
       projectOutlineJson: canonicalPayload.projectOutlineJson,
       projectSnapshotJson: canonicalPayload.projectSnapshotJson,
-      selectedSlideCodeJson: canonicalPayload.selectedSlideCodeJson,
+      selectedStepJson: canonicalPayload.selectedStepJson,
       toolManifestJson: canonicalPayload.toolManifestJson,
     }),
     purpose: 'scenario-editor',

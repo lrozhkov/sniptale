@@ -7,7 +7,8 @@ import { createTextClip } from '../../../features/video/project/factories/overla
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
-import { usePlaybackShortcuts, usePlaybackSpaceShortcut } from './playback/shortcuts';
+import { usePlaybackShortcuts } from './playback/shortcuts';
+import { usePlaybackSpaceShortcut } from '../../../composition/library-preview/shortcuts';
 import type { PlaybackHandlers, PlaybackLatestState } from '../../interaction/playback/types';
 
 function ShortcutHarness(props: {

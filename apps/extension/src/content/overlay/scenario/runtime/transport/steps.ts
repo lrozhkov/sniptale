@@ -20,14 +20,6 @@ export function moveScenarioStep(args: { projectId: string; stepId: string; toIn
   });
 }
 
-export function restoreScenarioStep(args: { projectId: string; stepId: string }) {
-  return getContentRuntimeServices().messaging.sendRuntimeMessage({
-    type: MessageType.SCENARIO_RESTORE_STEP,
-    projectId: args.projectId,
-    stepId: args.stepId,
-  });
-}
-
 export function saveScenarioCaptureStep(args: {
   dataUrl: string;
   filename: string;

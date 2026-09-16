@@ -1,1 +1,0 @@
-export { ScenarioWorkspaceCaptureCanvas } from './view';

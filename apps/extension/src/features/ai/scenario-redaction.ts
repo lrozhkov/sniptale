@@ -14,15 +14,3 @@ export function redactScenarioAiUrl(url: string | null | undefined): string | nu
     return null;
   }
 }
-
-export function compactScenarioAiText(value: string | null | undefined, maxLength = 240) {
-  if (!value) {
-    return null;
-  }
-
-  const text = value
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
-}

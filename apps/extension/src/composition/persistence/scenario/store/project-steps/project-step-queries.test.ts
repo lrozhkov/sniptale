@@ -21,9 +21,11 @@ vi.mock('../project-records/assets', async (importOriginal) => ({
   getScenarioAssetBlob: getScenarioAssetBlobMock,
 }));
 
-import { createScenarioCaptureStep } from '../../../../../features/scenario/project/public';
-import { createScenarioStoreProjectFixture } from '../test.helpers.ts';
-import { listRecentScenarioSteps, listScenarioTrashedSteps } from './project-step-queries';
+import {
+  createScenarioStoreProjectFixture,
+  createCapturedGuideStepFixture,
+} from '../test.helpers.ts';
+import { listRecentScenarioSteps, listScenarioPreviewSteps } from './project-step-queries';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,58 +34,38 @@ beforeEach(() => {
   getScenarioAssetBlobMock.mockResolvedValue(undefined);
 });
 
-async function verifyRecentAndTrashedQueries() {
-  const assetBlob = new Blob(['asset'], { type: 'image/png' });
-  const firstStep = createScenarioCaptureStep({ assetId: 'asset-1', title: 'First' });
-  const secondStep = createScenarioCaptureStep({ assetId: 'asset-2', title: 'Second' });
-  const project = {
-    ...createScenarioStoreProjectFixture(),
-    steps: [firstStep, secondStep],
-    trash: [
-      {
-        deletedAt: 30,
-        originalIndex: 0,
-        step: firstStep,
-      },
-    ],
-  };
-  getScenarioProjectMock.mockResolvedValue(project);
-  getScenarioAssetBlobMock.mockResolvedValue(assetBlob);
-
-  const recentSteps = await listRecentScenarioSteps(project.id, 1);
-  const trashedSteps = await listScenarioTrashedSteps(project.id);
-
-  expect(getScenarioAssetBlobMock).toHaveBeenCalledWith(secondStep.assetId);
-  expect(recentSteps).toEqual([
-    expect.objectContaining({
-      id: secondStep.id,
-      title: 'Second',
-      previewDataUrl: 'data:image/png;base64,preview',
-    }),
-  ]);
-  expect(trashedSteps).toEqual([
-    {
-      id: firstStep.id,
-      deletedAt: 30,
-      kind: 'capture',
-      originalIndex: 0,
-      title: 'First',
-    },
-  ]);
-}
-
-async function verifyMissingProjectQueries() {
-  getScenarioProjectMock.mockResolvedValue(undefined);
-
-  await expect(listRecentScenarioSteps('missing')).resolves.toEqual([]);
-  await expect(listScenarioTrashedSteps('missing')).resolves.toEqual([]);
-  expect(getScenarioAssetBlobMock).not.toHaveBeenCalled();
-}
-
 describe('project step queries', () => {
-  it(
-    'loads recent and trashed scenario step projections from the project owner',
-    verifyRecentAndTrashedQueries
-  );
-  it('keeps missing-project queries as empty results', verifyMissingProjectQueries);
+  it('uses captured image assets for recent steps and preserves document order in library previews', async () => {
+    const first = createCapturedGuideStepFixture('asset-1', 'First');
+    const second = createCapturedGuideStepFixture('asset-2', 'Second');
+    const project = { ...createScenarioStoreProjectFixture(), items: [first, second] };
+    getScenarioProjectMock.mockResolvedValue(project);
+    getScenarioAssetBlobMock.mockResolvedValue(new Blob(['asset'], { type: 'image/png' }));
+    expect(await listRecentScenarioSteps(project.id, 1)).toEqual([
+      expect.objectContaining({
+        id: second.id,
+        title: 'Second',
+        position: 1,
+        numberLabel: '2',
+        previewDataUrl: 'data:image/png;base64,preview',
+      }),
+    ]);
+    expect(getScenarioAssetBlobMock).toHaveBeenCalledWith('asset-2');
+    expect((await listScenarioPreviewSteps(project.id)).map((step) => step.id)).toEqual([
+      first.id,
+      second.id,
+    ]);
+  });
+
+  it('returns empty results without reading assets for missing projects', async () => {
+    await expect(listRecentScenarioSteps('missing')).resolves.toEqual([]);
+    await expect(listScenarioPreviewSteps('missing')).resolves.toEqual([]);
+    expect(getScenarioAssetBlobMock).not.toHaveBeenCalled();
+  });
+
+  it('propagates unavailable project failures instead of presenting an empty guide', async () => {
+    getScenarioProjectMock.mockRejectedValue(new Error('unavailable'));
+    await expect(listScenarioPreviewSteps('old')).rejects.toThrow('unavailable');
+    expect(getScenarioAssetBlobMock).not.toHaveBeenCalled();
+  });
 });

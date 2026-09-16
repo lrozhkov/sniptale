@@ -2,11 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowUpRight, FileStack, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { openScenarioEditorPage } from '../../../platform/navigation/extension-pages/index';
-import { listRecentScenarioSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
+import { listScenarioPreviewSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
 import { getScenarioProjectRecord } from '../../../composition/persistence/scenario/store/project-records/index';
 import type {
   ScenarioProjectSummary,
-  ScenarioRecentStep,
+  ScenarioPreviewStep,
 } from '../../../features/scenario/contracts/types/project';
 import { formatDate } from '../ui';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
@@ -19,7 +19,7 @@ interface GalleryScenarioPreviewPanelProps {
 function ScenarioPreviewSurface(props: { children: ReactNode }) {
   return (
     <div
-      className="flex min-h-0 flex-1 items-center justify-center
+      className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto
         bg-[radial-gradient(circle_at_top,
           color-mix(in_srgb,var(--sniptale-color-accent-soft)_80%,transparent),
           color-mix(in_srgb,var(--sniptale-color-surface-panel)_38%,var(--sniptale-color-surface-canvas)_62%)_40%,
@@ -50,20 +50,29 @@ function ScenarioPreviewEmptyState() {
   );
 }
 
-function ScenarioPreviewStepsGrid(props: { recentSteps: ScenarioRecentStep[] }) {
+function ScenarioPreviewStepsGrid(props: { recentSteps: ScenarioPreviewStep[] }) {
   return (
-    <div className="grid w-full max-w-5xl gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {props.recentSteps.slice(0, 6).map((step) => (
+    <div className="grid w-full max-w-5xl items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {props.recentSteps.map((step) => (
         <ScenarioPreviewStepCard key={step.id} step={step} />
       ))}
     </div>
   );
 }
 
-function ScenarioPreviewHero(props: { recentSteps: ScenarioRecentStep[] }) {
+function ScenarioPreviewHero(props: {
+  recentSteps: ScenarioPreviewStep[];
+  status: 'loading' | 'ready' | 'unavailable';
+}) {
   return (
     <ScenarioPreviewSurface>
-      {props.recentSteps.length === 0 ? (
+      {props.status !== 'ready' ? (
+        <p role="status">
+          {translate(
+            props.status === 'loading' ? 'gallery.app.loading' : 'gallery.preview.unavailableGuide'
+          )}
+        </p>
+      ) : props.recentSteps.length === 0 ? (
         <ScenarioPreviewEmptyState />
       ) : (
         <ScenarioPreviewStepsGrid recentSteps={props.recentSteps} />
@@ -119,10 +128,11 @@ function ScenarioPreviewSidebarHeader(props: {
   );
 }
 
-function ScenarioPreviewEditorButton(props: { projectId: string }) {
+function ScenarioPreviewEditorButton(props: { projectId: string; disabled: boolean }) {
   return (
     <button
       type="button"
+      disabled={props.disabled}
       onClick={() => void openScenarioEditorPage(props.projectId)}
       className="flex w-full items-center justify-center gap-2 rounded-[14px]
         border border-[var(--sniptale-color-border-accent-soft)]
@@ -140,6 +150,7 @@ function ScenarioPreviewSidebar(props: {
   onClose: () => void;
   project: ScenarioProjectSummary;
   stepCount: number | null;
+  canEdit: boolean;
 }) {
   return (
     <aside
@@ -159,27 +170,41 @@ function ScenarioPreviewSidebar(props: {
           label={translate('gallery.app.createdLabel')}
           value={formatDate(props.project.createdAt)}
         />
-        <ScenarioPreviewEditorButton projectId={props.project.id} />
+        <ScenarioPreviewEditorButton projectId={props.project.id} disabled={!props.canEdit} />
       </div>
     </aside>
   );
 }
 
-function useScenarioPreviewDetails(projectId: string) {
-  const [recentSteps, setRecentSteps] = useState<ScenarioRecentStep[]>([]);
+function useScenarioPreviewDetails(project: ScenarioProjectSummary) {
+  const projectId = project.id;
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [recentSteps, setRecentSteps] = useState<ScenarioPreviewStep[]>([]);
   const [stepCount, setStepCount] = useState<number | null>(null);
 
   useEffect(() => {
     let active = true;
+    setRecentSteps([]);
+    setStepCount(null);
+    if (project.availability !== 'available') {
+      setStatus('unavailable');
+      return;
+    }
+    setStatus('loading');
 
-    void Promise.all([listRecentScenarioSteps(projectId), getScenarioProjectRecord(projectId)])
+    void Promise.all([listScenarioPreviewSteps(projectId), getScenarioProjectRecord(projectId)])
       .then(([steps, projectRecord]) => {
         if (!active) {
           return;
         }
 
+        if (!projectRecord) {
+          setStatus('unavailable');
+          return;
+        }
+        setStatus('ready');
         setRecentSteps(steps);
-        setStepCount(projectRecord?.steps.length ?? 0);
+        setStepCount(projectRecord?.items.filter((item) => item.kind === 'step').length ?? 0);
       })
       .catch(() => {
         if (!active) {
@@ -187,19 +212,20 @@ function useScenarioPreviewDetails(projectId: string) {
         }
 
         setRecentSteps([]);
-        setStepCount(0);
+        setStepCount(null);
+        setStatus('unavailable');
       });
 
     return () => {
       active = false;
     };
-  }, [projectId]);
+  }, [projectId, project.availability]);
 
-  return { recentSteps, stepCount };
+  return { recentSteps, stepCount, status };
 }
 
 export function GalleryScenarioPreviewPanel(props: GalleryScenarioPreviewPanelProps) {
-  const { recentSteps, stepCount } = useScenarioPreviewDetails(props.project.id);
+  const { recentSteps, stepCount, status } = useScenarioPreviewDetails(props.project);
 
   return (
     <div
@@ -213,10 +239,11 @@ export function GalleryScenarioPreviewPanel(props: GalleryScenarioPreviewPanelPr
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]
             text-[var(--sniptale-color-text-primary)] shadow-sm"
         >
-          <ScenarioPreviewHero recentSteps={recentSteps} />
+          <ScenarioPreviewHero recentSteps={recentSteps} status={status} />
           <ScenarioPreviewSidebar
             project={props.project}
             stepCount={stepCount}
+            canEdit={status === 'ready'}
             onClose={props.onClose}
           />
         </div>

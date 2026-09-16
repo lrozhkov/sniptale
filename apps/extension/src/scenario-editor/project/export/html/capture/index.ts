@@ -1,1 +1,0 @@
-export { renderCaptureStepHtml } from './render';

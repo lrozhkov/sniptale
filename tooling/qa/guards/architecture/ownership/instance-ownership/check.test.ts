@@ -250,7 +250,9 @@ describe('ownership registry coverage', () => {
       OWNERSHIP_STATE_FILES.has('apps/extension/src/offscreen/recording/start/session.ts')
     ).toBe(true);
     expect(
-      OWNERSHIP_STATE_FILES.has('apps/extension/src/scenario-editor/project/state/index.ts')
+      OWNERSHIP_STATE_FILES.has(
+        'apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts'
+      )
     ).toBe(true);
   });
 });

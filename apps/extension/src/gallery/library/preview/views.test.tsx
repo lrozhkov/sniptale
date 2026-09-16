@@ -466,6 +466,7 @@ it('hides destructive and reset actions for scenario exports without pending cha
     item: createScenarioExportItem({
       filename: 'scenario-export.zip',
       project: {
+        availability: 'available' as const,
         id: 'project-1',
         name: 'Quarterly Demo',
         createdAt: 1,

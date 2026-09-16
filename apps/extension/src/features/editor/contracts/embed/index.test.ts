@@ -5,6 +5,9 @@ import {
   createScenarioEditorEmbedCloseMessage,
   isEditorEmbedMessage,
   readEditorEmbedMode,
+  readEditorEmbedSession,
+  createScenarioEditorEmbedInitMessage,
+  isEditorEmbedInitMessage,
 } from './index';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -48,10 +51,14 @@ describe('editor embed contract', () => {
   it('builds and validates apply and close messages', () => {
     expect(
       isEditorEmbedMessage(
-        createScenarioEditorEmbedApplyMessage('data:image/png;base64,abc', createEditorDocument())
+        createScenarioEditorEmbedApplyMessage(
+          'data:image/png;base64,abc',
+          createEditorDocument(),
+          'session-test'
+        )
       )
     ).toBe(true);
-    expect(isEditorEmbedMessage(createScenarioEditorEmbedCloseMessage())).toBe(true);
+    expect(isEditorEmbedMessage(createScenarioEditorEmbedCloseMessage('session-test'))).toBe(true);
     expect(isEditorEmbedMessage({ source: 'sniptale-editor-embed', type: 'scenario-apply' })).toBe(
       false
     );
@@ -59,10 +66,44 @@ describe('editor embed contract', () => {
       isEditorEmbedMessage({
         ...createScenarioEditorEmbedApplyMessage(
           'https://example.com/image.png',
-          createEditorDocument()
+          createEditorDocument(),
+          'session-test'
         ),
       })
     ).toBe(false);
     expect(isEditorEmbedMessage({ source: 'other', type: 'scenario-close' })).toBe(false);
   });
+});
+
+it('rejects missing, oversized, and malformed session identities and unsafe initialization', () => {
+  expect(readEditorEmbedSession('?embedSession=valid_1-2')).toBe('valid_1-2');
+  for (const sessionId of ['', 'x'.repeat(161), 'a b', '../foreign']) {
+    expect(readEditorEmbedSession(`?embedSession=${encodeURIComponent(sessionId)}`)).toBeNull();
+    expect(
+      isEditorEmbedMessage({ source: 'sniptale-editor-embed', type: 'scenario-close', sessionId })
+    ).toBe(false);
+  }
+  expect(
+    isEditorEmbedInitMessage(
+      createScenarioEditorEmbedInitMessage('session', {
+        dataUrl: 'data:image/png;base64,abc',
+        document: createEditorDocument(),
+      })
+    )
+  ).toBe(true);
+  expect(
+    isEditorEmbedInitMessage(
+      createScenarioEditorEmbedInitMessage('session', {
+        dataUrl: 'https://remote.test/private.png',
+      })
+    )
+  ).toBe(false);
+  expect(
+    isEditorEmbedMessage({
+      source: 'sniptale-editor-embed',
+      type: 'scenario-error',
+      sessionId: 'session',
+      code: 'raw exception',
+    })
+  ).toBe(false);
 });

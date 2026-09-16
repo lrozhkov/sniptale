@@ -29,6 +29,7 @@ import { mediaLibraryRootPublisher } from './root-publication/media';
 import { scenarioProjectRootPublisher } from './root-publication/scenario-project';
 import { videoProjectRootPublisher } from './root-publication/video-project';
 import { listGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
+import { runWithScenarioResourceRead } from '../../../composition/persistence/scenario/resource-sessions';
 
 export type MediaHubImportConflictStrategy = ArchiveRestoreStrategy;
 
@@ -63,7 +64,9 @@ export async function inspectLocalMediaHubBackup(
 ): Promise<MediaHubLocalBackupSummary> {
   await recoverAssetPublications();
   const options = createMediaHubBackupExportOptions(rawOptions);
-  const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options);
+  const plan = await runWithScenarioResourceRead(() =>
+    buildMediaHubBackupExportPlanFromLibraryV6(options)
+  );
   const summary = plan.roots.reduce(
     (total, root) => ({
       draftCount: total.draftCount + root.summary.draftCount,
@@ -132,12 +135,14 @@ export async function exportMediaHubBackup(
     mimeType: 'application/zip',
   });
   try {
-    const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options);
-    await exportMediaHubBackupV6({
-      plan,
-      sink,
-      ...(runtime.onProgress ? { onProgress: runtime.onProgress } : {}),
-      ...(runtime.signal ? { signal: runtime.signal } : {}),
+    await runWithScenarioResourceRead(async () => {
+      const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options);
+      await exportMediaHubBackupV6({
+        plan,
+        sink,
+        ...(runtime.onProgress ? { onProgress: runtime.onProgress } : {}),
+        ...(runtime.signal ? { signal: runtime.signal } : {}),
+      });
     });
   } catch (error) {
     await sink.abort(error).catch(() => undefined);

@@ -13,3 +13,19 @@ export {
   getScenarioStepEditorDocumentRecord,
   getScenarioStepEditorDocumentTransferRecord,
 } from './step-editor-documents/index';
+
+export { duplicateScenarioProjectRecord } from './project-records/duplicate';
+export {
+  importScenarioImages,
+  type GuideImageImportSource,
+  type GuideImageImportPlacement,
+} from './image-import';
+export { listScenarioStepTemplates, saveScenarioStepTemplate } from './project-records/templates';
+export {
+  applyScenarioStepTemplate,
+  type GuideTemplateApplication,
+} from './project-records/template-apply';
+
+export type { TourImageImportPlacement } from './image-import-tour';
+
+export { importScenarioNarration } from './audio-import';

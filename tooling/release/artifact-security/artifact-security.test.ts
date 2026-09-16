@@ -1,3 +1,4 @@
+import { EXPECTED_EFFECT_SANDBOX_CSP } from './sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,7 +31,12 @@ const baseManifest = {
       resources: ['fonts/manrope-latin-wght-normal.woff2'],
     },
   ],
-  sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+  sandbox: {
+    pages: [
+      'apps/extension/src/effect-runtime-sandbox/index.html',
+      'apps/extension/src/tour-preview-sandbox/index.html',
+    ],
+  },
 };
 const basePolicy = {
   hostPermissions: [],
@@ -95,11 +101,18 @@ function createFiles({
     ...(writeSandboxPage
       ? [
           {
-            contents: Buffer.from(sandboxHtml),
+            contents: Buffer.from(
+              `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_EFFECT_SANDBOX_CSP}">` +
+                sandboxHtml
+            ),
             relativePath: 'apps/extension/src/effect-runtime-sandbox/index.html',
           },
         ]
       : []),
+    {
+      contents: Buffer.from('<!doctype html>'),
+      relativePath: 'apps/extension/src/tour-preview-sandbox/index.html',
+    },
     ...extraFiles.map((file: { relativePath: string; text: string }) => ({
       contents: Buffer.from(file.text),
       relativePath: file.relativePath,
@@ -472,4 +485,21 @@ it('rejects retired Engine1, SDK handoff, golden, and bundled demo artifacts', a
     { text: 'const old = "features/video/project/video-pack/runtime";' },
     'retired Engine1 source path'
   );
+});
+
+it('rejects removal or weakening of the effect sandbox head policy', async () => {
+  const repoRoot = await createRepoRoot();
+  for (const html of [
+    '<!doctype html>',
+    `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_SANDBOX_CSP}">`,
+  ]) {
+    const files = createFiles().map((file) =>
+      file.relativePath === 'apps/extension/src/effect-runtime-sandbox/index.html'
+        ? { ...file, contents: Buffer.from(html) }
+        : file
+    );
+    await expect(verifyReleaseArtifactFiles({ files, repoRoot })).rejects.toThrow(
+      'strict head CSP'
+    );
+  }
 });

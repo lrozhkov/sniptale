@@ -216,3 +216,82 @@ async function verifyRejectedAsyncConfirmRecovery() {
   expect(confirmButton?.disabled).toBe(false);
   expect(cancelButton?.disabled).toBe(false);
 }
+
+it('owns keyboard focus, Escape and focus restoration for a confirmation', () => {
+  const trigger = document.createElement('button');
+  document.body.append(trigger);
+  trigger.focus();
+  const onCancel = vi.fn();
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <ProductConfirmDialog
+        title="Delete"
+        message="Delete item?"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onCancel={onCancel}
+      />
+    )
+  );
+  const dialog = container.querySelector('[role="alertdialog"]');
+  expect(dialog?.getAttribute('aria-modal')).toBe('true');
+  expect(dialog?.getAttribute('aria-labelledby')).toBeTruthy();
+  expect(document.activeElement?.textContent).toBe('Cancel');
+  act(() =>
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })
+    )
+  );
+  expect(document.activeElement?.textContent).toBe('Delete');
+  act(() =>
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    )
+  );
+  expect(onCancel).toHaveBeenCalledTimes(1);
+  act(() => root?.render(null));
+  expect(document.activeElement).toBe(trigger);
+  trigger.remove();
+});
+
+it('restores focus inside a ShadowRoot and traps reverse keyboard navigation', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const shadow = host.attachShadow({ mode: 'open' });
+  const trigger = document.createElement('button');
+  shadow.append(trigger);
+  trigger.focus();
+  container = document.createElement('div');
+  shadow.append(container);
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <ProductConfirmDialog
+        title="Delete"
+        message="Delete item?"
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+    )
+  );
+  const buttons = [...container.querySelectorAll<HTMLButtonElement>('button')];
+  expect(shadow.activeElement?.textContent).toBe('Cancel');
+  act(() => buttons[0]?.focus());
+  act(() =>
+    shadow.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        composed: true,
+      })
+    )
+  );
+  expect(shadow.activeElement?.textContent).toBe('Delete');
+  act(() => root?.render(null));
+  expect(shadow.activeElement).toBe(trigger);
+  host.remove();
+});

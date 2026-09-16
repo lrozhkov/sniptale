@@ -1,3 +1,4 @@
+import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import type {
   ProcessScenarioEditorWithLLMMessage,
   ProcessScenarioEditorWithLLMResponse,
@@ -45,7 +46,7 @@ function buildScenarioEditorUserContent(
 ) {
   return [
     {
-      text: buildScenarioEditorV3UserText(message, canonicalPayload),
+      text: buildScenarioEditorGuideUserText(message, canonicalPayload),
       type: 'text' as const,
     },
     ...canonicalPayload.attachments.map((attachment) => ({
@@ -55,7 +56,7 @@ function buildScenarioEditorUserContent(
   ];
 }
 
-function buildScenarioEditorV3UserText(
+function buildScenarioEditorGuideUserText(
   message: ProcessScenarioEditorWithLLMMessage,
   canonicalPayload: ScenarioEditorCanonicalEgressPayload
 ) {
@@ -66,16 +67,13 @@ function buildScenarioEditorV3UserText(
     'Project outline JSON:',
     redactAiPayloadText(canonicalPayload.projectOutlineJson),
     '',
-    'Selected slide code JSON:',
-    redactAiPayloadText(canonicalPayload.selectedSlideCodeJson),
-    '',
-    'Tool manifest JSON:',
-    redactAiPayloadText(canonicalPayload.toolManifestJson),
+    'Selected guide step JSON:',
+    redactAiPayloadText(canonicalPayload.selectedStepJson),
     '',
     'Project snapshot JSON:',
     redactAiPayloadText(canonicalPayload.projectSnapshotJson),
     '',
-    'Return ONLY strict JSON with the shape {"operations":[...]} using the tool manifest.',
+    'Return ONLY strict JSON with the shape {"operations":[...]} using the system contract.',
   ].join('\n');
 }
 
@@ -92,10 +90,12 @@ function parseScenarioEditorResponse(rawResponse: string): ProcessScenarioEditor
     };
   }
 
-  return parseScenarioEditorV3Response(parsedJson);
+  return parseScenarioEditorGuideResponse(parsedJson);
 }
 
-function parseScenarioEditorV3Response(parsedJson: unknown): ProcessScenarioEditorWithLLMResponse {
+function parseScenarioEditorGuideResponse(
+  parsedJson: unknown
+): ProcessScenarioEditorWithLLMResponse {
   const parsedPayload = scenarioAiOperationsResponseSchema.safeParse(parsedJson);
 
   if (!parsedPayload.success) {
@@ -137,7 +137,7 @@ async function processScenarioEditorRequest(
     baseUrl: config.baseUrl,
     modelCode: config.modelCode,
     providerErrorLabel: config.providerId,
-    systemPrompt: scenarioPrompt,
+    systemPrompt: buildScenarioAiSystemPrompt(scenarioPrompt),
     userContent: buildScenarioEditorUserContent(message, canonicalPayload),
   });
 

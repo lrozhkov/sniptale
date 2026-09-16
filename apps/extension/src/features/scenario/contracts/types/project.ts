@@ -1,105 +1,17 @@
+import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   ScenarioCaptureSourceKind,
   ScenarioCaptureSurface,
-  ScenarioNoteTone,
-  ScenarioAnnotationRenderMode,
-  ScenarioStepKind,
-  ScenarioSuggestedEventKind,
-  ScenarioSuggestedEventStatus,
 } from '@sniptale/runtime-contracts/scenario/types/base';
 import type {
   ScenarioCaptureMetadata,
-  ScenarioImageTransform,
   ScenarioPageDescriptor,
   ScenarioPoint,
   ScenarioTargetDescriptor,
-  ScenarioViewportTransform,
 } from '@sniptale/runtime-contracts/scenario/types/geometry';
-import type { ScenarioOverlay } from './overlays';
-
-export interface ScenarioSuggestedEvent {
-  id: string;
-  kind: ScenarioSuggestedEventKind;
-  status: ScenarioSuggestedEventStatus;
-  createdAt: number;
-  message: string;
-  sourceStepId: string | null;
-  target: ScenarioTargetDescriptor | null;
-  data: Record<string, string | number | boolean | null>;
-}
-
-interface ScenarioStepBase {
-  id: string;
-  kind: ScenarioStepKind;
-  title: string;
-  body: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-export interface ScenarioCaptureStep extends ScenarioStepBase {
-  kind: 'capture';
-  assetId: string;
-  galleryAssetId: string | null;
-  captureSurface: 'visible' | 'full' | 'selection';
-  sourceKind: 'manual' | 'auto-click';
-  page: ScenarioPageDescriptor;
-  target: ScenarioTargetDescriptor | null;
-  interactionPoint: ScenarioPoint | null;
-  cursorPoint: ScenarioPoint | null;
-  captureMetadata: ScenarioCaptureMetadata;
-  overlays: ScenarioOverlay[];
-  annotationRenderMode?: ScenarioAnnotationRenderMode;
-  imageTransform: ScenarioImageTransform;
-  viewportTransform: ScenarioViewportTransform;
-}
-
-export interface ScenarioSectionStep extends ScenarioStepBase {
-  kind: 'section';
-}
-
-export interface ScenarioNoteStep extends ScenarioStepBase {
-  kind: 'note';
-  tone: ScenarioNoteTone;
-}
-
-export interface ScenarioDividerStep extends ScenarioStepBase {
-  kind: 'divider';
-}
-
-export type ScenarioStep =
-  | ScenarioCaptureStep
-  | ScenarioSectionStep
-  | ScenarioNoteStep
-  | ScenarioDividerStep;
-
-export interface ScenarioStepPatch {
-  annotationRenderMode?: ScenarioAnnotationRenderMode;
-  body?: string;
-  imageTransform?: ScenarioImageTransform;
-  overlays?: ScenarioOverlay[];
-  title?: string;
-  tone?: ScenarioNoteTone;
-  viewportTransform?: ScenarioViewportTransform;
-}
-
-export interface ScenarioProject {
-  version: 2;
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-  tags?: string[];
-  steps: ScenarioStep[];
-  trash: Array<{
-    deletedAt: number;
-    originalIndex: number;
-    step: ScenarioStep;
-  }>;
-  suggestedEvents: ScenarioSuggestedEvent[];
-}
 
 export interface ScenarioProjectSummary {
+  purpose?: 'step-template' | undefined;
   id: string;
   name: string;
   createdAt: number;
@@ -107,6 +19,7 @@ export interface ScenarioProjectSummary {
   tags?: string[];
   lifecycle?: import('../../../../contracts/settings/library-lifecycle').LibraryLifecycle;
   workspaceRevision?: number;
+  availability: 'available' | 'unsupported' | 'invalid';
 }
 
 export interface ScenarioRecentStep {
@@ -120,15 +33,22 @@ export interface ScenarioRecentStep {
     sourceKind: ScenarioCaptureSourceKind;
     target: ScenarioTargetDescriptor | null;
   };
+  /** Document item index used as the drag/drop destination. */
   position: number;
+  /** Resolved display label; null hides numbering without changing document position. */
+  numberLabel: string | null;
   previewDataUrl: string;
   title: string;
 }
 
-export interface ScenarioTrashedStep {
+/** Read-only library projection; image bytes are acquired by the visible preview owner. */
+export interface ScenarioPreviewStep {
   id: string;
-  deletedAt: number;
-  kind: ScenarioStepKind;
-  originalIndex: number;
   title: string;
+  position: number;
+  numberLabel: string | null;
+  images: Pick<
+    GuideImageBlock,
+    'id' | 'assetId' | 'alt' | 'caption' | 'frame' | 'fit' | 'contentTransform'
+  >[];
 }

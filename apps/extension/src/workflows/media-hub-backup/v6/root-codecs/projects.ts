@@ -1,3 +1,4 @@
+import { encodePortableTour } from './scenario-tour';
 import type {
   StoredProjectAssetEntry,
   StoredProjectExportEntry,
@@ -12,12 +13,25 @@ import type {
 import type { VideoProjectEffectSnapshot } from '../../../../features/video/project/effect-instance/types';
 import type { PortableEditorDocumentV3 } from './editor-document';
 import type { PortableAggregatePresentation, PortableMediaThumbnail } from './media';
-import { isScenarioProjectV3 } from '../../../../features/scenario/project/v3';
+import {
+  SCENARIO_HISTORY_LIMIT,
+  SCENARIO_HISTORY_BYTE_LIMIT,
+  parseScenarioSavedVersions,
+} from '../../../../composition/persistence/scenario/history-model';
+import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { JsonValue } from '../contracts';
 import {
   parsePortableVideoReview,
   type PortableVideoReview,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
+
+/** Portable image keys add eight bytes per image; array separators add one per version. */
+export const MAX_PORTABLE_SCENARIO_HISTORY_BYTES =
+  SCENARIO_HISTORY_BYTE_LIMIT +
+  SCENARIO_HISTORY_LIMIT * GUIDE_LIMITS.maxItems * GUIDE_LIMITS.maxBlocksPerStep * 8 +
+  SCENARIO_HISTORY_LIMIT +
+  1;
 
 interface PortableProjectAsset {
   entry: Omit<StoredProjectAssetEntry, 'assetId'>;
@@ -61,9 +75,21 @@ interface PortableScenarioStepDocument extends Omit<
   document: PortableEditorDocumentV3;
 }
 
+interface PortableScenarioSavedVersion {
+  revision: number;
+  savedAt: number;
+  project: JsonValue;
+}
+type EncodedScenarioProjectEntry = PortableScenarioProjectMetadata['entry'] & {
+  history?: PortableScenarioSavedVersion[];
+};
+
 export interface PortableScenarioProjectMetadata {
   assets: PortableScenarioAsset[];
-  entry: Omit<ScenarioProjectEntry, 'project'> & { project: JsonValue };
+  entry: Omit<ScenarioProjectEntry, 'project' | 'history'> & {
+    project: JsonValue;
+  };
+  historyObjectId?: string;
   exportThumbnails: Array<{ exportId: string; thumbnail: PortableMediaThumbnail }>;
   exports: ScenarioExportEntry[];
   presentation?: PortableAggregatePresentation;
@@ -73,37 +99,50 @@ export interface PortableScenarioProjectMetadata {
 
 export function encodePortableScenarioProjectEntry(
   entry: ScenarioProjectEntry
-): PortableScenarioProjectMetadata['entry'] {
-  if (!isScenarioProjectV3(entry.project)) {
-    throw new Error('Only current scenario projects can be exported in v6.');
-  }
-  const encodeSlide = (
-    slide: ScenarioProjectEntry['project'] extends never
-      ? never
-      : (typeof entry.project.slides)[number]
-  ) => ({
-    ...slide,
-    elements: slide.elements.map((element) => {
-      if (element.kind !== 'image') return element;
-      const { assetId, ...assetRef } = element.assetRef;
-      return { ...element, assetRef: { ...assetRef, scenarioAssetId: assetId } };
-    }),
-    source:
-      slide.source.kind === 'capture'
-        ? (() => {
-            const { assetId, ...source } = slide.source;
-            return { ...source, scenarioAssetId: assetId };
-          })()
-        : slide.source,
-  });
+): EncodedScenarioProjectEntry {
+  const versions = parseScenarioSavedVersions(
+    entry.history,
+    entry.id,
+    entry.workspaceRevision,
+    entry.project.updatedAt
+  );
+  if (!versions) throw new Error('Saved guide history is invalid.');
+  const { history: _history, ...rest } = entry;
   return {
-    ...entry,
-    project: {
-      ...entry.project,
-      slides: entry.project.slides.map(encodeSlide),
-      trash: entry.project.trash.map((item) => ({ ...item, slide: encodeSlide(item.slide) })),
-    } as unknown as JsonValue,
+    ...rest,
+    project: encodePortableGuideProject(entry.project),
+    ...(versions.length
+      ? {
+          history: versions.map((version) => ({
+            ...version,
+            project: encodePortableGuideProject(version.project),
+          })),
+        }
+      : {}),
   };
+}
+
+function encodePortableGuideProject(value: GuideProject): JsonValue {
+  const parsed = parseGuideProject(value);
+  if (parsed.status !== 'ok') throw new Error('Only current guide projects can be exported.');
+  const project = {
+    ...parsed.project,
+    ...(parsed.project.tour ? { tour: encodePortableTour(parsed.project.tour) } : {}),
+    items: parsed.project.items.map((item) =>
+      item.kind !== 'step'
+        ? item
+        : {
+            ...item,
+            blocks: item.blocks.map((block) => {
+              if (block.kind !== 'image') return block;
+              const { assetId, ...rest } = block;
+              return { ...rest, scenarioAssetId: assetId };
+            }),
+          }
+    ),
+  };
+  if (!isJsonValue(project)) throw new Error('Portable guide is not JSON data.');
+  return project;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -208,6 +247,40 @@ function isPortableVideoProjectMetadata(value: unknown): value is PortableVideoP
   );
 }
 
+/** Admits the bounded history object before its project/image references are remapped. */
+export function decodePortableScenarioHistory(
+  value: unknown,
+  projectId: string
+): PortableScenarioSavedVersion[] {
+  if (!isPortableScenarioHistory(value, projectId))
+    throw new Error('Portable guide history is invalid.');
+  return value;
+}
+
+function isPortableScenarioHistory(
+  value: unknown,
+  projectId: string
+): value is PortableScenarioSavedVersion[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= SCENARIO_HISTORY_LIMIT &&
+    value.every(
+      (version) =>
+        isRecord(version) &&
+        typeof version['revision'] === 'number' &&
+        Number.isSafeInteger(version['revision']) &&
+        version['revision'] >= 0 &&
+        typeof version['savedAt'] === 'number' &&
+        Number.isFinite(version['savedAt']) &&
+        isRecord(version['project']) &&
+        version['project']['id'] === projectId &&
+        isJsonValue(version['project'])
+    ) &&
+    new TextEncoder().encode(JSON.stringify(value)).byteLength <=
+      MAX_PORTABLE_SCENARIO_HISTORY_BYTES
+  );
+}
+
 function isPortableScenarioProjectMetadata(
   value: unknown
 ): value is PortableScenarioProjectMetadata {
@@ -216,6 +289,11 @@ function isPortableScenarioProjectMetadata(
     isRecord(value['entry']) &&
     typeof value['entry']['id'] === 'string' &&
     isJsonValue(value['entry']['project']) &&
+    value['entry']['history'] === undefined &&
+    (value['historyObjectId'] === undefined ||
+      (typeof value['historyObjectId'] === 'string' &&
+        value['historyObjectId'].length > 0 &&
+        value['historyObjectId'].length <= 160)) &&
     Array.isArray(value['assets']) &&
     value['assets'].every(isPortableScenarioAsset) &&
     Array.isArray(value['exports']) &&

@@ -27,16 +27,8 @@ import {
   openScenarioEditor,
   setScenarioActiveProject,
 } from './transport/projects';
-import {
-  deleteScenarioStep,
-  moveScenarioStep,
-  restoreScenarioStep,
-  saveScenarioCaptureStep,
-} from './transport/steps';
-import {
-  captureVisibleScenarioInteraction,
-  recordScenarioSuggestedEvent,
-} from './transport/capture';
+import { deleteScenarioStep, moveScenarioStep, saveScenarioCaptureStep } from './transport/steps';
+import { captureVisibleScenarioInteraction } from './transport/capture';
 
 const capturePayload = {
   body: 'Body',
@@ -55,19 +47,6 @@ const capturePayload = {
   target: null,
   title: 'Title',
 };
-
-const suggestedEventTarget = {
-  selector: 'button',
-  iframeSelector: null,
-  tagName: 'button',
-  role: null,
-  text: 'Go',
-  ariaLabel: null,
-  title: null,
-  rect: { x: 1, y: 2, width: 3, height: 4 },
-  framePadding: null,
-};
-
 const expectedTransportCalls = [
   [{ type: MessageType.SCENARIO_GET_RESTORE_SNAPSHOT }],
   [
@@ -112,7 +91,6 @@ const expectedTransportCalls = [
       toIndex: 2,
     },
   ],
-  [{ type: MessageType.SCENARIO_RESTORE_STEP, projectId: 'project-1', stepId: 'step-1' }],
   [
     {
       type: MessageType.SCENARIO_SAVE_CAPTURE_STEP,
@@ -127,14 +105,6 @@ const expectedTransportCalls = [
       type: CaptureMessageType.CAPTURE_VISIBLE,
       actionType: 'scenario',
       scenarioCapture: capturePayload,
-    },
-  ],
-  [
-    {
-      type: MessageType.SCENARIO_RECORD_SUGGESTED_EVENT,
-      kind: 'input',
-      message: 'Input: field',
-      target: suggestedEventTarget,
     },
   ],
 ];
@@ -165,7 +135,6 @@ async function runTransportRoutingScenario() {
   });
   await deleteScenarioStep({ projectId: 'project-1', stepId: 'step-1' });
   await moveScenarioStep({ projectId: 'project-1', stepId: 'step-1', toIndex: 2 });
-  await restoreScenarioStep({ projectId: 'project-1', stepId: 'step-1' });
   await saveScenarioCaptureStep({
     dataUrl: 'data:image/png;base64,1',
     filename: 'capture.png',
@@ -173,11 +142,6 @@ async function runTransportRoutingScenario() {
     scenarioCapture: capturePayload,
   });
   await captureVisibleScenarioInteraction(capturePayload);
-  await recordScenarioSuggestedEvent({
-    kind: 'input',
-    message: 'Input: field',
-    target: suggestedEventTarget,
-  });
 }
 
 function expectTransportRoutingCalls() {

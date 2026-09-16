@@ -195,22 +195,6 @@ export const scenarioEditorV3Messages = {
     ru: 'Следующий слайд',
     en: 'Next slide',
   },
-  openAudienceScreen: {
-    ru: 'Открыть экран аудитории',
-    en: 'Open audience screen',
-  },
-  openAudienceScreenFailed: {
-    ru: 'Не удалось открыть экран аудитории.',
-    en: 'Failed to open audience screen.',
-  },
-  audienceSyncFailed: {
-    ru: 'Не удалось синхронизировать экран аудитории.',
-    en: 'Failed to sync audience screen.',
-  },
-  audienceWaiting: {
-    ru: 'Показ завершён / ожидаем докладчика',
-    en: 'Presentation ended / waiting for presenter',
-  },
   noNextSlide: {
     ru: 'Следующего слайда нет.',
     en: 'No next slide.',

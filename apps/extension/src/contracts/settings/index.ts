@@ -163,6 +163,7 @@ export interface AISettings {
 }
 
 export interface PromptTemplate {
+  scope?: 'page' | 'scenario';
   id: string;
   name: string;
   content: string;

@@ -11,7 +11,6 @@ const controllerMocks = vi.hoisted(() => ({
   useScenarioControllerState: vi.fn(),
   useScenarioNavigationLockOverride: vi.fn(),
   useScenarioSessionRefresh: vi.fn(),
-  useScenarioSuggestedEventLogging: vi.fn(),
 }));
 
 vi.mock('./auto-click-capture', () => ({
@@ -20,10 +19,6 @@ vi.mock('./auto-click-capture', () => ({
 
 vi.mock('./navigation-lock-override', () => ({
   useScenarioNavigationLockOverride: controllerMocks.useScenarioNavigationLockOverride,
-}));
-
-vi.mock('./suggested-event-logging', () => ({
-  useScenarioSuggestedEventLogging: controllerMocks.useScenarioSuggestedEventLogging,
 }));
 
 vi.mock('./session/state', () => ({
@@ -123,12 +118,6 @@ describe('useScenarioController orchestration', () => {
       setScreenshotMode: vi.fn(),
     });
 
-    expect(controllerMocks.useScenarioSuggestedEventLogging).toHaveBeenCalledWith({
-      pendingProjectSelection: false,
-      projectId: null,
-      scenarioEnabled: false,
-      screenshotMode: true,
-    });
     expect(controllerMocks.useScenarioNavigationLockOverride).toHaveBeenCalledWith({
       navigationLockEnabled: true,
       pendingProjectSelection: false,

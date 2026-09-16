@@ -12,7 +12,7 @@ import { translate } from '../../../../platform/i18n/index';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
-import { formatPreciseTime } from '../../../contracts/time-format';
+import { formatPreciseTime } from '../../../../composition/library-preview/time-format';
 
 function isStageFullscreen(frameRef: RefObject<HTMLElement | null>): boolean {
   return document.fullscreenElement === frameRef.current;

@@ -1,3 +1,4 @@
+import { EXPECTED_EFFECT_SANDBOX_CSP } from './sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,7 +19,12 @@ const baseManifest = {
   },
   manifest_version: 3,
   permissions: [],
-  sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+  sandbox: {
+    pages: [
+      'apps/extension/src/effect-runtime-sandbox/index.html',
+      'apps/extension/src/tour-preview-sandbox/index.html',
+    ],
+  },
   web_accessible_resources: [],
 };
 const basePolicy = {
@@ -87,6 +93,10 @@ function createFiles(args: {
 }) {
   return [
     ...createTestLegalArtifactFiles(),
+    {
+      contents: Buffer.from('<!doctype html>'),
+      relativePath: 'apps/extension/src/tour-preview-sandbox/index.html',
+    },
     { contents: Buffer.from(JSON.stringify(baseManifest)), relativePath: 'manifest.json' },
     { contents: Buffer.from(args.popupScript), relativePath: 'assets/popup.js' },
     ...(args.extensionHtml
@@ -99,7 +109,8 @@ function createFiles(args: {
       : []),
     {
       contents: Buffer.from(
-        '<!doctype html><script type="module" src="/assets/effect-runtime-sandbox.js"></script>'
+        `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_EFFECT_SANDBOX_CSP}">` +
+          '<!doctype html><script type="module" src="/assets/effect-runtime-sandbox.js"></script>'
       ),
       relativePath: 'apps/extension/src/effect-runtime-sandbox/index.html',
     },

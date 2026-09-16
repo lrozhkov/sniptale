@@ -1,5 +1,6 @@
-import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -16,9 +17,7 @@ import { parseScenarioProjectEntry } from './read-guards';
 import { parseScenarioAssetEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.guards';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
-import { parseScenarioProject } from './projects/guards';
 import { areScenarioProjectsEqual } from './aggregate-comparison';
-import { isScenarioProjectV3 } from '../../../features/scenario/project/v3';
 import { isRecord } from '../infrastructure/indexed-db/read-primitives';
 import {
   buildPhysicalDeleteOperation,
@@ -57,7 +56,14 @@ export {
   type ScenarioAggregateChildMutation,
 } from './asset-staging';
 
-type StoredScenarioProject = ScenarioProject | ScenarioProjectV3;
+const logger = createLogger({ namespace: 'ScenarioAggregatePublication' });
+
+function requireSupportedScenarioEntry(raw: unknown): ScenarioProjectEntry | undefined {
+  if (raw === undefined) return undefined;
+  const entry = parseScenarioProjectEntry(raw);
+  if (!entry) throw new Error('Scenario project content is unavailable.');
+  return entry;
+}
 
 class StaleScenarioAggregateRevisionError extends Error {
   constructor(projectId: string) {
@@ -82,20 +88,18 @@ interface PreparedCommitScenarioAggregateMutationOptions extends Omit<
   children?: PreparedScenarioAggregateChildMutation;
 }
 
-interface ScenarioAggregatePublicationPayload<
-  TProject extends StoredScenarioProject = StoredScenarioProject,
-> {
+interface ScenarioAggregatePublicationPayload {
   baseRevision: number | null;
   children: PreparedScenarioAggregateChildMutation;
   committedAt: number;
   expectedUpdatedAt?: number | null;
-  project: TProject;
+  project: GuideProject;
   storageClass?: LibraryStorageClass;
   targetEntry: ScenarioProjectEntry;
 }
 
-interface ScenarioAggregateMutationResult<TProject extends StoredScenarioProject> {
-  project: TProject;
+interface ScenarioAggregateMutationResult {
+  project: GuideProject;
   workspaceRevision: number;
 }
 
@@ -179,14 +183,22 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
   return [...new Set(storeNames)];
 }
 
-export async function commitScenarioAggregateMutation<TProject extends StoredScenarioProject>(
-  project: TProject,
+export async function commitScenarioAggregateMutation(
+  project: GuideProject,
   options: CommitScenarioAggregateMutationOptions = {}
-): Promise<ScenarioAggregateMutationResult<TProject>> {
+): Promise<ScenarioAggregateMutationResult> {
+  const parsed = parseGuideProject(project);
+  if (parsed.status !== 'ok') {
+    return rejectScenarioMutationBeforeHandoff(
+      options.children,
+      new Error('Invalid guide project.')
+    );
+  }
+  project = parsed.project;
   assertChildOwnership(project.id, options.children);
-  await recoverScenarioAssetPublications();
   let preparedChildren: PreparedScenarioAggregateChildMutation | undefined;
   try {
+    await recoverScenarioAssetPublications();
     preparedChildren = await prepareScenarioEditorDocumentMutations(options.children);
   } catch (error) {
     return rejectScenarioMutationBeforeHandoff(options.children, error);
@@ -209,7 +221,9 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
   try {
     assertChildOwnership(project.id, preparedChildren);
     const db = await initDB();
-    const existing = parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, project.id));
+    const existing = requireSupportedScenarioEntry(
+      await db.get(SCENARIO_PROJECTS_STORE, project.id)
+    );
     assertExpectedScenarioRevision({
       existing: existing ?? undefined,
       expectedRevision: preparedOptions.expectedRevision,
@@ -222,7 +236,7 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
       options: { ...preparedOptions, publicationUpdatedAt: committedAt },
       project,
     });
-    const payload: ScenarioAggregatePublicationPayload<TProject> = {
+    const payload: ScenarioAggregatePublicationPayload = {
       baseRevision: existing?.workspaceRevision ?? null,
       children: preparedChildren!,
       committedAt,
@@ -241,11 +255,9 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
       payload,
     });
     journalCreated = true;
-    let result: ScenarioAggregateMutationResult<TProject> | undefined;
+    let result: ScenarioAggregateMutationResult | undefined;
     await publishReadyJournalWithRetry(journal, async (ready) => {
-      result = (await publishScenarioAssetJournal(
-        ready
-      )) as ScenarioAggregateMutationResult<TProject>;
+      result = (await publishScenarioAssetJournal(ready)) as ScenarioAggregateMutationResult;
     });
     await releaseAssetReadyProtection(assetRefs.map((ref) => ref.assetId));
     if (!result) throw new Error('Scenario asset publication produced no result.');
@@ -271,15 +283,15 @@ export async function commitScenarioAggregateMutation<TProject extends StoredSce
   }
 }
 
-async function commitScenarioAggregateInTransaction<TProject extends StoredScenarioProject>(
+async function commitScenarioAggregateInTransaction(
   db: Awaited<ReturnType<typeof initDB>>,
-  project: TProject,
+  project: GuideProject,
   options: PreparedCommitScenarioAggregateMutationOptions
-): Promise<ScenarioAggregateMutationResult<TProject>> {
+): Promise<ScenarioAggregateMutationResult> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const tx = db.transaction(getMutationStoreNames(options.children), 'readwrite');
   const projectStore = tx.objectStore(SCENARIO_PROJECTS_STORE);
-  const existing = parseScenarioProjectEntry(await projectStore.get(project.id)) ?? undefined;
+  const existing = requireSupportedScenarioEntry(await projectStore.get(project.id));
   if (
     existing &&
     !hasScenarioChildMutations(options.children) &&
@@ -287,10 +299,11 @@ async function commitScenarioAggregateInTransaction<TProject extends StoredScena
   ) {
     await tx.done;
     return {
-      project: existing.project as TProject,
+      project: existing.project,
       workspaceRevision: existing.workspaceRevision ?? 0,
     };
   }
+
   assertExpectedScenarioRevision({
     existing,
     expectedRevision: options.expectedRevision,
@@ -314,37 +327,23 @@ async function commitScenarioAggregateInTransaction<TProject extends StoredScena
   return { project: entry.project, workspaceRevision: entry.workspaceRevision ?? 0 };
 }
 
-function createScenarioAggregateEntry<TProject extends StoredScenarioProject>(args: {
+function createScenarioAggregateEntry(args: {
   existing: ScenarioProjectEntry | undefined;
   options: PreparedCommitScenarioAggregateMutationOptions;
-  project: TProject;
-}): ScenarioProjectEntry & { project: TProject } {
-  return (
-    args.project.version === 3
-      ? createScenarioProjectEntry({
-          existing: args.existing,
-          project: args.project as ScenarioProjectV3,
-          ...(args.options.storageClass === undefined
-            ? {}
-            : { storageClass: args.options.storageClass }),
-          ...(args.options.publicationUpdatedAt === undefined
-            ? {}
-            : { updatedAt: args.options.publicationUpdatedAt }),
-        })
-      : createScenarioProjectEntry({
-          existing: args.existing,
-          project: args.project as ScenarioProject,
-          ...(args.options.storageClass === undefined
-            ? {}
-            : { storageClass: args.options.storageClass }),
-          ...(args.options.publicationUpdatedAt === undefined
-            ? {}
-            : { updatedAt: args.options.publicationUpdatedAt }),
-        })
-  ) as ScenarioProjectEntry & { project: TProject };
+  project: GuideProject;
+}): ScenarioProjectEntry {
+  return createScenarioProjectEntry({
+    existing: args.existing,
+    project: args.project,
+    ...(args.options.storageClass === undefined ? {} : { storageClass: args.options.storageClass }),
+    ...(args.options.publicationUpdatedAt === undefined
+      ? {}
+      : { updatedAt: args.options.publicationUpdatedAt }),
+  });
 }
 
-async function applyScenarioAssetMutations(
+/** Applies validated scenario child mutations inside the caller's aggregate transaction. */
+export async function applyScenarioAssetMutations(
   tx: ScenarioAggregateTransaction,
   projectId: string,
   children: PreparedScenarioAggregateChildMutation | undefined,
@@ -408,13 +407,11 @@ async function applyScenarioAssetMutations(
   }
 }
 
-export async function commitScenarioAggregateSnapshotMutation<
-  TProject extends StoredScenarioProject,
->(args: {
-  baseProject: TProject;
+export async function commitScenarioAggregateSnapshotMutation(args: {
+  baseProject: GuideProject;
   children?: ScenarioAggregateChildMutation;
-  nextProject: TProject;
-}): Promise<ScenarioAggregateMutationResult<TProject>> {
+  nextProject: GuideProject;
+}): Promise<ScenarioAggregateMutationResult> {
   if (args.baseProject.id !== args.nextProject.id) {
     return rejectScenarioMutationBeforeHandoff(
       args.children,
@@ -447,9 +444,8 @@ function parseScenarioAggregatePublicationPayload(
   value: unknown
 ): ScenarioAggregatePublicationPayload | null {
   if (!isRecord(value) || !isRecord(value['children'])) return null;
-  const project =
-    parseScenarioProject(value['project']) ??
-    (isScenarioProjectV3(value['project']) ? value['project'] : null);
+  const parsedProject = parseGuideProject(value['project']);
+  const project = parsedProject.status === 'ok' ? parsedProject.project : null;
   const targetEntry = parseScenarioProjectEntry(value['targetEntry']);
   const baseRevision = value['baseRevision'];
   const committedAt = value['committedAt'];
@@ -522,9 +518,16 @@ function parseScenarioAggregatePublicationPayload(
 async function publishScenarioAssetJournal(
   journal: AssetReadyJournal,
   allowSuperseded = false
-): Promise<ScenarioAggregateMutationResult<StoredScenarioProject> | null> {
+): Promise<ScenarioAggregateMutationResult | null> {
   if (journal.domain !== SCENARIO_ASSET_PUBLICATION_DOMAIN || journal.operationId) {
     throw new Error('Invalid standalone scenario asset publication journal.');
+  }
+  if (isRecord(journal.payload) && isRecord(journal.payload['project'])) {
+    const version = journal.payload['project']['version'];
+    if (version === 2 || version === 3) {
+      logger.info('Retired scenario publication format', { outcome: 'retired-format', version });
+      return null;
+    }
   }
   const payload = parseScenarioAggregatePublicationPayload(journal.payload);
   const payloadAssetRefs = payload
@@ -548,7 +551,7 @@ async function publishScenarioAssetJournal(
     throw new Error('Scenario editor document assets do not match its journal.');
   }
   const db = await initDB();
-  const existing = parseScenarioProjectEntry(
+  const existing = requireSupportedScenarioEntry(
     await db.get(SCENARIO_PROJECTS_STORE, payload.project.id)
   );
   if (existing && (await isScenarioPublicationAlreadyCommitted(db, existing, payload))) {

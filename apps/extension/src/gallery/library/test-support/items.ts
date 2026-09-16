@@ -47,6 +47,7 @@ function createScenarioProjectSummary(
   overrides: Partial<ScenarioProjectSummary> = {}
 ): ScenarioProjectSummary {
   return {
+    availability: 'available' as const,
     id: overrides.id ?? 'project-1',
     name: overrides.name ?? 'Scenario',
     createdAt: overrides.createdAt ?? 1,

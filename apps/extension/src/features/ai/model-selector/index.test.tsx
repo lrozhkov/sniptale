@@ -292,3 +292,34 @@ it('does not show chrome-ai entries when only stored providers and models are pa
   expect(container?.textContent).not.toContain('Google Chrome AI');
   expect(container?.textContent).not.toContain('Google / Google Chrome AI');
 });
+it('closes only the open selector on Escape and restores its trigger focus', async () => {
+  const parentKey = vi.fn();
+  await renderUi(
+    <div onKeyDown={parentKey}>
+      <AIModelSelector
+        models={MODELS}
+        providers={PROVIDERS}
+        selectedModelId="model-1"
+        onSelect={vi.fn()}
+      />
+    </div>
+  );
+  const trigger = getButtons()[0]!;
+  await act(async () => trigger.click());
+  const input = container!.querySelector('input')!;
+  expect(document.activeElement).toBe(input);
+  await act(async () =>
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(container!.querySelector('input')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  expect(parentKey).not.toHaveBeenCalled();
+  await act(async () =>
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(parentKey).toHaveBeenCalledTimes(1);
+});

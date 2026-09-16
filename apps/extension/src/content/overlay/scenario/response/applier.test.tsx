@@ -7,7 +7,6 @@ import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/t
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../../features/scenario/contracts/types/project';
 import type {
   ScenarioRecorderSurfaceState,
@@ -27,7 +26,6 @@ const setProjects = vi.fn();
 const setHighlightToken = vi.fn();
 const setRecentSteps = vi.fn();
 const setSession = vi.fn();
-const setTrashedSteps = vi.fn();
 
 function Harness() {
   latestApplyScenarioResponse = useScenarioResponseApplier({
@@ -40,7 +38,6 @@ function Harness() {
     setHighlightToken: setHighlightToken as React.Dispatch<React.SetStateAction<number>>,
     setRecentSteps: setRecentSteps as React.Dispatch<React.SetStateAction<ScenarioRecentStep[]>>,
     setSession: setSession as React.Dispatch<React.SetStateAction<ScenarioSessionState>>,
-    setTrashedSteps: setTrashedSteps as React.Dispatch<React.SetStateAction<ScenarioTrashedStep[]>>,
   });
 
   return null;
@@ -68,14 +65,17 @@ function createSnapshotResponseFixture() {
 
   return {
     expectedProjects: [
-      { id: 'project-1', name: 'Project 1', createdAt: 1, updatedAt: 10 },
+      {
+        availability: 'available' as const,
+        id: 'project-1',
+        name: 'Project 1',
+        createdAt: 1,
+        updatedAt: 10,
+      },
     ] satisfies ScenarioProjectSummary[],
     expectedRecentSteps: [
-      { id: 'step-1', position: 0, previewDataUrl: 'data:1', title: 'Step 1' },
+      { id: 'step-1', position: 0, numberLabel: '1', previewDataUrl: 'data:1', title: 'Step 1' },
     ] satisfies ScenarioRecentStep[],
-    expectedTrashedSteps: [
-      { id: 'trash-1', deletedAt: 20, kind: 'capture', originalIndex: 1, title: 'Trash' },
-    ] satisfies ScenarioTrashedStep[],
     snapshot,
   };
 }
@@ -89,7 +89,6 @@ function applySnapshotResponseFixture() {
       success: true,
       projects: fixture.expectedProjects,
       recentSteps: fixture.expectedRecentSteps,
-      trashedSteps: fixture.expectedTrashedSteps,
     });
   });
 
@@ -97,7 +96,9 @@ function applySnapshotResponseFixture() {
 }
 
 function applyResponseDataFixture() {
-  const recentSteps = [{ id: 'step-1', position: 0, previewDataUrl: 'data:1', title: 'Step 1' }];
+  const recentSteps = [
+    { id: 'step-1', position: 0, numberLabel: '1', previewDataUrl: 'data:1', title: 'Step 1' },
+  ];
 
   act(() => {
     getLatestApplyScenarioResponse()({
@@ -159,7 +160,6 @@ describe('scenario response applier hook', () => {
     expect(setOptimisticCaptureMode).toHaveBeenCalledWith(null);
     expect(setProjects).toHaveBeenCalledWith(fixture.expectedProjects);
     expect(setRecentSteps).toHaveBeenCalledWith(fixture.expectedRecentSteps);
-    expect(setTrashedSteps).toHaveBeenCalledWith(fixture.expectedTrashedSteps);
   });
 
   it('applies response data and refreshed recent steps without snapshot restore', async () => {

@@ -1,0 +1,100 @@
+.guide-video-action-timeline {
+  order: -1;
+  width: 100%;
+  min-width: 0;
+}
+.guide-video-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+.guide-video-action-heading > span {
+  flex: 1;
+}
+.guide-video-action-heading > button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+}
+.guide-video-action-list {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 3px 1px;
+}
+.guide-video-action-list > button {
+  flex: 0 0 auto;
+  gap: 4px;
+  max-width: 160px;
+  height: 26px;
+  padding: 3px 6px;
+}
+.guide-video-action-list > button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.guide-video-action-list [aria-pressed='true'] {
+  color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-surface-canvas);
+}
+.guide-video-time-scroll {
+  overflow-x: auto;
+  padding: 0 5px;
+}
+.guide-video-time-plane {
+  position: relative;
+  height: 30px;
+  min-width: 100%;
+  touch-action: none;
+  cursor: crosshair;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-video-time-plane:focus-visible {
+  outline: 1px solid var(--sniptale-color-accent);
+  outline-offset: -1px;
+}
+.guide-video-tick {
+  white-space: nowrap;
+  position: absolute;
+  top: 0;
+  font-size: 10px;
+  transform: translateX(-50%);
+  color: var(--sniptale-color-text-muted);
+}
+.guide-video-event-tick {
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  height: 8px;
+  background: var(--sniptale-color-text-muted);
+}
+.guide-video-playhead {
+  position: absolute;
+  top: 13px;
+  bottom: 0;
+  width: 2px;
+  background: var(--sniptale-color-accent);
+}
+.guide-video-action-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.guide-video-click-point {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--sniptale-color-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px var(--sniptale-color-surface-canvas);
+}
+.guide-video-tick:first-child {
+  transform: none;
+}
+.guide-video-tick:nth-child(5) {
+  transform: translateX(-100%);
+}

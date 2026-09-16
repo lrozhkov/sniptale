@@ -13,6 +13,7 @@ export function createScenarioAssetId(): string {
 
 export function mapScenarioAssetEntry(entry: DbScenarioAssetEntry): ScenarioAssetEntry {
   return {
+    ...(entry.duration === undefined ? {} : { duration: entry.duration }),
     id: entry.id,
     projectId: entry.projectId,
     galleryAssetId: entry.galleryAssetId,

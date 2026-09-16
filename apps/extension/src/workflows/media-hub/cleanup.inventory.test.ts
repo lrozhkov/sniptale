@@ -10,7 +10,7 @@ function createInventory(now: number): StorageCleanupInventory {
     pendingScenarioAssets: createPendingAssets(now),
     scenarioAssets: [createScenarioAsset()],
     scenarioExports: [createScenarioExport()],
-    scenarioProjects: [{ createdAt: 1, id: 'project-1', project: {} as never, updatedAt: 2 }],
+    scenarioProjects: [{ id: 'project-1' }],
     scenarioStepDocuments: [createStepDocument()],
     thumbnails: [createThumbnail('orphan-thumb'), createThumbnail('video-project:video-project-1')],
     videoProjects: [{ createdAt: 1, id: 'video-project-1', project: {} as never, updatedAt: 2 }],
@@ -84,6 +84,14 @@ function createThumbnail(assetId: string) {
 }
 
 describe('storage cleanup raw inventory candidates', () => {
+  it('keeps assets and editor documents while their root exists regardless of body availability', () => {
+    const inventory = createInventory(1_000_000_000);
+    inventory.scenarioProjects = [{ id: 'missing-project' }];
+    expect(
+      buildInventoryCleanupCandidates({ mediaItems: [], rawInventory: inventory })
+        .orphanedScenarioArtifacts
+    ).toEqual([]);
+  });
   beforeEach(() => {
     vi.spyOn(Date, 'now').mockReturnValue(1_000_000_000);
   });

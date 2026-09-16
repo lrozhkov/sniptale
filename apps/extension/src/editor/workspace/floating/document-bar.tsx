@@ -301,7 +301,7 @@ function EditorFloatingDocumentSummary(props: {
         <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
           {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
         </div>
-        {props.hasImage ? (
+        {props.hasImage && props.standalone ? (
           <div className={DOCUMENT_STATUS_CLASS_NAME}>
             <span className="truncate">
               {translate(
@@ -375,11 +375,13 @@ export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps)
   return (
     <div data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar dataUi="editor.floating.document-bar.surface">
-        <EditorFloatingDocumentSummary
-          documentState={documentState}
-          hasImage={props.hasImage}
-          standalone={standalone}
-        />
+        {standalone && (
+          <EditorFloatingDocumentSummary
+            documentState={documentState}
+            hasImage={props.hasImage}
+            standalone={standalone}
+          />
+        )}
         <EditorFloatingDocumentQuickActions
           documentController={props.documentController}
           hasImage={props.hasImage}

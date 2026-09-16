@@ -55,7 +55,10 @@ import { routeScenarioEditorLlmMessage } from './editor-router';
 function createMessage() {
   return {
     attachments: [],
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Rewrite step titles',
     llmSessionToken: 'llm-token-1',
     projectSnapshotJson: '{"steps":[]}',
@@ -151,7 +154,7 @@ it('rejects scenario editor LLM messages that were not preauthorized', () => {
   expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
 });
 
-it('normalizes legacy step and invalid v3 provider schema failures', async () => {
+it('normalizes legacy step and invalid guide provider schema failures', async () => {
   const sendResponse = vi.fn();
   requestMultimodalChatCompletionMock.mockResolvedValueOnce('{"steps":[{"stepId":1}]}');
 
@@ -167,7 +170,7 @@ it('normalizes legacy step and invalid v3 provider schema failures', async () =>
   requestMultimodalChatCompletionMock.mockResolvedValueOnce('{"operations":"broken"}');
   expect(
     routeScenarioEditorLlmMessage(
-      { ...createMessage(), contractVersion: 3 as const },
+      { ...createMessage(), contractVersion: 4 as const },
       sendResponse,
       createSender()
     )
@@ -180,11 +183,14 @@ it('normalizes legacy step and invalid v3 provider schema failures', async () =>
   });
 });
 
-it('uses canonical empty JSON defaults for missing v3 optional payload fields', async () => {
+it('uses canonical empty JSON defaults for missing guide optional payload fields', async () => {
   const sendResponse = vi.fn();
   const message = {
     ...createMessage(),
-    contractVersion: 3 as const,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
   };
   requestMultimodalChatCompletionMock.mockResolvedValue('{"operations":[]}');
 
@@ -198,17 +204,20 @@ it('uses canonical empty JSON defaults for missing v3 optional payload fields', 
   };
   const text = request.userContent.find((part) => part.type === 'text')?.text ?? '';
   expect(text).toContain(['Project outline JSON:', '{}'].join('\n'));
-  expect(text).toContain(['Selected slide code JSON:', '{}'].join('\n'));
+  expect(text).toContain(['Selected guide step JSON:', '{}'].join('\n'));
   expect(text).toContain(['Tool manifest JSON:', '{}'].join('\n'));
 });
 
-it('uses provided v3 optional payload fields before provider egress', async () => {
+it('uses provided guide optional payload fields before provider egress', async () => {
   const sendResponse = vi.fn();
   const message = {
     ...createMessage(),
-    contractVersion: 3 as const,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     projectOutlineJson: '{"outline":true}',
-    selectedSlideCodeJson: '{"slide":"one"}',
+    selectedStepJson: '{"slide":"one"}',
     toolManifestJson: '{"tools":["title"]}',
   };
   requestMultimodalChatCompletionMock.mockResolvedValue('{"operations":[]}');

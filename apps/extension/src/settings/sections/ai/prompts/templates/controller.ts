@@ -7,7 +7,7 @@ import { usePromptTemplates } from '../../../../../features/prompt-templates/hoo
 /**
  * Owns settings prompt template CRUD and modal flows.
  */
-export function useTemplatesSection() {
+export function useTemplatesSection(scope: 'page' | 'scenario' = 'page') {
   const [mutatingTemplateId, setMutatingTemplateId] = useState<string | null>(null);
   const {
     templates,
@@ -17,7 +17,7 @@ export function useTemplatesSection() {
     addTemplate,
     updateTemplate,
     templateLifecycle,
-  } = usePromptTemplates();
+  } = usePromptTemplates(scope);
   const editorState = useTemplateEditorState();
   const deleteState = useTemplateDeleteState();
   const { confirmDelete, handleResetTemplate, handleSaveTemplate } = useTemplateActions(

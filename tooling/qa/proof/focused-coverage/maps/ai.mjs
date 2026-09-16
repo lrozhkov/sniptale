@@ -79,12 +79,6 @@ export const AI_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/overlay/ai/pick/runtime/chrome/content-runner.test.ts'],
   },
   {
-    owner: 'chrome-ai-scenario-runner',
-    productionFile: 'apps/extension/src/scenario-editor/project/ai/chrome/scenario-runner.ts',
-    reason: 'Chrome AI scenario prompt egress is covered by scenario runner fixtures.',
-    testFiles: ['apps/extension/src/scenario-editor/project/ai/chrome/scenario-runner.test.ts'],
-  },
-  {
     owner: 'settings-ai-runtime-mutation-client',
     productionFile: 'apps/extension/src/settings/runtime/ai-settings/mutations.ts',
     reason:

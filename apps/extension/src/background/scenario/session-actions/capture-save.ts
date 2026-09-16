@@ -33,6 +33,6 @@ export async function handleScenarioSaveCaptureStep(
   return {
     ...(await buildScenarioPayloadResponse(args)),
     projectId: result.project.id,
-    stepId: result.slide.id,
+    stepId: result.step.id,
   };
 }

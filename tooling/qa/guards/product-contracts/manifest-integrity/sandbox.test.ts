@@ -1,3 +1,4 @@
+import { EXPECTED_SANDBOX_CSP } from '../manifest/manifest-integrity-sandbox.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -7,16 +8,7 @@ import { afterEach, expect, it } from 'vitest';
 import { collectManifestIntegrityViolations } from './check.mjs';
 
 const tempDirs: string[] = [];
-const SANDBOX_CSP = [
-  'sandbox allow-scripts;',
-  "default-src 'none';",
-  "script-src 'self';",
-  "style-src 'self';",
-  "connect-src 'none';",
-  'worker-src blob:;',
-  "child-src 'none';",
-  "object-src 'none';",
-].join(' ');
+const SANDBOX_CSP = EXPECTED_SANDBOX_CSP;
 type SandboxManifest = ReturnType<typeof createBaseManifest>;
 
 afterEach(() => {
@@ -53,7 +45,7 @@ function createSandboxPolicyMutations(): Array<(manifest: SandboxManifest) => vo
     replaceSandboxCsp("connect-src 'none'", 'connect-src https:'),
     replaceSandboxCsp('worker-src blob:', "worker-src 'self'"),
     replaceSandboxCsp('worker-src blob:', 'worker-src blob: data:'),
-    replaceSandboxCsp("child-src 'none'", 'child-src blob:'),
+    replaceSandboxCsp('child-src blob:', 'child-src https:'),
     replaceSandboxCsp("object-src 'none'", "object-src 'self'"),
     replaceSandboxCsp("script-src 'self'", "script-src 'self' 'unsafe-eval'"),
   ];
@@ -80,7 +72,12 @@ function createBaseManifest() {
       sandbox: SANDBOX_CSP,
     },
     icons: { 16: 'icons/icon-16.png' },
-    sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+    sandbox: {
+      pages: [
+        'apps/extension/src/effect-runtime-sandbox/index.html',
+        'apps/extension/src/tour-preview-sandbox/index.html',
+      ],
+    },
     web_accessible_resources: [],
   };
 }
@@ -99,6 +96,7 @@ function writeStandardManifestFiles(root: string) {
   writeFile(root, 'apps/extension/src/background/index.ts', 'export {};\n');
   writeFile(root, 'apps/extension/src/popup/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/src/effect-runtime-sandbox/index.html', '<!doctype html>\n');
+  writeFile(root, 'apps/extension/src/tour-preview-sandbox/index.html', '<!doctype html>\n');
   writeFile(root, 'apps/extension/public/icons/icon-16.png', 'png');
   writeFile(
     root,

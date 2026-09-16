@@ -31,7 +31,7 @@ describe('buildEditorDocumentActionGroups', () => {
     expect(saveImageAs && 'icon' in saveImageAs ? saveImageAs.icon : null).toBe(Save);
   });
 
-  it('replaces generic save groups with scenario embed actions', () => {
+  it('keeps local export actions without duplicate scenario navigation', () => {
     const groups = buildEditorDocumentActionGroups({
       defaultImagePresetId: null,
       embedMode: 'scenario',
@@ -52,10 +52,9 @@ describe('buildEditorDocumentActionGroups', () => {
       'primary-save',
       'save-utilities',
       'image-format',
-      'close',
     ]);
     expect(groups.flatMap((group) => group.items).some((item) => item.id === 'save-image-as')).toBe(
-      false
+      true
     );
   });
 });

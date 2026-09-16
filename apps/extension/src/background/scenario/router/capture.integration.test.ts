@@ -2,8 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   ensureScenarioCaptureProjectMock,
-  recordScenarioSuggestedEventMock,
-  saveScenarioCaptureSlideToProjectMock,
+  saveScenarioCaptureStepToProjectMock,
   openScenarioEditorMock,
   buildScenarioSessionPayloadMock,
   flushPendingCaptureIfNeededMock,
@@ -15,8 +14,7 @@ const {
     id: 'project-auto',
     name: 'Auto project',
   })),
-  recordScenarioSuggestedEventMock: vi.fn(),
-  saveScenarioCaptureSlideToProjectMock: vi.fn(),
+  saveScenarioCaptureStepToProjectMock: vi.fn(),
   openScenarioEditorMock: vi.fn(),
   buildScenarioSessionPayloadMock: vi.fn(),
   flushPendingCaptureIfNeededMock: vi.fn(),
@@ -37,13 +35,11 @@ vi.mock('../../../platform/runtime-messaging/index', async (importOriginal) => (
   getErrorMessage: getErrorMessageMock,
 }));
 
-vi.mock('../../../composition/persistence/scenario/store/suggested-events', () => ({
-  recordScenarioSuggestedEvent: recordScenarioSuggestedEventMock,
-}));
-
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  saveScenarioCaptureSlideToProject: saveScenarioCaptureSlideToProjectMock,
+vi.mock('../../../composition/persistence/scenario/store/capture-step', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/capture-step')
+  >()),
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
 }));
 
 vi.mock('../editor', () => ({
@@ -89,7 +85,15 @@ function createBaseSession() {
 function createScenarioPayloadResponse() {
   return {
     session: createBaseSession(),
-    projects: [{ id: 'project-1', name: 'Project 1', createdAt: 1, updatedAt: 2 }],
+    projects: [
+      {
+        availability: 'available' as const,
+        id: 'project-1',
+        name: 'Project 1',
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ],
   };
 }
 
@@ -131,9 +135,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   buildScenarioSessionPayloadMock.mockResolvedValue(createScenarioPayloadResponse());
   flushPendingCaptureIfNeededMock.mockResolvedValue({});
-  saveScenarioCaptureSlideToProjectMock.mockResolvedValue({
+  saveScenarioCaptureStepToProjectMock.mockResolvedValue({
     project: { id: 'project-1', name: 'Project 1' },
-    slide: { id: 'slide-1' },
+    step: { id: 'slide-1' },
   });
 });
 
@@ -156,7 +160,7 @@ it('auto-creates a project and saves the first capture when the session has no a
       tabId: 9,
     })
   );
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-auto',
     })
@@ -170,7 +174,7 @@ it('auto-creates a project and saves the first capture when the session has no a
   );
 });
 
-it('persists capture steps and suggested events for active projects', async () => {
+it('persists capture steps for active projects', async () => {
   const scenarioSessionService = createScenarioSessionServiceStub();
   vi.mocked(scenarioSessionService.getSession)
     .mockResolvedValueOnce(createBaseSession())
@@ -184,58 +188,20 @@ it('persists capture steps and suggested events for active projects', async () =
     }),
     scenarioSessionService
   );
-  const recordSuggestedEvent = await routeMessage(
-    {
-      type: MessageType.SCENARIO_RECORD_SUGGESTED_EVENT,
-      kind: 'keydown',
-      message: 'Ctrl+S',
-      data: { ctrl: true },
-    },
-    scenarioSessionService
-  );
-
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-1',
       title: 'Step 1',
     })
   );
-  expect(recordScenarioSuggestedEventMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      projectId: 'project-1',
-      kind: 'keydown',
-    })
-  );
   expect(saveCapture.sendResponse).toHaveBeenCalledWith(
     expect.objectContaining({ success: true, stepId: 'slide-1' })
   );
-  expect(recordSuggestedEvent.sendResponse).toHaveBeenCalledWith(
-    expect.objectContaining({ success: true })
-  );
 });
 
-it('skips suggested-event persistence and opens the editor using the active session project', async () => {
+it('opens the editor using the active session project', async () => {
   const scenarioSessionService = createScenarioSessionServiceStub();
-  vi.mocked(scenarioSessionService.getSession)
-    .mockResolvedValueOnce({
-      enabled: true,
-      captureMode: 'manual',
-      projectId: null,
-      projectName: null,
-      rememberProjectSelection: false,
-      pendingProjectSelection: false,
-      sidebarVisible: true,
-    })
-    .mockResolvedValueOnce(createBaseSession());
-
-  const recordSuggestedEvent = await routeMessage(
-    {
-      type: MessageType.SCENARIO_RECORD_SUGGESTED_EVENT,
-      kind: 'scroll',
-      message: 'Scrolled',
-    },
-    scenarioSessionService
-  );
+  vi.mocked(scenarioSessionService.getSession).mockResolvedValue(createBaseSession());
   const openEditor = await routeMessage(
     {
       type: MessageType.SCENARIO_OPEN_EDITOR,
@@ -243,12 +209,7 @@ it('skips suggested-event persistence and opens the editor using the active sess
     },
     scenarioSessionService
   );
-
-  expect(recordScenarioSuggestedEventMock).not.toHaveBeenCalled();
   expect(openScenarioEditorMock).toHaveBeenCalledWith('project-1', null);
-  expect(recordSuggestedEvent.sendResponse).toHaveBeenCalledWith(
-    expect.objectContaining({ success: true })
-  );
   expect(openEditor.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 });
 

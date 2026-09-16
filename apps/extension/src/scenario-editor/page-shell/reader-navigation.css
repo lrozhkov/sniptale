@@ -1,0 +1,105 @@
+.guide-reading-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.guide-reading-options > :last-child {
+  width: 9rem;
+  min-width: 9rem;
+}
+.guide-reading-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+  gap: 0.5rem;
+}
+.guide-reading-layout[data-navigation='side'] {
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+.guide-reading-layout > .guide-reading-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  overflow: auto;
+  min-width: 0;
+  border-radius: var(--sniptale-radius-lg);
+  background: var(--sniptale-color-surface-panel);
+}
+.guide-reading-nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  min-height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--sniptale-radius-md);
+  text-decoration: none;
+  color: inherit;
+  font: 0.8125rem/1.4 var(--sniptale-font-sans);
+  padding: 0.25rem 0.5rem;
+}
+.guide-reading-nav a:hover {
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-reading-nav a[aria-current] {
+  border-color: var(--sniptale-color-accent);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 10%,
+    var(--sniptale-color-surface-panel)
+  );
+}
+.guide-reading-nav a:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 1px;
+}
+.guide-reading-badge {
+  min-width: 1rem;
+  text-align: center;
+  font-weight: 650;
+}
+[data-navigation='top'][data-reading-mode='steps'] .guide-reading-title {
+  display: none;
+}
+.guide-reading-layout[data-navigation='side'] > .guide-reading-nav {
+  flex-direction: column;
+  align-items: stretch;
+}
+[data-navigation='side'] .guide-reading-title {
+  overflow-wrap: anywhere;
+}
+.guide-reading-layout[data-navigation='side'] .guide-reading-nav a {
+  flex-shrink: 0;
+}
+.guide-read-document > [hidden] {
+  display: none;
+}
+@media (max-width: 700px) {
+  .guide-reading-layout[data-navigation='side'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .guide-reading-layout[data-navigation='side'] > .guide-reading-nav {
+    max-height: 8rem;
+  }
+}
+.guide-reading-options {
+  flex-shrink: 0;
+}
+.guide-reader .guide-reading-options button {
+  width: auto;
+  min-height: 2rem;
+  padding-inline: 0.625rem;
+}
+.guide-html-workbench > .guide-reading-options {
+  margin: 0.5rem 0.75rem;
+}

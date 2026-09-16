@@ -139,7 +139,10 @@ it('rejects malformed scenario JSON before token consumption', async () => {
       kind: 'background-owned',
       message: {
         attachments: [],
-        contractVersion: 3,
+        contractVersion: 4 as const,
+        projectId: 'project-1',
+        baseRevision: 1,
+        scope: { stepIds: ['step-1'], blockIds: [] },
         instruction: 'Rewrite',
         llmSessionToken: 'token-1',
         projectSnapshotJson: 'not-json',

@@ -197,7 +197,7 @@ async function expectTrackMenuPlacement(page: Page): Promise<void> {
   await expect(trigger).toBeFocused();
 }
 
-async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
+export async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   const title = page.locator(
     '[data-ui="video-editor.floating.document-bar"] input:not([type="file"])'
   );
@@ -212,7 +212,7 @@ async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   await expect(drawer.getByText(longTitle, { exact: true })).toHaveCount(0);
   const navigation = drawer.getByRole('navigation');
   const video = navigation.getByRole('button', { name: 'Video', exact: true });
-  const screenshots = navigation.getByRole('button', { name: 'Screenshots', exact: true });
+  const screenshots = navigation.getByRole('button', { name: 'Images', exact: true });
   await expect(video).toHaveAttribute('aria-pressed', 'true');
   await screenshots.click();
   await expect(screenshots).toHaveAttribute('aria-pressed', 'true');
@@ -230,10 +230,9 @@ async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
   await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'ru' }));
-  await expect(navigation.getByRole('button', { name: 'Скриншоты', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  await expect(
+    navigation.getByRole('button', { name: 'Изображения', exact: true })
+  ).toHaveAttribute('aria-pressed', 'true');
   await navigation.getByRole('button', { name: 'Видео', exact: true }).click();
   await expect(navigation.getByRole('button', { name: 'Видео', exact: true })).toHaveAttribute(
     'aria-pressed',

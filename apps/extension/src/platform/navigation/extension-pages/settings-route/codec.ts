@@ -7,6 +7,7 @@ export const SETTINGS_SECTION_IDS = [
   'annotations',
   'video-effects',
   'editor-resources',
+  'scenario-layouts',
   'ai-connections',
   'ai-prompts',
   'voice-input',
@@ -19,6 +20,7 @@ export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
 
 export const SETTINGS_SECTION_VIEWS = {
   'video-effects': [],
+  'scenario-layouts': [],
   'interface-browser': [],
   'quick-actions': [],
   'screen-sizes': [],
@@ -27,7 +29,7 @@ export const SETTINGS_SECTION_VIEWS = {
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
   'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
-  'ai-prompts': ['templates', 'prompts'],
+  'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
   'voice-input': [],
   'native-app': ['connection', 'capture', 'commands', 'telemetry'],
   'access-data': ['permissions', 'privacy'],
@@ -37,6 +39,7 @@ export const SETTINGS_SECTION_VIEWS = {
 type SettingsRouteWithoutView = {
   section:
     | 'video-effects'
+    | 'scenario-layouts'
     | 'interface-browser'
     | 'quick-actions'
     | 'screen-sizes'
@@ -52,7 +55,7 @@ export type SettingsRoute =
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
   | { section: 'editor-resources'; view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
-  | { section: 'ai-prompts'; view?: 'templates' | 'prompts' }
+  | { section: 'ai-prompts'; view?: 'templates' | 'scenario-templates' | 'prompts' }
   | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }
   | { section: 'access-data'; view?: 'permissions' | 'privacy' };
 

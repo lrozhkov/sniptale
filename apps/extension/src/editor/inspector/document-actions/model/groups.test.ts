@@ -43,14 +43,13 @@ describe('editor-inspector-document-actions.model/groups', () => {
     ]);
   });
 
-  it('builds scenario embed action groups without generic save destinations', () => {
+  it('builds scenario embed action groups with local export actions and no duplicate host navigation', () => {
     const groups = buildScenarioDocumentActionGroupList(createCommands());
 
     expect(groups.map((group) => group.id)).toEqual([
       'primary-save',
       'save-utilities',
       'image-format',
-      'close',
     ]);
     expect(
       groups.flatMap((group) => group.items).some((item) => item.id === 'save-to-folder')

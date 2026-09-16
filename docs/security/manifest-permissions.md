@@ -31,3 +31,5 @@ This document owns permission-design decisions. `tooling/configs/qa/manifest-per
 Change a grant and its inventory entry together. A grant reduction requires the owner-seam gate, denial or fallback behavior, and regression proof before removal from the manifest.
 
 Evaluate optional permissions independently. Do not infer that `downloads`, `desktopCapture`, or `tabCapture` can be optional because another permission has request and failure handling.
+
+The tour preview sandbox receives a bounded prepared HTML Blob from its owning editor frame. It has no privileged API or network authority; the nested file retains its own hashed script CSP. The shared manifest sandbox policy permits local inline content for this file; the effect sandbox must retain its former restrictive effective CSP through a head meta, verified in release artifacts. Neither sandbox is web-accessible.

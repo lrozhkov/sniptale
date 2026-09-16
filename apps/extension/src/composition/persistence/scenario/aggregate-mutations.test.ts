@@ -1,129 +1,22 @@
-import { beforeEach, expect, it, vi } from 'vitest';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
 import {
-  DEFAULT_BROWSER_FRAME_STATE,
-  DEFAULT_EDITOR_FRAME_SETTINGS,
-} from '../../../features/editor/document/constants';
+  stores,
+  getStore,
+  normalizeKey,
+  db,
+  createAsset,
+  createDocument,
+} from './aggregate-mutations.test-support';
+import { expect, it, vi } from 'vitest';
+import {
+  createGuideProject,
+  createGuideStep,
+  createGuideImageBlock,
+} from '../../../features/scenario/project/factories';
+import { pruneScenarioResources, clearScenarioSavedHistory } from './retention';
+vi.mock('./resource-sessions', () => ({
+  tryScenarioResourceCleanup: async (_id: string, operation: () => Promise<unknown>) => operation(),
+}));
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
-
-const stores = vi.hoisted(() => new Map<string, Map<string, unknown>>());
-
-function getStore(name: string) {
-  let store = stores.get(name);
-  if (!store) {
-    store = new Map();
-    stores.set(name, store);
-  }
-  return store;
-}
-
-function normalizeKey(key: unknown): string {
-  return typeof key === 'string' ? key : JSON.stringify(key);
-}
-
-const db = {
-  get: vi.fn(async (name: string, id: string) => getStore(name).get(id)),
-  getAllFromIndex: vi.fn(async (name: string, _index: string, projectId: string) =>
-    [...getStore(name).values()].filter(
-      (value) => (value as { projectId?: string }).projectId === projectId
-    )
-  ),
-  transaction: vi.fn((names: string | string[]) => {
-    const allowed = new Set(Array.isArray(names) ? names : [names]);
-    return {
-      done: Promise.resolve(),
-      objectStore: (name: string) => {
-        if (!allowed.has(name)) throw new Error(`Unexpected store ${name}`);
-        return {
-          delete: async (id: unknown) => void getStore(name).delete(normalizeKey(id)),
-          get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
-          index: () => ({
-            count: async (assetId: string) =>
-              [...getStore(name).values()].filter(
-                (value) => (value as { assetId?: string }).assetId === assetId
-              ).length,
-            getAll: async (projectId: string) =>
-              [...getStore(name).values()].filter(
-                (value) => (value as { projectId?: string }).projectId === projectId
-              ),
-          }),
-          put: async (value: {
-            assetId?: string;
-            id?: string;
-            operationId?: string;
-            ownerId?: string;
-            ownerKind?: string;
-            role?: string;
-            stepId?: string;
-          }) => {
-            const key =
-              value.id ??
-              value.stepId ??
-              value.operationId ??
-              (value.ownerKind
-                ? JSON.stringify([value.ownerKind, value.ownerId, value.role])
-                : value.assetId) ??
-              '';
-            getStore(name).set(key, value);
-          },
-        };
-      },
-    };
-  }),
-};
-
-vi.mock('../infrastructure/indexed-db/core', () => ({
-  AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
-  ASSET_OPERATIONS_STORE: 'asset_operations',
-  ASSET_OWNERS_STORE: 'asset_owners',
-  ASSET_REFS_STORE: 'asset_refs',
-  SCENARIO_ASSETS_STORE: 'scenario_assets',
-  SCENARIO_EXPORTS_STORE: 'scenario_exports',
-  SCENARIO_PROJECTS_STORE: 'scenario_projects',
-  SCENARIO_STEP_EDITOR_DOCUMENTS_STORE: 'scenario_step_editor_documents',
-  initDB: vi.fn(async () => db),
-}));
-
-vi.mock('../assets', () => ({
-  buildPhysicalDeleteOperation: () => ({
-    assetIds: [],
-    createdAt: 1,
-    kind: 'physical-delete',
-    operationId: 'delete-1',
-    status: 'pending',
-    updatedAt: 1,
-  }),
-  completePhysicalDeleteOperation: vi.fn(async () => undefined),
-  createAssetPublicationJournal: vi.fn(async (args) => ({
-    ...args,
-    createdAt: 1,
-    journalId: 'journal-1',
-  })),
-  deleteAssetObject: vi.fn(async () => undefined),
-  discardPreparedAsset: vi.fn(async () => undefined),
-  parseAssetRef: (value: unknown) => value,
-  publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
-  recoverStandaloneAssetPublications: vi.fn(async () => 0),
-  releaseAssetReadyProtection: vi.fn(),
-  writeBlobToAsset: vi.fn(async (blob: Blob) => {
-    const assetId = `editor-${getStore('prepared_editor_assets').size + 1}`;
-    getStore('prepared_editor_assets').set(assetId, blob);
-    return {
-      ref: {
-        assetId,
-        createdAt: 1,
-        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
-        mimeType: blob.type || 'application/octet-stream',
-        sha256: null,
-        size: blob.size,
-      },
-    };
-  }),
-}));
-
-vi.mock('../infrastructure/indexed-db/mutation', () => ({
-  runWithIndexedDbMutation: vi.fn(async (effect) => effect(db)),
-}));
 
 import {
   commitScenarioAggregateMutation,
@@ -132,63 +25,8 @@ import {
 } from './aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
 
-function createAsset(projectId: string, id = 'asset-1') {
-  const blob = new Blob(['asset'], { type: 'image/png' });
-  const assetId = `opfs-${id}`;
-  return {
-    assetId,
-    assetRef: {
-      assetId,
-      createdAt: 1,
-      location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
-      mimeType: 'image/png',
-      sha256: null,
-      size: blob.size,
-    },
-    createdAt: 1,
-    galleryAssetId: null,
-    height: 10,
-    id,
-    mimeType: 'image/png',
-    projectId,
-    size: blob.size,
-    width: 10,
-  };
-}
-
-function createDocument(projectId: string, stepId = 'step-1') {
-  return {
-    createdAt: 1,
-    document: {
-      browserFrame: DEFAULT_BROWSER_FRAME_STATE,
-      canvasHeight: 10,
-      canvasJson: '{}',
-      canvasWidth: 10,
-      frame: DEFAULT_EDITOR_FRAME_SETTINGS,
-      sourceDisplayHeight: 10,
-      sourceDisplayWidth: 10,
-      sourceHeight: 10,
-      sourceImageData: 'data:image/png;base64,YQ==',
-      sourceLeft: 0,
-      sourceName: null,
-      sourceTop: 0,
-      sourceWidth: 10,
-      version: 2 as const,
-    },
-    projectId,
-    stepId,
-    updatedAt: 1,
-  };
-}
-
-beforeEach(() => {
-  stores.clear();
-  vi.clearAllMocks();
-  vi.spyOn(Date, 'now').mockReturnValue(100);
-});
-
 it('commits root and owned children, preserves document creation, and accepts exact replay', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const first = await commitScenarioAggregateMutation(project, {
     expectedRevision: null,
     children: {
@@ -217,7 +55,7 @@ it('commits root and owned children, preserves document creation, and accepts ex
 });
 
 it('rejects stale roots, foreign puts, collisions, and foreign child deletes', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   await commitScenarioAggregateMutation(project);
   await expect(
     commitScenarioAggregateMutation({ ...project, name: 'Stale' }, { expectedRevision: 0 })
@@ -242,7 +80,7 @@ it('rejects stale roots, foreign puts, collisions, and foreign child deletes', a
 });
 
 it('surfaces failed OPFS cleanup when a pre-journal mutation is rejected', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   await commitScenarioAggregateMutation(project);
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.discardPreparedAsset).mockRejectedValueOnce(
@@ -263,7 +101,7 @@ it('surfaces failed OPFS cleanup when a pre-journal mutation is rejected', async
 });
 
 it('surfaces editor cleanup failure together with a pre-journal revision rejection', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   await commitScenarioAggregateMutation(project);
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.discardPreparedAsset).mockRejectedValueOnce(
@@ -286,8 +124,24 @@ it('surfaces editor cleanup failure together with a pre-journal revision rejecti
   });
 });
 
+it('discards supplied staging when recovery rejects before a new publication journal', async () => {
+  const project = createGuideProject('Recovery failure');
+  const assetMocks = await import('../assets');
+  const error = new Error('recovery publication quota exhausted');
+  vi.mocked(assetMocks.recoverStandaloneAssetPublications).mockRejectedValueOnce(error);
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      expectedRevision: null,
+      children: { assetPuts: [createAsset(project.id, 'recovery-failure')] },
+    })
+  ).rejects.toBe(error);
+  expect(assetMocks.discardPreparedAsset).toHaveBeenCalledWith('opfs-recovery-failure');
+  expect(assetMocks.createAssetPublicationJournal).not.toHaveBeenCalled();
+  expect(getStore('scenario_projects').has(project.id)).toBe(false);
+});
+
 it('rejects a document preparation failure before publication handoff', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.writeBlobToAsset).mockRejectedValueOnce(new Error('quota exhausted'));
 
@@ -301,7 +155,7 @@ it('rejects a document preparation failure before publication handoff', async ()
 });
 
 it('surfaces persistence-admission release failure after scenario publication', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.releaseAssetReadyProtection).mockRejectedValueOnce(
     new Error('transition release failed')
@@ -318,7 +172,7 @@ it('surfaces persistence-admission release failure after scenario publication', 
 });
 
 it('fails closed when publication completes without a scenario aggregate result', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.publishReadyJournalWithRetry).mockResolvedValueOnce(undefined);
 
@@ -332,7 +186,7 @@ it('fails closed when publication completes without a scenario aggregate result'
 });
 
 it('records explicit lifecycle and updated-at constraints in publication payloads', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
   await commitScenarioAggregateMutation(project, {
     children: { assetPuts: [createAsset(project.id)] },
@@ -349,7 +203,7 @@ it('records explicit lifecycle and updated-at constraints in publication payload
 });
 
 it('replays a cold-runtime journal before a project-only mutation reads the revision', async () => {
-  const project = createScenarioProject('Cold runtime');
+  const project = createGuideProject('Cold runtime');
   const initial = await commitScenarioAggregateMutation(project);
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.recoverStandaloneAssetPublications).mockImplementationOnce(async () => {
@@ -375,7 +229,7 @@ it('replays a cold-runtime journal before a project-only mutation reads the revi
 });
 
 it('guards snapshot commits and orphan cleanup against concurrent owners', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const saved = await commitScenarioAggregateMutation(project);
   await expect(
     commitScenarioAggregateSnapshotMutation({
@@ -416,7 +270,7 @@ it('guards snapshot commits and orphan cleanup against concurrent owners', async
 });
 
 it('discards staged snapshot assets when the pre-handoff project read fails', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   db.get.mockRejectedValueOnce(new Error('scenario project read failed'));
 
   await expect(
@@ -432,7 +286,7 @@ it('discards staged snapshot assets when the pre-handoff project read fails', as
 });
 
 it('discards staged snapshot assets when database initialization fails', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const coreMocks = await import('../infrastructure/indexed-db/core');
   vi.mocked(coreMocks.initDB).mockRejectedValueOnce(new Error('database initialization failed'));
 
@@ -449,7 +303,7 @@ it('discards staged snapshot assets when database initialization fails', async (
 });
 
 it('retires a superseded ready journal so later scenario mutations can proceed', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const initial = await commitScenarioAggregateMutation(project);
   const assetMocks = await import('../assets');
   vi.mocked(assetMocks.publishReadyJournalWithRetry).mockImplementationOnce(
@@ -500,7 +354,7 @@ it('retires a superseded ready journal so later scenario mutations can proceed',
 });
 
 it('rejects malformed child arrays in a ready publication journal', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
   await commitScenarioAggregateMutation(project, {
     children: { assetPuts: [createAsset(project.id)] },
@@ -528,7 +382,7 @@ it('rejects malformed child arrays in a ready publication journal', async () => 
 });
 
 it('rejects malformed and mismatched editor assets in a ready journal', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
   await commitScenarioAggregateMutation(project, {
     children: { editorDocumentPuts: [createDocument(project.id)] },
@@ -577,7 +431,7 @@ it('rejects malformed and mismatched editor assets in a ready journal', async ()
 });
 
 it('deletes the complete scenario aggregate graph', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   await commitScenarioAggregateMutation(project, {
     children: {
       assetPuts: [createAsset(project.id)],
@@ -610,7 +464,7 @@ it('deletes the complete scenario aggregate graph', async () => {
 });
 
 it('keeps graph discovery and failed deletion inside one rollback-capable transaction', async () => {
-  const project = createScenarioProject('Aggregate');
+  const project = createGuideProject('Aggregate');
   await commitScenarioAggregateMutation(project, {
     children: { assetPuts: [createAsset(project.id)] },
   });
@@ -620,6 +474,7 @@ it('keeps graph discovery and failed deletion inside one rollback-capable transa
   });
   const stagedDeletes = vi.fn();
   db.transaction.mockImplementationOnce((_names: string | string[]) => ({
+    abort: vi.fn(),
     done: Promise.reject(new Error('transaction aborted')),
     objectStore: (name: string) => ({
       delete: stagedDeletes,
@@ -641,4 +496,166 @@ it('keeps graph discovery and failed deletion inside one rollback-capable transa
   expect(getStore('scenario_assets').has('asset-1')).toBe(true);
   expect(getStore('aggregate_presentations').size).toBe(1);
   expect(db.getAllFromIndex).not.toHaveBeenCalled();
+});
+
+it.each([2, 3])(
+  'retires version %i publication without publishing content or deleting owned image bytes',
+  async (version) => {
+    const project = createGuideProject('Current');
+    const assetMocks = await import('../assets');
+    const committed = await commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [createAsset(project.id)] },
+    });
+    const journal = await vi.mocked(assetMocks.createAssetPublicationJournal).mock.results.at(-1)
+      ?.value;
+    if (!journal) throw new Error('Expected ready journal');
+    const before = structuredClone(stores);
+    await expect(
+      scenarioAssetPublicationAdapter.publish({ ...journal, payload: { project: { version } } })
+    ).resolves.toBeUndefined();
+    expect(stores).toEqual(before);
+    expect(assetMocks.deleteAssetObject).not.toHaveBeenCalled();
+    expect(assetMocks.discardPreparedAsset).not.toHaveBeenCalled();
+    await expect(
+      commitScenarioAggregateMutation(
+        { ...committed.project, name: 'Next save' },
+        { expectedRevision: committed.workspaceRevision }
+      )
+    ).resolves.toEqual(
+      expect.objectContaining({ workspaceRevision: committed.workspaceRevision + 1 })
+    );
+  }
+);
+
+it.each([4, 99])(
+  'rejects malformed or future version %i journal payloads without removing owned bytes',
+  async (version) => {
+    const project = createGuideProject('Current');
+    const assetMocks = await import('../assets');
+    await commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [createAsset(project.id)] },
+    });
+    const journal = await vi.mocked(assetMocks.createAssetPublicationJournal).mock.results.at(-1)
+      ?.value;
+    if (!journal) throw new Error('Expected ready journal');
+    const before = structuredClone(stores);
+    await expect(
+      scenarioAssetPublicationAdapter.publish({ ...journal, payload: { project: { version } } })
+    ).rejects.toThrow('Invalid scenario asset publication payload');
+    expect(stores).toEqual(before);
+    expect(assetMocks.deleteAssetObject).not.toHaveBeenCalled();
+  }
+);
+it('records previous committed content once and leaves history unchanged on exact replay', async () => {
+  const first = await commitScenarioAggregateMutation(
+    createGuideProject('First', 'history-guide', 1)
+  );
+  const second = await commitScenarioAggregateMutation(
+    { ...first.project, name: 'Second' },
+    { expectedUpdatedAt: first.project.updatedAt }
+  );
+  const saved = getStore('scenario_projects').get(first.project.id);
+  expect(saved).toMatchObject({
+    workspaceRevision: 2,
+    history: [{ revision: 1, savedAt: first.project.updatedAt, project: first.project }],
+  });
+  await commitScenarioAggregateMutation(second.project, {
+    expectedUpdatedAt: second.project.updatedAt,
+  });
+  expect(getStore('scenario_projects').get(first.project.id)).toEqual(saved);
+});
+
+it('retains saved-version assets and documents, then prunes only unreachable children after clear', async () => {
+  const project = createGuideProject('Retention', 'retention', 1);
+  const step = createGuideStep('Before', 'step');
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'image',
+      assetId: 'old',
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'old.png' },
+      editDocumentId: 'old-document',
+    })
+  );
+  project.items.push(step);
+  const first = await commitScenarioAggregateMutation(project, {
+    children: {
+      assetPuts: [createAsset(project.id, 'old')],
+      editorDocumentPuts: [createDocument(project.id, 'old-document')],
+    },
+  });
+  const second = await commitScenarioAggregateMutation({ ...first.project, items: [] });
+  const before = getStore('scenario_projects').get(project.id);
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  expect(getStore('scenario_projects').get(project.id)).toEqual(before);
+  expect(getStore('scenario_assets').has('old')).toBe(true);
+  const cleared = await clearScenarioSavedHistory(project.id, second.project.updatedAt);
+  expect(cleared.updatedAt).toBeGreaterThan(second.project.updatedAt);
+  expect(getStore('scenario_projects').get(project.id)).not.toHaveProperty('history');
+  expect(await pruneScenarioResources(project.id)).toBe(2);
+  expect(getStore('scenario_assets').has('old')).toBe(false);
+  expect(getStore('scenario_step_editor_documents').has('old-document')).toBe(false);
+  const physical = await import('../assets');
+  expect(physical.completePhysicalDeleteOperation).toHaveBeenCalledWith(
+    expect.objectContaining({
+      assetIds: expect.arrayContaining(['opfs-old']),
+    })
+  );
+});
+
+it('preserves shared physical ownership and rejects stale history cleanup before deletion', async () => {
+  const project = createGuideProject('Retention', 'shared-retention', 1);
+  const first = await commitScenarioAggregateMutation(project, {
+    children: { assetPuts: [createAsset(project.id, 'unused')] },
+  });
+  const sharedKey = JSON.stringify(['other-owner', 'other', 'body']);
+  getStore('asset_owners').set(sharedKey, {
+    assetId: 'opfs-unused',
+    ownerKind: 'other-owner',
+    ownerId: 'other',
+    role: 'body',
+  });
+  await expect(clearScenarioSavedHistory(project.id, 0)).rejects.toMatchObject({
+    name: 'StaleScenarioAggregateRevisionError',
+  });
+  expect(getStore('scenario_assets').has('unused')).toBe(true);
+  expect(await pruneScenarioResources(project.id)).toBe(1);
+  expect(getStore('asset_refs').has('opfs-unused')).toBe(true);
+  expect(getStore('asset_owners').has(sharedKey)).toBe(true);
+  const current = getStore('scenario_projects').get(project.id) as {
+    workspaceRevision: number;
+    history?: unknown;
+  };
+  expect(current.workspaceRevision).toBe(first.workspaceRevision + 1);
+  expect(current.history).toBeUndefined();
+});
+
+it('protects tour-only image/audio/edit resources across saved history and prunes after removal', async () => {
+  const { tourProject } = await import('./tour.test-support');
+  const project = tourProject();
+  const audio = {
+    ...createAsset(project.id, 'audio'),
+    width: 0,
+    height: 0,
+    duration: 3,
+    mimeType: 'audio/webm',
+  };
+  audio.assetRef = { ...audio.assetRef, mimeType: 'audio/webm' };
+  const first = await commitScenarioAggregateMutation(project, {
+    children: {
+      assetPuts: [createAsset(project.id, 'image'), audio],
+      editorDocumentPuts: [createDocument(project.id, 'edit')],
+    },
+  });
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  const { tour: _tour, ...reference } = first.project;
+  const second = await commitScenarioAggregateMutation(reference, {
+    expectedRevision: first.workspaceRevision,
+  });
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  expect(getStore('scenario_assets').has('audio')).toBe(true);
+  await clearScenarioSavedHistory(project.id, second.project.updatedAt);
+  expect(await pruneScenarioResources(project.id)).toBe(3);
+  expect(getStore('scenario_assets').has('audio')).toBe(false);
 });

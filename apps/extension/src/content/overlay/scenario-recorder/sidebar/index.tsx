@@ -1,3 +1,5 @@
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { translate } from '../../../../platform/i18n';
 import {
   useEffect,
   useRef,
@@ -92,6 +94,7 @@ export function ScenarioRecorderSidebar(props: {
   uiScale?: number;
 }) {
   const sidebarState = useScenarioRecorderSidebarState();
+  const [deleteStepId, setDeleteStepId] = useState<string | null>(null);
   const { highlightedStepId, stepsContainerRef } = useHighlightedRecentStep({
     recentSteps: props.recentSteps,
     ...(props.highlightToken === undefined ? {} : { highlightToken: props.highlightToken }),
@@ -108,7 +111,7 @@ export function ScenarioRecorderSidebar(props: {
         dragging={props.dragging}
         dragStepId={sidebarState.dragStepId}
         highlightedStepId={highlightedStepId}
-        onDeleteStep={props.onDeleteStep}
+        onDeleteStep={setDeleteStepId}
         onInspectStep={sidebarState.setInspectedStep}
         onMoveStep={props.onMoveStep}
         onOpenEditor={() => props.onOpenEditor()}
@@ -123,6 +126,20 @@ export function ScenarioRecorderSidebar(props: {
         stepsContainerRef={stepsContainerRef}
       />
       {renderScenarioRecorderSidebarOverlays(sidebarState)}
+      <ProductConfirmDialog
+        isOpen={deleteStepId !== null}
+        title={translate('scenario.content.deleteStep')}
+        message={translate('scenario.content.deleteStepMessage')}
+        confirmText={translate('common.actions.delete')}
+        cancelText={translate('common.actions.cancel')}
+        onCancel={() => setDeleteStepId(null)}
+        onConfirm={() => {
+          if (deleteStepId && props.recentSteps.some((step) => step.id === deleteStepId))
+            props.onDeleteStep(deleteStepId);
+          setDeleteStepId(null);
+        }}
+        backdropClassName="!z-[2147483648]"
+      />
     </>
   );
 }

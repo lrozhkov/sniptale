@@ -1,7 +1,6 @@
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../../features/scenario/contracts/types/project';
 import type { ScenarioControllerResponse } from '../types';
 
@@ -11,7 +10,6 @@ export type ScenarioCollectionsApplierArgs = {
   setHighlightToken: React.Dispatch<React.SetStateAction<number>>;
   setProjects: React.Dispatch<React.SetStateAction<ScenarioProjectSummary[]>>;
   setRecentSteps: React.Dispatch<React.SetStateAction<ScenarioRecentStep[]>>;
-  setTrashedSteps: React.Dispatch<React.SetStateAction<ScenarioTrashedStep[]>>;
 };
 
 export function createScenarioCollectionsApplier(args: ScenarioCollectionsApplierArgs) {
@@ -32,9 +30,6 @@ export function createScenarioCollectionsApplier(args: ScenarioCollectionsApplie
       args.hasLoadedStepsRef.current = true;
       args.prevIdsRef.current = response.recentSteps.map((step) => step.id);
       args.setRecentSteps(response.recentSteps);
-    }
-    if (response.trashedSteps) {
-      args.setTrashedSteps(response.trashedSteps);
     }
   };
 }

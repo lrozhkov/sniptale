@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VoiceInputPortMessageType } from '@sniptale/runtime-contracts/voice-input';
 import { createRuntimePortFixture } from '../../../../../tooling/test/support/chrome-runtime-port';
+const diagnostics = vi.hoisted(() => ({ warn: vi.fn(), debug: vi.fn(), error: vi.fn() }));
+vi.mock('@sniptale/platform/observability/logger', () => ({ createLogger: () => diagnostics }));
 import { createVoiceInputClient } from './client';
 
 describe('voice input workflow client', () => {
@@ -166,4 +168,20 @@ describe('voice input workflow client', () => {
     });
     expect(schedule).toHaveBeenCalledWith(expect.any(Function), 2_000);
   });
+});
+
+it('treats an idle Port disconnect as lifecycle information instead of an extension warning', () => {
+  const connection = createRuntimePortFixture();
+  const listener = vi.fn();
+  const client = createVoiceInputClient({
+    connect: () => connection.port,
+    createId: () => 'status',
+    schedule: vi.fn(),
+  });
+  client.subscribe(listener);
+  client.refresh();
+  connection.onDisconnect.emit(connection.port);
+  expect(diagnostics.warn).not.toHaveBeenCalledWith('Voice input port disconnected');
+  expect(listener).not.toHaveBeenCalled();
+  client.disconnect();
 });

@@ -1,3 +1,4 @@
+import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
@@ -69,6 +70,7 @@ type EditorFloatingToolRailProps = EditorToolbarContentProps & {
 };
 
 export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
+  const embed = useEditorEmbedContext();
   const annotationDefaults = useFrameAnnotationCreationDefaults();
   const frameAnnotationActive = props.isToolButtonActive('frame-annotation');
   useEffect(() => {
@@ -93,7 +95,14 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   });
 
   return (
-    <div data-ui="editor.floating.tool-rail.stack" className={TOOL_RAIL_STACK_CLASS_NAME}>
+    <div
+      data-ui="editor.floating.tool-rail.stack"
+      className={floatingChromeClassNames(
+        TOOL_RAIL_STACK_CLASS_NAME,
+        embed.mode === 'scenario' &&
+          'min-[721px]:max-[1439px]:!top-[4.75rem] max-[720px]:!top-[8.5rem]'
+      )}
+    >
       <FloatingChromeToolbar
         aria-label={translate('shared.ui.commandPaletteToolsSection')}
         className={TOOL_RAIL_CLASS_NAME}

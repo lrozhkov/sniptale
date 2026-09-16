@@ -238,32 +238,17 @@ describe('extension page scenario helpers', () => {
       url: 'chrome-extension://test/apps/extension/src/scenario-editor/index.html',
     });
   });
+});
 
-  it('opens scenario audience view in a maximized popup window', async () => {
-    const { openScenarioAudiencePage } = await import('./index');
-
-    await openScenarioAudiencePage('project-1', 'session-1');
-
-    expect(browserWindowsCreateMock).toHaveBeenCalledWith({
-      state: 'maximized',
-      type: 'popup',
-      url:
-        'chrome-extension://test/apps/extension/src/scenario-editor/index.html?' +
-        'projectId=project-1&presentationView=audience&presentationSessionId=session-1',
-    });
-    expect(browserTabsCreateMock).not.toHaveBeenCalled();
-  });
-
-  it('falls back to a tab when audience popup creation is unavailable', async () => {
-    browserWindowsCreateMock.mockRejectedValueOnce(new Error('unavailable'));
-    const { openScenarioAudiencePage } = await import('./index');
-
-    await openScenarioAudiencePage('project-1', 'session-1');
-
-    expect(browserTabsCreateMock).toHaveBeenCalledWith({
-      url:
-        'chrome-extension://test/apps/extension/src/scenario-editor/index.html?' +
-        'projectId=project-1&presentationView=audience&presentationSessionId=session-1',
-    });
-  });
+it('builds a fixed local editor frame URL carrying only its embed session', async () => {
+  const { buildScenarioImageEditorUrl } = await import('./index');
+  const url = new URL(buildScenarioImageEditorUrl('session-123'));
+  expect(url.protocol).toBe('chrome-extension:');
+  expect(url.host).toBe('test');
+  expect(url.pathname).toBe('/apps/extension/src/editor/index.html');
+  expect([...url.searchParams]).toEqual([
+    ['embed', 'scenario'],
+    ['embedSession', 'session-123'],
+  ]);
+  expect(browserTabsCreateMock).not.toHaveBeenCalled();
 });

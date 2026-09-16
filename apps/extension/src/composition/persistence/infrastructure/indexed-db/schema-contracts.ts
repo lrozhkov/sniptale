@@ -104,7 +104,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_ASSETS_STORE, dataClass: 'durable-authority' },
@@ -200,6 +200,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       ) {
         throw new Error('Video workspace schema creation failed.');
       }
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'scenarioProjects', from: 1, to: 2 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 2,
+    toDatabaseVersion: 3,
+    risk: 'additive',
+    stores: [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Scenario tour stores are unavailable.');
       return undefined;
     },
   },

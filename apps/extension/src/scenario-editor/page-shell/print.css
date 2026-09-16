@@ -1,0 +1,123 @@
+.guide-print {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-canvas);
+}
+.guide-print-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: var(--sniptale-radius-lg);
+  background: var(--sniptale-color-surface-panel);
+}
+.guide-print-header h1 {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+.guide-print-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 0;
+}
+.guide-print-status {
+  margin: 0;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-print-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+.guide-print-paper {
+  width: var(--guide-print-width);
+  max-width: 100%;
+  min-height: var(--guide-print-height);
+  margin: 0 auto;
+  padding: 12mm;
+  background: var(--guide-paper, white);
+}
+.guide-print .guide-read-document {
+  max-width: none;
+}
+.guide-print .guide-read-document > :is(article, section) {
+  box-shadow: none;
+  max-width: none;
+  margin: 0 0 6mm;
+  border: 0;
+  border-radius: 0;
+  padding: 4mm;
+  break-inside: auto;
+}
+.guide-print .guide-read-image .guide-image-frame {
+  max-width: min(100%, calc(var(--guide-print-image-height) * var(--guide-frame-ratio)));
+}
+@media print {
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .guide-print {
+    display: block;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    background: white;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .guide-print-header,
+  .guide-print-settings,
+  .guide-print-status {
+    display: none;
+  }
+  .guide-print-scroll {
+    display: block;
+    overflow: visible;
+    padding: 0;
+  }
+  .guide-print-paper {
+    width: auto;
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .guide-print[data-pagination='step'] .guide-read-document > :not(:first-child) {
+    break-before: page;
+  }
+  .guide-print .guide-block {
+    break-inside: auto;
+  }
+  .guide-print .guide-read-image {
+    break-inside: avoid;
+  }
+  .guide-print :is(h2, h3, article > header) {
+    break-after: avoid;
+  }
+  .guide-print p {
+    orphans: 3;
+    widows: 3;
+  }
+}

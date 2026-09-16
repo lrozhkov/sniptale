@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { createVideoProjectEntry } from '../../../../composition/persistence/projects/index.test-support';
-import { createScenarioProjectV3 } from '../../../../features/scenario/project/v3';
+import { createGuideProject } from '../../../../features/scenario/project/factories';
 import { createMediaHubBackupExportOptions } from '../options';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
 import { buildVideoProjectRootInventory } from './video-projects';
@@ -40,7 +40,7 @@ describe('project draft archive inventory', () => {
   });
 
   it('includes a temporary scenario project only when drafts are requested', async () => {
-    const project = createScenarioProjectV3('Draft scenario');
+    const project = createGuideProject('Draft scenario');
     const entry = {
       createdAt: project.createdAt,
       id: project.id,
@@ -69,3 +69,21 @@ describe('project draft archive inventory', () => {
 function emptyReviewTransaction() {
   return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
 }
+
+it.each([2, 3, 99])(
+  'refuses to silently omit unsupported version %i from an all-library backup',
+  async (version) => {
+    const project = { ...createGuideProject('Unavailable', 'old', 10), version };
+    const db = database([
+      { id: project.id, project, createdAt: 10, updatedAt: 10, workspaceRevision: 1 },
+    ]);
+    await expect(
+      buildScenarioProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions(),
+        paths: createArchivePathAllocator(),
+      })
+    ).rejects.toThrow('unavailable');
+    expect(db.getAllFromIndex).not.toHaveBeenCalled();
+  }
+);

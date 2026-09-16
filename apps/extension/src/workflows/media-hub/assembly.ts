@@ -22,7 +22,6 @@ import {
   parsePendingScenarioAssetEntry,
   parseScenarioAssetEntry,
   parseScenarioExportEntry,
-  parseScenarioProjectEntry,
 } from '../../composition/persistence/scenario/read-guards';
 
 import type { StorageCleanupReport } from '../../features/media-hub/types';
@@ -47,7 +46,7 @@ async function loadStorageCleanupInventory(): Promise<StorageCleanupInventory> {
     db.getAll(SCENARIO_PENDING_ASSETS_STORE),
     db.getAll(SCENARIO_ASSETS_STORE),
     db.getAll(SCENARIO_EXPORTS_STORE),
-    db.getAll(SCENARIO_PROJECTS_STORE),
+    db.getAllKeys(SCENARIO_PROJECTS_STORE),
     db.getAll(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
     db.getAll(THUMBNAILS_STORE),
     db.getAll(VIDEO_PROJECTS_STORE),
@@ -59,7 +58,11 @@ async function loadStorageCleanupInventory(): Promise<StorageCleanupInventory> {
     pendingScenarioAssets: parseDbEntries(pendingScenarioAssets, parsePendingScenarioAssetEntry),
     scenarioAssets: parseDbEntries(scenarioAssets, parseScenarioAssetEntry),
     scenarioExports: parseDbEntries(scenarioExports, parseScenarioExportEntry),
-    scenarioProjects: parseDbEntries(scenarioProjects, parseScenarioProjectEntry),
+    scenarioProjects: scenarioProjects.map((key: unknown) => {
+      if (typeof key !== 'string' || !key)
+        throw new Error('Invalid scenario project ownership key.');
+      return { id: key };
+    }),
     scenarioStepDocuments:
       scenarioStepDocuments as StorageCleanupInventory['scenarioStepDocuments'],
     thumbnails: thumbnails as StorageCleanupInventory['thumbnails'],

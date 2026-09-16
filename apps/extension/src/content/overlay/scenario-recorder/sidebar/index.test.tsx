@@ -12,6 +12,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+const onDeleteStep = vi.fn();
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -19,12 +20,14 @@ const DEFAULT_STEPS: ScenarioRecorderSidebarStep[] = [
   {
     id: 'step-10',
     position: 9,
+    numberLabel: '10',
     previewDataUrl: 'data:image/png;base64,1',
     title: 'Step ten',
   },
   {
     id: 'step-9',
     position: 8,
+    numberLabel: '9',
     previewDataUrl: 'data:image/png;base64,2',
     title: 'Step nine',
   },
@@ -70,7 +73,7 @@ async function renderSidebar(
     root?.render(
       <ScenarioRecorderSidebar
         dragging={false}
-        onDeleteStep={vi.fn()}
+        onDeleteStep={onDeleteStep}
         onFinish={vi.fn()}
         onMoveStep={vi.fn()}
         onOpenEditor={vi.fn()}
@@ -88,6 +91,7 @@ async function renderSidebar(
 }
 
 beforeEach(() => {
+  onDeleteStep.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.useFakeTimers();
 });
@@ -174,6 +178,7 @@ it('animates only newly added steps instead of keeping the first render highligh
     {
       id: 'step-11',
       position: 10,
+      numberLabel: '11',
       previewDataUrl: 'data:image/png;base64,3',
       title: 'Step eleven',
     },
@@ -197,6 +202,7 @@ it('can start a deferred highlight for the latest step after remount', async () 
     {
       id: 'step-11',
       position: 10,
+      numberLabel: '11',
       previewDataUrl: 'data:image/png;base64,3',
       title: 'Step eleven',
     },
@@ -222,6 +228,7 @@ it('renders every available step instead of trimming the sidebar to the latest s
   const longStepList = Array.from({ length: 9 }, (_, index) => ({
     id: `step-${index + 1}`,
     position: index,
+    numberLabel: String(index + 1),
     previewDataUrl: `data:image/png;base64,${index + 1}`,
     title: `Step ${index + 1}`,
   }));
@@ -293,4 +300,69 @@ it('closes the fullscreen preview overlay from the explicit close control', asyn
   expect(
     container?.querySelector('[data-ui="content.scenario.sidebar.floating-preview"]')
   ).toBeNull();
+});
+
+it('requires confirmation and preserves the step when deletion is cancelled', async () => {
+  await renderSidebar();
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.step-delete"]'
+  );
+  if (!trigger) throw new Error('Missing delete action');
+  await act(async () => {
+    trigger.focus();
+    trigger.click();
+  });
+  expect(onDeleteStep).not.toHaveBeenCalled();
+  const dialog = document.querySelector('[role="alertdialog"]');
+  expect(dialog?.textContent).toContain('scenario.content.deleteStepMessage');
+  const cancel = [...(dialog?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === 'common.actions.cancel'
+  );
+  if (!cancel) throw new Error('Missing cancel action');
+  await act(async () => {
+    cancel.click();
+  });
+  expect(onDeleteStep).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  await act(async () => {
+    trigger.click();
+  });
+  const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find(
+    (button) => button.textContent === 'common.actions.delete'
+  );
+  if (!(confirm instanceof HTMLButtonElement)) throw new Error('Missing confirm action');
+  await act(async () => {
+    confirm.click();
+  });
+  expect(onDeleteStep).toHaveBeenCalledExactlyOnceWith('step-10');
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
+it('cancels deletion with Escape and ignores a target removed while confirmation is open', async () => {
+  await renderSidebar();
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.step-delete"]'
+  );
+  if (!trigger) throw new Error('Missing delete action');
+  await act(async () => {
+    trigger.focus();
+    trigger.click();
+  });
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  });
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(onDeleteStep).not.toHaveBeenCalled();
+  await act(async () => {
+    trigger.click();
+  });
+  await renderSidebar([]);
+  const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find(
+    (button) => button.textContent === 'common.actions.delete'
+  );
+  if (!(confirm instanceof HTMLButtonElement)) throw new Error('Missing confirm action');
+  await act(async () => {
+    confirm.click();
+  });
+  expect(onDeleteStep).not.toHaveBeenCalled();
 });

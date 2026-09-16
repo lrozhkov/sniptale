@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.4.1` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `2` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `3` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -38,9 +38,11 @@ The catalog owns control membership, order, scope, engine decision, normalized r
 This inventory is projected from the live source tree. It is navigation data, not an allowlist or path gate.
 
 - `apps/extension/src/composition/archive-transfer`
+- `apps/extension/src/composition/audio-recording`
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
 - `apps/extension/src/composition/gradient-preset-resources`
+- `apps/extension/src/composition/library-preview`
 - `apps/extension/src/composition/persistence/aggregate-presentations`
 - `apps/extension/src/composition/persistence/ai-settings`
 - `apps/extension/src/composition/persistence/annotation-template-tags`
@@ -144,7 +146,6 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/page-package`
 - `apps/extension/src/workflows/page-preparation`
 - `apps/extension/src/workflows/scenario-capture-edit`
-- `apps/extension/src/workflows/scenario-video`
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
@@ -195,6 +196,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `effect-runtime-sandbox` → `apps/extension/src/effect-runtime-sandbox`
 - `scenario-editor` → `apps/extension/src/scenario-editor`
 - `web-snapshot-viewer` → `apps/extension/src/web-snapshot-viewer`
+- `tour-preview-sandbox` → `apps/extension/src/tour-preview-sandbox`
 
 ## Background route owners
 

@@ -21,7 +21,7 @@ export const EXTENSION_UI_ENTRYPOINT_OWNER_MAPPINGS = [
     owner: 'extension-ui-scenario-editor-entrypoint',
     productionFile: 'apps/extension/src/scenario-editor/index.tsx',
     reason: 'The app-root scenario editor entry is exercised by its page-shell entrypoint suite.',
-    testFiles: ['apps/extension/src/scenario-editor/page-shell/entrypoint.test.tsx'],
+    testFiles: ['apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx'],
   },
   {
     owner: 'extension-ui-web-snapshot-viewer-entrypoint',

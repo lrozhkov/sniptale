@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   deleteEffectBundle,
   listEffectBundles,
-  setEffectBundleEnabled,
+  setEffectDocumentEnabled,
 } from '../../../../composition/persistence/effect-bundles';
 import {
   importEffectFiles,
@@ -80,7 +80,8 @@ export function useVideoEffectsSettings() {
         const imported = await importEffectFiles(files);
         if (owner.active) setResults(imported);
       }),
-    toggle: (id: string, enabled: boolean) => run(() => setEffectBundleEnabled(id, enabled)),
+    toggle: (packId: string, documentId: string, enabled: boolean) =>
+      run(() => setEffectDocumentEnabled(packId, documentId, enabled)),
     remove: (id: string) => run(() => deleteEffectBundle(id)),
   };
 }

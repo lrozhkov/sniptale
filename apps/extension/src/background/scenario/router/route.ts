@@ -7,8 +7,6 @@ import type {
   ScenarioListProjectsMessage,
   ScenarioMoveStepMessage,
   ScenarioOpenEditorMessage,
-  ScenarioRecordSuggestedEventMessage,
-  ScenarioRestoreStepMessage,
   ScenarioSaveCaptureStepMessage,
   ScenarioSetActiveProjectMessage,
   ScenarioSetCaptureModeMessage,
@@ -20,7 +18,6 @@ import type {
 import type { ScenarioSessionService } from '../session-service';
 import {
   handleScenarioCreateProject,
-  handleScenarioRecordSuggestedEvent,
   handleScenarioSaveCaptureStep,
   handleScenarioSessionQuery,
   handleScenarioSetActiveProject,
@@ -34,7 +31,6 @@ import {
   handleScenarioDeleteStep,
   handleScenarioMoveStep,
   handleScenarioOpenEditor,
-  handleScenarioRestoreStep,
 } from './step-actions';
 import { respondAsyncRoute } from '../../routing-contracts/response';
 
@@ -46,8 +42,6 @@ type ScenarioRouterMessage =
   | ScenarioListProjectsMessage
   | ScenarioMoveStepMessage
   | ScenarioOpenEditorMessage
-  | ScenarioRecordSuggestedEventMessage
-  | ScenarioRestoreStepMessage
   | ScenarioSaveCaptureStepMessage
   | ScenarioSetActiveProjectMessage
   | ScenarioSetCaptureModeMessage
@@ -75,8 +69,6 @@ type ScenarioRouterResponse =
   | Awaited<ReturnType<typeof handleScenarioSaveCaptureStep>>
   | Awaited<ReturnType<typeof handleScenarioDeleteStep>>
   | Awaited<ReturnType<typeof handleScenarioMoveStep>>
-  | Awaited<ReturnType<typeof handleScenarioRestoreStep>>
-  | Awaited<ReturnType<typeof handleScenarioRecordSuggestedEvent>>
   | Awaited<ReturnType<typeof handleScenarioOpenEditor>>;
 
 async function handleScenarioMessage(
@@ -107,10 +99,6 @@ async function handleScenarioMessage(
       return handleScenarioDeleteStep({ ...args, message: args.message });
     case 'SCENARIO_MOVE_STEP':
       return handleScenarioMoveStep({ ...args, message: args.message });
-    case 'SCENARIO_RESTORE_STEP':
-      return handleScenarioRestoreStep({ ...args, message: args.message });
-    case 'SCENARIO_RECORD_SUGGESTED_EVENT':
-      return handleScenarioRecordSuggestedEvent({ ...args, message: args.message });
     case 'SCENARIO_OPEN_EDITOR':
       return handleScenarioOpenEditor({ ...args, message: args.message });
   }

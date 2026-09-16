@@ -26,13 +26,12 @@ describe('extension page scenario editor urls', () => {
     );
     expect(
       buildScenarioEditorUrl({
-        presentationSessionId: 'session 7',
-        presentationView: 'audience',
-        projectId: 'project-7',
+        projectId: 'project 7',
+        stepId: 'step 4',
       })
     ).toBe(
       'chrome-extension://test/apps/extension/src/scenario-editor/index.html?' +
-        'projectId=project-7&presentationView=audience&presentationSessionId=session+7'
+        'projectId=project+7&stepId=step+4'
     );
   });
 });

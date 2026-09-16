@@ -2,6 +2,7 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import type { SavePreset } from '../../../contracts/settings';
 import {
   createScenarioEditorEmbedApplyMessage,
+  readEditorEmbedSession,
   readEditorEmbedMode,
 } from '../../../features/editor/contracts/embed';
 import { translate } from '../../../platform/i18n';
@@ -53,9 +54,11 @@ async function executeSave(
 }
 
 function applyEmbedSave(controller: SaveEditorRenderedImageController, dataUrl: string): void {
+  const sessionId = readEditorEmbedSession(window.location.search);
+  if (!sessionId) throw new Error(translate('editor.runtime.saveImageFailed'));
   const document = controller.exportDocument();
   window.parent.postMessage(
-    createScenarioEditorEmbedApplyMessage(dataUrl, document),
+    createScenarioEditorEmbedApplyMessage(dataUrl, document, sessionId),
     window.location.origin
   );
 }
@@ -89,13 +92,25 @@ export async function saveEditorRenderedImage(
   const dataUrl = controller.renderForExport
     ? await controller.renderForExport(renderOptions)
     : controller.renderToDataUrl(renderOptions);
-  const embedMode = readEditorEmbedMode(window.location.search);
   const actionType = options.actionType ?? 'download_default';
 
-  if (embedMode === 'scenario') {
-    applyEmbedSave(controller, dataUrl);
-    return;
-  }
-
   await executeSave(dataUrl, { ...options, actionType }, settings, exportSettings.imageFormat);
+}
+
+/** Applies the rendered draft only through the active scenario embed session. */
+export async function applyEditorRenderedImageToScenario(
+  controller: SaveEditorRenderedImageController
+): Promise<void> {
+  if (
+    readEditorEmbedMode(window.location.search) !== 'scenario' ||
+    !readEditorEmbedSession(window.location.search)
+  ) {
+    throw new Error(translate('editor.runtime.saveImageFailed'));
+  }
+  const settings = await loadEditorExportSettings();
+  const options = { format: settings.imageFormat, quality: settings.imageQuality } as const;
+  const dataUrl = controller.renderForExport
+    ? await controller.renderForExport(options)
+    : controller.renderToDataUrl(options);
+  applyEmbedSave(controller, dataUrl);
 }

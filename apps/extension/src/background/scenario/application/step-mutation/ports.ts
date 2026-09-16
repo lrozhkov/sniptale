@@ -8,7 +8,6 @@ interface ScenarioStepMutationRepository {
     stepId: string,
     toIndex: number
   ): Promise<unknown | undefined>;
-  restoreStepFromProject(projectId: string, stepId: string): Promise<unknown | undefined>;
 }
 
 export interface ScenarioStepMutationPorts {

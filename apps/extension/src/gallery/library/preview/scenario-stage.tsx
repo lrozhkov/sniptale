@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
-import { listRecentScenarioSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
-import type { ScenarioRecentStep } from '../../../features/scenario/contracts/types/project';
+import { listScenarioPreviewSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
+import type { ScenarioPreviewStep } from '../../../features/scenario/contracts/types/project';
 import { isGalleryScenarioExportItem, isGalleryScenarioItem, type GalleryItem } from '../items';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
 
@@ -31,7 +31,7 @@ function ScenarioPreviewEmptyState(props: { exportMode: boolean }) {
 
 function ScenarioPreviewStepsGrid(props: {
   exportMode: boolean;
-  recentSteps: ScenarioRecentStep[];
+  recentSteps: ScenarioPreviewStep[];
   title: string;
 }) {
   return (
@@ -49,8 +49,8 @@ function ScenarioPreviewStepsGrid(props: {
       {props.recentSteps.length === 0 ? (
         <ScenarioPreviewEmptyState exportMode={props.exportMode} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {props.recentSteps.slice(0, 6).map((step) => (
+        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {props.recentSteps.map((step) => (
             <ScenarioPreviewStepCard key={step.id} step={step} />
           ))}
         </div>
@@ -60,7 +60,8 @@ function ScenarioPreviewStepsGrid(props: {
 }
 
 export function PreviewScenarioStage(props: { item: GalleryItem }) {
-  const [recentSteps, setRecentSteps] = useState<ScenarioRecentStep[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const [recentSteps, setRecentSteps] = useState<ScenarioPreviewStep[]>([]);
 
   useEffect(() => {
     if (!isGalleryScenarioItem(props.item) && !isGalleryScenarioExportItem(props.item)) {
@@ -68,15 +69,23 @@ export function PreviewScenarioStage(props: { item: GalleryItem }) {
     }
 
     let active = true;
-    void listRecentScenarioSteps(props.item.project.id)
+    setRecentSteps([]);
+    if (props.item.project.availability !== 'available') {
+      setStatus('unavailable');
+      return;
+    }
+    setStatus('loading');
+    void listScenarioPreviewSteps(props.item.project.id)
       .then((steps) => {
         if (active) {
           setRecentSteps(steps);
+          setStatus('ready');
         }
       })
       .catch(() => {
         if (active) {
           setRecentSteps([]);
+          setStatus('unavailable');
         }
       });
 
@@ -85,6 +94,14 @@ export function PreviewScenarioStage(props: { item: GalleryItem }) {
     };
   }, [props.item]);
 
+  if (status !== 'ready')
+    return (
+      <p role="status">
+        {translate(
+          status === 'loading' ? 'gallery.app.loading' : 'gallery.preview.unavailableGuide'
+        )}
+      </p>
+    );
   return (
     <ScenarioPreviewStepsGrid
       exportMode={isGalleryScenarioExportItem(props.item)}

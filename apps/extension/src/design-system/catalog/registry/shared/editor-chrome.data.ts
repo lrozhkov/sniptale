@@ -53,12 +53,6 @@ export const SHARED_DESIGN_SYSTEM_EDITOR_CHROME_REGISTRY: DesignSystemRegistryEn
         'Image editor > Toolbar primitives',
         ['apps/extension/src/editor/chrome/ui/index.tsx']
       ),
-      usage(
-        'scenario.editor.toolbar.chrome',
-        'Редактор сценариев > Toolbar primitives',
-        'Scenario editor > Toolbar primitives',
-        ['apps/extension/src/scenario-editor/page-shell/toolbar/ScenarioEditorToolbar.tsx']
-      ),
     ],
     status: 'active',
     previewFidelity: 'canonical',

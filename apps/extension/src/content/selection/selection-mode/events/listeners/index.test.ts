@@ -88,9 +88,9 @@ function expectListenerCleanupLifecycle() {
 
   expect(addWindowEventListenerToAllWindowsDynamicMock.mock.calls.map(([event]) => event)).toEqual([
     'dragstart',
-    'mousemove',
-    'mousedown',
-    'mouseup',
+    'pointermove',
+    'pointerdown',
+    'pointerup',
     'click',
     'keydown',
   ]);
@@ -101,9 +101,9 @@ function expectListenerCleanupLifecycle() {
     ([, handler]) => handler
   );
   windowHandlers[0]?.(new Event('dragstart'), window);
-  windowHandlers[1]?.(new MouseEvent('mousemove'), window);
-  windowHandlers[2]?.(new MouseEvent('mousedown'), window);
-  windowHandlers[3]?.(new MouseEvent('mouseup'), window);
+  windowHandlers[1]?.(new MouseEvent('pointermove'), window);
+  windowHandlers[2]?.(new MouseEvent('pointerdown'), window);
+  windowHandlers[3]?.(new MouseEvent('pointerup'), window);
   windowHandlers[4]?.(new MouseEvent('click'), window);
   windowHandlers[5]?.(new KeyboardEvent('keydown'), window);
   expect(scenario.handlers.handleDragStart).toHaveBeenCalledOnce();
@@ -159,9 +159,9 @@ describe('selection-mode listener cleanup', () => {
       ])
     ).toEqual([
       ['dragstart', { capture: true }],
-      ['mousemove', { capture: true }],
-      ['mousedown', { capture: true }],
-      ['mouseup', { capture: true }],
+      ['pointermove', { capture: true }],
+      ['pointerdown', { capture: true }],
+      ['pointerup', { capture: true }],
       ['click', { capture: true }],
       ['keydown', { capture: true }],
     ]);

@@ -17,24 +17,6 @@ export interface ScenarioFramePadding {
   bottom: number;
 }
 
-export interface ScenarioImageTransform {
-  scale: number;
-  x: number;
-  y: number;
-}
-
-export interface ScenarioViewportTransform {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-export interface ScenarioAssetRef {
-  assetId: string;
-  galleryAssetId: string | null;
-}
-
 export interface ScenarioTargetDescriptor {
   selector: string | null;
   iframeSelector: string | null;

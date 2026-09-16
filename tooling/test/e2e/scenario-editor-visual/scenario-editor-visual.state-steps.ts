@@ -1,284 +1,625 @@
-import { mkdir } from 'node:fs/promises';
-import { type Locator, type Page, type TestInfo } from '@playwright/test';
-import { SCENARIO_VISUAL_BASELINE_SLIDE_IDS } from '../../../../apps/extension/src/scenario-editor/workspace/visual-baseline/fixtures';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { expect, type Page, type TestInfo, type Locator } from '@playwright/test';
 import {
-  assertAiPanelKeepsCompactHeight,
-  assertCompactRangesSitOnRowBorder,
-  assertFloatingPanelPlacement,
-  assertInspectorPanelFitsContent,
-  assertScenarioColorPaletteHasSwatches,
-} from './scenario-editor-visual.floating-assertions';
-import {
-  assertVisualAcceptance,
-  createPageIssueCollector,
-  openVisualHarness,
-  SCENARIO_VISUAL_VIEWPORTS,
-  selectSurfaceMode,
-  waitForScenarioVisualStability,
-  type ThemeName,
-  type VisualSurfaceCase,
-} from './scenario-editor-visual.helpers';
+  applyHarnessBootstrap,
+  SCENARIO_EDITOR_VISUAL_HARNESS_PATH,
+} from '../extension-critical.helpers';
 
-const DESKTOP_VIEWPORT = SCENARIO_VISUAL_VIEWPORTS.find((viewport) => viewport.name === 'desktop')!;
-type PageIssueCollector = ReturnType<typeof createPageIssueCollector>;
-
-async function openDesktopEditorState(
+async function documentCommand(
   page: Page,
-  hostOrigin: string,
-  slideId: string
-): Promise<void> {
-  await openVisualHarness(page, hostOrigin, 'dark', DESKTOP_VIEWPORT.size, slideId);
-  await selectSurfaceMode(page, 'editor');
-  await waitForScenarioVisualStability(page);
-}
-
-async function assertCleanFloatingState(page: Page, issues: PageIssueCollector): Promise<void> {
-  issues.assertClean();
-  await assertFloatingPanelPlacement(page);
-  await assertVisualAcceptance(page);
-}
-
-export async function verifyDefaultFloatingLayout(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'default-floating-layout');
-}
-
-export async function verifyElementCompactControls(page: Page, testInfo: TestInfo): Promise<void> {
-  await selectFirstInspectorLayer(page);
-  await assertInspectorPanelFitsContent(page);
-  await assertCompactRangesSitOnRowBorder(page);
-  await assertVisualAcceptance(page);
-  await captureStateScreenshot(page, testInfo, 'element-compact-controls');
-}
-
-export async function verifyElementColorPalette(page: Page, testInfo: TestInfo): Promise<void> {
+  scope: Locator,
+  command: string,
+  kind: 'item' | 'block' | 'insert'
+) {
+  if (kind === 'insert') {
+    const button = scope
+      .locator('.guide-insertion-block[data-end="true"]')
+      .getByRole('button', { name: command, exact: true });
+    await button.focus();
+    await button.click();
+    return;
+  }
+  const selector = kind === 'item' ? '.guide-item-actions button' : '.guide-block-actions button';
+  const trigger = scope.locator(selector).first();
+  await trigger.focus();
+  await trigger.click();
   await page
-    .locator('[data-ui="scenario.inspector.parameters"]')
-    .locator('[data-ui="shared.ui.color-selector.palette-trigger"]')
-    .first()
+    .locator('.guide-action-menu')
+    .getByRole('button', { name: command, exact: true })
     .click();
-  await page.locator('[data-ui="shared.ui.color-selector.expanded-layer"]').waitFor({
-    state: 'visible',
-  });
-  await assertScenarioColorPaletteHasSwatches(page);
-  await assertVisualAcceptance(page);
-  await captureStateScreenshot(page, testInfo, 'element-color-palette-open');
 }
 
-export async function verifyInsertTextAction(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await clickInsertPanelButton(page, translate('scenario.editor.insertText', 'ru'));
-  await page.locator('[data-ui="scenario.inspector.parameters"] textarea').first().waitFor({
-    state: 'visible',
-  });
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'insert-text-action');
+export async function verifyStepNavigation(page: Page): Promise<void> {
+  await expect(page.locator('article#compare')).toBeFocused();
+  await page.getByRole('link', { name: 'Text-only step', exact: true }).click();
+  await expect(page.locator('article#text-only')).toBeFocused();
+  await expect(page).toHaveURL(/stepId=text-only/);
 }
 
-export async function verifyTemplatePickerOpen(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await clickInsertPanelButton(page, translate('scenario.editor.layouts', 'ru'));
-  await page.locator('[data-ui="scenario.templates.picker"]').waitFor({ state: 'visible' });
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'template-picker-open');
+export async function verifySaveAndReopen(page: Page): Promise<void> {
+  const title = page.locator('article#text-only .guide-step-title');
+  await title.fill('Saved local step');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('article#text-only .guide-step-title')).toHaveValue('Saved local step');
+  await expect(page.locator('article#text-only')).toBeFocused();
 }
 
-export async function verifyExportToolOpen(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await clickDocumentBarButton(page, translate('scenario.editor.export', 'ru'));
-  await page.locator('[data-ui="scenario.inspector.export-tool"]').waitFor({ state: 'visible' });
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'export-tool-open');
-}
-
-export async function verifyInspectorCollapsed(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await page
-    .getByRole('button', { exact: true, name: translate('editor.toolbar.collapseInspector', 'ru') })
-    .click();
-  await page
-    .locator('[data-ui="scenario.floating.inspector.expand"]')
-    .waitFor({ state: 'visible' });
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'inspector-collapsed');
-}
-
-export async function verifySplitResized(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await resizeSlideLayerSplit(page);
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'slides-layers-split-resized');
-}
-
-export async function verifyEmptyViewportSlide(
-  page: Page,
-  hostOrigin: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, SCENARIO_VISUAL_BASELINE_SLIDE_IDS.emptyViewport);
-  await assertCleanFloatingState(page, issues);
-  await captureStateScreenshot(page, testInfo, 'empty-viewport-slide');
-}
-
-export async function verifyTextCompactControls(page: Page, testInfo: TestInfo): Promise<void> {
-  await selectFirstInspectorLayer(page);
-  await assertInspectorPanelFitsContent(page);
-  await assertCompactRangesSitOnRowBorder(page);
-  await assertVisualAcceptance(page);
-  await captureStateScreenshot(page, testInfo, 'text-compact-controls');
-}
-
-export async function captureTextWeightRow(page: Page, testInfo: TestInfo): Promise<void> {
-  const weightRange = page
-    .locator('[data-ui="scenario.inspector.parameters"]')
-    .locator(`input[aria-label="${translate('scenario.editor.weight', 'ru')} range"]`);
-  const weightRow = weightRange.locator(
-    'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"][1]'
+export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
+  const original = new URL(page.url());
+  original.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  original.searchParams.set('locale', 'en');
+  const originalId = original.searchParams.get('projectId');
+  const originalTitle = await page.locator('article#text-only .guide-step-title').inputValue();
+  await page.locator('article#text-only .guide-step-title').fill('Unsaved content copied');
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+  await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).not.toBe(originalId);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await expect(page.locator('article .guide-step-title').nth(1)).toHaveValue(
+    'Unsaved content copied'
   );
-
-  await scrollWeightRowIntoView(weightRow);
-  await captureLocatorScreenshot(weightRow, testInfo, 'desktop-dark-text-weight-row.png');
+  await page
+    .getByRole('textbox', { name: 'Scenario', exact: true })
+    .fill('Renamed independent guide');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const copied = new URL(page.url());
+  copied.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  copied.searchParams.set('locale', 'en');
+  await page.goto(original.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('article#text-only .guide-step-title')).toHaveValue(originalTitle);
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.locator('article')).toHaveCount(2);
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.locator('article')).toHaveCount(0);
+  await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).toBeNull();
+  await page.goto(copied.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('textbox', { name: 'Scenario', exact: true })).toHaveValue(
+    'Renamed independent guide'
+  );
+  await expect(page.locator('article .guide-step-title').nth(1)).toHaveValue(
+    'Unsaved content copied'
+  );
+  await expect(page.locator('main img')).toHaveCount(2);
+  await expect
+    .poll(() =>
+      page
+        .locator('main img')
+        .evaluateAll((images) =>
+          images.every(
+            (image) => image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+          )
+        )
+    )
+    .toBe(true);
 }
 
-async function scrollWeightRowIntoView(weightRow: Locator): Promise<void> {
-  await weightRow.evaluate((row) => {
-    const scroller = row.closest<HTMLElement>('[data-ui="scenario.inspector.parameters"]');
-    if (!scroller) {
-      return;
+export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  const resource = page.locator('.guide-resource-main').first();
+  await resource.click();
+  await expect(page.locator('article#compare')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('article#compare .guide-step-title')).toBeFocused();
+  await page.locator('article#text-only .guide-step-title').focus();
+  await expect(page.locator('article#text-only .guide-step-title')).toBeFocused();
+  await expect(page.locator('article#text-only')).toHaveAttribute('data-selected', 'true');
+  await page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  const inspector = page.locator('#guide-inspector-panel');
+  if (await inspector.isVisible())
+    await inspector.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#guide-library-panel')).toBeHidden();
+  await expect(page.locator('#guide-inspector-panel')).toBeHidden();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+  const save = page
+    .locator('.guide-page-header')
+    .getByRole('button', { name: 'Inspector', exact: true });
+  await expect(save).toBeInViewport();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page
+    .locator('.guide-page-header')
+    .getByRole('button', { name: 'Outline', exact: true })
+    .click();
+  await expect(page.locator('#guide-library-panel')).toBeVisible();
+  await expect(save).toBeInViewport();
+  await page.screenshot({ path: 'tasks/scenario-production-polish/header-200.png' });
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '';
+  });
+}
+
+export async function verifyGuideComposition(page: Page): Promise<void> {
+  const step = page.locator('article#text-only');
+  await step.getByRole('textbox', { name: 'Step title', exact: true }).fill('Flexible step');
+  await documentCommand(page, step, 'Text', 'insert');
+  await documentCommand(page, step, 'Text', 'insert');
+  await documentCommand(page, step, 'Heading', 'insert');
+  await documentCommand(page, step, 'Note', 'insert');
+  await step.locator('.guide-description').nth(0).fill('First explanation');
+  await step.locator('.guide-description').nth(1).fill('Second explanation');
+  await step.getByRole('textbox', { name: 'Heading', exact: true }).fill('Detail');
+  await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
+  await step.getByRole('textbox', { name: 'Step title', exact: true }).focus();
+  await page.getByRole('button', { name: 'Show all settings', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show step number', exact: true }).uncheck();
+  await expect(step.locator('header > span:not(.guide-voice-field)')).toHaveCount(0);
+  await step.locator('.guide-block').first().hover();
+  await documentCommand(page, step.locator('.guide-block').first(), 'Duplicate block', 'block');
+  await expect(step.locator('.guide-block')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(step.locator('.guide-block')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(step.locator('.guide-block')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const heading = step
+    .locator('.guide-block')
+    .filter({ has: page.getByRole('textbox', { name: 'Heading', exact: true }) });
+  await heading.hover();
+  await documentCommand(page, heading, 'Move up', 'block');
+  await heading.hover();
+  await documentCommand(page, heading, 'Split step here', 'block');
+  await expect(page.locator('article')).toHaveCount(3);
+  await expect(step.locator('.guide-block')).toHaveCount(1);
+  await page.getByRole('link', { name: 'Flexible step', exact: true }).click();
+  await documentCommand(
+    page,
+    page.locator('.guide-document > [data-selected="true"]'),
+    'Merge with next step',
+    'item'
+  );
+  await expect(page.locator('article')).toHaveCount(2);
+  await expect(step.locator('.guide-block')).toHaveCount(4);
+  const addSection = page
+    .locator('.guide-insertion-item[data-end="true"]')
+    .getByRole('button', { name: 'Add section', exact: true });
+  await addSection.focus();
+  await addSection.click();
+  await page.getByRole('textbox', { name: 'Section title', exact: true }).last().fill('Finish');
+  await documentCommand(
+    page,
+    page.locator('.guide-document > [data-selected="true"]'),
+    'Move up',
+    'item'
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.guide-section-title').last()).toHaveValue('Finish');
+  await expect(page.locator('article#text-only .guide-block')).toHaveCount(4);
+  await expect(page.locator('article#text-only .guide-description').first()).toHaveValue(
+    'First explanation'
+  );
+  await expect(page.locator('article#text-only .guide-block-heading')).toHaveValue('Detail');
+  await expect(page.locator('article#text-only header > span:not(.guide-voice-field)')).toHaveCount(
+    0
+  );
+  await expect(page.locator('.guide-document img')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
+}
+
+export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise<void> {
+  const before = await page.locator('article').count();
+  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  await page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Image library', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Select item: Library screenshot.png', exact: true })
+    .click();
+  await testInfo.attach('image-import-selection', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.getByRole('button', { name: 'Import selected', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await expect(page.locator('article')).toHaveCount(before + 1);
+  await page
+    .getByRole('dialog', { name: 'Resources', exact: true })
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  await expect(page.locator('article').nth(before).locator('header .guide-step-title')).toHaveValue(
+    'Library screenshot.png'
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.locator('article')).toHaveCount(before);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('article')).toHaveCount(before + 1);
+  const raster = page.locator('article').nth(before).locator('img');
+  await expect(raster).toBeVisible();
+  await expect
+    .poll(() =>
+      raster.evaluate(
+        (node) => node instanceof HTMLImageElement && node.complete && node.naturalWidth > 0
+      )
+    )
+    .toBe(true);
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.locator('article')).toHaveCount(0);
+}
+
+export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promise<void> {
+  const figure = page.locator('article#compare figure').first();
+  await figure.hover();
+  await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
+  const controls = page.locator('#guide-inspector-panel');
+  await expect(controls).toBeVisible();
+  await expect(figure.locator('.guide-image-controls')).toHaveCount(0);
+  await controls.getByRole('button', { name: 'Center image', exact: true }).click();
+  await controls.getByRole('button', { name: 'Fill', exact: true }).click();
+  await controls.getByRole('textbox', { name: 'Frame width', exact: true }).fill('500');
+  await controls.getByRole('textbox', { name: 'Frame width', exact: true }).press('Enter');
+  await controls.getByRole('textbox', { name: 'Frame height', exact: true }).fill('320');
+  await controls.getByRole('textbox', { name: 'Frame height', exact: true }).press('Enter');
+  await controls.getByRole('textbox', { name: 'Zoom, %', exact: true }).fill('150');
+  await controls.getByRole('textbox', { name: 'Zoom, %', exact: true }).press('Enter');
+  await controls.getByRole('textbox', { name: 'Caption', exact: true }).fill('Framed screenshot');
+  await controls
+    .getByRole('textbox', { name: 'Alternative text', exact: true })
+    .fill('A framed interface');
+  const frame = figure.locator('.guide-image-frame');
+  await frame.scrollIntoViewIfNeeded();
+  const rect = await frame.boundingBox();
+  if (!rect) throw new Error('Missing image frame');
+  await page.mouse.move(rect.x + 80, rect.y + 80);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -40);
+  await page.keyboard.up('Control');
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 100, rect.y + 90);
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      figure.locator('img').evaluate((image) => Number.parseFloat(getComputedStyle(image).scale))
+    )
+    .toBeGreaterThan(1.5);
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => Number.parseFloat(getComputedStyle(image).translate))
+    )
+    .toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
+  await expect
+    .poll(() =>
+      figure.locator('img').evaluate((image) => Number.parseFloat(getComputedStyle(image).scale))
+    )
+    .toBeGreaterThan(1.5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('scale', '1.5');
+  await page.mouse.move(rect.x + 80, rect.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 120, rect.y + 100);
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => getComputedStyle(image).translate.split(' ').map(Number.parseFloat))
+    )
+    .toEqual([expect.closeTo(4000 / rect.width, 3), expect.closeTo(2000 / rect.height, 3)]);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => getComputedStyle(image).translate.split(' ').map(Number.parseFloat))
+    )
+    .toEqual([expect.closeTo(4000 / rect.width, 3), expect.closeTo(2000 / rect.height, 3)]);
+  await testInfo.attach('image-framing', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await controls.locator('.guide-image-controls').scrollIntoViewIfNeeded();
+  await testInfo.attach('image-framing-controls', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1024, height: 640 });
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(figure.locator('figcaption')).toHaveText('Framed screenshot');
+  await expect(figure.locator('img')).toHaveAttribute('alt', 'A framed interface');
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => getComputedStyle(image).translate.split(' ').map(Number.parseFloat))
+    )
+    .toEqual([expect.closeTo(4000 / rect.width, 3), expect.closeTo(2000 / rect.height, 3)]);
+  await expect(figure.locator('img')).toHaveCSS('scale', '1.5');
+  await expect(figure.locator('img')).toHaveCSS('object-fit', 'cover');
+  await expect(frame).toHaveAttribute('style', /width: min\(100%, 500px\)/);
+  expect((await frame.boundingBox())?.width).toBeLessThanOrEqual(500);
+}
+
+export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo): Promise<void> {
+  const launch = page.locator('[data-edit-image]').first();
+  const title = page.locator('article#compare > header .guide-step-title');
+  await title.fill('Unsaved title retained through annotations');
+  const originalImage = await page.locator('.guide-image-frame img').first().getAttribute('src');
+  await page.locator('article#compare figure').first().hover();
+  await launch.click();
+  const child = page.frameLocator('.guide-image-editor iframe');
+  const apply = child.locator('[data-ui="editor.floating.document-bar.apply-scenario-button"]');
+  await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  await expect(page.locator('.guide-image-editor > header')).toHaveCount(0);
+  await expect(page.locator('.guide-image-editor iframe')).toHaveJSProperty('clientHeight', 900);
+  const previousDownloads = await page.evaluate(async () =>
+    (await chrome.downloads.search({})).map((entry) => entry.id)
+  );
+  await child.locator('[data-ui="editor.floating.document-bar.save-button"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (previous) =>
+          (await chrome.downloads.search({})).some(
+            (entry) => !previous.includes(entry.id) && entry.state === 'complete'
+          ),
+        previousDownloads
+      )
+    )
+    .toBe(true);
+  await expect(apply).toBeEnabled();
+  await expect(page.locator('.guide-image-editor')).toHaveCount(1);
+  await page.setViewportSize({ width: 1024, height: 640 });
+  await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  const documentBar = child.locator('[data-ui="editor.floating.document-bar"]');
+  const toolRail = child.locator('[data-ui="editor.floating.tool-rail"]');
+  const documentBounds = await documentBar.boundingBox();
+  const toolBounds = await toolRail.boundingBox();
+  expect(
+    documentBounds && toolBounds && toolBounds.y >= documentBounds.y + documentBounds.height
+  ).toBe(true);
+  await child.locator('[data-ui="editor.floating.tool-rail.select"]').click({ trial: true });
+  await testInfo.attach('guide-image-editor-local-frame', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await child.getByRole('button', { name: 'Back without applying' }).click();
+  await expect(launch).toBeFocused();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await expect(page.locator('.guide-image-frame img').first()).toHaveAttribute(
+    'src',
+    originalImage ?? ''
+  );
+  await page.locator('article#compare figure').first().hover();
+  await launch.click();
+  await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  await child.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+  const canvas = child.locator('canvas.upper-canvas');
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error('Missing editor canvas');
+  await page.mouse.move(bounds.x + bounds.width * 0.4, bounds.y + bounds.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + bounds.height * 0.6, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await child.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+  await page.mouse.move(bounds.x + bounds.width * 0.4, bounds.y + bounds.height * 0.4);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + bounds.height * 0.6, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await apply.click();
+  await expect(page.locator('.guide-image-editor')).toHaveCount(0);
+  await expect(launch).toBeFocused();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const firstPublication = await readImageEditProof(page);
+  expect(firstPublication.annotations).toBeGreaterThan(0);
+  expect(firstPublication.frameAnnotations).toBeGreaterThan(0);
+  expect(firstPublication.standaloneWorkspaces).toBe(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await page.reload();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await page.locator('article#compare figure').first().hover();
+  await launch.click();
+  await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  await apply.click();
+  await expect(page.locator('.guide-image-editor')).toHaveCount(0);
+  const reopened = await readImageEditProof(page);
+  expect(reopened.annotations).toBe(firstPublication.annotations);
+  expect(reopened.frameAnnotations).toBe(firstPublication.frameAnnotations);
+  expect(reopened.standaloneWorkspaces).toBe(0);
+  await page.locator('article#compare figure').first().hover();
+  await launch.click();
+  await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  await child.locator('[data-ui="editor.floating.document-bar.cancel-scenario-button"]').click();
+  await expect(launch).toBeFocused();
+}
+
+async function readImageEditProof(page: Page) {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const tx = db.transaction(['scenario_step_editor_documents', 'image_workspaces'], 'readonly');
+      const documents = await new Promise<Array<{ document: { canvasJson: string } }>>(
+        (resolve, reject) => {
+          const request = tx.objectStore('scenario_step_editor_documents').getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        }
+      );
+      const standaloneWorkspaces = await new Promise<number>((resolve, reject) => {
+        const request = tx.objectStore('image_workspaces').count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return {
+        annotations: Math.max(
+          0,
+          ...documents.map((entry) => {
+            const canvas = JSON.parse(entry.document.canvasJson) as {
+              objects?: Array<{ type?: string }>;
+            };
+            return (
+              canvas.objects?.filter((object) => object.type?.toLowerCase() === 'path').length ?? 0
+            );
+          })
+        ),
+        frameAnnotations: Math.max(
+          0,
+          ...documents.map((entry) => {
+            const canvas = JSON.parse(entry.document.canvasJson) as {
+              objects?: Array<{ sniptaleFrameAnnotationJson?: string }>;
+            };
+            return (
+              canvas.objects?.filter((object) => object.sniptaleFrameAnnotationJson).length ?? 0
+            );
+          })
+        ),
+        standaloneWorkspaces,
+      };
+    } finally {
+      db.close();
     }
-    const rowRect = row.getBoundingClientRect();
-    const scrollerRect = scroller.getBoundingClientRect();
-    scroller.scrollTop += rowRect.top - scrollerRect.top - 56;
-    scroller.scrollLeft = 0;
-  });
-  await weightRow.waitFor({ state: 'visible' });
-}
-
-export async function verifyAiPanelOpen(
-  page: Page,
-  hostOrigin: string,
-  slideId: string,
-  testInfo: TestInfo,
-  issues: PageIssueCollector
-): Promise<void> {
-  await openDesktopEditorState(page, hostOrigin, slideId);
-  await clickDocumentBarButton(page, translate('scenario.editor.aiEditorTool', 'ru'));
-  await page.locator('[data-ui="scenario.editor.ai-panel"]').waitFor({ state: 'visible' });
-  issues.assertClean();
-  await assertFloatingPanelPlacement(page);
-  await assertAiPanelKeepsCompactHeight(page);
-  await assertVisualAcceptance(page);
-  await captureStateScreenshot(page, testInfo, 'ai-panel-open');
-}
-
-async function clickInsertPanelButton(page: Page, name: string): Promise<void> {
-  await page
-    .locator('[data-ui="scenario.floating.insert-panel"]')
-    .getByRole('button', { exact: true, name })
-    .click();
-}
-
-async function clickDocumentBarButton(page: Page, name: string): Promise<void> {
-  await page
-    .locator('[data-ui="scenario.floating.document-bar.surface"]')
-    .getByRole('button', { exact: true, name })
-    .click();
-}
-
-async function resizeSlideLayerSplit(page: Page): Promise<void> {
-  await page
-    .getByRole('button', { exact: true, name: translate('scenario.editor.layers', 'ru') })
-    .press('ArrowDown');
-  await page.locator('[data-ui="scenario.floating.layers-panel"]').waitFor({ state: 'visible' });
-}
-
-async function selectFirstInspectorLayer(page: Page): Promise<void> {
-  await page.locator('[data-ui="scenario.inspector.layers"] button[aria-pressed]').first().click();
-  await page.locator('[data-ui="scenario.inspector.parameters"]').waitFor({ state: 'visible' });
-}
-
-export async function captureShellScreenshot(
-  page: Page,
-  testInfo: TestInfo,
-  viewportName: string
-): Promise<void> {
-  await mkdir(testInfo.outputDir, { recursive: true });
-  await page.screenshot({
-    fullPage: true,
-    path: testInfo.outputPath(`${viewportName}-light-editor-shell.png`),
   });
 }
 
-async function captureStateScreenshot(
-  page: Page,
-  testInfo: TestInfo,
-  stateName: string
-): Promise<void> {
-  await mkdir(testInfo.outputDir, { recursive: true });
-  await page.screenshot({
-    fullPage: true,
-    path: testInfo.outputPath(`desktop-dark-${stateName}.png`),
+export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo): Promise<void> {
+  const title = page.locator('article#compare > header .guide-step-title');
+  await title.fill('Historical version A');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await title.fill('Historical version B');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const url = new URL(page.url());
+  url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  url.searchParams.set('locale', 'en');
+  await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(title).toHaveValue('Historical version B');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(title).toHaveValue('Historical version A');
+  await expect(page.locator('.guide-image-frame img')).toHaveCount(2);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await testInfo.attach('persisted-undo', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
   });
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(title).toHaveValue('Historical version B');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(title).toHaveValue('Historical version B');
 }
 
-async function captureLocatorScreenshot(
-  locator: Locator,
-  testInfo: TestInfo,
-  filename: string
-): Promise<void> {
-  await mkdir(testInfo.outputDir, { recursive: true });
-  await locator.screenshot({ path: testInfo.outputPath(filename) });
+export async function verifyResourceRetention(page: Page): Promise<void> {
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  const originalAssetCount = await readProjectAssetCount(page);
+  const second = await page.context().newPage();
+  try {
+    await applyHarnessBootstrap(second, { preserveMediaLibrary: true });
+    await second.goto(reopen.toString());
+    await expect(second.locator('.guide-image-frame img')).toHaveCount(2);
+    await documentCommand(page, page.locator('article#compare'), 'Remove item', 'item');
+    await expect(page.locator('article#compare')).toHaveCount(0);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.locator('.guide-image-frame img')).toHaveCount(2);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    const retentionUrl = new URL(reopen);
+    retentionUrl.searchParams.set('clearHistory', '1');
+    await page.goto(retentionUrl.toString());
+    await expect(page.locator('article#text-only')).toBeVisible();
+    expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
+    await expect(second.locator('.guide-image-frame img')).toHaveCount(2);
+    await expect
+      .poll(() =>
+        second
+          .locator('.guide-image-frame img')
+          .evaluateAll((images) =>
+            images.every(
+              (image) =>
+                image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+            )
+          )
+      )
+      .toBe(true);
+    await page.goto(reopen.toString());
+    await expect(page.locator('article#text-only')).toBeVisible();
+    expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
+    await second.close();
+    await page.goto('about:blank');
+    await page.goto(reopen.toString());
+    await expect(page.locator('article#text-only')).toBeVisible();
+    await expect.poll(() => readProjectAssetCount(page)).toBe(0);
+    await expect(page.locator('article#compare')).toHaveCount(0);
+  } finally {
+    if (!second.isClosed()) await second.close();
+  }
 }
 
-export async function captureSurfaceScreenshot(
-  page: Page,
-  testInfo: TestInfo,
-  theme: ThemeName,
-  viewportName: string,
-  surface: VisualSurfaceCase
-): Promise<void> {
-  await mkdir(testInfo.outputDir, { recursive: true });
-  await page.screenshot({
-    fullPage: true,
-    path: testInfo.outputPath(`${viewportName}-${theme}-${surface.screenshotName}.png`),
+async function readProjectAssetCount(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const id = new URL(location.href).searchParams.get('projectId');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const request = db
+          .transaction('scenario_assets', 'readonly')
+          .objectStore('scenario_assets')
+          .index('projectId')
+          .count(id ?? '');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
   });
 }

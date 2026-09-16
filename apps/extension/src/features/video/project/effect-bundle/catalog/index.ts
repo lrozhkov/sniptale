@@ -18,6 +18,8 @@ interface EffectBundleCatalogAssetReference {
 }
 
 export interface EffectBundleCatalogDocumentEntry {
+  /** Resolved catalog availability; never changes applied project instances. */
+  enabled?: boolean;
   presetPreferences?: EffectPresetPreferences;
   /** Catalog presentation only, never part of an immutable document or stored entry. */
   previewPresetId?: string;

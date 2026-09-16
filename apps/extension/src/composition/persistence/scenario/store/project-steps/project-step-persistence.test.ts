@@ -14,12 +14,11 @@ vi.mock('../../projects', async (importOriginal) => {
   };
 });
 
-import { createScenarioCaptureStep } from '../../../../../features/scenario/project/public';
+import { createGuideStep } from '../../../../../features/scenario/project/public';
 import { createScenarioStoreProjectFixture } from '../test.helpers.ts';
 import {
   deleteScenarioStepFromProject,
   moveScenarioStepInProject,
-  restoreScenarioStepFromProject,
 } from './project-step-persistence';
 
 beforeEach(() => {
@@ -29,15 +28,15 @@ beforeEach(() => {
 });
 
 function createProjectFixture() {
-  const firstStep = createScenarioCaptureStep({ assetId: 'asset-1', title: 'First' });
-  const secondStep = createScenarioCaptureStep({ assetId: 'asset-2', title: 'Second' });
+  const firstStep = createGuideStep('First', 'step-1');
+  const secondStep = createGuideStep('Second', 'step-2');
 
   return {
     firstStep,
     secondStep,
     project: {
       ...createScenarioStoreProjectFixture(),
-      steps: [firstStep, secondStep],
+      items: [firstStep, secondStep],
     },
   };
 }
@@ -48,13 +47,10 @@ async function verifyMutationPersistenceLifecycle() {
 
   const reorderedProject = await moveScenarioStepInProject(project.id, secondStep.id, 0);
   const deletedProject = await deleteScenarioStepFromProject(project.id, firstStep.id);
-  getScenarioProjectMock.mockResolvedValue(deletedProject);
-  const restoredProject = await restoreScenarioStepFromProject(project.id, firstStep.id);
 
-  expect(reorderedProject?.steps.map((step) => step.id)).toEqual([secondStep.id, firstStep.id]);
-  expect(deletedProject?.steps.map((step) => step.id)).toEqual([secondStep.id]);
-  expect(restoredProject?.steps.map((step) => step.id)).toEqual([firstStep.id, secondStep.id]);
-  expect(saveScenarioProjectMock).toHaveBeenCalledTimes(3);
+  expect(reorderedProject?.items.map((step) => step.id)).toEqual([secondStep.id, firstStep.id]);
+  expect(deletedProject?.items.map((step) => step.id)).toEqual([secondStep.id]);
+  expect(saveScenarioProjectMock).toHaveBeenCalledTimes(2);
   expect(saveScenarioProjectMock).toHaveBeenNthCalledWith(
     1,
     expect.objectContaining({ id: project.id }),
@@ -65,40 +61,25 @@ async function verifyMutationPersistenceLifecycle() {
     expect.objectContaining({ id: project.id }),
     { baseUpdatedAt: project.updatedAt }
   );
-  expect(saveScenarioProjectMock).toHaveBeenNthCalledWith(
-    3,
-    expect.objectContaining({ id: project.id }),
-    { baseUpdatedAt: deletedProject?.updatedAt }
-  );
 }
 
 async function verifyNoOpPersistenceLifecycle() {
   const { firstStep, project } = createProjectFixture();
   const deletedProject = {
     ...project,
-    steps: project.steps.slice(1),
-    trash: [
-      {
-        deletedAt: 30,
-        originalIndex: 0,
-        step: firstStep,
-      },
-    ],
+    items: project.items.slice(1),
   };
   getScenarioProjectMock
     .mockResolvedValueOnce(project)
     .mockResolvedValueOnce(deletedProject)
-    .mockResolvedValueOnce(project)
     .mockResolvedValueOnce(undefined);
 
   const untouchedMove = await moveScenarioStepInProject(project.id, firstStep.id, 0);
   const untouchedDelete = await deleteScenarioStepFromProject(project.id, 'missing');
-  const untouchedRestore = await restoreScenarioStepFromProject(project.id, 'missing');
   const missingMove = await moveScenarioStepInProject('missing', firstStep.id, 1);
 
   expect(untouchedMove).toBe(project);
   expect(untouchedDelete).toBe(deletedProject);
-  expect(untouchedRestore).toBe(project);
   expect(missingMove).toBeUndefined();
   expect(saveScenarioProjectMock).not.toHaveBeenCalled();
 }
@@ -135,7 +116,7 @@ function installRevisionCheckedProjectSaveMock(
 }
 
 describe('project step persistence', () => {
-  it('persists delete, restore, and reorder mutations', verifyMutationPersistenceLifecycle);
+  it('persists delete and reorder mutations', verifyMutationPersistenceLifecycle);
   it('skips persistence for no-op and missing-project mutations', verifyNoOpPersistenceLifecycle);
   it(
     'returns persisted revisions for immediate follow-up step mutations',

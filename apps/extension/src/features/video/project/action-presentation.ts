@@ -156,3 +156,21 @@ function resolveReason(
   } else if (preset === 'NONE') return 'preset-none';
   return hasInterval ? null : 'outside-source';
 }
+
+/** Assigns the event kind used when a user chooses an action preset. */
+export function resolveActionKindForPreset(
+  preset: VideoProjectActionPreset
+): VideoProjectActionEvent['kind'] {
+  switch (preset) {
+    case 'SCROLL_EMPHASIS':
+      return 'SCROLL';
+    case 'DWELL_ZOOM':
+      return 'PAUSE';
+    case 'SPOTLIGHT':
+      return 'CALLOUT';
+    case 'NONE':
+    case 'CLICK_PRESS':
+    case 'CLICK_RIPPLE':
+      return 'CLICK';
+  }
+}

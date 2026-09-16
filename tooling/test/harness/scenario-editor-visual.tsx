@@ -1,59 +1,190 @@
+import { GuideLayoutAssistance } from '../../../apps/extension/src/scenario-editor/page-shell/layout-assistance';
+import { saveRecordingTelemetry } from '../../../apps/extension/src/composition/persistence/recordings/telemetry';
+import { saveRecording } from '../../../apps/extension/src/composition/persistence/recordings';
+import {
+  getMediaLibraryEntry,
+  saveScreenshotMediaAsset,
+} from '../../../apps/extension/src/composition/persistence/media-library';
+import { clearScenarioSavedHistory } from '../../../apps/extension/src/composition/persistence/scenario/retention';
 import { createRoot } from 'react-dom/client';
 import { harnessReady } from './browser-mocks/browser-mocks';
+import { ScenarioEditorPage } from '../../../apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage';
 import {
-  createScenarioVisualBaselineAssets,
-  createScenarioVisualBaselineProject,
-  SCENARIO_VISUAL_BASELINE_SLIDE_IDS,
-} from '../../../apps/extension/src/scenario-editor/workspace/visual-baseline/fixtures';
-import { ScenarioV3EditorShell } from '../../../apps/extension/src/scenario-editor/page-shell';
+  createGuideProject,
+  createGuideStep,
+  createGuideImageBlock,
+  createGuideParagraphs,
+} from '../../../apps/extension/src/features/scenario/project/public';
 import { commitScenarioAggregateMutation } from '../../../apps/extension/src/composition/persistence/scenario/aggregate-mutations';
-import {
-  initializeAppTheme,
-  type AppThemePreference,
-} from '../../../apps/extension/src/ui/theme/index';
+import { getScenarioProject } from '../../../apps/extension/src/composition/persistence/scenario/projects';
+import { createScenarioAssetEntryFromBlob } from '../../../apps/extension/src/composition/persistence/scenario/store/capture-step/asset-entry';
+import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
+import { setLocalePreference } from '../../../apps/extension/src/platform/i18n';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
 
-const DEFAULT_SLIDE_ID = SCENARIO_VISUAL_BASELINE_SLIDE_IDS.capturedApp;
-
-function readThemePreference(): AppThemePreference {
-  const theme = new URLSearchParams(window.location.search).get('theme');
-  return theme === 'dark' || theme === 'light' ? theme : 'light';
-}
-
-function readInitialSlideId(): string {
-  return new URLSearchParams(window.location.search).get('slide') ?? DEFAULT_SLIDE_ID;
-}
-
-function applyHarnessDocumentStyles(): void {
-  document.documentElement.style.width = '100%';
-  document.documentElement.style.height = '100%';
-  document.body.style.width = '100%';
-  document.body.style.height = '100%';
-  document.body.style.margin = '0';
-  document.getElementById('root')?.style.setProperty('height', '100%');
-}
-
-async function mountScenarioEditorVisualHarness(): Promise<void> {
-  await harnessReady;
-  applyHarnessDocumentStyles();
-  initializeAppTheme(readThemePreference());
-
-  const project = createScenarioVisualBaselineProject();
-  const committed = await commitScenarioAggregateMutation(project, {
-    children: { assetPuts: createScenarioVisualBaselineAssets(project.id) },
-  });
-
-  createRoot(document.getElementById('root')!).render(
-    <ScenarioV3EditorShell
-      initialSlideId={readInitialSlideId()}
-      project={committed.project}
-      onProjectChange={() => undefined}
-    />
+async function createFixtureImage(): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 960;
+  canvas.height = 540;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Visual fixture canvas is unavailable');
+  context.fillStyle = '#e8eef5';
+  context.fillRect(0, 0, 960, 540);
+  context.fillStyle = '#15263d';
+  context.fillRect(40, 40, 880, 80);
+  context.fillStyle = '#ffffff';
+  context.font = '28px sans-serif';
+  context.fillText('Local guide screenshot', 64, 92);
+  context.fillStyle = '#3672ce';
+  context.fillRect(64, 170, 330, 220);
+  context.fillStyle = '#ffffff';
+  context.fillRect(430, 170, 450, 220);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Fixture image encoding failed'))),
+      'image/png'
+    )
   );
 }
 
-void mountScenarioEditorVisualHarness();
+async function seedGuide(projectId: string): Promise<void> {
+  if (await getScenarioProject(projectId)) return;
+  const project = createGuideProject('Local step guide', projectId);
+  const { assetEntry } = await createScenarioAssetEntryFromBlob({
+    blob: await createFixtureImage(),
+    projectId,
+  });
+  const step = createGuideStep('Compare two images', 'compare');
+  step.blocks = [
+    {
+      kind: 'text',
+      id: 'description',
+      paragraphs: createGuideParagraphs(
+        'Two images belong to this one step.\nKeep the explanation with the screenshots.'
+      ),
+    },
+    ...['before', 'after'].map((id) => ({
+      ...createGuideImageBlock({
+        id,
+        assetId: assetEntry.id,
+        width: 960,
+        height: 540,
+        source: { kind: 'import', filename: 'example.png' },
+      }),
+      alt: `${id} screenshot`,
+      caption: id,
+    })),
+  ];
+  project.items = [
+    {
+      kind: 'section',
+      id: 'intro',
+      title: 'Introduction',
+      paragraphs: createGuideParagraphs('A guide built and stored locally.'),
+    },
+    step,
+    createGuideStep('Text-only step', 'text-only'),
+  ];
+  await commitScenarioAggregateMutation(project, { children: { assetPuts: [assetEntry] } });
+}
+
+async function mountGuideHarness(): Promise<void> {
+  await harnessReady;
+  if (!(await getMediaLibraryEntry('guide-visual-library-image'))) {
+    await saveScreenshotMediaAsset({
+      id: 'guide-visual-library-image',
+      filename: 'Library screenshot.png',
+      blob: await createFixtureImage(),
+    });
+  }
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('videoFixture') === '1' && !(await getMediaLibraryEntry('guide-preview-video'))) {
+    await saveRecording('guide-preview-video', await createFixtureVideo(), 'Library motion.webm');
+  }
+  if (params.get('actionFixture') === '1')
+    await saveRecordingTelemetry({
+      recordingId: 'guide-preview-video',
+      createdAt: 1,
+      updatedAt: 1,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: null,
+      signals: [],
+      actionEvents: [
+        {
+          id: 'fixture-click',
+          kind: 'CLICK',
+          time: 1.2,
+          duration: 0.45,
+          point: null,
+          recordingPoint: { x: 0.25, y: 0.5 },
+          label: 'Open settings',
+          data: { targetName: 'Open settings', targetTag: 'button' },
+          preset: 'NONE',
+        },
+        {
+          id: 'fixture-key',
+          kind: 'KEY',
+          time: 0.2,
+          duration: 0.5,
+          point: null,
+          label: 'Ctrl + K',
+          data: {},
+          preset: 'NONE',
+        },
+      ],
+    });
+  initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
+  await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
+  const projectId = params.get('projectId') ?? 'guide-visual';
+  await seedGuide(projectId);
+  if (params.get('clearHistory') === '1') {
+    const project = await getScenarioProject(projectId);
+    if (!project) throw new Error('Missing retention fixture');
+    await clearScenarioSavedHistory(projectId, project.updatedAt);
+    params.delete('clearHistory');
+  }
+  params.set('projectId', projectId);
+  window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
+  const root = document.getElementById('root');
+  if (!root) throw new Error('Missing guide harness root');
+  createRoot(root).render(
+    <GuideLayoutAssistance>
+      <ScenarioEditorPage />
+    </GuideLayoutAssistance>
+  );
+}
+
+void mountGuideHarness();
+
+async function createFixtureVideo(): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 180;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Video fixture canvas unavailable');
+  const stream = canvas.captureStream(20);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+  const chunks: Blob[] = [];
+  let frame = 0;
+  const timer = setInterval(() => {
+    context.fillStyle = frame++ < 15 ? '#cc3344' : '#2266dd';
+    context.fillRect(0, 0, 320, 180);
+  }, 50);
+  try {
+    return await new Promise((resolve, reject) => {
+      recorder.ondataavailable = (event) => chunks.push(event.data);
+      recorder.onerror = () => reject(new Error('Video fixture recording failed'));
+      recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType }));
+      recorder.start();
+      setTimeout(() => recorder.stop(), 1800);
+    });
+  } finally {
+    clearInterval(timer);
+    stream.getTracks().forEach((track) => track.stop());
+  }
+}

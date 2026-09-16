@@ -2,6 +2,8 @@ import { expect, it } from 'vitest';
 
 import {
   assertSafeScenarioAssetStorageInput,
+  assertSafeScenarioAssetStorageMetadata,
+  isSafeScenarioAssetAudioMimeType,
   isSafeScenarioAssetImageMimeType,
 } from './asset-policy';
 
@@ -26,4 +28,20 @@ it('rejects unsafe scenario asset storage input at the DB boundary', () => {
   expect(() =>
     assertSafeScenarioAssetStorageInput(new Blob([], { type: 'image/png' }), 'image/png')
   ).toThrow('Scenario asset exceeds storage size limit.');
+});
+
+it('bounds narration bytes separately without admitting audio as a capture image', () => {
+  expect(isSafeScenarioAssetAudioMimeType('audio/webm;codecs=opus')).toBe(true);
+  expect(isSafeScenarioAssetImageMimeType('audio/webm')).toBe(false);
+  expect(() =>
+    assertSafeScenarioAssetStorageMetadata(256 * 1024 * 1024, 'audio/webm')
+  ).not.toThrow();
+  expect(() =>
+    assertSafeScenarioAssetStorageMetadata(256 * 1024 * 1024 + 1, 'audio/webm')
+  ).toThrow();
+  expect(() => assertSafeScenarioAssetStorageMetadata(64 * 1024 * 1024 + 1, 'image/png')).toThrow();
+  for (const size of [0, -1, NaN, Infinity, 1.5]) {
+    expect(() => assertSafeScenarioAssetStorageMetadata(size, 'audio/webm')).toThrow();
+  }
+  expect(() => assertSafeScenarioAssetStorageMetadata(1, 'audio/unknown')).toThrow();
 });

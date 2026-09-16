@@ -1,17 +1,17 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { ensureScenarioCaptureProjectMock, saveScenarioCaptureSlideToProjectMock } = vi.hoisted(
+const { ensureScenarioCaptureProjectMock, saveScenarioCaptureStepToProjectMock } = vi.hoisted(
   () => ({
     ensureScenarioCaptureProjectMock: vi.fn(async () => ({
       id: 'project-auto',
       name: 'Auto project',
     })),
-    saveScenarioCaptureSlideToProjectMock: vi.fn(),
+    saveScenarioCaptureStepToProjectMock: vi.fn(),
   })
 );
 
-vi.mock('../../../../composition/persistence/scenario/store/v3', () => ({
-  saveScenarioCaptureSlideToProject: saveScenarioCaptureSlideToProjectMock,
+vi.mock('../../../../composition/persistence/scenario/store/capture-step', () => ({
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
 }));
 
 vi.mock('../../../scenario/router/project-selection', () => ({
@@ -30,7 +30,7 @@ import {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  saveScenarioCaptureSlideToProjectMock.mockResolvedValue(undefined);
+  saveScenarioCaptureStepToProjectMock.mockResolvedValue(undefined);
 });
 
 it('auto-creates a project and saves the first capture without an active project', async () => {
@@ -52,7 +52,7 @@ it('auto-creates a project and saves the first capture without an active project
       tabId: 7,
     })
   );
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-auto',
       dataUrl: 'data:image/png;base64,buffer',
@@ -95,7 +95,7 @@ async function expectAutoCreateWhileWaitingForSelection() {
   });
 
   expect(waitingService.bufferPendingCapture).not.toHaveBeenCalled();
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({ projectId: 'project-auto' })
   );
 }
@@ -118,16 +118,16 @@ async function expectAutoCreateWhenPendingCaptureExists() {
   });
 
   expect(existingBufferService.bufferPendingCapture).not.toHaveBeenCalled();
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({ projectId: 'project-auto' })
   );
 }
 
 it('skips capture only when scenario mode is disabled, and otherwise auto-creates a project', async () => {
   await expectNoBufferingForDisabledSession();
-  saveScenarioCaptureSlideToProjectMock.mockClear();
+  saveScenarioCaptureStepToProjectMock.mockClear();
   await expectAutoCreateWhileWaitingForSelection();
-  saveScenarioCaptureSlideToProjectMock.mockClear();
+  saveScenarioCaptureStepToProjectMock.mockClear();
   await expectAutoCreateWhenPendingCaptureExists();
 });
 
@@ -150,7 +150,7 @@ it('persists directly into the active project when the session already has one',
     scenarioSessionService,
   });
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-1',
       dataUrl: 'data:image/png;base64,ready',
@@ -173,7 +173,7 @@ async function expectBufferedMetadataNormalization() {
     scenarioSessionService: bufferService,
   });
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-auto',
       captureSurface: 'full',
@@ -203,7 +203,7 @@ async function expectSavedMetadataNormalization() {
     scenarioSessionService: saveService,
   });
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-10',
       captureSurface: 'full',
@@ -229,7 +229,7 @@ it('returns early when the capture did not include scenario metadata', async () 
   });
 
   expect(scenarioSessionService.getSession).not.toHaveBeenCalled();
-  expect(saveScenarioCaptureSlideToProjectMock).not.toHaveBeenCalled();
+  expect(saveScenarioCaptureStepToProjectMock).not.toHaveBeenCalled();
 });
 
 it('returns early when project auto-selection does not yield an id', async () => {
@@ -247,6 +247,6 @@ it('returns early when project auto-selection does not yield an id', async () =>
     scenarioSessionService,
   });
 
-  expect(saveScenarioCaptureSlideToProjectMock).not.toHaveBeenCalled();
+  expect(saveScenarioCaptureStepToProjectMock).not.toHaveBeenCalled();
   expect(scenarioSessionService.bumpProjectRevision).not.toHaveBeenCalled();
 });

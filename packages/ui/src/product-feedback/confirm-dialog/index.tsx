@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ProductModal,
   ProductModalBody,
@@ -142,6 +142,7 @@ function renderProductConfirmDialogModal(props: {
   isLoading: boolean;
   message: ReactNode;
   title: ReactNode;
+  titleId: string;
 }) {
   return (
     <ProductModal
@@ -149,6 +150,7 @@ function renderProductConfirmDialogModal(props: {
       closeOnBackdrop={!props.isLoading}
       onClose={props.handleCancel}
       role="alertdialog"
+      labelledBy={props.titleId}
       width="min(440px, calc(100vw - 32px))"
       {...(props.backdropClassName === undefined
         ? {}
@@ -156,7 +158,11 @@ function renderProductConfirmDialogModal(props: {
     >
       <ProductModalHeader
         compact
-        title={<span className="sniptale-confirm-title">{props.title}</span>}
+        title={
+          <span id={props.titleId} className="sniptale-confirm-title">
+            {props.title}
+          </span>
+        }
         onClose={props.handleCancel}
         disabled={props.isLoading}
       />
@@ -174,6 +180,50 @@ function renderProductConfirmDialogModal(props: {
       })}
     </ProductModal>
   );
+}
+
+function useConfirmationFocus(isOpen: boolean, onCancel: () => void) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cancelRef = useRef(onCancel);
+  cancelRef.current = onCancel;
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const dialog = containerRef.current?.querySelector<HTMLElement>('[role="alertdialog"]');
+    if (!dialog) return;
+    const root = dialog.getRootNode();
+    const focusRoot = root instanceof ShadowRoot ? root : dialog.ownerDocument;
+    const previous = focusRoot.activeElement;
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.tabIndex = -1;
+    const buttons = () => [...dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])')];
+    (
+      dialog.querySelector<HTMLButtonElement>('.sniptale-confirm-actions button:not([disabled])') ??
+      dialog
+    ).focus({ preventScroll: true });
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!dialog.contains(focusRoot.activeElement)) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        cancelRef.current();
+      } else if (event.key === 'Tab') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const targets = buttons();
+        const active = focusRoot.activeElement;
+        const index = targets.findIndex((target) => target === active);
+        const next = (index + (event.shiftKey ? -1 : 1) + targets.length) % targets.length;
+        (targets[next] ?? dialog).focus({ preventScroll: true });
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus({ preventScroll: true });
+    };
+  }, [isOpen]);
+  return containerRef;
 }
 
 export function ProductConfirmDialog({
@@ -197,21 +247,29 @@ export function ProductConfirmDialog({
     ...(onConfirm === undefined ? {} : { onConfirm }),
   });
 
+  const titleId = useId();
+  const containerRef = useConfirmationFocus(isOpen, handleCancel);
+
   if (!isOpen) {
     return null;
   }
 
-  return renderProductConfirmDialogModal({
-    cancelText,
-    confirmText,
-    dialogClassName: resolvedDialogClassName,
-    handleCancel,
-    handleConfirm,
-    isLoading: resolvedIsLoading,
-    message,
-    title,
-    ...(resolvedBackdropClassName === undefined
-      ? {}
-      : { backdropClassName: resolvedBackdropClassName }),
-  });
+  return (
+    <div ref={containerRef} style={{ display: 'contents' }}>
+      {renderProductConfirmDialogModal({
+        cancelText,
+        confirmText,
+        dialogClassName: resolvedDialogClassName,
+        handleCancel,
+        handleConfirm,
+        isLoading: resolvedIsLoading,
+        message,
+        title,
+        titleId,
+        ...(resolvedBackdropClassName === undefined
+          ? {}
+          : { backdropClassName: resolvedBackdropClassName }),
+      })}
+    </div>
+  );
 }

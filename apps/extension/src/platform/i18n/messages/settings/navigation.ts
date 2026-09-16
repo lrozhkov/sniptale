@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const settingsNavigationMessages = defineMessageSource({
+  scenarioLayouts: { ru: 'Макеты сценария', en: 'Scenario layouts' },
   videoEffects: { ru: 'Эффекты видеоредактора', en: 'Video editor effects' },
   groups: {
     general: {
@@ -73,6 +74,10 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Import and export',
   },
   descriptions: {
+    scenarioLayouts: {
+      ru: 'Создавайте и редактируйте макеты шагов с текстом и изображениями.',
+      en: 'Create and edit step layouts with text and images.',
+    },
     videoEffects: {
       ru: 'Каталог эффектов, импорт и управление',
       en: 'Effect catalog, import and management',

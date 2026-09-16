@@ -44,17 +44,29 @@ beforeEach(() => {
 async function verifyProjectCrudLifecycle() {
   const project = createScenarioStoreProjectFixture();
   listScenarioProjectsMock.mockResolvedValue([
-    { id: 'project-1', name: 'Scenario', createdAt: 10, updatedAt: 20 },
+    {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Scenario',
+      createdAt: 10,
+      updatedAt: 20,
+    },
   ]);
   getScenarioProjectMock.mockResolvedValue(project);
 
   await expect(createScenarioProjectRecord('Scenario')).resolves.toEqual(
-    expect.objectContaining({ name: 'Scenario', steps: [] })
+    expect.objectContaining({ name: 'Scenario', version: 4, items: [] })
   );
   await expect(getScenarioProjectRecord('project-1')).resolves.toEqual(project);
   await expect(saveScenarioProjectRecord(project)).resolves.toEqual(project);
   await expect(listScenarioProjectSummaries()).resolves.toEqual([
-    { id: 'project-1', name: 'Scenario', createdAt: 10, updatedAt: 20 },
+    {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Scenario',
+      createdAt: 10,
+      updatedAt: 20,
+    },
   ]);
 
   expect(saveScenarioProjectMock).toHaveBeenCalled();
@@ -181,4 +193,14 @@ describe('project records store', () => {
     'returns persisted revisions for immediate follow-up project saves',
     verifyMetadataReturnsPersistedRevisionForFollowUpSave
   );
+});
+
+it('excludes templates from ordinary gallery and capture project selection', async () => {
+  const normal = { id: 'guide', name: 'Guide', availability: 'available' };
+  listScenarioProjectsMock.mockResolvedValue([
+    normal,
+    { id: 'template', name: 'Template', purpose: 'step-template', availability: 'available' },
+    { id: 'broken-template', name: 'Broken', purpose: 'step-template', availability: 'invalid' },
+  ]);
+  await expect(listScenarioProjectSummaries()).resolves.toEqual([normal]);
 });
