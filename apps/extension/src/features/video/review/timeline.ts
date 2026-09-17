@@ -9,6 +9,19 @@ interface ReviewTimeSegment {
   rate: number;
 }
 
+/**
+ * One conversion authority for playhead, action markers, snapping, preview, and export.
+ * `source` coordinates the original media (persisted ReviewEdit boundaries); `timeline`
+ * coordinates the resulting sequence after cuts and speed changes. Removed source points
+ * convert to null; timeline times resolve through visible segments only.
+ */
+interface ReviewTimeMap {
+  sourceToTimeline(source: number): number | null;
+  timelineToSource(time: number): number | null;
+  getDuration(): number;
+  getSegments(): readonly ReviewTimeSegment[];
+}
+
 /** Single source-time lane; removed spans retain their source width and have zero result duration. */
 export function buildReviewTimeMap(
   duration: number,
@@ -46,6 +59,26 @@ export function buildReviewTimeMap(
   }
   append(duration, 'keep', 1);
   return segments;
+}
+
+/** Wraps the segment builder in the shared conversion API for every timeline-time consumer. */
+export function createReviewTimeMap(duration: number, edits: readonly ReviewEdit[]): ReviewTimeMap {
+  const segments = buildReviewTimeMap(duration, edits);
+  const duration_ = segments.at(-1)?.resultEnd ?? 0;
+  return {
+    sourceToTimeline: (source) => sourceToReviewResult(source, segments),
+    timelineToSource: (time) => {
+      const last = segments.at(-1);
+      if (last && time === last.resultEnd) return last.sourceEnd;
+      const segment = segments.find(
+        (part) => part.kind !== 'cut' && time >= part.resultStart && time < part.resultEnd
+      );
+      if (!segment) return null;
+      return segment.sourceStart + (time - segment.resultStart) * segment.rate;
+    },
+    getDuration: () => duration_,
+    getSegments: () => segments,
+  };
 }
 
 /** A removed source point has no result time; the final source endpoint maps to result duration. */

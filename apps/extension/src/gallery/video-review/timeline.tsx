@@ -5,7 +5,7 @@ import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { reviewEventLabel, reviewTimeLabel } from './controls';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
   duration: number;
@@ -74,7 +74,7 @@ export function ReviewTimeline(props: TimelineProps) {
     >
       <ReviewToolbar
         {...props}
-        resultDuration={buildReviewTimeMap(props.duration, props.edits ?? []).at(-1)!.resultEnd}
+        resultDuration={createReviewTimeMap(props.duration, props.edits ?? []).getDuration()}
         zoom={zoom}
         onZoom={setZoom}
       />
