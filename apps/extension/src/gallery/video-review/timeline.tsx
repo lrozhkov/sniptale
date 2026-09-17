@@ -1,10 +1,12 @@
 import { ReviewRuler, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import { reviewEventLabel, reviewTimeLabel } from './controls';
+import { ReviewTelemetryStrip } from './timeline-telemetry';
+import { useReviewTimelinePlaneDrag } from './timeline-drag';
+import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
@@ -22,6 +24,7 @@ type TimelineProps = {
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void;
   onEdit?(edit: ReviewEdit): void;
   markers: readonly ReviewTelemetryMarker[];
+  selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
   onSeek(time: number, snap?: boolean): void;
   onSelect(value: ReviewAnchor): void;
   onPlay(): void;
@@ -33,31 +36,7 @@ const percent = (time: number, duration: number) => `${(time / duration) * 100}%
 export function ReviewTimeline(props: TimelineProps) {
   const [zoom, setZoom] = useState(1);
   const viewport = useRef<HTMLDivElement>(null);
-  const plane = useRef<HTMLDivElement>(null);
-  const drag = useRef<{
-    start: number;
-    x: number;
-    range: ReviewAnchor | null;
-    selection: ReviewAnchor;
-    time: number;
-    pointerId: number;
-  } | null>(null);
   const [width, setWidth] = useState(640);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      const current = drag.current;
-      if (event.key !== 'Escape' || !current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      drag.current = null;
-      if (plane.current?.hasPointerCapture(current.pointerId))
-        plane.current.releasePointerCapture(current.pointerId);
-      props.onSeek(current.time, false);
-      props.onSelect(current.selection);
-    };
-    window.addEventListener('keydown', cancel, true);
-    return () => window.removeEventListener('keydown', cancel, true);
-  });
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
@@ -67,6 +46,7 @@ export function ReviewTimeline(props: TimelineProps) {
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
+  const plane = useReviewTimelinePlaneDrag(props);
   return (
     <section
       data-ui="gallery.videoReview.timeline"
@@ -84,7 +64,7 @@ export function ReviewTimeline(props: TimelineProps) {
         className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
       >
         <div
-          ref={plane}
+          ref={plane.plane}
           data-ui="gallery.videoReview.timePlane"
           role="slider"
           tabIndex={0}
@@ -96,71 +76,21 @@ export function ReviewTimeline(props: TimelineProps) {
           className="relative cursor-crosshair pb-4 pt-1 outline-none focus-visible:ring-1
               focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)]"
           style={{ width: Math.max(1, width * zoom) }}
-          onPointerDown={(event) => {
-            if (
-              event.button !== 0 ||
-              (event.target instanceof Element && event.target.closest('button'))
-            )
-              return;
-            const bounds = event.currentTarget.getBoundingClientRect();
-            const time = Math.max(
-              0,
-              Math.min(
-                props.duration,
-                ((event.clientX - bounds.left) / bounds.width) * props.duration
-              )
-            );
-            drag.current = {
-              start: time,
-              x: event.clientX,
-              range: null,
-              selection: props.selection,
-              time: props.time,
-              pointerId: event.pointerId,
-            };
-            event.currentTarget.setPointerCapture(event.pointerId);
-            props.onSeek(time);
-            if (
-              props.selection.kind !== 'range' ||
-              time < props.selection.start ||
-              time > props.selection.end
-            )
-              props.onSelect({ kind: 'point', time });
-          }}
-          onPointerMove={(event) => {
-            const current = drag.current;
-            if (!current || Math.abs(event.clientX - current.x) < 4) return;
-            const bounds = event.currentTarget.getBoundingClientRect();
-            const time = Math.max(
-              0,
-              Math.min(
-                props.duration,
-                ((event.clientX - bounds.left) / bounds.width) * props.duration
-              )
-            );
-            current.range = {
-              kind: 'range',
-              start: Math.min(current.start, time),
-              end: Math.max(current.start, time),
-            };
-            props.onSelect(current.range);
-          }}
-          onPointerUp={(event) => {
-            const current = drag.current;
-            drag.current = null;
-            if (event.currentTarget.hasPointerCapture(event.pointerId))
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            if (current?.range) props.onRangeCommit?.(current.range);
-          }}
-          onPointerCancel={() => {
-            drag.current = null;
-          }}
+          onPointerDown={plane.onPointerDown}
+          onPointerMove={plane.onPointerMove}
+          onPointerUp={plane.onPointerUp}
+          onPointerCancel={plane.onPointerCancel}
         >
           {props.markers.length ? (
             <ReviewTelemetryStrip
               markers={props.markers}
               duration={props.duration}
+              time={props.time}
+              width={width}
               zoom={zoom}
+              {...(props.selectedTelemetryRef
+                ? { selectedTelemetryRef: props.selectedTelemetryRef }
+                : {})}
               onMarker={props.onMarker}
             />
           ) : null}
@@ -182,46 +112,5 @@ export function ReviewTimeline(props: TimelineProps) {
         </div>
       </div>
     </section>
-  );
-}
-
-/** Recorded cursor samples are grouped for display; full telemetry remains in the report. */
-function ReviewTelemetryStrip(
-  props: Pick<TimelineProps, 'markers' | 'duration' | 'onMarker'> & { zoom: number }
-) {
-  const markers = useMemo(() => {
-    const occupied = new Set<number>();
-    return props.markers.filter((marker) => {
-      if (marker.ref.kind !== 'cursor') return true;
-      const bucket = Math.floor((marker.start / props.duration) * 120 * props.zoom);
-      if (occupied.has(bucket)) return false;
-      occupied.add(bucket);
-      return true;
-    });
-  }, [props.markers, props.duration, props.zoom]);
-  return (
-    <div className="relative mb-1 h-5">
-      {markers.map((marker) => (
-        <button
-          key={`${marker.ref.kind}:${marker.ref.id}`}
-          type="button"
-          aria-label={[
-            translate('gallery.videoReview.telemetry'),
-            reviewEventLabel(marker.eventType),
-            reviewTimeLabel(marker.start),
-          ].join(' · ')}
-          title={`${reviewEventLabel(marker.eventType)} · ${reviewTimeLabel(marker.start)}`}
-          onClick={() => props.onMarker(marker)}
-          className="absolute top-1 h-2.5 min-w-1.5 -translate-x-1/2 rounded-sm border
-          border-[var(--sniptale-color-border-accent-strong)]
-          bg-[var(--sniptale-color-accent-soft)]"
-          style={{
-            left: percent(marker.start, props.duration),
-            width:
-              marker.end > marker.start ? percent(marker.end - marker.start, props.duration) : 6,
-          }}
-        />
-      ))}
-    </div>
   );
 }

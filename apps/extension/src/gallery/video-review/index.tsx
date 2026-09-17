@@ -478,6 +478,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     setPlaying,
     selection,
     setSelection,
+    selected,
     telemetry,
     setTelemetry,
     busy,
@@ -596,6 +597,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           onEdit={editing.select}
           annotations={snapshot.document.annotations}
           markers={telemetry ? projected.markers : []}
+          {...(selected?.telemetryRef ? { selectedTelemetryRef: selected.telemetryRef } : {})}
           onSeek={seek}
           onSelect={setSelection}
           onPlay={play}

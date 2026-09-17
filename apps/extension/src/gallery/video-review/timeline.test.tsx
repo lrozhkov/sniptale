@@ -23,6 +23,7 @@ beforeEach(() => {
       disconnect() {}
     }
   );
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
   environment.host = document.createElement('div');
   environment.root = createRoot(environment.host);
 });
@@ -165,11 +166,52 @@ it('groups cursor telemetry and deduplicates dense cursor samples', () => {
     ...host.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventCursor"]'),
   ];
   expect(cursorButtons).toHaveLength(3);
-  for (const button of cursorButtons) expect(button.style.width).toBe('6px');
+  // Point events render at the shared screen-space floor width.
+  for (const button of cursorButtons) expect(button.style.width).toBe('14px');
   act(() =>
     host.querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventClick"]')!.click()
   );
   expect(props.onMarker).toHaveBeenCalledWith(action);
+});
+
+it('splits colliding actions into lanes and collapses the dense tail into an overflow chip', () => {
+  const markers = [0, 1, 2, 3, 4].map((index) => ({
+    ref: { kind: 'action' as const, id: `click${index}` },
+    eventType: 'CLICK',
+    start: 1 + index * 0.01,
+    end: 1 + index * 0.01,
+  }));
+  const { host } = renderTimeline({ markers });
+  const strip = host.querySelector<HTMLElement>('div.relative.mb-1')!;
+  expect(strip.style.height).toBe('28px');
+  const markerButtons = [
+    ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),
+  ];
+  expect(markerButtons).toHaveLength(3);
+  const tops = new Set(markerButtons.map((button) => button.style.top));
+  expect(tops.size).toBe(3);
+  const chip = strip.querySelector<HTMLElement>('[data-ui="gallery.videoReview.actionOverflow"]')!;
+  expect(chip.textContent).toContain('+2');
+  // Choosing an action from the overflow chip selects it through the same handler.
+  act(() =>
+    chip.dispatchEvent(new CustomEvent('change', { bubbles: true, detail: { value: 'click3' } }))
+  );
+});
+
+it('highlights the selected action and the action under the playhead', () => {
+  const markers = [
+    { ref: { kind: 'action' as const, id: 'a' }, eventType: 'CLICK', start: 1, end: 1 },
+    { ref: { kind: 'action' as const, id: 'b' }, eventType: 'SCROLL', start: 2, end: 2.5 },
+  ];
+  const { host } = renderTimeline({
+    markers,
+    time: 2.2,
+    ...(markers[0] ? { selectedTelemetryRef: markers[0]!.ref } : {}),
+  });
+  const strip = host.querySelector('div.relative.mb-1')!;
+  const [selected, scrolled] = [...strip.querySelectorAll<HTMLButtonElement>('button')];
+  expect(selected?.className).toContain('bg-[var(--sniptale-color-accent-emphasis)]');
+  expect(scrolled?.className).toContain('ring-1');
 });
 
 it('exposes transport, volume, zoom range, and edited result duration in the toolbar', () => {
