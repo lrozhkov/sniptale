@@ -559,6 +559,46 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
   }
 });
 
+it('creates a zoom region from the playhead, edits it in the inspector, and persists it', async () => {
+  const fixture = createEditorFixture();
+  const { root, click } = fixture;
+  try {
+    await act(async () =>
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await click('advancedEditing');
+    await click('zoomTrack');
+    expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(1);
+    expect(fixture.snapshot.workspace.advanced.zoom.enabled).toBe(true);
+    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]).toMatchObject({
+      start: 0,
+      end: 2,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+    });
+    const inspector = document.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')!;
+    expect(inspector).not.toBeNull();
+    const scale = inspector.querySelector<HTMLInputElement>(
+      '[aria-label="gallery.videoReview.zoomScale"]'
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(scale, '2');
+      scale.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]!.transform.scale).toBe(2);
+    // Track visibility is layout-only: basic mode hides the lane and keeps the saved region.
+    await click('advancedEditing');
+    expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]!.transform.scale).toBe(2);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
 it('ignores the comment shortcut while report copying disables the comment control', async () => {
   const fixture = createEditorFixture();
   let finish!: () => void;

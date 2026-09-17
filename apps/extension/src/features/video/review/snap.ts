@@ -1,16 +1,25 @@
 import type { ReviewEdit } from './types';
+import type { QuickEditZoomRegion } from './advanced/types';
 
 /** Magnet reach in plane pixels; the seconds threshold is derived from the plane width. */
 export const SNAP_THRESHOLD_PX = 8;
 
-/** Magnet targets for boundary drags: media cut boundaries, every edit edge, and the playhead. */
+/**
+ * Magnet targets for boundary drags: media cut boundaries, every edit edge,
+ * neighboring zoom boundaries, and the playhead.
+ */
 export function getSnapCandidates(source: {
   edits: readonly ReviewEdit[];
   playhead: number;
   boundaries?: readonly number[];
+  zoomRegions?: readonly QuickEditZoomRegion[];
 }): number[] {
   const values = new Set<number>();
   for (const value of source.boundaries ?? []) values.add(value);
+  for (const region of source.zoomRegions ?? []) {
+    values.add(region.start);
+    values.add(region.end);
+  }
   for (const edit of source.edits) {
     values.add(edit.start);
     values.add(edit.end);

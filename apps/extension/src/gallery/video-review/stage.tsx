@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
-import {
-  fitVideoRect,
-  normalizeVideoPoint,
-  projectVideoRegion,
-  regionFromPoints,
-} from '../../features/video/review/geometry';
+import { fitVideoRect, projectVideoRegion } from '../../features/video/review/geometry';
 import type { ReviewRegion, ReviewSource } from '../../features/video/review/types';
+import {
+  computeQuickEditSceneLayout,
+  quickEditCanvasPointToContent,
+} from '../../features/video/review/advanced/scene';
+import type {
+  QuickEditBackgroundSettings,
+  QuickEditCameraTransform,
+} from '../../features/video/review/advanced/types';
+import { useReviewDrawingPlane } from './stage-drawing';
 
 /** Draws in the oriented image plane, never in the player's letterbox margins. */
 export function ReviewStage(props: {
@@ -15,6 +19,11 @@ export function ReviewStage(props: {
   video: RefObject<HTMLVideoElement | null>;
   drawing: boolean;
   region: ReviewRegion | undefined;
+  zoom?: {
+    camera: QuickEditCameraTransform;
+    background: QuickEditBackgroundSettings;
+    onDrag(point: { x: number; y: number }): void;
+  };
   onRegion(value: ReviewRegion): void;
   onReady(): void;
   onTime(time: number): void;
@@ -22,10 +31,8 @@ export function ReviewStage(props: {
   onError(): void;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const start = useRef<{ x: number; y: number } | null>(null);
-  const moving = useRef<ReviewRegion | null>(null);
+  const zoomDrag = useRef<{ origin: { x: number; y: number }; pointerId: number } | null>(null);
   const [size, setSize] = useState({ width: 1, height: 1 });
-  const [drag, setDrag] = useState<ReviewRegion | null>(null);
   useEffect(() => {
     const node = host.current;
     if (!node) return;
@@ -37,36 +44,47 @@ export function ReviewStage(props: {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    if (!props.drawing) {
-      start.current = null;
-      setDrag(null);
-    }
-  }, [props.drawing]);
-  const content = fitVideoRect(size, props.source);
-  const region = drag ?? props.region;
-  const projected = region ? projectVideoRegion(region, content) : null;
-  const nextRegion = (end: { x: number; y: number }) => {
-    if (!start.current) return null;
-    const original = moving.current;
-    return original
-      ? {
-          ...original,
-          x: Math.max(0, Math.min(1 - original.width, original.x + end.x - start.current.x)),
-          y: Math.max(0, Math.min(1 - original.height, original.y + end.y - start.current.y)),
-        }
-      : regionFromPoints(start.current, end);
-  };
-  useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        start.current = null;
-        moving.current = null;
-        setDrag(null);
+      if (event.key === 'Escape' && zoomDrag.current) {
+        const origin = zoomDrag.current.origin;
+        zoomDrag.current = null;
+        props.zoom?.onDrag(origin);
       }
     };
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
-  }, []);
+  });
+  const content = fitVideoRect(size, props.source);
+  const plane = useReviewDrawingPlane({
+    drawing: props.drawing,
+    content,
+    region: props.region,
+    onRegion: props.onRegion,
+    pause: () => props.video.current?.pause(),
+  });
+  const projected = plane.drag
+    ? projectVideoRegion(plane.drag, content)
+    : props.region
+      ? projectVideoRegion(props.region, content)
+      : null;
+  const zoomLayout = props.zoom
+    ? computeQuickEditSceneLayout({
+        output: size,
+        source: props.source,
+        background: props.zoom.background,
+        camera: props.zoom.camera,
+      })
+    : null;
+  const zoomFocus = zoomLayout
+    ? {
+        x:
+          zoomLayout.videoTransform.x +
+          props.zoom!.camera.centerX * zoomLayout.videoTransform.width,
+        y:
+          zoomLayout.videoTransform.y +
+          props.zoom!.camera.centerY * zoomLayout.videoTransform.height,
+      }
+    : null;
   return (
     <div
       ref={host}
@@ -76,71 +94,10 @@ export function ReviewStage(props: {
         cursor: props.drawing ? 'crosshair' : 'default',
         touchAction: props.drawing ? 'none' : 'auto',
       }}
-      onPointerDown={(event) => {
-        if (!props.drawing || event.button !== 0) return;
-        const bounds = event.currentTarget.getBoundingClientRect();
-        start.current = normalizeVideoPoint(
-          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-          content
-        );
-        moving.current = null;
-        const target = event.target;
-        const corner =
-          target instanceof Element
-            ? target.closest('[data-region-corner]')?.getAttribute('data-region-corner')
-            : null;
-        const point = start.current;
-        if (point && props.region) {
-          const region = props.region;
-          if (corner === 'nw' || corner === 'ne' || corner === 'sw' || corner === 'se') {
-            start.current = {
-              x: corner.endsWith('w') ? region.x + region.width : region.x,
-              y: corner.startsWith('n') ? region.y + region.height : region.y,
-            };
-          } else if (
-            point.x >= region.x &&
-            point.x <= region.x + region.width &&
-            point.y >= region.y &&
-            point.y <= region.y + region.height
-          )
-            moving.current = region;
-        }
-        if (start.current) {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          props.video.current?.pause();
-        }
-      }}
-      onPointerMove={(event) => {
-        if (!start.current) return;
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const end = normalizeVideoPoint(
-          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-          content,
-          true
-        );
-        if (end) setDrag(nextRegion(end));
-      }}
-      onPointerUp={(event) => {
-        if (!start.current) return;
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const end = normalizeVideoPoint(
-          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-          content,
-          true
-        );
-        const next = end ? nextRegion(end) : null;
-        start.current = null;
-        moving.current = null;
-        setDrag(null);
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          event.currentTarget.releasePointerCapture(event.pointerId);
-        if (next) props.onRegion(next);
-      }}
-      onPointerCancel={() => {
-        start.current = null;
-        moving.current = null;
-        setDrag(null);
-      }}
+      onPointerDown={plane.onPointerDown}
+      onPointerMove={plane.onPointerMove}
+      onPointerUp={plane.onPointerUp}
+      onPointerCancel={plane.onPointerCancel}
     >
       <video
         ref={props.video}
@@ -156,38 +113,102 @@ export function ReviewStage(props: {
         onEnded={() => props.onPlaying(false)}
         onError={props.onError}
       />
-      {projected ? (
-        <div
-          aria-label={translate('gallery.videoReview.selectedRegion')}
-          className={`${props.drawing ? 'cursor-move' : 'pointer-events-none'}
-              absolute border-2 border-[var(--sniptale-color-accent)]
-              bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]`}
-          style={{
-            left: projected.x,
-            top: projected.y,
-            width: projected.width,
-            height: projected.height,
-          }}
-        >
-          {props.drawing
-            ? (['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
-                <span
-                  key={corner}
-                  data-region-corner={corner}
-                  className="absolute h-2.5 w-2.5 rounded-sm border border-[var(--sniptale-color-accent)]
-                      bg-[var(--sniptale-color-surface-panel)]"
-                  style={{
-                    left: corner.endsWith('w') ? -5 : undefined,
-                    right: corner.endsWith('e') ? -5 : undefined,
-                    top: corner.startsWith('n') ? -5 : undefined,
-                    bottom: corner.startsWith('s') ? -5 : undefined,
-                    cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
-                  }}
-                />
-              ))
-            : null}
-        </div>
+      {projected ? <ReviewRegionOverlay drawing={props.drawing} projected={projected} /> : null}
+      {zoomFocus && props.zoom && zoomLayout ? (
+        <ReviewZoomTarget
+          focus={zoomFocus}
+          camera={props.zoom.camera}
+          videoTransform={zoomLayout.videoTransform}
+          onDrag={props.zoom.onDrag}
+          zoomDrag={zoomDrag}
+        />
       ) : null}
     </div>
+  );
+}
+
+function ReviewRegionOverlay(props: { drawing: boolean; projected: ReviewRegion }) {
+  return (
+    <div
+      aria-label={translate('gallery.videoReview.selectedRegion')}
+      className={`${props.drawing ? 'cursor-move' : 'pointer-events-none'}
+          absolute border-2 border-[var(--sniptale-color-accent)]
+          bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]`}
+      style={{
+        left: props.projected.x,
+        top: props.projected.y,
+        width: props.projected.width,
+        height: props.projected.height,
+      }}
+    >
+      {props.drawing
+        ? (['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
+            <span
+              key={corner}
+              data-region-corner={corner}
+              className="absolute h-2.5 w-2.5 rounded-sm border border-[var(--sniptale-color-accent)]
+                  bg-[var(--sniptale-color-surface-panel)]"
+              style={{
+                left: corner.endsWith('w') ? -5 : undefined,
+                right: corner.endsWith('e') ? -5 : undefined,
+                top: corner.startsWith('n') ? -5 : undefined,
+                bottom: corner.startsWith('s') ? -5 : undefined,
+                cursor: corner === 'nw' || corner === 'se' ? 'nwse-resize' : 'nesw-resize',
+              }}
+            />
+          ))
+        : null}
+    </div>
+  );
+}
+
+/** Draggable camera focus: the handle maps canvas movement into normalized content points. */
+function ReviewZoomTarget(props: {
+  focus: { x: number; y: number };
+  camera: QuickEditCameraTransform;
+  videoTransform: { x: number; y: number; width: number; height: number };
+  onDrag(point: { x: number; y: number }): void;
+  zoomDrag: React.RefObject<{ origin: { x: number; y: number }; pointerId: number } | null>;
+}) {
+  return (
+    <div
+      data-ui="gallery.videoReview.zoomTarget"
+      role="slider"
+      aria-label={translate('gallery.videoReview.zoomStageTarget')}
+      aria-valuemin={0}
+      aria-valuemax={1}
+      aria-valuenow={props.camera.centerX}
+      className="absolute z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-move
+          items-center justify-center rounded-full border-2
+          border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]"
+      style={{ left: props.focus.x, top: props.focus.y }}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.stopPropagation();
+        props.zoomDrag.current = {
+          origin: { x: props.camera.centerX, y: props.camera.centerY },
+          pointerId: event.pointerId,
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        if (!props.zoomDrag.current) return;
+        const bounds = event.currentTarget.parentElement!.getBoundingClientRect();
+        const content = quickEditCanvasPointToContent(
+          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
+          props.videoTransform
+        );
+        if (content) props.onDrag(content);
+      }}
+      onPointerUp={(event) => {
+        if (!props.zoomDrag.current) return;
+        props.zoomDrag.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={() => {
+        props.zoomDrag.current = null;
+      }}
+    />
   );
 }

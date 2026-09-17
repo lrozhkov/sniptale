@@ -30,6 +30,24 @@ describe('getSnapCandidates', () => {
     expect(getSnapCandidates({ edits: [], playhead: 1.5 })).toEqual([1.5]);
   });
 
+  it('includes neighboring zoom boundaries when provided', () => {
+    const zoom = (
+      id: string,
+      start: number,
+      end: number
+    ): import('./advanced/types').QuickEditZoomRegion => ({
+      id,
+      start,
+      end,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+    });
+    expect(getSnapCandidates({ edits: [], playhead: 3, zoomRegions: [zoom('z', 1, 4)] })).toEqual([
+      1, 3, 4,
+    ]);
+  });
+
   it('includes media cut boundaries when provided', () => {
     expect(getSnapCandidates({ edits: [edit(2, 4)], playhead: 0, boundaries: [0, 6, 10] })).toEqual(
       [0, 2, 4, 6, 10]

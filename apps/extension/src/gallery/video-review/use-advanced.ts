@@ -70,6 +70,8 @@ export function useReviewAdvanced(session: Session) {
         ...current,
         ui: { ...current.ui, tracks: { ...current.ui.tracks, [track]: visible } },
       }),
+    setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>
+      schedule({ ...current, zoom: update(current.zoom) }),
     flush,
     reset,
   };

@@ -24,6 +24,11 @@ import { ReviewTimelineToolbar } from './review-toolbar';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { useReviewPlayback } from './use-playback';
 import { useReviewEdits } from './use-edits';
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
+import { ReviewZoomTrack } from './zoom-track';
+import { ReviewZoomInspector } from './zoom-inspector';
+import { useReviewZoomEditor } from './zoom-editor';
 
 function useReviewKeys({
   time,
@@ -104,6 +109,54 @@ function useReviewKeys({
   });
 }
 
+function useReviewCommentActions(args: {
+  composer: ReturnType<
+    typeof import('../../workflows/video-review/session').createVideoReviewSession
+  > extends never
+    ? never
+    : ReturnType<typeof useReviewComposer>;
+  video: React.RefObject<HTMLVideoElement | null>;
+  seek(value: number, snap?: boolean): void;
+  setSelection(value: ReviewAnchor): void;
+  setSelected(value: ReviewAnnotation | null): void;
+  setCutting(cutting: false): void;
+  canStart(): boolean;
+  busy: boolean;
+  exporterPhase: string;
+}) {
+  const select = (annotation: ReviewAnnotation) => {
+    args.setCutting(false);
+    args.video.current?.pause();
+    args.setSelected(annotation);
+    args.seek(
+      annotation.anchor.kind === 'point' ? annotation.anchor.time : annotation.anchor.start,
+      false
+    );
+    args.setSelection(annotation.anchor);
+  };
+  const add = (selection: ReviewAnchor, marker?: ReviewTelemetryMarker) => {
+    if (args.busy || args.exporterPhase !== 'idle' || !args.canStart()) return;
+    args.video.current?.pause();
+    const anchor = marker ? { kind: 'point' as const, time: marker.start } : selection;
+    args.seek(anchor.kind === 'point' ? anchor.time : anchor.start, false);
+    args.composer.change(
+      {
+        id: crypto.randomUUID(),
+        text: '',
+        anchor,
+        ...(marker ? { telemetryRef: marker.ref } : {}),
+      },
+      null
+    );
+    if (marker) {
+      args.setCutting(false);
+      args.seek(marker.start, false);
+      args.setSelection(anchor);
+    }
+  };
+  return { select, add };
+}
+
 function useReviewEditorShortcuts(args: {
   time: number;
   seek(value: number, snap?: boolean): void;
@@ -162,15 +215,11 @@ function useReviewEditorState(resource: LoadedReview) {
   );
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
-  const telemetry = resource.telemetry ? advanced.ui.tracks.actions : false;
   const { busy, setBusy, message, setMessage, run } = useReviewActionStatus();
-  const projected = useMemo(
-    () =>
-      resource.telemetry
-        ? projectReviewTelemetry(resource.telemetry, source.duration, false)
-        : { markers: [], warnings: 0 },
-    [resource.telemetry, source.duration]
-  );
+  const zoom = useReviewZoomEditor({
+    setZoom: advancedState.setZoom,
+    background: advanced.background,
+  });
   const { video, time, onTime, playing, setPlaying, seek, play, volume, setVolume } =
     useReviewPlayback({
       duration: source.duration,
@@ -207,42 +256,30 @@ function useReviewEditorState(resource: LoadedReview) {
   });
   const { cutting, setCutting } = cuts;
   const editing = { ...cuts, exporter };
+  const telemetry = resource.telemetry ? advanced.ui.tracks.actions : false;
+  const projected = useMemo(
+    () =>
+      resource.telemetry
+        ? projectReviewTelemetry(resource.telemetry, source.duration, false)
+        : { markers: [], warnings: 0 },
+    [resource.telemetry, source.duration]
+  );
   const canStart = () => {
     if (!composer.annotation) return true;
     setMessage(translate('gallery.videoReview.finishComment'));
     return false;
   };
-  const selectComment = (annotation: ReviewAnnotation) => {
-    setCutting(false);
-    video.current?.pause();
-    setSelected(annotation);
-    seek(
-      annotation.anchor.kind === 'point' ? annotation.anchor.time : annotation.anchor.start,
-      false
-    );
-    setSelection(annotation.anchor);
-  };
-  const add = (marker?: ReviewTelemetryMarker) => {
-    if (busy || exporter.phase !== 'idle' || !canStart()) return;
-    video.current?.pause();
-    setMessage(null);
-    const anchor = marker ? { kind: 'point' as const, time: marker.start } : selection;
-    seek(anchor.kind === 'point' ? anchor.time : anchor.start, false);
-    composer.change(
-      {
-        id: crypto.randomUUID(),
-        text: '',
-        anchor,
-        ...(marker ? { telemetryRef: marker.ref } : {}),
-      },
-      null
-    );
-    if (marker) {
-      setCutting(false);
-      seek(marker.start, false);
-      setSelection(anchor);
-    }
-  };
+  const comments = useReviewCommentActions({
+    composer,
+    video,
+    seek,
+    setSelection,
+    setSelected,
+    setCutting,
+    canStart,
+    busy,
+    exporterPhase: exporter.phase,
+  });
   useReviewEditorShortcuts({
     time,
     seek,
@@ -260,7 +297,7 @@ function useReviewEditorState(resource: LoadedReview) {
     },
     pointTool: () => cuts.setCutting(false),
     remove: () => cuts.remove(),
-    addComment: () => add(),
+    addComment: () => comments.add(selection),
     toggleCut: () => cuts.toggle('cut'),
   });
   return {
@@ -284,6 +321,7 @@ function useReviewEditorState(resource: LoadedReview) {
     advanced,
     setMode: advancedState.setMode,
     setTrackVisibility: advancedState.setTrackVisibility,
+    zoom,
     resetAdvanced: advancedState.reset,
     flushAdvanced: advancedState.flush,
     projected,
@@ -295,8 +333,8 @@ function useReviewEditorState(resource: LoadedReview) {
     play,
     run,
     canStart,
-    selectComment,
-    add,
+    selectComment: comments.select,
+    add: (marker?: ReviewTelemetryMarker) => comments.add(selection, marker),
     displayRegion: reviewRegion(
       time,
       composer.annotation,
@@ -363,6 +401,8 @@ type InspectorState = Pick<
   | 'canStart'
   | 'selectComment'
   | 'add'
+  | 'advanced'
+  | 'zoom'
   | 'resetAdvanced'
   | 'flushAdvanced'
 >;
@@ -392,6 +432,8 @@ function ReviewInspectorBinding({
     canStart,
     selectComment,
     add,
+    advanced,
+    zoom,
     resetAdvanced,
     flushAdvanced,
   } = state;
@@ -478,6 +520,17 @@ function ReviewInspectorBinding({
           .finally(() => setBusy(false));
       }}
     >
+      {(() => {
+        const zoomRegion = zoom.selected(advanced.zoom);
+        return zoomRegion ? (
+          <ReviewZoomInspector
+            region={zoomRegion}
+            onChange={(patch: QuickEditZoomRegionPatch) => zoom.change(zoomRegion.id, patch)}
+            onReset={() => zoom.resetPosition(zoomRegion.id)}
+            onDelete={() => zoom.remove(zoomRegion.id)}
+          />
+        ) : null;
+      })()}
       {snapshot.error === 'conflict' ? (
         <ReviewButton
           label={translate('gallery.videoReview.reload')}
@@ -538,6 +591,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     advanced,
     setMode,
     setTrackVisibility,
+    zoom,
     busy,
     setMessage,
     projected,
@@ -547,6 +601,8 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     add,
     displayRegion,
   } = state;
+  const features = useMemo(() => resolveQuickEditEffectiveFeatures(advanced), [advanced]);
+  const onZoomAdd = () => zoom.add(time, source.duration);
   return (
     <div
       className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_360px] max-[799px]:grid-cols-1
@@ -560,6 +616,10 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           video={video}
           drawing={!!composer.annotation && !playing && !busy}
           region={displayRegion}
+          {...(() => {
+            const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
+            return zoomRegion ? { zoom: zoom.focusOverlay(zoomRegion) } : {};
+          })()}
           onRegion={(region) => {
             if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
           }}
@@ -610,6 +670,23 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
               }
             />
           }
+          {...(features.zoomTrackVisible
+            ? {
+                zoomTrack: (
+                  <ReviewZoomTrack
+                    duration={source.duration}
+                    time={time}
+                    regions={advanced.zoom.regions}
+                    edits={snapshot.document.edits}
+                    boundaries={editing.exporter.index?.boundaries}
+                    selectedId={zoom.selection}
+                    onSelect={zoom.setSelection}
+                    onAdd={onZoomAdd}
+                    onDragCommit={zoom.commitDrag}
+                  />
+                ),
+              }
+            : {})}
           {...(editing.exporter.index ? { boundaries: editing.exporter.index.boundaries } : {})}
           onRangeCommit={(range) => {
             if (editing.mode) void editing.commitRange(range);

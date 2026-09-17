@@ -19,6 +19,7 @@ type TimelineProps = {
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
   tools?: ReactNode;
+  zoomTrack?: ReactNode;
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void;
@@ -109,6 +110,7 @@ export function ReviewTimeline(props: TimelineProps) {
               />
             </div>
           </div>
+          {props.zoomTrack}
         </div>
       </div>
     </section>
