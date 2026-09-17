@@ -15,7 +15,7 @@ export interface QuickEditUiState {
 
 export interface QuickEditZoomTransition {
   type: 'none' | 'linear' | 'ease-in-out';
-  durationMs: number;
+  duration: number;
 }
 
 /** Camera target in normalized content coordinates, independent of background layout. */
@@ -25,10 +25,14 @@ export interface QuickEditCameraTransform {
   centerY: number;
 }
 
+/**
+ * Zoom interval on the quick-editor timeline. `start`/`end` are timeline seconds,
+ * matching the shared ReviewTimeMap coordinate domain.
+ */
 export interface QuickEditZoomRegion {
   id: string;
-  startMs: number;
-  endMs: number;
+  start: number;
+  end: number;
   transform: QuickEditCameraTransform;
   enter: QuickEditZoomTransition;
   exit: QuickEditZoomTransition;
@@ -66,16 +70,17 @@ export type QuickEditBackgroundSettings =
       layout: QuickEditBackgroundLayout;
     };
 
+/** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
 export interface QuickEditAudioClip {
   id: string;
   assetId: string;
-  timelineStartMs: number;
-  sourceOffsetMs: number;
-  durationMs: number;
+  timelineStart: number;
+  sourceOffset: number;
+  duration: number;
   volume: number;
   muted: boolean;
-  fadeInMs: number;
-  fadeOutMs: number;
+  fadeIn: number;
+  fadeOut: number;
 }
 
 export interface QuickEditOriginalAudio {

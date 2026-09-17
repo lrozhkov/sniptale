@@ -23,8 +23,9 @@ const MAX_QUICK_EDIT_CAMERA_SCALE = 4;
 const MIN_QUICK_EDIT_CAMERA_SCALE = 1;
 const MAX_QUICK_EDIT_ZOOM_REGIONS = 512;
 const MAX_QUICK_EDIT_AUDIO_CLIPS = 512;
-const MAX_QUICK_EDIT_OFFSET_MS = 86_400_000;
-const MAX_QUICK_EDIT_TRANSITION_MS = 60_000;
+/** Quick-editor timeline coordinates are seconds, bounded like video project durations. */
+const MAX_QUICK_EDIT_TIME = 86_400;
+const MAX_QUICK_EDIT_TRANSITION = 60;
 const MAX_QUICK_EDIT_BACKGROUND_SIZE = 4_096;
 const MAX_QUICK_EDIT_CLIP_VOLUME = 2;
 
@@ -68,10 +69,10 @@ function parseZoomTransition(value: unknown): QuickEditZoomTransition | null {
   if (
     !isRecord(value) ||
     (value['type'] !== 'none' && value['type'] !== 'linear' && value['type'] !== 'ease-in-out') ||
-    !isBoundedNumber(value['durationMs'], 0, MAX_QUICK_EDIT_TRANSITION_MS)
+    !isBoundedNumber(value['duration'], 0, MAX_QUICK_EDIT_TRANSITION)
   )
     return null;
-  return { type: value['type'], durationMs: value['durationMs'] };
+  return { type: value['type'], duration: value['duration'] };
 }
 
 function parseCameraTransform(value: unknown): QuickEditCameraTransform | null {
@@ -89,9 +90,9 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (
     !isRecord(value) ||
     !identity(value['id']) ||
-    !isBoundedNumber(value['startMs'], 0, MAX_QUICK_EDIT_OFFSET_MS) ||
-    !isBoundedNumber(value['endMs'], 0, MAX_QUICK_EDIT_OFFSET_MS) ||
-    value['startMs'] >= value['endMs']
+    !isBoundedNumber(value['start'], 0, MAX_QUICK_EDIT_TIME) ||
+    !isBoundedNumber(value['end'], 0, MAX_QUICK_EDIT_TIME) ||
+    value['start'] >= value['end']
   )
     return null;
   const transform = parseCameraTransform(value['transform']);
@@ -100,8 +101,8 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   if (!transform || !enter || !exit) return null;
   return {
     id: value['id'],
-    startMs: value['startMs'],
-    endMs: value['endMs'],
+    start: value['start'],
+    end: value['end'],
     transform,
     enter,
     exit,
@@ -116,7 +117,7 @@ function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
   let previous: QuickEditZoomRegion | null = null;
   for (const region of regions) {
     if (ids.has(region.id)) return null;
-    if (previous && region.startMs < previous.endMs) return null;
+    if (previous && region.start < previous.end) return null;
     ids.add(region.id);
     previous = region;
   }
@@ -175,25 +176,25 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     !isRecord(value) ||
     !identity(value['id']) ||
     !identity(value['assetId']) ||
-    !isBoundedNumber(value['timelineStartMs'], 0, MAX_QUICK_EDIT_OFFSET_MS) ||
-    !isBoundedNumber(value['sourceOffsetMs'], 0, MAX_QUICK_EDIT_OFFSET_MS) ||
-    !isBoundedNumber(value['durationMs'], 1, MAX_QUICK_EDIT_OFFSET_MS) ||
+    !isBoundedNumber(value['timelineStart'], 0, MAX_QUICK_EDIT_TIME) ||
+    !isBoundedNumber(value['sourceOffset'], 0, MAX_QUICK_EDIT_TIME) ||
+    !isBoundedNumber(value['duration'], 0.001, MAX_QUICK_EDIT_TIME) ||
     !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME) ||
     typeof value['muted'] !== 'boolean' ||
-    !isBoundedNumber(value['fadeInMs'], 0, MAX_QUICK_EDIT_TRANSITION_MS) ||
-    !isBoundedNumber(value['fadeOutMs'], 0, MAX_QUICK_EDIT_TRANSITION_MS)
+    !isBoundedNumber(value['fadeIn'], 0, MAX_QUICK_EDIT_TRANSITION) ||
+    !isBoundedNumber(value['fadeOut'], 0, MAX_QUICK_EDIT_TRANSITION)
   )
     return null;
   return {
     id: value['id'],
     assetId: value['assetId'],
-    timelineStartMs: value['timelineStartMs'],
-    sourceOffsetMs: value['sourceOffsetMs'],
-    durationMs: value['durationMs'],
+    timelineStart: value['timelineStart'],
+    sourceOffset: value['sourceOffset'],
+    duration: value['duration'],
     volume: value['volume'],
     muted: value['muted'],
-    fadeInMs: value['fadeInMs'],
-    fadeOutMs: value['fadeOutMs'],
+    fadeIn: value['fadeIn'],
+    fadeOut: value['fadeOut'],
   };
 }
 

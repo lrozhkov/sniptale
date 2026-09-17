@@ -15,25 +15,25 @@ const gradient: Gradient = {
   ],
 };
 
-const zoomRegion = (id: string, startMs: number, endMs: number) => ({
+const zoomRegion = (id: string, start: number, end: number) => ({
   id,
-  startMs,
-  endMs,
+  start,
+  end,
   transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
-  enter: { type: 'none', durationMs: 0 },
-  exit: { type: 'none', durationMs: 0 },
+  enter: { type: 'none', duration: 0 },
+  exit: { type: 'none', duration: 0 },
 });
 
 const audioClip = (id: string) => ({
   id,
   assetId: 'asset:voice',
-  timelineStartMs: 2_000,
-  sourceOffsetMs: 0,
-  durationMs: 5_000,
+  timelineStart: 2,
+  sourceOffset: 0,
+  duration: 5,
   volume: 1,
   muted: false,
-  fadeInMs: 100,
-  fadeOutMs: 100,
+  fadeIn: 0.1,
+  fadeOut: 0.1,
 });
 
 const advanced = (): QuickEditAdvancedState => ({
@@ -44,11 +44,11 @@ const advanced = (): QuickEditAdvancedState => ({
     regions: [
       {
         id: 'z1',
-        startMs: 1_000,
-        endMs: 4_000,
+        start: 1,
+        end: 4,
         transform: { scale: 1.5, centerX: 0.25, centerY: 0.75 },
-        enter: { type: 'ease-in-out', durationMs: 300 },
-        exit: { type: 'none', durationMs: 0 },
+        enter: { type: 'ease-in-out', duration: 0.3 },
+        exit: { type: 'none', duration: 0 },
       },
     ],
   },
@@ -146,7 +146,7 @@ describe('rejects malformed persisted state', () => {
         enabled: true,
         regions: [
           {
-            ...zoomRegion('z1', 1_000, 4_000),
+            ...zoomRegion('z1', 1, 4),
             transform: { scale: 8, centerX: 0.5, centerY: 0.5 },
           },
         ],
@@ -159,7 +159,7 @@ describe('rejects malformed persisted state', () => {
         enabled: true,
         regions: [
           {
-            ...zoomRegion('z1', 1_000, 4_000),
+            ...zoomRegion('z1', 1, 4),
             transform: { scale: 1.5, centerX: 1.2, centerY: 0.5 },
           },
         ],
@@ -171,17 +171,17 @@ describe('rejects malformed persisted state', () => {
   it('rejects duplicated ids but allows adjacent non-overlapping regions', () => {
     const duplicated: unknown = {
       ...structuredClone(advanced()),
-      zoom: { enabled: true, regions: [zoomRegion('a', 0, 3_000), zoomRegion('a', 3_000, 3_500)] },
+      zoom: { enabled: true, regions: [zoomRegion('a', 0, 3), zoomRegion('a', 3, 3.5)] },
     };
     expect(loadQuickEditAdvancedState(duplicated)).toBeNull();
     const adjacent: unknown = {
       ...structuredClone(advanced()),
-      zoom: { enabled: true, regions: [zoomRegion('a', 0, 3_000), zoomRegion('b', 3_000, 3_500)] },
+      zoom: { enabled: true, regions: [zoomRegion('a', 0, 3), zoomRegion('b', 3, 3.5)] },
     };
     expect(loadQuickEditAdvancedState(adjacent)).not.toBeNull();
     const overlapping: unknown = {
       ...structuredClone(advanced()),
-      zoom: { enabled: true, regions: [zoomRegion('a', 0, 3_000), zoomRegion('b', 2_000, 3_500)] },
+      zoom: { enabled: true, regions: [zoomRegion('a', 0, 3), zoomRegion('b', 2, 3.5)] },
     };
     expect(loadQuickEditAdvancedState(overlapping)).toBeNull();
   });
@@ -191,7 +191,7 @@ describe('rejects malformed persisted state', () => {
       ...structuredClone(advanced()),
       zoom: {
         enabled: true,
-        regions: [{ ...zoomRegion('z1', 1_000, 4_000), enter: { type: 'linear', durationMs: -1 } }],
+        regions: [{ ...zoomRegion('z1', 1, 4), enter: { type: 'linear', duration: -1 } }],
       },
     };
     expect(loadQuickEditAdvancedState(negative)).toBeNull();
@@ -199,7 +199,7 @@ describe('rejects malformed persisted state', () => {
       ...structuredClone(advanced()),
       zoom: {
         enabled: true,
-        regions: [{ ...zoomRegion('z1', 1_000, 4_000), exit: { type: 'bounce', durationMs: 300 } }],
+        regions: [{ ...zoomRegion('z1', 1, 4), exit: { type: 'bounce', duration: 0.3 } }],
       },
     };
     expect(loadQuickEditAdvancedState(unknownType)).toBeNull();
@@ -244,7 +244,7 @@ describe('rejects malformed persisted state', () => {
       ...structuredClone(advanced()),
       audio: {
         ...structuredClone(advanced().audio),
-        voiceover: [{ ...audioClip('v1'), timelineStartMs: -1 }],
+        voiceover: [{ ...audioClip('v1'), timelineStart: -1 }],
       },
     };
     expect(loadQuickEditAdvancedState(negativeStart)).toBeNull();
