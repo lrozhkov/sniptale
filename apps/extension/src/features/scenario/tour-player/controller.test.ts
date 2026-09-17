@@ -46,7 +46,7 @@ async function mount(options?: Parameters<typeof createTourPlayer>[2]) {
   if (!root) throw new Error('Missing player fixture');
   document.body.append(root);
   const player = createTourPlayer(root, { tour, labels, assets: [] }, options);
-  const value = { player, root };
+  const value = { player, root, tour };
   mounted.push(value);
   return value;
 }

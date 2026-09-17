@@ -230,18 +230,35 @@ a:focus-visible {
   text-align: center;
 }
 .tour-navigation {
-  max-width: min(720px, calc(100vw - 24px));
-  max-height: calc(100svh - 24px);
-  width: 100%;
+  position: absolute;
+  width: min(320px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
+  max-height: min(420px, calc(100svh - 96px));
+  margin: 0;
   border: 1px solid #ffffff30;
   border-radius: 12px;
   background: var(--tour-surface);
   color: var(--tour-text);
-  padding: 12px;
-  overflow: hidden;
+  padding: 10px;
+  overflow-y: auto;
+  z-index: 6;
 }
-.tour-navigation::backdrop {
-  background: #0009;
+.tour-navigation .tour-contents-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin: 0;
+}
+.tour-navigation .tour-contents-list .tour-button {
+  text-align: start;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-navigation .tour-contents-list .tour-button[aria-current] {
+  border-color: color-mix(in srgb, var(--tour-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--tour-accent) 16%, transparent);
 }
 .tour-contents-list {
   display: grid;
@@ -268,8 +285,7 @@ a:focus-visible {
   .tour-button {
     padding: 6px 8px;
   }
-  .tour-navigation-buttons,
-  .tour-contents-list {
+  .tour-navigation-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .tour-navigation-scene {

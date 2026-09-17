@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
-import { buildTourPlayerHtml, type TourPlayerLabels } from './document';
+import { buildTourPlayerBlob, buildTourPlayerHtml, type TourPlayerLabels } from './document';
 const labels: TourPlayerLabels = {
   expand: 'Expand explanation',
   collapse: 'Collapse explanation',
@@ -423,4 +423,46 @@ it('exports visual blur through the shared renderer without authoring handles', 
   expect(effect.style.opacity).toBe('');
   expect(dom.window.document.querySelector('.tour-resize-handle')).toBeNull();
   dom.close();
+});
+
+it('rejects invalid embedded media before export', async () => {
+  const broken = fixture();
+  broken.assets = [{ id: 'image', mime: 'image/png', base64: 'not base64!!' }];
+  await expect(buildTourPlayerHtml(broken)).rejects.toThrow('Invalid embedded tour media.');
+});
+
+it('streams the same shell through an abortable blob with embedded assets', async () => {
+  const args = fixture();
+  const blob = await buildTourPlayerBlob({
+    ...args,
+    assets: [
+      {
+        id: 'image',
+        mime: 'image/png',
+        blob: await (await fetch('data:image/png;base64,' + png)).blob(),
+      },
+    ],
+    signal: new AbortController().signal,
+  });
+  expect(blob.type).toBe('text/html;charset=utf-8');
+  const text = await blob.text();
+  expect(text.split(png)).toHaveLength(2);
+  expect(text).toContain('aria-haspopup="dialog"');
+  const aborted = fixture();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    buildTourPlayerBlob({
+      ...aborted,
+      assets: [{ id: 'image', mime: 'image/png', blob: new Blob() }],
+      signal: controller.signal,
+    })
+  ).rejects.toThrow();
+  await expect(
+    buildTourPlayerBlob({
+      ...args,
+      assets: [{ id: 'image', mime: 'image/png', blob: new Blob() }],
+      signal: new AbortController().signal,
+    })
+  ).rejects.toThrow('Empty tour media.');
 });

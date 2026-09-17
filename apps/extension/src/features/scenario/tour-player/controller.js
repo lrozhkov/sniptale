@@ -133,7 +133,7 @@ export function createTourPlayer(root, input, options = {}) {
     dispose() {
       if (lifetime.signal.aborted) return;
       lifetime.abort();
-      if (navigation.open) navigation.close();
+      view.closeContents();
       scene.replaceChildren();
     },
   };
