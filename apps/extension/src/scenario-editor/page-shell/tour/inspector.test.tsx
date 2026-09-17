@@ -483,6 +483,31 @@ it('shows one section heading in sections mode and moves object actions into it'
   expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
 });
 
+it('renders tour numeric rows as plain quiet-focus rows with scrub', async () => {
+  presentation = 'sections';
+  draw();
+  await click('Slide objects');
+  await click('Hotspot');
+  await click('Back to slide settings');
+  await click('Camera');
+  const rows = [...host.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]')];
+  expect(rows.length).toBeGreaterThan(0);
+  for (const row of rows) {
+    expect(row.getAttribute('data-appearance')).toBe('plain');
+    const field = row.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')!;
+    expect(field.getAttribute('data-focus-appearance')).toBe('quiet');
+    expect(row.querySelector('input[type=range]')).not.toBeNull();
+  }
+  const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!;
+  expect(zoom.value).toBeTruthy();
+  const range = host.querySelector<HTMLInputElement>('input[type=range]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range, '250');
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!.value).toBeTruthy();
+});
+
 it('preserves image categories through All and object drill-down without editing the tour', async () => {
   presentation = 'sections';
   draw();

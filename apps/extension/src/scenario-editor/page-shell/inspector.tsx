@@ -81,6 +81,7 @@ export function GuideInspectorNumber({
         step={step}
         precision={0}
         disabled={disabled}
+        focusAppearance="quiet"
         normalizeValue={Math.round}
         onPreviewValue={() => {}}
         onCommitValue={onChange}

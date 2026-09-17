@@ -2,7 +2,7 @@ import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/to
 import { Layers } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
 /** One transition style applies to every scene; targets keep their source coordinates. */
@@ -36,28 +36,26 @@ export function TourTransitionSettings({
         onChange={(kind) => onChange({ ...tour, transition: { ...transition, kind } })}
       />
       {transition.kind !== 'none' && (
-        <NumericRow
+        <TourInspectorNumericRow
           label={t('scenario.editor.tourSwitchMs')}
           value={transition.durationMs}
           min={0}
           max={2000}
           step={50}
-          precision={0}
           disabled={disabled}
-          onPreviewValue={changeSwitch}
-          onCommitValue={changeSwitch}
+          onPreview={changeSwitch}
+          onChange={changeSwitch}
         />
       )}
-      <NumericRow
+      <TourInspectorNumericRow
         label={t('scenario.editor.tourTravelMs')}
         value={transition.hotspotTravelMs}
         min={0}
         max={2000}
         step={50}
-        precision={0}
         disabled={disabled}
-        onPreviewValue={changeTravel}
-        onCommitValue={changeTravel}
+        onPreview={changeTravel}
+        onChange={changeTravel}
       />
       <p className="guide-inspector-hint">{t('scenario.editor.tourTransitionHint')}</p>
     </GuideInspectorGroup>

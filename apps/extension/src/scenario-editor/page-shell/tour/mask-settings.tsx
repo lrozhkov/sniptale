@@ -3,7 +3,7 @@ import { createSolidPaint, getRepresentativeColor, type Paint } from '@sniptale/
 import type { TourMask } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { ScanLine } from 'lucide-react';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import type { Translate } from '../../../platform/i18n';
@@ -66,17 +66,15 @@ export function TourMaskSettings({
         />
       )}
       {controls.amount && (
-        <NumericRow
-          appearance="plain"
+        <TourInspectorNumericRow
           label={t(controls.amount.label)}
           value={amount ?? controls.amount.value}
           unit={controls.amount.unit}
           min={controls.amount.min}
           max={controls.amount.max}
-          scrub={{ min: controls.amount.min, max: controls.amount.max }}
           disabled={disabled}
-          onPreviewValue={(amount) => setPreview({ id: value.id, kind: value.kind, amount })}
-          onCommitValue={(amount) => {
+          onPreview={(amount) => setPreview({ id: value.id, kind: value.kind, amount })}
+          onChange={(amount) => {
             setPreview(null);
             onChange(controls.amount!.change(amount));
           }}

@@ -10,7 +10,7 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GuideVoiceField } from '../voice-field';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { Translate } from '../../../platform/i18n';
 
@@ -59,7 +59,7 @@ export function TourPointFields({
   return (
     <div className="tour-coordinate-fields">
       {(['x', 'y'] as const).map((axis) => (
-        <NumericRow
+        <TourInspectorNumericRow
           key={axis}
           label={axis.toUpperCase()}
           value={point[axis] * 100}
@@ -68,8 +68,7 @@ export function TourPointFields({
           unit="%"
           precision={1}
           disabled={disabled}
-          onPreviewValue={() => {}}
-          onCommitValue={(value) => onChange({ ...point, [axis]: value / 100 })}
+          onChange={(value) => onChange({ ...point, [axis]: value / 100 })}
         />
       ))}
     </div>

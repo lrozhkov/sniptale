@@ -5,7 +5,7 @@ import {
 import { SurfaceStyleSelector } from '../../../ui/surface-style-selector';
 import { useSurfaceStylePresetCatalog } from '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
 /** Same surface/preset editor as callouts; composition stays bounded by tour-owned numeric controls. */
@@ -51,14 +51,13 @@ export function TourHintStyle({
           { key: 'radius', label: t('scenario.editor.tourHintRadius'), min: 0, max: 32 },
         ] as const
       ).map(({ key, ...props }) => (
-        <NumericRow
+        <TourInspectorNumericRow
           key={key}
           {...props}
           value={surface[key]}
           unit="px"
           disabled={disabled}
-          onPreviewValue={() => {}}
-          onCommitValue={(next) => onChange({ ...value, surface: { ...surface, [key]: next } })}
+          onChange={(next) => onChange({ ...value, surface: { ...surface, [key]: next } })}
         />
       ))}
     </div>

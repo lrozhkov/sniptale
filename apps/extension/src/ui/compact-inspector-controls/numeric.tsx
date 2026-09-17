@@ -8,6 +8,8 @@ import { TextWithOverflowHint } from './overflow-hint';
 export interface NumericValueFieldProps {
   className?: string | undefined;
   disabled?: boolean | undefined;
+  /** Focus presentation: 'accent-box' draws an accent border box, 'quiet' a thin accent line. */
+  focusAppearance?: 'accent-box' | 'quiet' | undefined;
   invalid?: boolean | undefined;
   label: string;
   max?: number | undefined;
@@ -47,17 +49,23 @@ function NumericValueFieldView({
   props: NumericValueFieldProps;
   state: ReturnType<typeof useNumericValueFieldState>;
 }) {
+  const quietFocus = props.focusAppearance === 'quiet';
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-value-field"
+      data-focus-appearance={props.focusAppearance ?? 'accent-box'}
       className={cx(
         'group/compact-numeric relative flex',
         'h-[var(--sniptale-compact-control-height,32px)] w-[6.25rem] shrink-0 items-center',
         'gap-0',
         'rounded-[7px] px-2 transition-[border-color,background-color]',
         'border border-transparent bg-transparent',
-        'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
-        'focus-within:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_70%,transparent)]',
+        ...(quietFocus
+          ? []
+          : [
+              'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
+              'focus-within:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_70%,transparent)]',
+            ]),
         props.invalid &&
           'border-[color:var(--sniptale-color-danger)] text-[color:var(--sniptale-color-danger)]',
         props.disabled && 'cursor-not-allowed opacity-55',
@@ -67,6 +75,16 @@ function NumericValueFieldView({
       <NumericValueInput props={props} state={state} />
       <NumericUnitLabel state={state} />
       <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
+      {quietFocus && (
+        <span
+          aria-hidden="true"
+          className={[
+            'pointer-events-none absolute inset-x-1 bottom-0 h-px',
+            'bg-[color:var(--sniptale-color-accent)] opacity-0 transition-opacity',
+            'group-focus-within/compact-numeric:opacity-60',
+          ].join(' ')}
+        />
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import type { importScenarioNarration } from '../../../composition/persistence/s
 import { getTourNarrationTarget } from '../../../features/scenario/project/public';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField } from './fields';
@@ -156,7 +156,7 @@ function NarrationFields({
 }) {
   return (
     <>
-      <NumericRow
+      <TourInspectorNumericRow
         label={t('scenario.editor.tourAudioStart')}
         value={narration.trimStart}
         min={0}
@@ -164,10 +164,10 @@ function NarrationFields({
         step={0.1}
         precision={2}
         disabled={locked}
-        onPreviewValue={(trimStart) => change({ trimStart })}
-        onCommitValue={(trimStart) => change({ trimStart })}
+        onPreview={(trimStart) => change({ trimStart })}
+        onChange={(trimStart) => change({ trimStart })}
       />
-      <NumericRow
+      <TourInspectorNumericRow
         label={t('scenario.editor.tourAudioEnd')}
         value={narration.trimEnd}
         min={narration.trimStart + Math.min(0.01, narration.duration / 2)}
@@ -175,10 +175,10 @@ function NarrationFields({
         step={0.1}
         precision={2}
         disabled={locked}
-        onPreviewValue={(trimEnd) => change({ trimEnd })}
-        onCommitValue={(trimEnd) => change({ trimEnd })}
+        onPreview={(trimEnd) => change({ trimEnd })}
+        onChange={(trimEnd) => change({ trimEnd })}
       />
-      <NumericRow
+      <TourInspectorNumericRow
         label={t('scenario.editor.tourAudioGain')}
         value={narration.gain * 100}
         min={0}
@@ -186,8 +186,8 @@ function NarrationFields({
         step={5}
         unit="%"
         disabled={locked}
-        onPreviewValue={(value) => change({ gain: value / 100 })}
-        onCommitValue={(value) => change({ gain: value / 100 })}
+        onPreview={(value) => change({ gain: value / 100 })}
+        onChange={(value) => change({ gain: value / 100 })}
       />
       <TourTextField
         label={t('scenario.editor.tourAudioTranscript')}

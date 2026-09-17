@@ -3,7 +3,7 @@ import { Play, Timer } from 'lucide-react';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { GuideInspectorGroup } from '../inspector';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
 /** Playback defaults are document settings, independent of the selected slide. */
@@ -42,7 +42,7 @@ export function TourPlaybackSettings({
           {label}
         </label>
       ))}
-      <NumericRow
+      <TourInspectorNumericRow
         label={t('scenario.editor.tourMinimumHold')}
         value={tour.playback.minimumHoldSeconds}
         min={0.1}
@@ -50,8 +50,8 @@ export function TourPlaybackSettings({
         step={0.5}
         precision={1}
         disabled={disabled}
-        onPreviewValue={changeMinimum}
-        onCommitValue={changeMinimum}
+        onPreview={changeMinimum}
+        onChange={changeMinimum}
       />
       <p className="guide-inspector-hint">{t('scenario.editor.tourAutoplayHint')}</p>
     </GuideInspectorGroup>
@@ -90,7 +90,7 @@ export function TourTimingSettings({
       />
       {timing.mode === 'manual' && (
         <>
-          <NumericRow
+          <TourInspectorNumericRow
             label={t('scenario.editor.tourHoldSeconds')}
             value={timing.holdSeconds}
             min={0.1}
@@ -98,8 +98,8 @@ export function TourTimingSettings({
             step={0.5}
             precision={1}
             disabled={disabled}
-            onPreviewValue={changeHold}
-            onCommitValue={changeHold}
+            onPreview={changeHold}
+            onChange={changeHold}
           />
           {slide.narration && (
             <label className="guide-number-toggle">

@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import type { TourDocument, TourImageSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { ScanSearch } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import {
   resolveTourCamera,
   tourCameraEnabled,
@@ -54,7 +53,7 @@ export function TourCameraSettings({
       )}
       {enabled && (
         <>
-          <CameraAmount
+          <TourInspectorNumericRow
             key={`${slide.id}:zoom:${camera.mode}`}
             label={t('scenario.editor.tourCameraZoom')}
             value={zoom * 100}
@@ -73,7 +72,7 @@ export function TourCameraSettings({
               })
             }
           />
-          <CameraAmount
+          <TourInspectorNumericRow
             key={`${slide.id}:delay`}
             label={t('scenario.editor.tourCameraDelay')}
             value={(camera.delayMs ?? 300) / 1000}
@@ -81,12 +80,13 @@ export function TourCameraSettings({
             max={5}
             step={0.1}
             unit="s"
+            precision={1}
             disabled={locked}
             onChange={(amount) =>
               onChange({ ...slide, camera: { ...camera, delayMs: Math.round(amount * 1000) } })
             }
           />
-          <CameraAmount
+          <TourInspectorNumericRow
             key={`${slide.id}:duration`}
             label={t('scenario.editor.tourCameraDuration')}
             value={(camera.durationMs ?? 700) / 1000}
@@ -94,6 +94,7 @@ export function TourCameraSettings({
             max={5}
             step={0.1}
             unit="s"
+            precision={1}
             disabled={locked}
             onChange={(amount) =>
               onChange({ ...slide, camera: { ...camera, durationMs: Math.round(amount * 1000) } })
@@ -106,34 +107,5 @@ export function TourCameraSettings({
         </>
       )}
     </GuideInspectorGroup>
-  );
-}
-function CameraAmount({
-  onChange,
-  ...props
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  unit: '%' | 's';
-  disabled: boolean;
-  onChange: (value: number) => void;
-}) {
-  const [preview, setPreview] = useState<number | null>(null);
-  return (
-    <NumericRow
-      {...props}
-      appearance="plain"
-      value={preview ?? props.value}
-      precision={props.unit === '%' ? 0 : 1}
-      scrub={{ min: props.min, max: props.max, step: props.step }}
-      onPreviewValue={setPreview}
-      onCommitValue={(value) => {
-        setPreview(null);
-        onChange(value);
-      }}
-    />
   );
 }
