@@ -17,6 +17,7 @@ const integration = vi.hoisted(() => ({
   commit: vi.fn(),
   history: vi.fn(),
   read: vi.fn(),
+  advanced: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
 }));
@@ -36,6 +37,7 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
   saveVideoWorkspaceDraft: integration.draft,
+  saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
@@ -49,9 +51,11 @@ import {
   parseReviewOperation,
 } from '../../features/video/review/validation';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { loadQuickEditAdvancedState } from '../../features/video/review/advanced/validation';
 import { VideoReview } from './index';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type {
+  saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
@@ -196,6 +200,21 @@ function createEditorFixture() {
     }
   );
   integration.read.mockImplementation(async () => structuredClone(snapshot));
+  integration.advanced.mockImplementation(
+    async (args: Parameters<typeof saveVideoWorkspaceAdvanced>[0]) => {
+      const advanced = loadQuickEditAdvancedState(args.advanced);
+      if (!advanced) throw new Error('Advanced state is invalid.');
+      snapshot = {
+        ...snapshot,
+        workspace: {
+          ...snapshot.workspace,
+          revision: snapshot.workspace.revision + 1,
+          advanced,
+        },
+      };
+      return structuredClone(snapshot);
+    }
+  );
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
@@ -706,6 +725,54 @@ it('blocks history and destructive shortcuts while the export controls are disab
     expect(integration.commit).not.toHaveBeenCalled();
   } finally {
     await act(async () => fail?.(new Error('Cancelled test export')));
+    await fixture.cleanup();
+  }
+});
+
+it('toggles the persisted advanced mode and restores it after reopening the editor', async () => {
+  const fixture = createEditorFixture();
+  const { root, button, click } = fixture;
+  try {
+    await act(async () =>
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
+    await click('advancedEditing');
+    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('true');
+    expect(button('zoomTrack').getAttribute('aria-pressed')).toBe('false');
+    await click('zoomTrack');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.ui).toEqual({
+      mode: 'advanced',
+      tracks: { actions: true, zoom: true, audio: false },
+    });
+    expect(integration.advanced).toHaveBeenCalled();
+    await click('advancedEditing');
+    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.ui.mode).toBe('basic');
+    expect(fixture.snapshot.workspace.advanced.ui.tracks.zoom).toBe(true);
+    // Reopening reads the same durable workspace: the saved mode and track return.
+    await act(async () => root.unmount());
+    const reopenedHost = document.createElement('div');
+    document.body.appendChild(reopenedHost);
+    const reopenedRoot = createRoot(reopenedHost);
+    const reopenedButton = (key: string) =>
+      reopenedHost.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`)!;
+    try {
+      await act(async () =>
+        reopenedRoot.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      expect(reopenedButton('advancedEditing').getAttribute('aria-pressed')).toBe('false');
+      await act(async () => reopenedButton('advancedEditing').click());
+      expect(reopenedButton('zoomTrack').getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      await act(async () => reopenedRoot.unmount());
+      reopenedHost.remove();
+    }
+  } finally {
     await fixture.cleanup();
   }
 });

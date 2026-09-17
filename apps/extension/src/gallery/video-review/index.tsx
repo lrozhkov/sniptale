@@ -18,8 +18,9 @@ import {
 } from './use-session';
 import { exportReviewReport } from './report-actions';
 import { useReviewExport } from './use-export';
-import { ReviewEditActions, ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
-import { Activity, MessageSquarePlus } from 'lucide-react';
+import { useReviewAdvanced } from './use-advanced';
+import { ReviewEditActions } from './edit-actions';
+import { ReviewTimelineToolbar } from './review-toolbar';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { useReviewPlayback } from './use-playback';
 import { useReviewEdits } from './use-edits';
@@ -103,17 +104,65 @@ function useReviewKeys({
   });
 }
 
+function useReviewEditorShortcuts(args: {
+  time: number;
+  seek(value: number, snap?: boolean): void;
+  play(): void;
+  composerAnnotation: ReviewAnnotation | null;
+  busy: boolean;
+  exporterPhase: 'idle' | 'exporting' | 'publishing';
+  exporterAvailable: boolean;
+  boundaries: readonly number[] | undefined;
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  session: ReturnType<
+    typeof import('../../workflows/video-review/session').createVideoReviewSession
+  >;
+  cancelDrawing(): void;
+  pointTool(): void;
+  remove(): void;
+  addComment(): void;
+  toggleCut(): void;
+}) {
+  const editingBlocked = !!args.composerAnnotation;
+  const exportBlocked = args.exporterPhase !== 'idle';
+  useReviewKeys({
+    time: args.time,
+    seek: args.seek,
+    play: args.play,
+    cancelDrawing: args.cancelDrawing,
+    undo: () => {
+      if (!editingBlocked && !exportBlocked) void args.run(() => args.session.history('undo'));
+    },
+    redo: () => {
+      if (!editingBlocked && !exportBlocked) void args.run(() => args.session.history('redo'));
+    },
+    remove: () => {
+      if (!editingBlocked && !args.busy && !exportBlocked) args.remove();
+    },
+    add: args.addComment,
+    tool: (key) => {
+      if (!editingBlocked && !args.busy && !exportBlocked) {
+        if (key === 'v') args.pointTool();
+        else if (args.exporterAvailable) args.toggleCut();
+      }
+    },
+    ...(args.boundaries ? { boundaries: args.boundaries } : {}),
+  });
+}
+
 function useReviewEditorState(resource: LoadedReview) {
   const { session, source } = resource;
   const snapshot = useReviewSnapshot(session);
   const composer = useReviewComposer(session);
   const exporter = useReviewExport(resource);
+  const advancedState = useReviewAdvanced(session);
+  const advanced = advancedState.advanced;
   const [selection, setSelection] = useState<ReviewAnchor>(
     composer.annotation?.anchor ?? { kind: 'point', time: 0 }
   );
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
-  const [telemetry, setTelemetry] = useState(!!resource.telemetry);
+  const telemetry = resource.telemetry ? advanced.ui.tracks.actions : false;
   const { busy, setBusy, message, setMessage, run } = useReviewActionStatus();
   const projected = useMemo(
     () =>
@@ -194,33 +243,25 @@ function useReviewEditorState(resource: LoadedReview) {
       setSelection(anchor);
     }
   };
-  useReviewKeys({
+  useReviewEditorShortcuts({
     time,
     seek,
     play,
+    composerAnnotation: composer.annotation,
+    busy,
+    exporterPhase: exporter.phase,
+    exporterAvailable: !!exporter.index,
+    boundaries: cutting && exporter.index ? exporter.index.boundaries : undefined,
+    run,
+    session,
     cancelDrawing: () => {
       cuts.setCutting(false);
       setSelection({ kind: 'point', time });
     },
-    undo: () => {
-      if (!composer.annotation && exporter.phase === 'idle')
-        void run(() => session.history('undo'));
-    },
-    redo: () => {
-      if (!composer.annotation && exporter.phase === 'idle')
-        void run(() => session.history('redo'));
-    },
-    remove: () => {
-      if (!composer.annotation && !busy && exporter.phase === 'idle') cuts.remove();
-    },
-    add: () => add(),
-    tool: (key) => {
-      if (!composer.annotation && !busy && exporter.phase === 'idle') {
-        if (key === 'v') cuts.setCutting(false);
-        else if (exporter.index) cuts.toggle('cut');
-      }
-    },
-    ...(cutting && exporter.index ? { boundaries: exporter.index.boundaries } : {}),
+    pointTool: () => cuts.setCutting(false),
+    remove: () => cuts.remove(),
+    addComment: () => add(),
+    toggleCut: () => cuts.toggle('cut'),
   });
   return {
     editing,
@@ -240,7 +281,11 @@ function useReviewEditorState(resource: LoadedReview) {
     selected,
     setHovered,
     telemetry,
-    setTelemetry,
+    advanced,
+    setMode: advancedState.setMode,
+    setTrackVisibility: advancedState.setTrackVisibility,
+    resetAdvanced: advancedState.reset,
+    flushAdvanced: advancedState.flush,
     projected,
     busy,
     setBusy,
@@ -318,6 +363,8 @@ type InspectorState = Pick<
   | 'canStart'
   | 'selectComment'
   | 'add'
+  | 'resetAdvanced'
+  | 'flushAdvanced'
 >;
 
 function ReviewInspectorBinding({
@@ -345,6 +392,8 @@ function ReviewInspectorBinding({
     canStart,
     selectComment,
     add,
+    resetAdvanced,
+    flushAdvanced,
   } = state;
   const errorKey: Parameters<typeof translate>[0] =
     snapshot.error === 'conflict'
@@ -392,6 +441,7 @@ function ReviewInspectorBinding({
         video.current?.pause();
         void run(async () => {
           await composer.flush();
+          await flushAdvanced();
           await session.flush();
           onBack();
         });
@@ -432,7 +482,12 @@ function ReviewInspectorBinding({
         <ReviewButton
           label={translate('gallery.videoReview.reload')}
           disabled={busy}
-          onClick={() => void run(composer.reload)}
+          onClick={() =>
+            void run(async () => {
+              await composer.reload();
+              resetAdvanced();
+            })
+          }
         />
       ) : null}
       {composer.annotation ? (
@@ -480,7 +535,9 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     setSelection,
     selected,
     telemetry,
-    setTelemetry,
+    advanced,
+    setMode,
+    setTrackVisibility,
     busy,
     setMessage,
     projected,
@@ -524,58 +581,34 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           volume={volume}
           onVolume={setVolume}
           tools={
-            <>
-              <ReviewTimelineTools
-                mode={editing.mode}
-                available={!!editing.exporter.index}
-                busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
-                rate={editing.rate}
-                audio={editing.audio}
-                selected={!!editing.selected}
-                onPointer={() => editing.setCutting(false)}
-                onToggle={editing.toggle}
-                onRate={editing.changeRate}
-                onAudio={editing.changeAudio}
-                onRemove={editing.remove}
-              />
-              <ReviewButton
-                label={translate(
-                  selection.kind === 'range'
-                    ? 'gallery.videoReview.commentRange'
-                    : 'gallery.videoReview.addComment'
-                )}
-                disabled={busy || !!composer.annotation}
-                onClick={() => add()}
-                className="!border-0 !bg-transparent !shadow-none !text-xs"
-              >
-                <MessageSquarePlus size={16} />
-                <span className="hidden @[720px]:inline">
-                  {translate(
-                    selection.kind === 'range'
-                      ? 'gallery.videoReview.commentRange'
-                      : 'gallery.videoReview.commentText'
-                  )}
-                </span>
-              </ReviewButton>
-              <ReviewFragmentAction
-                selection={selection}
-                index={editing.exporter.index}
-                edits={snapshot.document.edits}
-                busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
-                onDownload={editing.exporter.downloadSelection}
-              />
-              {resource.telemetry ? (
-                <ReviewButton
-                  label={translate('gallery.videoReview.telemetry')}
-                  aria-pressed={telemetry}
-                  className="!border-0 !bg-transparent !shadow-none
-                      aria-pressed:!bg-[var(--sniptale-color-accent-soft)]"
-                  onClick={() => setTelemetry(!telemetry)}
-                >
-                  <Activity size={16} />
-                </ReviewButton>
-              ) : null}
-            </>
+            <ReviewTimelineToolbar
+              editing={{
+                mode: editing.mode,
+                rate: editing.rate,
+                audio: editing.audio,
+                selected: !!editing.selected,
+                exporter: editing.exporter,
+                setCutting: editing.setCutting,
+                toggle: editing.toggle,
+                changeRate: editing.changeRate,
+                changeAudio: editing.changeAudio,
+                remove: editing.remove,
+              }}
+              busy={busy}
+              composerBusy={!!composer.annotation}
+              selection={selection}
+              edits={snapshot.document.edits}
+              advanced={advanced}
+              setMode={setMode}
+              setTrackVisibility={setTrackVisibility}
+              telemetryAvailable={!!resource.telemetry}
+              onAddComment={() => add()}
+              onDownloadFragment={() =>
+                selection.kind === 'range'
+                  ? editing.exporter.downloadSelection(selection)
+                  : undefined
+              }
+            />
           }
           {...(editing.exporter.index ? { boundaries: editing.exporter.index.boundaries } : {})}
           onRangeCommit={(range) => {

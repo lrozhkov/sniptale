@@ -107,6 +107,20 @@ export const galleryVideoReviewMessages = defineMessageSource({
   rangeEnd: { ru: 'Конец, с', en: 'End, s' },
   telemetry: { ru: 'История действий', en: 'Action history' },
   cursor: { ru: 'Курсор: обзор', en: 'Cursor overview' },
+  advancedEditing: {
+    ru: 'Расширенный режим',
+    en: 'Advanced editing',
+  },
+  advancedEditingHint: {
+    ru: 'Зум, фон, дорожки звука и расширенный экспорт',
+    en: 'Zoom, background, audio tracks, and advanced export',
+  },
+  zoomTrack: { ru: 'Дорожка зума', en: 'Zoom track' },
+  audioTrack: { ru: 'Дорожки звука', en: 'Audio tracks' },
+  advancedSuppressedHint: {
+    ru: 'Расширенные настройки сохранены и временно не применяются.',
+    en: 'Advanced settings are saved and temporarily not applied.',
+  },
   telemetryUnavailable: {
     ru: 'История действий для этого видео отсутствует.',
     en: 'No action history is available for this video.',
