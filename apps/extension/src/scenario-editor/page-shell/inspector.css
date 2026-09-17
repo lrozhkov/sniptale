@@ -24,6 +24,14 @@
   padding-block: 12px;
   border-top: 1px solid var(--sniptale-color-border-soft);
 }
+.guide-inspector-categorized .guide-inspector-group {
+  padding-block: 0;
+  border-top: none;
+}
+.guide-inspector-categorized .guide-inspector-group + .guide-inspector-group {
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
 .guide-inspector-group-heading {
   display: flex;
   align-items: center;

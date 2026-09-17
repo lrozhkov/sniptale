@@ -459,6 +459,30 @@ it('creates a local explanation style override from inherited settings', async (
   expect(project.tour!.style.textAppearance.surface).toBeUndefined();
 });
 
+it('shows one section heading in sections mode and moves object actions into it', async () => {
+  presentation = 'sections';
+  draw();
+  const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
+  expect(heading).not.toBeNull();
+  expect(heading.textContent).toContain('Slide');
+  expect(host.querySelector('.guide-inspector-group-heading')).toBeNull();
+  await click('Slide objects');
+  const objectsHeading = host.querySelector(
+    '[data-ui="shared.categorized-inspector.section-heading"]'
+  )!;
+  expect(objectsHeading.textContent).toContain('Slide objects');
+  expect([...objectsHeading.querySelectorAll('button')]).toHaveLength(3);
+  await click('Hotspot');
+  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  await click('Back to slide settings');
+  await click('Playback');
+  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  presentation = 'all';
+  draw();
+  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
+});
+
 it('preserves image categories through All and object drill-down without editing the tour', async () => {
   presentation = 'sections';
   draw();

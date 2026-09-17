@@ -30,7 +30,7 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField, TourTextPresentation } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
-import { TourNavigationSettings } from './navigation-settings';
+import { TourNavigationSettings, TourAddButtonControl } from './navigation-settings';
 import { TourEndSettings } from './end-settings';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
@@ -48,6 +48,79 @@ type InspectorProps = {
   onChangeSlide: (slide: TourSlide, group?: string | null) => boolean;
   onSelectObject: (id: string | null) => void;
 };
+
+/** Slide categories with heading controls for the object and button toolbars. */
+function TourSlideCategories({
+  slide,
+  disabled,
+  t,
+  onChangeSlide,
+  onSelectObject,
+}: {
+  slide: TourSlide;
+  disabled: boolean;
+  t: Translate;
+  onChangeSlide: (slide: TourSlide, group?: string | null) => boolean;
+  onSelectObject: (id: string | null) => void;
+}) {
+  const addImageObject = (kind: 'hotspot' | 'annotation' | 'mask') => {
+    if (slide.kind !== 'image') return;
+    const { slide: next, id } = addTourImageObject(slide, kind, t);
+    if (onChangeSlide(next)) onSelectObject(id);
+  };
+  const objectControl =
+    slide.kind === 'image' ? (
+      <TourImageObjectActions slide={slide} disabled={disabled} onAdd={addImageObject} t={t} />
+    ) : null;
+  const buttonControl =
+    slide.kind === 'navigation' ? (
+      <TourAddButtonControl
+        slide={slide}
+        disabled={disabled}
+        onChange={onChangeSlide}
+        onSelect={onSelectObject}
+        t={t}
+      />
+    ) : null;
+  return slide.kind === 'image'
+    ? [
+        { id: 'content', icon: Image, label: t('scenario.editor.tourSlide'), categorized: true },
+        {
+          id: 'camera',
+          icon: ScanSearch,
+          label: t('scenario.editor.tourCamera'),
+          categorized: true,
+        },
+        {
+          id: 'objects',
+          icon: Crosshair,
+          label: t('scenario.editor.tourObjects'),
+          categorized: true,
+          headingControl: objectControl,
+        },
+      ]
+    : [
+        {
+          id: 'content',
+          icon: Image,
+          label: t('scenario.editor.tourAddNavigation'),
+          categorized: true,
+        },
+        {
+          id: 'layout',
+          icon: LayoutPanelTop,
+          label: t('scenario.editor.tourComposition'),
+          categorized: true,
+        },
+        {
+          id: 'buttons',
+          icon: List,
+          label: t('scenario.editor.tourContentsLinks'),
+          categorized: true,
+          headingControl: buttonControl,
+        },
+      ];
+}
 
 /** The inspector edits exactly one scope: whole tour, end screen, slide or selected object. */
 export function TourInspector(props: InspectorProps) {
@@ -122,20 +195,14 @@ export function TourInspector(props: InspectorProps) {
         {settings('object')}
       </>
     );
-  const categories =
-    slide.kind === 'image'
-      ? [
-          { id: 'content', icon: Image, label: t('scenario.editor.tourSlide') },
-          { id: 'camera', icon: ScanSearch, label: t('scenario.editor.tourCamera') },
-          { id: 'objects', icon: Crosshair, label: t('scenario.editor.tourObjects') },
-        ]
-      : [
-          { id: 'content', icon: Image, label: t('scenario.editor.tourAddNavigation') },
-          { id: 'layout', icon: LayoutPanelTop, label: t('scenario.editor.tourComposition') },
-          { id: 'buttons', icon: List, label: t('scenario.editor.tourContentsLinks') },
-        ];
   return renderSections(slide.kind, [
-    ...categories.map((section) => ({ ...section, content: settings(section.id) })),
+    ...TourSlideCategories({
+      slide,
+      disabled,
+      t,
+      onChangeSlide: props.onChangeSlide,
+      onSelectObject,
+    }).map((section) => ({ ...section, content: settings(section.id) })),
     {
       id: 'playback',
       icon: Play,
@@ -335,77 +402,14 @@ function TourImageObjects({
   t: Translate;
 }) {
   const add = (kind: 'hotspot' | 'annotation' | 'mask') => {
-    const id = crypto.randomUUID();
-    const next: TourImageSlide =
-      kind === 'hotspot'
-        ? {
-            ...slide,
-            hotspots: [
-              ...slide.hotspots,
-              {
-                id,
-                point: { x: 0.5, y: 0.5 },
-                targetRect: null,
-                label: t('scenario.editor.tourHotspot'),
-                text: '',
-                action: { kind: 'next' },
-                appearance: null,
-                pulse: true,
-              },
-            ],
-          }
-        : kind === 'annotation'
-          ? {
-              ...slide,
-              annotations: [
-                ...slide.annotations,
-                { id, text: '', anchor: { x: 0.5, y: 0.5 }, appearance: null },
-              ],
-            }
-          : {
-              ...slide,
-              masks: [
-                ...slide.masks,
-                {
-                  id,
-                  kind: 'highlight',
-                  rect: { x: 0.25, y: 0.25, width: 0.3, height: 0.2 },
-                  color: '#f97316',
-                  opacity: 0.3,
-                },
-              ],
-            };
+    const { slide: next, id } = addTourImageObject(slide, kind, t);
     if (onChange(next)) onSelect(id);
   };
   return (
     <GuideInspectorGroup
       icon={Crosshair}
       title={t('scenario.editor.tourObjects')}
-      action={
-        <div className="tour-object-actions">
-          <ContentToolbarButton
-            disabled={disabled || !slide.image || slide.hotspots.length >= 20}
-            title={t('scenario.editor.tourHotspot')}
-            onClick={() => add('hotspot')}
-          >
-            <Crosshair size={15} />
-          </ContentToolbarButton>
-          <ContentToolbarButton
-            disabled={disabled || !slide.image || slide.annotations.length >= 20}
-            title={t('scenario.editor.tourAnnotation')}
-            onClick={() => add('annotation')}
-          >
-            <MessageSquare size={15} />
-          </ContentToolbarButton>
-          <ContentToolbarButton
-            disabled={disabled || !slide.image || slide.masks.length >= 20}
-            title={t('scenario.editor.tourMask')}
-            onClick={() => add('mask')}
-          >
-            <ScanLine size={15} />
-          </ContentToolbarButton>
-        </div>
-      }
+      action={<TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />}
     >
       {[
         ...slide.hotspots.map((entry) => ({
@@ -430,6 +434,93 @@ function TourImageObjects({
         </button>
       ))}
     </GuideInspectorGroup>
+  );
+}
+
+/** Adds one object with a fresh id through a single slide update. */
+function addTourImageObject(
+  slide: TourImageSlide,
+  kind: 'hotspot' | 'annotation' | 'mask',
+  t: Translate
+): { slide: TourImageSlide; id: string } {
+  const id = crypto.randomUUID();
+  const next: TourImageSlide =
+    kind === 'hotspot'
+      ? {
+          ...slide,
+          hotspots: [
+            ...slide.hotspots,
+            {
+              id,
+              point: { x: 0.5, y: 0.5 },
+              targetRect: null,
+              label: t('scenario.editor.tourHotspot'),
+              text: '',
+              action: { kind: 'next' },
+              appearance: null,
+              pulse: true,
+            },
+          ],
+        }
+      : kind === 'annotation'
+        ? {
+            ...slide,
+            annotations: [
+              ...slide.annotations,
+              { id, text: '', anchor: { x: 0.5, y: 0.5 }, appearance: null },
+            ],
+          }
+        : {
+            ...slide,
+            masks: [
+              ...slide.masks,
+              {
+                id,
+                kind: 'highlight',
+                rect: { x: 0.25, y: 0.25, width: 0.3, height: 0.2 },
+                color: '#f97316',
+                opacity: 0.3,
+              },
+            ],
+          };
+  return { slide: next, id };
+}
+
+function TourImageObjectActions({
+  slide,
+  disabled,
+  onAdd,
+  t,
+}: {
+  slide: TourImageSlide;
+  disabled: boolean;
+  onAdd: (kind: 'hotspot' | 'annotation' | 'mask') => void;
+  t: Translate;
+}) {
+  return (
+    <div className="tour-object-actions">
+      <ContentToolbarButton
+        disabled={disabled || !slide.image || slide.hotspots.length >= 20}
+        title={t('scenario.editor.tourHotspot')}
+        onClick={() => onAdd('hotspot')}
+      >
+        <Crosshair size={15} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        disabled={disabled || !slide.image || slide.annotations.length >= 20}
+        title={t('scenario.editor.tourAnnotation')}
+        onClick={() => onAdd('annotation')}
+      >
+        <MessageSquare size={15} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        disabled={disabled || !slide.image || slide.masks.length >= 20}
+        title={t('scenario.editor.tourMask')}
+        onClick={() => onAdd('mask')}
+      >
+        <ScanLine size={15} />
+      </ContentToolbarButton>
+    </div>
   );
 }
 

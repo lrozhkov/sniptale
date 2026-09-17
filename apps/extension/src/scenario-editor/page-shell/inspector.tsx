@@ -1,7 +1,29 @@
-import type { ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { NumericValueField } from '../../ui/compact-inspector-controls/numeric';
 import './inspector.css';
+
+const InspectorCategorizedContentContext = createContext(false);
+
+/**
+ * Marks inspector content that renders inside one shared category heading:
+ * groups drop their own duplicate heading and actions move to the heading control.
+ */
+export function InspectorCategorizedContent({
+  flatten = true,
+  children,
+}: {
+  flatten?: boolean;
+  children: ReactNode;
+}) {
+  const content = <div className="guide-inspector-categorized">{children}</div>;
+  if (!flatten) return content;
+  return (
+    <InspectorCategorizedContentContext.Provider value={true}>
+      {content}
+    </InspectorCategorizedContentContext.Provider>
+  );
+}
 
 /** Consistent section hierarchy for document, step and block properties. */
 export function GuideInspectorGroup({
@@ -15,13 +37,16 @@ export function GuideInspectorGroup({
   action?: ReactNode;
   children: ReactNode;
 }) {
+  const categorized = useContext(InspectorCategorizedContentContext);
   return (
     <section className="guide-inspector-group" aria-label={title}>
-      <div className="guide-inspector-group-heading">
-        <Icon size={15} aria-hidden="true" />
-        <h3>{title}</h3>
-        {action}
-      </div>
+      {!categorized && (
+        <div className="guide-inspector-group-heading">
+          <Icon size={15} aria-hidden="true" />
+          <h3>{title}</h3>
+          {action}
+        </div>
+      )}
       <div className="guide-inspector-group-body">{children}</div>
     </section>
   );

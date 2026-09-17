@@ -155,6 +155,43 @@ export function TourNavigationSettings({
   );
 }
 
+/** Adds one empty navigation button through a single slide update. */
+export function TourAddButtonControl({
+  slide,
+  disabled,
+  onChange,
+  onSelect,
+  t,
+}: {
+  slide: TourNavigationSlide;
+  disabled: boolean;
+  onChange: (slide: TourNavigationSlide) => boolean;
+  onSelect: (id: string | null) => void;
+  t: Translate;
+}) {
+  return (
+    <ContentToolbarButton
+      disabled={disabled || slide.buttons.length >= 120}
+      title={t('scenario.editor.tourAddButton')}
+      onClick={() => {
+        const id = crypto.randomUUID();
+        if (
+          onChange({
+            ...slide,
+            buttons: [
+              ...slide.buttons,
+              { id, label: t('scenario.editor.tourButton'), action: { kind: 'next' } },
+            ],
+          })
+        )
+          onSelect(id);
+      }}
+    >
+      <Plus size={16} />
+    </ContentToolbarButton>
+  );
+}
+
 /** Ordered button list and contents generation share one atomic slide update. */
 function TourNavigationButtons({
   slide,
@@ -191,25 +228,13 @@ function TourNavigationButtons({
       icon={List}
       title={t('scenario.editor.tourContentsLinks')}
       action={
-        <ContentToolbarButton
-          disabled={disabled || slide.buttons.length >= 120}
-          title={t('scenario.editor.tourAddButton')}
-          onClick={() => {
-            const id = crypto.randomUUID();
-            if (
-              onChange({
-                ...slide,
-                buttons: [
-                  ...slide.buttons,
-                  { id, label: t('scenario.editor.tourButton'), action: { kind: 'next' } },
-                ],
-              })
-            )
-              onSelect(id);
-          }}
-        >
-          <Plus size={16} />
-        </ContentToolbarButton>
+        <TourAddButtonControl
+          slide={slide}
+          disabled={disabled}
+          onChange={onChange}
+          onSelect={onSelect}
+          t={t}
+        />
       }
     >
       <ProductActionButton
