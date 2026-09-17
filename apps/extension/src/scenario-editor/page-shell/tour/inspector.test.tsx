@@ -471,7 +471,7 @@ it('shows one section heading in sections mode and moves object actions into it'
     '[data-ui="shared.categorized-inspector.section-heading"]'
   )!;
   expect(objectsHeading.textContent).toContain('Slide objects');
-  expect([...objectsHeading.querySelectorAll('button')]).toHaveLength(3);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
   await click('Hotspot');
   expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
   await click('Back to slide settings');

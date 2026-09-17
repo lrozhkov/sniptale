@@ -28,6 +28,7 @@ import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup } from '../inspector';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourTextField, TourTextPresentation } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
 import { TourNavigationSettings, TourAddButtonControl } from './navigation-settings';
@@ -49,7 +50,9 @@ type InspectorProps = {
   onSelectObject: (id: string | null) => void;
 };
 
-/** Slide categories with heading controls for the object and button toolbars. */
+/**
+ * Slide categories for image and navigation slides; grouped content matches the category labels.
+ */
 function TourSlideCategories({
   slide,
   disabled,
@@ -63,15 +66,6 @@ function TourSlideCategories({
   onChangeSlide: (slide: TourSlide, group?: string | null) => boolean;
   onSelectObject: (id: string | null) => void;
 }) {
-  const addImageObject = (kind: 'hotspot' | 'annotation' | 'mask') => {
-    if (slide.kind !== 'image') return;
-    const { slide: next, id } = addTourImageObject(slide, kind, t);
-    if (onChangeSlide(next)) onSelectObject(id);
-  };
-  const objectControl =
-    slide.kind === 'image' ? (
-      <TourImageObjectActions slide={slide} disabled={disabled} onAdd={addImageObject} t={t} />
-    ) : null;
   const buttonControl =
     slide.kind === 'navigation' ? (
       <TourAddButtonControl
@@ -96,7 +90,6 @@ function TourSlideCategories({
           icon: Crosshair,
           label: t('scenario.editor.tourObjects'),
           categorized: true,
-          headingControl: objectControl,
         },
       ]
     : [
@@ -188,10 +181,10 @@ export function TourInspector(props: InspectorProps) {
   if (objectId)
     return (
       <>
-        <ProductActionButton compact tone="secondary" onClick={() => onSelectObject(null)}>
+        <ScenarioInspectorActionButton onClick={() => onSelectObject(null)}>
           <ArrowLeft size={15} />
           {t('scenario.editor.tourBackToSlide')}
-        </ProductActionButton>
+        </ScenarioInspectorActionButton>
         {settings('object')}
       </>
     );
@@ -364,9 +357,8 @@ function TourImageObjectSettings({
             }
           />
         )}
-        <ProductActionButton
-          compact
-          tone="secondary"
+        <ScenarioInspectorActionButton
+          tone="danger"
           disabled={disabled}
           onClick={() => {
             if (
@@ -382,7 +374,7 @@ function TourImageObjectSettings({
         >
           <Trash2 size={15} />
           {t('common.actions.delete')}
-        </ProductActionButton>
+        </ScenarioInspectorActionButton>
       </>
     );
   return null;
@@ -406,11 +398,8 @@ function TourImageObjects({
     if (onChange(next)) onSelect(id);
   };
   return (
-    <GuideInspectorGroup
-      icon={Crosshair}
-      title={t('scenario.editor.tourObjects')}
-      action={<TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />}
-    >
+    <GuideInspectorGroup icon={Crosshair} title={t('scenario.editor.tourObjects')}>
+      <TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />
       {[
         ...slide.hotspots.map((entry) => ({
           id: entry.id,
@@ -504,21 +493,21 @@ function TourImageObjectActions({
         title={t('scenario.editor.tourHotspot')}
         onClick={() => onAdd('hotspot')}
       >
-        <Crosshair size={15} />
+        <Crosshair size={16} />
       </ContentToolbarButton>
       <ContentToolbarButton
         disabled={disabled || !slide.image || slide.annotations.length >= 20}
         title={t('scenario.editor.tourAnnotation')}
         onClick={() => onAdd('annotation')}
       >
-        <MessageSquare size={15} />
+        <MessageSquare size={16} />
       </ContentToolbarButton>
       <ContentToolbarButton
         disabled={disabled || !slide.image || slide.masks.length >= 20}
         title={t('scenario.editor.tourMask')}
         onClick={() => onAdd('mask')}
       >
-        <ScanLine size={15} />
+        <ScanLine size={16} />
       </ContentToolbarButton>
     </div>
   );

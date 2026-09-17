@@ -8,8 +8,7 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
 import { getTourNarrationTarget } from '../../../features/scenario/project/public';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourInspectorNumericRow } from './numeric-row';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
@@ -69,13 +68,15 @@ export function TourNarrationSettings({
               {resources.find((r) => r.assetId === narration.assetId)?.name ||
                 t('scenario.editor.tourNarration')}
             </span>
-            <ContentToolbarButton
+            <ScenarioInspectorActionButton
+              tone="danger"
+              layout="icon"
               title={t('scenario.editor.tourAudioRemove')}
               disabled={disabled}
               onClick={() => update(null)}
             >
               <Unlink size={15} />
-            </ContentToolbarButton>
+            </ScenarioInspectorActionButton>
           </div>
           <TourNarrationPreview key={narration.assetId} narration={narration} t={t} />
         </>
@@ -86,16 +87,14 @@ export function TourNarrationSettings({
         onImport={onImport}
         t={t}
       >
-        <ProductActionButton
-          compact
-          tone="secondary"
+        <ScenarioInspectorActionButton
           disabled={disabled || !resources.length}
           aria-expanded={choosing}
           onClick={() => setChoosing(!choosing)}
         >
           <FolderOpen size={15} />
           {t('scenario.editor.tourAudioChoose')}
-        </ProductActionButton>
+        </ScenarioInspectorActionButton>
       </TourNarrationAcquisition>
       {choosing && (
         <TourAudioPicker
