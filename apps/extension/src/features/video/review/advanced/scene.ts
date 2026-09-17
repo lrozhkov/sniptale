@@ -27,7 +27,7 @@ const easing = (progress: number, type: QuickEditZoomRegion['enter']['type']) =>
   return progress * progress * (3 - 2 * progress);
 };
 
-/** Content area inside the output frame after background padding. */
+/** Content area inside the output frame; padding never collapses the canvas below one pixel. */
 export function computeQuickEditContentRect(
   output: { width: number; height: number },
   background: QuickEditBackgroundSettings
@@ -35,7 +35,12 @@ export function computeQuickEditContentRect(
   const padding = background.enabled ? background.layout.padding : 0;
   const x = Math.min(padding, output.width / 2);
   const y = Math.min(padding, output.height / 2);
-  return { x, y, width: output.width - 2 * x, height: output.height - 2 * y };
+  return {
+    x,
+    y,
+    width: Math.max(1, output.width - 2 * x),
+    height: Math.max(1, output.height - 2 * y),
+  };
 }
 
 /**

@@ -103,6 +103,39 @@ it('maps canvas target drags into normalized content points and restores on esca
   await stage.event(target, 'pointerup', bounds.left + 400, bounds.top + 180);
 });
 
+it('paints the canvas background behind the fitted video when enabled', async () => {
+  const background: QuickEditBackgroundSettings = {
+    enabled: true,
+    type: 'solid',
+    color: '#112233ff',
+    layout: { padding: 40, cornerRadius: 12 },
+  };
+  act(() => {
+    root.render(
+      <ReviewStage
+        url="blob:review"
+        source={source}
+        video={{ current: null }}
+        drawing={false}
+        region={undefined}
+        zoom={{
+          camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+          background,
+          onDrag: vi.fn(),
+        }}
+        onRegion={vi.fn()}
+        onReady={vi.fn()}
+        onTime={vi.fn()}
+        onPlaying={vi.fn()}
+        onError={vi.fn()}
+      />
+    );
+  });
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  expect(stage.style.background).toBe('rgb(17, 34, 51)');
+  expect(stage.style.borderRadius).toBe('12px');
+});
+
 it('renders nothing interactive while the zoom selection is absent', async () => {
   act(() => {
     root.render(

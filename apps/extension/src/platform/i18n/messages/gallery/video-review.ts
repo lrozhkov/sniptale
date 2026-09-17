@@ -134,6 +134,13 @@ export const galleryVideoReviewMessages = defineMessageSource({
   zoomResetPosition: { ru: 'Сбросить позицию', en: 'Reset position' },
   zoomDelete: { ru: 'Удалить зум', en: 'Delete zoom' },
   zoomStageTarget: { ru: 'Фокус кадра зума', en: 'Zoom frame focus' },
+  canvas: { ru: 'Холст', en: 'Canvas' },
+  background: { ru: 'Фон', en: 'Background' },
+  backgroundNone: { ru: 'Без фона', en: 'No background' },
+  backgroundSolid: { ru: 'Цвет', en: 'Color' },
+  backgroundGradient: { ru: 'Градиент', en: 'Gradient' },
+  backgroundPadding: { ru: 'Отступ, px', en: 'Padding, px' },
+  backgroundCornerRadius: { ru: 'Радиус, px', en: 'Corner radius, px' },
   audioTrack: { ru: 'Дорожки звука', en: 'Audio tracks' },
   advancedSuppressedHint: {
     ru: 'Расширенные настройки сохранены и временно не применяются.',

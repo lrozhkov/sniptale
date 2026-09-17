@@ -72,6 +72,11 @@ export function useReviewAdvanced(session: Session) {
       }),
     setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>
       schedule({ ...current, zoom: update(current.zoom) }),
+    setBackground: (
+      update: (
+        background: QuickEditAdvancedState['background']
+      ) => QuickEditAdvancedState['background']
+    ) => schedule({ ...current, background: update(current.background) }),
     flush,
     reset,
   };

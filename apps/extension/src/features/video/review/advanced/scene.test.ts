@@ -38,6 +38,17 @@ describe('computeQuickEditContentRect', () => {
         }
       )
     ).toEqual({ x: 40, y: 40, width: 720, height: 520 });
+    expect(
+      computeQuickEditContentRect(
+        { width: 1, height: 1 },
+        {
+          enabled: true,
+          type: 'solid',
+          color: '#000000ff',
+          layout: { padding: 40, cornerRadius: 0 },
+        }
+      )
+    ).toEqual({ x: 0.5, y: 0.5, width: 1, height: 1 });
   });
 });
 

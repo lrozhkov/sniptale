@@ -25,9 +25,8 @@ import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { useReviewPlayback } from './use-playback';
 import { useReviewEdits } from './use-edits';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
-import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { ReviewZoomTrack } from './zoom-track';
-import { ReviewZoomInspector } from './zoom-inspector';
+import { ReviewAdvancedPanels } from './advanced-panels';
 import { useReviewZoomEditor } from './zoom-editor';
 
 function useReviewKeys({
@@ -107,6 +106,21 @@ function useReviewKeys({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   });
+}
+
+function useReviewTelemetryProjection(args: {
+  telemetry: LoadedReview['telemetry'];
+  duration: number;
+  actionsVisible: boolean;
+}) {
+  const projected = useMemo(
+    () =>
+      args.telemetry
+        ? projectReviewTelemetry(args.telemetry, args.duration, false)
+        : { markers: [], warnings: 0 },
+    [args.telemetry, args.duration]
+  );
+  return { telemetry: args.telemetry ? args.actionsVisible : false, projected };
 }
 
 function useReviewCommentActions(args: {
@@ -256,14 +270,11 @@ function useReviewEditorState(resource: LoadedReview) {
   });
   const { cutting, setCutting } = cuts;
   const editing = { ...cuts, exporter };
-  const telemetry = resource.telemetry ? advanced.ui.tracks.actions : false;
-  const projected = useMemo(
-    () =>
-      resource.telemetry
-        ? projectReviewTelemetry(resource.telemetry, source.duration, false)
-        : { markers: [], warnings: 0 },
-    [resource.telemetry, source.duration]
-  );
+  const { telemetry, projected } = useReviewTelemetryProjection({
+    telemetry: resource.telemetry,
+    duration: source.duration,
+    actionsVisible: advanced.ui.tracks.actions,
+  });
   const canStart = () => {
     if (!composer.annotation) return true;
     setMessage(translate('gallery.videoReview.finishComment'));
@@ -322,6 +333,7 @@ function useReviewEditorState(resource: LoadedReview) {
     setMode: advancedState.setMode,
     setTrackVisibility: advancedState.setTrackVisibility,
     zoom,
+    setBackground: advancedState.setBackground,
     resetAdvanced: advancedState.reset,
     flushAdvanced: advancedState.flush,
     projected,
@@ -403,6 +415,7 @@ type InspectorState = Pick<
   | 'add'
   | 'advanced'
   | 'zoom'
+  | 'setBackground'
   | 'resetAdvanced'
   | 'flushAdvanced'
 >;
@@ -434,6 +447,7 @@ function ReviewInspectorBinding({
     add,
     advanced,
     zoom,
+    setBackground,
     resetAdvanced,
     flushAdvanced,
   } = state;
@@ -520,17 +534,7 @@ function ReviewInspectorBinding({
           .finally(() => setBusy(false));
       }}
     >
-      {(() => {
-        const zoomRegion = zoom.selected(advanced.zoom);
-        return zoomRegion ? (
-          <ReviewZoomInspector
-            region={zoomRegion}
-            onChange={(patch: QuickEditZoomRegionPatch) => zoom.change(zoomRegion.id, patch)}
-            onReset={() => zoom.resetPosition(zoomRegion.id)}
-            onDelete={() => zoom.remove(zoomRegion.id)}
-          />
-        ) : null;
-      })()}
+      <ReviewAdvancedPanels advanced={advanced} zoom={zoom} setBackground={setBackground} />
       {snapshot.error === 'conflict' ? (
         <ReviewButton
           label={translate('gallery.videoReview.reload')}

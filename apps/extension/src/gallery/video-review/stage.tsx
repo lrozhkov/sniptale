@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
 import { fitVideoRect, projectVideoRegion } from '../../features/video/review/geometry';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 import type { ReviewRegion, ReviewSource } from '../../features/video/review/types';
 import {
   computeQuickEditSceneLayout,
@@ -54,7 +55,18 @@ export function ReviewStage(props: {
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   });
-  const content = fitVideoRect(size, props.source);
+  const zoomLayout = props.zoom
+    ? computeQuickEditSceneLayout({
+        output: size,
+        source: props.source,
+        background: props.zoom.background,
+        camera: props.zoom.camera,
+      })
+    : null;
+  const backgroundPaint = props.zoom?.background.enabled
+    ? backgroundPaintOf(props.zoom.background)
+    : null;
+  const content = zoomLayout ? zoomLayout.videoRect : fitVideoRect(size, props.source);
   const plane = useReviewDrawingPlane({
     drawing: props.drawing,
     content,
@@ -67,14 +79,6 @@ export function ReviewStage(props: {
     : props.region
       ? projectVideoRegion(props.region, content)
       : null;
-  const zoomLayout = props.zoom
-    ? computeQuickEditSceneLayout({
-        output: size,
-        source: props.source,
-        background: props.zoom.background,
-        camera: props.zoom.camera,
-      })
-    : null;
   const zoomFocus = zoomLayout
     ? {
         x:
@@ -93,6 +97,12 @@ export function ReviewStage(props: {
       style={{
         cursor: props.drawing ? 'crosshair' : 'default',
         touchAction: props.drawing ? 'none' : 'auto',
+        ...(backgroundPaint && props.zoom?.background.enabled
+          ? {
+              background: backgroundPaint,
+              borderRadius: props.zoom.background.layout.cornerRadius,
+            }
+          : {}),
       }}
       onPointerDown={plane.onPointerDown}
       onPointerMove={plane.onPointerMove}
@@ -160,6 +170,17 @@ function ReviewRegionOverlay(props: { drawing: boolean; projected: ReviewRegion 
         : null}
     </div>
   );
+}
+
+function backgroundPaintOf(background: {
+  type: 'solid' | 'gradient' | 'image';
+  color?: string;
+  gradient?: import('@sniptale/foundation/paint').Gradient;
+}): string {
+  if (background.type === 'solid' && background.color) return background.color;
+  if (background.type === 'gradient' && background.gradient)
+    return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
+  return '#000000';
 }
 
 /** Draggable camera focus: the handle maps canvas movement into normalized content points. */
