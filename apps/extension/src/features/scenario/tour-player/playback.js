@@ -8,8 +8,21 @@ import {
 } from './timing.js';
 import { createTourTransport } from './transport.js';
 
+/** Audio preview syncs only until a decoding error takes over the transport state. */
+function syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state }) {
+  if (audioState) return;
+  audio.sync(
+    Math.max(0, elapsed - entrance) / 1000,
+    playing && state === 'ready' && elapsed >= entrance && !audioState
+  );
+}
+
 /** Projects transport and route policy; the session owns media readiness and the single clock. */
-export function createTourPlayback(root, input, signal, motion, navigate, silent = false) {
+export function createTourPlayback(
+  root,
+  input,
+  { signal, motion, navigate, silent = false, chrome }
+) {
   let tour = input.tour;
   let index = 0;
   let ended = false;
@@ -22,6 +35,11 @@ export function createTourPlayback(root, input, signal, motion, navigate, silent
   const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const reduced = () => Boolean(motionPreference?.matches);
   const update = createTourTransport(root, input.labels, signal, toggle, seek);
+  const playbackView = (elapsed, state) => ({
+    elapsed: ended ? (timeline?.duration ?? duration) : (timeline?.offsets[index] ?? 0) + elapsed,
+    duration: timeline?.duration ?? duration,
+    state: audioState ?? (choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state),
+  });
   let audioState = null;
   const audio = createTourAudio(root, signal, (state) => {
     audioState = state;
@@ -33,19 +51,10 @@ export function createTourPlayback(root, input, signal, motion, navigate, silent
     hidden: () => root.ownerDocument.hidden,
     autoplay: tour.playback.autoplay && !root.ownerDocument.hidden,
     changed(elapsed, playing, state) {
-      if (!audioState)
-        audio.sync(
-          Math.max(0, elapsed - entrance) / 1000,
-          playing && state === 'ready' && elapsed >= entrance && !audioState
-        );
-      update({
-        elapsed: ended
-          ? (timeline?.duration ?? duration)
-          : (timeline?.offsets[index] ?? 0) + elapsed,
-        duration: timeline?.duration ?? duration,
-        playing,
-        state: audioState ?? (choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state),
-      });
+      syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state });
+      const view = playbackView(elapsed, state);
+      update({ ...view, playing });
+      chrome?.update({ playing, state: view.state });
     },
     complete: advance,
   });

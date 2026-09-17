@@ -1,5 +1,6 @@
 import { createTourScene } from './scene.js';
 import { createTourPlayback } from './playback.js';
+import { createTourChrome } from './chrome.js';
 
 /** Owns one mounted player and releases every document listener and resize observer. */
 export function createTourPlayer(root, input, options = {}) {
@@ -20,19 +21,19 @@ export function createTourPlayer(root, input, options = {}) {
   let ended = false;
   const history = [];
   const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
+  const chrome = options.authoring ? null : createTourChrome(root, lifetime.signal);
   const playback = options.authoring
     ? null
-    : createTourPlayback(
-        root,
-        input,
-        lifetime.signal,
-        view.motion,
-        (target, restart = false) => {
+    : createTourPlayback(root, input, {
+        signal: lifetime.signal,
+        motion: view.motion,
+        navigate: (target, restart = false) => {
           if (restart) history.length = 0;
           go(target, !restart);
         },
-        options.preview
-      );
+        silent: options.preview,
+        chrome,
+      });
   function manualGo(target, recordHistory = true) {
     playback?.interact();
     go(target, recordHistory);
