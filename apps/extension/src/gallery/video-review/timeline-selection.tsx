@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
-import { nearestReviewBoundary } from '../../features/video/review/cuts';
+import {
+  SNAP_THRESHOLD_PX,
+  getSnapCandidates,
+  snapTimelineTime,
+} from '../../features/video/review/snap';
 import { reviewTimeLabel } from './controls';
 
 type SelectionProps = {
@@ -22,11 +26,20 @@ const percent = (time: number, duration: number) => `${(time / duration) * 100}%
 
 /** One source lane; existing edits can be moved or resized directly. */
 export function ReviewSourceLane(props: SelectionProps) {
+  const [guide, setGuide] = useState<number | null>(null);
   return (
     <div
       data-ui="gallery.videoReview.sourceLane"
       className="relative mt-1 h-12 rounded bg-[var(--sniptale-color-surface-hover)]"
     >
+      {guide !== null ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 z-20 w-px
+              bg-[var(--sniptale-color-accent-emphasis)]"
+          style={{ left: percent(guide, props.duration) }}
+        />
+      ) : null}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 flex items-center gap-2 overflow-hidden px-3
@@ -47,15 +60,17 @@ export function ReviewSourceLane(props: SelectionProps) {
         />
       ) : null}
       {props.edits?.map((edit) => (
-        <ReviewEditBlock key={edit.id} {...props} edit={edit} />
+        <ReviewEditBlock key={edit.id} {...props} onSnap={setGuide} edit={edit} />
       ))}
       <ReviewCommentMarkers {...props} />
     </div>
   );
 }
 
-function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
-  const { edit, duration } = props;
+function ReviewEditBlock(
+  props: SelectionProps & { edit: ReviewEdit; onSnap(guide: number | null): void }
+) {
+  const { edit, duration, onSnap } = props;
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
   const drag = useRef<{
     x: number;
@@ -74,12 +89,13 @@ function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
       event.stopImmediatePropagation();
       drag.current = null;
       setPreview(null);
+      onSnap(null);
       if (current.node.hasPointerCapture(current.pointerId))
         current.node.releasePointerCapture(current.pointerId);
     };
     window.addEventListener('keydown', cancel, true);
     return () => window.removeEventListener('keydown', cancel, true);
-  }, []);
+  }, [onSnap]);
   const range = preview ?? edit;
   const label =
     edit.kind === 'cut'
@@ -133,12 +149,20 @@ function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
             : current.edge === 'move'
               ? start + length
               : Math.max(0, Math.min(duration, edit.end + delta));
-        if (props.boundaries?.length) {
-          start = nearestReviewBoundary(start, props.boundaries);
-          end = nearestReviewBoundary(end, props.boundaries);
-        }
-        if (start < end) {
-          current.range = { start, end };
+        const snapped = snapReviewEditDrag({
+          edge: current.edge,
+          start,
+          end,
+          duration,
+          widthPx: current.width,
+          bypass: event.shiftKey,
+          edits: props.edits,
+          boundaries: props.boundaries,
+          playhead: props.time,
+        });
+        onSnap(snapped.guide);
+        if (snapped.start < snapped.end) {
+          current.range = { start: snapped.start, end: snapped.end };
           setPreview(current.range);
         }
       }}
@@ -146,6 +170,7 @@ function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
         const current = drag.current;
         drag.current = null;
         setPreview(null);
+        onSnap(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
         if (current?.moved) props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
@@ -153,6 +178,7 @@ function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
       onPointerCancel={() => {
         drag.current = null;
         setPreview(null);
+        onSnap(null);
       }}
     >
       <button
@@ -168,38 +194,90 @@ function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
         <span className="truncate">{label}</span>
       </button>
       {(['start', 'end'] as const).map((edge) => (
-        <button
+        <ReviewEditEdge
           key={edge}
-          type="button"
-          data-edge={edge}
-          aria-label={translate(
-            edge === 'start' ? 'gallery.videoReview.resizeStart' : 'gallery.videoReview.resizeEnd'
-          )}
-          className={`absolute inset-y-0 w-3 cursor-ew-resize rounded bg-black/10
-              ${edge === 'start' ? 'left-0' : 'right-0'}`}
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-            event.preventDefault();
-            event.stopPropagation();
-            const choices = props.boundaries ?? [];
-            const next =
-              event.key === 'ArrowRight'
-                ? choices.find((value) => value > edit[edge])
-                : [...choices].reverse().find((value) => value < edit[edge]);
-            if (next !== undefined)
-              props.onChangeEdit?.(edit, {
-                kind: 'range',
-                start: edit.start,
-                end: edit.end,
-                [edge]: next,
-              });
-          }}
-        >
-          <span aria-hidden="true" className="mx-auto block h-4 w-px bg-current opacity-50" />
-        </button>
+          edge={edge}
+          edit={edit}
+          boundaries={props.boundaries}
+          onChangeEdit={props.onChangeEdit}
+        />
       ))}
     </div>
   );
+}
+
+/** Pointer and keyboard resizing of one edit edge; keyboard steps follow the media boundaries. */
+function ReviewEditEdge(props: {
+  edge: 'start' | 'end';
+  edit: ReviewEdit;
+  boundaries: readonly number[] | undefined;
+  onChangeEdit: ((edit: ReviewEdit, range: ReviewAnchor) => void) | undefined;
+}) {
+  return (
+    <button
+      type="button"
+      data-edge={props.edge}
+      aria-label={translate(
+        props.edge === 'start' ? 'gallery.videoReview.resizeStart' : 'gallery.videoReview.resizeEnd'
+      )}
+      className={`absolute inset-y-0 w-3 cursor-ew-resize rounded bg-black/10
+          ${props.edge === 'start' ? 'left-0' : 'right-0'}`}
+      onKeyDown={(event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        event.stopPropagation();
+        const choices = props.boundaries ?? [];
+        const next =
+          event.key === 'ArrowRight'
+            ? choices.find((value) => value > props.edit[props.edge])
+            : [...choices].reverse().find((value) => value < props.edit[props.edge]);
+        if (next !== undefined)
+          props.onChangeEdit?.(props.edit, {
+            kind: 'range',
+            start: props.edit.start,
+            end: props.edit.end,
+            [props.edge]: next,
+          });
+      }}
+    >
+      <span aria-hidden="true" className="mx-auto block h-4 w-px bg-current opacity-50" />
+    </button>
+  );
+}
+
+/** Trim snaps only the dragged edge; a whole-block move keeps both edges magnetic. */
+function snapReviewEditDrag(args: {
+  edge: 'start' | 'end' | 'move';
+  start: number;
+  end: number;
+  duration: number;
+  widthPx: number;
+  bypass: boolean;
+  edits: readonly ReviewEdit[] | undefined;
+  boundaries: readonly number[] | undefined;
+  playhead: number;
+}): { start: number; end: number; guide: number | null } {
+  if (args.bypass || !args.edits || args.widthPx <= 0)
+    return { start: args.start, end: args.end, guide: null };
+  const threshold = (SNAP_THRESHOLD_PX * args.duration) / args.widthPx;
+  const candidates = getSnapCandidates({
+    edits: args.edits,
+    playhead: args.playhead,
+    ...(args.boundaries ? { boundaries: args.boundaries } : {}),
+  });
+  let guide: number | null = null;
+  let { start, end } = args;
+  if (args.edge !== 'end') {
+    const snap = snapTimelineTime(start, candidates, threshold);
+    start = snap.time;
+    guide = snap.candidate;
+  }
+  if (args.edge !== 'start') {
+    const snap = snapTimelineTime(end, candidates, threshold);
+    end = snap.time;
+    guide = snap.candidate ?? guide;
+  }
+  return { start, end, guide };
 }
 
 /** Co-located point comments share one marker; the full set remains in the inspector feed. */

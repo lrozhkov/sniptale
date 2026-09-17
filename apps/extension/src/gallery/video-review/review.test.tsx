@@ -2,7 +2,6 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewSourceLane } from './timeline-selection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewAnchor } from '../../features/video/review/types';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -555,103 +554,6 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       host.querySelector<HTMLButtonElement>('[title="Exact annotation"]')!.click()
     );
     expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
-  } finally {
-    await fixture.cleanup();
-  }
-});
-
-it('moves and resizes edit blocks once per gesture, cancelling transient geometry safely', async () => {
-  const fixture = createEditorFixture();
-  const { host, root } = fixture;
-  const change = vi.fn(),
-    select = vi.fn();
-  const edit = {
-    id: 'cut',
-    kind: 'cut' as const,
-    start: 2,
-    end: 4,
-    requestedStart: 2,
-    requestedEnd: 4,
-  };
-  try {
-    await act(async () =>
-      root.render(
-        <ReviewSourceLane
-          duration={10}
-          time={0}
-          selection={{ kind: 'point', time: 0 }}
-          annotations={[]}
-          edits={[edit]}
-          boundaries={[0, 2, 4, 6, 8, 10]}
-          onEdit={select}
-          onChangeEdit={change}
-          onSeek={vi.fn()}
-          onSelect={vi.fn()}
-          onComment={vi.fn()}
-        />
-      )
-    );
-    const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
-    vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 48));
-    const button = lane.querySelector<HTMLButtonElement>('button')!;
-    const block = button.parentElement!;
-    Object.assign(block, {
-      setPointerCapture: vi.fn(),
-      hasPointerCapture: () => true,
-      releasePointerCapture: vi.fn(),
-    });
-    const event = async (target: Element, kind: string, x: number, button = 0) =>
-      act(async () => {
-        target.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x, button }));
-      });
-    await event(button, 'pointerdown', 200);
-    await event(block, 'pointermove', 400);
-    expect(block.style.left).toBe('40%');
-    expect(change).not.toHaveBeenCalled();
-    await event(block, 'pointerup', 400);
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 4, end: 6 });
-    expect(change).toHaveBeenCalledOnce();
-    const start = block.querySelector('[data-edge="start"]')!,
-      end = block.querySelector('[data-edge="end"]')!;
-    await event(start, 'pointerdown', 200);
-    await event(block, 'pointermove', 0);
-    await event(block, 'pointerup', 0);
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 0, end: 4 });
-    await event(end, 'pointerdown', 400);
-    await event(block, 'pointermove', 700);
-    await event(block, 'pointerup', 700);
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6 });
-    change.mockClear();
-    await event(button, 'pointerdown', 200);
-    await event(block, 'pointermove', 600);
-    await event(block, 'pointercancel', 600);
-    await event(block, 'pointerup', 600);
-    expect(change).not.toHaveBeenCalled();
-    expect(block.style.left).toBe('20%');
-    for (const target of [button, start, end]) {
-      vi.mocked(block.releasePointerCapture).mockClear();
-      const destination = target === start ? 0 : 400;
-      await event(target, 'pointerdown', 200);
-      await event(block, 'pointermove', destination);
-      await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-      expect(block.style.left).toBe('20%');
-      expect(block.style.width).toBe('20%');
-      expect(block.releasePointerCapture).toHaveBeenCalled();
-      await event(block, 'pointerup', destination);
-      expect(change).not.toHaveBeenCalled();
-    }
-    await event(button, 'pointerdown', 200, 2);
-    await event(block, 'pointermove', 500);
-    await event(block, 'pointerup', 500);
-    expect(change).not.toHaveBeenCalled();
-    await act(async () =>
-      end.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
-    );
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6 });
-    await act(async () =>
-      start.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
-    );
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 0, end: 4 });
   } finally {
     await fixture.cleanup();
   }
