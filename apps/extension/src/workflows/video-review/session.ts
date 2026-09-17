@@ -2,6 +2,7 @@ import {
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
   readVideoWorkspace,
+  saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
 } from '../../composition/persistence/review-workspaces/store';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -12,6 +13,7 @@ const persistence = {
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
   readVideoWorkspace,
+  saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
 };
 
@@ -83,6 +85,15 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
       return () => {
         listeners.delete(listener);
       };
+    },
+    saveAdvanced(advanced: unknown) {
+      const captured = structuredClone(advanced);
+      return enqueue(() =>
+        deps.saveVideoWorkspaceAdvanced({
+          ...identity(),
+          advanced: captured,
+        })
+      );
     },
     saveDraft(annotation: ReviewAnnotation | null, before: ReviewAnnotation | null) {
       const captured = structuredClone({ annotation, before });

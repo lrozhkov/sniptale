@@ -6,6 +6,7 @@ import {
   readVideoReviewForBackup,
 } from './backup-restore';
 import type { VideoWorkspace } from './contracts';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
 const workspace: VideoWorkspace = {
@@ -16,6 +17,7 @@ const workspace: VideoWorkspace = {
   revision: 4,
   cursor: 0,
   history: [{ id: 'op', at: 2, target: 'annotation', before: null, after: annotation }],
+  advanced: createQuickEditAdvancedState(),
   createdAt: 1,
   updatedAt: 3,
 };

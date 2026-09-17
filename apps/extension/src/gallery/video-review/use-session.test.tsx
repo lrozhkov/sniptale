@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewComposer } from './use-session';
 
@@ -23,6 +24,7 @@ function setup() {
       source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 200 },
       revision: 1,
       cursor: 0,
+      advanced: createQuickEditAdvancedState(),
       history: [],
       createdAt: 1,
       updatedAt: 1,
@@ -60,6 +62,7 @@ function setup() {
     }),
     readVideoWorkspace: vi.fn(async () => structuredClone(snapshot)),
     moveVideoWorkspaceHistory: vi.fn(async () => structuredClone(snapshot)),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => structuredClone(snapshot)),
   } satisfies Parameters<typeof createVideoReviewSession>[1];
   const session = createVideoReviewSession(snapshot, deps);
   function Harness() {

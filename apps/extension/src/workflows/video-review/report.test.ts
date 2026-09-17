@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewReport } from './report';
 
 it('exports exact times and excluded comments, without leaking draft or undo text through hostile fences', () => {
@@ -17,6 +18,7 @@ it('exports exact times and excluded comments, without leaking draft or undo tex
       source: { duration: 10, width: 800, height: 400, size: 12, mimeType: 'video/webm' },
       revision: 4,
       cursor: 2,
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 4,
       history: [
@@ -95,6 +97,7 @@ it('serializes full native telemetry and speed intent in microseconds, retaining
       source,
       revision: 3,
       cursor: 2,
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 2,
       history: [
@@ -240,6 +243,7 @@ it('binds actual export timing to its revision without claiming later edits were
       source: { duration: 8, width: 160, height: 90, size: 100, mimeType: 'video/webm' },
       revision: 2,
       cursor: 1,
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 2,
       history: [

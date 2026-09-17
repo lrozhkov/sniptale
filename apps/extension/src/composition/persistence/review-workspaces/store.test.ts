@@ -20,8 +20,11 @@ import {
   moveVideoWorkspaceHistory,
   openVideoWorkspace,
   readVideoWorkspace,
+  saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
 } from './store';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
 
 const id = 'recording:beta-v1-recording';
 const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
@@ -332,4 +335,86 @@ it('refuses to create a session for a replaced file loaded before opening the ed
     code: 'changed-source',
   });
   expect(await readVideoWorkspace(id)).toBeNull();
+});
+
+it('opens legacy workspaces with advanced defaults and persists explicit replacement', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  expect(opened.workspace.advanced).toEqual(createQuickEditAdvancedState());
+  expect(parseVideoWorkspace({ ...opened.workspace, advanced: undefined })).toEqual(
+    opened.workspace
+  );
+  const advanced = {
+    ...createQuickEditAdvancedState(),
+    ui: { mode: 'advanced', tracks: { actions: true, zoom: true, audio: true } },
+  };
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced,
+  });
+  expect(saved.workspace.advanced).toEqual(advanced);
+  const reopened = await openVideoWorkspace(id, source);
+  expect(reopened.workspace.advanced).toEqual(advanced);
+});
+
+it('rejects stale or malformed advanced saves without touching the record', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: opened.workspace.revision + 1,
+      advanced: createQuickEditAdvancedState(),
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedSourceAssetId: 'wrong-asset',
+      expectedRevision: opened.workspace.revision,
+      advanced: createQuickEditAdvancedState(),
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: opened.workspace.revision,
+      advanced: { broken: true },
+    })
+  ).rejects.toMatchObject({ code: 'invalid' });
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(opened.workspace);
+});
+
+it('advances the revision for advanced saves so history writers detect the change', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced: createQuickEditAdvancedState(),
+  });
+  expect(saved.workspace.revision).toBe(opened.workspace.revision + 1);
+  expect(saved.workspace.history).toEqual([]);
+  expect(saved.workspace.cursor).toBe(0);
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: opened.workspace.revision,
+      operation,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+});
+
+it('keeps schema version constant in stored advanced state', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced: createQuickEditAdvancedState(),
+  });
+  expect(saved.workspace.advanced.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
 });

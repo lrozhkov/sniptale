@@ -15,6 +15,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { applyReviewOperation, replayReviewHistory } from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
+import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type { ReviewSource } from '../../../features/video/review/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
@@ -244,6 +245,29 @@ export async function moveVideoWorkspaceHistory(args: {
     const cursor = snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
     if (cursor < 0 || cursor > snapshot.workspace.history.length) return snapshot;
     return { ...snapshot, workspace: await putWorkspace(tx, { ...snapshot.workspace, cursor }) };
+  });
+}
+
+/** Replaces the whole advanced state; deletion happens only through explicit replacement. */
+export async function saveVideoWorkspaceAdvanced(args: {
+  aggregateId: string;
+  expectedRevision: number;
+  expectedSourceAssetId: string;
+  advanced: unknown;
+}): Promise<VideoWorkspaceSnapshot> {
+  return mutate(args.aggregateId, async (tx) => {
+    const snapshot = await requireSnapshot(
+      tx,
+      args.aggregateId,
+      args.expectedRevision,
+      args.expectedSourceAssetId
+    );
+    const advanced = loadQuickEditAdvancedState(args.advanced);
+    if (!advanced) throw new VideoWorkspaceError('invalid');
+    return {
+      ...snapshot,
+      workspace: await putWorkspace(tx, { ...snapshot.workspace, advanced }),
+    };
   });
 }
 

@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';
 import { useReviewExport } from './use-export';
@@ -31,6 +32,7 @@ function setup() {
       revision: 1,
       cursor: 0,
       history: [],
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 1,
     },

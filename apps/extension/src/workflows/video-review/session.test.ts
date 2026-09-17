@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from './session';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
@@ -13,6 +14,7 @@ function initial(): VideoWorkspaceSnapshot {
       revision: 1,
       cursor: 0,
       history: [],
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 1,
     },
@@ -36,6 +38,7 @@ it('serializes draft then Save using the committed draft revision, without an ex
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => ({ ...snapshot, draft })),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
     commitVideoWorkspace: vi.fn(async () => saved),
     readVideoWorkspace: vi.fn(async () => snapshot),
     moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
@@ -72,6 +75,7 @@ it('keeps recovery and committed state after failed Save and exposes reload expl
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
     commitVideoWorkspace: vi.fn(async () => {
       throw { code: 'conflict' };
     }),
@@ -88,4 +92,51 @@ it('keeps recovery and committed state after failed Save and exposes reload expl
   await session.history('undo');
   expect(session.getSnapshot().error).toBeNull();
   expect(session.getSnapshot().snapshot.draft?.annotation.text).toBe('Comment');
+});
+
+it('saves advanced state through the revisioned queue and reports failures as codes', async () => {
+  const snapshot = initial();
+  const advanced = {
+    ...createQuickEditAdvancedState(),
+    ui: { mode: 'advanced' as const, tracks: { actions: true, zoom: true, audio: false } },
+  };
+  const saved = {
+    ...snapshot,
+    workspace: { ...snapshot.workspace, revision: 2, advanced },
+  };
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => saved),
+    commitVideoWorkspace: vi.fn(async () => snapshot),
+    readVideoWorkspace: vi.fn(async () => snapshot),
+    moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  await session.saveAdvanced(advanced);
+  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledWith(
+    expect.objectContaining({
+      aggregateId: 'recording:r',
+      expectedRevision: 1,
+      expectedSourceAssetId: 'source',
+      advanced,
+    })
+  );
+  expect(session.getSnapshot().snapshot.workspace.advanced).toEqual(advanced);
+  expect(session.getSnapshot().error).toBeNull();
+});
+
+it('propagates an advanced save failure as a session error', async () => {
+  const snapshot = initial();
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => {
+      throw { code: 'invalid' };
+    }),
+    commitVideoWorkspace: vi.fn(async () => snapshot),
+    readVideoWorkspace: vi.fn(async () => snapshot),
+    moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  await expect(session.saveAdvanced({ broken: true })).rejects.toEqual({ code: 'invalid' });
+  expect(session.getSnapshot()).toMatchObject({ error: 'invalid', pending: 0 });
 });

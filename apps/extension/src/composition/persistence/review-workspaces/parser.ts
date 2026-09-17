@@ -5,6 +5,7 @@ import {
   parseReviewOperation,
   parseReviewSource,
 } from '../../../features/video/review/validation';
+import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type { VideoWorkspace, VideoWorkspaceDraft } from './contracts';
 
 const revision = (value: unknown): value is number =>
@@ -47,6 +48,8 @@ export function parseVideoWorkspace(value: unknown): VideoWorkspace | null {
   } catch {
     return null;
   }
+  const advanced = loadQuickEditAdvancedState(value['advanced']);
+  if (!advanced) return null;
   return {
     aggregateId: value['aggregateId'],
     formatVersion: 1,
@@ -55,6 +58,7 @@ export function parseVideoWorkspace(value: unknown): VideoWorkspace | null {
     revision: value['revision'],
     history,
     cursor: value['cursor'],
+    advanced,
     createdAt: value['createdAt'],
     updatedAt: value['updatedAt'],
   };

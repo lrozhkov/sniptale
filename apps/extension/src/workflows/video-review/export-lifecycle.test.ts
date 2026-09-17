@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { exportReviewedVideo } from './export-lifecycle';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { PreparedAssetObject } from '../../composition/persistence/assets';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 
 function fixture() {
   const source = { duration: 6, width: 160, height: 90, mimeType: 'video/webm', size: 5 };
@@ -13,6 +14,7 @@ function fixture() {
       source,
       revision: 2,
       cursor: 1,
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 2,
       history: [

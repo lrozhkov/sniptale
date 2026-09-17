@@ -48,6 +48,7 @@ import {
   parseReviewAnnotation,
   parseReviewOperation,
 } from '../../features/video/review/validation';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { VideoReview } from './index';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type {
@@ -116,6 +117,7 @@ function createEditorFixture() {
       source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 },
       revision: 1,
       cursor: 0,
+      advanced: createQuickEditAdvancedState(),
       history: [],
       createdAt: 1,
       updatedAt: 1,
