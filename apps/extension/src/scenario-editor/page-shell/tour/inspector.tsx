@@ -120,7 +120,6 @@ export function TourInspector(props: InspectorProps) {
           {t('scenario.editor.tourBackToSlide')}
         </ProductActionButton>
         {settings('object')}
-        {props.narration}
       </>
     );
   const categories =
