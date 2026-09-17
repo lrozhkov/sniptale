@@ -132,21 +132,50 @@
   border-color: transparent;
   box-shadow: none;
 }
-.tour-slide-row > .tour-slide-action {
-  width: 0;
+.tour-slide-card {
+  display: flex;
+  align-items: center;
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--sniptale-radius-sm);
+}
+.tour-slide-card:hover,
+.tour-slide-card:focus-within {
+  background: var(--sniptale-color-surface-hover);
+}
+.tour-slide-card[data-current='true'],
+.tour-slide-card[data-current='true']:hover,
+.tour-slide-card[data-current='true']:focus-within {
+  border-color: color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
+}
+.tour-slide-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  flex: none;
+  width: 0;
   opacity: 0;
   overflow: hidden;
   pointer-events: none;
 }
-.tour-slide-row:hover > .tour-slide-action,
-.tour-slide-row:focus-within > .tour-slide-action {
-  width: 1.5rem;
-  min-width: 1.5rem;
+.tour-slide-card:hover .tour-slide-actions,
+.tour-slide-card:focus-within .tour-slide-actions {
+  width: max-content;
   opacity: 1;
   pointer-events: auto;
 }
-.tour-slide-row > .tour-slide-action:hover {
+.tour-slide-card .tour-slide-action {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.tour-slide-card .tour-slide-action:hover {
   background: var(--sniptale-color-surface-hover);
 }
 .tour-slide-grip {
@@ -185,8 +214,8 @@ html[data-tour-reordering] * {
   pointer-events: none;
   max-height: 8rem;
   overflow: hidden;
+  border: 1px solid var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-panel);
-  border-color: var(--sniptale-color-border-soft);
   box-shadow: var(--sniptale-shadow-floating);
 }
 .tour-slide-select {
@@ -197,7 +226,7 @@ html[data-tour-reordering] * {
   min-width: 0;
   min-height: 2.5rem;
   padding: 0.25rem;
-  border: 1px solid transparent;
+  border: none;
   border-radius: var(--sniptale-radius-sm);
   background: transparent;
   color: inherit;
@@ -206,18 +235,12 @@ html[data-tour-reordering] * {
   text-align: start;
   cursor: pointer;
 }
-.tour-slide-select > span:last-child {
+.tour-slide-title {
+  flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
-}
-.tour-slide-row:hover .tour-slide-select > span:last-child,
-.tour-slide-row:focus-within .tour-slide-select > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-html[data-tour-reordering] .tour-slide-row .tour-slide-select > span:last-child {
-  white-space: normal;
 }
 .tour-slide-select img {
   width: 3rem;
@@ -232,11 +255,11 @@ html[data-tour-reordering] .tour-slide-row .tour-slide-select > span:last-child 
   font-size: 0.6875rem;
   flex: none;
 }
-.tour-slide-select:hover,
+.tour-slide-row:not(:has(.tour-slide-card)) > .tour-slide-select:hover,
 .tour-object-row:hover {
   background: var(--sniptale-color-surface-hover);
 }
-.tour-slide-select[aria-current],
+.tour-slide-row:not(:has(.tour-slide-card)) > .tour-slide-select[aria-current],
 .tour-object-row[aria-current] {
   border-color: color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent);
   background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);

@@ -147,6 +147,32 @@ it('duplicates, reorders by keyboard and repairs incoming links only after expli
   expect(second?.kind === 'image' && second.hotspots[0]?.action.kind).toBe('none');
   expect(current.items).toEqual(before);
 });
+it('keeps slide actions inside the selectable card and selection on the card', async () => {
+  await render();
+  const row = () => host.querySelectorAll('.tour-slide-row')[0]!;
+  const card = row().querySelector('.tour-slide-card')!;
+  expect(card).not.toBeNull();
+  expect(card.querySelector('.tour-slide-select')).not.toBeNull();
+  expect(card.querySelectorAll('.tour-slide-action')).toHaveLength(2);
+  expect(card.getAttribute('data-current')).toBe('true');
+  await click('2Second', host);
+  expect(row().querySelector('.tour-slide-card')?.getAttribute('data-current')).toBe('false');
+  await click('Duplicate slide', row());
+  expect(
+    host
+      .querySelectorAll('.tour-slide-row')[1]!
+      .querySelector('.tour-slide-card')
+      ?.getAttribute('data-current')
+  ).toBe('true');
+  expect(
+    host
+      .querySelectorAll('.tour-slide-row')[0]!
+      .querySelector('.tour-slide-card')
+      ?.getAttribute('data-current')
+  ).toBe('false');
+  expect(host.querySelectorAll('.tour-slide-title')).toHaveLength(3);
+});
+
 it('shows unique resources, previews them and cycles through their usages without editing', async () => {
   await render();
   await click('Resources');
@@ -306,15 +332,15 @@ it('lists each affected navigation source before clearing links to a removed sli
   expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
 });
 
-it('offers narration for the exact selected hotspot', async () => {
+it('keeps slide narration out of the selected-object drill-down', async () => {
   await render();
   await click('2Second');
   await click('Slide objects', host.querySelector('#guide-inspector-panel')!);
   await click('Go first');
   const inspector = host.querySelector('#guide-inspector-panel')!;
-  expect(inspector.textContent).toContain('Object narration');
+  expect(inspector.textContent).not.toContain('Object narration');
   expect([...inspector.querySelectorAll('button')].some((b) => b.textContent === 'Record')).toBe(
-    true
+    false
   );
 });
 
@@ -332,7 +358,7 @@ it('uses the header presentation switch and keeps narration in playback, objects
   await click('Hotspot', panel());
   expect(panel().querySelector('nav')).toBeNull();
   expect(panel().querySelector('[title="Show all settings"]')).toBeNull();
-  expect(panel().textContent).toContain('Object narration');
+  expect(panel().textContent).not.toContain('Object narration');
   await click('Back to slide settings', panel());
   expect(panel().querySelector('[aria-label="Slide objects"]')?.getAttribute('aria-pressed')).toBe(
     'true'
