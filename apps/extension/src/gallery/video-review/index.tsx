@@ -6,8 +6,9 @@ import {
   type ReviewTelemetryMarker,
 } from '../../features/video/review/telemetry';
 import { ReviewButton } from './controls';
-import { ReviewStage } from './stage';
-import { ReviewTimeline } from './timeline';
+import { ReviewCanvasCommentsSection } from './comment-editor';
+import { ReviewStageBinding } from './stage-binding';
+import { ReviewTimelineBinding } from './timeline-binding';
 import { ReviewInspector } from './inspector';
 import { ReviewComposer } from './composer';
 import {
@@ -20,13 +21,11 @@ import { exportReviewReport } from './report-actions';
 import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
 import { ReviewEditActions } from './edit-actions';
-import { ReviewTimelineToolbar } from './review-toolbar';
-import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { useReviewPlayback } from './use-playback';
 import { useReviewEdits } from './use-edits';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
-import { ReviewZoomTrack } from './zoom-track';
 import { ReviewAdvancedPanels } from './advanced-panels';
+import { useCanvasComments } from './use-canvas-comments';
 import { useReviewZoomEditor } from './zoom-editor';
 
 function useReviewKeys({
@@ -423,10 +422,12 @@ type InspectorState = Pick<
 function ReviewInspectorBinding({
   resource,
   state,
+  canvasComments,
   onBack,
 }: {
   resource: LoadedReview;
   state: InspectorState;
+  canvasComments: ReturnType<typeof useCanvasComments>;
   onBack(): void;
 }) {
   const {
@@ -491,6 +492,13 @@ function ReviewInspectorBinding({
       canRedo={
         !composer.annotation &&
         snapshot.snapshot.workspace.cursor < snapshot.snapshot.workspace.history.length
+      }
+      canvas={
+        <ReviewCanvasCommentsSection
+          {...canvasComments}
+          comments={snapshot.document.canvasComments}
+          busy={busy}
+        />
       }
       message={snapshot.error ? translate(errorKey) : message}
       onBack={() => {
@@ -576,6 +584,14 @@ function ReviewCommentComposer({
 
 function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
   const state = useReviewEditorState(resource);
+  const canvasComments = useCanvasComments({
+    session: state.session,
+    time: state.time,
+    busy: state.busy,
+    exporterPhase: state.editing.exporter.phase,
+    canStart: state.canStart,
+    run: state.run,
+  });
   const {
     editing,
     source,
@@ -606,7 +622,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     displayRegion,
   } = state;
   const features = useMemo(() => resolveQuickEditEffectiveFeatures(advanced), [advanced]);
-  const onZoomAdd = () => zoom.add(time, source.duration);
   return (
     <div
       className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_360px] max-[799px]:grid-cols-1
@@ -614,16 +629,22 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           max-[799px]:overflow-y-auto"
     >
       <main className="flex min-h-0 min-w-0 flex-col overflow-y-auto p-4">
-        <ReviewStage
+        <ReviewStageBinding
           url={resource.url}
           source={source}
           video={video}
           drawing={!!composer.annotation && !playing && !busy}
           region={displayRegion}
-          {...(() => {
+          zoom={features.zoomTrackVisible ? advanced.zoom : null}
+          zoomOverlay={(() => {
             const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
-            return zoomRegion ? { zoom: zoom.focusOverlay(zoomRegion) } : {};
+            return zoomRegion ? zoom.focusOverlay(zoomRegion) : undefined;
           })()}
+          comments={snapshot.document.canvasComments}
+          canvasComments={canvasComments}
+          time={time}
+          background={advanced.background}
+          busy={busy}
           onRegion={(region) => {
             if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
           }}
@@ -640,86 +661,39 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           onPlaying={setPlaying}
           onError={() => setMessage(translate('gallery.videoReview.playbackFailed'))}
         />
-        <ReviewTimeline
-          duration={source.duration}
+        <ReviewTimelineBinding
+          editing={editing}
+          edits={snapshot.document.edits}
+          annotations={snapshot.document.annotations}
+          source={source}
           volume={volume}
           onVolume={setVolume}
-          tools={
-            <ReviewTimelineToolbar
-              editing={{
-                mode: editing.mode,
-                rate: editing.rate,
-                audio: editing.audio,
-                selected: !!editing.selected,
-                exporter: editing.exporter,
-                setCutting: editing.setCutting,
-                toggle: editing.toggle,
-                changeRate: editing.changeRate,
-                changeAudio: editing.changeAudio,
-                remove: editing.remove,
-              }}
-              busy={busy}
-              composerBusy={!!composer.annotation}
-              selection={selection}
-              edits={snapshot.document.edits}
-              advanced={advanced}
-              setMode={setMode}
-              setTrackVisibility={setTrackVisibility}
-              telemetryAvailable={!!resource.telemetry}
-              onAddComment={() => add()}
-              onDownloadFragment={() =>
-                selection.kind === 'range'
-                  ? editing.exporter.downloadSelection(selection)
-                  : undefined
-              }
-            />
-          }
-          {...(features.zoomTrackVisible
-            ? {
-                zoomTrack: (
-                  <ReviewZoomTrack
-                    duration={source.duration}
-                    time={time}
-                    regions={advanced.zoom.regions}
-                    edits={snapshot.document.edits}
-                    boundaries={editing.exporter.index?.boundaries}
-                    selectedId={zoom.selection}
-                    onSelect={zoom.setSelection}
-                    onAdd={onZoomAdd}
-                    onDragCommit={zoom.commitDrag}
-                  />
-                ),
-              }
-            : {})}
-          {...(editing.exporter.index ? { boundaries: editing.exporter.index.boundaries } : {})}
-          onRangeCommit={(range) => {
-            if (editing.mode) void editing.commitRange(range);
-          }}
-          onChangeEdit={(edit, range) => void editing.commitRange(range, edit)}
+          busy={busy}
+          composerBusy={!!composer.annotation}
+          selection={selection}
+          setSelection={setSelection}
+          advanced={advanced}
+          setMode={setMode}
+          setTrackVisibility={setTrackVisibility}
+          telemetryAvailable={!!resource.telemetry}
           time={time}
           playing={playing}
-          selection={
-            editing.cutting && editing.exporter.index && selection.kind === 'range'
-              ? {
-                  kind: 'range',
-                  start: nearestReviewBoundary(selection.start, editing.exporter.index.boundaries),
-                  end: nearestReviewBoundary(selection.end, editing.exporter.index.boundaries),
-                }
-              : selection
-          }
-          edits={snapshot.document.edits}
-          onEdit={editing.select}
-          annotations={snapshot.document.annotations}
           markers={telemetry ? projected.markers : []}
-          {...(selected?.telemetryRef ? { selectedTelemetryRef: selected.telemetryRef } : {})}
-          onSeek={seek}
-          onSelect={setSelection}
-          onPlay={play}
-          onMarker={add}
+          selectedTelemetryRef={selected?.telemetryRef}
+          zoom={zoom}
+          canvasComments={canvasComments}
+          onAddComment={add}
           onComment={selectComment}
+          onSeek={seek}
+          onPlay={play}
         />
       </main>
-      <ReviewInspectorBinding resource={resource} state={state} onBack={onBack} />
+      <ReviewInspectorBinding
+        resource={resource}
+        state={state}
+        canvasComments={canvasComments}
+        onBack={onBack}
+      />
     </div>
   );
 }

@@ -718,3 +718,52 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     await fixture.cleanup();
   }
 });
+
+it('adds an overlay comment, drags it on the stage and deletes it via the editor', async () => {
+  const fixture = createEditorFixture();
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('addOverlayComment');
+    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('canvasComment');
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
+      attachment: 'content',
+      position: { x: 0.5, y: 0.5 },
+      start: 0,
+    });
+    expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.canvasComments"]')).not.toBeNull();
+
+    const point = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.canvasComment"] button'
+    )!;
+    Object.assign(point, { setPointerCapture: vi.fn() });
+    const drag = async (dx: number, dy: number) =>
+      act(async () => {
+        point.dispatchEvent(
+          new MouseEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0, button: 0 })
+        );
+        point.dispatchEvent(
+          new MouseEvent('pointermove', { bubbles: true, clientX: dx, clientY: dy, button: 0 })
+        );
+        point.dispatchEvent(
+          new MouseEvent('pointerup', { bubbles: true, clientX: dx, clientY: dy, button: 0 })
+        );
+      });
+    await drag(160, 90);
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
+      position: { x: 0.75, y: 0.75 },
+    });
+
+    await click('stayOnScreen');
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
+      attachment: 'viewport',
+    });
+    await click('undo');
+    await click('overlayDelete');
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});

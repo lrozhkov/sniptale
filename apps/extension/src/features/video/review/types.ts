@@ -1,3 +1,4 @@
+import type { Paint } from '@sniptale/foundation/paint';
 import type { ReviewSpeedRate } from './speed';
 
 /** Immutable media facts. All review times are seconds on the original video. */
@@ -43,10 +44,34 @@ export type ReviewEdit = ReviewEditRange &
 export interface ReviewDocument {
   annotations: ReviewAnnotation[];
   edits: ReviewEdit[];
+  canvasComments: CanvasComment[];
+}
+
+/**
+ * Overlay comment pinned to the final frame; times are seconds on the original video.
+ * Content positions are normalized to the padded content area so zoom drags them along;
+ * viewport positions are normalized to the output canvas and ignore the camera.
+ */
+export interface CanvasComment {
+  id: string;
+  text: string;
+  start?: number;
+  end?: number;
+  visible: boolean;
+  renderToVideo: boolean;
+  attachment: 'content' | 'viewport';
+  position: { x: number; y: number };
+  /** Bubble surface colors and corner rounding. */
+  style: { fillPaint: Paint; textColor: string; radius: number };
 }
 
 /** One user commit; before/after values make linear undo deterministic after a restart. */
 export type ReviewOperation = { id: string; at: number } & (
   | { target: 'annotation'; before: ReviewAnnotation | null; after: ReviewAnnotation | null }
   | { target: 'edit'; before: ReviewEdit | null; after: ReviewEdit | null }
+  | {
+      target: 'canvasComment';
+      before: CanvasComment | null;
+      after: CanvasComment | null;
+    }
 );

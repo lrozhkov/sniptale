@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyReviewOperation, replayReviewHistory } from './document';
+import { createCanvasComment } from './comments';
 import type { ReviewAnnotation, ReviewOperation, ReviewSource } from './types';
 
 const source: ReviewSource = {
@@ -24,6 +25,21 @@ const added: ReviewOperation = {
 };
 
 describe('video review history', () => {
+  it('replays canvas comment operations like other targets at every cursor', () => {
+    const comment = createCanvasComment({ id: 'c1', at: 2 });
+    const edited = { ...comment, text: 'Now with text' };
+    const history: ReviewOperation[] = [
+      { id: 'op1', at: 1, target: 'canvasComment', before: null, after: comment },
+      { id: 'op2', at: 2, target: 'canvasComment', before: comment, after: edited },
+      { id: 'op3', at: 3, target: 'canvasComment', before: edited, after: null },
+    ];
+    expect(replayReviewHistory(history, 0, source).canvasComments).toEqual([]);
+    expect(replayReviewHistory(history, 1, source).canvasComments).toEqual([comment]);
+    expect(replayReviewHistory(history, 2, source).canvasComments).toEqual([edited]);
+    expect(replayReviewHistory(history, 3, source).canvasComments).toEqual([]);
+    expect(comment.text).toBe('');
+  });
+
   it('replays add, edit and delete at every undo cursor without mutating earlier values', () => {
     const edited = { ...annotation, text: 'Corrected text' };
     const history: ReviewOperation[] = [

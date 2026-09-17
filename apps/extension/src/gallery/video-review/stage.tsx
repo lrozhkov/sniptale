@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
 import { fitVideoRect, projectVideoRegion } from '../../features/video/review/geometry';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
-import type { ReviewRegion, ReviewSource } from '../../features/video/review/types';
+import type { CanvasComment, ReviewRegion, ReviewSource } from '../../features/video/review/types';
 import {
   computeQuickEditSceneLayout,
   quickEditCanvasPointToContent,
@@ -11,6 +11,7 @@ import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
 } from '../../features/video/review/advanced/types';
+import { ReviewCommentOverlay } from './comment-overlay';
 import { useReviewDrawingPlane } from './stage-drawing';
 
 /** Draws in the oriented image plane, never in the player's letterbox margins. */
@@ -24,6 +25,16 @@ export function ReviewStage(props: {
     camera: QuickEditCameraTransform;
     background: QuickEditBackgroundSettings;
     onDrag(point: { x: number; y: number }): void;
+  };
+  comments?: {
+    items: readonly CanvasComment[];
+    time: number;
+    background: QuickEditBackgroundSettings;
+    camera: QuickEditCameraTransform | null;
+    selectedId: string | null;
+    busy: boolean;
+    onSelect(id: string): void;
+    onMove(id: string, position: { x: number; y: number }): void;
   };
   onRegion(value: ReviewRegion): void;
   onReady(): void;
@@ -123,6 +134,20 @@ export function ReviewStage(props: {
         onEnded={() => props.onPlaying(false)}
         onError={props.onError}
       />
+      {props.comments && props.comments.items.length ? (
+        <ReviewCommentOverlay
+          comments={props.comments.items}
+          output={size}
+          source={props.source}
+          background={props.comments.background}
+          camera={props.comments.camera}
+          time={props.comments.time}
+          selectedId={props.comments.selectedId}
+          busy={props.comments.busy}
+          onSelect={props.comments.onSelect}
+          onMove={props.comments.onMove}
+        />
+      ) : null}
       {projected ? <ReviewRegionOverlay drawing={props.drawing} projected={projected} /> : null}
       {zoomFocus && props.zoom && zoomLayout ? (
         <ReviewZoomTarget

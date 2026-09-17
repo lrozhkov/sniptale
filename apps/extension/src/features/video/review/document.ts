@@ -29,6 +29,12 @@ export function applyReviewOperation(
       annotations: replaceItem(document.annotations, operation.before, operation.after),
     };
   }
+  if (operation.target === 'canvasComment') {
+    return {
+      ...document,
+      canvasComments: replaceItem(document.canvasComments, operation.before, operation.after),
+    };
+  }
   const edits = replaceItem(document.edits, operation.before, operation.after);
   const ordered = [...edits].sort((a, b) => a.start - b.start);
   let previousEnd = 0;
@@ -51,7 +57,7 @@ export function replayReviewHistory(
   if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > history.length) {
     throw new Error('Review history cursor is invalid.');
   }
-  let document: ReviewDocument = { annotations: [], edits: [] };
+  let document: ReviewDocument = { annotations: [], edits: [], canvasComments: [] };
   for (const operation of history.slice(0, cursor)) {
     document = applyReviewOperation(document, operation, source);
   }

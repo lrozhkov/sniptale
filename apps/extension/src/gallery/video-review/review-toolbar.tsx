@@ -8,7 +8,14 @@ import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types
 import { ReviewButton } from './controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
-import { Activity, AudioLines, Focus, MessageSquarePlus, SlidersHorizontal } from 'lucide-react';
+import {
+  Activity,
+  AudioLines,
+  Focus,
+  MessageSquarePlus,
+  SlidersHorizontal,
+  StickyNote,
+} from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
 type Editing = ReturnType<typeof useReviewEdits>;
@@ -35,6 +42,7 @@ type ToolbarProps = {
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
   telemetryAvailable: boolean;
   onAddComment(): void;
+  onAddOverlayComment(): void;
   onDownloadFragment(): void;
 };
 
@@ -75,6 +83,17 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
               ? 'gallery.videoReview.commentRange'
               : 'gallery.videoReview.commentText'
           )}
+        </span>
+      </ReviewButton>
+      <ReviewButton
+        label={translate('gallery.videoReview.addOverlayComment')}
+        disabled={props.busy || props.composerBusy}
+        onClick={props.onAddOverlayComment}
+        className="!border-0 !bg-transparent !shadow-none !text-xs"
+      >
+        <StickyNote size={16} />
+        <span className="hidden @[720px]:inline">
+          {translate('gallery.videoReview.addOverlayComment')}
         </span>
       </ReviewButton>
       <ReviewFragmentAction

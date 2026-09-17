@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { parseReviewAnnotation, parseReviewOperation, parseReviewSource } from './validation';
+import { createCanvasComment } from './comments';
 
 const source = { duration: 10, width: 100, height: 50, mimeType: 'video/webm', size: 1000 };
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point', time: 1 } };
@@ -92,4 +93,57 @@ it('validates effective and requested edit intervals and admitted speed/audio ch
   ]) {
     expect(parseReviewOperation({ ...op, after: { ...edit, ...patch } }, 10)).toBeNull();
   }
+});
+
+it('parses canvas comment operations and rejects unbounded or malformed overlay values', () => {
+  const comment = createCanvasComment({ id: 'c1', at: 2 });
+  const op = { id: 'op9', at: 3, target: 'canvasComment', before: null, after: comment };
+  expect(parseReviewOperation(op, 10)).toEqual(op);
+  expect(
+    parseReviewOperation(
+      { id: 'op9', at: 3, target: 'canvasComment', before: comment, after: null },
+      10
+    )?.target
+  ).toBe('canvasComment');
+  for (const patch of [
+    { position: { x: 1.1, y: 0.5 } },
+    { position: { x: 0.5, y: -0.1 } },
+    { attachment: 'frame' },
+    { visible: 'yes' },
+    { start: 4, end: 2 },
+    { start: 11 },
+    { end: -1 },
+  ]) {
+    const value = typeof patch === 'object' ? { ...comment, ...patch } : comment;
+    expect(
+      parseReviewOperation(
+        { id: 'op9', at: 3, target: 'canvasComment', before: null, after: value },
+        10
+      )
+    ).toBeNull();
+  }
+  expect(
+    parseReviewOperation(
+      {
+        id: 'op9',
+        at: 3,
+        target: 'canvasComment',
+        before: null,
+        after: { ...comment, style: { ...comment.style, fillPaint: 'red' } },
+      },
+      10
+    )
+  ).toBeNull();
+  expect(
+    parseReviewOperation(
+      {
+        id: 'op9',
+        at: 3,
+        target: 'canvasComment',
+        before: null,
+        after: { ...comment, style: { ...comment.style, radius: 65 } },
+      },
+      10
+    )
+  ).toBeNull();
 });

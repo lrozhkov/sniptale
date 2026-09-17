@@ -24,6 +24,7 @@ export function ReviewInspector(props: {
   onReport(action: 'copy' | 'download'): void;
   children: ReactNode;
   actions?: ReactNode;
+  canvas?: ReactNode;
 }) {
   return (
     <aside
@@ -69,54 +70,16 @@ export function ReviewInspector(props: {
             {translate('gallery.videoReview.commentsEmpty')}
           </p>
         ) : null}
-        <ol className="space-y-2">
-          {props.annotations.map((annotation) => (
-            <li
-              key={annotation.id}
-              className={`group relative rounded-lg border p-3
-              ${
-                props.selectedId === annotation.id
-                  ? 'border-[var(--sniptale-color-accent)]'
-                  : 'border-[var(--sniptale-color-border-soft)]'
-              }`}
-              onMouseEnter={() => props.onHover(annotation)}
-              onMouseLeave={() => props.onHover(null)}
-            >
-              <button
-                type="button"
-                className="block w-full text-left"
-                onClick={() => props.onSelect(annotation)}
-              >
-                <span className="pr-16 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-                  {annotation.anchor.kind === 'point'
-                    ? reviewTimeLabel(annotation.anchor.time)
-                    : `${reviewTimeLabel(annotation.anchor.start)}–${reviewTimeLabel(annotation.anchor.end)}`}
-                </span>
-                <span className="mt-1 block whitespace-pre-wrap break-words text-sm">
-                  {annotation.text}
-                </span>
-              </button>
-              <div className="absolute right-1 top-1 flex gap-1">
-                <ReviewButton
-                  label={translate('gallery.videoReview.editComment')}
-                  disabled={props.busy}
-                  className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
-                  onClick={() => props.onEdit(annotation)}
-                >
-                  <Pencil size={16} />
-                </ReviewButton>
-                <ReviewButton
-                  label={translate('gallery.videoReview.deleteComment')}
-                  disabled={props.busy}
-                  className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
-                  onClick={() => props.onDelete(annotation)}
-                >
-                  <Trash2 size={16} />
-                </ReviewButton>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <ReviewAnnotationList
+          annotations={props.annotations}
+          selectedId={props.selectedId}
+          busy={props.busy}
+          onSelect={props.onSelect}
+          onHover={props.onHover}
+          onEdit={props.onEdit}
+          onDelete={props.onDelete}
+        />
+        {props.canvas}
       </div>
       <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         {props.actions}
@@ -153,5 +116,67 @@ export function ReviewInspector(props: {
         </ReviewButton>
       </div>
     </aside>
+  );
+}
+
+/** Saved timeline comments with hover, select, and row actions. */
+function ReviewAnnotationList(props: {
+  annotations: readonly ReviewAnnotation[];
+  selectedId: string | null;
+  busy: boolean;
+  onSelect(value: ReviewAnnotation): void;
+  onHover(value: ReviewAnnotation | null): void;
+  onEdit(value: ReviewAnnotation): void;
+  onDelete(value: ReviewAnnotation): void;
+}) {
+  return (
+    <ol className="space-y-2">
+      {props.annotations.map((annotation) => (
+        <li
+          key={annotation.id}
+          className={`group relative rounded-lg border p-3
+              ${
+                props.selectedId === annotation.id
+                  ? 'border-[var(--sniptale-color-accent)]'
+                  : 'border-[var(--sniptale-color-border-soft)]'
+              }`}
+          onMouseEnter={() => props.onHover(annotation)}
+          onMouseLeave={() => props.onHover(null)}
+        >
+          <button
+            type="button"
+            className="block w-full text-left"
+            onClick={() => props.onSelect(annotation)}
+          >
+            <span className="pr-16 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+              {annotation.anchor.kind === 'point'
+                ? reviewTimeLabel(annotation.anchor.time)
+                : `${reviewTimeLabel(annotation.anchor.start)}–${reviewTimeLabel(annotation.anchor.end)}`}
+            </span>
+            <span className="mt-1 block whitespace-pre-wrap break-words text-sm">
+              {annotation.text}
+            </span>
+          </button>
+          <div className="absolute right-1 top-1 flex gap-1">
+            <ReviewButton
+              label={translate('gallery.videoReview.editComment')}
+              disabled={props.busy}
+              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+              onClick={() => props.onEdit(annotation)}
+            >
+              <Pencil size={16} />
+            </ReviewButton>
+            <ReviewButton
+              label={translate('gallery.videoReview.deleteComment')}
+              disabled={props.busy}
+              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+              onClick={() => props.onDelete(annotation)}
+            >
+              <Trash2 size={16} />
+            </ReviewButton>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
