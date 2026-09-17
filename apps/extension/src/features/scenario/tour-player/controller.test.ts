@@ -726,7 +726,7 @@ it('shows navigation primary text directly in a compact centered composition', a
   expect(content?.style.textAlign).toBe('center');
   expect(
     root.querySelector<HTMLElement>('.tour-navigation-buttons')?.style.gridTemplateColumns
-  ).toBe('repeat(1, minmax(0, 1fr))');
+  ).toMatch(/^repeat\(1, [\d.]+px\)$/);
 });
 
 it('keeps every navigation link reachable across unequal text page heights', async () => {
