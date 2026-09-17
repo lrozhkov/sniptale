@@ -124,14 +124,19 @@ a:focus-visible {
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 2px solid #fff;
+  border: none;
   border-radius: 50%;
-  background: var(--tour-accent);
+  background: transparent;
   color: #fff;
   text-decoration: none;
   font-size: 14px;
   z-index: 2;
   cursor: pointer;
+}
+.tour-hotspot.tour-annotation-anchor,
+.tour-motion-hotspot {
+  border: 2px solid #fff;
+  background: var(--tour-accent);
   box-shadow: 0 1px 5px #0006;
 }
 .tour-hotspot[data-pulse='true']::before {
