@@ -48,6 +48,7 @@ export function ReviewTimelineBinding(props: {
   audioState: QuickEditAudioState;
   audioVisible: boolean;
   onImportAudioFile(file: File): void;
+  onRecordVoiceover(): void;
   onAddComment(marker?: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
@@ -124,6 +125,7 @@ export function ReviewTimelineBinding(props: {
                 onTrimClip={props.audio.trimClip}
                 onOriginal={props.audio.setOriginal}
                 onImportFile={props.onImportAudioFile}
+                onRecordVoiceover={props.onRecordVoiceover}
               />
             ),
           }

@@ -28,6 +28,7 @@ import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/a
 import { ReviewAdvancedPanels } from './advanced-panels';
 import { useCanvasComments } from './use-canvas-comments';
 import { useReviewAudio } from './use-review-audio';
+import { ReviewVoiceoverRecording, useReviewVoiceoverRecording } from './voiceover-recording';
 import { importAudioAsset, importedAudioClip } from '../../workflows/video-review/audio-import';
 import { useReviewZoomEditor } from './zoom-editor';
 
@@ -590,13 +591,11 @@ function ReviewCommentComposer({
   );
 }
 
-function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
-  const state = useReviewEditorState(resource);
-  const audio = useReviewAudio({
-    audio: state.advanced.audio,
-    setAudio: state.setAudio,
-    timelineDuration: state.source.duration,
-  });
+/** Wires music import and voiceover recording to the review audio model. */
+function useReviewEditorAudio(
+  state: ReturnType<typeof useReviewEditorState>,
+  audio: ReturnType<typeof useReviewAudio>
+) {
   const onImportAudioFile = (file: File) => {
     if (state.busy || state.editing.exporter.phase !== 'idle' || !state.canStart()) return;
     void state.run(async () => {
@@ -607,6 +606,25 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
       );
     });
   };
+  const voiceover = useReviewVoiceoverRecording({
+    video: state.video,
+    time: state.time,
+    sourceDuration: state.source.duration,
+    audio,
+    run: state.run,
+    guard: () => !state.busy && state.editing.exporter.phase === 'idle' && state.canStart(),
+  });
+  return { onImportAudioFile, voiceover };
+}
+
+function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
+  const state = useReviewEditorState(resource);
+  const audio = useReviewAudio({
+    audio: state.advanced.audio,
+    setAudio: state.setAudio,
+    timelineDuration: state.source.duration,
+  });
+  const { onImportAudioFile, voiceover } = useReviewEditorAudio(state, audio);
   const canvasComments = useCanvasComments({
     session: state.session,
     time: state.time,
@@ -707,6 +725,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           audioState={advanced.audio}
           audioVisible={features.audioTrackVisible}
           onImportAudioFile={onImportAudioFile}
+          onRecordVoiceover={voiceover.open}
           onAddComment={add}
           onComment={selectComment}
           onSeek={seek}
@@ -719,6 +738,15 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
         canvasComments={canvasComments}
         audio={audio}
         onBack={onBack}
+      />
+      <ReviewVoiceoverRecording
+        isOpen={voiceover.recording}
+        playhead={time}
+        timelineDuration={source.duration}
+        onClose={voiceover.close}
+        onSyncStart={voiceover.syncStart}
+        onSyncStop={voiceover.syncStop}
+        onSave={voiceover.save}
       />
     </div>
   );

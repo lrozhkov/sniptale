@@ -45,220 +45,11 @@ vi.mock('../shared/download', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/download')>()),
   downloadGalleryBlob: integration.download,
 }));
-import {
-  parseReviewAnnotation,
-  parseReviewOperation,
-} from '../../features/video/review/validation';
-import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
-import { loadQuickEditAdvancedState } from '../../features/video/review/advanced/validation';
 import { VideoReview } from './index';
-import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import type {
-  saveVideoWorkspaceAdvanced,
-  saveVideoWorkspaceDraft,
-  commitVideoWorkspace,
-  moveVideoWorkspaceHistory,
-} from '../../composition/persistence/review-workspaces/store';
-
-function createEditorFixture() {
-  integration.index.mockRejectedValue(new Error('No safe index'));
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    }
-  );
-  for (const [target, key] of [
-    [HTMLDialogElement.prototype, 'showModal'],
-    [HTMLDialogElement.prototype, 'close'],
-    [URL, 'createObjectURL'],
-    [URL, 'revokeObjectURL'],
-  ] as const) {
-    if (!(key in target))
-      Object.defineProperty(target, key, {
-        configurable: true,
-        writable: true,
-        value: () => undefined,
-      });
-  }
-  const show = vi
-    .spyOn(HTMLDialogElement.prototype, 'showModal')
-    .mockImplementation(function (this: HTMLDialogElement) {
-      this.open = true;
-    });
-  const close = vi
-    .spyOn(HTMLDialogElement.prototype, 'close')
-    .mockImplementation(function (this: HTMLDialogElement) {
-      this.open = false;
-    });
-  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(
-    function (this: HTMLMediaElement) {
-      this.dispatchEvent(new Event('pause'));
-    }
-  );
-  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
-    async function (this: HTMLMediaElement) {
-      this.dispatchEvent(new Event('play'));
-    }
-  );
-  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640);
-  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(360);
-  const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:review');
-  const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-  const clipboard = vi.fn(async () => undefined);
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: { writeText: clipboard },
-  });
-  let snapshot: VideoWorkspaceSnapshot = {
-    workspace: {
-      aggregateId: 'recording:r',
-      sourceAssetId: 'file',
-      formatVersion: 1,
-      source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 },
-      revision: 1,
-      cursor: 0,
-      advanced: createQuickEditAdvancedState(),
-      history: [],
-      createdAt: 1,
-      updatedAt: 1,
-    },
-    draft: null,
-  };
-  integration.load.mockImplementation(async () => ({
-    source: snapshot.workspace.source,
-    snapshot: structuredClone(snapshot),
-    file: new File(['video'], 'video.webm'),
-    filename: 'video.webm',
-    telemetry: {
-      captureMode: 'tab',
-      viewport: { width: 320, height: 180 },
-      actionEvents: [],
-      cursorTrack: null,
-      signals: [
-        { id: 'idle', kind: 'cursor-idle', startTime: 2, endTime: 3, point: null, data: {} },
-        {
-          id: 'warning',
-          kind: 'static-frame',
-          startTime: 0,
-          endTime: 0,
-          point: null,
-          data: { code: 'unavailable' },
-        },
-      ],
-    },
-  }));
-  integration.draft.mockImplementation(
-    async (args: Parameters<typeof saveVideoWorkspaceDraft>[0]) => {
-      snapshot = {
-        ...snapshot,
-        draft: args.annotation
-          ? {
-              aggregateId: 'recording:r',
-              annotation: parseReviewAnnotation(args.annotation, 4, true)!,
-              before: args.before ? parseReviewAnnotation(args.before, 4)! : null,
-              revision: (snapshot.draft?.revision ?? 0) + 1,
-              updatedAt: 2,
-            }
-          : null,
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  integration.commit.mockImplementation(
-    async (args: Parameters<typeof commitVideoWorkspace>[0]) => {
-      snapshot = {
-        ...snapshot,
-        workspace: {
-          ...snapshot.workspace,
-          revision: snapshot.workspace.revision + 1,
-          history: [
-            ...snapshot.workspace.history.slice(0, snapshot.workspace.cursor),
-            parseReviewOperation(args.operation, 4)!,
-          ],
-          cursor: snapshot.workspace.cursor + 1,
-        },
-        draft: args.consumeDraftRevision ? null : snapshot.draft,
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  integration.history.mockImplementation(
-    async (args: Parameters<typeof moveVideoWorkspaceHistory>[0]) => {
-      snapshot = {
-        ...snapshot,
-        workspace: {
-          ...snapshot.workspace,
-          cursor: snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1),
-          revision: snapshot.workspace.revision + 1,
-        },
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  integration.read.mockImplementation(async () => structuredClone(snapshot));
-  integration.advanced.mockImplementation(
-    async (args: Parameters<typeof saveVideoWorkspaceAdvanced>[0]) => {
-      const advanced = loadQuickEditAdvancedState(args.advanced);
-      if (!advanced) throw new Error('Advanced state is invalid.');
-      snapshot = {
-        ...snapshot,
-        workspace: {
-          ...snapshot.workspace,
-          revision: snapshot.workspace.revision + 1,
-          advanced,
-        },
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  const back = vi.fn();
-  const button = (key: string) => {
-    const node = host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`);
-    if (!node) throw new Error(`Missing ${key}`);
-    return node;
-  };
-  const click = async (key: string) => act(async () => button(key).click());
-  const fill = async (value: string) =>
-    act(async () => {
-      const field = host.querySelector('textarea')!;
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-        field,
-        value
-      );
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  return {
-    host,
-    root,
-    back,
-    button,
-    click,
-    fill,
-    show,
-    close,
-    createUrl,
-    revokeUrl,
-    clipboard,
-    get snapshot() {
-      return snapshot;
-    },
-    async cleanup() {
-      await act(async () => root.unmount());
-      host.remove();
-      vi.restoreAllMocks();
-      vi.unstubAllGlobals();
-    },
-  };
-}
+import { createEditorFixture } from './editor-fixture.test-support';
 
 it('integrates selection, recoverable text, drawing, history and report actions in the modal', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { host, root, back, click, fill, show, close, createUrl, revokeUrl, clipboard } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -350,7 +141,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
 });
 
 it('keeps unsaved text in the editor when Back cannot persist recovery, then retries', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host, back, click, fill } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -370,7 +161,7 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
 });
 
 it('offers source-load retry and surfaces playback failure without exiting', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host, back, click } = fixture;
   integration.load.mockRejectedValueOnce(new Error('Missing source'));
   try {
@@ -410,7 +201,7 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
 }
 
 it('selects a range by dragging anywhere on the time plane and clears it outside', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host } = fixture;
   let selected: ReviewAnchor = { kind: 'point', time: 0 };
   const seek = vi.fn();
@@ -468,7 +259,7 @@ it('selects a range by dragging anywhere on the time plane and clears it outside
 });
 
 it('commits safe cuts, skips excluded playback and preserves exact comment navigation', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host, back, click } = fixture;
   integration.index.mockResolvedValue({
     duration: 4,
@@ -560,7 +351,7 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
 });
 
 it('creates a zoom region from the playhead, edits it in the inspector, and persists it', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, click } = fixture;
   try {
     await act(async () =>
@@ -600,7 +391,7 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
 });
 
 it('ignores the comment shortcut while report copying disables the comment control', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   let finish!: () => void;
   fixture.clipboard.mockImplementation(
     () =>
@@ -626,7 +417,7 @@ it('ignores the comment shortcut while report copying disables the comment contr
 });
 
 it('blocks history and destructive shortcuts while the export controls are disabled', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   let fail!: (reason: Error) => void;
   integration.export.mockImplementation(
     () =>
@@ -672,7 +463,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
 });
 
 it('toggles the persisted advanced mode and restores it after reopening the editor', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, button, click } = fixture;
   try {
     await act(async () =>
@@ -720,7 +511,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
 });
 
 it('adds an overlay comment, drags it on the stage and deletes it via the editor', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -769,7 +560,7 @@ it('adds an overlay comment, drags it on the stage and deletes it via the editor
 });
 
 it('reveals the three audio lanes and persists the original audio gate', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -784,6 +575,28 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     await act(async () => mute.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
     expect(fixture.snapshot.workspace.advanced.audio.original.muted).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('opens the shared voiceover recorder from the audio lane', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
+    await click('audioTrack');
+    await click('recordVoiceover');
+    const modal = host.querySelector('[role="dialog"]');
+    expect(modal).not.toBeNull();
+    expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>('sniptale-modal-close, [title="common.actions.close"]')!
+        .click()
+    );
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
   } finally {
     await fixture.cleanup();
   }

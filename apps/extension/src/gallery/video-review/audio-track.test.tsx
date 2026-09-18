@@ -23,6 +23,7 @@ const onTrimClip = vi.fn(
 );
 const onOriginal = vi.fn((_patch: Partial<QuickEditOriginalAudio>) => undefined);
 const onImportFile = vi.fn((_file: File) => undefined);
+const onRecordVoiceover = vi.fn();
 const onSelect = vi.fn((_id: string | null) => undefined);
 
 const clip = (id: string, timelineStart: number, duration: number): QuickEditAudioClip => ({
@@ -34,7 +35,15 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  for (const mock of [onMoveClip, onTrimClip, onOriginal, onImportFile, onSelect]) mock.mockClear();
+  for (const mock of [
+    onMoveClip,
+    onTrimClip,
+    onOriginal,
+    onImportFile,
+    onSelect,
+    onRecordVoiceover,
+  ])
+    mock.mockClear();
 });
 
 afterEach(async () => {
@@ -64,6 +73,7 @@ const renderTrack = (
         onTrimClip={onTrimClip}
         onOriginal={onOriginal}
         onImportFile={onImportFile}
+        onRecordVoiceover={onRecordVoiceover}
       />
     );
   });

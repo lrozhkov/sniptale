@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
-import { Plus, Volume2, VolumeX } from 'lucide-react';
+import { Mic, Plus, Volume2, VolumeX } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditAudioClip,
@@ -235,6 +235,7 @@ export function ReviewAudioTrack(props: {
   onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File): void;
+  onRecordVoiceover(): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   return (
@@ -300,7 +301,20 @@ export function ReviewAudioTrack(props: {
                   </ReviewButton>
                 ),
               }
-            : {})}
+            : lane.key === 'voiceover'
+              ? {
+                  trailing: (
+                    <ReviewButton
+                      label={translate('gallery.videoReview.recordVoiceover')}
+                      disabled={props.busy}
+                      className="!absolute right-1 top-1/2 z-10 !h-6 !min-h-6 -translate-y-1/2 !px-1.5"
+                      onClick={props.onRecordVoiceover}
+                    >
+                      <Mic size={14} />
+                    </ReviewButton>
+                  ),
+                }
+              : {})}
         />
       ))}
     </div>

@@ -259,6 +259,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   audioFadeIn: { ru: 'Плавное начало', en: 'Fade in' },
   audioFadeOut: { ru: 'Плавное затухание', en: 'Fade out' },
   audioClipDelete: { ru: 'Удалить клип', en: 'Delete clip' },
+  recordVoiceover: { ru: 'Записать озвучку', en: 'Record voiceover' },
   overlayComments: { ru: 'Комментарии на кадре', en: 'Frame comments' },
   overlayPoint: { ru: 'Комментарий', en: 'Comment' },
   overlayText: { ru: 'Текст', en: 'Text' },
