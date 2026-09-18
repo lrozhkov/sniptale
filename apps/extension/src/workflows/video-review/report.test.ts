@@ -290,12 +290,14 @@ it('binds actual export timing to its revision without claiming later edits were
       audioPackets: 300,
       resultDuration: 6,
       audioRanges: [{ sourceStart: 4.001, sourceEnd: 8.001, resultStart: 2, resultEnd: 6 }],
+      videoReencoded: true,
     },
   };
   const report = createVideoReviewReport(args);
   expect(report).toContain('"exported": true');
   expect(report).toContain('"sourceStartUs": 4001000');
   expect(report).toContain('"resultDurationUs": 6000000');
+  expect(report).toContain('"videoReencoded": true');
   expect(report).not.toContain('private');
   snapshot.workspace.revision = 3;
   const later = createVideoReviewReport(args);

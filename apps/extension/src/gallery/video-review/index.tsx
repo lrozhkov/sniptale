@@ -365,6 +365,7 @@ function ReviewInspectorBinding({
             snapshot.document.edits.some((edit) => edit.kind === 'speed')
           }
           advancedBlockers={editing.exporter.blocked}
+          reencodeReasons={editing.exporter.reencode()}
           onExport={() => {
             video.current?.pause();
             void editing.exporter.start();

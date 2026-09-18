@@ -151,7 +151,7 @@ export function createVideoReviewReport(args: {
             filename: args.exportReceipt.filename,
             createdAt: new Date(args.exportReceipt.createdAt).toISOString(),
             resultDurationUs: microseconds(args.exportReceipt.resultDuration),
-            videoReencoded: false,
+            videoReencoded: args.exportReceipt.videoReencoded ?? false,
             audioReencoded: args.exportReceipt.audioReencoded ?? false,
             outputAudioCodec: args.exportReceipt.outputAudioCodec ?? null,
             videoPackets: args.exportReceipt.videoPackets,

@@ -19,7 +19,7 @@ vi.mock('../shared/download', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/download')>()),
   downloadGalleryBlob: mocks.download,
 }));
-function setup() {
+function setup(apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState>) => void) {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const source = { duration: 6, width: 160, height: 90, mimeType: 'video/webm', size: 5 };
@@ -47,6 +47,7 @@ function setup() {
     url: 'blob:original',
     session: createVideoReviewSession(snapshot),
   };
+  apply?.(resource.session.getSnapshot().snapshot.workspace.advanced);
   mocks.index.mockResolvedValue({
     duration: 6,
     boundaries: [0, 2, 4, 6],
@@ -54,6 +55,7 @@ function setup() {
     audioCodec: null,
     container: 'webm',
     rotation: 0,
+    processedVideoCodec: 'vp9',
   });
   const root = createRoot(document.createElement('div'));
   let hook!: ReturnType<typeof useReviewExport>;
@@ -64,6 +66,7 @@ function setup() {
   return {
     root,
     Harness,
+    resource,
     get hook() {
       return hook;
     },
@@ -165,6 +168,31 @@ it('downloads a selection without replacing the full-result report receipt', asy
     );
     expect(fixture.hook.result).toBe(full);
     expect(fixture.hook.phase).toBe('idle');
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('downloads the rendered result when only visual effects are applied', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+    advanced.zoom.enabled = true;
+  });
+  mocks.export.mockResolvedValue({
+    file: new File(['copy'], 'copy.webm'),
+    receipt: { filename: 'copy.webm' },
+  });
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () => fixture.hook.download());
+    expect(mocks.export).toHaveBeenCalledOnce();
+    expect(mocks.export.mock.calls[0]![0].destination).toBe('download');
+    expect(mocks.download).toHaveBeenCalledWith(
+      expect.anything(),
+      'copy.webm',
+      undefined,
+      expect.any(Function)
+    );
   } finally {
     await fixture.cleanup();
   }

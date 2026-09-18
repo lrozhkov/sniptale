@@ -15,26 +15,17 @@ import {
   buildQuickEditAudioPlan,
   type QuickEditAudioPlanEntry,
 } from '../../features/video/review/advanced/audio-plan';
-import {
-  resolveQuickEditExportPlan,
-  type QuickEditExportReason,
-} from '../../features/video/review/advanced/effective';
+import { resolveQuickEditExportPlan } from '../../features/video/review/advanced/effective';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
 import { resolveReviewAssetBytes } from './asset-bytes';
 import { loadVideoReviewSource } from './source';
 import { writeReviewPackets, type ReviewPacketReceipt } from './packet-export';
+import { writeReviewFrames } from './render-export';
 import type { ReviewMediaIndex } from './media-index';
 import { encodeReviewProvenance } from '../../features/video/review/provenance';
+import { QuickEditExportUnavailable } from './export-unavailable';
 
-/** Typed unavailability so the UI can show the exact reasons instead of a generic failure. */
-export class QuickEditExportUnavailable extends Error {
-  readonly reasons: readonly QuickEditExportReason[];
-  constructor(reasons: readonly QuickEditExportReason[]) {
-    super('Review export is unavailable.');
-    this.name = 'QuickEditExportUnavailable';
-    this.reasons = reasons;
-  }
-}
+export { QuickEditExportUnavailable };
 
 export interface ReviewExportClipPlan {
   /** Fragment-local entries: output time is already shifted into the fragment. */
@@ -59,6 +50,7 @@ const persistence = {
   saveRecordingsBatchSafely,
   loadVideoReviewSource,
   writeReviewPackets,
+  writeReviewFrames,
   readProjectAsset: resolveReviewAssetBytes,
 };
 
@@ -141,11 +133,16 @@ export async function exportReviewedVideo(
   const plan = resolveQuickEditExportPlan({
     document,
     advanced: workspace.advanced,
-    ...(index.processedAudioCodec ? { audioProcessingAvailable: true } : {}),
+    // A source audio track with a probed unavailable codec is a known blocker;
+    // clips-only exports defer the authoritative probe to the exporter.
+    ...(index.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
+    videoRenderAvailable: !!index.processedVideoCodec,
   });
   if (plan.kind === 'unavailable') throw new QuickEditExportUnavailable(plan.reasons);
   if (plan.audio === 'process' && index.audioCodec && !index.processedAudioCodec)
     throw new QuickEditExportUnavailable(['audio-encoder']);
+  if (plan.video === 'render' && !index.processedVideoCodec)
+    throw new QuickEditExportUnavailable(['video-encoder']);
   const fragment = args.selection
     ? createReviewFragment({
         selection: args.selection,
@@ -157,11 +154,11 @@ export async function exportReviewedVideo(
   if (args.selection && (!fragment || args.destination !== 'download'))
     throw new Error('A nonempty fragment requires a temporary download.');
   const edits = fragment?.edits ?? document.edits;
+  const fragmentOffset = fragment
+    ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
+    : 0;
   let exportAudio: ReviewExportClipPlan | undefined;
   if (plan.audio === 'process') {
-    const fragmentOffset = fragment
-      ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
-      : 0;
     exportAudio = await buildReviewExportClipPlan({
       advanced: workspace.advanced,
       fragmentOffset,
@@ -198,16 +195,31 @@ export async function exportReviewedVideo(
   });
   let publishing = false;
   try {
-    const packetReceipt = await deps.writeReviewPackets({
-      file: original.file,
-      index,
-      edits,
-      writer,
-      signal,
-      provenance,
-      ...(exportAudio ? { exportAudio } : {}),
-      ...(args.onProgress ? { onProgress: args.onProgress } : {}),
-    });
+    const packetReceipt =
+      plan.video === 'render'
+        ? await deps.writeReviewFrames({
+            file: original.file,
+            index,
+            edits,
+            advanced: workspace.advanced,
+            fragmentOffset,
+            writer,
+            signal,
+            provenance,
+            readProjectAsset: deps.readProjectAsset,
+            ...(exportAudio ? { exportAudio } : {}),
+            ...(args.onProgress ? { onProgress: args.onProgress } : {}),
+          })
+        : await deps.writeReviewPackets({
+            file: original.file,
+            index,
+            edits,
+            writer,
+            signal,
+            provenance,
+            ...(exportAudio ? { exportAudio } : {}),
+            ...(args.onProgress ? { onProgress: args.onProgress } : {}),
+          });
     signal.throwIfAborted();
     const prepared = await writer.finalize();
     const file = await deps.readAssetFile(prepared.ref, filename);

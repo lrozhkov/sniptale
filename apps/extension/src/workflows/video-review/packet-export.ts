@@ -24,6 +24,8 @@ export interface ReviewPacketReceipt {
   audioPackets: number;
   resultDuration: number;
   audioReencoded?: boolean;
+  /** Full frame re-encode; the packet copy path never sets this. */
+  videoReencoded?: boolean;
   outputAudioCodec?: 'aac' | 'opus' | null;
   audioRanges: { sourceStart: number; sourceEnd: number; resultStart: number; resultEnd: number }[];
 }
@@ -93,7 +95,8 @@ export async function writeReviewPackets(args: {
       },
     });
     output = tracks.output;
-    const videoSource = tracks.video;
+    if (tracks.video.kind !== 'copy') throw new Error('Video output configuration changed.');
+    const videoSource = tracks.video.source;
     let videoEnd = 0;
     await output.start();
     for (const segment of segments) {
@@ -190,7 +193,7 @@ async function muxSegmentPackets(args: {
   videoPackets: AsyncGenerator<EncodedPacket, void, unknown>;
   audioPackets: AsyncGenerator<EncodedPacket | AudioSample, void, unknown> | null;
   videoSource: EncodedVideoPacketSource;
-  audioSource: ReturnType<typeof createReviewMediaOutput>['audio'];
+  audioSource: ReturnType<typeof createReviewMediaOutput>['audio'] | null;
   videoConfig: VideoDecoderConfig;
   audioConfig: AudioDecoderConfig | null | undefined;
   receipt: ReviewPacketReceipt;
@@ -266,7 +269,7 @@ async function* retainedVideo(
   if (pending) yield timed(pending, segment.sourceEnd);
 }
 
-async function* retainedAudio(
+export async function* retainedAudio(
   sink: EncodedPacketSink,
   segment: Segment,
   clock: { time: number },

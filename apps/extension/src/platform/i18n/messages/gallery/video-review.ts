@@ -83,10 +83,15 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'кодирование звука недоступно',
     en: 'audio encoding is unavailable',
   },
+  exportBlockerVideoEncoder: {
+    ru: 'кодирование видео недоступно',
+    en: 'video encoding is unavailable',
+  },
   exportBlockerAssetMissing: {
     ru: 'импортированный материал недоступен',
     en: 'imported media is unavailable',
   },
+  exportApplied: { ru: 'Экспорт применит:', en: 'Export will apply:' },
   eventClick: { ru: 'Щелчок', en: 'Click' },
   eventDoubleClick: { ru: 'Двойной щелчок', en: 'Double click' },
   eventScroll: { ru: 'Прокрутка', en: 'Scroll' },

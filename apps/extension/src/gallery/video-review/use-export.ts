@@ -58,6 +58,7 @@ export function useReviewExport(resource: LoadedReview) {
       // A source audio track with a probed unavailable codec is a known blocker;
       // clips-only exports defer the authoritative probe to the exporter.
       ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
+      videoRenderAvailable: !!index?.processedVideoCodec,
     });
   };
   const start = async (
@@ -118,6 +119,16 @@ export function useReviewExport(resource: LoadedReview) {
     failed,
     blocked,
     result,
+    plan,
+    /** Ready-plan reasons worth an applied-changes hint; null while nothing is applied. */
+    reencode: (): readonly QuickEditExportReason[] | null => {
+      const current = plan();
+      return current.kind === 'ready' &&
+        (current.video === 'render' || current.audio === 'process') &&
+        current.reasons.length
+        ? current.reasons
+        : null;
+    },
     start,
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
       start('download', selection),
@@ -131,7 +142,10 @@ export function useReviewExport(resource: LoadedReview) {
         return;
       }
       const state = resource.session.getSnapshot();
-      const applied = currentPlan.audio === 'process' || state.document.edits.length > 0;
+      const applied =
+        currentPlan.video === 'render' ||
+        currentPlan.audio === 'process' ||
+        state.document.edits.length > 0;
       if (!applied) downloadGalleryBlob(resource.file, resource.filename);
       else void start('download');
     },

@@ -3,6 +3,9 @@ import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecyc
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { PreparedAssetObject } from '../../composition/persistence/assets';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { createCanvasComment } from '../../features/video/review/comments';
+import type { ReviewMediaIndex } from './media-index';
+import type { ReviewPacketReceipt } from './packet-export';
 
 function fixture() {
   const source = { duration: 6, width: 160, height: 90, mimeType: 'video/webm', size: 5 };
@@ -68,6 +71,9 @@ function fixture() {
       resultDuration: 4,
       audioRanges: [],
     })),
+    writeReviewFrames: vi.fn(async (): Promise<ReviewPacketReceipt> => {
+      throw new Error('Unexpected full render in packet-path fixture.');
+    }),
   } satisfies Parameters<typeof exportReviewedVideo>[1];
   const controller = new AbortController();
   const args = {
@@ -79,7 +85,7 @@ function fixture() {
       audioCodec: null,
       container: 'webm' as const,
       rotation: 0 as const,
-    },
+    } as ReviewMediaIndex,
     signal: controller.signal,
   };
   return { args, deps, writer, controller, original, result };
@@ -243,15 +249,59 @@ it('blocks the export when an applied clip asset is missing or undecodable', asy
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
 });
 
-it('blocks visual changes with their applied reasons and never stages bytes', async () => {
+it('routes visual changes to the full frame renderer and stages the encoded result', async () => {
+  const { args, deps, writer } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.zoom.enabled = true;
+  args.index = {
+    ...args.index,
+    processedVideoCodec: 'vp9',
+    frameRate: 30,
+  };
+  deps.writeReviewFrames = vi.fn(async () => ({
+    videoPackets: 90,
+    audioPackets: 0,
+    resultDuration: 4,
+    audioRanges: [],
+  }));
+  const exported = await exportReviewedVideo(args, deps);
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({ fragmentOffset: 0 })
+  );
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  expect(exported.receipt).toMatchObject({ resultDuration: 4, filename: 'clip-edited.webm' });
+  expect(writer.abort).not.toHaveBeenCalled();
+});
+
+it('blocks visual changes without a video encoder and never stages bytes', async () => {
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
   advanced.zoom.enabled = true;
-  deps.readProjectAsset.mockResolvedValue(null);
   await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
     name: 'QuickEditExportUnavailable',
-    reasons: expect.arrayContaining(['zoom']),
+    reasons: ['video-encoder'],
+  });
+  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+});
+
+it('blocks burned comments with their applied reasons and never stages bytes', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.zoom.enabled = true;
+  args.snapshot.workspace.history.push({
+    id: 'op-comment',
+    at: 3,
+    target: 'canvasComment',
+    before: null,
+    after: { ...createCanvasComment({ id: 'c' }), text: 'note' },
+  });
+  args.snapshot.workspace.cursor = 2;
+  await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
+    name: 'QuickEditExportUnavailable',
+    reasons: expect.arrayContaining(['burned-comment']),
   });
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
 });

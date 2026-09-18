@@ -128,16 +128,49 @@ it('plans render requirements and audio-only processing from applied changes', (
   });
   expect(blocked).toMatchObject({
     kind: 'unavailable',
-    reasons: expect.arrayContaining(['zoom', 'background', 'burned-comment']),
+    reasons: ['burned-comment'],
   });
-  if (blocked.kind !== 'unavailable') throw new Error('expected blocked export');
-  expect(blocked.reasons).not.toContain('voiceover');
-  const unburned = resolveQuickEditExportPlan({
+  const visual = resolveQuickEditExportPlan({
     document: document(false),
     advanced: state,
   });
-  if (unburned.kind !== 'unavailable') throw new Error('expected blocked export');
-  expect(unburned.reasons).not.toContain('burned-comment');
+  expect(visual).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: ['zoom', 'background'],
+  });
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(false),
+      advanced: state,
+      videoRenderAvailable: false,
+    })
+  ).toMatchObject({ kind: 'unavailable', reasons: ['video-encoder'] });
+
+  const visualWithAudio = advancedWithContent();
+  visualWithAudio.audio.music = [musicStub()];
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(false),
+      advanced: visualWithAudio,
+    })
+  ).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+    reasons: ['zoom', 'background', 'music'],
+  });
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(false),
+      advanced: visualWithAudio,
+      videoRenderAvailable: false,
+    })
+  ).toMatchObject({
+    kind: 'unavailable',
+    reasons: ['video-encoder', 'music'],
+  });
 
   const voice = advancedWithContent();
   voice.background = { enabled: false };

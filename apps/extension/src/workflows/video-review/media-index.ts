@@ -1,4 +1,11 @@
-import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input, type Rotation } from 'mediabunny';
+import {
+  ALL_FORMATS,
+  BlobSource,
+  EncodedPacketSink,
+  Input,
+  canEncodeVideo,
+  type Rotation,
+} from 'mediabunny';
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import { chooseReviewAudioCodec } from './audio-render';
 
@@ -10,6 +17,23 @@ export interface ReviewMediaIndex {
   container: 'mp4' | 'webm';
   rotation: Rotation;
   processedAudioCodec?: 'aac' | 'opus' | null;
+  /** Encoder for a full frame render; null keeps visual exports honestly blocked. */
+  processedVideoCodec?: 'avc' | 'vp8' | 'vp9' | null;
+  /** Probed average frame rate; the render loop quantizes output frames to it. */
+  frameRate?: number;
+}
+
+/** Re-encode codec for one frame render; mp4 keeps the broadly supported AVC path. */
+export async function chooseReviewVideoCodec(
+  container: 'mp4' | 'webm',
+  dimensions: { width: number; height: number }
+): Promise<'avc' | 'vp8' | 'vp9' | null> {
+  if (typeof VideoEncoder === 'undefined') return null;
+  const candidates = container === 'mp4' ? (['avc'] as const) : (['vp9', 'vp8'] as const);
+  for (const codec of candidates) {
+    if (await canEncodeVideo(codec, dimensions)) return codec;
+  }
+  return null;
 }
 
 /** Indexes actual independent packets; no decoded frames or retained packet payloads. */
@@ -73,7 +97,14 @@ export async function inspectReviewMedia(
       throw new Error('The first video packet is not an independent source entry point.');
     const container =
       videoCodec === 'avc' || videoCodec === 'hevc' || audioCodec === 'aac' ? 'mp4' : 'webm';
-    const processedAudioCodec = audio ? await chooseReviewAudioCodec(audio, container) : null;
+    const [processedAudioCodec, processedVideoCodec, packetStats] = await Promise.all([
+      chooseReviewAudioCodec(audio ?? null, container),
+      chooseReviewVideoCodec(container, {
+        width: await video.getDisplayWidth(),
+        height: await video.getDisplayHeight(),
+      }),
+      video.computePacketStats(256, { metadataOnly: true }),
+    ]);
     signal.throwIfAborted();
     return {
       duration,
@@ -82,6 +113,11 @@ export async function inspectReviewMedia(
       audioCodec,
       container,
       processedAudioCodec,
+      processedVideoCodec,
+      frameRate:
+        Number.isFinite(packetStats.averagePacketRate) && packetStats.averagePacketRate > 0
+          ? Math.min(120, Math.max(1, Math.round(packetStats.averagePacketRate)))
+          : 30,
       rotation: await video.getRotation(),
     };
   } finally {

@@ -20,6 +20,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   music: 'gallery.videoReview.exportBlockerMusic',
   'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',
   'audio-encoder': 'gallery.videoReview.exportBlockerAudioEncoder',
+  'video-encoder': 'gallery.videoReview.exportBlockerVideoEncoder',
   'asset-missing': 'gallery.videoReview.exportBlockerAssetMissing',
 };
 
@@ -127,6 +128,8 @@ export function ReviewEditActions(props: {
   hasResult: boolean;
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
+  /** Ready-plan reasons worth an applied-changes line; null while nothing is applied. */
+  reencodeReasons?: readonly QuickEditExportReason[] | null;
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
@@ -182,6 +185,12 @@ export function ReviewEditActions(props: {
       {props.audioUnavailable ? (
         <p role="status" className="text-xs">
           {translate('gallery.videoReview.speedAudioUnavailable')}
+        </p>
+      ) : null}
+      {!blocked && props.reencodeReasons?.length ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.exportApplied')}{' '}
+          {props.reencodeReasons.map((reason) => translate(REASON_LABEL[reason])).join(' · ')}
         </p>
       ) : null}
       {blocked ? (

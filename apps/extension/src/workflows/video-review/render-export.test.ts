@@ -1,0 +1,446 @@
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { ReviewEdit } from '../../features/video/review/types';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import {
+  drawReviewSceneFrame,
+  drainSegmentAudio,
+  renderRenderWindowFrames,
+  reviewRenderFrameSchedule,
+  writeReviewFrames,
+} from './render-export';
+
+const state = vi.hoisted(() => ({
+  encoded: [] as { timestamp: number; close: unknown }[],
+  drawn: [] as { draw: unknown; close: unknown }[],
+}));
+
+vi.mock('mediabunny', () => {
+  class VideoSample {
+    timestamp: number;
+    close = vi.fn();
+    draw = vi.fn();
+    constructor(_source: unknown, init: { timestamp: number }) {
+      this.timestamp = init.timestamp;
+    }
+  }
+  class VideoSampleSink {
+    async *samplesAtTimestamps(times: readonly number[]) {
+      for (const time of times) {
+        const sample = new VideoSample(null, { timestamp: time });
+        state.drawn.push({ draw: sample.draw, close: sample.close });
+        yield sample;
+      }
+    }
+  }
+  class Input {
+    async getPrimaryVideoTrack() {
+      return {
+        codec: 'vp9',
+        canDecode: async () => true,
+        getDisplayWidth: async () => 320,
+        getDisplayHeight: async () => 180,
+      };
+    }
+    async getPrimaryAudioTrack() {
+      return null;
+    }
+    dispose(): void {}
+  }
+  class Output {
+    start = vi.fn();
+    finalize = vi.fn();
+    cancel = vi.fn();
+    addVideoTrack = vi.fn();
+    addAudioTrack = vi.fn();
+    setMetadataTags = vi.fn();
+  }
+  class VideoSampleSource {
+    add = vi.fn(async (sample: VideoSample) => {
+      state.encoded.push({ timestamp: sample.timestamp, close: sample.close });
+    });
+    close(): void {}
+  }
+  return {
+    ALL_FORMATS: [],
+    BlobSource: class {},
+    Input,
+    Output,
+    StreamTarget: class {},
+    Mp4OutputFormat: class {},
+    WebMOutputFormat: class {},
+    VideoSample,
+    VideoSampleSink,
+    VideoSampleSource,
+    EncodedVideoPacketSource: class {},
+    EncodedAudioPacketSource: class {},
+    AudioSampleSource: class {},
+    EncodedPacketSink: class {},
+  };
+});
+
+const realDocument = globalThis.document;
+const realCreateImageBitmap = globalThis.createImageBitmap;
+
+function contextFixture() {
+  return {
+    fillStyle: '',
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    roundRect: vi.fn(),
+    clip: vi.fn(),
+    fillRect: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+}
+
+beforeAll(() => {
+  globalThis.document = {
+    createElement: () => ({ width: 0, height: 0, getContext: () => contextFixture() }),
+  } as unknown as Document;
+  globalThis.createImageBitmap = (async () => {
+    throw new Error('decode failed');
+  }) as typeof createImageBitmap;
+});
+
+afterAll(() => {
+  globalThis.document = realDocument;
+  globalThis.createImageBitmap = realCreateImageBitmap;
+});
+
+function writerFixture() {
+  return { writeAt: vi.fn(async () => undefined) };
+}
+
+function argsFixture(overrides?: {
+  advanced?: ReturnType<typeof createQuickEditAdvancedState>;
+  processedVideoCodec?: 'avc' | 'vp8' | 'vp9' | null;
+  frameRate?: number;
+}) {
+  const advanced = overrides?.advanced ?? createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  return {
+    file: new Blob(['video']),
+    index: {
+      duration: 2,
+      boundaries: [0, 2],
+      videoCodec: 'vp9' as const,
+      audioCodec: null,
+      container: 'webm' as const,
+      rotation: 0 as const,
+      processedVideoCodec:
+        overrides && overrides.processedVideoCodec !== undefined
+          ? overrides.processedVideoCodec
+          : ('vp9' as const),
+      frameRate: overrides?.frameRate ?? 2,
+    },
+    edits: [] as ReviewEdit[],
+    advanced,
+    fragmentOffset: 0,
+    writer: writerFixture(),
+    signal: new AbortController().signal,
+    readProjectAsset: vi.fn(async () => null),
+  };
+}
+
+function segmentStub(sourceStart: number, sourceEnd: number) {
+  return {
+    sourceStart,
+    sourceEnd,
+    resultStart: sourceStart,
+    resultEnd: sourceEnd,
+    kind: 'keep' as const,
+    rate: 1,
+  };
+}
+
+function cutEdit(start: number, end: number) {
+  return {
+    id: `cut-${start}`,
+    kind: 'cut' as const,
+    start,
+    end,
+    requestedStart: start,
+    requestedEnd: end,
+  };
+}
+
+function speedEdit(start: number, end: number) {
+  return {
+    id: `speed-${start}`,
+    kind: 'speed' as const,
+    start,
+    end,
+    requestedStart: start,
+    requestedEnd: end,
+    rate: 0.5 as const,
+    audio: 'speed' as const,
+  };
+}
+
+describe('reviewRenderFrameSchedule', () => {
+  it('covers an unedited duration exactly on the fps lattice', () => {
+    const windows = reviewRenderFrameSchedule(2.5, [], 10);
+    expect(windows).toHaveLength(1);
+    expect(windows[0]!.timestamps).toHaveLength(25);
+    expect(windows[0]!.timestamps[0]).toBe(0);
+    expect(windows[0]!.timestamps.at(-1)).toBe(2.4);
+    expect(windows[0]!.sourceTimes[0]).toBe(0);
+    expect(windows[0]!.sourceTimes.at(-1)).toBeCloseTo(2.4, 9);
+  });
+
+  it('shifts timestamps across cuts and resamples speed segments', () => {
+    const windows = reviewRenderFrameSchedule(10, [cutEdit(1, 3), speedEdit(5, 7)], 2);
+    expect(windows).toHaveLength(4);
+    expect(windows[0]!.segment).toMatchObject({ sourceStart: 0, sourceEnd: 1, resultStart: 0 });
+    expect(windows[1]!.segment).toMatchObject({ sourceStart: 3, sourceEnd: 5, resultStart: 1 });
+    expect(windows[2]!.segment).toMatchObject({
+      sourceStart: 5,
+      sourceEnd: 7,
+      resultStart: 3,
+      rate: 0.5,
+    });
+    expect(windows[3]!.segment).toMatchObject({ sourceStart: 7, sourceEnd: 10, resultStart: 7 });
+    expect(windows[2]!.timestamps).toHaveLength(8);
+    expect(windows[2]!.timestamps[0]).toBe(3);
+    expect(windows[2]!.sourceTimes[2]).toBeCloseTo(5.5, 9);
+  });
+
+  it('keeps frames over a sub-frame tail and rejects invalid frame rates', () => {
+    const windows = reviewRenderFrameSchedule(0.1, [], 30);
+    expect(windows[0]!.timestamps).toHaveLength(3);
+    expect(() => reviewRenderFrameSchedule(1, [], 0)).toThrow('Render frame rate is invalid.');
+  });
+});
+
+describe('drawReviewSceneFrame', () => {
+  const layout = {
+    contentRect: { x: 8, y: 8, width: 160, height: 88 },
+    videoRect: { x: 8, y: 8, width: 160, height: 88 },
+    videoTransform: { x: 4, y: 2, width: 168, height: 104 },
+  };
+
+  it('paints the background, clips the content rect, and draws the camera-transformed frame', () => {
+    const context = contextFixture();
+    const draw = vi.fn();
+    drawReviewSceneFrame(context, {
+      canvas: { width: 176, height: 104 },
+      layout,
+      background: {
+        enabled: true,
+        type: 'solid',
+        color: '#123456ff',
+        layout: { padding: 8, cornerRadius: 0 },
+      },
+      image: null,
+      sample: { draw } as never,
+    });
+    expect(context.fillRect).toHaveBeenCalledWith(0, 0, 176, 104);
+    expect(context.beginPath).toHaveBeenCalled();
+    expect(context.rect).toHaveBeenCalledWith(8, 8, 160, 88);
+    expect(context.clip).toHaveBeenCalled();
+    expect(draw).toHaveBeenCalledWith(context, 4, 2, 168, 104);
+    expect(context.restore).toHaveBeenCalled();
+  });
+
+  it('clips with the rounded content rect when a corner radius is set', () => {
+    const context = contextFixture();
+    const draw = vi.fn();
+    drawReviewSceneFrame(context, {
+      canvas: { width: 176, height: 104 },
+      layout,
+      background: {
+        enabled: true,
+        type: 'solid',
+        color: '#000000ff',
+        layout: { padding: 8, cornerRadius: 24 },
+      },
+      image: null,
+      sample: { draw } as never,
+    });
+    expect(context.roundRect).toHaveBeenCalledWith(8, 8, 160, 88, 24);
+    expect(context.rect).not.toHaveBeenCalled();
+  });
+
+  it('draws a contained image background under the unclipped full-frame video', () => {
+    const context = contextFixture();
+    const draw = vi.fn();
+    const image = { width: 40, height: 40 } as ImageBitmap;
+    drawReviewSceneFrame(context, {
+      canvas: { width: 160, height: 90 },
+      layout: {
+        ...layout,
+        contentRect: { x: 0, y: 0, width: 160, height: 90 },
+        videoTransform: { x: 0, y: 0, width: 160, height: 90 },
+      },
+      background: {
+        enabled: true,
+        type: 'image',
+        assetId: 'asset:pic',
+        imageFit: 'contain',
+        layout: { padding: 0, cornerRadius: 0 },
+      },
+      image,
+      sample: { draw } as never,
+    });
+    expect(context.drawImage).toHaveBeenCalledWith(image, 35, 0, 90, 90);
+    expect(context.clip).toHaveBeenCalled();
+    expect(draw).toHaveBeenCalledWith(context, 0, 0, 160, 90);
+  });
+});
+
+describe('renderRenderWindowFrames', () => {
+  it('draws and encodes every scheduled frame at its output timestamp', async () => {
+    const videoOut = { add: vi.fn(async () => undefined), close: vi.fn() };
+    const onProgress = vi.fn();
+    const frameSink = {
+      samplesAtTimestamps: async function* (times: readonly number[]) {
+        for (const _time of times) yield { draw: vi.fn(), close: vi.fn() } as never;
+      },
+    };
+    await renderRenderWindowFrames({
+      window: { segment: segmentStub(0, 1), timestamps: [0, 0.5], sourceTimes: [0, 0.5] },
+      fps: 2,
+      fragmentOffset: 1,
+      zoomRegions: [
+        {
+          id: 'z',
+          start: 1,
+          end: 2,
+          transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+          enter: { type: 'none', duration: 0 },
+          exit: { type: 'none', duration: 0 },
+        },
+      ],
+      background: { enabled: false },
+      canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+      context: contextFixture(),
+      image: null,
+      frameSink: frameSink as never,
+      videoOut,
+      resultDuration: 1,
+      onProgress,
+      signal: new AbortController().signal,
+    });
+    expect(videoOut.add).toHaveBeenCalledTimes(2);
+    expect(onProgress).toHaveBeenLastCalledWith(1);
+  });
+
+  it('fails loudly when a source frame is missing', async () => {
+    const frameSink = {
+      samplesAtTimestamps: async function* () {
+        yield null;
+      },
+    };
+    await expect(
+      renderRenderWindowFrames({
+        window: { segment: segmentStub(0, 1), timestamps: [0], sourceTimes: [0] },
+        fps: 2,
+        fragmentOffset: 0,
+        zoomRegions: [],
+        background: { enabled: false },
+        canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+        context: contextFixture(),
+        image: null,
+        frameSink: frameSink as never,
+        videoOut: { add: vi.fn(), close: vi.fn() },
+        resultDuration: 1,
+        onProgress: undefined,
+        signal: new AbortController().signal,
+      })
+    ).rejects.toThrow('Source frame is unavailable.');
+  });
+});
+
+describe('drainSegmentAudio', () => {
+  it('fails when processed audio has no audio output track', async () => {
+    await expect(
+      drainSegmentAudio({
+        segment: segmentStub(0, 1),
+        track: null,
+        sink: null,
+        audioOut: null,
+        processedAudio: 'opus',
+        audioConfig: null,
+        muted: false,
+        exportAudio: undefined,
+        sampleRate: 48_000,
+        audioCodec: null,
+        clock: { time: 0 },
+        receipt: {
+          videoPackets: 0,
+          audioPackets: 0,
+          resultDuration: 1,
+          audioRanges: [],
+        },
+        signal: new AbortController().signal,
+      })
+    ).rejects.toThrow('Audio output configuration changed.');
+  });
+});
+
+describe('writeReviewFrames', () => {
+  afterEach(() => {
+    state.encoded.length = 0;
+    state.drawn.length = 0;
+  });
+
+  it('blocks the render without a probed video encoder', async () => {
+    await expect(
+      writeReviewFrames(argsFixture({ processedVideoCodec: null }))
+    ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable', reasons: ['video-encoder'] });
+  });
+
+  it('blocks unverifiable cut boundaries before staging', async () => {
+    const args = argsFixture();
+    args.edits = [cutEdit(0.5, 1.5)] as ReviewEdit[];
+    await expect(writeReviewFrames(args)).rejects.toThrow(
+      'Export requires verified cut boundaries.'
+    );
+  });
+
+  it('renders every scheduled frame through the scene draw and encodes the output', async () => {
+    const args = argsFixture({ frameRate: 2 });
+    const receipt = await writeReviewFrames(args);
+    expect(args.readProjectAsset).not.toHaveBeenCalled();
+    expect(receipt).toMatchObject({
+      videoPackets: 4,
+      audioPackets: 0,
+      resultDuration: 2,
+      audioReencoded: false,
+      outputAudioCodec: null,
+    });
+    expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1, 1.5]);
+    expect(
+      state.encoded.every(
+        (sample) => (sample.close as ReturnType<typeof vi.fn>).mock.calls.length === 1
+      )
+    ).toBe(true);
+    expect(
+      state.drawn.every(
+        (sample) => (sample.close as ReturnType<typeof vi.fn>).mock.calls.length === 1
+      )
+    ).toBe(true);
+    expect(
+      state.drawn.every(
+        (sample) => (sample.draw as ReturnType<typeof vi.fn>).mock.calls.length === 1
+      )
+    ).toBe(true);
+  });
+
+  it('loads a missing image background as a typed unavailable export', async () => {
+    const args = argsFixture();
+    args.advanced.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'asset:pic',
+      imageFit: 'cover',
+      layout: { padding: 0, cornerRadius: 0 },
+    };
+    await expect(writeReviewFrames(args)).rejects.toMatchObject({
+      name: 'QuickEditExportUnavailable',
+      reasons: ['asset-missing'],
+    });
+  });
+});
