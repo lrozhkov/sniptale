@@ -1,12 +1,17 @@
 import { ReviewTimeline } from './timeline';
 import { ReviewTimelineToolbar } from './review-toolbar';
 import { ReviewZoomTrack } from './zoom-track';
+import { ReviewAudioTrack } from './audio-track';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
-import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type {
+  QuickEditAdvancedState,
+  QuickEditAudioState,
+} from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { useCanvasComments } from './use-canvas-comments';
+import type { useReviewAudio } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
 import type { useReviewExport } from './use-export';
 import type { useReviewZoomEditor } from './zoom-editor';
@@ -39,6 +44,10 @@ export function ReviewTimelineBinding(props: {
   selectedTelemetryRef: ReviewTelemetryMarker['ref'] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   canvasComments: ReturnType<typeof useCanvasComments>;
+  audio: ReturnType<typeof useReviewAudio>;
+  audioState: QuickEditAudioState;
+  audioVisible: boolean;
+  onImportAudioFile(file: File): void;
   onAddComment(marker?: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
@@ -101,6 +110,23 @@ export function ReviewTimelineBinding(props: {
         : {})}
       {...(props.editing.exporter.index
         ? { boundaries: props.editing.exporter.index.boundaries }
+        : {})}
+      {...(props.audioVisible
+        ? {
+            audioTrack: (
+              <ReviewAudioTrack
+                audio={props.audioState}
+                duration={props.source.duration}
+                selectedId={props.audio.selectedId}
+                busy={props.busy}
+                onSelect={props.audio.setSelectedId}
+                onMoveClip={props.audio.moveClip}
+                onTrimClip={props.audio.trimClip}
+                onOriginal={props.audio.setOriginal}
+                onImportFile={props.onImportAudioFile}
+              />
+            ),
+          }
         : {})}
       onRangeCommit={(range) => {
         if (props.editing.mode) void props.editing.commitRange(range);

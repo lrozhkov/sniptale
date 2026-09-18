@@ -34,6 +34,7 @@ it('previews cuts, speed and mute in source time, restores audio, and cancels it
       ],
       onSeek: vi.fn(),
       onFailure: vi.fn(),
+      original: { muted: false, volume: 0.25 },
     });
     return <video ref={hook.video} />;
   }
@@ -49,7 +50,6 @@ it('previews cuts, speed and mute in source time, restores audio, and cancels it
     expect(hook.video.current!.playbackRate).toBe(4);
     expect(hook.video.current!.muted).toBe(true);
     expect(hook.video.current!.preservesPitch).toBe(false);
-    act(() => hook.setVolume(0.25));
     act(() => hook.onTime(6));
     expect(hook.video.current!.playbackRate).toBe(1);
     expect(hook.video.current!.muted).toBe(false);

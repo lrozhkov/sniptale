@@ -7,6 +7,7 @@ import {
 } from '../../features/video/review/telemetry';
 import { ReviewButton } from './controls';
 import { ReviewCanvasCommentsSection } from './comment-editor';
+import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewStageBinding } from './stage-binding';
 import { ReviewTimelineBinding } from './timeline-binding';
 import { ReviewInspector } from './inspector';
@@ -26,6 +27,8 @@ import { useReviewEdits } from './use-edits';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { ReviewAdvancedPanels } from './advanced-panels';
 import { useCanvasComments } from './use-canvas-comments';
+import { useReviewAudio } from './use-review-audio';
+import { importAudioAsset, importedAudioClip } from '../../workflows/video-review/audio-import';
 import { useReviewZoomEditor } from './zoom-editor';
 
 function useReviewKeys({
@@ -233,16 +236,16 @@ function useReviewEditorState(resource: LoadedReview) {
     setZoom: advancedState.setZoom,
     background: advanced.background,
   });
-  const { video, time, onTime, playing, setPlaying, seek, play, volume, setVolume } =
-    useReviewPlayback({
-      duration: source.duration,
-      edits: snapshot.document.edits,
-      boundaries: () => (cuts.cutting ? exporter.index?.boundaries : undefined),
-      onSeek: (next) => {
-        if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
-      },
-      onFailure: () => setMessage(translate('gallery.videoReview.playbackFailed')),
-    });
+  const { video, time, onTime, playing, setPlaying, seek, play } = useReviewPlayback({
+    duration: source.duration,
+    edits: snapshot.document.edits,
+    original: advanced.audio.original,
+    boundaries: () => (cuts.cutting ? exporter.index?.boundaries : undefined),
+    onSeek: (next) => {
+      if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
+    },
+    onFailure: () => setMessage(translate('gallery.videoReview.playbackFailed')),
+  });
   const cuts = useReviewEdits({
     duration: source.duration,
     ...(exporter.index ? { boundaries: exporter.index.boundaries } : {}),
@@ -319,8 +322,6 @@ function useReviewEditorState(resource: LoadedReview) {
     video,
     time,
     onTime,
-    volume,
-    setVolume,
     playing,
     setPlaying,
     selection,
@@ -333,6 +334,7 @@ function useReviewEditorState(resource: LoadedReview) {
     setTrackVisibility: advancedState.setTrackVisibility,
     zoom,
     setBackground: advancedState.setBackground,
+    setAudio: advancedState.setAudio,
     resetAdvanced: advancedState.reset,
     flushAdvanced: advancedState.flush,
     projected,
@@ -415,6 +417,7 @@ type InspectorState = Pick<
   | 'advanced'
   | 'zoom'
   | 'setBackground'
+  | 'setAudio'
   | 'resetAdvanced'
   | 'flushAdvanced'
 >;
@@ -423,11 +426,13 @@ function ReviewInspectorBinding({
   resource,
   state,
   canvasComments,
+  audio,
   onBack,
 }: {
   resource: LoadedReview;
   state: InspectorState;
   canvasComments: ReturnType<typeof useCanvasComments>;
+  audio: ReturnType<typeof useReviewAudio>;
   onBack(): void;
 }) {
   const {
@@ -494,11 +499,14 @@ function ReviewInspectorBinding({
         snapshot.snapshot.workspace.cursor < snapshot.snapshot.workspace.history.length
       }
       canvas={
-        <ReviewCanvasCommentsSection
-          {...canvasComments}
-          comments={snapshot.document.canvasComments}
-          busy={busy}
-        />
+        <>
+          <ReviewCanvasCommentsSection
+            {...canvasComments}
+            comments={snapshot.document.canvasComments}
+            busy={busy}
+          />
+          <ReviewAudioInspectorSection audio={audio} busy={busy} />
+        </>
       }
       message={snapshot.error ? translate(errorKey) : message}
       onBack={() => {
@@ -584,6 +592,21 @@ function ReviewCommentComposer({
 
 function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
   const state = useReviewEditorState(resource);
+  const audio = useReviewAudio({
+    audio: state.advanced.audio,
+    setAudio: state.setAudio,
+    timelineDuration: state.source.duration,
+  });
+  const onImportAudioFile = (file: File) => {
+    if (state.busy || state.editing.exporter.phase !== 'idle' || !state.canStart()) return;
+    void state.run(async () => {
+      const imported = await importAudioAsset(file);
+      audio.addImported(
+        importedAudioClip(imported.assetId, imported.duration, state.time, state.source.duration),
+        'music'
+      );
+    });
+  };
   const canvasComments = useCanvasComments({
     session: state.session,
     time: state.time,
@@ -600,8 +623,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     video,
     time,
     onTime,
-    volume,
-    setVolume,
     playing,
     setPlaying,
     selection,
@@ -666,8 +687,8 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           edits={snapshot.document.edits}
           annotations={snapshot.document.annotations}
           source={source}
-          volume={volume}
-          onVolume={setVolume}
+          volume={advanced.audio.original.volume}
+          onVolume={(value) => audio.setOriginal({ volume: value })}
           busy={busy}
           composerBusy={!!composer.annotation}
           selection={selection}
@@ -682,6 +703,10 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           selectedTelemetryRef={selected?.telemetryRef}
           zoom={zoom}
           canvasComments={canvasComments}
+          audio={audio}
+          audioState={advanced.audio}
+          audioVisible={features.audioTrackVisible}
+          onImportAudioFile={onImportAudioFile}
           onAddComment={add}
           onComment={selectComment}
           onSeek={seek}
@@ -692,6 +717,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
         resource={resource}
         state={state}
         canvasComments={canvasComments}
+        audio={audio}
         onBack={onBack}
       />
     </div>

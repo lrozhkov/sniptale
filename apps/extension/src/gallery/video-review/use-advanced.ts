@@ -77,6 +77,9 @@ export function useReviewAdvanced(session: Session) {
         background: QuickEditAdvancedState['background']
       ) => QuickEditAdvancedState['background']
     ) => schedule({ ...current, background: update(current.background) }),
+    setAudio: (
+      update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio']
+    ) => schedule({ ...current, audio: update(current.audio) }),
     flush,
     reset,
   };

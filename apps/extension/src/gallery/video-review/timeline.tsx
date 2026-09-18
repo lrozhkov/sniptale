@@ -20,6 +20,7 @@ type TimelineProps = {
   edits?: readonly ReviewEdit[];
   tools?: ReactNode;
   zoomTrack?: ReactNode;
+  audioTrack?: ReactNode;
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void;
@@ -111,6 +112,7 @@ export function ReviewTimeline(props: TimelineProps) {
             </div>
           </div>
           {props.zoomTrack}
+          {props.audioTrack}
         </div>
       </div>
     </section>

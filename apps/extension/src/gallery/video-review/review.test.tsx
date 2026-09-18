@@ -767,3 +767,24 @@ it('adds an overlay comment, drags it on the stage and deletes it via the editor
     await fixture.cleanup();
   }
 });
+
+it('reveals the three audio lanes and persists the original audio gate', async () => {
+  const fixture = createEditorFixture();
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
+    await click('audioTrack');
+    const lanes = host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]');
+    expect(lanes).toHaveLength(3);
+    expect(host.querySelector('[data-ui="gallery.videoReview.audioTrack"]')).not.toBeNull();
+    const mute = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.audioClipMute"]'
+    )!;
+    await act(async () => mute.click());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect(fixture.snapshot.workspace.advanced.audio.original.muted).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
