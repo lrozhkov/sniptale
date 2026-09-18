@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RefObject } from 'react';
 import { ReviewVoiceoverRecording, useReviewVoiceoverRecording } from './voiceover-recording';
+import { importAudioAsset } from '../../workflows/video-review/audio-import';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -79,7 +80,8 @@ type RecordingApi = ReturnType<typeof useReviewVoiceoverRecording>;
 
 function renderHookHarness(props: {
   guard: () => boolean;
-  run?: (action: () => Promise<unknown>) => Promise<unknown>;
+  time?: { current: number };
+  flushAdvanced?: () => Promise<void>;
 }) {
   let latest!: RecordingApi;
   const node = {
@@ -94,11 +96,11 @@ function renderHookHarness(props: {
   const Harness = () => {
     latest = useReviewVoiceoverRecording({
       video,
-      time: 3,
+      time: props.time?.current ?? 3,
       sourceDuration: 10,
       audio,
-      run: props.run ?? (async (action) => action()),
       guard: props.guard,
+      flushAdvanced: props.flushAdvanced ?? (async () => undefined),
     });
     return null;
   };
@@ -109,15 +111,17 @@ function renderHookHarness(props: {
     },
     node,
     audio,
+    Harness,
   };
 }
 
 const trim: AudioTrimRange = { trimStart: 0, trimEnd: 1 };
 
-it('opens only when the guard allows and closes on demand', () => {
+it('opens only when the guard allows and captures the take start', () => {
   const harness = renderHookHarness({ guard: () => true });
   act(() => harness.latest.open());
   expect(harness.latest.recording).toBe(true);
+  expect(harness.latest.takeStart).toBe(3);
   act(() => harness.latest.close());
   expect(harness.latest.recording).toBe(false);
 });
@@ -137,7 +141,7 @@ it('syncs playback to the playhead and pauses on stop', async () => {
   expect(harness.node.pause).toHaveBeenCalledOnce();
 });
 
-it('swallows autoplay rejection and tolerates a missing video node', async () => {
+it('rejects sync start when the source playback fails', async () => {
   const failing = {
     currentTime: 0,
     play: vi.fn(async () => Promise.reject(new Error('no'))),
@@ -156,14 +160,13 @@ it('swallows autoplay rejection and tolerates a missing video node', async () =>
       time: 1,
       sourceDuration: 4,
       audio,
-      run: async (action) => action(),
       guard: () => true,
+      flushAdvanced: async () => undefined,
     });
     return null;
   };
   act(() => root.render(<Harness />));
-  await act(async () => latest.syncStart());
-  expect(failing.currentTime).toBe(1);
+  await expect(act(async () => latest.syncStart())).rejects.toThrow('no');
   video = { current: null } as RefObject<HTMLVideoElement | null>;
   act(() => root.render(<Harness />));
   await act(async () => latest.syncStart());
@@ -171,29 +174,76 @@ it('swallows autoplay rejection and tolerates a missing video node', async () =>
 });
 
 it('skips saving when the session was already aborted', async () => {
-  const run = vi.fn(async (action: () => Promise<unknown>) => action());
-  const harness = renderHookHarness({ guard: () => true, run });
+  const harness = renderHookHarness({ guard: () => true });
   const controller = new AbortController();
   controller.abort();
   await act(async () => harness.latest.save(new File(['a'], 'a.webm'), trim, controller.signal));
-  expect(run).not.toHaveBeenCalled();
+  expect(importAudioAsset).not.toHaveBeenCalled();
   expect(harness.audio.addImported).not.toHaveBeenCalled();
 });
 
-it('imports the recording and adds a bounded voiceover clip at the playhead', async () => {
-  const run = vi.fn(async (action: () => Promise<unknown>) => action());
-  const harness = renderHookHarness({ guard: () => true, run });
+it('places the take at its start plus the trim offset after the transport advanced (V1)', async () => {
+  const flushAdvanced = vi.fn(async () => undefined);
+  const time = { current: 3 };
+  const harness = renderHookHarness({ guard: () => true, time, flushAdvanced });
+  act(() => harness.latest.open());
+  time.current = 7;
+  act(() => root.render(<harness.Harness />));
   await act(async () =>
-    harness.latest.save(new File(['a'], 'a.webm'), trim, new AbortController().signal)
+    harness.latest.save(
+      new File(['a'], 'a.webm'),
+      { trimStart: 1, trimEnd: 3 },
+      new AbortController().signal
+    )
   );
-  expect(run).toHaveBeenCalledOnce();
   expect(harness.audio.addImported).toHaveBeenCalledWith(
     expect.objectContaining({
       assetId: 'project-asset:7',
       duration: 2,
-      atTime: 3,
+      atTime: 4,
       timelineDuration: 10,
     }),
     'voiceover'
   );
+  expect(flushAdvanced).toHaveBeenCalledOnce();
+});
+
+it('rejects the save when the import fails so the take stays available (V2)', async () => {
+  vi.mocked(importAudioAsset).mockRejectedValueOnce(new Error('quota'));
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  await expect(
+    act(async () =>
+      harness.latest.save(new File(['a'], 'a.webm'), trim, new AbortController().signal)
+    )
+  ).rejects.toThrow('quota');
+  expect(harness.audio.addImported).not.toHaveBeenCalled();
+});
+
+it('does not attach the clip when the import finished after abort (V3)', async () => {
+  let release!: () => void;
+  vi.mocked(importAudioAsset).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve({ assetId: 'project-asset:9', duration: 2 });
+      })
+  );
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  const controller = new AbortController();
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = harness.latest.save(new File(['a'], 'a.webm'), trim, controller.signal);
+    await Promise.resolve();
+  });
+  controller.abort();
+  // Attach the rejection probe before resolving the import so the abort rejection
+  // is never momentarily unhandled.
+  const rejection = expect(pending).rejects.toThrow();
+  await act(async () => {
+    release();
+    await Promise.resolve();
+  });
+  await rejection;
+  expect(harness.audio.addImported).not.toHaveBeenCalled();
 });

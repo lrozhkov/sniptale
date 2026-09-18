@@ -9,7 +9,17 @@ import {
 } from '../../features/video/review/speed';
 import { Scissors, Download, FileVideo, Gauge, MousePointer2, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
+import type { QuickEditExportBlocker } from '../../features/video/review/advanced/effective';
 import { ReviewButton, reviewTimeLabel } from './controls';
+
+const BLOCKER_LABEL: Record<QuickEditExportBlocker, Parameters<typeof translate>[0]> = {
+  zoom: 'gallery.videoReview.exportBlockerZoom',
+  background: 'gallery.videoReview.exportBlockerBackground',
+  'burned-comment': 'gallery.videoReview.exportBlockerBurnedComment',
+  voiceover: 'gallery.videoReview.exportBlockerVoiceover',
+  music: 'gallery.videoReview.exportBlockerMusic',
+  'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',
+};
 
 const plain =
   '!border-0 !bg-transparent !shadow-none !h-8 !w-8 aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
@@ -114,11 +124,13 @@ export function ReviewEditActions(props: {
   failed: boolean;
   hasResult: boolean;
   audioUnavailable?: boolean;
+  advancedBlockers?: readonly QuickEditExportBlocker[] | null;
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
 }) {
   const running = props.phase !== 'idle';
+  const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1">
@@ -126,7 +138,7 @@ export function ReviewEditActions(props: {
           label={translate('gallery.videoReview.exportVideo')}
           primary
           className="flex-1"
-          disabled={!props.available || props.busy || running || props.audioUnavailable}
+          disabled={!props.available || props.busy || running || props.audioUnavailable || blocked}
           onClick={props.onExport}
         >
           <FileVideo size={15} />
@@ -137,6 +149,7 @@ export function ReviewEditActions(props: {
           disabled={
             running ||
             props.busy ||
+            blocked ||
             (props.hasEdits && (!props.available || props.audioUnavailable))
           }
           onClick={props.onDownload}
@@ -167,6 +180,12 @@ export function ReviewEditActions(props: {
       {props.audioUnavailable ? (
         <p role="status" className="text-xs">
           {translate('gallery.videoReview.speedAudioUnavailable')}
+        </p>
+      ) : null}
+      {blocked ? (
+        <p role="status" className="text-xs">
+          {translate('gallery.videoReview.exportAdvancedUnavailable')}{' '}
+          {props.advancedBlockers!.map((blocker) => translate(BLOCKER_LABEL[blocker])).join(' · ')}
         </p>
       ) : null}
     </div>

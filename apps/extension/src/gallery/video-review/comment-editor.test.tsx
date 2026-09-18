@@ -106,7 +106,9 @@ it('lists overlay comments, selects them, and adds through the section button', 
         onSelect={onSelect}
         onAdd={onAdd}
         onPatch={vi.fn()}
+        onDraft={vi.fn()}
         onDelete={vi.fn()}
+        flushTexts={vi.fn(async () => undefined)}
       />
     );
   });
@@ -120,4 +122,49 @@ it('lists overlay comments, selects them, and adds through the section button', 
       .click()
   );
   expect(onAdd).toHaveBeenCalled();
+});
+
+it('keeps the typed draft when the acknowledged text arrives and commits it later', async () => {
+  const onPatch = vi.fn();
+  const onDraft = vi.fn();
+  const render = (text: string) =>
+    act(() => {
+      root.render(
+        <ReviewCanvasCommentEditor
+          comment={{ ...comment(), text }}
+          busy={false}
+          onPatch={onPatch}
+          onDraft={onDraft}
+          onDelete={vi.fn()}
+        />
+      );
+    });
+  render('Hello');
+  const area = host.querySelector('textarea') as HTMLTextAreaElement;
+  typeValue(area, 'A');
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
+  expect(onPatch).toHaveBeenCalledWith({ text: 'A' });
+  typeValue(area, 'AB');
+  render('A');
+  expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('AB');
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
+  expect(onPatch).toHaveBeenCalledWith({ text: 'AB' });
+  expect(onDraft).toHaveBeenCalledWith('c1', 'AB');
+});
+
+it('commits pending text when the editor unmounts', async () => {
+  const onPatch = vi.fn();
+  act(() => {
+    root.render(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        busy={false}
+        onPatch={onPatch}
+        onDelete={vi.fn()}
+      />
+    );
+  });
+  typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft');
+  await act(async () => root.unmount());
+  expect(onPatch).toHaveBeenCalledWith({ text: 'Draft' });
 });

@@ -160,3 +160,17 @@ it('starts and stops capture, shows permission failure, and exposes the shared m
   expect(document.querySelector('[role="alert"]')?.textContent).toBe('Permission denied');
   expect(button('Apply narration').disabled).toBe(true);
 });
+
+it('reports a failed capture start with the shared recorder error', async () => {
+  const state = io.session();
+  state.trim = null;
+  state.save.audioBlob = null;
+  state.transport.status = 'idle';
+  state.transport.startRecording = vi.fn(async () => Promise.reject(new Error('no mic')));
+  await render();
+  await act(async () => button('Start recording').click());
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
+    'Recording could not start. Try again.'
+  );
+  expect(close).not.toHaveBeenCalled();
+});

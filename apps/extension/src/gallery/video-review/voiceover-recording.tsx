@@ -12,15 +12,18 @@ export function useReviewVoiceoverRecording(args: {
   time: number;
   sourceDuration: number;
   audio: ReturnType<typeof useReviewAudio>;
-  run(action: () => Promise<unknown>): Promise<unknown>;
   guard(): boolean;
+  flushAdvanced(): Promise<void>;
 }) {
   const [recording, setRecording] = useState(false);
+  const [takeStart, setTakeStart] = useState<number | null>(null);
   return {
     recording,
+    takeStart,
     open: () => {
       if (!args.guard()) return;
       args.video.current?.pause();
+      setTakeStart(args.time);
       setRecording(true);
     },
     close: () => setRecording(false),
@@ -28,18 +31,24 @@ export function useReviewVoiceoverRecording(args: {
       const node = args.video.current;
       if (!node) return;
       node.currentTime = args.time;
-      await node.play().catch(() => undefined);
+      await node.play();
     },
     syncStop: () => args.video.current?.pause(),
-    save: async (file: File, _trim: AudioTrimRange, signal: AbortSignal) => {
+    /** The shared recorder already trims the file, so placement is take start + trim offset. */
+    save: async (file: File, trim: AudioTrimRange, signal: AbortSignal) => {
       if (signal.aborted) return;
-      await args.run(async () => {
-        const imported = await importAudioAsset(file);
-        args.audio.addImported(
-          importedAudioClip(imported.assetId, imported.duration, args.time, args.sourceDuration),
-          'voiceover'
-        );
-      });
+      const imported = await importAudioAsset(file);
+      signal.throwIfAborted();
+      args.audio.addImported(
+        importedAudioClip(
+          imported.assetId,
+          imported.duration,
+          (takeStart ?? args.time) + trim.trimStart,
+          args.sourceDuration
+        ),
+        'voiceover'
+      );
+      await args.flushAdvanced();
     },
   };
 }
@@ -83,6 +92,7 @@ export function useReviewEditorAudio(args: {
   timelineDuration: number;
   video: RefObject<HTMLVideoElement | null>;
   run(action: () => Promise<unknown>): Promise<unknown>;
+  flushAdvanced(): Promise<void>;
   audio: ReturnType<typeof useReviewAudio>;
 }) {
   const guard = () => !args.busy && args.canStart();
@@ -106,8 +116,8 @@ export function useReviewEditorAudio(args: {
     time: args.time,
     sourceDuration: args.timelineDuration,
     audio: args.audio,
-    run: args.run,
     guard,
+    flushAdvanced: args.flushAdvanced,
   });
   return { onImportAudioFile, voiceover };
 }

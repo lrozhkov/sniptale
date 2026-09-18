@@ -5,7 +5,11 @@ import type { ReviewTelemetryMarker } from '../../features/video/review/telemetr
 import { layoutReviewActionLanes } from '../../features/video/review/action-lanes';
 import { reviewEventLabel, reviewTimeLabel } from './controls';
 
-const ACTION_LANE_ROW_PX = 7;
+const ACTION_MARKER_HEIGHT_PX = 10;
+const ACTION_LANE_GAP_PX = 4;
+const ACTION_LANE_PITCH_PX = ACTION_MARKER_HEIGHT_PX + ACTION_LANE_GAP_PX;
+/** ProductSelect small-trigger height; one system of numbers for every row. */
+const ACTION_OVERFLOW_HEIGHT_PX = 28;
 
 type TelemetryStripProps = {
   markers: readonly ReviewTelemetryMarker[];
@@ -29,11 +33,18 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       }),
     [props.markers, props.duration, props.width, props.zoom]
   );
-  const rows = layout.collapsed ? layout.visibleLanes + 1 : layout.laneCount;
+  const laneCount = layout.collapsed ? layout.visibleLanes : layout.laneCount;
+  const lanesHeight =
+    laneCount === 0
+      ? 0
+      : laneCount * ACTION_MARKER_HEIGHT_PX + (laneCount - 1) * ACTION_LANE_GAP_PX;
+  const height = layout.collapsed
+    ? lanesHeight + ACTION_LANE_GAP_PX + ACTION_OVERFLOW_HEIGHT_PX
+    : lanesHeight;
   const isActive = (marker: ReviewTelemetryMarker) =>
     props.time >= marker.start && props.time < Math.max(marker.end, marker.start + 0.05);
   return (
-    <div className="relative mb-1" style={{ height: rows * ACTION_LANE_ROW_PX }}>
+    <div className="relative mb-1" style={{ height }}>
       {layout.items
         .filter((item) => item.visible)
         .map((item) => {
@@ -58,14 +69,15 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               title={`${reviewEventLabel(marker.eventType)} · ${reviewTimeLabel(marker.start)}`}
               onClick={() => props.onMarker(marker)}
               className={[
-                'absolute h-2.5 min-w-1.5 rounded-sm border transition-colors',
+                'absolute min-w-1.5 rounded-sm border transition-colors',
                 tone,
                 active ? 'ring-1 ring-[var(--sniptale-color-accent)]' : '',
               ].join(' ')}
               style={{
                 left: item.left,
                 width: item.width,
-                top: item.lane * ACTION_LANE_ROW_PX,
+                top: item.lane * ACTION_LANE_PITCH_PX,
+                height: ACTION_MARKER_HEIGHT_PX,
               }}
             />
           );
@@ -80,17 +92,22 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           options={layout.items
             .filter((item) => !item.visible)
             .map((item) => ({
-              value: item.marker.ref.id,
+              value: `${item.marker.ref.kind}:${item.marker.ref.id}`,
               label: `${reviewEventLabel(item.marker.eventType)} · ${reviewTimeLabel(
                 item.marker.start
               )}`,
             }))}
-          onChange={(id) => {
-            const item = layout.items.find((entry) => entry.marker.ref.id === id);
+          onChange={(key) => {
+            const item = layout.items.find(
+              (entry) => `${entry.marker.ref.kind}:${entry.marker.ref.id}` === key
+            );
             if (item) props.onMarker(item.marker);
           }}
-          className="absolute left-0 h-4 !w-16"
-          style={{ top: layout.visibleLanes * ACTION_LANE_ROW_PX }}
+          className="absolute left-0 !w-16"
+          style={{
+            top: layout.visibleLanes * ACTION_LANE_PITCH_PX,
+            height: ACTION_OVERFLOW_HEIGHT_PX,
+          }}
         />
       ) : null}
     </div>

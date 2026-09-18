@@ -9,23 +9,57 @@ export function ReviewCanvasCommentEditor(props: {
   comment: CanvasComment;
   busy: boolean;
   onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
+  onDraft?(id: string, text: string): void;
   onDelete(): void;
 }) {
   const [text, setText] = useState(props.comment.text);
   const timer = useRef<number | null>(null);
+  const committed = useRef<string | null>(null);
+  const textRef = useRef(text);
+  const propsRef = useRef(props);
   useEffect(() => {
-    setText(props.comment.text);
+    textRef.current = text;
+  }, [text]);
+  useEffect(() => {
+    propsRef.current = props;
+  });
+  // A late persisted prop must never cancel an in-progress local draft; only a
+  // fresh comment identity (or a quiet external change) resets the editor.
+  useEffect(() => {
+    const current = propsRef.current;
+    setText(current.comment.text);
+    committed.current = null;
     return () => {
       if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
     };
-  }, [props.comment.id, props.comment.text]);
+  }, [props.comment.id]);
+  useEffect(
+    () => () => {
+      if (textRef.current !== propsRef.current.comment.text)
+        propsRef.current.onPatch({ text: textRef.current });
+    },
+    []
+  );
+  useEffect(() => {
+    if (props.comment.text === committed.current) {
+      committed.current = null;
+      return;
+    }
+    if (timer.current === null && textRef.current === committed.current)
+      setText(props.comment.text);
+  }, [props.comment.text]);
   const commit = (value: string) => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
-    if (value !== props.comment.text) props.onPatch({ text: value });
+    if (value !== props.comment.text) {
+      committed.current = value;
+      props.onPatch({ text: value });
+    }
   };
   const change = (value: string) => {
     setText(value);
+    props.onDraft?.(props.comment.id, value);
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => commit(value), 320);
   };
@@ -38,7 +72,9 @@ export function ReviewCanvasCommentEditor(props: {
       <label className="block text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('gallery.videoReview.overlayText')}
         <textarea
+          data-ui="gallery.videoReview.overlayTextInput"
           value={text}
+          disabled={props.busy}
           onChange={(event) => change(event.target.value)}
           onBlur={(event) => commit(event.target.value)}
           className="mt-1 w-full resize-none rounded-md border
@@ -110,7 +146,9 @@ export function ReviewCanvasCommentsSection(props: {
   onSelect(id: string): void;
   onAdd(): void;
   onPatch(comment: CanvasComment, patch: Partial<Omit<CanvasComment, 'id'>>): void;
+  onDraft(id: string, text: string): void;
   onDelete(comment: CanvasComment): void;
+  flushTexts(): Promise<void>;
 }) {
   const selected = props.comments.find((comment) => comment.id === props.selectedId) ?? null;
   return (
@@ -168,6 +206,7 @@ export function ReviewCanvasCommentsSection(props: {
           comment={selected}
           busy={props.busy}
           onPatch={(patch) => void props.onPatch(selected, patch)}
+          onDraft={props.onDraft}
           onDelete={() => void props.onDelete(selected)}
         />
       ) : null}

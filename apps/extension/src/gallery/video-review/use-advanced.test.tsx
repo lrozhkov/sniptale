@@ -51,7 +51,7 @@ function setup() {
     return null;
   }
   act(() => root.render(<Harness />));
-  return { session, deps, saveFromOtherTab, Harness };
+  return { session, deps, saveFromOtherTab, Harness, build };
 }
 
 beforeEach(() => {
@@ -105,4 +105,76 @@ it('rebuilds writes from reloaded persisted content after a conflict recovery', 
   };
   expect(write.advanced.ui.mode).toBe('basic');
   expect(write.advanced.zoom.regions).toHaveLength(1);
+});
+
+it('composes two commands staged before the next render (S1)', async () => {
+  const { deps } = setup();
+  act(() => {
+    advanced.setMode('advanced');
+    advanced.setTrackVisibility('zoom', true);
+  });
+  expect(advanced.advanced.ui.mode).toBe('advanced');
+  expect(advanced.advanced.ui.tracks.zoom).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(1);
+  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
+    advanced: QuickEditAdvancedState;
+  };
+  expect(write.advanced.ui.mode).toBe('advanced');
+  expect(write.advanced.ui.tracks.zoom).toBe(true);
+});
+
+it('keeps the newest local revision when an older write acknowledges (S2)', async () => {
+  const { deps, build } = setup();
+  let releaseA!: () => void;
+  deps.saveVideoWorkspaceAdvanced.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        releaseA = () => resolve(build());
+      })
+  );
+  act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  act(() =>
+    advanced.setBackground((background) => ({
+      ...background,
+      enabled: true,
+      type: 'solid',
+      color: '#111111ff',
+      layout: { padding: 12, cornerRadius: 4 },
+    }))
+  );
+  await act(async () => {
+    releaseA();
+    await Promise.resolve();
+  });
+  expect(advanced.advanced.background.enabled).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(2);
+  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
+    advanced: QuickEditAdvancedState;
+  };
+  expect(write.advanced.zoom.enabled).toBe(true);
+  expect(write.advanced.background.enabled).toBe(true);
+});
+
+it('keeps the pending edit after a save failure, rejects flush, and retries (S3)', async () => {
+  const { deps } = setup();
+  deps.saveVideoWorkspaceAdvanced
+    .mockRejectedValueOnce(new Error('storage'))
+    .mockRejectedValueOnce(new Error('storage'));
+  act(() => advanced.setMode('advanced'));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  expect(advanced.saveFailed).toBe(true);
+  expect(advanced.advanced.ui.mode).toBe('advanced');
+  await expect(advanced.flush()).rejects.toThrow();
+  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(2);
+  expect(advanced.advanced.ui.mode).toBe('advanced');
+  await act(async () => advanced.retry());
+  expect(advanced.saveFailed).toBe(false);
+  expect(advanced.advanced.ui.mode).toBe('advanced');
+  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
+    advanced: QuickEditAdvancedState;
+  };
+  expect(write.advanced.ui.mode).toBe('advanced');
 });

@@ -4,6 +4,10 @@ import {
   type ReviewMediaIndex,
 } from '../../workflows/video-review/media-index';
 import { exportReviewedVideo } from '../../workflows/video-review/export-lifecycle';
+import {
+  resolveQuickEditExportSupport,
+  type QuickEditExportBlocker,
+} from '../../features/video/review/advanced/effective';
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
@@ -16,6 +20,7 @@ export function useReviewExport(resource: LoadedReview) {
   const [phase, setPhase] = useState<'idle' | 'exporting' | 'publishing'>('idle');
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
+  const [blocked, setBlocked] = useState<readonly QuickEditExportBlocker[] | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const active = useRef<AbortController | null>(null);
   const publishing = useRef(false);
@@ -40,11 +45,26 @@ export function useReviewExport(resource: LoadedReview) {
       active.current?.abort();
     };
   }, [resource.file]);
+  /** Effective advanced additions the current packet exporter cannot render. */
+  const unsupported = (): readonly QuickEditExportBlocker[] | null => {
+    const state = resource.session.getSnapshot();
+    const support = resolveQuickEditExportSupport({
+      document: state.document,
+      advanced: state.snapshot.workspace.advanced,
+    });
+    return support.ok ? null : support.blockers;
+  };
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
     if (active.current || !index) return;
+    const blockers = unsupported();
+    if (blockers) {
+      setBlocked(blockers);
+      return;
+    }
+    setBlocked(null);
     const controller = new AbortController();
     active.current = controller;
     publishing.current = false;
@@ -88,6 +108,7 @@ export function useReviewExport(resource: LoadedReview) {
     phase,
     progress,
     failed,
+    blocked,
     result,
     start,
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
@@ -96,8 +117,13 @@ export function useReviewExport(resource: LoadedReview) {
       if (!publishing.current) active.current?.abort();
     },
     download: () => {
-      if (!resource.session.getSnapshot().document.edits.length)
-        downloadGalleryBlob(resource.file, resource.filename);
+      const state = resource.session.getSnapshot();
+      const blockers = unsupported();
+      if (blockers) {
+        setBlocked(blockers);
+        return;
+      }
+      if (!state.document.edits.length) downloadGalleryBlob(resource.file, resource.filename);
       else void start('download');
     },
   };

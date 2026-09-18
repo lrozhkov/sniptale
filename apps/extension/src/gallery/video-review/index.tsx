@@ -485,6 +485,7 @@ function ReviewInspectorBinding({
             !editing.exporter.index.processedAudioCodec &&
             snapshot.document.edits.some((edit) => edit.kind === 'speed')
           }
+          advancedBlockers={editing.exporter.blocked}
           onExport={() => {
             video.current?.pause();
             void editing.exporter.start();
@@ -514,6 +515,7 @@ function ReviewInspectorBinding({
         void run(async () => {
           await composer.flush();
           await flushAdvanced();
+          await canvasComments.flushTexts();
           await session.flush();
           onBack();
         });
@@ -604,6 +606,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     timelineDuration: state.source.duration,
     video: state.video,
     run: state.run,
+    flushAdvanced: state.flushAdvanced,
     audio,
   });
   const canvasComments = useCanvasComments({
@@ -722,7 +725,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
       />
       <ReviewVoiceoverRecording
         isOpen={voiceover.recording}
-        playhead={time}
+        playhead={voiceover.takeStart ?? time}
         timelineDuration={source.duration}
         onClose={voiceover.close}
         onSyncStart={voiceover.syncStart}

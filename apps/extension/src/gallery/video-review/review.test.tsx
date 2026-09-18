@@ -650,3 +650,27 @@ it('opens the shared voiceover recorder from the audio lane', async () => {
     await fixture.cleanup();
   }
 });
+
+it('persists a pending overlay comment draft on Back', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('addOverlayComment');
+    const area = host.querySelector<HTMLTextAreaElement>(
+      '[data-ui="gallery.videoReview.overlayTextInput"]'
+    )!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+      area,
+      'Saved draft'
+    );
+    area.dispatchEvent(new Event('input', { bubbles: true }));
+    await click('back');
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
+      text: 'Saved draft',
+    });
+    expect(back).toHaveBeenCalledOnce();
+  } finally {
+    await fixture.cleanup();
+  }
+});

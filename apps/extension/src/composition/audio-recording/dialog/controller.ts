@@ -125,12 +125,18 @@ export function useAudioRecordingDialogSession({
     startingRef.current = true;
     setStarting(true);
     setSaveError(null);
-    void controller.transport.startRecording().finally(() => {
-      if (lifetime.current === active && !active.signal.aborted) {
-        startingRef.current = false;
-        setStarting(false);
-      }
-    });
+    void controller.transport
+      .startRecording()
+      .catch(() => {
+        if (lifetime.current === active && !active.signal.aborted)
+          setSaveError(translate('videoEditor.app.recordAudioStartFailed'));
+      })
+      .finally(() => {
+        if (lifetime.current === active && !active.signal.aborted) {
+          startingRef.current = false;
+          setStarting(false);
+        }
+      });
   };
   return {
     deviceId,
