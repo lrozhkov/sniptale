@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { exportReviewedVideo } from './export-lifecycle';
+import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { PreparedAssetObject } from '../../composition/persistence/assets';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -61,6 +61,7 @@ function fixture() {
     readAssetFile: vi.fn(async () => result),
     releaseAssetReadyProtection: vi.fn(async () => undefined),
     saveRecordingsBatchSafely: vi.fn(async () => undefined),
+    readProjectAsset: vi.fn(async (_assetId: string) => new Blob() as unknown as Blob | null),
     writeReviewPackets: vi.fn(async () => ({
       videoPackets: 40,
       audioPackets: 0,
@@ -161,6 +162,163 @@ it('rejects a removed fragment or gallery destination before allocating storage'
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
 });
 
+it('mixes applied external audio and original settings into an audio-only export', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.audio.music = [
+    {
+      id: 'm',
+      assetId: 'project-asset:m',
+      timelineStart: 1,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 0.5,
+      muted: false,
+      fadeIn: 0.2,
+      fadeOut: 0,
+    },
+  ];
+  advanced.audio.original = { muted: false, volume: 1.5 };
+  class FakeOfflineContext {
+    async decodeAudioData() {
+      return { duration: 2, numberOfChannels: 2, getChannelData: () => new Float32Array(96_000) };
+    }
+  }
+  vi.stubGlobal('OfflineAudioContext', FakeOfflineContext);
+  try {
+    await exportReviewedVideo(args, deps);
+    const call = (deps.writeReviewPackets.mock.calls[0] ?? []) as unknown as Record<
+      string,
+      unknown
+    >[];
+    const exported = (call[0] ?? {}) as { exportAudio?: ReviewExportClipPlan };
+    expect(exported.exportAudio).toMatchObject({
+      originalVolume: 1.5,
+      originalMuted: false,
+    });
+    expect(exported.exportAudio!.entries).toEqual([
+      expect.objectContaining({ clipId: 'm', timelineStart: 1, volume: 0.5 }),
+    ]);
+    expect(exported.exportAudio!.buffers.get('project-asset:m')).toBeDefined();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('blocks the export when an applied clip asset is missing or undecodable', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.audio.music = [
+    {
+      id: 'm',
+      assetId: 'project-asset:m',
+      timelineStart: 1,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  deps.readProjectAsset.mockResolvedValue(null);
+  vi.stubGlobal(
+    'OfflineAudioContext',
+    class {
+      async decodeAudioData() {
+        return { duration: 2, numberOfChannels: 2, getChannelData: () => new Float32Array(96_000) };
+      }
+    }
+  );
+  try {
+    await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
+      name: 'QuickEditExportUnavailable',
+      reasons: ['asset-missing'],
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+});
+
+it('blocks visual changes with their applied reasons and never stages bytes', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.zoom.enabled = true;
+  deps.readProjectAsset.mockResolvedValue(null);
+  await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
+    name: 'QuickEditExportUnavailable',
+    reasons: expect.arrayContaining(['zoom']),
+  });
+  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+});
+
+it('shifts fragment clip placements across a leading cut to global output time', async () => {
+  const { args, deps } = fixture();
+  args.snapshot.workspace.history[0]!.after = {
+    id: 'cut',
+    kind: 'cut',
+    start: 1,
+    end: 3,
+    requestedStart: 1,
+    requestedEnd: 3,
+  };
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.audio.music = [
+    {
+      id: 'm',
+      assetId: 'project-asset:m',
+      timelineStart: 1.5,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  vi.stubGlobal(
+    'OfflineAudioContext',
+    class {
+      async decodeAudioData() {
+        return { duration: 2, numberOfChannels: 2, getChannelData: () => new Float32Array(96_000) };
+      }
+    }
+  );
+  try {
+    await exportReviewedVideo(
+      { ...args, destination: 'download', selection: { kind: 'range', start: 2, end: 6 } },
+      deps
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+  const call = (deps.writeReviewPackets.mock.calls[0] ?? []) as unknown as Record<
+    string,
+    unknown
+  >[];
+  const exported = (call[0] ?? {}) as { exportAudio?: ReviewExportClipPlan };
+  // Full-output time of source 2 is 1; the clip plays at 1.5 globally → 0.5 fragment-local.
+  expect(exported.exportAudio!.entries[0]).toMatchObject({ timelineStart: 0.5 });
+});
+
+it('blocks the export with the audio-encoder reason when the indexed probe failed', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.audio.original = { muted: false, volume: 1.5 };
+  const index = { ...args.index, audioCodec: 'opus' as const, processedAudioCodec: null };
+  await expect(exportReviewedVideo({ ...args, index }, deps)).rejects.toMatchObject({
+    name: 'QuickEditExportUnavailable',
+    reasons: ['audio-encoder'],
+  });
+  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+});
+
 it('rejects unsupported speed audio before allocating any temporary or published asset', async () => {
   const { args, deps } = fixture();
   args.snapshot.workspace.history[0]!.after = {
@@ -178,7 +336,7 @@ it('rejects unsupported speed audio before allocating any temporary or published
       { ...args, index: { ...args.index, audioCodec: 'opus', processedAudioCodec: null } },
       deps
     )
-  ).rejects.toThrow('Audio processing');
+  ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable', reasons: ['audio-encoder'] });
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
   expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
 });

@@ -42,14 +42,6 @@ export function resolveQuickEditEffectiveFeatures(
   };
 }
 
-export type QuickEditExportBlocker =
-  | 'zoom'
-  | 'background'
-  | 'burned-comment'
-  | 'voiceover'
-  | 'music'
-  | 'original-audio';
-
 /**
  * Applied configuration for stage, mixer, and exporter: every render/audio branch
  * consumes this instead of the stored state or lane visibility.
@@ -79,31 +71,55 @@ export function resolveQuickEditEffectiveState(
   };
 }
 
-type QuickEditExportSupport =
-  | { ok: true }
-  | { ok: false; blockers: readonly QuickEditExportBlocker[] };
+export type QuickEditExportReason =
+  | 'zoom'
+  | 'background'
+  | 'burned-comment'
+  | 'voiceover'
+  | 'music'
+  | 'original-audio'
+  | 'audio-encoder'
+  | 'asset-missing';
+
+export type QuickEditExportPlan =
+  | { kind: 'unavailable'; reasons: readonly QuickEditExportReason[] }
+  | {
+      kind: 'ready';
+      video: 'copy' | 'render';
+      audio: 'copy' | 'process';
+      reasons: readonly QuickEditExportReason[];
+    };
 
 /**
- * Honest export-plan gate: the current packet exporter only carries cuts, speed,
- * and source-audio remux. Everything that changes rendered pixels or adds audio
- * must block the fast path with a user-visible reason instead of silently
- * exporting the untouched original.
+ * Export decision from the applied configuration, not lane visibility or dormant
+ * settings. Visual changes require the full frame renderer; audio-only changes
+ * are processable when the capability hint allows audio encoding.
  */
-export function resolveQuickEditExportSupport(args: {
+export function resolveQuickEditExportPlan(args: {
   document: Pick<ReviewDocument, 'edits' | 'canvasComments'>;
   advanced: QuickEditAdvancedState;
-}): QuickEditExportSupport {
-  if (args.advanced.ui.mode !== 'advanced') return { ok: true };
-  const blockers: QuickEditExportBlocker[] = [];
-  if (args.advanced.zoom.enabled) blockers.push('zoom');
-  if (args.advanced.background.enabled) blockers.push('background');
+  /** Capability hint; undefined defers the authoritative check to the exporter. */
+  audioProcessingAvailable?: boolean;
+}): QuickEditExportPlan {
+  if (args.advanced.ui.mode !== 'advanced')
+    return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
+  const visual: QuickEditExportReason[] = [];
+  if (args.advanced.zoom.enabled) visual.push('zoom');
+  if (args.advanced.background.enabled) visual.push('background');
   if (args.document.canvasComments.some((comment) => comment.renderToVideo))
-    blockers.push('burned-comment');
-  if (args.advanced.audio.voiceover.length > 0) blockers.push('voiceover');
-  if (args.advanced.audio.music.length > 0) blockers.push('music');
+    visual.push('burned-comment');
+  const audio: QuickEditExportReason[] = [];
+  if (args.advanced.audio.voiceover.length > 0) audio.push('voiceover');
+  if (args.advanced.audio.music.length > 0) audio.push('music');
   if (args.advanced.audio.original.muted || args.advanced.audio.original.volume !== 1)
-    blockers.push('original-audio');
-  return blockers.length ? { ok: false, blockers } : { ok: true };
+    audio.push('original-audio');
+  if (visual.length) return { kind: 'unavailable', reasons: [...visual, ...audio] };
+  if (audio.length) {
+    if (args.audioProcessingAvailable === false)
+      return { kind: 'unavailable', reasons: ['audio-encoder'] };
+    return { kind: 'ready', video: 'copy', audio: 'process', reasons: audio };
+  }
+  return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
 }
 
 /** Non-empty advanced content worth a "saved and temporarily not applied" hint. */

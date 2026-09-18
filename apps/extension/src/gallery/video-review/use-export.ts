@@ -3,10 +3,14 @@ import {
   inspectReviewMedia,
   type ReviewMediaIndex,
 } from '../../workflows/video-review/media-index';
-import { exportReviewedVideo } from '../../workflows/video-review/export-lifecycle';
 import {
-  resolveQuickEditExportSupport,
-  type QuickEditExportBlocker,
+  exportReviewedVideo,
+  QuickEditExportUnavailable,
+} from '../../workflows/video-review/export-lifecycle';
+import {
+  resolveQuickEditExportPlan,
+  type QuickEditExportPlan,
+  type QuickEditExportReason,
 } from '../../features/video/review/advanced/effective';
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
@@ -20,7 +24,7 @@ export function useReviewExport(resource: LoadedReview) {
   const [phase, setPhase] = useState<'idle' | 'exporting' | 'publishing'>('idle');
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
-  const [blocked, setBlocked] = useState<readonly QuickEditExportBlocker[] | null>(null);
+  const [blocked, setBlocked] = useState<readonly QuickEditExportReason[] | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const active = useRef<AbortController | null>(null);
   const publishing = useRef(false);
@@ -45,23 +49,25 @@ export function useReviewExport(resource: LoadedReview) {
       active.current?.abort();
     };
   }, [resource.file]);
-  /** Effective advanced additions the current packet exporter cannot render. */
-  const unsupported = (): readonly QuickEditExportBlocker[] | null => {
+  /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
+  const plan = (): QuickEditExportPlan => {
     const state = resource.session.getSnapshot();
-    const support = resolveQuickEditExportSupport({
+    return resolveQuickEditExportPlan({
       document: state.document,
       advanced: state.snapshot.workspace.advanced,
+      // A source audio track with a probed unavailable codec is a known blocker;
+      // clips-only exports defer the authoritative probe to the exporter.
+      ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
     });
-    return support.ok ? null : support.blockers;
   };
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
     if (active.current || !index) return;
-    const blockers = unsupported();
-    if (blockers) {
-      setBlocked(blockers);
+    const currentPlan = plan();
+    if (currentPlan.kind === 'unavailable') {
+      setBlocked(currentPlan.reasons);
       return;
     }
     setBlocked(null);
@@ -94,8 +100,10 @@ export function useReviewExport(resource: LoadedReview) {
           });
         if (!selection) setResult(value);
       }
-    } catch {
-      if (mounted.current && !controller.signal.aborted) setFailed(true);
+    } catch (error) {
+      if (error instanceof QuickEditExportUnavailable) {
+        if (mounted.current && !controller.signal.aborted) setBlocked(error.reasons);
+      } else if (mounted.current && !controller.signal.aborted) setFailed(true);
     } finally {
       active.current = null;
       publishing.current = false;
@@ -117,13 +125,14 @@ export function useReviewExport(resource: LoadedReview) {
       if (!publishing.current) active.current?.abort();
     },
     download: () => {
-      const state = resource.session.getSnapshot();
-      const blockers = unsupported();
-      if (blockers) {
-        setBlocked(blockers);
+      const currentPlan = plan();
+      if (currentPlan.kind === 'unavailable') {
+        setBlocked(currentPlan.reasons);
         return;
       }
-      if (!state.document.edits.length) downloadGalleryBlob(resource.file, resource.filename);
+      const state = resource.session.getSnapshot();
+      const applied = currentPlan.audio === 'process' || state.document.edits.length > 0;
+      if (!applied) downloadGalleryBlob(resource.file, resource.filename);
       else void start('download');
     },
   };

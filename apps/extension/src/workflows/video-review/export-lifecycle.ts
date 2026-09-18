@@ -8,12 +8,41 @@ import {
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { replayReviewHistory } from '../../features/video/review/document';
 import { createReviewFragment } from '../../features/video/review/fragment';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnchor } from '../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import {
+  buildQuickEditAudioPlan,
+  type QuickEditAudioPlanEntry,
+} from '../../features/video/review/advanced/audio-plan';
+import {
+  resolveQuickEditExportPlan,
+  type QuickEditExportReason,
+} from '../../features/video/review/advanced/effective';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
+import { resolveReviewAssetBytes } from './asset-bytes';
 import { loadVideoReviewSource } from './source';
 import { writeReviewPackets, type ReviewPacketReceipt } from './packet-export';
 import type { ReviewMediaIndex } from './media-index';
 import { encodeReviewProvenance } from '../../features/video/review/provenance';
+
+/** Typed unavailability so the UI can show the exact reasons instead of a generic failure. */
+export class QuickEditExportUnavailable extends Error {
+  readonly reasons: readonly QuickEditExportReason[];
+  constructor(reasons: readonly QuickEditExportReason[]) {
+    super('Review export is unavailable.');
+    this.name = 'QuickEditExportUnavailable';
+    this.reasons = reasons;
+  }
+}
+
+export interface ReviewExportClipPlan {
+  /** Fragment-local entries: output time is already shifted into the fragment. */
+  entries: readonly QuickEditAudioPlanEntry[];
+  buffers: ReadonlyMap<string, AudioBuffer>;
+  originalVolume: number;
+  originalMuted: boolean;
+}
 
 export interface ReviewExportReceipt extends ReviewPacketReceipt {
   revision: number;
@@ -21,6 +50,7 @@ export interface ReviewExportReceipt extends ReviewPacketReceipt {
   filename: string;
   createdAt: number;
 }
+
 const persistence = {
   assertAssetWriteAdmission,
   createSeekableAssetObjectWriter,
@@ -29,7 +59,59 @@ const persistence = {
   saveRecordingsBatchSafely,
   loadVideoReviewSource,
   writeReviewPackets,
+  readProjectAsset: resolveReviewAssetBytes,
 };
+
+/** Output time of a source position inside the full edit map. */
+function reviewOutputTimeAt(
+  map: ReturnType<typeof buildReviewTimeMap>,
+  sourceTime: number
+): number {
+  for (const segment of map) {
+    if (segment.kind === 'cut') continue;
+    if (sourceTime < segment.sourceStart) return segment.resultStart;
+    if (sourceTime < segment.sourceEnd)
+      return segment.resultStart + (sourceTime - segment.sourceStart) / segment.rate;
+  }
+  return map.at(-1)?.resultEnd ?? 0;
+}
+
+/**
+ * Builds the applied external-audio mix plan and decodes every referenced asset
+ * once; a missing asset blocks the export with a user-visible reason instead of
+ * silently dropping the lane.
+ */
+async function buildReviewExportClipPlan(args: {
+  advanced: QuickEditAdvancedState;
+  fragmentOffset: number;
+  signal: AbortSignal;
+  readProjectAsset: (assetId: string) => Promise<Blob | null>;
+}): Promise<ReviewExportClipPlan> {
+  const filterDormant = (lane: 'voiceover' | 'music') =>
+    args.advanced.audio[lane].filter((clip) => !clip.dormant);
+  const entries = buildQuickEditAudioPlan({
+    voiceover: filterDormant('voiceover'),
+    music: filterDormant('music'),
+  }).map((entry) => ({ ...entry, timelineStart: entry.timelineStart - args.fragmentOffset }));
+  const buffers = new Map<string, AudioBuffer>();
+  const decoder = new OfflineAudioContext(2, 1, 48_000);
+  for (const assetId of new Set(entries.map((entry) => entry.assetId))) {
+    const blob = await args.readProjectAsset(assetId);
+    args.signal.throwIfAborted();
+    if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
+    try {
+      buffers.set(assetId, await decoder.decodeAudioData(await blob.arrayBuffer()));
+    } catch {
+      throw new QuickEditExportUnavailable(['asset-missing']);
+    }
+  }
+  return {
+    entries,
+    buffers,
+    originalVolume: args.advanced.audio.original.volume,
+    originalMuted: args.advanced.audio.original.muted,
+  };
+}
 
 /** Owns staging cancellation until journal publication becomes the final non-cancellable step. */
 export async function exportReviewedVideo(
@@ -56,6 +138,14 @@ export async function exportReviewedVideo(
   )
     throw new Error('Review source or committed revision changed.');
   const document = replayReviewHistory(workspace.history, workspace.cursor, workspace.source);
+  const plan = resolveQuickEditExportPlan({
+    document,
+    advanced: workspace.advanced,
+    ...(index.processedAudioCodec ? { audioProcessingAvailable: true } : {}),
+  });
+  if (plan.kind === 'unavailable') throw new QuickEditExportUnavailable(plan.reasons);
+  if (plan.audio === 'process' && index.audioCodec && !index.processedAudioCodec)
+    throw new QuickEditExportUnavailable(['audio-encoder']);
   const fragment = args.selection
     ? createReviewFragment({
         selection: args.selection,
@@ -67,9 +157,22 @@ export async function exportReviewedVideo(
   if (args.selection && (!fragment || args.destination !== 'download'))
     throw new Error('A nonempty fragment requires a temporary download.');
   const edits = fragment?.edits ?? document.edits;
-  const audioReencoded = !!index.audioCodec && edits.some((edit) => edit.kind === 'speed');
-  if (audioReencoded && !index.processedAudioCodec)
-    throw new Error('Audio processing is unavailable.');
+  let exportAudio: ReviewExportClipPlan | undefined;
+  if (plan.audio === 'process') {
+    const fragmentOffset = fragment
+      ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
+      : 0;
+    exportAudio = await buildReviewExportClipPlan({
+      advanced: workspace.advanced,
+      fragmentOffset,
+      signal,
+      readProjectAsset: deps.readProjectAsset,
+    });
+  }
+  const speedAudio = !!index.audioCodec && edits.some((edit) => edit.kind === 'speed');
+  if (speedAudio && !index.processedAudioCodec)
+    throw new QuickEditExportUnavailable(['audio-encoder']);
+  const audioReencoded = speedAudio || !!exportAudio;
   const createdAt = Date.now();
   const provenance = encodeReviewProvenance({
     format: 'sniptale.video-edit.v1',
@@ -102,6 +205,7 @@ export async function exportReviewedVideo(
       writer,
       signal,
       provenance,
+      ...(exportAudio ? { exportAudio } : {}),
       ...(args.onProgress ? { onProgress: args.onProgress } : {}),
     });
     signal.throwIfAborted();

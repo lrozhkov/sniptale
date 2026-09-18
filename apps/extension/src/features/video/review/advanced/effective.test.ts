@@ -4,7 +4,7 @@ import {
   hasSuppressedAdvancedFeatures,
   resolveQuickEditEffectiveFeatures,
   resolveQuickEditEffectiveState,
-  resolveQuickEditExportSupport,
+  resolveQuickEditExportPlan,
 } from './effective';
 import { createCanvasComment } from '../comments';
 import type { QuickEditAdvancedState } from './types';
@@ -115,48 +115,68 @@ function musicStub() {
   };
 }
 
-it('blocks the current exporter when advanced presentation would be dropped', () => {
+it('plans render requirements and audio-only processing from applied changes', () => {
   const document = (renderToVideo: boolean) => ({
     edits: [],
     canvasComments: [{ ...createCanvasComment({ id: 'c', at: 0 }), renderToVideo }],
   });
   const state = advancedWithContent();
   state.zoom = { enabled: true, regions: [regionStub()] };
-  const blocked = resolveQuickEditExportSupport({
+  const blocked = resolveQuickEditExportPlan({
     document: document(true),
     advanced: state,
   });
-  if (blocked.ok) throw new Error('expected blocked export');
-  expect([...blocked.blockers]).toEqual(
-    expect.arrayContaining(['zoom', 'background', 'burned-comment'])
-  );
-  const unburned = resolveQuickEditExportSupport({
+  expect(blocked).toMatchObject({
+    kind: 'unavailable',
+    reasons: expect.arrayContaining(['zoom', 'background', 'burned-comment']),
+  });
+  if (blocked.kind !== 'unavailable') throw new Error('expected blocked export');
+  expect(blocked.reasons).not.toContain('voiceover');
+  const unburned = resolveQuickEditExportPlan({
     document: document(false),
     advanced: state,
   });
-  if (unburned.ok) throw new Error('expected blocked export');
-  expect([...unburned.blockers]).not.toContain('burned-comment');
+  if (unburned.kind !== 'unavailable') throw new Error('expected blocked export');
+  expect(unburned.reasons).not.toContain('burned-comment');
 
   const voice = advancedWithContent();
   voice.background = { enabled: false };
   voice.zoom = { enabled: false, regions: [] };
   voice.audio.voiceover = [voiceClipStub()];
-  const voiceBlocked = resolveQuickEditExportSupport({
-    document: document(false),
-    advanced: voice,
+  expect(resolveQuickEditExportPlan({ document: document(false), advanced: voice })).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'process',
+    reasons: ['voiceover'],
   });
-  if (voiceBlocked.ok) throw new Error('expected blocked voiceover export');
-  expect([...voiceBlocked.blockers]).toEqual(['voiceover']);
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(false),
+      advanced: voice,
+      audioProcessingAvailable: false,
+    })
+  ).toMatchObject({ kind: 'unavailable', reasons: ['audio-encoder'] });
 
   const original = advancedWithContent();
   original.zoom = { enabled: false, regions: [] };
   original.background = { enabled: false };
   original.audio.original = { muted: false, volume: 1.5 };
   expect(
-    resolveQuickEditExportSupport({ document: document(false), advanced: original })
+    resolveQuickEditExportPlan({ document: document(false), advanced: original })
   ).toMatchObject({
-    ok: false,
-    blockers: ['original-audio'],
+    kind: 'ready',
+    audio: 'process',
+    reasons: ['original-audio'],
+  });
+
+  const none = advancedWithContent();
+  none.zoom = { enabled: false, regions: [] };
+  none.background = { enabled: false };
+  expect(resolveQuickEditExportPlan({ document: document(false), advanced: none })).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
   });
 });
 
@@ -164,14 +184,14 @@ it('lets the basic path export basic changes even with stored advanced settings'
   const basic = advancedWithContent();
   basic.ui.mode = 'basic';
   expect(
-    resolveQuickEditExportSupport({
+    resolveQuickEditExportPlan({
       document: {
         edits: [{ kind: 'cut', start: 0, end: 1 } as never],
         canvasComments: [],
       },
       advanced: basic,
     })
-  ).toMatchObject({ ok: true });
+  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
 });
 
 function regionStub() {

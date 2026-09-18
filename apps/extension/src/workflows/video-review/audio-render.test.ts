@@ -86,7 +86,15 @@ class TestAudioBuffer {
 }
 
 function installAudioContext() {
-  const windows: { input?: TestAudioBuffer; frames: number; rate?: number }[] = [];
+  const windows: {
+    input?: TestAudioBuffer;
+    frames: number;
+    rate?: number;
+    gains?: Array<{
+      gain: { value: number; readonlyPoints: Array<[string, number, number]> };
+      destinations: unknown[];
+    }>;
+  }[] = [];
   let onRender = () => {};
   vi.stubGlobal('AudioBuffer', TestAudioBuffer);
   vi.stubGlobal(
@@ -117,6 +125,28 @@ function installAudioContext() {
           },
           connect() {},
           start() {},
+        };
+      }
+      createGain() {
+        const window = this.window;
+        const gain = {
+          value: 1,
+          readonlyPoints: [] as Array<[string, number, number]>,
+          setValueAtTime(value: number, time: number) {
+            gain.readonlyPoints.push(['set', value, time]);
+          },
+          linearRampToValueAtTime(value: number, time: number) {
+            gain.readonlyPoints.push(['ramp', value, time]);
+          },
+        };
+        window.gains ??= [];
+        window.gains!.push({ gain, destinations: [] });
+        return {
+          gain,
+          connect(destination: unknown) {
+            window.gains!.at(-1)!.destinations.push(destination);
+            return destination;
+          },
         };
       }
       async startRendering() {
@@ -237,6 +267,54 @@ it('bounds accelerated windows and emits a short final chunk without a whole-sou
       199_681
     );
     expect(audioMock.samples).not.toHaveBeenCalled();
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+it('mixes applied external clips and original gain into each window', async () => {
+  const fixture = await audioFixture();
+  try {
+    const clipBuffer = new TestAudioBuffer({
+      numberOfChannels: 1,
+      length: 96_000,
+      sampleRate: 48_000,
+    });
+    const entry = {
+      lane: 'music' as const,
+      clipId: 'm',
+      assetId: 'project-asset:m',
+      timelineStart: 0.5,
+      duration: 1,
+      sourceOffset: 0,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+    };
+    const samples = [];
+    for await (const sample of renderReviewAudio(
+      fixture.track,
+      { sourceStart: 0, sourceEnd: 1, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
+      false,
+      new AbortController().signal,
+      {
+        entries: [entry],
+        buffers: new Map<string, AudioBuffer>([
+          ['project-asset:m', clipBuffer as unknown as AudioBuffer],
+        ]),
+        originalVolume: 2,
+        originalMuted: false,
+      }
+    ))
+      samples.push(sample);
+    const window = fixture.windows[0]!;
+    // The original chain gains by 2; the clip is placed at its output position
+    // with a full clip-local envelope, starting mid-clip at the matching gain.
+    expect(window.gains!).toHaveLength(2);
+    expect(window.gains![0]!.gain.value).toBe(2);
+    const clipGain = window.gains![1]!.gain;
+    expect(clipGain.readonlyPoints[0]).toEqual(['set', 1, 0.02 + 0.5]);
+    expect(clipGain.readonlyPoints.at(-1)).toEqual(['ramp', 1, 0.02 + 1]);
   } finally {
     fixture.cleanup();
   }

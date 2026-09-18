@@ -9,16 +9,18 @@ import {
 } from '../../features/video/review/speed';
 import { Scissors, Download, FileVideo, Gauge, MousePointer2, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import type { QuickEditExportBlocker } from '../../features/video/review/advanced/effective';
+import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
 import { ReviewButton, reviewTimeLabel } from './controls';
 
-const BLOCKER_LABEL: Record<QuickEditExportBlocker, Parameters<typeof translate>[0]> = {
+const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   zoom: 'gallery.videoReview.exportBlockerZoom',
   background: 'gallery.videoReview.exportBlockerBackground',
   'burned-comment': 'gallery.videoReview.exportBlockerBurnedComment',
   voiceover: 'gallery.videoReview.exportBlockerVoiceover',
   music: 'gallery.videoReview.exportBlockerMusic',
   'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',
+  'audio-encoder': 'gallery.videoReview.exportBlockerAudioEncoder',
+  'asset-missing': 'gallery.videoReview.exportBlockerAssetMissing',
 };
 
 const plain =
@@ -124,7 +126,7 @@ export function ReviewEditActions(props: {
   failed: boolean;
   hasResult: boolean;
   audioUnavailable?: boolean;
-  advancedBlockers?: readonly QuickEditExportBlocker[] | null;
+  advancedBlockers?: readonly QuickEditExportReason[] | null;
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
@@ -185,7 +187,7 @@ export function ReviewEditActions(props: {
       {blocked ? (
         <p role="status" className="text-xs">
           {translate('gallery.videoReview.exportAdvancedUnavailable')}{' '}
-          {props.advancedBlockers!.map((blocker) => translate(BLOCKER_LABEL[blocker])).join(' · ')}
+          {props.advancedBlockers!.map((blocker) => translate(REASON_LABEL[blocker])).join(' · ')}
         </p>
       ) : null}
     </div>

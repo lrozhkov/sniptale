@@ -79,6 +79,14 @@ export const galleryVideoReviewMessages = defineMessageSource({
   exportBlockerVoiceover: { ru: 'озвучка', en: 'voiceover' },
   exportBlockerMusic: { ru: 'музыка', en: 'music' },
   exportBlockerOriginalAudio: { ru: 'настройки исходного звука', en: 'original audio settings' },
+  exportBlockerAudioEncoder: {
+    ru: 'кодирование звука недоступно',
+    en: 'audio encoding is unavailable',
+  },
+  exportBlockerAssetMissing: {
+    ru: 'импортированный материал недоступен',
+    en: 'imported media is unavailable',
+  },
   eventClick: { ru: 'Щелчок', en: 'Click' },
   eventDoubleClick: { ru: 'Двойной щелчок', en: 'Double click' },
   eventScroll: { ru: 'Прокрутка', en: 'Scroll' },

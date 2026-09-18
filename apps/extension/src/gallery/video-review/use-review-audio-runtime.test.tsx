@@ -547,18 +547,3 @@ it('skips clips whose asset is missing', async () => {
   });
   expect(engine.scheduled).toHaveLength(0);
 });
-
-it('resolves review clip references through the project asset store', async () => {
-  const file = new Blob();
-  vi.resetModules();
-  vi.doMock('../../composition/persistence/projects', () => ({
-    getProjectAsset: vi.fn(async (id: string) =>
-      id === 'known' ? { status: 'ready', entry: { file } } : { status: 'not-found' }
-    ),
-  }));
-  const { resolveReviewAssetBytes } = await import('./use-review-audio-runtime');
-  await expect(resolveReviewAssetBytes('recording:other')).resolves.toBeNull();
-  await expect(resolveReviewAssetBytes('project-asset:known')).resolves.toBe(file);
-  await expect(resolveReviewAssetBytes('project-asset:missing')).resolves.toBeNull();
-  vi.doUnmock('../../composition/persistence/projects');
-});

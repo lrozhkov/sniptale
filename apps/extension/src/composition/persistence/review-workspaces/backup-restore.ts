@@ -5,6 +5,7 @@ import {
 } from '../infrastructure/indexed-db/core.stores';
 import type { VideoWorkspace, VideoWorkspaceDraft, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
+import { remapReviewAssetReferences } from './asset-refs';
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
@@ -77,6 +78,8 @@ export function prepareVideoReviewRestore(args: {
   sourceAggregateId: string;
   targetAggregateId: string;
   sourceAssetId: string;
+  /** Restored project-asset id map for review audio and image references. */
+  assetIdMap?: ReadonlyMap<string, string>;
 }): VideoWorkspaceSnapshot {
   const review = parsePortableVideoReview(args.review, args.sourceAggregateId);
   const workspace = parseVideoWorkspace({
@@ -85,10 +88,14 @@ export function prepareVideoReviewRestore(args: {
     sourceAssetId: args.sourceAssetId,
   });
   if (!workspace) throw new Error('Restored video review is invalid.');
-  return {
+  const snapshot: VideoWorkspaceSnapshot = {
     workspace,
     draft: review.draft ? { ...review.draft, aggregateId: args.targetAggregateId } : null,
   };
+  const { assetIdMap } = args;
+  return assetIdMap && assetIdMap.size
+    ? remapReviewAssetReferences(snapshot, assetIdMap)
+    : snapshot;
 }
 
 /** Must be called inside the original media publication transaction. */

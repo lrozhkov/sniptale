@@ -15,6 +15,7 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
+import type { ReviewExportClipPlan } from './export-lifecycle';
 import { audioPacketDuration, chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
@@ -35,6 +36,7 @@ export async function writeReviewPackets(args: {
   writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
   signal: AbortSignal;
   provenance?: string;
+  exportAudio?: ReviewExportClipPlan;
   onProgress?(fraction: number): void;
 }): Promise<ReviewPacketReceipt> {
   const { index, signal } = args;
@@ -49,6 +51,7 @@ export async function writeReviewPackets(args: {
     (part) => part.kind !== 'cut'
   );
   if (!segments.length) throw new Error('The edited video is empty.');
+  const speedExists = args.edits.some((edit) => edit.kind === 'speed');
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
   signal.addEventListener('abort', dispose, { once: true });
@@ -62,9 +65,9 @@ export async function writeReviewPackets(args: {
     const audioConfig = await audio?.getDecoderConfig();
     if (!videoConfig || (audio && !audioConfig))
       throw new Error('Codec configuration is unavailable.');
-    const processing = args.edits.some((edit) => edit.kind === 'speed') && !!audio;
-    const processedAudio =
-      processing && audio ? await chooseReviewAudioCodec(audio, index.container) : null;
+
+    const processing = (speedExists && !!audio) || !!args.exportAudio;
+    const processedAudio = processing ? await chooseReviewAudioCodec(audio, index.container) : null;
     if (processing && !processedAudio) throw new Error('Audio processing is unavailable.');
     const videoSink = new EncodedPacketSink(video);
     const audioSink = audio ? new EncodedPacketSink(audio) : null;
@@ -74,7 +77,7 @@ export async function writeReviewPackets(args: {
       audioPackets: 0,
       resultDuration: segments.at(-1)!.resultEnd,
       audioRanges: [],
-      audioReencoded: processing,
+      audioReencoded: !!processedAudio,
       outputAudioCodec: processedAudio ?? index.audioCodec,
     };
     const clock = { time: 0 };
@@ -91,7 +94,6 @@ export async function writeReviewPackets(args: {
     });
     output = tracks.output;
     const videoSource = tracks.video;
-    const audioSource = tracks.audio;
     let videoEnd = 0;
     await output.start();
     for (const segment of segments) {
@@ -104,25 +106,18 @@ export async function writeReviewPackets(args: {
         segment,
         signal
       );
-      const muted = args.edits.some(
-        (edit) =>
-          edit.kind === 'speed' && edit.start === segment.sourceStart && edit.audio === 'mute'
-      );
-      const audioPackets =
-        processing && audio
-          ? renderReviewAudio(audio, segment, muted, signal)
-          : audioSink && index.audioCodec
-            ? retainedAudio(
-                audioSink,
-                segment,
-                clock,
-                index.audioCodec,
-                sampleRate,
-                receipt,
-                signal
-              )
-            : null;
-      if (processing)
+      const muted =
+        !!args.exportAudio?.originalMuted ||
+        args.edits.some(
+          (edit) =>
+            edit.kind === 'speed' && edit.start === segment.sourceStart && edit.audio === 'mute'
+        );
+      const audioPackets = processedAudio
+        ? renderReviewAudio(audio, segment, muted, signal, args.exportAudio)
+        : audioSink && index.audioCodec
+          ? retainedAudio(audioSink, segment, clock, index.audioCodec, sampleRate, receipt, signal)
+          : null;
+      if (processedAudio && (speedExists || !!args.exportAudio))
         receipt.audioRanges.push({
           sourceStart: segment.sourceStart,
           sourceEnd: segment.sourceEnd,
@@ -135,7 +130,7 @@ export async function writeReviewPackets(args: {
           videoPackets,
           audioPackets,
           videoSource,
-          audioSource,
+          audioSource: tracks.audio,
           videoConfig,
           audioConfig,
           receipt,
@@ -145,7 +140,7 @@ export async function writeReviewPackets(args: {
       );
     }
     videoSource.close();
-    audioSource?.source.close();
+    tracks.audio?.source.close();
     signal.throwIfAborted();
     await output.finalize();
     signal.throwIfAborted();
