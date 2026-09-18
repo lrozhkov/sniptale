@@ -3,8 +3,8 @@ import type { RefObject } from 'react';
 import { MaterialAudioRecordingModal } from '../../composition/audio-recording/dialog';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 import { translate } from '../../platform/i18n';
-import type { useReviewAudio } from './use-review-audio';
-import { importAudioAsset, importedAudioClip } from '../../workflows/video-review/audio-import';
+import type { useReviewAudio, ReviewAudioLane } from './use-review-audio';
+import { importReviewAudio, importedAudioClip } from '../../workflows/video-review/audio-import';
 
 /** Owns one recording lifecycle: open/close, playback sync, and the saved clip. */
 export function useReviewVoiceoverRecording(args: {
@@ -38,16 +38,25 @@ export function useReviewVoiceoverRecording(args: {
     /** The shared recorder already trims the file, so placement is take start + trim offset. */
     save: async (file: File, trim: AudioTrimRange, signal: AbortSignal) => {
       if (signal.aborted) return;
-      const at = args.toOutputTime((takeStart ?? args.time) + trim.trimStart);
-      if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
-      const imported = await importAudioAsset(file);
-      signal.throwIfAborted();
-      args.audio.addImported(
-        importedAudioClip(imported.assetId, imported.duration, at, args.resultDuration),
-        'voiceover',
-        imported.duration
-      );
-      await args.flushAdvanced();
+      const sourceAt = (takeStart ?? args.time) + trim.trimStart;
+      await importReviewAudio({
+        file,
+        signal,
+        assertCurrentTarget: () => {
+          if (args.toOutputTime(sourceAt) === null)
+            throw new Error(translate('gallery.videoReview.placementOnCut'));
+        },
+        attach: (assetId, duration) => {
+          const at = args.toOutputTime(sourceAt);
+          if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
+          args.audio.addImported(
+            importedAudioClip(assetId, duration, at, args.resultDuration),
+            'voiceover',
+            duration
+          );
+          return args.flushAdvanced();
+        },
+      });
     },
   };
 }
@@ -97,20 +106,35 @@ export function useReviewEditorAudio(args: {
   audio: ReturnType<typeof useReviewAudio>;
 }) {
   const guard = () => !args.busy && args.canStart();
-  const onImportAudioFile = (file: File, timelineTime?: number) => {
+  const onImportAudioFile = (
+    file: File,
+    lane: ReviewAudioLane = 'music',
+    timelineTime?: number
+  ) => {
     if (!guard()) return;
-    const at = timelineTime ?? args.toOutputTime(args.time);
-    if (at === null) {
+    if (timelineTime === undefined && args.toOutputTime(args.time) === null) {
       args.onCutPlacement();
       return;
     }
     void args.run(async () => {
-      const imported = await importAudioAsset(file);
-      args.audio.addImported(
-        importedAudioClip(imported.assetId, imported.duration, at, args.resultDuration),
-        'music',
-        imported.duration
-      );
+      await importReviewAudio({
+        file,
+        signal: new AbortController().signal,
+        assertCurrentTarget: () => {
+          if (timelineTime === undefined && args.toOutputTime(args.time) === null)
+            throw new Error(translate('gallery.videoReview.placementOnCut'));
+        },
+        attach: (assetId, duration) => {
+          const at = timelineTime ?? args.toOutputTime(args.time);
+          if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
+          args.audio.addImported(
+            importedAudioClip(assetId, duration, at, args.resultDuration),
+            lane,
+            duration
+          );
+          return args.flushAdvanced();
+        },
+      });
     });
   };
   const voiceover = useReviewVoiceoverRecording({

@@ -43,7 +43,17 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   readVideoWorkspace: integration.read,
 }));
 vi.mock('../../workflows/video-review/audio-import', () => ({
-  importAudioAsset: vi.fn(async () => ({ assetId: 'project-asset:drop', duration: 2 })),
+  importReviewAudio: vi.fn(
+    async (args: {
+      attach(assetId: string, duration: number): Promise<void>;
+      assertCurrentTarget(): void;
+      signal: AbortSignal;
+    }) => {
+      args.signal.throwIfAborted();
+      args.assertCurrentTarget();
+      await args.attach('project-asset:drop', 2);
+    }
+  ),
   importedAudioClip: (
     assetId: string,
     duration: number,

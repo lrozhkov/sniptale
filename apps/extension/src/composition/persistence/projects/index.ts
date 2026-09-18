@@ -38,6 +38,7 @@ import {
   readAssetFile,
   releaseAssetReadyProtection,
   writeBlobToAsset,
+  type AssetRef,
 } from '../assets';
 import {
   PROJECT_ASSET_OWNER_KIND,
@@ -248,35 +249,71 @@ export async function listVideoProjectEntries(): Promise<VideoProjectEntry[]> {
     .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
+export interface PreparedProjectAsset {
+  id: string;
+  ref: AssetRef;
+  /** Publishes the library entry and releases the ready protection once. */
+  publish(): Promise<void>;
+  /** Discards the staged object unless a publication journal already owns it. */
+  discard(): Promise<void>;
+}
+
+/**
+ * Stages one project asset under ready protection without publishing it: the
+ * caller attaches a durable reference first and only then publishes or discards.
+ */
+export async function prepareProjectAsset(
+  blob: Blob,
+  mimeType: string,
+  filename?: string,
+  id?: string
+): Promise<PreparedProjectAsset> {
+  const entryId = id ?? crypto.randomUUID();
+  await recoverProjectMediaPublications();
+  await assertAssetWriteAdmission(blob.size);
+  const prepared = await writeBlobToAsset(blob, { mimeType });
+  const entry: StoredProjectAssetEntry = {
+    assetId: prepared.ref.assetId,
+    id: entryId,
+    mimeType: prepared.ref.mimeType,
+    createdAt: Date.now(),
+    size: prepared.ref.size,
+  };
+  let owned = false;
+  const publish = async () => {
+    if (owned) throw new Error('Project asset is already published.');
+    const payload: ProjectAssetPublicationPayload = { entry, filename: filename || entryId };
+    const journal = await createAssetPublicationJournal({
+      assetRefs: [prepared.ref],
+      domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
+      payload,
+    });
+    owned = true;
+    await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
+    await releaseAssetReadyProtection([prepared.ref.assetId]);
+  };
+  return {
+    id: entryId,
+    ref: prepared.ref,
+    publish,
+    discard: async () => {
+      if (owned) return;
+      await discardPreparedAsset(prepared.ref.assetId);
+    },
+  };
+}
+
 export async function saveProjectAsset(
   id: string,
   blob: Blob,
   mimeType: string,
   filename = id
 ): Promise<void> {
-  await recoverProjectMediaPublications();
-  await assertAssetWriteAdmission(blob.size);
-  const prepared = await writeBlobToAsset(blob, { mimeType });
-  const entry: StoredProjectAssetEntry = {
-    assetId: prepared.ref.assetId,
-    id,
-    mimeType: prepared.ref.mimeType,
-    createdAt: Date.now(),
-    size: prepared.ref.size,
-  };
-  let journalCreated = false;
+  const prepared = await prepareProjectAsset(blob, mimeType, filename, id);
   try {
-    const payload: ProjectAssetPublicationPayload = { entry, filename };
-    const journal = await createAssetPublicationJournal({
-      assetRefs: [prepared.ref],
-      domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
-      payload,
-    });
-    journalCreated = true;
-    await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
-    await releaseAssetReadyProtection([prepared.ref.assetId]);
+    await prepared.publish();
   } catch (error) {
-    if (!journalCreated) await discardPreparedAsset(prepared.ref.assetId);
+    await prepared.discard();
     throw error;
   }
 }

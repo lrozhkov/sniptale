@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
 import { parsePortableMediaMetadata } from './media';
 
 function metadata() {
@@ -53,7 +54,11 @@ function metadata() {
 it('parses a standalone project video review without changing the supplied metadata', () => {
   const input = metadata();
   const before = structuredClone(input);
-  expect(parsePortableMediaMetadata(input).videoReview).toEqual(input.videoReview);
+  // A legacy portable workspace parses as the v2 normalized record the restore writes.
+  expect(parsePortableMediaMetadata(input).videoReview).toEqual({
+    ...input.videoReview,
+    workspace: { ...input.videoReview.workspace, advanced: createQuickEditAdvancedState() },
+  });
   expect(input).toEqual(before);
 });
 
@@ -95,7 +100,8 @@ it('rejects invalid byte ownership, local identity, history and review source', 
 it('accepts historical WebM project exports without an explicit MIME type', () => {
   const input = metadata();
   const { mimeType: _mime, ...projectExport } = input.projectExport;
-  expect(parsePortableMediaMetadata({ ...input, projectExport }).videoReview).toEqual(
-    input.videoReview
-  );
+  expect(parsePortableMediaMetadata({ ...input, projectExport }).videoReview).toEqual({
+    ...input.videoReview,
+    workspace: { ...input.videoReview.workspace, advanced: createQuickEditAdvancedState() },
+  });
 });

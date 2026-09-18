@@ -22,7 +22,9 @@ const onTrimClip = vi.fn(
   (_lane: 'voiceover' | 'music', _id: string, _edge: string, _time: number) => undefined
 );
 const onOriginal = vi.fn((_patch: Partial<QuickEditOriginalAudio>) => undefined);
-const onImportFile = vi.fn((_file: File, _timelineTime?: number) => undefined);
+const onImportFile = vi.fn(
+  (_file: File, _lane: 'voiceover' | 'music', _timelineTime?: number) => undefined
+);
 const onRecordVoiceover = vi.fn();
 const onSelect = vi.fn((_id: string | null) => undefined);
 
@@ -128,7 +130,8 @@ it('imports a dropped audio file at the drop point on the music lane', async () 
   await act(async () => dispatchDrag(music, 'drop', [file], 250));
   expect(onImportFile).toHaveBeenCalledOnce();
   expect(onImportFile.mock.calls[0]![0]).toBe(file);
-  expect(onImportFile.mock.calls[0]![1]).toBeCloseTo(2.5, 5);
+  expect(onImportFile.mock.calls[0]![1]).toBe('music');
+  expect(onImportFile.mock.calls[0]![2]).toBeCloseTo(2.5, 5);
   expect(music.getAttribute('data-drop-active')).toBeNull();
 });
 
@@ -143,8 +146,9 @@ it('clears the drop affordance on leave and ignores drops without files', async 
   expect(music.getAttribute('data-drop-active')).toBeNull();
   await act(async () => dispatchDrag(music, 'drop', [], 400));
   expect(onImportFile).not.toHaveBeenCalled();
-  await act(async () => dispatchDrag(voiceover, 'dragenter', [file]));
-  expect(voiceover.getAttribute('data-drop-active')).toBeNull();
+  await act(async () => dispatchDrag(voiceover, 'drop', [file], 400));
+  expect(onImportFile).toHaveBeenCalledOnce();
+  expect(onImportFile.mock.calls[0]![1]).toBe('voiceover');
 });
 
 it('rejects file drops while the editor is busy', async () => {

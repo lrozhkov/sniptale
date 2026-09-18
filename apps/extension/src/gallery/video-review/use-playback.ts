@@ -26,7 +26,8 @@ export function useReviewPlayback(props: {
       node.playbackRate = settings.rate;
       node.preservesPitch = false;
       node.muted = settings.muted || latest.current.original.muted;
-      node.volume = latest.current.original.volume;
+      // The element caps at one; the preview audio graph amplifies beyond it.
+      node.volume = Math.min(1, latest.current.original.volume);
       if (next >= latest.current.duration) node.pause();
     }
     setTime(next);

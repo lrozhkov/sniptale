@@ -11,7 +11,7 @@ import type {
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { useCanvasComments } from './use-canvas-comments';
-import type { useReviewAudio } from './use-review-audio';
+import type { useReviewAudio, ReviewAudioLane } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
 import type { useReviewExport } from './use-export';
 import type { useReviewZoomEditor } from './zoom-editor';
@@ -52,7 +52,7 @@ function ReviewAudioLane(props: {
   resultDuration: number;
   audio: ReturnType<typeof useReviewAudio>;
   busy: boolean;
-  onImportFile(file: File, timelineTime?: number): void;
+  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
 }) {
   return (
@@ -103,7 +103,7 @@ export function ReviewTimelineBinding(props: {
   audio: ReturnType<typeof useReviewAudio>;
   audioState: QuickEditAudioState;
   audioVisible: boolean;
-  onImportAudioFile(file: File, timelineTime?: number): void;
+  onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
   onAddComment(marker?: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;

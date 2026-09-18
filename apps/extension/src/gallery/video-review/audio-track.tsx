@@ -5,6 +5,7 @@ import {
   type DragEvent,
   type MutableRefObject,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import { Mic, Plus, Volume2, VolumeX } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -294,10 +295,11 @@ export function ReviewAudioTrack(props: {
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
   onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
-  onImportFile(file: File, timelineTime?: number): void;
+  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const picker = useRef<ReviewAudioLane | null>(null);
   return (
     <div data-ui="gallery.videoReview.audioTrack" className="space-y-1">
       <input
@@ -308,34 +310,81 @@ export function ReviewAudioTrack(props: {
         onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = '';
-          if (file) props.onImportFile(file);
+          if (file) props.onImportFile(file, picker.current ?? 'music');
+          picker.current = null;
         }}
       />
-      <div
-        data-ui="gallery.videoReview.audioLane"
-        className="relative mt-1 flex h-8 items-center gap-2 rounded bg-[var(--sniptale-color-surface-hover)] px-3"
+      <ReviewOriginalLane
+        original={props.audio.original}
+        busy={props.busy}
+        onOriginal={props.onOriginal}
+      />
+      <ReviewClipLanes
+        audio={props.audio}
+        duration={props.duration}
+        selectedId={props.selectedId}
+        busy={props.busy}
+        onSelect={props.onSelect}
+        onMoveClip={props.onMoveClip}
+        onTrimClip={props.onTrimClip}
+        onImportFile={props.onImportFile}
+        onRecordVoiceover={props.onRecordVoiceover}
+        pickerLane={picker}
+        pickerInput={input}
+      />
+    </div>
+  );
+}
+
+function ReviewOriginalLane(props: {
+  original: QuickEditOriginalAudio;
+  busy: boolean;
+  onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
+}) {
+  return (
+    <div
+      data-ui="gallery.videoReview.audioLane"
+      className="relative mt-1 flex h-8 items-center gap-2 rounded bg-[var(--sniptale-color-surface-hover)] px-3"
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded opacity-40"
+        style={{
+          background:
+            'repeating-linear-gradient(90deg, transparent 0 3px, var(--sniptale-color-border-soft) 3px 4px)',
+        }}
+      />
+      <span className="relative z-10 text-[11px] text-[var(--sniptale-color-text-muted)]">
+        {translate('gallery.videoReview.audioOriginal')}
+      </span>
+      <ReviewButton
+        label={translate('gallery.videoReview.audioClipMute')}
+        aria-pressed={props.original.muted}
+        disabled={props.busy}
+        className="relative z-10 !h-6 !min-h-6 !px-1.5"
+        onClick={() => props.onOriginal({ muted: !props.original.muted })}
       >
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 rounded opacity-40"
-          style={{
-            background:
-              'repeating-linear-gradient(90deg, transparent 0 3px, var(--sniptale-color-border-soft) 3px 4px)',
-          }}
-        />
-        <span className="relative z-10 text-[11px] text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.audioOriginal')}
-        </span>
-        <ReviewButton
-          label={translate('gallery.videoReview.audioClipMute')}
-          aria-pressed={props.audio.original.muted}
-          disabled={props.busy}
-          className="relative z-10 !h-6 !min-h-6 !px-1.5"
-          onClick={() => props.onOriginal({ muted: !props.audio.original.muted })}
-        >
-          {props.audio.original.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-        </ReviewButton>
-      </div>
+        {props.original.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+      </ReviewButton>
+    </div>
+  );
+}
+
+function ReviewClipLanes(props: {
+  audio: QuickEditAudioState;
+  duration: number;
+  selectedId: string | null;
+  busy: boolean;
+  onSelect(id: string | null): void;
+  onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
+  onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
+  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
+  onRecordVoiceover(): void;
+  pickerLane: RefObject<ReviewAudioLane | null>;
+  pickerInput: RefObject<HTMLInputElement | null>;
+}) {
+  return (
+    <>
       {LANES.map((lane) => (
         <ReviewAudioClipLane
           key={lane.key}
@@ -348,37 +397,36 @@ export function ReviewAudioTrack(props: {
           onSelect={props.onSelect}
           onMoveClip={props.onMoveClip}
           onTrimClip={props.onTrimClip}
-          {...(lane.key === 'music'
-            ? {
-                onDropFile: (file: File, timelineTime: number) =>
-                  props.onImportFile(file, timelineTime),
-                trailing: (
-                  <ReviewButton
-                    label={translate('gallery.videoReview.audioImport')}
-                    disabled={props.busy}
-                    className="!absolute right-1 top-1/2 z-10 !h-6 !min-h-6 -translate-y-1/2 !px-1.5"
-                    onClick={() => input.current?.click()}
-                  >
-                    <Plus size={14} />
-                  </ReviewButton>
-                ),
-              }
-            : lane.key === 'voiceover'
-              ? {
-                  trailing: (
-                    <ReviewButton
-                      label={translate('gallery.videoReview.recordVoiceover')}
-                      disabled={props.busy}
-                      className="!absolute right-1 top-1/2 z-10 !h-6 !min-h-6 -translate-y-1/2 !px-1.5"
-                      onClick={props.onRecordVoiceover}
-                    >
-                      <Mic size={14} />
-                    </ReviewButton>
-                  ),
-                }
-              : {})}
+          onDropFile={(file: File, timelineTime: number) =>
+            props.onImportFile(file, lane.key, timelineTime)
+          }
+          trailing={
+            <>
+              {lane.key === 'voiceover' && (
+                <ReviewButton
+                  label={translate('gallery.videoReview.recordVoiceover')}
+                  disabled={props.busy}
+                  className="!absolute right-7 top-1/2 z-10 !h-6 !min-h-6 -translate-y-1/2 !px-1.5"
+                  onClick={props.onRecordVoiceover}
+                >
+                  <Mic size={14} />
+                </ReviewButton>
+              )}
+              <ReviewButton
+                label={translate('gallery.videoReview.audioImport')}
+                disabled={props.busy}
+                className="!absolute right-1 top-1/2 z-10 !h-6 !min-h-6 -translate-y-1/2 !px-1.5"
+                onClick={() => {
+                  props.pickerLane.current = lane.key;
+                  props.pickerInput.current?.click();
+                }}
+              >
+                <Plus size={14} />
+              </ReviewButton>
+            </>
+          }
         />
       ))}
-    </div>
+    </>
   );
 }

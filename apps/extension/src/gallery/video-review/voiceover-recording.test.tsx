@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RefObject } from 'react';
 import { ReviewVoiceoverRecording, useReviewVoiceoverRecording } from './voiceover-recording';
-import { importAudioAsset } from '../../workflows/video-review/audio-import';
+import { importReviewAudio } from '../../workflows/video-review/audio-import';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -12,7 +12,17 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 vi.mock('../../workflows/video-review/audio-import', () => ({
-  importAudioAsset: vi.fn(async () => ({ assetId: 'project-asset:7', duration: 2 })),
+  importReviewAudio: vi.fn(
+    async (args: {
+      signal: AbortSignal;
+      assertCurrentTarget(): void;
+      attach(assetId: string, duration: number): Promise<void>;
+    }) => {
+      args.signal.throwIfAborted();
+      args.assertCurrentTarget();
+      await args.attach('project-asset:7', 2);
+    }
+  ),
   importedAudioClip: (
     assetId: string,
     duration: number,
@@ -181,7 +191,7 @@ it('skips saving when the session was already aborted', async () => {
   const controller = new AbortController();
   controller.abort();
   await act(async () => harness.latest.save(new File(['a'], 'a.webm'), trim, controller.signal));
-  expect(importAudioAsset).not.toHaveBeenCalled();
+  expect(importReviewAudio).not.toHaveBeenCalled();
   expect(harness.audio.addImported).not.toHaveBeenCalled();
 });
 
@@ -245,7 +255,7 @@ it('refuses the take when its start was removed by the cuts (R03)', async () => 
 });
 
 it('rejects the save when the import fails so the take stays available (V2)', async () => {
-  vi.mocked(importAudioAsset).mockRejectedValueOnce(new Error('quota'));
+  vi.mocked(importReviewAudio).mockRejectedValueOnce(new Error('quota'));
   const harness = renderHookHarness({ guard: () => true });
   act(() => harness.latest.open());
   await expect(
@@ -258,10 +268,17 @@ it('rejects the save when the import fails so the take stays available (V2)', as
 
 it('does not attach the clip when the import finished after abort (V3)', async () => {
   let release!: () => void;
-  vi.mocked(importAudioAsset).mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        release = () => resolve({ assetId: 'project-asset:9', duration: 2 });
+  vi.mocked(importReviewAudio).mockImplementationOnce(
+    (args) =>
+      new Promise<void>((resolve, reject) => {
+        release = () => {
+          try {
+            args.signal.throwIfAborted();
+            args.attach('project-asset:9', 2).then(resolve, reject);
+          } catch (error) {
+            reject(error);
+          }
+        };
       })
   );
   const harness = renderHookHarness({ guard: () => true });
