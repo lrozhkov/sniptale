@@ -1,15 +1,87 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import type { VideoWorkspaceSnapshot } from './contracts';
+import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 
 const AUDIO_PREFIX = 'project-asset:';
 const LANES = ['voiceover', 'music'] as const;
+/** Portable metadata forbids local asset keys; review lane refs travel renamed. */
+const PORTABLE_REF_KEY = 'assetRef';
+
+/** Renames the lane clip asset keys so archive metadata stays portable-safe. */
+export function encodePortableReviewAssetRefs<T>(review: T): T {
+  if (
+    !isRecord(review) ||
+    !isRecord(review['workspace']) ||
+    !isRecord(review['workspace']['advanced'])
+  )
+    return review;
+  const advanced = review['workspace']['advanced'] as Record<string, unknown>;
+  const audio = advanced['audio'];
+  if (!isRecord(audio)) return review;
+  return {
+    ...review,
+    workspace: {
+      ...review['workspace'],
+      advanced: {
+        ...advanced,
+        audio: renameLaneRef(audio, 'assetId', PORTABLE_REF_KEY),
+      },
+    },
+  } as T;
+}
+
+/** Restores the runtime lane clip shape from its portable encoding. */
+export function decodePortableReviewAssetRefs<T>(workspace: T): T {
+  if (!isRecord(workspace) || !isRecord(workspace['advanced'])) return workspace;
+  const advanced = workspace['advanced'] as Record<string, unknown>;
+  const audio = advanced['audio'];
+  if (!isRecord(audio)) return workspace;
+  return {
+    ...workspace,
+    advanced: {
+      ...advanced,
+      audio: renameLaneRef(audio, PORTABLE_REF_KEY, 'assetId'),
+    },
+  } as T;
+}
+
+function renameLaneRef(
+  audio: Record<string, unknown>,
+  sourceKey: string,
+  targetKey: string
+): Record<string, unknown> {
+  const next = { ...audio };
+  for (const lane of LANES) {
+    const clips = audio[lane];
+    if (!Array.isArray(clips)) continue;
+    next[lane] = clips.map((clip: unknown) => {
+      if (!isRecord(clip)) return clip;
+      const reference = clip[sourceKey];
+      if (typeof reference !== 'string') return clip;
+      const { [sourceKey]: _renamed, ...rest } = clip;
+      return { ...rest, [targetKey]: reference };
+    });
+  }
+  return next;
+}
+
+/** Asset id maps are keyed by the bare stored entry id; refs keep their prefix. */
+function lookupAssetId(
+  assetIdMap: ReadonlyMap<string, string>,
+  reference: string
+): string | undefined {
+  if (!reference.startsWith(AUDIO_PREFIX)) return undefined;
+  const bare = reference.slice(AUDIO_PREFIX.length);
+  const mapped = assetIdMap.get(reference) ?? assetIdMap.get(bare);
+  if (mapped === undefined) return undefined;
+  return mapped.startsWith(AUDIO_PREFIX) ? mapped : AUDIO_PREFIX + mapped;
+}
 
 /** Collects every project-asset reference the review keeps in its advanced state. */
 export function collectReviewAssetReferences(
-  snapshot: VideoWorkspaceSnapshot
+  workspace: Pick<VideoWorkspace, 'advanced'>
 ): ReadonlySet<string> {
   const references = new Set<string>();
-  const advanced = snapshot.workspace.advanced;
+  const advanced = workspace.advanced;
   for (const clip of [...advanced.audio.voiceover, ...advanced.audio.music]) {
     if (clip.assetId.startsWith(AUDIO_PREFIX)) references.add(clip.assetId);
   }
@@ -54,9 +126,9 @@ function remapRecoveryAudio(
       recoveryAudio[lane] = clips.map((clip: unknown) => {
         if (!isRecord(clip)) return clip;
         const assetId = clip['assetId'];
-        if (typeof assetId === 'string' && assetIdMap.has(assetId)) {
+        if (typeof assetId === 'string' && lookupAssetId(assetIdMap, assetId)) {
           changed = true;
-          return { ...clip, assetId: assetIdMap.get(assetId) };
+          return { ...clip, assetId: lookupAssetId(assetIdMap, assetId) };
         }
         return clip;
       });
@@ -79,12 +151,14 @@ export function remapReviewAssetReferences(
   const advanced = snapshot.workspace.advanced;
   const clipLanes = LANES.map((lane) => {
     const clips = advanced.audio[lane];
-    if (!clips.some((clip) => assetIdMap.has(clip.assetId))) return [lane, clips] as const;
+    if (!clips.some((clip) => lookupAssetId(assetIdMap, clip.assetId)))
+      return [lane, clips] as const;
     return [
       lane,
-      clips.map((clip) =>
-        assetIdMap.has(clip.assetId) ? { ...clip, assetId: assetIdMap.get(clip.assetId)! } : clip
-      ),
+      clips.map((clip) => {
+        const remapped = lookupAssetId(assetIdMap, clip.assetId);
+        return remapped ? { ...clip, assetId: remapped } : clip;
+      }),
     ] as const;
   });
   const audio = { ...advanced.audio };

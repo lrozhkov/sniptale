@@ -28,7 +28,10 @@ import {
   parseProjectExportEntry,
   parseVideoProjectEntry,
 } from '../../../../composition/persistence/projects/read-guards';
-import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
+import {
+  decodePortableVideoProjectAssetRefs,
+  parsePortableVideoProjectMetadata,
+} from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
@@ -51,6 +54,8 @@ function transformReferences(
   return Object.fromEntries(
     Object.entries(value).map(([key, child]) => {
       if (key === 'projectAssetId' && typeof child === 'string')
+        return [key, assetIds.get(child) ?? child];
+      if (key === 'projectAssetRef' && typeof child === 'string')
         return [key, assetIds.get(child) ?? child];
       if (key === 'recordingId' && typeof child === 'string') {
         const mediaId = rootIds[`media:library-item:recording:${child}`];
@@ -136,7 +141,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
     const entry = parseVideoProjectEntry({
       ...rebaseTemporaryLifecycle(metadata.entry),
       id: targetProjectId,
-      project: transformedProject,
+      project: decodePortableVideoProjectAssetRefs(transformedProject),
     });
     if (!entry) throw new Error('Restored video project metadata is invalid.');
     const assets = metadata.projectAssets.map((asset) => {
@@ -155,6 +160,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
             sourceAggregateId: `project-asset:${asset.entry.id}`,
             targetAggregateId: `project-asset:${parsed.id}`,
             sourceAssetId: object.ref.assetId,
+            assetIdMap,
           })
         : null;
       if (videoReview && videoReview.workspace.source.size !== object.ref.size)
@@ -197,6 +203,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
               sourceAggregateId: `export:${item.entry.id}`,
               targetAggregateId: `export:${exportId}`,
               sourceAssetId: object.ref.assetId,
+              assetIdMap,
             })
           : null;
         if (videoReview && videoReview.workspace.source.size !== object.ref.size)

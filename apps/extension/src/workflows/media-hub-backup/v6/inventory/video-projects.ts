@@ -2,6 +2,10 @@ import {
   readVideoReviewForBackup,
   type VideoReviewBackupDatabase,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
+import {
+  collectReviewAssetReferences,
+  encodePortableReviewAssetRefs,
+} from '../../../../composition/persistence/review-workspaces/asset-refs';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
@@ -24,7 +28,10 @@ import {
 } from '../../../../composition/persistence/projects/contracts';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../../features/video/project/effect-instance';
 import { encodePortableThumbnail } from '../root-codecs/media';
-import type { PortableVideoProjectMetadata } from '../root-codecs/projects';
+import {
+  encodePortableVideoProjectAssetRefs,
+  type PortableVideoProjectMetadata,
+} from '../root-codecs/projects';
 import type { JsonValue, MediaHubBackupExportOptions } from '../contracts';
 import type { MediaHubBackupRootInventoryItem } from '../export';
 import {
@@ -70,7 +77,8 @@ function readSelectedVideoProjects(
 async function buildProjectAssets(
   db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
-  collector: ReturnType<typeof createObjectCollector>
+  collector: ReturnType<typeof createObjectCollector>,
+  referencedIds: Set<string>
 ) {
   const output = [];
   const ids = [
@@ -96,9 +104,14 @@ async function buildProjectAssets(
           sourceAssetId: asset.assetId,
         })
       : undefined;
+    if (videoReview) {
+      for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
+    }
     output.push({
       entry: portable,
-      ...(videoReview ? { videoReview } : {}),
+      ...(videoReview
+        ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
+        : {}),
       filename,
       objectId: collector.addObject(
         file,
@@ -119,7 +132,8 @@ async function buildProjectAssets(
 async function buildProjectExports(
   db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
-  collector: ReturnType<typeof createObjectCollector>
+  collector: ReturnType<typeof createObjectCollector>,
+  referencedIds: Set<string>
 ) {
   const output = [];
   const exports = (await db.getAllFromIndex(PROJECT_EXPORTS_STORE, 'projectId', entry.id))
@@ -139,9 +153,14 @@ async function buildProjectExports(
           sourceAssetId: exportEntry.assetId,
         })
       : undefined;
+    if (videoReview) {
+      for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
+    }
     output.push({
       entry: portable,
-      ...(videoReview ? { videoReview } : {}),
+      ...(videoReview
+        ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
+        : {}),
       objectId: collector.addObject(
         file,
         exportEntry.filename,
@@ -184,6 +203,54 @@ function buildPortableEffectSnapshots(
   });
 }
 
+/**
+ * Archives review-owned external assets (imported music or voiceover) that the
+ * project's own asset list does not carry; stale references are skipped so a
+ * missing source cannot block the whole backup.
+ */
+async function buildReviewReferencedAssets(
+  db: VideoInventoryDatabase,
+  entry: VideoProjectEntry,
+  collector: ReturnType<typeof createObjectCollector>,
+  collectedIds: ReadonlySet<string>,
+  referencedIds: ReadonlySet<string>
+) {
+  const output = [];
+  let fallbackIndex = 0;
+  const prefix = 'project-asset:';
+  for (const reference of referencedIds) {
+    if (!reference.startsWith(prefix)) continue;
+    const id = reference.slice(prefix.length);
+    if (collectedIds.has(id)) continue;
+    const raw = await db.get(PROJECT_ASSETS_STORE, id);
+    const asset = raw === undefined ? null : parseProjectAssetEntry(raw);
+    if (!asset) continue;
+    const media = parseMediaLibraryEntry(
+      await db.get(MEDIA_LIBRARY_STORE, createProjectAssetMediaId(asset.id))
+    );
+    const filename =
+      media?.filename ?? createReadableAssetFilename(fallbackIndex++, asset.mimeType);
+    const file = await readInventoryAssetFile(db, asset.assetId, filename);
+    const { assetId: _assetId, ...portable } = asset;
+    output.push({
+      entry: portable,
+      filename,
+      objectId: collector.addObject(
+        file,
+        filename,
+        asset.mimeType,
+        withDraftRoot(entry.lifecycle?.storageClass === 'temporary', [
+          'Recordings',
+          'Projects',
+          entry.project.name,
+          'Assets',
+        ])
+      ),
+    });
+  }
+  return output;
+}
+
 async function buildVideoProjectRoot(args: {
   db: VideoInventoryDatabase;
   entry: VideoProjectEntry;
@@ -195,8 +262,23 @@ async function buildVideoProjectRoot(args: {
     `video-${String(args.index + 1).padStart(6, '0')}`,
     args.paths
   );
-  const projectAssets = await buildProjectAssets(args.db, args.entry, collector);
-  const projectExports = await buildProjectExports(args.db, args.entry, collector);
+  const referencedIds = new Set<string>();
+  const sourceAssets = await buildProjectAssets(args.db, args.entry, collector, referencedIds);
+  const projectExports = await buildProjectExports(args.db, args.entry, collector, referencedIds);
+  const projectAssets = [
+    ...sourceAssets,
+    ...(await buildReviewReferencedAssets(
+      args.db,
+      args.entry,
+      collector,
+      new Set(
+        args.entry.project.assets.flatMap((asset) =>
+          asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
+        )
+      ),
+      referencedIds
+    )),
+  ];
   const { effectSnapshots: _effectSnapshots, ...project } = args.entry.project;
   const portableSnapshots = buildPortableEffectSnapshots(args.entry, collector);
   const storedProjectThumbnail = parseMediaThumbnailEntry(
@@ -221,7 +303,10 @@ async function buildVideoProjectRoot(args: {
   const metadata: PortableVideoProjectMetadata = {
     entry: {
       ...args.entry,
-      project: { ...project, ...(portableSnapshots ? { effectSnapshots: portableSnapshots } : {}) },
+      project: {
+        ...(encodePortableVideoProjectAssetRefs(project) as typeof project),
+        ...(portableSnapshots ? { effectSnapshots: portableSnapshots } : {}),
+      },
     },
     projectAssets,
     projectExports,

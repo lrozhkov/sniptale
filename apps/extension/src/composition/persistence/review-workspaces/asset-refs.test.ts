@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectReviewAssetReferences, remapReviewAssetReferences } from './asset-refs';
-import type { VideoWorkspaceSnapshot } from './contracts';
+import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
 
@@ -65,7 +65,7 @@ describe('collectReviewAssetReferences', () => {
       },
       draft: null,
     };
-    expect(collectReviewAssetReferences(snapshot as unknown as VideoWorkspaceSnapshot)).toEqual(
+    expect(collectReviewAssetReferences(snapshot.workspace as VideoWorkspace)).toEqual(
       new Set(['project-asset:voice', 'project-asset:music', 'project-asset:v1music'])
     );
   });
@@ -79,9 +79,7 @@ describe('collectReviewAssetReferences', () => {
       },
       draft: null,
     };
-    expect(collectReviewAssetReferences(empty as unknown as VideoWorkspaceSnapshot)).toEqual(
-      new Set()
-    );
+    expect(collectReviewAssetReferences(empty.workspace as VideoWorkspace)).toEqual(new Set());
   });
 });
 
@@ -121,7 +119,7 @@ describe('remapReviewAssetReferences', () => {
         advanced: withRefs,
       },
       draft: null,
-    } as unknown as VideoWorkspaceSnapshot;
+    } as VideoWorkspaceSnapshot;
     // Nothing matches: the same reference object is returned unchanged.
     expect(
       remapReviewAssetReferences(
@@ -145,5 +143,33 @@ describe('remapReviewAssetReferences', () => {
     expect(recovered.audio.voiceover[0]!.assetId).toBe('project-asset:old-voice2');
     expect(result.workspace.sourceAssetId).toBe(snapshot.workspace.sourceAssetId);
     expect(snapshot.workspace.advanced.audio.music[0]!.assetId).toBe('project-asset:music');
+  });
+
+  it('accepts bare stored entry ids in the restored asset map', () => {
+    const withRefs = advanced({
+      audio: {
+        original: { muted: false, volume: 1 },
+        voiceover: [],
+        music: [
+          {
+            id: 'm',
+            assetId: 'project-asset:music',
+            timelineStart: 1,
+            sourceOffset: 0,
+            duration: 2,
+            volume: 1,
+            muted: false,
+            fadeIn: 0,
+            fadeOut: 0,
+          },
+        ],
+      },
+    });
+    const snapshot = {
+      workspace: { aggregateId: 'recording:a', sourceAssetId: 'asset:1', advanced: withRefs },
+      draft: null,
+    } as VideoWorkspaceSnapshot;
+    const result = remapReviewAssetReferences(snapshot, new Map([['music', 'restored-music']]));
+    expect(result.workspace.advanced.audio.music[0]!.assetId).toBe('project-asset:restored-music');
   });
 });

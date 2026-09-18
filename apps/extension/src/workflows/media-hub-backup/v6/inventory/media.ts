@@ -2,6 +2,7 @@ import {
   readVideoReviewForBackup,
   type VideoReviewBackupDatabase,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
+import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
 import {
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -283,11 +284,13 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'recording') {
     const recording = parseRecordingEntry(await args.db.get(STORE_NAME, entry.source.recordingId));
     if (!recording) throw new Error('Recording source is missing.');
-    const videoReview = await readVideoReviewForBackup({
-      db: args.db,
-      aggregateId: entry.id,
-      sourceAssetId: recording.assetId,
-    });
+    const videoReview = encodePortableReviewAssetRefs(
+      await readVideoReviewForBackup({
+        db: args.db,
+        aggregateId: entry.id,
+        sourceAssetId: recording.assetId,
+      })
+    );
     return {
       ...(await buildRecordingSource({ ...args, entry, recordingId: entry.source.recordingId })),
       ...(videoReview ? { videoReview } : {}),
@@ -303,11 +306,13 @@ async function buildMediaSource(args: {
   if (!child || !entry.mimeType.startsWith('video/'))
     throw new Error('Project video source is missing.');
   const file = await readRefFile(args.db, child.assetId, entry.filename);
-  const videoReview = await readVideoReviewForBackup({
-    db: args.db,
-    aggregateId: entry.id,
-    sourceAssetId: child.assetId,
-  });
+  const videoReview = encodePortableReviewAssetRefs(
+    await readVideoReviewForBackup({
+      db: args.db,
+      aggregateId: entry.id,
+      sourceAssetId: child.assetId,
+    })
+  );
   const originalObjectId = args.collector.add(
     file,
     entry.filename,

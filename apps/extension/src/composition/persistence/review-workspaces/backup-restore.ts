@@ -5,7 +5,7 @@ import {
 } from '../infrastructure/indexed-db/core.stores';
 import type { VideoWorkspace, VideoWorkspaceDraft, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
-import { remapReviewAssetReferences } from './asset-refs';
+import { decodePortableReviewAssetRefs, remapReviewAssetReferences } from './asset-refs';
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
@@ -18,7 +18,10 @@ export function parsePortableVideoReview(value: unknown, aggregateId: string): P
   if (!isRecord(value) || !isRecord(value['workspace']) || 'sourceAssetId' in value['workspace']) {
     throw new Error('Portable video review is invalid.');
   }
-  const workspace = parseVideoWorkspace({ ...value['workspace'], sourceAssetId: 'portable' });
+  const workspace = parseVideoWorkspace({
+    ...(decodePortableReviewAssetRefs(value['workspace']) as Record<string, unknown>),
+    sourceAssetId: 'portable',
+  });
   const draft =
     value['draft'] === null
       ? null

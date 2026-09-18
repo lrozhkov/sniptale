@@ -311,6 +311,35 @@ function isPortableScenarioProjectMetadata(
   );
 }
 
+const PORTABLE_PROJECT_REF_KEY = 'projectAssetRef';
+
+/**
+ * Portable metadata forbids local asset keys; every project asset reference
+ * inside the project tree (clips, embedded shapes, scene background) travels
+ * renamed and is remapped through the restored asset id map on publication.
+ */
+export function encodePortableVideoProjectAssetRefs(project: unknown): unknown {
+  return renameProjectAssetRefs(project, 'assetId', PORTABLE_PROJECT_REF_KEY);
+}
+
+export function decodePortableVideoProjectAssetRefs(project: unknown): unknown {
+  return renameProjectAssetRefs(project, PORTABLE_PROJECT_REF_KEY, 'assetId');
+}
+
+function renameProjectAssetRefs(value: unknown, sourceKey: string, targetKey: string): unknown {
+  if (Array.isArray(value))
+    return value.map((item) => renameProjectAssetRefs(item, sourceKey, targetKey));
+  if (typeof value !== 'object' || value === null) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, child]) => [
+      key === sourceKey && typeof child === 'string' ? targetKey : key,
+      key === sourceKey && typeof child === 'string'
+        ? child
+        : renameProjectAssetRefs(child, sourceKey, targetKey),
+    ])
+  );
+}
+
 export function parsePortableVideoProjectMetadata(value: unknown): PortableVideoProjectMetadata {
   assertPortableProjectBase(value, 'video');
   if (!isPortableVideoProjectMetadata(value)) {
