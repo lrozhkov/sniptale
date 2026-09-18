@@ -3,6 +3,7 @@ import { isBoundedNumber, isUnitInterval } from '../../project/validation/primit
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+  QUICK_EDIT_ADVANCED_SCHEMA_V1,
   type QuickEditAdvancedState,
   type QuickEditAudioClip,
   type QuickEditAudioState,
@@ -17,6 +18,8 @@ import {
   type QuickEditZoomTransition,
 } from './types';
 import { createQuickEditAdvancedState } from './defaults';
+import { migrateQuickEditAdvancedV1 } from './migration';
+import type { ReviewTimeSegment } from '../timeline';
 
 /** Renderer-consistent camera magnification bounds, matching video project scale limits. */
 const MAX_QUICK_EDIT_CAMERA_SCALE = 4;
@@ -106,10 +109,14 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     transform,
     enter,
     exit,
+    ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
   };
 }
 
-/** Persisted regions never overlap; adjacency is allowed so transitions can touch boundaries. */
+/**
+ * Persisted active regions never overlap; adjacency is allowed so transitions can touch
+ * boundaries. Dormant placements keep unproven source-time values and are exempt.
+ */
 function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
   const regions = parseBoundedArray(value, MAX_QUICK_EDIT_ZOOM_REGIONS, parseZoomRegion);
   if (!regions) return null;
@@ -117,8 +124,9 @@ function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
   let previous: QuickEditZoomRegion | null = null;
   for (const region of regions) {
     if (ids.has(region.id)) return null;
-    if (previous && region.start < previous.end) return null;
     ids.add(region.id);
+    if (region.dormant) continue;
+    if (previous && region.start < previous.end) return null;
     previous = region;
   }
   return regions;
@@ -195,6 +203,7 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     muted: value['muted'],
     fadeIn: value['fadeIn'],
     fadeOut: value['fadeOut'],
+    ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
   };
 }
 
@@ -230,18 +239,38 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
 
 /**
  * Single load point for persisted advanced quick-editor state: absent legacy data becomes
- * defaults, and any malformed field rejects the whole record at the workspace boundary.
+ * defaults, malformed fields reject the whole record at the workspace boundary, and the
+ * known v1 format migrates through the replayed result-time segments.
  */
-export function loadQuickEditAdvancedState(raw: unknown): QuickEditAdvancedState | null {
+export function loadQuickEditAdvancedState(
+  raw: unknown,
+  segments?: readonly ReviewTimeSegment[]
+): QuickEditAdvancedState | null {
   if (raw === undefined) return createQuickEditAdvancedState();
-  if (!isRecord(raw) || raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION) return null;
+  if (!isRecord(raw)) return null;
+  const version = raw['schemaVersion'];
+  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION) return parseAdvancedFields(raw);
+  if (version === QUICK_EDIT_ADVANCED_SCHEMA_V1 && segments) {
+    const parsed = parseAdvancedFields(raw);
+    if (!parsed) return null;
+    const { schemaVersion: _schemaVersion, ...fields } = parsed;
+    return migrateQuickEditAdvancedV1(fields, segments);
+  }
+  return null;
+}
+
+/** Parses the current shape; the recovery copy is an opaque string. */
+function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedState | null {
   const ui = parseUiState(raw['ui']);
   const zoom = parseZoomState(raw['zoom']);
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const recovery = raw['recoveryV1'];
+  if (recovery !== undefined && typeof recovery !== 'string') return null;
   if (!ui || !zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    ...(recovery === undefined ? {} : { recoveryV1: recovery }),
     ui,
     zoom,
     background,

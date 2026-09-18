@@ -19,6 +19,58 @@ import type { useReviewZoomEditor } from './zoom-editor';
 type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
+/** Zoom lane on the result-time scale with shared snap candidates. */
+function ReviewZoomLane(props: {
+  advanced: QuickEditAdvancedState;
+  resultDuration: number;
+  outputTime: number | null;
+  edits: readonly ReviewEdit[];
+  boundaries: readonly number[] | undefined;
+  zoom: ReturnType<typeof useReviewZoomEditor>;
+  onAdd(): void;
+  toOutputTime(source: number): number | null;
+}) {
+  return (
+    <ReviewZoomTrack
+      duration={props.resultDuration}
+      time={props.outputTime}
+      regions={props.advanced.zoom.regions}
+      edits={props.edits}
+      boundaries={props.boundaries}
+      toOutputTime={props.toOutputTime}
+      selectedId={props.zoom.selection}
+      onSelect={props.zoom.setSelection}
+      onAdd={props.onAdd}
+      onDragCommit={props.zoom.commitDrag}
+    />
+  );
+}
+
+/** Audio lane on the result-time scale with bounded clip mutations. */
+function ReviewAudioLane(props: {
+  audioState: QuickEditAudioState;
+  resultDuration: number;
+  audio: ReturnType<typeof useReviewAudio>;
+  busy: boolean;
+  onImportFile(file: File, timelineTime?: number): void;
+  onRecordVoiceover(): void;
+}) {
+  return (
+    <ReviewAudioTrack
+      audio={props.audioState}
+      duration={props.resultDuration}
+      selectedId={props.audio.selectedId}
+      busy={props.busy}
+      onSelect={props.audio.setSelectedId}
+      onMoveClip={props.audio.moveClip}
+      onTrimClip={props.audio.trimClip}
+      onOriginal={props.audio.setOriginal}
+      onImportFile={props.onImportFile}
+      onRecordVoiceover={props.onRecordVoiceover}
+    />
+  );
+}
+
 /** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
 export function ReviewTimelineBinding(props: {
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
@@ -27,6 +79,10 @@ export function ReviewTimelineBinding(props: {
   };
   edits: readonly ReviewEdit[];
   source: { duration: number };
+  resultDuration: number;
+  outputTime: number | null;
+  toOutputTime(source: number): number | null;
+  onCutPlacement(): void;
   annotations: readonly ReviewAnnotation[];
   volume: number;
   onVolume(value: number): void;
@@ -55,7 +111,11 @@ export function ReviewTimelineBinding(props: {
   onPlay(): void;
 }) {
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
-  const onZoomAdd = () => props.zoom.add(props.time, props.source.duration);
+  const onZoomAdd = () => {
+    const at = props.toOutputTime(props.time);
+    if (at === null) props.onCutPlacement();
+    else props.zoom.add(at, props.resultDuration);
+  };
   return (
     <ReviewTimeline
       duration={props.source.duration}
@@ -95,16 +155,15 @@ export function ReviewTimelineBinding(props: {
       {...(features.zoomTrackVisible
         ? {
             zoomTrack: (
-              <ReviewZoomTrack
-                duration={props.source.duration}
-                time={props.time}
-                regions={props.advanced.zoom.regions}
+              <ReviewZoomLane
+                advanced={props.advanced}
+                resultDuration={props.resultDuration}
+                outputTime={props.outputTime}
                 edits={props.edits}
                 boundaries={props.editing.exporter.index?.boundaries}
-                selectedId={props.zoom.selection}
-                onSelect={props.zoom.setSelection}
+                zoom={props.zoom}
                 onAdd={onZoomAdd}
-                onDragCommit={props.zoom.commitDrag}
+                toOutputTime={props.toOutputTime}
               />
             ),
           }
@@ -115,15 +174,11 @@ export function ReviewTimelineBinding(props: {
       {...(props.audioVisible
         ? {
             audioTrack: (
-              <ReviewAudioTrack
-                audio={props.audioState}
-                duration={props.source.duration}
-                selectedId={props.audio.selectedId}
+              <ReviewAudioLane
+                audioState={props.audioState}
+                resultDuration={props.resultDuration}
+                audio={props.audio}
                 busy={props.busy}
-                onSelect={props.audio.setSelectedId}
-                onMoveClip={props.audio.moveClip}
-                onTrimClip={props.audio.trimClip}
-                onOriginal={props.audio.setOriginal}
                 onImportFile={props.onImportAudioFile}
                 onRecordVoiceover={props.onRecordVoiceover}
               />

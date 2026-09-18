@@ -3,6 +3,7 @@ import { createQuickEditAdvancedState } from './defaults';
 import {
   hasSuppressedAdvancedFeatures,
   resolveQuickEditEffectiveFeatures,
+  resolveQuickEditEffectiveState,
   resolveQuickEditExportSupport,
 } from './effective';
 import { createCanvasComment } from '../comments';
@@ -56,6 +57,48 @@ it('reports suppressed advanced content for the basic-mode hint', () => {
   const musicOnly = createQuickEditAdvancedState();
   musicOnly.audio.music = [musicStub()];
   expect(hasSuppressedAdvancedFeatures(musicOnly)).toBe(true);
+});
+
+it('returns the applied configuration for stage, mixer, and exporter (R04)', () => {
+  const stored = advancedWithContent();
+  stored.zoom = { enabled: true, regions: [regionStub()] };
+  stored.audio.original = { muted: true, volume: 0.5 };
+  stored.audio.voiceover = [voiceClipStub()];
+  const advanced = resolveQuickEditEffectiveState(stored);
+  expect(advanced.zoomRegions).toEqual(stored.zoom.regions);
+  expect(advanced.background).toEqual(stored.background);
+  expect(advanced.originalAudio).toEqual({ muted: true, volume: 0.5 });
+  expect(advanced.voiceover).toEqual(stored.audio.voiceover);
+
+  const basic = resolveQuickEditEffectiveState({ ...stored, ui: { ...stored.ui, mode: 'basic' } });
+  expect(basic.zoomRegions).toEqual([]);
+  expect(basic.background).toEqual({ enabled: false });
+  expect(basic.originalAudio).toEqual({ muted: false, volume: 1 });
+  expect(basic.voiceover).toEqual([]);
+  expect(basic.music).toEqual([]);
+
+  // Track visibility alone never changes the applied configuration.
+  const hidden = resolveQuickEditEffectiveState({
+    ...stored,
+    ui: { ...stored.ui, tracks: { actions: true, zoom: false, audio: false } },
+  });
+  expect(hidden.zoomRegions).toEqual(stored.zoom.regions);
+  expect(hidden.background).toEqual(stored.background);
+
+  // Dormant placements stay stored but never apply.
+  const dormantStored = resolveQuickEditEffectiveState({
+    ...stored,
+    zoom: {
+      enabled: true,
+      regions: [...stored.zoom.regions, { ...regionStub(), dormant: true }],
+    },
+    audio: {
+      ...stored.audio,
+      voiceover: [...stored.audio.voiceover, { ...voiceClipStub(), dormant: true }],
+    },
+  });
+  expect(dormantStored.zoomRegions).toEqual(stored.zoom.regions);
+  expect(dormantStored.voiceover).toEqual(stored.audio.voiceover);
 });
 
 function musicStub() {

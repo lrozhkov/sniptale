@@ -94,3 +94,36 @@ export function useReviewEdits(props: {
     },
   };
 }
+
+/** Commits one edit range; export phases and unfinished comments block the write. */
+export async function commitReviewEdit(args: {
+  session: {
+    commit(operation: {
+      id: string;
+      at: number;
+      target: 'edit';
+      before: ReviewEdit | null;
+      after: ReviewEdit | null;
+    }): Promise<unknown>;
+  };
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  busy: boolean;
+  exporterPhase: string;
+  canStart(): boolean;
+  before: ReviewEdit | null;
+  after: ReviewEdit | null;
+}): Promise<boolean> {
+  if (args.busy || args.exporterPhase !== 'idle' || !args.canStart()) return false;
+  let committed = false;
+  await args.run(async () => {
+    await args.session.commit({
+      id: crypto.randomUUID(),
+      at: Date.now(),
+      target: 'edit',
+      before: args.before,
+      after: args.after,
+    });
+    committed = true;
+  });
+  return committed;
+}

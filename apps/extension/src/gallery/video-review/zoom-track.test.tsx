@@ -46,16 +46,19 @@ function renderTrack(
     range: { start: number; end: number },
     edge: 'start' | 'end' | 'move'
   ) => void,
-  onAdd = vi.fn()
+  onAdd = vi.fn(),
+  time: number | null = 6,
+  overrides?: { edits?: ReviewEdit[]; toOutputTime?: (source: number) => number | null }
 ) {
   act(() => {
     root.render(
       <ReviewZoomTrack
         duration={10}
-        time={6}
+        {...(time === null ? { time: null } : { time })}
         regions={regions}
-        edits={edits}
+        edits={overrides?.edits ?? edits}
         boundaries={[0, 2, 4, 6, 8, 10]}
+        toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
         selectedId={null}
         onSelect={vi.fn()}
         onAdd={onAdd}
@@ -83,6 +86,56 @@ it('adds regions through the lane button', async () => {
   const track = renderTrack([zoom('a', 0, 2)], vi.fn(), onAdd);
   await act(async () => track.add.click());
   expect(onAdd).toHaveBeenCalledOnce();
+});
+
+it('snaps to edit edges projected into result time (R03)', async () => {
+  const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);
+  const sourceEdits: ReviewEdit[] = [
+    { id: 'edit-1', start: 6, end: 7, requestedStart: 6, requestedEnd: 7, kind: 'cut' },
+  ];
+  const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), 6, {
+    edits: sourceEdits,
+    toOutputTime: (source) => source / 2,
+  });
+  const first = track.blocks[0];
+  if (!first) throw new Error('Zoom region did not render.');
+  Object.assign(first, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(first, 'pointerdown', 100);
+  await track.event(first, 'pointermove', 400);
+  await track.event(first, 'pointerup', 400);
+  // Source edge 6 projects to result 3: the move snaps there instead of 2.75.
+  expect(commit).toHaveBeenLastCalledWith('a', { start: 3, end: 5 }, 'move');
+});
+
+it('ignores dormant regions for snapping (R03)', async () => {
+  const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);
+  const dormant = { ...zoom('d', 3, 5), dormant: true };
+  const track = renderTrack([zoom('a', 0, 2), dormant], commit, vi.fn(), 6);
+  const first = track.blocks[0];
+  if (!first) throw new Error('Zoom region did not render.');
+  Object.assign(first, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  // freeStart 2.96: a dormant region at [3,5) must not magnet the move to 3.
+  await track.event(first, 'pointerdown', 100);
+  await track.event(first, 'pointermove', 396);
+  await track.event(first, 'pointerup', 396);
+  expect(commit).toHaveBeenLastCalledWith('a', { start: 2.96, end: 4.96 }, 'move');
+});
+
+it('renders the output-time playhead only when the source point is kept (R03)', () => {
+  renderTrack([zoom('a', 0, 2)], vi.fn(), vi.fn(), 6);
+  const playhead = host.querySelector<HTMLElement>('[data-zoom-playhead]');
+  expect(playhead).not.toBeNull();
+  expect(playhead?.style.left).toBe('60%');
+  renderTrack([zoom('a', 0, 2)], vi.fn(), vi.fn(), null);
+  expect(host.querySelector('[data-zoom-playhead]')).toBeNull();
 });
 
 it('moves a whole region and keeps a trim drag inside the neighbor window', async () => {

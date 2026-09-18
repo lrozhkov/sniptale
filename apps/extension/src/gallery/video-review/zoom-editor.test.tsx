@@ -46,7 +46,6 @@ it('owns region selection, updates, and the stage focus overlay through one hook
   function Harness() {
     ref.current = useReviewZoomEditor({
       setZoom: setZoom as (update: (zoom: QuickEditZoomState) => QuickEditZoomState) => void,
-      background: { enabled: false },
       zoom: { ...createQuickEditAdvancedState().zoom },
       timelineDuration: 10,
     });
@@ -107,7 +106,6 @@ it('keeps the selection when removing a different region', async () => {
   function Harness() {
     ref.current = useReviewZoomEditor({
       setZoom: setZoom as never,
-      background: { enabled: false },
       zoom: { ...createQuickEditAdvancedState().zoom },
       timelineDuration: 10,
     });
@@ -129,6 +127,101 @@ it('keeps the selection when removing a different region', async () => {
   expect(apply(setZoom, zoomed).regions).toHaveLength(1);
 });
 
+it('revives a dormant migrated region on a user edit and keeps invalid commits dormant', async () => {
+  const setZoom = vi.fn((_update: (zoom: QuickEditZoomState) => QuickEditZoomState) => undefined);
+  const ref = { current: null as ReturnType<typeof useReviewZoomEditor> | null };
+  const dormant: QuickEditZoomState = {
+    enabled: true,
+    regions: [
+      {
+        id: 'z',
+        start: 0.5,
+        end: 1.5,
+        transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+        dormant: true,
+      },
+    ],
+  };
+  function Harness() {
+    ref.current = useReviewZoomEditor({
+      setZoom: setZoom as (update: (zoom: QuickEditZoomState) => QuickEditZoomState) => void,
+      zoom: dormant,
+      timelineDuration: 10,
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  const current = () => {
+    if (!ref.current) throw new Error('Editor hook did not mount.');
+    return ref.current;
+  };
+  act(() => current().change('z', { scale: 3 }));
+  const revived = apply(setZoom, dormant);
+  expect(revived.regions[0]).toMatchObject({ dormant: false, transform: { scale: 3 } });
+  // A dormant region no longer blocks insertion at its stored coordinates.
+  act(() => current().add(1, 10));
+  const after = apply(setZoom, revived);
+  expect(after.regions).toHaveLength(2);
+  expect(after.regions[1]).toMatchObject({ start: 1, end: 3 });
+});
+
+it('keeps a dormant region dormant when its stored interval collides with an active one', async () => {
+  const setZoom = vi.fn((_update: (zoom: QuickEditZoomState) => QuickEditZoomState) => undefined);
+  const ref = { current: null as ReturnType<typeof useReviewZoomEditor> | null };
+  const mixed: QuickEditZoomState = {
+    enabled: true,
+    regions: [
+      {
+        id: 'z',
+        start: 0.5,
+        end: 5.5,
+        transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+        dormant: true,
+      },
+      {
+        id: 'a',
+        start: 4,
+        end: 6,
+        transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+      },
+    ],
+  };
+  function Harness() {
+    ref.current = useReviewZoomEditor({
+      setZoom: setZoom as (update: (zoom: QuickEditZoomState) => QuickEditZoomState) => void,
+      zoom: mixed,
+      timelineDuration: 10,
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  const current = () => {
+    if (!ref.current) throw new Error('Editor hook did not mount.');
+    return ref.current;
+  };
+  // Inspector edit: revival refused, the stored dormant state stays untouched.
+  act(() => current().change('z', { scale: 3 }));
+  let result = apply(setZoom, mixed);
+  expect(result.regions[0]).toMatchObject({ dormant: true, transform: { scale: 1.5 } });
+  // Drag revival: the moved interval would overlap the active neighbor.
+  act(() => current().commitDrag('z', { start: 1, end: 6 }, 'move'));
+  result = apply(setZoom, mixed);
+  expect(result.regions[0]).toMatchObject({ dormant: true, start: 0.5, end: 5.5 });
+  // A fitting edit revives: trimming the dormant region out of the overlap.
+  act(() => current().change('z', { end: 3.5 }));
+  result = apply(setZoom, mixed);
+  expect(result.regions[0]).toMatchObject({ dormant: false, start: 0.5, end: 3.5 });
+  // The occupied-playhead fallback points at the active region, not the dormant one.
+  act(() => current().add(5, 10));
+  expect(current().selection).toBe('a');
+});
+
 it('refuses a zoom at EOF and selects the existing region when the playhead is occupied', async () => {
   const setZoom = vi.fn((_update: (zoom: QuickEditZoomState) => QuickEditZoomState) => undefined);
   const ref = { current: null as ReturnType<typeof useReviewZoomEditor> | null };
@@ -136,7 +229,6 @@ it('refuses a zoom at EOF and selects the existing region when the playhead is o
   function Harness() {
     ref.current = useReviewZoomEditor({
       setZoom: setZoom as (update: (zoom: QuickEditZoomState) => QuickEditZoomState) => void,
-      background: { enabled: false },
       zoom: zoomRef.current,
       timelineDuration: 10,
     });

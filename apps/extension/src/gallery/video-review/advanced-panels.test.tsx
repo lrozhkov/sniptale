@@ -44,7 +44,6 @@ function Harness() {
   ) => setAdvanced((current) => ({ ...current, background: update(current.background) }));
   const zoom = useReviewZoomEditor({
     setZoom: (update) => setAdvanced((current) => ({ ...current, zoom: update(current.zoom) })),
-    background: advanced.background,
     zoom: advanced.zoom,
     timelineDuration: 10,
   });

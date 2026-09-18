@@ -10,7 +10,8 @@ import { importAudioAsset, importedAudioClip } from '../../workflows/video-revie
 export function useReviewVoiceoverRecording(args: {
   video: RefObject<HTMLVideoElement | null>;
   time: number;
-  sourceDuration: number;
+  resultDuration: number;
+  toOutputTime(source: number): number | null;
   audio: ReturnType<typeof useReviewAudio>;
   guard(): boolean;
   flushAdvanced(): Promise<void>;
@@ -37,15 +38,12 @@ export function useReviewVoiceoverRecording(args: {
     /** The shared recorder already trims the file, so placement is take start + trim offset. */
     save: async (file: File, trim: AudioTrimRange, signal: AbortSignal) => {
       if (signal.aborted) return;
+      const at = args.toOutputTime((takeStart ?? args.time) + trim.trimStart);
+      if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
       const imported = await importAudioAsset(file);
       signal.throwIfAborted();
       args.audio.addImported(
-        importedAudioClip(
-          imported.assetId,
-          imported.duration,
-          (takeStart ?? args.time) + trim.trimStart,
-          args.sourceDuration
-        ),
+        importedAudioClip(imported.assetId, imported.duration, at, args.resultDuration),
         'voiceover',
         imported.duration
       );
@@ -90,7 +88,9 @@ export function useReviewEditorAudio(args: {
   busy: boolean;
   canStart: () => boolean;
   time: number;
-  timelineDuration: number;
+  resultDuration: number;
+  toOutputTime(source: number): number | null;
+  onCutPlacement(): void;
   video: RefObject<HTMLVideoElement | null>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   flushAdvanced(): Promise<void>;
@@ -99,15 +99,15 @@ export function useReviewEditorAudio(args: {
   const guard = () => !args.busy && args.canStart();
   const onImportAudioFile = (file: File, timelineTime?: number) => {
     if (!guard()) return;
+    const at = timelineTime ?? args.toOutputTime(args.time);
+    if (at === null) {
+      args.onCutPlacement();
+      return;
+    }
     void args.run(async () => {
       const imported = await importAudioAsset(file);
       args.audio.addImported(
-        importedAudioClip(
-          imported.assetId,
-          imported.duration,
-          timelineTime ?? args.time,
-          args.timelineDuration
-        ),
+        importedAudioClip(imported.assetId, imported.duration, at, args.resultDuration),
         'music',
         imported.duration
       );
@@ -116,7 +116,8 @@ export function useReviewEditorAudio(args: {
   const voiceover = useReviewVoiceoverRecording({
     video: args.video,
     time: args.time,
-    sourceDuration: args.timelineDuration,
+    resultDuration: args.resultDuration,
+    toOutputTime: args.toOutputTime,
     audio: args.audio,
     guard,
     flushAdvanced: args.flushAdvanced,

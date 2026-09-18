@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type {
   QuickEditAdvancedState,
-  QuickEditBackgroundSettings,
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import {
@@ -16,14 +15,115 @@ import {
 
 type ZoomState = QuickEditAdvancedState['zoom'];
 
+/** A revived placement must fit among active neighbors or it stays dormant. */
+function fitsActiveWindow(zoom: ZoomState, id: string, start: number, end: number) {
+  if (!(start < end)) return false;
+  return !zoom.regions.some(
+    (other) => !other.dormant && other.id !== id && start < other.end && end > other.start
+  );
+}
+
+/** Bounded region changes; a colliding dormant placement keeps its stored values. */
+function applyZoomChange(
+  timelineDuration: number,
+  zoom: ZoomState,
+  id: string,
+  patch: QuickEditZoomRegionPatch
+): ZoomState {
+  const originalRegion = zoom.regions.find((region) => region.id === id);
+  if (!originalRegion) return zoom;
+  let regions = zoom.regions;
+  if (patch.start !== undefined) {
+    const start = patch.start;
+    regions = regions.map((region) => {
+      if (region.id !== id) return region;
+      const range = trimQuickEditZoomRegion({
+        regions,
+        id,
+        edge: 'start',
+        time: start,
+        timelineDuration,
+      });
+      if (!fitsActiveWindow(zoom, id, range.start, region.end)) return region;
+      return { ...region, start: range.start, dormant: false };
+    });
+  }
+  if (patch.end !== undefined) {
+    const end = patch.end;
+    regions = regions.map((region) => {
+      if (region.id !== id) return region;
+      const range = trimQuickEditZoomRegion({
+        regions,
+        id,
+        edge: 'end',
+        time: end,
+        timelineDuration,
+      });
+      if (!fitsActiveWindow(zoom, id, region.start, range.end)) return region;
+      return { ...region, end: range.end, dormant: false };
+    });
+  }
+  const { start: _startPatch, end: _endPatch, ...rest } = patch;
+  // Any user-authored edit proves result-time intent and revives a dormant
+  // placement, unless its stored interval collides with an active neighbor.
+  const updated = updateQuickEditZoomRegion(regions, id, rest);
+  const revived = updated.find((region) => region.id === id);
+  regions =
+    revived && fitsActiveWindow(zoom, id, revived.start, revived.end)
+      ? updated.map((region) => (region.id === id ? { ...region, dormant: false } : region))
+      : updated.map((region) => (region.id === id ? originalRegion : region));
+  return { ...zoom, regions };
+}
+
+/** Drag commits follow the same revival rules as inspector changes. */
+function applyZoomCommit(
+  timelineDuration: number,
+  zoom: ZoomState,
+  id: string,
+  range: { start: number; end: number },
+  edge: 'start' | 'end' | 'move'
+): ZoomState {
+  const region = zoom.regions.find((item) => item.id === id);
+  if (!region) return zoom;
+  if (edge === 'move') {
+    const moved = moveQuickEditZoomRegion({
+      regions: zoom.regions,
+      id,
+      requestedStart: range.start,
+      timelineDuration,
+    });
+    if (!fitsActiveWindow(zoom, id, moved.start, moved.end)) return zoom;
+    return {
+      ...zoom,
+      regions: zoom.regions.map((item) =>
+        item.id === id ? { ...item, ...moved, dormant: false } : item
+      ),
+    };
+  }
+  const trimmed = trimQuickEditZoomRegion({
+    regions: zoom.regions,
+    id,
+    edge,
+    time: edge === 'start' ? range.start : range.end,
+    timelineDuration,
+  });
+  if (!fitsActiveWindow(zoom, id, trimmed.start, trimmed.end)) return zoom;
+  return {
+    ...zoom,
+    regions: zoom.regions.map((item) =>
+      item.id === id ? { ...item, start: trimmed.start, end: trimmed.end, dormant: false } : item
+    ),
+  };
+}
+
 /** One zoom-editing workflow owner: region selection, updates, and the stage focus overlay. */
 export function useReviewZoomEditor(args: {
   setZoom(update: (zoom: ZoomState) => ZoomState): void;
-  background: QuickEditBackgroundSettings;
   zoom: ZoomState;
   timelineDuration: number;
 }) {
   const [selection, setSelection] = useState<string | null>(null);
+  // A revived placement must fit among active neighbors or it stays dormant.
   const add = (at: number, timelineDuration: number) => {
     const range = availableQuickEditZoomRange({
       regions: args.zoom.regions,
@@ -33,7 +133,9 @@ export function useReviewZoomEditor(args: {
     if (!range) {
       // Occupied playhead: point the editor at the existing region instead of
       // inserting an overlapping one; EOF refuses silently.
-      const existing = args.zoom.regions.find((region) => at >= region.start && at < region.end);
+      const existing = args.zoom.regions.find(
+        (region) => !region.dormant && at >= region.start && at < region.end
+      );
       if (existing) setSelection(existing.id);
       return;
     }
@@ -63,73 +165,16 @@ export function useReviewZoomEditor(args: {
       regions: updateQuickEditZoomRegion(zoom.regions, id, { centerX: 0.5, centerY: 0.5 }),
     }));
   const change = (id: string, patch: QuickEditZoomRegionPatch) =>
-    args.setZoom((zoom) => {
-      let regions = zoom.regions;
-      if (patch.start !== undefined) {
-        const start = patch.start;
-        regions = regions.map((region) => {
-          if (region.id !== id) return region;
-          const range = trimQuickEditZoomRegion({
-            regions,
-            id,
-            edge: 'start',
-            time: start,
-            timelineDuration: args.timelineDuration,
-          });
-          return { ...region, start: range.start };
-        });
-      }
-      if (patch.end !== undefined) {
-        const end = patch.end;
-        regions = regions.map((region) => {
-          if (region.id !== id) return region;
-          const range = trimQuickEditZoomRegion({
-            regions,
-            id,
-            edge: 'end',
-            time: end,
-            timelineDuration: args.timelineDuration,
-          });
-          return { ...region, end: range.end };
-        });
-      }
-      const { start: _startPatch, end: _endPatch, ...rest } = patch;
-      return { ...zoom, regions: updateQuickEditZoomRegion(regions, id, rest) };
-    });
+    args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch));
   const commitDrag = (
     id: string,
     range: { start: number; end: number },
     edge: 'start' | 'end' | 'move'
-  ) =>
-    args.setZoom((zoom) => ({
-      ...zoom,
-      regions: zoom.regions.map((region) => {
-        if (region.id !== id) return region;
-        if (edge === 'move')
-          return {
-            ...region,
-            ...moveQuickEditZoomRegion({
-              regions: zoom.regions,
-              id,
-              requestedStart: range.start,
-              timelineDuration: args.timelineDuration,
-            }),
-          };
-        const trimmed = trimQuickEditZoomRegion({
-          regions: zoom.regions,
-          id,
-          edge,
-          time: edge === 'start' ? range.start : range.end,
-          timelineDuration: args.timelineDuration,
-        });
-        return { ...region, start: trimmed.start, end: trimmed.end };
-      }),
-    }));
+  ) => args.setZoom((zoom) => applyZoomCommit(args.timelineDuration, zoom, id, range, edge));
   const selected = (zoom: ZoomState): QuickEditZoomRegion | null =>
     zoom.regions.find((item) => item.id === selection) ?? null;
   const focusOverlay = (region: QuickEditZoomRegion) => ({
     camera: region.transform,
-    background: args.background,
     onDrag: (point: { x: number; y: number }) =>
       change(region.id, { centerX: point.x, centerY: point.y }),
   });

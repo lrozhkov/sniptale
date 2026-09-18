@@ -24,7 +24,9 @@ import { useReviewAdvanced } from './use-advanced';
 import { ReviewEditActions } from './edit-actions';
 import { useReviewPlayback } from './use-playback';
 import { useReviewEdits } from './use-edits';
-import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
+import { commitReviewEdit } from './use-edits';
+import { useReviewTimeMap } from './use-review-time';
 import { ReviewAdvancedPanels } from './advanced-panels';
 import { useCanvasComments } from './use-canvas-comments';
 import { useReviewAudio } from './use-review-audio';
@@ -226,27 +228,28 @@ function useReviewEditorState(resource: LoadedReview) {
   const exporter = useReviewExport(resource);
   const advancedState = useReviewAdvanced(session);
   const advanced = advancedState.advanced;
+  const features = useMemo(() => resolveQuickEditEffectiveState(advanced), [advanced]);
   const [selection, setSelection] = useState<ReviewAnchor>(
     composer.annotation?.anchor ?? { kind: 'point', time: 0 }
   );
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
   const { busy, setBusy, message, setMessage, run } = useReviewActionStatus();
-  const zoom = useReviewZoomEditor({
-    setZoom: advancedState.setZoom,
-    background: advanced.background,
-    zoom: advanced.zoom,
-    timelineDuration: source.duration,
-  });
   const { video, time, onTime, playing, setPlaying, seek, play } = useReviewPlayback({
     duration: source.duration,
     edits: snapshot.document.edits,
-    original: advanced.audio.original,
+    original: features.originalAudio,
     boundaries: () => (cuts.cutting ? exporter.index?.boundaries : undefined),
     onSeek: (next) => {
       if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
     },
     onFailure: () => setMessage(translate('gallery.videoReview.playbackFailed')),
+  });
+  const timeline = useReviewTimeMap(source, snapshot.document.edits, time);
+  const zoom = useReviewZoomEditor({
+    setZoom: advancedState.setZoom,
+    zoom: advanced.zoom,
+    timelineDuration: timeline.resultDuration,
   });
   const cuts = useReviewEdits({
     duration: source.duration,
@@ -256,21 +259,16 @@ function useReviewEditorState(resource: LoadedReview) {
     onInvalid: () => setMessage(translate('gallery.videoReview.invalidEditRange')),
     seek: (value) => seek(value),
     setSelection,
-    commit: async (before, after) => {
-      if (busy || exporter.phase !== 'idle' || !canStart()) return false;
-      let committed = false;
-      await run(async () => {
-        await session.commit({
-          id: crypto.randomUUID(),
-          at: Date.now(),
-          target: 'edit',
-          before,
-          after,
-        });
-        committed = true;
-      });
-      return committed;
-    },
+    commit: (before, after) =>
+      commitReviewEdit({
+        session,
+        run,
+        busy,
+        exporterPhase: exporter.phase,
+        canStart,
+        before,
+        after,
+      }),
   });
   const { cutting, setCutting } = cuts;
   const editing = { ...cuts, exporter };
@@ -332,6 +330,8 @@ function useReviewEditorState(resource: LoadedReview) {
     setHovered,
     telemetry,
     advanced,
+    features,
+    timeline,
     setMode: advancedState.setMode,
     setTrackVisibility: advancedState.setTrackVisibility,
     zoom,
@@ -599,13 +599,15 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
   const audio = useReviewAudio({
     audio: state.advanced.audio,
     setAudio: state.setAudio,
-    timelineDuration: state.source.duration,
+    timelineDuration: state.timeline.resultDuration,
   });
   const { onImportAudioFile, voiceover } = useReviewEditorAudio({
     busy: state.busy,
     canStart: state.canStart,
     time: state.time,
-    timelineDuration: state.source.duration,
+    resultDuration: state.timeline.resultDuration,
+    toOutputTime: state.timeline.toOutputTime,
+    onCutPlacement: () => setMessage(translate('gallery.videoReview.placementOnCut')),
     video: state.video,
     run: state.run,
     flushAdvanced: state.flushAdvanced,
@@ -634,6 +636,8 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     selected,
     telemetry,
     advanced,
+    features,
+    timeline,
     setMode,
     setTrackVisibility,
     zoom,
@@ -646,7 +650,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     add,
     displayRegion,
   } = state;
-  const features = useMemo(() => resolveQuickEditEffectiveFeatures(advanced), [advanced]);
+  const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
   return (
     <div
       className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_360px] max-[799px]:grid-cols-1
@@ -660,15 +664,13 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           video={video}
           drawing={!!composer.annotation && !playing && !busy}
           region={displayRegion}
-          zoom={features.zoomTrackVisible ? advanced.zoom : null}
-          zoomOverlay={(() => {
-            const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
-            return zoomRegion ? zoom.focusOverlay(zoomRegion) : undefined;
-          })()}
+          zoomRegions={features.zoomRegions}
+          background={features.background}
+          outputTime={timeline.sceneOutputTime}
+          zoomOverlay={zoomRegion ? zoom.focusOverlay(zoomRegion) : undefined}
           comments={snapshot.document.canvasComments}
           canvasComments={canvasComments}
           time={time}
-          background={advanced.background}
           busy={busy}
           onRegion={(region) => {
             if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
@@ -698,6 +700,10 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           selection={selection}
           setSelection={setSelection}
           advanced={advanced}
+          resultDuration={timeline.resultDuration}
+          outputTime={timeline.outputTime}
+          toOutputTime={timeline.toOutputTime}
+          onCutPlacement={() => setMessage(translate('gallery.videoReview.placementOnCut'))}
           setMode={setMode}
           setTrackVisibility={setTrackVisibility}
           telemetryAvailable={!!resource.telemetry}

@@ -6,6 +6,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Участок должен содержать хотя бы один ключевой интервал, не пересекать другие правки и не удалять всё видео.',
     en: 'Choose at least one keyframe interval, without overlapping other edits or removing the entire video.',
   },
+  placementOnCut: {
+    ru: 'Плейхед на вырезанном участке — переместите его на сохранённый отрезок, чтобы разместить эффект или звук.',
+    en: 'The playhead is on a removed part — move it to a kept segment to place the effect or audio.',
+  },
   commentRange: { ru: 'Комментарий к интервалу', en: 'Comment on interval' },
   commentsEmpty: { ru: 'Пока нет комментариев', en: 'No comments yet' },
   commentPlaceholder: {

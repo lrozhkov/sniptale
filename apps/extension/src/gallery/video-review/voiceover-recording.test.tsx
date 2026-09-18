@@ -82,6 +82,7 @@ function renderHookHarness(props: {
   guard: () => boolean;
   time?: { current: number };
   flushAdvanced?: () => Promise<void>;
+  toOutputTime?: (source: number) => number | null;
 }) {
   let latest!: RecordingApi;
   const node = {
@@ -97,7 +98,8 @@ function renderHookHarness(props: {
     latest = useReviewVoiceoverRecording({
       video,
       time: props.time?.current ?? 3,
-      sourceDuration: 10,
+      resultDuration: 10,
+      toOutputTime: props.toOutputTime ?? ((source: number) => source),
       audio,
       guard: props.guard,
       flushAdvanced: props.flushAdvanced ?? (async () => undefined),
@@ -158,7 +160,8 @@ it('rejects sync start when the source playback fails', async () => {
     latest = useReviewVoiceoverRecording({
       video,
       time: 1,
-      sourceDuration: 4,
+      resultDuration: 4,
+      toOutputTime: (source: number) => source,
       audio,
       guard: () => true,
       flushAdvanced: async () => undefined,
@@ -207,6 +210,38 @@ it('places the take at its start plus the trim offset after the transport advanc
     2
   );
   expect(flushAdvanced).toHaveBeenCalledOnce();
+});
+
+it('places the take through the output-time map (R03)', async () => {
+  const harness = renderHookHarness({ guard: () => true, toOutputTime: (t) => t - 2 });
+  act(() => harness.latest.open());
+  await act(async () =>
+    harness.latest.save(
+      new File(['a'], 'a.webm'),
+      { trimStart: 1, trimEnd: 3 },
+      new AbortController().signal
+    )
+  );
+  expect(harness.audio.addImported).toHaveBeenCalledWith(
+    expect.objectContaining({ atTime: 2, timelineDuration: 10 }),
+    'voiceover',
+    2
+  );
+});
+
+it('refuses the take when its start was removed by the cuts (R03)', async () => {
+  const harness = renderHookHarness({ guard: () => true, toOutputTime: () => null });
+  act(() => harness.latest.open());
+  await expect(
+    act(async () =>
+      harness.latest.save(
+        new File(['a'], 'a.webm'),
+        { trimStart: 1, trimEnd: 3 },
+        new AbortController().signal
+      )
+    )
+  ).rejects.toThrow('gallery.videoReview.placementOnCut');
+  expect(harness.audio.addImported).not.toHaveBeenCalled();
 });
 
 it('rejects the save when the import fails so the take stays available (V2)', async () => {

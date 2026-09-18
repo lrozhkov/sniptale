@@ -1,6 +1,6 @@
 import type { ReviewAnchor, ReviewEdit } from './types';
 
-interface ReviewTimeSegment {
+export interface ReviewTimeSegment {
   sourceStart: number;
   sourceEnd: number;
   resultStart: number;

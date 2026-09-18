@@ -21,9 +21,14 @@ export function ReviewStage(props: {
   video: RefObject<HTMLVideoElement | null>;
   drawing: boolean;
   region: ReviewRegion | undefined;
+  /** One scene: applied background and the camera at the represented frame. */
+  scene?: {
+    background: QuickEditBackgroundSettings;
+    camera: QuickEditCameraTransform;
+  };
+  /** Handle target for the selected zoom region, independent from the playhead camera. */
   zoom?: {
     camera: QuickEditCameraTransform;
-    background: QuickEditBackgroundSettings;
     onDrag(point: { x: number; y: number }): void;
   };
   comments?: {
@@ -66,18 +71,27 @@ export function ReviewStage(props: {
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   });
+  const sceneLayout = props.scene
+    ? computeQuickEditSceneLayout({
+        output: size,
+        source: props.source,
+        background: props.scene.background,
+        camera: props.scene.camera,
+      })
+    : null;
   const zoomLayout = props.zoom
     ? computeQuickEditSceneLayout({
         output: size,
         source: props.source,
-        background: props.zoom.background,
+        background: props.scene?.background ?? { enabled: false },
         camera: props.zoom.camera,
       })
     : null;
-  const backgroundPaint = props.zoom?.background.enabled
-    ? backgroundPaintOf(props.zoom.background)
+  const backgroundPaint = props.scene?.background.enabled
+    ? backgroundPaintOf(props.scene.background)
     : null;
-  const content = zoomLayout ? zoomLayout.videoRect : fitVideoRect(size, props.source);
+  // Drawing maps into the represented pixels, so the post-camera rect is authoritative.
+  const content = sceneLayout ? sceneLayout.videoTransform : fitVideoRect(size, props.source);
   const plane = useReviewDrawingPlane({
     drawing: props.drawing,
     content,
@@ -108,10 +122,10 @@ export function ReviewStage(props: {
       style={{
         cursor: props.drawing ? 'crosshair' : 'default',
         touchAction: props.drawing ? 'none' : 'auto',
-        ...(backgroundPaint && props.zoom?.background.enabled
+        ...(backgroundPaint && props.scene?.background.enabled
           ? {
               background: backgroundPaint,
-              borderRadius: props.zoom.background.layout.cornerRadius,
+              borderRadius: props.scene.background.layout.cornerRadius,
             }
           : {}),
       }}
@@ -120,35 +134,21 @@ export function ReviewStage(props: {
       onPointerUp={plane.onPointerUp}
       onPointerCancel={plane.onPointerCancel}
     >
-      <video
-        ref={props.video}
-        src={props.url}
-        controls={false}
-        playsInline
-        preload="metadata"
-        className="pointer-events-none absolute inset-0 h-full w-full object-contain"
-        onLoadedMetadata={props.onReady}
-        onTimeUpdate={(event) => props.onTime(event.currentTarget.currentTime)}
-        onPlay={() => props.onPlaying(true)}
-        onPause={() => props.onPlaying(false)}
-        onEnded={() => props.onPlaying(false)}
+      <ReviewSceneVideo
+        url={props.url}
+        video={props.video}
+        {...(props.scene ? { scene: props.scene } : {})}
+        layout={sceneLayout}
+        drawing={props.drawing}
+        projected={projected}
+        onReady={props.onReady}
+        onTime={props.onTime}
+        onPlaying={props.onPlaying}
         onError={props.onError}
       />
       {props.comments && props.comments.items.length ? (
-        <ReviewCommentOverlay
-          comments={props.comments.items}
-          output={size}
-          source={props.source}
-          background={props.comments.background}
-          camera={props.comments.camera}
-          time={props.comments.time}
-          selectedId={props.comments.selectedId}
-          busy={props.comments.busy}
-          onSelect={props.comments.onSelect}
-          onMove={props.comments.onMove}
-        />
+        <ReviewStageComments comments={props.comments} output={size} source={props.source} />
       ) : null}
-      {projected ? <ReviewRegionOverlay drawing={props.drawing} projected={projected} /> : null}
       {zoomFocus && props.zoom && zoomLayout ? (
         <ReviewZoomTarget
           focus={zoomFocus}
@@ -162,7 +162,120 @@ export function ReviewStage(props: {
   );
 }
 
-function ReviewRegionOverlay(props: { drawing: boolean; projected: ReviewRegion }) {
+/** Overlay comment stack using the shared scene geometry. */
+function ReviewStageComments(props: {
+  comments: {
+    items: readonly CanvasComment[];
+    time: number;
+    background: QuickEditBackgroundSettings;
+    camera: QuickEditCameraTransform | null;
+    selectedId: string | null;
+    busy: boolean;
+    onSelect(id: string): void;
+    onMove(id: string, position: { x: number; y: number }): void;
+  };
+  output: { width: number; height: number };
+  source: ReviewSource;
+}) {
+  return (
+    <ReviewCommentOverlay
+      comments={props.comments.items}
+      output={props.output}
+      source={props.source}
+      background={props.comments.background}
+      camera={props.comments.camera}
+      time={props.comments.time}
+      selectedId={props.comments.selectedId}
+      busy={props.comments.busy}
+      onSelect={props.comments.onSelect}
+      onMove={props.comments.onMove}
+    />
+  );
+}
+
+/** One composition-space video: fitted inside the padded content rect, cropped by the clip. */
+function ReviewSceneVideo(props: {
+  url: string;
+  video: RefObject<HTMLVideoElement | null>;
+  scene?: {
+    background: QuickEditBackgroundSettings;
+    camera: QuickEditCameraTransform;
+  };
+  layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
+  drawing: boolean;
+  projected: ReviewRegion | null;
+  onReady(): void;
+  onTime(time: number): void;
+  onPlaying(value: boolean): void;
+  onError(): void;
+}) {
+  const clip = props.scene?.background.enabled ? props.scene.background.layout : null;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: props.layout?.contentRect.x ?? 0,
+        top: props.layout?.contentRect.y ?? 0,
+        width: props.layout?.contentRect.width ?? undefined,
+        height: props.layout?.contentRect.height ?? undefined,
+        overflow: 'hidden',
+        borderRadius: clip?.cornerRadius,
+      }}
+    >
+      <video
+        ref={props.video}
+        src={props.url}
+        controls={false}
+        playsInline
+        preload="metadata"
+        className="pointer-events-none"
+        style={
+          props.layout
+            ? {
+                position: 'absolute',
+                left: props.layout.videoTransform.x - props.layout.contentRect.x,
+                top: props.layout.videoTransform.y - props.layout.contentRect.y,
+                width: props.layout.videoTransform.width,
+                height: props.layout.videoTransform.height,
+                maxWidth: 'none',
+                pointerEvents: 'none',
+              }
+            : {
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                pointerEvents: 'none',
+              }
+        }
+        onLoadedMetadata={props.onReady}
+        onTimeUpdate={(event) => props.onTime(event.currentTarget.currentTime)}
+        onPlay={() => props.onPlaying(true)}
+        onPause={() => props.onPlaying(false)}
+        onEnded={() => props.onPlaying(false)}
+        onError={props.onError}
+      />
+      {props.projected ? (
+        <ReviewRegionOverlay
+          drawing={props.drawing}
+          offset={
+            props.layout
+              ? { x: props.layout.contentRect.x, y: props.layout.contentRect.y }
+              : { x: 0, y: 0 }
+          }
+          projected={props.projected}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function ReviewRegionOverlay(props: {
+  drawing: boolean;
+  offset: { x: number; y: number };
+  projected: ReviewRegion;
+}) {
   return (
     <div
       aria-label={translate('gallery.videoReview.selectedRegion')}
@@ -170,8 +283,8 @@ function ReviewRegionOverlay(props: { drawing: boolean; projected: ReviewRegion 
           absolute border-2 border-[var(--sniptale-color-accent)]
           bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_12%,transparent)]`}
       style={{
-        left: props.projected.x,
-        top: props.projected.y,
+        left: props.projected.x - props.offset.x,
+        top: props.projected.y - props.offset.y,
         width: props.projected.width,
         height: props.projected.height,
       }}

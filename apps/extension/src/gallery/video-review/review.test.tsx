@@ -3,6 +3,7 @@ import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
+import { parseReviewOperation } from '../../features/video/review/validation';
 import type { ReviewAnchor } from '../../features/video/review/types';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -404,6 +405,90 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(fixture.snapshot.workspace.advanced.zoom.regions[0]!.transform.scale).toBe(2);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('places new zoom regions in result time after cuts and speed changes (R03)', async () => {
+  const history = [
+    parseReviewOperation(
+      {
+        id: 'edit-cut-1',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut-1', start: 0, end: 1, requestedStart: 0, requestedEnd: 1, kind: 'cut' },
+      },
+      4
+    )!,
+    parseReviewOperation(
+      {
+        id: 'edit-speed-1',
+        at: 2,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'speed-1',
+          start: 1,
+          end: 2,
+          requestedStart: 1,
+          requestedEnd: 2,
+          kind: 'speed',
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+      4
+    )!,
+  ].filter((operation) => operation !== null);
+  const fixture = createEditorFixture(integration, { history });
+  const { root, host, click } = fixture;
+  try {
+    await act(async () =>
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    // Result of cut [0,1) + speed [1,2)x2 + keep [2,4): 2.5 s; source 3 sits at 1.5.
+    await dragTimePlane(host, 300);
+    await click('advancedEditing');
+    await click('zoomTrack');
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]).toMatchObject({
+      start: 1.5,
+      end: 2.5,
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('refuses a zoom placement while the playhead is on a removed part (R03)', async () => {
+  const history = [
+    parseReviewOperation(
+      {
+        id: 'edit-cut-1',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut-1', start: 0, end: 1, requestedStart: 0, requestedEnd: 1, kind: 'cut' },
+      },
+      4
+    )!,
+  ].filter((operation) => operation !== null);
+  const fixture = createEditorFixture(integration, { history });
+  const { root, host, click } = fixture;
+  try {
+    await act(async () =>
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await dragTimePlane(host, 50);
+    await click('advancedEditing');
+    await click('zoomTrack');
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(0);
+    expect(host.textContent).toContain('gallery.videoReview.placementOnCut');
   } finally {
     await fixture.cleanup();
   }

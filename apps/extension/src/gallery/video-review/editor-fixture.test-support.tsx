@@ -14,6 +14,7 @@ import type {
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
 } from '../../composition/persistence/review-workspaces/store';
+import type { ReviewOperation } from '../../features/video/review/types';
 
 interface EditorFixtureIntegration {
   load: ReturnType<typeof vi.fn>;
@@ -81,7 +82,7 @@ function stubReviewDom() {
   return { show, close, createUrl, revokeUrl, clipboard };
 }
 
-function stubReviewSession(integration: EditorFixtureIntegration) {
+function stubReviewSession(integration: EditorFixtureIntegration, history: ReviewOperation[]) {
   let snapshot: VideoWorkspaceSnapshot = {
     workspace: {
       aggregateId: 'recording:r',
@@ -89,37 +90,41 @@ function stubReviewSession(integration: EditorFixtureIntegration) {
       formatVersion: 1,
       source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 },
       revision: 1,
-      cursor: 0,
+      cursor: history.length,
       advanced: createQuickEditAdvancedState(),
-      history: [],
+      history: [...history],
       createdAt: 1,
       updatedAt: 1,
     },
     draft: null,
   };
-  integration.load.mockImplementation(async () => ({
-    source: snapshot.workspace.source,
-    snapshot: structuredClone(snapshot),
-    file: new File(['video'], 'video.webm'),
-    filename: 'video.webm',
-    telemetry: {
-      captureMode: 'tab',
-      viewport: { width: 320, height: 180 },
-      actionEvents: [],
-      cursorTrack: null,
-      signals: [
-        { id: 'idle', kind: 'cursor-idle', startTime: 2, endTime: 3, point: null, data: {} },
-        {
-          id: 'warning',
-          kind: 'static-frame',
-          startTime: 0,
-          endTime: 0,
-          point: null,
-          data: { code: 'unavailable' },
-        },
-      ],
-    },
-  }));
+  integration.load.mockImplementation(async () => {
+    if (process.env['DEBUG_FIXTURE'])
+      console.log('fixture history', JSON.stringify(snapshot.workspace.history));
+    return {
+      source: snapshot.workspace.source,
+      snapshot: structuredClone(snapshot),
+      file: new File(['video'], 'video.webm'),
+      filename: 'video.webm',
+      telemetry: {
+        captureMode: 'tab',
+        viewport: { width: 320, height: 180 },
+        actionEvents: [],
+        cursorTrack: null,
+        signals: [
+          { id: 'idle', kind: 'cursor-idle', startTime: 2, endTime: 3, point: null, data: {} },
+          {
+            id: 'warning',
+            kind: 'static-frame',
+            startTime: 0,
+            endTime: 0,
+            point: null,
+            data: { code: 'unavailable' },
+          },
+        ],
+      },
+    };
+  });
   integration.draft.mockImplementation(
     async (args: Parameters<typeof saveVideoWorkspaceDraft>[0]) => {
       snapshot = {
@@ -191,10 +196,13 @@ function stubReviewSession(integration: EditorFixtureIntegration) {
   };
 }
 
-export function createEditorFixture(integration: EditorFixtureIntegration) {
+export function createEditorFixture(
+  integration: EditorFixtureIntegration,
+  options?: { history?: readonly ReviewOperation[] }
+) {
   integration.index.mockRejectedValue(new Error('No safe index'));
   const { show, close, createUrl, revokeUrl, clipboard } = stubReviewDom();
-  const session = stubReviewSession(integration);
+  const session = stubReviewSession(integration, [...(options?.history ?? [])]);
   const host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);

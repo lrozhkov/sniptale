@@ -1,5 +1,11 @@
 import type { ReviewDocument } from '../types';
-import type { QuickEditAdvancedState } from './types';
+import type {
+  QuickEditAdvancedState,
+  QuickEditAudioClip,
+  QuickEditBackgroundSettings,
+  QuickEditOriginalAudio,
+  QuickEditZoomRegion,
+} from './types';
 
 interface QuickEditEffectiveFeatures {
   mode: 'basic' | 'advanced';
@@ -43,6 +49,35 @@ export type QuickEditExportBlocker =
   | 'voiceover'
   | 'music'
   | 'original-audio';
+
+/**
+ * Applied configuration for stage, mixer, and exporter: every render/audio branch
+ * consumes this instead of the stored state or lane visibility.
+ */
+interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
+  zoomRegions: readonly QuickEditZoomRegion[];
+  background: QuickEditBackgroundSettings;
+  originalAudio: QuickEditOriginalAudio;
+  voiceover: readonly QuickEditAudioClip[];
+  music: readonly QuickEditAudioClip[];
+}
+
+/** Derives the applied configuration without mutating the stored document. */
+export function resolveQuickEditEffectiveState(
+  state: QuickEditAdvancedState
+): QuickEditEffectiveState {
+  const advanced = state.ui.mode === 'advanced';
+  return {
+    ...resolveQuickEditEffectiveFeatures(state),
+    zoomRegions: (advanced && state.zoom.enabled ? state.zoom.regions : []).filter(
+      (region) => !region.dormant
+    ),
+    background: advanced ? state.background : { enabled: false },
+    originalAudio: advanced ? state.audio.original : { muted: false, volume: 1 },
+    voiceover: (advanced ? state.audio.voiceover : []).filter((clip) => !clip.dormant),
+    music: (advanced ? state.audio.music : []).filter((clip) => !clip.dormant),
+  };
+}
 
 type QuickEditExportSupport =
   | { ok: true }

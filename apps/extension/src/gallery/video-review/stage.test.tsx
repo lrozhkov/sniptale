@@ -40,11 +40,12 @@ afterEach(async () => {
 });
 
 const source = { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 };
+const identity: QuickEditCameraTransform = { scale: 1, centerX: 0.5, centerY: 0.5 };
+const disabled: QuickEditBackgroundSettings = { enabled: false };
 
-const renderStage = (zoom: {
-  camera: QuickEditCameraTransform;
-  background: QuickEditBackgroundSettings;
-  onDrag: (point: { x: number; y: number }) => void;
+const renderStage = (props: {
+  scene?: { background: QuickEditBackgroundSettings; camera: QuickEditCameraTransform };
+  zoom?: { camera: QuickEditCameraTransform; onDrag: (point: { x: number; y: number }) => void };
 }) => {
   act(() => {
     root.render(
@@ -54,7 +55,8 @@ const renderStage = (zoom: {
         video={{ current: null }}
         drawing={false}
         region={undefined}
-        zoom={zoom}
+        {...(props.scene ? { scene: props.scene } : {})}
+        {...(props.zoom ? { zoom: props.zoom } : {})}
         onRegion={vi.fn()}
         onReady={vi.fn()}
         onTime={vi.fn()}
@@ -64,7 +66,7 @@ const renderStage = (zoom: {
     );
   });
   return {
-    target: host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomTarget"]')!,
+    video: host.querySelector('video')!,
     event: async (target: Element, kind: string, x: number, y: number) =>
       act(async () => {
         target.dispatchEvent(
@@ -74,13 +76,70 @@ const renderStage = (zoom: {
   };
 };
 
+it('applies the scene camera transform to the video element (R05)', async () => {
+  const stage = renderStage({
+    scene: { background: disabled, camera: { scale: 2, centerX: 0.5, centerY: 0.5 } },
+  });
+  // Fitted rect for an 800x450 host and a 320x180 source fills the host; a 2x
+  // camera scales the video around the focus and crops to the content rect.
+  expect(stage.video.style.left).toBe('-400px');
+  expect(stage.video.style.top).toBe('-225px');
+  expect(stage.video.style.width).toBe('1600px');
+  expect(stage.video.style.height).toBe('900px');
+  expect(stage.video.style.maxWidth).toBe('none');
+});
+
+it('paints the scene background and crops the video to the content rect', async () => {
+  const stage = renderStage({
+    scene: {
+      background: {
+        enabled: true,
+        type: 'solid',
+        color: '#112233ff',
+        layout: { padding: 40, cornerRadius: 12 },
+      },
+      camera: identity,
+    },
+  });
+  const stageNode = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  expect(stageNode.style.background).toBe('rgb(17, 34, 51)');
+  const clip = stage.video.parentElement!;
+  expect(clip.style.left).toBe('40px');
+  expect(clip.style.top).toBe('40px');
+  expect(clip.style.width).toBe('720px');
+  expect(clip.style.height).toBe('370px');
+  expect(clip.style.overflow).toBe('hidden');
+  // Fitted video inside the padded content rect (letterboxed horizontally).
+  const left = Number(stage.video.style.left.replace('px', ''));
+  const width = Number(stage.video.style.width.replace('px', ''));
+  expect(left).toBeCloseTo(31.11, 1);
+  expect(Number(stage.video.style.top.replace('px', ''))).toBeCloseTo(0, 6);
+  expect(width).toBeCloseTo(657.78, 1);
+  expect(Number(stage.video.style.height.replace('px', ''))).toBeCloseTo(370, 6);
+});
+
+it('keeps the scene applied when the zoom selection is absent (R05)', async () => {
+  const stage = renderStage({
+    scene: { background: disabled, camera: { scale: 2, centerX: 0.3, centerY: 0.4 } },
+  });
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]')).toBeNull();
+  expect(stage.video.style.width).toBe('1600px');
+});
+
+it('keeps the identity scene for basic mode without advanced content', async () => {
+  const stage = renderStage({ scene: { background: disabled, camera: identity } });
+  expect(stage.video.style.left).toBe('0px');
+  expect(stage.video.style.top).toBe('0px');
+  expect(stage.video.style.width).toBe('800px');
+  expect(stage.video.style.height).toBe('450px');
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]')).toBeNull();
+});
+
 it('maps canvas target drags into normalized content points and restores on escape', async () => {
   const onDrag = vi.fn((_point: { x: number; y: number }) => undefined);
-  const background: QuickEditBackgroundSettings = { enabled: false };
   const stage = renderStage({
-    camera: { scale: 2, centerX: 0.3, centerY: 0.4 },
-    background,
-    onDrag,
+    scene: { background: disabled, camera: identity },
+    zoom: { camera: { scale: 2, centerX: 0.3, centerY: 0.4 }, onDrag },
   });
   const target = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomTarget"]')!;
   Object.assign(target, {
@@ -101,57 +160,4 @@ it('maps canvas target drags into normalized content points and restores on esca
   await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(onDrag).toHaveBeenLastCalledWith({ x: 0.3, y: 0.4 });
   await stage.event(target, 'pointerup', bounds.left + 400, bounds.top + 180);
-});
-
-it('paints the canvas background behind the fitted video when enabled', async () => {
-  const background: QuickEditBackgroundSettings = {
-    enabled: true,
-    type: 'solid',
-    color: '#112233ff',
-    layout: { padding: 40, cornerRadius: 12 },
-  };
-  act(() => {
-    root.render(
-      <ReviewStage
-        url="blob:review"
-        source={source}
-        video={{ current: null }}
-        drawing={false}
-        region={undefined}
-        zoom={{
-          camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
-          background,
-          onDrag: vi.fn(),
-        }}
-        onRegion={vi.fn()}
-        onReady={vi.fn()}
-        onTime={vi.fn()}
-        onPlaying={vi.fn()}
-        onError={vi.fn()}
-      />
-    );
-  });
-  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
-  expect(stage.style.background).toBe('rgb(17, 34, 51)');
-  expect(stage.style.borderRadius).toBe('12px');
-});
-
-it('renders nothing interactive while the zoom selection is absent', async () => {
-  act(() => {
-    root.render(
-      <ReviewStage
-        url="blob:review"
-        source={source}
-        video={{ current: null }}
-        drawing={false}
-        region={undefined}
-        onRegion={vi.fn()}
-        onReady={vi.fn()}
-        onTime={vi.fn()}
-        onPlaying={vi.fn()}
-        onError={vi.fn()}
-      />
-    );
-  });
-  expect(host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]')).toBeNull();
 });

@@ -1,6 +1,9 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 1;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 2;
+
+/** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
+export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
 
 export interface QuickEditTrackVisibility {
   actions: boolean;
@@ -36,6 +39,8 @@ export interface QuickEditZoomRegion {
   transform: QuickEditCameraTransform;
   enter: QuickEditZoomTransition;
   exit: QuickEditZoomTransition;
+  /** Kept but not applied: its interval could not be proven in result time. */
+  dormant?: boolean;
 }
 
 export interface QuickEditZoomState {
@@ -74,6 +79,8 @@ export type QuickEditBackgroundSettings =
 export interface QuickEditAudioClip {
   id: string;
   assetId: string;
+  /** Kept but not applied: its start could not be proven in result time. */
+  dormant?: boolean;
   timelineStart: number;
   sourceOffset: number;
   duration: number;
@@ -101,4 +108,6 @@ export interface QuickEditAdvancedState {
   zoom: QuickEditZoomState;
   background: QuickEditBackgroundSettings;
   audio: QuickEditAudioState;
+  /** Raw v1 payload retained by the deterministic load-time migration. */
+  recoveryV1?: string;
 }

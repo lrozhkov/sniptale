@@ -358,6 +358,98 @@ it('opens legacy workspaces with advanced defaults and persists explicit replace
   expect(reopened.workspace.advanced).toEqual(advanced);
 });
 
+it('migrates a v1 advanced payload on load and keeps the workspace writable (R03)', async () => {
+  rows.get('video_workspaces')!.set(id, {
+    aggregateId: id,
+    sourceAssetId: 'beta-v1-recording-asset',
+    formatVersion: 1,
+    source,
+    revision: 1,
+    cursor: 2,
+    history: [
+      {
+        id: 'edit-cut-1',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut-1', start: 0, end: 2, requestedStart: 0, requestedEnd: 2, kind: 'cut' },
+      },
+      {
+        id: 'edit-speed-1',
+        at: 2,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'speed-1',
+          start: 2,
+          end: 6,
+          requestedStart: 2,
+          requestedEnd: 6,
+          kind: 'speed',
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+    ],
+    createdAt: 1,
+    updatedAt: 1,
+    advanced: {
+      schemaVersion: 1,
+      ui: { mode: 'advanced', tracks: { actions: true, zoom: true, audio: true } },
+      zoom: {
+        enabled: true,
+        regions: [
+          {
+            id: 'z2',
+            start: 0.5,
+            end: 1.5,
+            transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'none', duration: 0 },
+            exit: { type: 'none', duration: 0 },
+          },
+          {
+            id: 'z1',
+            start: 8,
+            end: 10,
+            transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'ease-in-out', duration: 0.3 },
+            exit: { type: 'ease-in-out', duration: 0.3 },
+          },
+        ],
+      },
+      background: { enabled: false },
+      audio: { original: { muted: false, volume: 1 }, voiceover: [], music: [] },
+    },
+  });
+  const opened = await openVideoWorkspace(id, source);
+  expect(opened.workspace.advanced.schemaVersion).toBe(2);
+  expect(opened.workspace.advanced.zoom.regions[0]).toMatchObject({
+    start: 0.5,
+    end: 1.5,
+    dormant: true,
+  });
+  expect(opened.workspace.advanced.zoom.regions[1]).toMatchObject({
+    start: 4,
+    end: 6,
+    dormant: false,
+  });
+  // Every write re-validates the migrated record: dormant source coords stay exempt.
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced: opened.workspace.advanced,
+  });
+  expect(saved.workspace.advanced.zoom.regions).toHaveLength(2);
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: saved.workspace.revision,
+    operation,
+  });
+  expect(committed.workspace.history).toHaveLength(3);
+});
+
 it('rejects stale or malformed advanced saves without touching the record', async () => {
   const opened = await openVideoWorkspace(id, source);
   await expect(

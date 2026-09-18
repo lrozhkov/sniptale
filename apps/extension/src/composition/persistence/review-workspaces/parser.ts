@@ -1,5 +1,6 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { replayReviewHistory } from '../../../features/video/review/document';
+import { buildReviewTimeMap } from '../../../features/video/review/timeline';
 import {
   parseReviewAnnotation,
   parseReviewOperation,
@@ -43,12 +44,20 @@ export function parseVideoWorkspace(value: unknown): VideoWorkspace | null {
     ids.add(operation.id);
     history.push(operation);
   }
+  let document;
   try {
     replayReviewHistory(history, history.length, source);
+    document = replayReviewHistory(history, value['cursor'], source);
   } catch {
     return null;
   }
-  const advanced = loadQuickEditAdvancedState(value['advanced']);
+  let segments;
+  try {
+    segments = buildReviewTimeMap(source.duration, document.edits);
+  } catch {
+    return null;
+  }
+  const advanced = loadQuickEditAdvancedState(value['advanced'], segments);
   if (!advanced) return null;
   return {
     aggregateId: value['aggregateId'],

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -16,10 +16,13 @@ import { ReviewButton, reviewTimeLabel } from './controls';
 
 type ZoomTrackProps = {
   duration: number;
-  time: number;
+  /** Result-time playhead; absent while the source point was removed by a cut. */
+  time: number | null;
   regions: readonly QuickEditZoomRegion[];
   edits: readonly ReviewEdit[];
   boundaries: readonly number[] | undefined;
+  /** Source-to-result projection; removed source points return null. */
+  toOutputTime(source: number): number | null;
   selectedId: string | null;
   onSelect(id: string | null): void;
   onAdd(): void;
@@ -56,9 +59,8 @@ function zoomDragRange(args: {
   duration: number;
   widthPx: number;
   bypass: boolean;
-  edits: readonly ReviewEdit[];
-  playhead: number;
-  boundaries: readonly number[] | undefined;
+  /** Result-time candidates: projected edit/boundary edges plus the playhead. */
+  snapEdges: readonly number[];
   regions: readonly QuickEditZoomRegion[];
 }): { start: number; end: number; guide: number | null } {
   const { region, duration } = args;
@@ -66,10 +68,10 @@ function zoomDragRange(args: {
   const candidates = args.bypass
     ? []
     : getSnapCandidates({
-        edits: args.edits,
-        playhead: args.playhead,
-        zoomRegions: args.regions,
-        ...(args.boundaries ? { boundaries: args.boundaries } : {}),
+        edits: [],
+        playhead: null,
+        zoomRegions: args.regions.filter((region) => !region.dormant),
+        boundaries: args.snapEdges,
       }).filter((value) => value !== region.start && value !== region.end);
   if (args.edge === 'move') {
     const freeStart = Math.max(0, Math.min(duration - args.length, region.start + args.delta));
@@ -141,6 +143,21 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   }, []);
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : { start: region.start, end: region.end };
+  const { edits, boundaries, time, toOutputTime } = props;
+  // One result-time candidate set: source edit/boundary edges projected, removed points dropped.
+  const snapEdges = useMemo(() => {
+    const values = new Set<number>();
+    for (const value of edits.flatMap((edit) => [edit.start, edit.end])) {
+      const projected = toOutputTime(value);
+      if (projected !== null) values.add(projected);
+    }
+    for (const value of boundaries ?? []) {
+      const projected = toOutputTime(value);
+      if (projected !== null) values.add(projected);
+    }
+    if (time !== null) values.add(time);
+    return [...values].sort((a, b) => a - b);
+  }, [edits, boundaries, time, toOutputTime]);
   return (
     <div
       data-ui="gallery.videoReview.zoomLane"
@@ -157,6 +174,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
         <ReviewZoomRegionBlock
           key={region.id}
           {...props}
+          snapEdges={snapEdges}
           region={region}
           range={shownRange(region)}
           selected={props.selectedId === region.id}
@@ -165,6 +183,15 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
           onGuide={setGuide}
         />
       ))}
+      {props.time !== null ? (
+        <div
+          aria-hidden="true"
+          data-zoom-playhead="true"
+          className="pointer-events-none absolute inset-y-0 z-10 w-px
+              bg-[var(--sniptale-color-accent)]"
+          style={{ left: percent(props.time, props.duration) }}
+        />
+      ) : null}
       {guide !== null ? (
         <div
           aria-hidden="true"
@@ -199,11 +226,12 @@ function ReviewZoomRegionBlock(
     range: { start: number; end: number };
     selected: boolean;
     drag: React.RefObject<ZoomDragState | null>;
+    snapEdges: readonly number[];
     onPreview(range: { start: number; end: number } | null): void;
     onGuide(guide: number | null): void;
   }
 ) {
-  const { region, duration, onPreview, onGuide } = props;
+  const { region, duration, snapEdges, onPreview, onGuide } = props;
   const label =
     `${translate('gallery.videoReview.zoomRegionLabel')} ` +
     `${reviewTimeLabel(region.start)} – ${reviewTimeLabel(region.end)}`;
@@ -257,9 +285,7 @@ function ReviewZoomRegionBlock(
           duration,
           widthPx: current.width,
           bypass: event.shiftKey,
-          edits: props.edits,
-          playhead: props.time,
-          boundaries: props.boundaries,
+          snapEdges,
           regions: props.regions,
         });
         onGuide(next.guide);

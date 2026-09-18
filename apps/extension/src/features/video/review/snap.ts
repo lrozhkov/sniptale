@@ -10,7 +10,7 @@ export const SNAP_THRESHOLD_PX = 8;
  */
 export function getSnapCandidates(source: {
   edits: readonly ReviewEdit[];
-  playhead: number;
+  playhead: number | null;
   boundaries?: readonly number[];
   zoomRegions?: readonly QuickEditZoomRegion[];
 }): number[] {
@@ -24,7 +24,7 @@ export function getSnapCandidates(source: {
     values.add(edit.start);
     values.add(edit.end);
   }
-  values.add(source.playhead);
+  if (source.playhead !== null) values.add(source.playhead);
   return [...values].sort((a, b) => a - b);
 }
 

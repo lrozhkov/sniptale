@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Gradient } from '@sniptale/foundation/paint';
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedState } from './validation';
+import { buildReviewTimeMap } from '../timeline';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION, type QuickEditAdvancedState } from './types';
 
 const gradient: Gradient = {
@@ -69,6 +70,77 @@ it('migrates absent legacy state to defaults at the single load point', () => {
   expect(loadQuickEditAdvancedState(undefined)).toEqual(createQuickEditAdvancedState());
 });
 
+describe('migrates v1 source-time placements to result time (R03)', () => {
+  const segments = buildReviewTimeMap(12, [
+    { id: 'cut-1', start: 0, end: 2, requestedStart: 0, requestedEnd: 2, kind: 'cut' },
+    {
+      id: 'speed-1',
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      kind: 'speed',
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+
+  it('migrates a v1 payload through the conversion segments', () => {
+    const legacy: unknown = {
+      ...structuredClone(advanced()),
+      schemaVersion: 1,
+      zoom: {
+        enabled: true,
+        regions: [
+          {
+            id: 'zoom-1',
+            start: 8,
+            end: 10,
+            transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'ease-in-out', duration: 0.3 },
+            exit: { type: 'ease-in-out', duration: 0.3 },
+          },
+        ],
+      },
+      audio: {
+        ...structuredClone(advanced()).audio,
+        voiceover: [audioClip('v1')],
+      },
+    };
+    const migrated = loadQuickEditAdvancedState(legacy, segments);
+    expect(migrated?.schemaVersion).toBe(2);
+    expect(migrated?.zoom.regions[0]).toMatchObject({ start: 4, end: 6 });
+    // Source 2 maps to the start of the sped segment at result time 0.
+    expect(migrated?.audio.voiceover[0]).toMatchObject({ timelineStart: 0 });
+    expect(JSON.parse(migrated?.recoveryV1 ?? '')).toMatchObject({ schemaVersion: 1 });
+  });
+
+  it('round-trips the migrated payload without re-migrating', () => {
+    const legacy: unknown = {
+      ...structuredClone(advanced()),
+      schemaVersion: 1,
+    };
+    const migrated = loadQuickEditAdvancedState(legacy, segments);
+    expect(loadQuickEditAdvancedState(structuredClone(migrated), segments)).toEqual(migrated);
+  });
+
+  it('refuses v1 payloads without conversion segments', () => {
+    const legacy: unknown = { ...structuredClone(advanced()), schemaVersion: 1 };
+    expect(loadQuickEditAdvancedState(legacy)).toBeNull();
+  });
+
+  it('keeps a partially removed region dormant instead of collapsing it', () => {
+    const legacy: unknown = {
+      ...structuredClone(advanced()),
+      schemaVersion: 1,
+    };
+    const migrated = loadQuickEditAdvancedState(legacy, segments);
+    // Region z1 starts inside the removed [0,2) span; the converted pair is
+    // degenerate, so the stored interval is retained verbatim.
+    expect(migrated?.zoom.regions[0]).toMatchObject({ start: 1, end: 4 });
+  });
+});
+
 it('parses a canonical round trip unchanged', () => {
   const value = advanced();
   expect(loadQuickEditAdvancedState(structuredClone(value))).toEqual(value);
@@ -117,7 +189,7 @@ describe('rejects malformed persisted state', () => {
     expect(loadQuickEditAdvancedState(null)).toBeNull();
     expect(loadQuickEditAdvancedState('state')).toBeNull();
     expect(
-      loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 2 })
+      loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 3 })
     ).toBeNull();
     expect(
       loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 0 })
