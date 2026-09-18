@@ -203,7 +203,8 @@ it('places the take at its start plus the trim offset after the transport advanc
       atTime: 4,
       timelineDuration: 10,
     }),
-    'voiceover'
+    'voiceover',
+    2
   );
   expect(flushAdvanced).toHaveBeenCalledOnce();
 });

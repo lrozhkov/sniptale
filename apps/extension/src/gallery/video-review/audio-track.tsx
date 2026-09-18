@@ -14,7 +14,7 @@ import type {
   QuickEditOriginalAudio,
 } from '../../features/video/review/advanced/types';
 import {
-  clampQuickEditAudioClip,
+  moveQuickEditAudioClip,
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
 import { ReviewButton } from './controls';
@@ -259,10 +259,7 @@ function ReviewAudioClipBlock(props: {
                   base.timelineStart + base.duration + delta,
                   props.duration
                 )
-              : clampQuickEditAudioClip(
-                  { ...base, timelineStart: base.timelineStart + delta },
-                  props.duration
-                );
+              : moveQuickEditAudioClip(base, base.timelineStart + delta, props.duration);
         props.onPreview({ timelineStart: next.timelineStart, duration: next.duration });
       }}
       onPointerUp={props.onCommit}

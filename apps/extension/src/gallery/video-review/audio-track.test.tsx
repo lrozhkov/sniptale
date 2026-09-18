@@ -209,3 +209,27 @@ it('trims the right edge through its drag handle', async () => {
   await send('pointerup', block, 100);
   expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 7);
 });
+
+it('keeps the preview duration while moving near the timeline end (A3)', async () => {
+  const lanes = renderTrack({
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('a1', 0, 2)],
+    music: [],
+  });
+  const lane = lanes[1]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  const send = (kind: string, x: number) =>
+    act(async () =>
+      block.dispatchEvent(
+        new MouseEvent(kind, { bubbles: true, clientX: x, clientY: 0, button: 0 })
+      )
+    );
+  await send('pointerdown', 0);
+  await send('pointermove', 1950);
+  expect(block.style.width).toBe('20%');
+  expect(block.style.left).toBe('80%');
+  await send('pointerup', 1950);
+  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 8);
+});

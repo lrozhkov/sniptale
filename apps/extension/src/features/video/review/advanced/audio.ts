@@ -58,27 +58,66 @@ export function clampQuickEditAudioClip(
   return { ...clip, timelineStart, duration };
 }
 
-/** Trims one timeline edge; a left trim advances into the asset instead of shortening it. */
+/** Fades never exceed the clip and share its length proportionally when it shrinks. */
+function normalizeFades(clip: QuickEditAudioClip): QuickEditAudioClip {
+  const sum = clip.fadeIn + clip.fadeOut;
+  const factor = sum > clip.duration && sum > 0 ? clip.duration / sum : 1;
+  return { ...clip, fadeIn: clip.fadeIn * factor, fadeOut: clip.fadeOut * factor };
+}
+
+/**
+ * Bounded edge trim: a left trim advances into the asset instead of inventing
+ * audio before the file, and a right trim is bounded by the known asset length
+ * as well as the timeline. Without a known asset duration only the timeline
+ * bounds apply.
+ */
 export function trimQuickEditAudioClip(
   clip: QuickEditAudioClip,
   edge: 'start' | 'end',
   timelineTime: number,
-  timelineDuration: number
+  timelineDuration: number,
+  assetDuration?: number
 ): QuickEditAudioClip {
   if (edge === 'start') {
-    const nextStart = clamp(timelineTime, 0, clip.timelineStart + clip.duration - MIN_CLIP_SECONDS);
+    const minStart =
+      assetDuration === undefined ? 0 : Math.max(0, clip.timelineStart - clip.sourceOffset);
+    const nextStart = clamp(
+      timelineTime,
+      minStart,
+      clip.timelineStart + clip.duration - MIN_CLIP_SECONDS
+    );
     const shift = nextStart - clip.timelineStart;
-    return clampQuickEditAudioClip(
-      updateQuickEditAudioClip(clip, {
-        timelineStart: nextStart,
-        sourceOffset: clip.sourceOffset + shift,
-        duration: clip.duration - shift,
-      }),
-      timelineDuration
+    return normalizeFades(
+      clampQuickEditAudioClip(
+        {
+          ...clip,
+          timelineStart: nextStart,
+          sourceOffset: clip.sourceOffset + shift,
+          duration: clip.duration - shift,
+        },
+        timelineDuration
+      )
     );
   }
-  const duration = Math.max(MIN_CLIP_SECONDS, timelineTime - clip.timelineStart);
-  return clampQuickEditAudioClip(updateQuickEditAudioClip(clip, { duration }), timelineDuration);
+  const assetMax =
+    assetDuration === undefined
+      ? Infinity
+      : Math.max(MIN_CLIP_SECONDS, assetDuration - clip.sourceOffset);
+  const maxDuration = Math.min(assetMax, timelineDuration - clip.timelineStart);
+  const duration = clamp(timelineTime - clip.timelineStart, MIN_CLIP_SECONDS, maxDuration);
+  return normalizeFades(clampQuickEditAudioClip({ ...clip, duration }, timelineDuration));
+}
+
+/** Moving never trims: the requested start clamps to the free timeline window. */
+export function moveQuickEditAudioClip(
+  clip: QuickEditAudioClip,
+  requestedStart: number,
+  timelineDuration: number
+): QuickEditAudioClip {
+  return {
+    ...clip,
+    timelineStart: clamp(requestedStart, 0, Math.max(0, timelineDuration - clip.duration)),
+  };
 }
 
 /** Preview and export share one original-audio gate: speed muting wins over the original flag. */

@@ -124,6 +124,9 @@ function cameraProgress(
   phase: 'enter' | 'exit'
 ): number {
   const transition = region[phase];
+  // A none transition never consumes region time: the camera holds its target
+  // from the start (enter) or until the region actually ends (exit).
+  if (transition.type === 'none') return 1;
   const boundary = phase === 'enter' ? region.start : region.end - transition.duration;
   if (transition.duration <= 0) return 1;
   if (phase === 'exit') {
@@ -132,6 +135,23 @@ function cameraProgress(
   }
   if (timelineTime >= region.start + transition.duration) return 1;
   return easing((timelineTime - region.start) / transition.duration, transition.type);
+}
+
+/**
+ * Over-long enter/exit pairs normalize proportionally into the region so the
+ * camera always reaches its target; only evaluation changes, never the stored
+ * region. Returns the effective transition durations for this region length.
+ */
+function normalizeQuickEditZoomTransitions(region: QuickEditZoomRegion): {
+  enter: number;
+  exit: number;
+} {
+  const sum = region.enter.duration + region.exit.duration;
+  const available = Math.max(0, region.end - region.start);
+  if (sum <= available || sum <= 0)
+    return { enter: region.enter.duration, exit: region.exit.duration };
+  const factor = available / sum;
+  return { enter: region.enter.duration * factor, exit: region.exit.duration * factor };
 }
 
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
@@ -146,9 +166,15 @@ export function evaluateQuickEditCameraAtTime(
 ): QuickEditCameraTransform {
   for (const region of regions) {
     if (timelineTime < region.start || timelineTime >= region.end) continue;
+    const normalized = normalizeQuickEditZoomTransitions(region);
+    const scaled: QuickEditZoomRegion = {
+      ...region,
+      enter: { ...region.enter, duration: normalized.enter },
+      exit: { ...region.exit, duration: normalized.exit },
+    };
     const progress = Math.min(
-      cameraProgress(region, timelineTime, 'enter'),
-      cameraProgress(region, timelineTime, 'exit')
+      cameraProgress(scaled, timelineTime, 'enter'),
+      cameraProgress(scaled, timelineTime, 'exit')
     );
     return {
       scale: lerp(1, region.transform.scale, progress),

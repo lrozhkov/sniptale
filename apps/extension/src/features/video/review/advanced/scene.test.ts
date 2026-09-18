@@ -226,3 +226,29 @@ describe('evaluateQuickEditCameraAtTime', () => {
     expect(evaluateQuickEditCameraAtTime(adjacent, 2)).toEqual(adjacent[1]!.transform);
   });
 });
+
+it('holds a none exit at the target until the region actually ends (Z5)', () => {
+  const held = [
+    region({
+      start: 0,
+      end: 2,
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0.3 },
+    }),
+  ];
+  expect(evaluateQuickEditCameraAtTime(held, 1.8)).toEqual(held[0]!.transform);
+  expect(evaluateQuickEditCameraAtTime(held, 2)).toEqual({ scale: 1, centerX: 0.5, centerY: 0.5 });
+});
+
+it('normalizes over-long transitions so a short region reaches its target (Z4)', () => {
+  const short = [
+    region({
+      start: 0,
+      end: 0.1,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'ease-in-out', duration: 0.3 },
+      exit: { type: 'ease-in-out', duration: 0.3 },
+    }),
+  ];
+  expect(evaluateQuickEditCameraAtTime(short, 0.05)).toEqual(short[0]!.transform);
+});

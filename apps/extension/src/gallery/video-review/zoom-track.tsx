@@ -3,7 +3,10 @@ import { Plus } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
-import { clampQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import {
+  moveQuickEditZoomRegion,
+  trimQuickEditZoomRegion,
+} from '../../features/video/review/advanced/zoom';
 import {
   SNAP_THRESHOLD_PX,
   getSnapCandidates,
@@ -20,7 +23,11 @@ type ZoomTrackProps = {
   selectedId: string | null;
   onSelect(id: string | null): void;
   onAdd(): void;
-  onDragCommit(id: string, range: { start: number; end: number }): void;
+  onDragCommit(
+    id: string,
+    range: { start: number; end: number },
+    edge: 'start' | 'end' | 'move'
+  ): void;
 };
 const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
 
@@ -37,8 +44,9 @@ interface ZoomDragState {
 }
 
 /**
- * Drag math for one zoom region: trim snaps only the dragged edge, a move keeps both
- * edges magnetic; own edges are excluded and the neighbor window is never violated.
+ * Drag math for one zoom region: a move picks one snap delta for both edges and
+ * keeps the region length, a trim snaps only the dragged edge, and the bounded
+ * trim/move helpers enforce the neighbor window.
  */
 function zoomDragRange(args: {
   edge: ZoomDragState['edge'];
@@ -54,41 +62,61 @@ function zoomDragRange(args: {
   regions: readonly QuickEditZoomRegion[];
 }): { start: number; end: number; guide: number | null } {
   const { region, duration } = args;
-  let start =
-    args.edge === 'end'
-      ? region.start
-      : Math.max(
-          0,
-          Math.min(duration - (args.edge === 'move' ? args.length : 0), region.start + args.delta)
-        );
-  let end =
-    args.edge === 'start'
-      ? region.end
-      : args.edge === 'move'
-        ? start + args.length
-        : Math.max(0, Math.min(duration, region.end + args.delta));
-  let guide: number | null = null;
-  if (!args.bypass) {
-    const threshold = (SNAP_THRESHOLD_PX * duration) / args.widthPx;
-    const candidates = getSnapCandidates({
-      edits: args.edits,
-      playhead: args.playhead,
-      zoomRegions: args.regions,
-      ...(args.boundaries ? { boundaries: args.boundaries } : {}),
-    }).filter((value) => value !== region.start && value !== region.end);
-    if (args.edge !== 'end') {
-      const snap = snapTimelineTime(start, candidates, threshold);
-      start = snap.time;
-      guide = snap.candidate;
-    }
-    if (args.edge !== 'start') {
-      const snap = snapTimelineTime(end, candidates, threshold);
-      end = snap.time;
-      guide = snap.candidate ?? guide;
-    }
+  const threshold = args.bypass ? 0 : (SNAP_THRESHOLD_PX * duration) / args.widthPx;
+  const candidates = args.bypass
+    ? []
+    : getSnapCandidates({
+        edits: args.edits,
+        playhead: args.playhead,
+        zoomRegions: args.regions,
+        ...(args.boundaries ? { boundaries: args.boundaries } : {}),
+      }).filter((value) => value !== region.start && value !== region.end);
+  if (args.edge === 'move') {
+    const freeStart = Math.max(0, Math.min(duration - args.length, region.start + args.delta));
+    const snappedStart = snapTimelineTime(freeStart, candidates, threshold);
+    const snappedEnd = snapTimelineTime(freeStart + args.length, candidates, threshold);
+    const startDistance =
+      snappedStart.candidate === null ? Infinity : Math.abs(snappedStart.time - freeStart);
+    const endDistance =
+      snappedEnd.candidate === null
+        ? Infinity
+        : Math.abs(snappedEnd.time - (freeStart + args.length));
+    const guidedStart =
+      startDistance <= endDistance ? snappedStart.time : snappedEnd.time - args.length;
+    const moved = moveQuickEditZoomRegion({
+      regions: args.regions,
+      id: region.id,
+      requestedStart: guidedStart,
+      timelineDuration: duration,
+    });
+    return {
+      start: moved.start,
+      end: moved.end,
+      guide: startDistance <= endDistance ? snappedStart.candidate : snappedEnd.candidate,
+    };
   }
-  const clamped = clampQuickEditZoomRegion(args.regions, region.id, start, end);
-  return { ...clamped, guide };
+  if (args.edge === 'start') {
+    const requested = region.start + args.delta;
+    const snap = snapTimelineTime(requested, candidates, threshold);
+    const range = trimQuickEditZoomRegion({
+      regions: args.regions,
+      id: region.id,
+      edge: 'start',
+      time: snap.time,
+      timelineDuration: duration,
+    });
+    return { ...range, guide: snap.candidate };
+  }
+  const requestedEnd = region.end + args.delta;
+  const snapEnd = snapTimelineTime(requestedEnd, candidates, threshold);
+  const rangeEnd = trimQuickEditZoomRegion({
+    regions: args.regions,
+    id: region.id,
+    edge: 'end',
+    time: snapEnd.time,
+    timelineDuration: duration,
+  });
+  return { ...rangeEnd, guide: snapEnd.candidate };
 }
 
 /** Zoom regions on their own lane; drags snap to shared candidates and never overlap. */
@@ -247,7 +275,7 @@ function ReviewZoomRegionBlock(
         onGuide(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        if (current?.moved) props.onDragCommit(current.id, current.range);
+        if (current?.moved) props.onDragCommit(current.id, current.range, current.edge);
       }}
       onPointerCancel={() => {
         props.drag.current = null;

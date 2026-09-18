@@ -46,7 +46,8 @@ export function useReviewVoiceoverRecording(args: {
           (takeStart ?? args.time) + trim.trimStart,
           args.sourceDuration
         ),
-        'voiceover'
+        'voiceover',
+        imported.duration
       );
       await args.flushAdvanced();
     },
@@ -107,7 +108,8 @@ export function useReviewEditorAudio(args: {
           timelineTime ?? args.time,
           args.timelineDuration
         ),
-        'music'
+        'music',
+        imported.duration
       );
     });
   };

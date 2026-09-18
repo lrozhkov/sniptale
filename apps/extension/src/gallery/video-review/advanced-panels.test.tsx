@@ -45,6 +45,8 @@ function Harness() {
   const zoom = useReviewZoomEditor({
     setZoom: (update) => setAdvanced((current) => ({ ...current, zoom: update(current.zoom) })),
     background: advanced.background,
+    zoom: advanced.zoom,
+    timelineDuration: 10,
   });
   return (
     <>
@@ -58,7 +60,7 @@ function Harness() {
           }))
         }
       />
-      <button type="button" aria-label="addZoom" onClick={() => zoom.add(0, 10)} />
+      <button type="button" aria-label="addZoom" onClick={() => zoom.add(3, 10)} />
       <ReviewAdvancedPanels advanced={advanced} zoom={zoom} setBackground={setBackground} />
     </>
   );

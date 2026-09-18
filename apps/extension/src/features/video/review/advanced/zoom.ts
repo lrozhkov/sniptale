@@ -104,3 +104,70 @@ export function insertQuickEditZoomRegion(
   if (index < 0) return [...regions, region];
   return [...regions.slice(0, index), region, ...regions.slice(index)];
 }
+
+/** A free slot at the playhead; occupied or EOF positions return null (no overlap insertion). */
+export function availableQuickEditZoomRange(args: {
+  regions: readonly QuickEditZoomRegion[];
+  at: number;
+  timelineDuration: number;
+  preferredLength?: number;
+}): { start: number; end: number } | null {
+  const preferredLength = args.preferredLength ?? DEFAULT_REGION_SECONDS;
+  if (
+    !Number.isFinite(args.at) ||
+    args.at < 0 ||
+    args.at >= args.timelineDuration ||
+    args.regions.some((region) => args.at >= region.start && args.at < region.end)
+  )
+    return null;
+  const nextStart =
+    args.regions.find((region) => region.start > args.at)?.start ?? args.timelineDuration;
+  const end = Math.min(args.at + preferredLength, nextStart, args.timelineDuration);
+  return end - args.at >= MIN_REGION_SECONDS ? { start: args.at, end } : null;
+}
+
+/** Moves a whole region, preserving its length and the neighbor ordering. */
+export function moveQuickEditZoomRegion(args: {
+  regions: readonly QuickEditZoomRegion[];
+  id: string;
+  requestedStart: number;
+  timelineDuration: number;
+}): { start: number; end: number } {
+  const index = args.regions.findIndex((region) => region.id === args.id);
+  const region = args.regions[index];
+  if (!region) return { start: args.requestedStart, end: args.requestedStart };
+  const length = region.end - region.start;
+  const windowStart = index > 0 ? args.regions[index - 1]!.end : 0;
+  const windowEnd =
+    index < args.regions.length - 1 ? args.regions[index + 1]!.start : args.timelineDuration;
+  const start = Math.max(windowStart, Math.min(args.requestedStart, windowEnd - length));
+  return { start, end: start + length };
+}
+
+/**
+ * Bounded edge trims: trimStart keeps the end fixed, trimEnd keeps the start fixed,
+ * and neither edge crosses a neighbor or collapses the region.
+ */
+export function trimQuickEditZoomRegion(args: {
+  regions: readonly QuickEditZoomRegion[];
+  id: string;
+  edge: 'start' | 'end';
+  time: number;
+  timelineDuration: number;
+}): { start: number; end: number } {
+  const index = args.regions.findIndex((region) => region.id === args.id);
+  const region = args.regions[index];
+  if (!region) return { start: 0, end: 0 };
+  const windowStart = index > 0 ? args.regions[index - 1]!.end : 0;
+  const windowEnd =
+    index < args.regions.length - 1 ? args.regions[index + 1]!.start : args.timelineDuration;
+  if (args.edge === 'start')
+    return {
+      start: Math.max(windowStart, Math.min(args.time, region.end - MIN_REGION_SECONDS)),
+      end: region.end,
+    };
+  return {
+    start: region.start,
+    end: Math.max(region.start + MIN_REGION_SECONDS, Math.min(args.time, windowEnd)),
+  };
+}

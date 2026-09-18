@@ -41,7 +41,11 @@ const edits: ReviewEdit[] = [];
 
 function renderTrack(
   regions: QuickEditZoomRegion[],
-  onDragCommit: (id: string, range: { start: number; end: number }) => void,
+  onDragCommit: (
+    id: string,
+    range: { start: number; end: number },
+    edge: 'start' | 'end' | 'move'
+  ) => void,
   onAdd = vi.fn()
 ) {
   act(() => {
@@ -100,7 +104,7 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   await track.event(first, 'pointerdown', 100);
   await track.event(first, 'pointermove', 200);
   await track.event(first, 'pointerup', 200);
-  expect(commit).toHaveBeenLastCalledWith('a', { start: 1, end: 3 });
+  expect(commit).toHaveBeenLastCalledWith('a', { start: 1, end: 3 }, 'move');
   const startEdge = second.querySelector('[data-zoom-edge="start"]')!;
   if (!(first instanceof HTMLElement) || !(second instanceof HTMLElement)) return;
   // Trim the start edge of the second region onto the first region's boundary (8px magnet).
@@ -108,13 +112,13 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   await track.event(second, 'pointermove', 195);
   expect(document.querySelector('[data-zoom-guide]')).not.toBeNull();
   await track.event(second, 'pointerup', 195);
-  expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 });
+  expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
   expect(document.querySelector('[data-zoom-guide]')).toBeNull();
   // The shift bypass releases the magnet; the clamp still keeps the window open.
   await track.event(startEdge, 'pointerdown', 400);
   await track.event(second, 'pointermove', 195, true);
   await track.event(second, 'pointerup', 195);
-  expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 });
+  expect(commit).toHaveBeenLastCalledWith('b', { start: 2, end: 6 }, 'start');
   expect(commit).toHaveBeenCalledTimes(3);
   // Escape cancels the transient drag without committing.
   await track.event(startEdge, 'pointerdown', 400);

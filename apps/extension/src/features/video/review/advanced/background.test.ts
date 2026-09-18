@@ -43,8 +43,24 @@ describe('updateQuickEditBackground', () => {
     });
   });
 
+  it('enables a ready default gradient when the paint switch has no stored gradient (B1)', () => {
+    const fromDisabled = updateQuickEditBackground({ enabled: false }, { type: 'gradient' });
+    if (!fromDisabled.enabled) throw new Error('expected enabled background');
+    expect(fromDisabled.type).toBe('gradient');
+    if (fromDisabled.type !== 'gradient') throw new Error('expected gradient');
+    expect(fromDisabled.gradient.stops).toHaveLength(2);
+    expect(fromDisabled.layout).toEqual({ padding: 40, cornerRadius: 24 });
+    const fromSolid = updateQuickEditBackground(solid, { type: 'gradient' });
+    if (!fromSolid.enabled) throw new Error('expected enabled background');
+    expect(fromSolid.type).toBe('gradient');
+    if (fromSolid.type !== 'gradient') throw new Error('expected gradient');
+    expect(fromSolid.gradient.stops.map((stop: { color: string }) => stop.color)).toEqual([
+      '#000000ff',
+      '#000000ff',
+    ]);
+  });
+
   it('switches to a gradient only with gradient data and keeps the layout', () => {
-    expect(updateQuickEditBackground(solid, { type: 'gradient' })).toEqual(solid);
     const next = updateQuickEditBackground(solid, {
       type: 'gradient',
       gradient: gradient as unknown as import('@sniptale/foundation/paint').Gradient,

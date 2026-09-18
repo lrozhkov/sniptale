@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import {
   clampQuickEditAudioClip,
   createQuickEditAudioClip,
+  moveQuickEditAudioClip,
   resolveOriginalAudioPlayback,
   trimQuickEditAudioClip,
   updateQuickEditAudioClip,
@@ -85,4 +86,75 @@ it('merges speed muting with the original audio gate for preview and export', ()
   });
   expect(resolveOriginalAudioPlayback({ muted: false, volume: 1 }, true).muted).toBe(true);
   expect(resolveOriginalAudioPlayback({ muted: true, volume: 1 }, false).muted).toBe(true);
+});
+
+it('bounds the left trim to the asset so it cannot invent source audio (A1)', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'a1',
+    assetId: 'asset:2',
+    timelineStart: 5,
+    duration: 2,
+    endMax: 20,
+  });
+  const bounded = trimQuickEditAudioClip(clip, 'start', 0, 20, 2);
+  expect(bounded.timelineStart).toBe(5);
+  expect(bounded.sourceOffset).toBe(0);
+  expect(bounded.duration).toBe(2);
+});
+
+it('bounds the right trim by the asset length (A2)', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'a1',
+    assetId: 'asset:2',
+    timelineStart: 5,
+    duration: 2,
+    endMax: 20,
+  });
+  const bounded = trimQuickEditAudioClip(clip, 'end', 20, 20, 2);
+  expect(bounded.duration).toBe(2);
+  expect(bounded.sourceOffset).toBe(0);
+  const opened = trimQuickEditAudioClip(
+    { ...clip, sourceOffset: 1, duration: 1 },
+    'start',
+    4,
+    20,
+    2
+  );
+  expect(opened.timelineStart).toBe(4);
+  expect(opened.sourceOffset).toBe(0);
+  expect(opened.duration).toBe(2);
+});
+
+it('keeps fades inside the clip while trimming', () => {
+  const clip = {
+    ...createQuickEditAudioClip({
+      id: 'a3',
+      assetId: 'asset:3',
+      timelineStart: 0,
+      duration: 2,
+      endMax: 20,
+    }),
+    fadeIn: 3,
+    fadeOut: 3,
+  };
+  const trimmed = trimQuickEditAudioClip(clip, 'end', 1, 20, 5);
+  expect(trimmed.duration).toBe(1);
+  expect(trimmed.fadeIn).toBeCloseTo(0.5, 6);
+  expect(trimmed.fadeOut).toBeCloseTo(0.5, 6);
+});
+
+it('moves a clip without changing its duration (A3)', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'a4',
+    assetId: 'asset:4',
+    timelineStart: 0,
+    duration: 2,
+    endMax: 20,
+  });
+  expect(moveQuickEditAudioClip(clip, 19.5, 20)).toEqual({
+    ...clip,
+    timelineStart: 18,
+  });
+  expect(moveQuickEditAudioClip(clip, -4, 20).timelineStart).toBe(0);
+  expect(moveQuickEditAudioClip(clip, -4, 20).duration).toBe(2);
 });

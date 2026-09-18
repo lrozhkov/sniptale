@@ -235,6 +235,8 @@ function useReviewEditorState(resource: LoadedReview) {
   const zoom = useReviewZoomEditor({
     setZoom: advancedState.setZoom,
     background: advanced.background,
+    zoom: advanced.zoom,
+    timelineDuration: source.duration,
   });
   const { video, time, onTime, playing, setPlaying, seek, play } = useReviewPlayback({
     duration: source.duration,

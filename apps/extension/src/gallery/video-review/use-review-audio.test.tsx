@@ -3,6 +3,10 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { useReviewAudio } from './use-review-audio';
+
+vi.mock('../../composition/persistence/media-library', () => ({
+  listMediaLibrary: vi.fn(async () => []),
+}));
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 import type { QuickEditAudioState } from '../../features/video/review/advanced/types';
 
@@ -71,4 +75,75 @@ it('owns selection, bounded clip mutations, and the original audio gate', async 
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   }
+});
+
+it('bounds trims to library-known asset durations and keeps moves duration-stable', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const { listMediaLibrary } = await import('../../composition/persistence/media-library');
+  vi.mocked(listMediaLibrary).mockResolvedValue([
+    {
+      id: 'item:2',
+      entityId: '2',
+      type: 'audio',
+      kind: 'audio',
+      filename: 'take.webm',
+      originalFilename: 'take.webm',
+      createdAt: 1,
+      updatedAt: 1,
+      size: 10,
+      mimeType: 'audio/webm',
+      width: null,
+      height: null,
+      duration: 2,
+      hasThumbnail: false,
+      imageContentState: null,
+      presentationRevision: null,
+      workspaceRevision: null,
+      sourceUrl: null,
+      sourceTitle: null,
+      sourceFavicon: null,
+      tags: [],
+      lifecycle: 'ready',
+      source: { kind: 'project-asset', projectAssetId: '2' },
+    },
+  ] as never);
+  const clipA = createQuickEditAudioClip({
+    id: 'a2',
+    assetId: 'project-asset:2',
+    timelineStart: 5,
+    duration: 2,
+    endMax: 20,
+  });
+  let audioState: QuickEditAudioState = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [clipA],
+  };
+  const setAudio = vi.fn((update: (audio: QuickEditAudioState) => QuickEditAudioState) => {
+    audioState = update(audioState);
+  });
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewAudio>;
+  function Harness() {
+    hook = useReviewAudio({ audio: audioState, setAudio, timelineDuration: 20 });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    act(() => hook.trimClip('music', 'a2', 'start', 0));
+    expect(audioState.music[0]!.timelineStart).toBe(5);
+    expect(audioState.music[0]!.duration).toBe(2);
+    act(() => hook.trimClip('music', 'a2', 'end', 20));
+    expect(audioState.music[0]!.duration).toBe(2);
+    act(() => hook.moveClip('music', 'a2', 19.5));
+    expect(audioState.music[0]!.timelineStart).toBe(18);
+    expect(audioState.music[0]!.duration).toBe(2);
+  } finally {
+    await act(async () => root.unmount());
+  }
+  vi.unstubAllGlobals();
 });

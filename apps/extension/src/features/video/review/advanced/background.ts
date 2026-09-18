@@ -1,4 +1,5 @@
 import type { Gradient } from '@sniptale/foundation/paint';
+import { createGradientPaint } from '@sniptale/foundation/paint';
 import type { QuickEditBackgroundLayout, QuickEditBackgroundSettings } from './types';
 
 /** Persisted layout bounds, matching the workspace validation. */
@@ -47,8 +48,14 @@ export function updateQuickEditBackground(
   if (type === 'gradient') {
     const gradient =
       patch.gradient ?? (active && active.type === 'gradient' ? active.gradient : null);
-    if (!gradient) return background;
-    return { enabled: true, type, gradient, layout };
+    if (gradient) return { enabled: true, type, gradient, layout };
+    // A paint switch must turn the background on even without stored gradient
+    // data: derive a ready two-stop default from the previous paint color.
+    const fallbackColor =
+      patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR);
+    const fallback = createGradientPaint(fallbackColor, () => crypto.randomUUID(), 'linear');
+    if (fallback.kind !== 'gradient') return { enabled: false };
+    return { enabled: true, type, gradient: fallback.gradient, layout };
   }
   return {
     enabled: true,

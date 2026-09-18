@@ -47,6 +47,8 @@ it('owns region selection, updates, and the stage focus overlay through one hook
     ref.current = useReviewZoomEditor({
       setZoom: setZoom as (update: (zoom: QuickEditZoomState) => QuickEditZoomState) => void,
       background: { enabled: false },
+      zoom: { ...createQuickEditAdvancedState().zoom },
+      timelineDuration: 10,
     });
     return null;
   }
@@ -82,8 +84,17 @@ it('owns region selection, updates, and the stage focus overlay through one hook
   act(() => current().change(added.regions[0]!.id, { scale: 2 }));
   expect(apply(setZoom, added).regions[0]!.transform.scale).toBe(2);
 
-  act(() => current().commitDrag(added.regions[0]!.id, { start: 2, end: 5 }));
-  expect(apply(setZoom, added).regions[0]).toMatchObject({ start: 2, end: 5 });
+  act(() => current().commitDrag(added.regions[0]!.id, { start: 2, end: 5 }, 'move'));
+  expect(apply(setZoom, added).regions[0]).toMatchObject({ start: 2, end: 4 });
+
+  act(() => current().change(added.regions[0]!.id, { start: 2 }));
+  expect(apply(setZoom, added).regions[0]!.start).toBe(2);
+
+  act(() => current().change(added.regions[0]!.id, { end: 4 }));
+  expect(apply(setZoom, added).regions[0]!.end).toBe(4);
+
+  act(() => current().commitDrag(added.regions[0]!.id, { start: 1, end: 5 }, 'start'));
+  expect(apply(setZoom, added).regions[0]!.start).toBe(1);
 
   act(() => current().remove(added.regions[0]!.id));
   expect(apply(setZoom, added).regions).toHaveLength(0);
@@ -97,6 +108,8 @@ it('keeps the selection when removing a different region', async () => {
     ref.current = useReviewZoomEditor({
       setZoom: setZoom as never,
       background: { enabled: false },
+      zoom: { ...createQuickEditAdvancedState().zoom },
+      timelineDuration: 10,
     });
     return null;
   }
@@ -114,4 +127,49 @@ it('keeps the selection when removing a different region', async () => {
   act(() => current().remove('b'));
   expect(current().selection).toBe('a');
   expect(apply(setZoom, zoomed).regions).toHaveLength(1);
+});
+
+it('refuses a zoom at EOF and selects the existing region when the playhead is occupied', async () => {
+  const setZoom = vi.fn((_update: (zoom: QuickEditZoomState) => QuickEditZoomState) => undefined);
+  const ref = { current: null as ReturnType<typeof useReviewZoomEditor> | null };
+  const zoomRef = { current: { ...createQuickEditAdvancedState().zoom } };
+  function Harness() {
+    ref.current = useReviewZoomEditor({
+      setZoom: setZoom as (update: (zoom: QuickEditZoomState) => QuickEditZoomState) => void,
+      background: { enabled: false },
+      zoom: zoomRef.current,
+      timelineDuration: 10,
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  const current = () => {
+    if (!ref.current) throw new Error('Editor hook did not mount.');
+    return ref.current;
+  };
+  let appliedCalls = 0;
+  const applyZoom = () => {
+    while (appliedCalls < setZoom.mock.calls.length) {
+      const update = setZoom.mock.calls[appliedCalls]![0] as (
+        zoom: QuickEditZoomState
+      ) => QuickEditZoomState;
+      zoomRef.current = update(zoomRef.current);
+      appliedCalls += 1;
+    }
+    return zoomRef.current;
+  };
+
+  act(() => current().add(10, 10));
+  expect(setZoom).not.toHaveBeenCalled();
+  expect(current().selection).toBeNull();
+
+  act(() => current().add(3, 10));
+  const first = applyZoom();
+  act(() => root.render(<Harness />));
+  expect(first.regions).toHaveLength(1);
+  const firstId = first.regions[0]!.id;
+  act(() => current().add(3.5, 10));
+  const second = applyZoom();
+  expect(second.regions).toHaveLength(1);
+  expect(current().selection).toBe(firstId);
 });
