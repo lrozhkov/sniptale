@@ -41,6 +41,25 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
+vi.mock('../../workflows/video-review/audio-import', () => ({
+  importAudioAsset: vi.fn(async () => ({ assetId: 'project-asset:drop', duration: 2 })),
+  importedAudioClip: (
+    assetId: string,
+    duration: number,
+    atTime: number,
+    timelineDuration: number
+  ) => ({
+    id: `audio-${assetId}`,
+    assetId,
+    timelineStart: Math.max(0, Math.min(atTime, Math.max(0, timelineDuration - 0.2))),
+    sourceOffset: 0,
+    duration,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  }),
+}));
 vi.mock('../shared/download', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/download')>()),
   downloadGalleryBlob: integration.download,
@@ -575,6 +594,36 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     await act(async () => mute.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
     expect(fixture.snapshot.workspace.advanced.audio.original.muted).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('imports a file dropped on the music lane at the drop point', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
+    await click('audioTrack');
+    const music = host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')[2]!;
+    vi.spyOn(music, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 32));
+    const file = new File([new Uint8Array(4)], 'song.mp3', { type: 'audio/mpeg' });
+    const dragEvent = (type: string, files: File[]) => {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 250 });
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { files, types: files.length ? ['Files'] : [] },
+      });
+      return event;
+    };
+    await act(async () => music.dispatchEvent(dragEvent('dragenter', [file])));
+    expect(music.getAttribute('data-drop-active')).toBe('true');
+    await act(async () => music.dispatchEvent(dragEvent('drop', [file])));
+    expect(music.getAttribute('data-drop-active')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    const musicClips = fixture.snapshot.workspace.advanced.audio.music;
+    expect(musicClips).toHaveLength(1);
+    expect(musicClips[0]!.timelineStart).toBeCloseTo(1.25, 5);
   } finally {
     await fixture.cleanup();
   }

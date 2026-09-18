@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type DragEvent,
+  type MutableRefObject,
+  type ReactNode,
+} from 'react';
 import { Mic, Plus, Volume2, VolumeX } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type {
@@ -14,6 +21,13 @@ import { ReviewButton } from './controls';
 import type { ReviewAudioLane } from './use-review-audio';
 
 const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
+
+/** A drag carries files when the payload list or the Files type is present. */
+function dragHasFiles(event: DragEvent<HTMLElement>) {
+  return (
+    event.dataTransfer.files.length > 0 || Array.from(event.dataTransfer.types).includes('Files')
+  );
+}
 
 interface AudioDragState {
   lane: ReviewAudioLane;
@@ -45,6 +59,7 @@ function ReviewAudioClipLane(props: {
   onSelect(id: string): void;
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
   onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
+  onDropFile?: (file: File, timelineTime: number) => void;
   trailing?: ReactNode;
 }) {
   const [preview, setPreview] = useState<{
@@ -52,6 +67,8 @@ function ReviewAudioClipLane(props: {
     timelineStart: number;
     duration: number;
   } | null>(null);
+  const [dropHover, setDropHover] = useState(false);
+  const dropDepth = useRef(0);
   const drag = useRef<AudioDragState | null>(null);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
@@ -61,6 +78,8 @@ function ReviewAudioClipLane(props: {
       event.stopImmediatePropagation();
       drag.current = null;
       setPreview(null);
+      dropDepth.current = 0;
+      setDropHover(false);
       if (current.node.hasPointerCapture(current.pointerId))
         current.node.releasePointerCapture(current.pointerId);
     };
@@ -79,10 +98,54 @@ function ReviewAudioClipLane(props: {
       props.onTrimClip(current.lane, current.id, 'end', shown.timelineStart + shown.duration);
     else props.onMoveClip(current.lane, current.id, shown.timelineStart);
   };
+  const drop = props.onDropFile;
   return (
     <div
       data-ui="gallery.videoReview.audioLane"
-      className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]"
+      {...(drop
+        ? {
+            'data-drop-active': dropHover ? 'true' : undefined,
+            className: `relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] ${
+              dropHover
+                ? 'outline-2 outline-offset-[-1px] outline-[var(--sniptale-color-border-accent-strong)]'
+                : ''
+            }`,
+            onDragEnter: (event: DragEvent<HTMLDivElement>) => {
+              if (props.busy || !dragHasFiles(event)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              dropDepth.current += 1;
+              setDropHover(true);
+            },
+            onDragOver: (event: DragEvent<HTMLDivElement>) => {
+              if (props.busy || !dragHasFiles(event)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.dataTransfer.dropEffect = 'copy';
+            },
+            onDragLeave: (event: DragEvent<HTMLDivElement>) => {
+              if (dropDepth.current === 0) return;
+              event.preventDefault();
+              dropDepth.current = Math.max(0, dropDepth.current - 1);
+              if (dropDepth.current === 0) setDropHover(false);
+            },
+            onDrop: (event: DragEvent<HTMLDivElement>) => {
+              if (props.busy || !dragHasFiles(event)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              dropDepth.current = 0;
+              setDropHover(false);
+              const file = event.dataTransfer.files[0];
+              if (!file) return;
+              const rect = event.currentTarget.getBoundingClientRect();
+              const time =
+                rect.width > 0 ? ((event.clientX - rect.left) / rect.width) * props.duration : 0;
+              drop(file, Math.max(0, Math.min(time, props.duration)));
+            },
+          }
+        : {
+            className: 'relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]',
+          })}
     >
       <div
         aria-hidden="true"
@@ -234,7 +297,7 @@ export function ReviewAudioTrack(props: {
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
   onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
-  onImportFile(file: File): void;
+  onImportFile(file: File, timelineTime?: number): void;
   onRecordVoiceover(): void;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -290,6 +353,8 @@ export function ReviewAudioTrack(props: {
           onTrimClip={props.onTrimClip}
           {...(lane.key === 'music'
             ? {
+                onDropFile: (file: File, timelineTime: number) =>
+                  props.onImportFile(file, timelineTime),
                 trailing: (
                   <ReviewButton
                     label={translate('gallery.videoReview.audioImport')}

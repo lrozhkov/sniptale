@@ -47,7 +47,7 @@ export function ReviewTimelineBinding(props: {
   audio: ReturnType<typeof useReviewAudio>;
   audioState: QuickEditAudioState;
   audioVisible: boolean;
-  onImportAudioFile(file: File): void;
+  onImportAudioFile(file: File, timelineTime?: number): void;
   onRecordVoiceover(): void;
   onAddComment(marker?: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;

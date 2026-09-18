@@ -22,7 +22,7 @@ const onTrimClip = vi.fn(
   (_lane: 'voiceover' | 'music', _id: string, _edge: string, _time: number) => undefined
 );
 const onOriginal = vi.fn((_patch: Partial<QuickEditOriginalAudio>) => undefined);
-const onImportFile = vi.fn((_file: File) => undefined);
+const onImportFile = vi.fn((_file: File, _timelineTime?: number) => undefined);
 const onRecordVoiceover = vi.fn();
 const onSelect = vi.fn((_id: string | null) => undefined);
 
@@ -103,6 +103,58 @@ it('imports audio through the hidden file picker', async () => {
   });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   expect(onImportFile).toHaveBeenCalled();
+});
+
+function dispatchDrag(
+  lane: Element,
+  type: 'dragenter' | 'dragleave' | 'dragover' | 'drop',
+  files: File[],
+  clientX = 0
+) {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX });
+  Object.defineProperty(event, 'dataTransfer', {
+    value: { files, types: files.length ? ['Files'] : [] },
+  });
+  lane.dispatchEvent(event);
+}
+
+it('imports a dropped audio file at the drop point on the music lane', async () => {
+  const lanes = renderTrack();
+  const music = lanes[2]!;
+  vi.spyOn(music, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const file = new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' });
+  await act(async () => dispatchDrag(music, 'dragenter', [file], 0));
+  expect(music.getAttribute('data-drop-active')).toBe('true');
+  await act(async () => dispatchDrag(music, 'drop', [file], 250));
+  expect(onImportFile).toHaveBeenCalledOnce();
+  expect(onImportFile.mock.calls[0]![0]).toBe(file);
+  expect(onImportFile.mock.calls[0]![1]).toBeCloseTo(2.5, 5);
+  expect(music.getAttribute('data-drop-active')).toBeNull();
+});
+
+it('clears the drop affordance on leave and ignores drops without files', async () => {
+  const lanes = renderTrack();
+  const music = lanes[2]!;
+  const voiceover = lanes[1]!;
+  const file = new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' });
+  await act(async () => dispatchDrag(music, 'dragenter', [file]));
+  expect(music.getAttribute('data-drop-active')).toBe('true');
+  await act(async () => dispatchDrag(music, 'dragleave', [file]));
+  expect(music.getAttribute('data-drop-active')).toBeNull();
+  await act(async () => dispatchDrag(music, 'drop', [], 400));
+  expect(onImportFile).not.toHaveBeenCalled();
+  await act(async () => dispatchDrag(voiceover, 'dragenter', [file]));
+  expect(voiceover.getAttribute('data-drop-active')).toBeNull();
+});
+
+it('rejects file drops while the editor is busy', async () => {
+  const lanes = renderTrack(undefined, true);
+  const music = lanes[2]!;
+  const file = new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' });
+  await act(async () => dispatchDrag(music, 'dragenter', [file]));
+  expect(music.getAttribute('data-drop-active')).toBeNull();
+  await act(async () => dispatchDrag(music, 'drop', [file], 250));
+  expect(onImportFile).not.toHaveBeenCalled();
 });
 
 it('drags clip blocks with move and trim edges and commits clamped values', async () => {

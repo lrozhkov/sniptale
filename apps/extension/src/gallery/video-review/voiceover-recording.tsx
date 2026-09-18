@@ -74,3 +74,40 @@ export function ReviewVoiceoverRecording(props: {
     />
   );
 }
+
+/** Wires music import and voiceover recording to the review audio model. */
+export function useReviewEditorAudio(args: {
+  busy: boolean;
+  canStart: () => boolean;
+  time: number;
+  timelineDuration: number;
+  video: RefObject<HTMLVideoElement | null>;
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  audio: ReturnType<typeof useReviewAudio>;
+}) {
+  const guard = () => !args.busy && args.canStart();
+  const onImportAudioFile = (file: File, timelineTime?: number) => {
+    if (!guard()) return;
+    void args.run(async () => {
+      const imported = await importAudioAsset(file);
+      args.audio.addImported(
+        importedAudioClip(
+          imported.assetId,
+          imported.duration,
+          timelineTime ?? args.time,
+          args.timelineDuration
+        ),
+        'music'
+      );
+    });
+  };
+  const voiceover = useReviewVoiceoverRecording({
+    video: args.video,
+    time: args.time,
+    sourceDuration: args.timelineDuration,
+    audio: args.audio,
+    run: args.run,
+    guard,
+  });
+  return { onImportAudioFile, voiceover };
+}

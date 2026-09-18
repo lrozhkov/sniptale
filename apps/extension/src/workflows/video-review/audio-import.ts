@@ -33,17 +33,17 @@ export async function importAudioAsset(file: File): Promise<{ assetId: string; d
   return { assetId: `project-asset:${id}`, duration: await decodeAudioDuration(file) };
 }
 
-/** Places an imported clip at the playhead, bounded by the timeline end. */
+/** Places an imported clip at the target time, bounded by the timeline end. */
 export function importedAudioClip(
   assetId: string,
   duration: number,
-  playhead: number,
+  atTime: number,
   timelineDuration: number
 ): QuickEditAudioClip {
   return createQuickEditAudioClip({
     id: `audio-${crypto.randomUUID()}`,
     assetId,
-    timelineStart: playhead,
+    timelineStart: atTime,
     duration,
     endMax: timelineDuration,
   });
