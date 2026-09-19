@@ -38,6 +38,7 @@ function setup(apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState
     },
     draft: null,
   };
+  apply?.(snapshot.workspace.advanced);
   const resource: LoadedReview = {
     source,
     snapshot,
@@ -47,7 +48,6 @@ function setup(apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState
     url: 'blob:original',
     session: createVideoReviewSession(snapshot),
   };
-  apply?.(resource.session.getSnapshot().snapshot.workspace.advanced);
   mocks.index.mockResolvedValue({
     duration: 6,
     boundaries: [0, 2, 4, 6],

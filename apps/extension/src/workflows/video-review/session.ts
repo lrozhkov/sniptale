@@ -7,7 +7,10 @@ import {
 } from '../../composition/persistence/review-workspaces/store';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { ReviewAnnotation, ReviewOperation } from '../../features/video/review/types';
-import { replayReviewHistory } from '../../features/video/review/document';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../features/video/review/document';
 
 const persistence = {
   commitVideoWorkspace,
@@ -38,7 +41,8 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     replayReviewHistory(
       snapshot.workspace.history,
       snapshot.workspace.cursor,
-      snapshot.workspace.source
+      snapshot.workspace.source,
+      reviewAdvancedContentBaseline(snapshot.workspace.advanced)
     );
   let state = {
     snapshot: structuredClone(initial),

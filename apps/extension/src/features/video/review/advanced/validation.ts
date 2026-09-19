@@ -4,6 +4,7 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
   QUICK_EDIT_ADVANCED_SCHEMA_V1,
+  type QuickEditAdvancedContent,
   type QuickEditAdvancedState,
   type QuickEditAudioClip,
   type QuickEditAudioState,
@@ -240,6 +241,21 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
   const music = parseAudioClips(value['music']);
   if (!original || !voiceover || !music) return null;
   return { original, voiceover, music };
+}
+
+/**
+ * Single load point for persisted advanced content (history `advancedContent`
+ * operations): the ui chrome is absent by contract and malformed content
+ * rejects the operation at the workspace boundary.
+ */
+export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvancedContent | null {
+  if (!isRecord(raw) || raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION || 'ui' in raw)
+    return null;
+  const zoom = parseZoomState(raw['zoom']);
+  const background = parseBackgroundSettings(raw['background']);
+  const audio = parseAudioState(raw['audio']);
+  if (!zoom || !background || !audio) return null;
+  return { schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION, zoom, background, audio };
 }
 
 /**

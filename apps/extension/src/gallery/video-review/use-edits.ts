@@ -13,9 +13,17 @@ export function useReviewEdits(props: {
   seek(value: number): void;
   setSelection(value: ReviewAnchor): void;
   commit(before: ReviewEdit | null, after: ReviewEdit | null): Promise<boolean>;
+  selectedEditId?: string | null;
+  onSelectedEditIdChange?(id: string | null): void;
 }) {
   const [mode, setMode] = useState<'cut' | 'speed' | null>(null);
-  const [selectedEditId, setSelectedEditId] = useState<string | null>(null);
+  const [localSelectedEditId, setLocalSelectedEditId] = useState<string | null>(null);
+  const selectedEditId =
+    props.selectedEditId === undefined ? localSelectedEditId : props.selectedEditId;
+  const setSelectedEditId = (id: string | null) => {
+    if (props.selectedEditId === undefined) setLocalSelectedEditId(id);
+    props.onSelectedEditIdChange?.(id);
+  };
   const [rate, setRate] = useState<Speed['rate']>(2);
   const [audio, setAudio] = useState<Speed['audio']>('speed');
   const selected = props.edits.find((edit) => edit.id === selectedEditId) ?? null;

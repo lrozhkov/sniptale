@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Gradient } from '@sniptale/foundation/paint';
 import { createQuickEditAdvancedState } from './defaults';
-import { loadQuickEditAdvancedState } from './validation';
+import { loadQuickEditAdvancedContentState, loadQuickEditAdvancedState } from './validation';
 import { buildReviewTimeMap } from '../timeline';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION, type QuickEditAdvancedState } from './types';
 
@@ -365,4 +365,16 @@ describe('rejects malformed persisted state', () => {
     };
     expect(loadQuickEditAdvancedState(duplicated)).toBeNull();
   });
+});
+
+it('loads content snapshots and rejects ui leakage or schema drift', () => {
+  const state = advanced();
+  const content = { zoom: state.zoom, background: state.background, audio: state.audio };
+  expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 2 })).toEqual({
+    ...content,
+    schemaVersion: 2,
+  });
+  expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 1 })).toBeNull();
+  expect(loadQuickEditAdvancedContentState({ ...state, schemaVersion: 2 })).toBeNull();
+  expect(loadQuickEditAdvancedContentState(undefined)).toBeNull();
 });

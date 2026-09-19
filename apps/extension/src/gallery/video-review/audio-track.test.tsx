@@ -237,3 +237,29 @@ it('keeps the preview duration while moving near the timeline end (A3)', async (
   await send('pointerup', 1950);
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 8);
 });
+
+it('discards a drag preview on pointer cancellation without committing it', async () => {
+  const lanes = renderTrack({
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('a1', 2, 2)],
+    music: [],
+  });
+  const lane = lanes[1]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: vi.fn(() => false),
+  });
+  const send = (kind: string, x: number) =>
+    act(async () =>
+      block.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x, button: 0 }))
+    );
+  await send('pointerdown', 0);
+  await send('pointermove', 100);
+  expect(block.style.left).toBe('30%');
+  await send('pointercancel', 100);
+  expect(block.style.left).toBe('20%');
+  expect(onMoveClip).not.toHaveBeenCalled();
+  expect(onTrimClip).not.toHaveBeenCalled();
+});

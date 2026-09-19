@@ -23,7 +23,10 @@ import {
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
 } from './store';
-import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import {
+  createQuickEditAdvancedContent,
+  createQuickEditAdvancedState,
+} from '../../../features/video/review/advanced/defaults';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
 
 const id = 'recording:beta-v1-recording';
@@ -360,6 +363,34 @@ it('opens legacy workspaces with advanced defaults and persists explicit replace
   expect(saved.workspace.advanced).toEqual(advanced);
   const reopened = await openVideoWorkspace(id, source);
   expect(reopened.workspace.advanced).toEqual(advanced);
+});
+
+it('commits advanced content as a fixed-point history payload and reopens its baseline', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const before = createQuickEditAdvancedContent();
+  const after = {
+    ...before,
+    audio: { ...before.audio, original: { muted: true, volume: 0.5 } },
+  };
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    operation: {
+      id: 'advanced-1',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after,
+    },
+  });
+  expect(committed.workspace.history[0]).toMatchObject({
+    target: 'advancedContent',
+    before: { schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION },
+    after: { schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION },
+  });
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(committed.workspace);
+  expect(parseVideoWorkspace(committed.workspace)).toEqual(committed.workspace);
 });
 
 it('migrates a v1 advanced payload on load and keeps the workspace writable (R03)', async () => {

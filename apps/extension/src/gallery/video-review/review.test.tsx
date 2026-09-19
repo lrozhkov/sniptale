@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import type { CanvasComment, ReviewAnchor } from '../../features/video/review/types';
+import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -77,6 +78,15 @@ vi.mock('../shared/download', async (importOriginal) => ({
 }));
 import { VideoReview } from './index';
 import { createEditorFixture } from './editor-fixture.test-support';
+
+function advancedContentAt(snapshot: VideoWorkspaceSnapshot, index = -1) {
+  const operations = snapshot.workspace.history.filter(
+    (operation) => operation.target === 'advancedContent'
+  );
+  const operation = index < 0 ? operations.at(-1) : operations[index];
+  if (operation?.target !== 'advancedContent') throw new Error('Missing advanced content op');
+  return operation.after;
+}
 
 it('integrates selection, recoverable text, drawing, history and report actions in the modal', async () => {
   const fixture = createEditorFixture(integration);
@@ -392,9 +402,9 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
     await click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(1);
-    expect(fixture.snapshot.workspace.advanced.zoom.enabled).toBe(true);
-    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]).toMatchObject({
+    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions).toHaveLength(1);
+    expect(advancedContentAt(fixture.snapshot, 0).zoom.enabled).toBe(true);
+    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions[0]).toMatchObject({
       start: 0,
       end: 2,
       transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
@@ -409,12 +419,12 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
       scale.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]!.transform.scale).toBe(2);
-    // Track visibility is layout-only: basic mode hides the lane and keeps the saved region.
+    expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2);
+    // Track visibility is layout-only: basic mode hides the lane and keeps the region.
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]!.transform.scale).toBe(2);
+    expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2);
   } finally {
     await fixture.cleanup();
   }
@@ -464,7 +474,7 @@ it('places new zoom regions in result time after cuts and speed changes (R03)', 
     await click('zoomTrack');
     await click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.snapshot.workspace.advanced.zoom.regions[0]).toMatchObject({
+    expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
       start: 1.5,
       end: 2.5,
     });
@@ -551,6 +561,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
+    await fixture.click('advancedEditing');
     await fixture.click('cutMode');
     await dragTimePlane(fixture.host, 0, 100);
     await act(async () =>
@@ -560,6 +571,8 @@ it('blocks history and destructive shortcuts while the export controls are disab
     );
     await fixture.click('exportVideo');
     expect(fixture.button('undo').disabled).toBe(true);
+    for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack', 'hideOverlays'])
+      expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();
     for (const key of ['z', 'y'])
@@ -689,7 +702,7 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     )!;
     await act(async () => mute.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
-    expect(fixture.snapshot.workspace.advanced.audio.original.muted).toBe(true);
+    expect(advancedContentAt(fixture.snapshot).audio.original.muted).toBe(true);
   } finally {
     await fixture.cleanup();
   }
@@ -717,7 +730,7 @@ it('imports a file dropped on the music lane at the drop point', async () => {
     await act(async () => music.dispatchEvent(dragEvent('drop', [file])));
     expect(music.getAttribute('data-drop-active')).toBeNull();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
-    const musicClips = fixture.snapshot.workspace.advanced.audio.music;
+    const musicClips = advancedContentAt(fixture.snapshot).audio.music;
     expect(musicClips).toHaveLength(1);
     expect(musicClips[0]!.timelineStart).toBeCloseTo(1.25, 5);
   } finally {

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -71,22 +72,26 @@ function ReviewAudioClipLane(props: {
   const [dropHover, setDropHover] = useState(false);
   const dropDepth = useRef(0);
   const drag = useRef<AudioDragState | null>(null);
+  const cancelDrag = useCallback(() => {
+    const current = drag.current;
+    drag.current = null;
+    setPreview(null);
+    if (current?.node.hasPointerCapture(current.pointerId))
+      current.node.releasePointerCapture(current.pointerId);
+  }, []);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       const current = drag.current;
       if (event.key !== 'Escape' || !current) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      drag.current = null;
-      setPreview(null);
+      cancelDrag();
       dropDepth.current = 0;
       setDropHover(false);
-      if (current.node.hasPointerCapture(current.pointerId))
-        current.node.releasePointerCapture(current.pointerId);
     };
     window.addEventListener('keydown', cancel, true);
     return () => window.removeEventListener('keydown', cancel, true);
-  }, []);
+  }, [cancelDrag]);
   const commit = () => {
     const current = drag.current;
     const shown = preview;
@@ -175,6 +180,7 @@ function ReviewAudioClipLane(props: {
             onSelect={props.onSelect}
             onPreview={(value) => setPreview(value && { id: clip.id, ...value })}
             onCommit={commit}
+            onCancel={cancelDrag}
           />
         );
       })}
@@ -205,6 +211,7 @@ function ReviewAudioClipBlock(props: {
   onSelect(id: string): void;
   onPreview(value: { timelineStart: number; duration: number } | null): void;
   onCommit(): void;
+  onCancel(): void;
 }) {
   const clip = props.clip;
   return (
@@ -264,7 +271,7 @@ function ReviewAudioClipBlock(props: {
         props.onPreview({ timelineStart: next.timelineStart, duration: next.duration });
       }}
       onPointerUp={props.onCommit}
-      onPointerCancel={props.onCommit}
+      onPointerCancel={props.onCancel}
     >
       <span
         data-audio-edge="start"

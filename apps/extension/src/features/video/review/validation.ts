@@ -1,6 +1,7 @@
 import { parsePaint } from '@sniptale/foundation/paint';
 import { isReviewSpeedRate } from './speed';
 import { CANVAS_COMMENT_LIMITS } from './comments';
+import { loadQuickEditAdvancedContentState } from './advanced/validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
   CanvasComment,
@@ -253,6 +254,12 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
     )
       return null;
     return { ...metadata, target: 'canvasComment', before, after };
+  }
+  if (value['target'] === 'advancedContent') {
+    const before = loadQuickEditAdvancedContentState(value['before']);
+    const after = loadQuickEditAdvancedContentState(value['after']);
+    if (!before || !after) return null;
+    return { ...metadata, target: 'advancedContent', before, after };
   }
   return null;
 }

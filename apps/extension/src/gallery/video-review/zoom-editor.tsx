@@ -121,8 +121,15 @@ export function useReviewZoomEditor(args: {
   setZoom(update: (zoom: ZoomState) => ZoomState): void;
   zoom: ZoomState;
   timelineDuration: number;
+  selection?: string | null;
+  onSelectionChange?(id: string | null): void;
 }) {
-  const [selection, setSelection] = useState<string | null>(null);
+  const [localSelection, setLocalSelection] = useState<string | null>(null);
+  const selection = args.selection === undefined ? localSelection : args.selection;
+  const setSelection = (id: string | null) => {
+    if (args.selection === undefined) setLocalSelection(id);
+    args.onSelectionChange?.(id);
+  };
   // A revived placement must fit among active neighbors or it stays dormant.
   const add = (at: number, timelineDuration: number) => {
     const range = availableQuickEditZoomRange({
@@ -157,7 +164,7 @@ export function useReviewZoomEditor(args: {
       ...zoom,
       regions: zoom.regions.filter((item) => item.id !== id),
     }));
-    setSelection((current) => (current === id ? null : current));
+    setSelection(selection === id ? null : selection);
   };
   const resetPosition = (id: string) =>
     args.setZoom((zoom) => ({

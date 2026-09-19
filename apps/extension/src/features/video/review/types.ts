@@ -45,6 +45,8 @@ export interface ReviewDocument {
   annotations: ReviewAnnotation[];
   edits: ReviewEdit[];
   canvasComments: CanvasComment[];
+  /** Derived advanced content; history `advancedContent` operations replay onto the baseline. */
+  advancedContent: import('./advanced/types').QuickEditAdvancedContent;
 }
 
 /**
@@ -79,4 +81,24 @@ export type ReviewOperation = { id: string; at: number } & (
       before: CanvasComment | null;
       after: CanvasComment | null;
     }
+  | {
+      /** Whole-content advanced snapshot; `ui` chrome never travels through history. */
+      target: 'advancedContent';
+      before: import('./advanced/types').QuickEditAdvancedContent;
+      after: import('./advanced/types').QuickEditAdvancedContent;
+    }
 );
+
+/**
+ * One active selection shared by Delete, the inspector, handles, and keyboard
+ * navigation; not persistent content. Cut removal and lane deletion resolve
+ * through the same owner, so a stale edit never hides behind a newer selection.
+ */
+export type ReviewSelection =
+  | { kind: 'none' }
+  | { kind: 'edit'; id: string }
+  | { kind: 'annotation'; id: string }
+  | { kind: 'canvas-comment'; id: string }
+  | { kind: 'zoom'; id: string }
+  | { kind: 'zoom-link'; id: string }
+  | { kind: 'audio'; lane: 'voiceover' | 'music'; id: string };

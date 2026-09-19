@@ -71,8 +71,7 @@ function ReviewAudioLane(props: {
   );
 }
 
-/** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
-export function ReviewTimelineBinding(props: {
+type TimelineBindingProps = {
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
     cutting: Editing['cutting'];
     exporter: Exporter;
@@ -110,7 +109,51 @@ export function ReviewTimelineBinding(props: {
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
   onPlay(): void;
-}) {
+};
+
+/** Toolbar lock covers every content and presentation control during blocked phases. */
+function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
+  return (
+    <fieldset
+      disabled={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
+      className="contents"
+    >
+      <ReviewTimelineToolbar
+        editing={{
+          mode: props.editing.mode,
+          rate: props.editing.rate,
+          audio: props.editing.audio,
+          selected: !!props.editing.selected,
+          exporter: props.editing.exporter,
+          setCutting: props.editing.setCutting,
+          toggle: props.editing.toggle,
+          changeRate: props.editing.changeRate,
+          changeAudio: props.editing.changeAudio,
+          remove: props.editing.remove,
+        }}
+        busy={props.busy}
+        composerBusy={props.composerBusy}
+        selection={props.selection}
+        edits={props.edits}
+        advanced={props.advanced}
+        setMode={props.setMode}
+        setTrackVisibility={props.setTrackVisibility}
+        setOverlaysVisible={props.setOverlaysVisible}
+        telemetryAvailable={props.telemetryAvailable}
+        onAddComment={() => props.onAddComment()}
+        onAddOverlayComment={() => void props.canvasComments.onAdd()}
+        onDownloadFragment={() =>
+          props.selection.kind === 'range'
+            ? props.editing.exporter.downloadSelection(props.selection)
+            : undefined
+        }
+      />
+    </fieldset>
+  );
+}
+
+/** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
+export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
   const onZoomAdd = () => {
     const at = props.toOutputTime(props.time);
@@ -122,38 +165,7 @@ export function ReviewTimelineBinding(props: {
       duration={props.source.duration}
       volume={props.volume}
       onVolume={props.onVolume}
-      tools={
-        <ReviewTimelineToolbar
-          editing={{
-            mode: props.editing.mode,
-            rate: props.editing.rate,
-            audio: props.editing.audio,
-            selected: !!props.editing.selected,
-            exporter: props.editing.exporter,
-            setCutting: props.editing.setCutting,
-            toggle: props.editing.toggle,
-            changeRate: props.editing.changeRate,
-            changeAudio: props.editing.changeAudio,
-            remove: props.editing.remove,
-          }}
-          busy={props.busy}
-          composerBusy={props.composerBusy}
-          selection={props.selection}
-          edits={props.edits}
-          advanced={props.advanced}
-          setMode={props.setMode}
-          setTrackVisibility={props.setTrackVisibility}
-          setOverlaysVisible={props.setOverlaysVisible}
-          telemetryAvailable={props.telemetryAvailable}
-          onAddComment={() => props.onAddComment()}
-          onAddOverlayComment={() => void props.canvasComments.onAdd()}
-          onDownloadFragment={() =>
-            props.selection.kind === 'range'
-              ? props.editing.exporter.downloadSelection(props.selection)
-              : undefined
-          }
-        />
-      }
+      tools={<ReviewTimelineToolsBinding {...props} />}
       {...(features.zoomTrackVisible
         ? {
             zoomTrack: (

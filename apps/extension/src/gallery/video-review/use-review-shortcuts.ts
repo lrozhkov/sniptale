@@ -91,9 +91,8 @@ export function useReviewEditorShortcuts(args: {
   exporterAvailable: boolean;
   boundaries: readonly number[] | undefined;
   run(action: () => Promise<unknown>): Promise<unknown>;
-  session: ReturnType<
-    typeof import('../../workflows/video-review/session').createVideoReviewSession
-  >;
+  undo(): Promise<unknown>;
+  redo(): Promise<unknown>;
   cancelDrawing(): void;
   pointTool(): void;
   remove(): void;
@@ -108,10 +107,10 @@ export function useReviewEditorShortcuts(args: {
     play: args.play,
     cancelDrawing: args.cancelDrawing,
     undo: () => {
-      if (!editingBlocked && !exportBlocked) void args.run(() => args.session.history('undo'));
+      if (!editingBlocked && !exportBlocked) void args.run(args.undo);
     },
     redo: () => {
-      if (!editingBlocked && !exportBlocked) void args.run(() => args.session.history('redo'));
+      if (!editingBlocked && !exportBlocked) void args.run(args.redo);
     },
     remove: () => {
       if (!editingBlocked && !args.busy && !exportBlocked) args.remove();

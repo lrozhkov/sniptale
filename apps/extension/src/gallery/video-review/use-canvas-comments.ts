@@ -65,8 +65,15 @@ export function useCanvasComments(args: {
   exporterPhase: string;
   canStart(): boolean;
   run(action: () => Promise<unknown>): Promise<unknown>;
+  selectedId?: string | null;
+  onSelectionChange?(id: string | null): void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
+  const selectedId = args.selectedId === undefined ? localSelectedId : args.selectedId;
+  const setSelectedId = (id: string | null) => {
+    if (args.selectedId === undefined) setLocalSelectedId(id);
+    args.onSelectionChange?.(id);
+  };
   const drafts = useRef(new Map<string, string>());
   const guard = () => {
     if (args.busy || args.exporterPhase !== 'idle' || !args.canStart()) return false;
@@ -150,7 +157,7 @@ export function useCanvasComments(args: {
         })
         .then(() => drafts.current.delete(comment.id))
     );
-    setSelectedId((current) => (current === comment.id ? null : current));
+    if (selectedId === comment.id) setSelectedId(null);
   };
   /** Durable flush of unsent text drafts; bypasses the busy gate for lifecycle callers. */
   const flushTexts = async () => {

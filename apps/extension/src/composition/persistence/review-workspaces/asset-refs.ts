@@ -1,10 +1,33 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import type { QuickEditAdvancedContent } from '../../../features/video/review/advanced/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 
 const AUDIO_PREFIX = 'project-asset:';
 const LANES = ['voiceover', 'music'] as const;
 /** Portable metadata forbids local asset keys; review lane refs travel renamed. */
 const PORTABLE_REF_KEY = 'assetRef';
+
+/** Walks every history `advancedContent` operation payload once per transform. */
+function mapHistoryAudio(
+  value: unknown,
+  transform: (audio: Record<string, unknown>) => Record<string, unknown>
+): unknown {
+  if (!isRecord(value) || !Array.isArray(value['history']) || !value['history'].length)
+    return value;
+  const history = (value['history'] as unknown[]).map((operation) => {
+    if (!isRecord(operation) || operation['target'] !== 'advancedContent') return operation;
+    const mapPayload = (payload: unknown) => {
+      if (!isRecord(payload) || !isRecord(payload['audio'])) return payload;
+      return { ...payload, audio: transform(payload['audio']) };
+    };
+    return {
+      ...operation,
+      ...(operation['before'] === undefined ? {} : { before: mapPayload(operation['before']) }),
+      ...(operation['after'] === undefined ? {} : { after: mapPayload(operation['after']) }),
+    };
+  });
+  return { ...value, history };
+}
 
 /** Renames the lane clip asset keys so archive metadata stays portable-safe. */
 export function encodePortableReviewAssetRefs<T>(review: T): T {
@@ -25,6 +48,11 @@ export function encodePortableReviewAssetRefs<T>(review: T): T {
         ...advanced,
         audio: renameLaneRef(audio, 'assetId', PORTABLE_REF_KEY),
       },
+      history: (
+        mapHistoryAudio(review['workspace'], (laneAudio) =>
+          renameLaneRef(laneAudio, 'assetId', PORTABLE_REF_KEY)
+        ) as { history: VideoWorkspace['history'] }
+      ).history,
     },
   } as T;
 }
@@ -41,6 +69,11 @@ export function decodePortableReviewAssetRefs<T>(workspace: T): T {
       ...advanced,
       audio: renameLaneRef(audio, PORTABLE_REF_KEY, 'assetId'),
     },
+    history: (
+      mapHistoryAudio(workspace, (laneAudio) =>
+        renameLaneRef(laneAudio, PORTABLE_REF_KEY, 'assetId')
+      ) as { history: unknown }
+    ).history as typeof workspace.history,
   } as T;
 }
 
@@ -76,17 +109,31 @@ function lookupAssetId(
   return mapped.startsWith(AUDIO_PREFIX) ? mapped : AUDIO_PREFIX + mapped;
 }
 
-/** Collects every project-asset reference the review keeps in its advanced state. */
+/** Collects every project-asset reference the review keeps, including history ops. */
 export function collectReviewAssetReferences(
-  workspace: Pick<VideoWorkspace, 'advanced'>
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>
 ): ReadonlySet<string> {
   const references = new Set<string>();
   const advanced = workspace.advanced;
-  for (const clip of [...advanced.audio.voiceover, ...advanced.audio.music]) {
-    if (clip.assetId.startsWith(AUDIO_PREFIX)) references.add(clip.assetId);
-  }
+  collectContentReferences(advanced, references);
   if (advanced.recoveryV1) collectRecoveryReferences(advanced.recoveryV1, references);
+  for (const operation of workspace.history ?? []) {
+    if (operation.target !== 'advancedContent') continue;
+    collectContentReferences(operation.before, references);
+    collectContentReferences(operation.after, references);
+  }
   return references;
+}
+
+function collectContentReferences(
+  content: Pick<QuickEditAdvancedContent, 'audio'>,
+  into: Set<string>
+): void {
+  for (const lane of LANES) {
+    for (const clip of content.audio[lane]) {
+      if (clip.assetId.startsWith(AUDIO_PREFIX)) into.add(clip.assetId);
+    }
+  }
 }
 
 function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void {
@@ -111,6 +158,24 @@ function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void 
   }
 }
 
+/** Remaps lane clip references inside one advancedContent snapshot. */
+function remapContentAudio(
+  content: QuickEditAdvancedContent,
+  assetIdMap: ReadonlyMap<string, string>
+): QuickEditAdvancedContent {
+  const audio = { ...content.audio };
+  let changed = false;
+  for (const lane of LANES) {
+    audio[lane] = content.audio[lane].map((clip) => {
+      const remapped = lookupAssetId(assetIdMap, clip.assetId);
+      if (!remapped) return clip;
+      changed = true;
+      return { ...clip, assetId: remapped };
+    });
+  }
+  return changed ? { ...content, audio } : content;
+}
+
 function remapRecoveryAudio(
   recoveryV1: string,
   assetIdMap: ReadonlyMap<string, string>
@@ -126,9 +191,11 @@ function remapRecoveryAudio(
       recoveryAudio[lane] = clips.map((clip: unknown) => {
         if (!isRecord(clip)) return clip;
         const assetId = clip['assetId'];
-        if (typeof assetId === 'string' && lookupAssetId(assetIdMap, assetId)) {
+        const remapped =
+          typeof assetId === 'string' ? lookupAssetId(assetIdMap, assetId) : undefined;
+        if (remapped) {
           changed = true;
-          return { ...clip, assetId: lookupAssetId(assetIdMap, assetId) };
+          return { ...clip, assetId: remapped };
         }
         return clip;
       });
@@ -148,6 +215,29 @@ export function remapReviewAssetReferences(
   assetIdMap: ReadonlyMap<string, string>
 ): VideoWorkspaceSnapshot {
   if (!assetIdMap.size) return snapshot;
+  const remappedSnapshot = remapSnapshot(snapshot, assetIdMap);
+  const history = (snapshot.workspace.history ?? []).map((operation) => {
+    if (operation.target !== 'advancedContent') return operation;
+    const before = remapContentAudio(operation.before, assetIdMap);
+    const after = remapContentAudio(operation.after, assetIdMap);
+    if (before === operation.before && after === operation.after) return operation;
+    return { ...operation, target: 'advancedContent' as const, before, after };
+  });
+  if (
+    remappedSnapshot === snapshot &&
+    history.every((operation, index) => operation === (snapshot.workspace.history ?? [])[index])
+  )
+    return snapshot;
+  return {
+    ...remappedSnapshot,
+    workspace: { ...remappedSnapshot.workspace, history },
+  };
+}
+
+function remapSnapshot(
+  snapshot: VideoWorkspaceSnapshot,
+  assetIdMap: ReadonlyMap<string, string>
+): VideoWorkspaceSnapshot {
   const advanced = snapshot.workspace.advanced;
   const clipLanes = LANES.map((lane) => {
     const clips = advanced.audio[lane];

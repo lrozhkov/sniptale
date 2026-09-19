@@ -19,8 +19,20 @@ export function useReviewAudio(args: {
   audio: QuickEditAudioState;
   setAudio(update: (audio: QuickEditAudioState) => QuickEditAudioState): void;
   timelineDuration: number;
+  selectedId?: string | null;
+  onSelectionChange?(selection: { lane: ReviewAudioLane; id: string } | null): void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
+  const selectedId = args.selectedId === undefined ? localSelectedId : args.selectedId;
+  const setSelected = (id: string | null, lane?: ReviewAudioLane) => {
+    if (args.selectedId === undefined) setLocalSelectedId(id);
+    const resolvedLane =
+      lane ??
+      (['voiceover', 'music'] as const).find((candidate) =>
+        args.audio[candidate].some((clip) => clip.id === id)
+      );
+    args.onSelectionChange?.(id && resolvedLane ? { lane: resolvedLane, id } : null);
+  };
   const assetDurations = useRef(new Map<string, number>());
   useEffect(() => {
     let active = true;
@@ -61,12 +73,12 @@ export function useReviewAudio(args: {
     );
   return {
     selectedId,
-    setSelectedId,
+    setSelectedId: setSelected,
     selected: selected ?? null,
     addImported: (clip: QuickEditAudioClip, lane: ReviewAudioLane, assetDuration?: number) => {
       if (assetDuration !== undefined) assetDurations.current.set(clip.assetId, assetDuration);
       patchLane(lane, (clips) => [...clips, clip]);
-      setSelectedId(clip.id);
+      setSelected(clip.id, lane);
     },
     moveClip: (lane: ReviewAudioLane, id: string, timelineStart: number) =>
       updateClip(lane, id, (clip) =>
@@ -89,7 +101,7 @@ export function useReviewAudio(args: {
     ) => updateClip(lane, id, (clip) => updateQuickEditAudioClip(clip, patch)),
     removeClip: (lane: ReviewAudioLane, id: string) => {
       patchLane(lane, (clips) => clips.filter((clip) => clip.id !== id));
-      setSelectedId((current) => (current === id ? null : current));
+      if (selectedId === id) setSelected(null);
     },
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
       args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ...patch } })),

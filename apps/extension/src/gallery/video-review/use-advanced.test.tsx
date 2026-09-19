@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type { ReviewOperation } from '../../features/video/review/types';
+import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 
@@ -15,6 +17,7 @@ let advanced: ReturnType<typeof useReviewAdvanced>;
 function setup() {
   let workspaceAdvanced = createQuickEditAdvancedState();
   let revision = 1;
+  let history: ReviewOperation[] = [];
   const build = (): VideoWorkspaceSnapshot => ({
     workspace: {
       aggregateId: 'recording:r',
@@ -22,9 +25,9 @@ function setup() {
       formatVersion: 1,
       source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 200 },
       revision,
-      cursor: 0,
+      cursor: history.length,
       advanced: structuredClone(workspaceAdvanced),
-      history: [],
+      history: [...history],
       createdAt: 1,
       updatedAt: 1,
     },
@@ -32,7 +35,13 @@ function setup() {
   });
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => build()),
-    commitVideoWorkspace: vi.fn(async () => build()),
+    commitVideoWorkspace: vi.fn(async (args: { operation: unknown }) => {
+      const operation = parseReviewOperation(args.operation, 4);
+      if (!operation) throw new Error('Operation is invalid.');
+      history = [...history, operation];
+      revision += 1;
+      return build();
+    }),
     readVideoWorkspace: vi.fn(async () => build()),
     moveVideoWorkspaceHistory: vi.fn(async () => build()),
     saveVideoWorkspaceAdvanced: vi.fn(async (args: { advanced: unknown }) => {
@@ -51,7 +60,7 @@ function setup() {
     return null;
   }
   act(() => root.render(<Harness />));
-  return { session, deps, saveFromOtherTab, Harness, build };
+  return { session, deps, saveFromOtherTab, build };
 }
 
 beforeEach(() => {
@@ -124,13 +133,41 @@ it('composes two commands staged before the next render (S1)', async () => {
   expect(write.advanced.ui.tracks.zoom).toBe(true);
 });
 
+it('stages ui commands through the whole-state writer and content through history ops', async () => {
+  const { deps, session } = setup();
+  act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
+  act(() =>
+    advanced.setBackground((background) => ({
+      ...background,
+      enabled: true,
+      type: 'solid',
+      color: '#111111ff',
+      layout: { padding: 12, cornerRadius: 4 },
+    }))
+  );
+  expect(advanced.advanced.zoom.enabled).toBe(true);
+  expect(advanced.advanced.background.enabled).toBe(true);
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  // One collapsed content operation; the whole-state writer stays untouched.
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
+  const op = deps.commitVideoWorkspace.mock.lastCall?.[0].operation as {
+    target: string;
+    after: { zoom: { enabled: boolean }; background: { enabled: boolean } };
+  };
+  expect(op.target).toBe('advancedContent');
+  expect(op.after.zoom.enabled).toBe(true);
+  expect(op.after.background.enabled).toBe(true);
+  expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
+  act(() => session.getSnapshot());
+});
+
 it('keeps the newest local revision when an older write acknowledges (S2)', async () => {
   const { deps, build } = setup();
   let releaseA!: () => void;
-  deps.saveVideoWorkspaceAdvanced.mockImplementationOnce(
+  deps.commitVideoWorkspace.mockImplementationOnce(
     () =>
       new Promise((resolve) => {
-        releaseA = () => resolve(build());
+        releaseA = () => resolve(build() as never);
       })
   );
   act(() => advanced.setZoom((zoom) => ({ ...zoom, enabled: true })));
@@ -150,12 +187,12 @@ it('keeps the newest local revision when an older write acknowledges (S2)', asyn
   });
   expect(advanced.advanced.background.enabled).toBe(true);
   await act(async () => vi.advanceTimersByTimeAsync(250));
-  expect(deps.saveVideoWorkspaceAdvanced).toHaveBeenCalledTimes(2);
-  const write = deps.saveVideoWorkspaceAdvanced.mock.lastCall?.[0] as {
-    advanced: QuickEditAdvancedState;
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
+  const op = deps.commitVideoWorkspace.mock.lastCall?.[0].operation as {
+    after: { zoom: { enabled: boolean }; background: { enabled: boolean } };
   };
-  expect(write.advanced.zoom.enabled).toBe(true);
-  expect(write.advanced.background.enabled).toBe(true);
+  expect(op.after.zoom.enabled).toBe(true);
+  expect(op.after.background.enabled).toBe(true);
 });
 
 it('keeps the pending edit after a save failure, rejects flush, and retries (S3)', async () => {

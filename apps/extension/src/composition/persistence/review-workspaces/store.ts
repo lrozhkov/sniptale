@@ -13,7 +13,11 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { applyReviewOperation, replayReviewHistory } from '../../../features/video/review/document';
+import {
+  applyReviewOperation,
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type { ReviewSource } from '../../../features/video/review/types';
@@ -215,7 +219,12 @@ export async function commitVideoWorkspace(args: {
         JSON.stringify(operation.before) !== JSON.stringify(draft.before))
     )
       throw new VideoWorkspaceError('conflict');
-    const document = replayReviewHistory(workspace.history, workspace.cursor, workspace.source);
+    const document = replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    );
     applyReviewOperation(document, operation, workspace.source);
     const next = await putWorkspace(tx, {
       ...workspace,

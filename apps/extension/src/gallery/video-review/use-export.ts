@@ -17,6 +17,29 @@ import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type ExportResult = Awaited<ReturnType<typeof exportReviewedVideo>>;
+
+/** Export starts only after debounced editor content reaches the shared session. */
+export function prepareReviewExporter(
+  exporter: ReturnType<typeof useReviewExport>,
+  run: (action: () => Promise<unknown>) => Promise<unknown>,
+  flushPending: () => Promise<void>
+): ReturnType<typeof useReviewExport> {
+  const start = async (
+    destination: 'gallery' | 'download' = 'gallery',
+    selection?: Extract<ReviewAnchor, { kind: 'range' }>
+  ) => {
+    await run(async () => {
+      await flushPending();
+      await exporter.start(destination, selection);
+    });
+  };
+  return {
+    ...exporter,
+    start,
+    downloadSelection: (selection) => start('download', selection),
+  };
+}
+
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
   const [index, setIndex] = useState<ReviewMediaIndex | null>(null);
@@ -54,7 +77,12 @@ export function useReviewExport(resource: LoadedReview) {
     const state = resource.session.getSnapshot();
     return resolveQuickEditExportPlan({
       document: state.document,
-      advanced: state.snapshot.workspace.advanced,
+      advanced: {
+        ...state.snapshot.workspace.advanced,
+        zoom: state.document.advancedContent.zoom,
+        background: state.document.advancedContent.background,
+        audio: state.document.advancedContent.audio,
+      },
       // A source audio track with a probed unavailable codec is a known blocker;
       // clips-only exports defer the authoritative probe to the exporter.
       ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),

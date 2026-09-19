@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import { useReviewAdvancedContent } from './use-advanced-content';
 import { useReviewSnapshot } from './use-session';
 
 type Session = ReturnType<
@@ -7,18 +8,13 @@ type Session = ReturnType<
 >;
 
 const ADVANCED_SAVE_DEBOUNCE_MS = 250;
-
 type PendingSave = { revision: number; value: QuickEditAdvancedState };
 
-/**
- * Latest-write-wins autosave owner for the persisted advanced state. Commands compose
- * from the synchronous local revision, an acknowledged older write never clears a newer
- * pending one, and a failed write keeps the pending state available for Retry while
- * flush() rejects instead of pretending success.
- */
+/** UI chrome autosave remains outside user history; rendered content uses the history owner. */
 export function useReviewAdvanced(session: Session) {
   const snapshot = useReviewSnapshot(session);
   const persisted = snapshot.snapshot.workspace.advanced;
+  const contentState = useReviewAdvancedContent(session, snapshot.document.advancedContent);
   const [optimistic, setOptimistic] = useState<PendingSave | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const currentRef = useRef(persisted);
@@ -99,15 +95,24 @@ export function useReviewAdvanced(session: Session) {
     timer.current = null;
     pending.current = null;
     currentRef.current = session.getSnapshot().snapshot.workspace.advanced;
+    contentState.reset();
     if (mounted.current) {
       setOptimistic(null);
       setSaveFailed(false);
     }
-  }, [session]);
+  }, [contentState, session]);
+  const content = contentState.content;
+  const advanced: QuickEditAdvancedState = {
+    ...persisted,
+    ui: optimistic?.value.ui ?? persisted.ui,
+    zoom: content.zoom,
+    background: content.background,
+    audio: content.audio,
+  };
   return {
-    advanced: optimistic?.value ?? persisted,
-    saveFailed,
-    retry: flush,
+    advanced,
+    saveFailed: saveFailed || contentState.saveFailed,
+    retry: () => Promise.all([flush(), contentState.flush()]),
     setMode: (mode: 'basic' | 'advanced') =>
       stage((current) => ({ ...current, ui: { ...current.ui, mode } })),
     setTrackVisibility: (track: 'actions' | 'zoom' | 'audio', visible: boolean) =>
@@ -117,17 +122,13 @@ export function useReviewAdvanced(session: Session) {
       })),
     setOverlaysVisible: (visible: boolean) =>
       stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
-    setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>
-      stage((current) => ({ ...current, zoom: update(current.zoom) })),
-    setBackground: (
-      update: (
-        background: QuickEditAdvancedState['background']
-      ) => QuickEditAdvancedState['background']
-    ) => stage((current) => ({ ...current, background: update(current.background) })),
-    setAudio: (
-      update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio']
-    ) => stage((current) => ({ ...current, audio: update(current.audio) })),
-    flush,
+    setZoom: contentState.setZoom,
+    setBackground: contentState.setBackground,
+    setAudio: contentState.setAudio,
+    flush: async () => {
+      await flush();
+      await contentState.flush();
+    },
     reset,
   };
 }

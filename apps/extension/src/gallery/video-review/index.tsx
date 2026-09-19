@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
-import {
-  projectReviewTelemetry,
-  type ReviewTelemetryMarker,
-} from '../../features/video/review/telemetry';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewButton } from './controls';
 import { ReviewCanvasCommentsSection } from './comment-editor';
 import { ReviewAudioInspectorSection } from './audio-editor';
@@ -22,79 +19,16 @@ import { exportReviewReport } from './report-actions';
 import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
 import { ReviewEditActions } from './edit-actions';
-import { useReviewEdits } from './use-edits';
+import type { useReviewEdits } from './use-edits';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { commitReviewEdit } from './use-edits';
 import { useReviewTransport } from './use-review-transport';
 import { ReviewAdvancedPanels } from './advanced-panels';
-import { useCanvasComments } from './use-canvas-comments';
-import { useReviewAudio } from './use-review-audio';
+import type { useCanvasComments } from './use-canvas-comments';
+import { useReviewSelection } from './use-review-selection';
+import type { useReviewAudio } from './use-review-audio';
 import { ReviewVoiceoverRecording, useReviewEditorAudio } from './voiceover-recording';
-import { useReviewZoomEditor } from './zoom-editor';
-import { useReviewEditorShortcuts } from './use-review-shortcuts';
-
-function useReviewTelemetryProjection(args: {
-  telemetry: LoadedReview['telemetry'];
-  duration: number;
-  actionsVisible: boolean;
-}) {
-  const projected = useMemo(
-    () =>
-      args.telemetry
-        ? projectReviewTelemetry(args.telemetry, args.duration, false)
-        : { markers: [], warnings: 0 },
-    [args.telemetry, args.duration]
-  );
-  return { telemetry: args.telemetry ? args.actionsVisible : false, projected };
-}
-
-function useReviewCommentActions(args: {
-  composer: ReturnType<
-    typeof import('../../workflows/video-review/session').createVideoReviewSession
-  > extends never
-    ? never
-    : ReturnType<typeof useReviewComposer>;
-  video: React.RefObject<HTMLVideoElement | null>;
-  seek(value: number, snap?: boolean): void;
-  setSelection(value: ReviewAnchor): void;
-  setSelected(value: ReviewAnnotation | null): void;
-  setCutting(cutting: false): void;
-  canStart(): boolean;
-  busy: boolean;
-  exporterPhase: string;
-}) {
-  const select = (annotation: ReviewAnnotation) => {
-    args.setCutting(false);
-    args.video.current?.pause();
-    args.setSelected(annotation);
-    args.seek(
-      annotation.anchor.kind === 'point' ? annotation.anchor.time : annotation.anchor.start,
-      false
-    );
-    args.setSelection(annotation.anchor);
-  };
-  const add = (selection: ReviewAnchor, marker?: ReviewTelemetryMarker) => {
-    if (args.busy || args.exporterPhase !== 'idle' || !args.canStart()) return;
-    args.video.current?.pause();
-    const anchor = marker ? { kind: 'point' as const, time: marker.start } : selection;
-    args.seek(anchor.kind === 'point' ? anchor.time : anchor.start, false);
-    args.composer.change(
-      {
-        id: crypto.randomUUID(),
-        text: '',
-        anchor,
-        ...(marker ? { telemetryRef: marker.ref } : {}),
-      },
-      null
-    );
-    if (marker) {
-      args.setCutting(false);
-      args.seek(marker.start, false);
-      args.setSelection(anchor);
-    }
-  };
-  return { select, add };
-}
+import { useReviewEditorWiring } from './use-review-wiring';
+import { useReviewEditingTools } from './use-review-editing';
 
 function useReviewEditorState(resource: LoadedReview) {
   const { session, source } = resource;
@@ -109,7 +43,13 @@ function useReviewEditorState(resource: LoadedReview) {
   );
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
+  const { selection: activeSelection, setSelection: setActiveSelection } = useReviewSelection();
   const { busy, setBusy, message, setMessage, run } = useReviewActionStatus();
+  const canStart = () => {
+    if (!composer.annotation) return true;
+    setMessage(translate('gallery.videoReview.finishComment'));
+    return false;
+  };
   const onTransportFailure = () => setMessage(translate('gallery.videoReview.playbackFailed'));
   const { video, time, onTime, playing, setPlaying, seek, play, timeline } = useReviewTransport({
     resource,
@@ -123,70 +63,56 @@ function useReviewEditorState(resource: LoadedReview) {
     boundaries: () => (cuts.cutting ? exporter.index?.boundaries : undefined),
     onTransportFailure,
   });
-  const zoom = useReviewZoomEditor({
-    setZoom: advancedState.setZoom,
+  const { zoom, cuts } = useReviewEditingTools({
+    advancedState,
     zoom: advanced.zoom,
     timelineDuration: timeline.resultDuration,
-  });
-  const cuts = useReviewEdits({
-    duration: source.duration,
-    ...(exporter.index ? { boundaries: exporter.index.boundaries } : {}),
+    activeSelection,
+    setActiveSelection,
+    sourceDuration: source.duration,
+    exporter,
     edits: snapshot.document.edits,
     pause: () => video.current?.pause(),
+    seek,
+    setTimelineSelection: setSelection,
     onInvalid: () => setMessage(translate('gallery.videoReview.invalidEditRange')),
-    seek: (value) => seek(value),
-    setSelection,
-    commit: (before, after) =>
-      commitReviewEdit({
-        session,
-        run,
-        busy,
-        exporterPhase: exporter.phase,
-        canStart,
-        before,
-        after,
-      }),
+    session,
+    run,
+    busy,
+    canStart,
   });
-  const { cutting, setCutting } = cuts;
-  const editing = { ...cuts, exporter };
-  const { telemetry, projected } = useReviewTelemetryProjection({
-    telemetry: resource.telemetry,
-    duration: source.duration,
-    actionsVisible: advanced.ui.tracks.actions,
-  });
-  const canStart = () => {
-    if (!composer.annotation) return true;
-    setMessage(translate('gallery.videoReview.finishComment'));
-    return false;
-  };
-  const comments = useReviewCommentActions({
+  const wiring = useReviewEditorWiring({
+    session,
+    document: snapshot.document,
+    advanced,
+    advancedState,
+    exporter,
+    zoom,
+    activeSelection,
+    setActiveSelection,
+    clearAnnotation: setSelected,
+    time,
+    timelineDuration: timeline.resultDuration,
+    busy,
+    canStart,
+    run,
     composer,
     video,
     seek,
-    setSelection,
-    setSelected,
-    setCutting,
-    canStart,
-    busy,
-    exporterPhase: exporter.phase,
+    setTimelineSelection: setSelection,
+    setCutting: cuts.setCutting,
+    telemetry: resource.telemetry,
+    sourceDuration: source.duration,
+    actionsVisible: advanced.ui.tracks.actions,
+    play,
+    timelineSelection: selection,
+    cuts,
   });
-  useReviewEditorShortcuts(
-    reviewShortcutBinding({
-      time,
-      busy,
-      seek,
-      play,
-      cutting,
-      exporter,
-      selection,
-      composer,
-      cuts,
-      comments,
-      run,
-      session,
-      setSelection,
-    })
-  );
+  const { audio, canvasComments, comments, telemetry, projected } = wiring;
+  const editing: ReturnType<typeof useReviewEdits> & { exporter: typeof exporter } = {
+    ...cuts,
+    exporter: wiring.exporter,
+  };
   return {
     editing,
     session,
@@ -200,6 +126,10 @@ function useReviewEditorState(resource: LoadedReview) {
     setPlaying,
     selection,
     setSelection,
+    activeSelection,
+    setActiveSelection,
+    audio,
+    canvasComments,
     selected,
     setHovered,
     telemetry,
@@ -223,7 +153,10 @@ function useReviewEditorState(resource: LoadedReview) {
     play,
     run,
     canStart,
-    selectComment: comments.select,
+    selectComment: (annotation: ReviewAnnotation) => {
+      setActiveSelection({ kind: 'annotation', id: annotation.id });
+      comments.select(annotation);
+    },
     add: (marker?: ReviewTelemetryMarker) => comments.add(selection, marker),
     displayRegion: reviewRegion(
       time,
@@ -232,49 +165,6 @@ function useReviewEditorState(resource: LoadedReview) {
       selected,
       snapshot.document.annotations
     ),
-  };
-}
-
-/** Keyboard binding assembled from the composed actions; shortcuts stay one wiring owner. */
-function reviewShortcutBinding(args: {
-  time: number;
-  busy: boolean;
-  seek(value: number): void;
-  play(): void;
-  cutting: boolean;
-  exporter: {
-    phase: 'idle' | 'exporting' | 'publishing';
-    index: { boundaries: number[] } | null;
-  };
-  selection: ReviewAnchor;
-  setSelection(value: ReviewAnchor): void;
-  composer: { annotation: ReviewAnnotation | null };
-  cuts: Pick<ReturnType<typeof useReviewEdits>, 'setCutting' | 'remove' | 'toggle'>;
-  comments: Pick<ReturnType<typeof useReviewCommentActions>, 'add'>;
-  run(action: () => Promise<unknown>): Promise<unknown>;
-  session: ReturnType<
-    typeof import('../../workflows/video-review/session').createVideoReviewSession
-  >;
-}) {
-  return {
-    time: args.time,
-    seek: args.seek,
-    play: args.play,
-    composerAnnotation: args.composer.annotation,
-    busy: args.busy,
-    exporterPhase: args.exporter.phase,
-    exporterAvailable: !!args.exporter.index,
-    boundaries: args.cutting && args.exporter.index ? args.exporter.index.boundaries : undefined,
-    run: args.run,
-    session: args.session,
-    cancelDrawing: () => {
-      args.cuts.setCutting(false);
-      args.setSelection({ kind: 'point', time: args.time });
-    },
-    pointTool: () => args.cuts.setCutting(false),
-    remove: () => args.cuts.remove(),
-    addComment: () => args.comments.add(args.selection),
-    toggleCut: () => args.cuts.toggle('cut'),
   };
 }
 
@@ -380,6 +270,27 @@ function ReviewInspectorActions({
   );
 }
 
+async function moveReviewHistory(args: {
+  direction: 'undo' | 'redo';
+  flushAdvanced(): Promise<void>;
+  flushTexts(): Promise<void>;
+  session: ReturnType<
+    typeof import('../../workflows/video-review/session').createVideoReviewSession
+  >;
+}) {
+  await args.flushAdvanced();
+  await args.flushTexts();
+  await args.session.flush();
+  await args.session.history(args.direction);
+}
+
+function reviewErrorMessage(error: ReturnType<typeof useReviewEditorState>['snapshot']['error']) {
+  if (error === 'conflict') return translate('gallery.videoReview.conflict');
+  if (error === 'changed-source') return translate('gallery.videoReview.sourceChanged');
+  if (error === 'missing-media') return translate('gallery.videoReview.missingMedia');
+  return translate('gallery.videoReview.saveFailed');
+}
+
 function ReviewInspectorBinding({
   resource,
   state,
@@ -415,14 +326,15 @@ function ReviewInspectorBinding({
     resetAdvanced,
     flushAdvanced,
   } = state;
-  const errorKey: Parameters<typeof translate>[0] =
-    snapshot.error === 'conflict'
-      ? 'gallery.videoReview.conflict'
-      : snapshot.error === 'changed-source'
-        ? 'gallery.videoReview.sourceChanged'
-        : snapshot.error === 'missing-media'
-          ? 'gallery.videoReview.missingMedia'
-          : 'gallery.videoReview.saveFailed';
+  const onHistory = (direction: 'undo' | 'redo') =>
+    void run(() =>
+      moveReviewHistory({
+        direction,
+        flushAdvanced,
+        flushTexts: canvasComments.flushTexts,
+        session,
+      })
+    );
   return (
     <ReviewInspector
       filename={resource.filename}
@@ -458,7 +370,7 @@ function ReviewInspectorBinding({
           <ReviewAudioInspectorSection audio={audio} busy={busy} />
         </>
       }
-      message={snapshot.error ? translate(errorKey) : message}
+      message={snapshot.error ? reviewErrorMessage(snapshot.error) : message}
       onBack={() => {
         video.current?.pause();
         void run(async () => {
@@ -469,8 +381,8 @@ function ReviewInspectorBinding({
           onBack();
         });
       }}
-      onUndo={() => void run(() => session.history('undo'))}
-      onRedo={() => void run(() => session.history('redo'))}
+      onUndo={() => onHistory('undo')}
+      onRedo={() => onHistory('redo')}
       onAdd={() => add()}
       onSelect={selectComment}
       onHover={setHovered}
@@ -545,13 +457,8 @@ function ReviewCommentComposer({
   );
 }
 
-/** Audio lane wiring: import, recorder, and original-audio controls share one adapter. */
+/** Audio lane wiring: import and the recorder reuse the state-owned audio selection. */
 function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
-  const audio = useReviewAudio({
-    audio: state.advanced.audio,
-    setAudio: state.setAudio,
-    timelineDuration: state.timeline.resultDuration,
-  });
   const { onImportAudioFile, voiceover } = useReviewEditorAudio({
     busy: state.busy,
     canStart: state.canStart,
@@ -562,23 +469,17 @@ function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
     video: state.video,
     run: state.run,
     flushAdvanced: state.flushAdvanced,
-    audio,
+    audio: state.audio,
   });
-  return { audio, onImportAudioFile, voiceover };
+  return { onImportAudioFile, voiceover };
 }
 
 function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
   const state = useReviewEditorState(resource);
-  const { audio, onImportAudioFile, voiceover } = useReviewAudioWiring(state);
-  const canvasComments = useCanvasComments({
-    session: state.session,
-    time: state.time,
-    busy: state.busy,
-    exporterPhase: state.editing.exporter.phase,
-    canStart: state.canStart,
-    run: state.run,
-  });
+  const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const {
+    audio,
+    canvasComments,
     editing,
     source,
     snapshot,

@@ -6,7 +6,10 @@ import {
   releaseAssetReadyProtection,
 } from '../../composition/persistence/assets';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import { replayReviewHistory } from '../../features/video/review/document';
+import {
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../features/video/review/document';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnchor } from '../../features/video/review/types';
@@ -130,10 +133,22 @@ export async function exportReviewedVideo(
     original.source.duration !== index.duration
   )
     throw new Error('Review source or committed revision changed.');
-  const document = replayReviewHistory(workspace.history, workspace.cursor, workspace.source);
+  const document = replayReviewHistory(
+    workspace.history,
+    workspace.cursor,
+    workspace.source,
+    reviewAdvancedContentBaseline(workspace.advanced)
+  );
+  // Content flows through history ops; ui chrome stays with the whole-state record.
+  const advanced = {
+    ...workspace.advanced,
+    zoom: document.advancedContent.zoom,
+    background: document.advancedContent.background,
+    audio: document.advancedContent.audio,
+  };
   const plan = resolveQuickEditExportPlan({
     document,
-    advanced: workspace.advanced,
+    advanced,
     // A source audio track with a probed unavailable codec is a known blocker;
     // clips-only exports defer the authoritative probe to the exporter.
     ...(index.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
@@ -161,7 +176,7 @@ export async function exportReviewedVideo(
   let exportAudio: ReviewExportClipPlan | undefined;
   if (plan.audio === 'process') {
     exportAudio = await buildReviewExportClipPlan({
-      advanced: workspace.advanced,
+      advanced,
       fragmentOffset,
       signal,
       readProjectAsset: deps.readProjectAsset,
@@ -202,7 +217,7 @@ export async function exportReviewedVideo(
             file: original.file,
             index,
             edits,
-            advanced: workspace.advanced,
+            advanced,
             comments: resolveOverlayComments(document),
             fragmentOffset,
             writer,

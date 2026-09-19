@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyReviewOperation, replayReviewHistory } from './document';
+import { createQuickEditAdvancedContent } from './advanced/defaults';
+import type { QuickEditAdvancedContent } from './advanced/types';
 import { createCanvasComment } from './comments';
 import type { ReviewAnnotation, ReviewOperation, ReviewSource } from './types';
 
@@ -127,5 +129,66 @@ describe('video review history', () => {
         source
       )
     ).toThrow('entire');
+  });
+});
+
+describe('advancedContent operations', () => {
+  it('replays content ops on the baseline and undo returns to it', () => {
+    const baseline = createQuickEditAdvancedContent();
+    const zoomed: QuickEditAdvancedContent = {
+      ...baseline,
+      zoom: {
+        enabled: true,
+        regions: [
+          {
+            id: 'z',
+            start: 1,
+            end: 3,
+            transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'none', duration: 0 },
+            exit: { type: 'none', duration: 0 },
+          },
+        ],
+      },
+    };
+    const operation: ReviewOperation = {
+      id: 'op-a',
+      at: 5,
+      target: 'advancedContent',
+      before: baseline,
+      after: zoomed,
+    };
+    const history = [operation];
+    expect(replayReviewHistory(history, 1, source, baseline).advancedContent).toEqual(zoomed);
+    expect(replayReviewHistory(history, 0, source, baseline).advancedContent).toEqual(baseline);
+  });
+
+  it('rejects stale content before-values and no-change commits', () => {
+    const baseline = createQuickEditAdvancedContent();
+    const changed: QuickEditAdvancedContent = {
+      ...baseline,
+      audio: { ...baseline.audio, original: { muted: true, volume: 1 } },
+    };
+    expect(() =>
+      applyReviewOperation(
+        replayReviewHistory([], 0, source, baseline),
+        { id: 'op-b', at: 1, target: 'advancedContent', before: baseline, after: changed },
+        source
+      )
+    ).not.toThrow();
+    expect(() =>
+      applyReviewOperation(
+        replayReviewHistory([], 0, source, baseline),
+        { id: 'op-c', at: 1, target: 'advancedContent', before: changed, after: baseline },
+        source
+      )
+    ).toThrow('does not match');
+    expect(() =>
+      applyReviewOperation(
+        replayReviewHistory([], 0, source, baseline),
+        { id: 'op-d', at: 1, target: 'advancedContent', before: baseline, after: baseline },
+        source
+      )
+    ).toThrow('no change');
   });
 });

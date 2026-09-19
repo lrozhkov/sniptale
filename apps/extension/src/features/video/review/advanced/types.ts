@@ -113,3 +113,16 @@ export interface QuickEditAdvancedState {
   /** Raw v1 payload retained by the deterministic load-time migration. */
   recoveryV1?: string;
 }
+
+/**
+ * Advanced content without editor chrome: the part that changes the rendered
+ * result. It lives in the review history as `advancedContent` operations, so
+ * zoom/background/audio changes join the same undo timeline as cuts.
+ */
+export interface QuickEditAdvancedContent {
+  /** Version travels with each history payload so persisted operations are fixed-point parseable. */
+  schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
+  zoom: QuickEditZoomState;
+  background: QuickEditBackgroundSettings;
+  audio: QuickEditAudioState;
+}
