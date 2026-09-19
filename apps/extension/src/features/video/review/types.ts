@@ -51,9 +51,12 @@ export interface ReviewDocument {
  * Overlay comment pinned to the final frame; times are seconds on the original video.
  * Content positions are normalized to the padded content area so zoom drags them along;
  * viewport positions are normalized to the output canvas and ignore the camera.
+ * `annotationId` links an overlay to a saved annotation: the annotation owns the text,
+ * the overlay only references it, so both stay one source of truth.
  */
 export interface CanvasComment {
   id: string;
+  annotationId?: string;
   text: string;
   start?: number;
   end?: number;
@@ -61,6 +64,8 @@ export interface CanvasComment {
   renderToVideo: boolean;
   attachment: 'content' | 'viewport';
   position: { x: number; y: number };
+  /** Bubble placement relative to the anchor point; missing means above. */
+  placement?: 'above' | 'below';
   /** Bubble surface colors and corner rounding. */
   style: { fillPaint: Paint; textColor: string; radius: number };
 }

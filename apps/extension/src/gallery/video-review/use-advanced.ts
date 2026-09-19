@@ -115,6 +115,8 @@ export function useReviewAdvanced(session: Session) {
         ...current,
         ui: { ...current.ui, tracks: { ...current.ui.tracks, [track]: visible } },
       })),
+    setOverlaysVisible: (visible: boolean) =>
+      stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
     setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>
       stage((current) => ({ ...current, zoom: update(current.zoom) })),
     setBackground: (

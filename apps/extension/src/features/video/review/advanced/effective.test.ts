@@ -11,7 +11,11 @@ import type { QuickEditAdvancedState } from './types';
 
 const advancedWithContent = (): QuickEditAdvancedState => ({
   ...createQuickEditAdvancedState(),
-  ui: { mode: 'advanced', tracks: { actions: true, zoom: true, audio: true } },
+  ui: {
+    mode: 'advanced',
+    tracks: { actions: true, zoom: true, audio: true },
+    overlaysVisible: true,
+  },
   zoom: { enabled: true, regions: [] },
   background: {
     enabled: true,
@@ -36,7 +40,11 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
   });
   const basic = resolveQuickEditEffectiveFeatures({
     ...advancedWithContent(),
-    ui: { mode: 'basic', tracks: { actions: true, zoom: true, audio: true } },
+    ui: {
+      mode: 'basic',
+      tracks: { actions: true, zoom: true, audio: true },
+      overlaysVisible: true,
+    },
   });
   expect(basic).toMatchObject({
     mode: 'basic',
@@ -127,8 +135,10 @@ it('plans render requirements and audio-only processing from applied changes', (
     advanced: state,
   });
   expect(blocked).toMatchObject({
-    kind: 'unavailable',
-    reasons: ['burned-comment'],
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: expect.arrayContaining(['comments', 'zoom', 'background']),
   });
   const visual = resolveQuickEditExportPlan({
     document: document(false),
@@ -140,6 +150,19 @@ it('plans render requirements and audio-only processing from applied changes', (
     audio: 'copy',
     reasons: ['zoom', 'background'],
   });
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(true),
+      advanced: createQuickEditAdvancedState(),
+      videoRenderAvailable: false,
+    })
+  ).toMatchObject({ kind: 'unavailable', reasons: ['video-encoder'] });
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(true),
+      advanced: createQuickEditAdvancedState(),
+    })
+  ).toMatchObject({ kind: 'ready', video: 'render', audio: 'copy', reasons: ['comments'] });
   expect(
     resolveQuickEditExportPlan({
       document: document(false),

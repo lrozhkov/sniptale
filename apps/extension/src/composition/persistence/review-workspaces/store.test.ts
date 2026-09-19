@@ -345,7 +345,11 @@ it('opens legacy workspaces with advanced defaults and persists explicit replace
   );
   const advanced = {
     ...createQuickEditAdvancedState(),
-    ui: { mode: 'advanced', tracks: { actions: true, zoom: true, audio: true } },
+    ui: {
+      mode: 'advanced',
+      tracks: { actions: true, zoom: true, audio: true },
+      overlaysVisible: true,
+    },
   };
   const saved = await saveVideoWorkspaceAdvanced({
     aggregateId: id,
@@ -395,7 +399,11 @@ it('migrates a v1 advanced payload on load and keeps the workspace writable (R03
     updatedAt: 1,
     advanced: {
       schemaVersion: 1,
-      ui: { mode: 'advanced', tracks: { actions: true, zoom: true, audio: true } },
+      ui: {
+        mode: 'advanced',
+        tracks: { actions: true, zoom: true, audio: true },
+        overlaysVisible: true,
+      },
       zoom: {
         enabled: true,
         regions: [

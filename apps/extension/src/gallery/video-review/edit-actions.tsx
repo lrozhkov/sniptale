@@ -15,7 +15,7 @@ import { ReviewButton, reviewTimeLabel } from './controls';
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   zoom: 'gallery.videoReview.exportBlockerZoom',
   background: 'gallery.videoReview.exportBlockerBackground',
-  'burned-comment': 'gallery.videoReview.exportBlockerBurnedComment',
+  comments: 'gallery.videoReview.exportBlockerComments',
   voiceover: 'gallery.videoReview.exportBlockerVoiceover',
   music: 'gallery.videoReview.exportBlockerMusic',
   'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',

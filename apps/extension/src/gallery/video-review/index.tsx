@@ -170,26 +170,23 @@ function useReviewEditorState(resource: LoadedReview) {
     busy,
     exporterPhase: exporter.phase,
   });
-  useReviewEditorShortcuts({
-    time,
-    seek,
-    play,
-    composerAnnotation: composer.annotation,
-    busy,
-    exporterPhase: exporter.phase,
-    exporterAvailable: !!exporter.index,
-    boundaries: cutting && exporter.index ? exporter.index.boundaries : undefined,
-    run,
-    session,
-    cancelDrawing: () => {
-      cuts.setCutting(false);
-      setSelection({ kind: 'point', time });
-    },
-    pointTool: () => cuts.setCutting(false),
-    remove: () => cuts.remove(),
-    addComment: () => comments.add(selection),
-    toggleCut: () => cuts.toggle('cut'),
-  });
+  useReviewEditorShortcuts(
+    reviewShortcutBinding({
+      time,
+      busy,
+      seek,
+      play,
+      cutting,
+      exporter,
+      selection,
+      composer,
+      cuts,
+      comments,
+      run,
+      session,
+      setSelection,
+    })
+  );
   return {
     editing,
     session,
@@ -211,6 +208,7 @@ function useReviewEditorState(resource: LoadedReview) {
     timeline,
     setMode: advancedState.setMode,
     setTrackVisibility: advancedState.setTrackVisibility,
+    setOverlaysVisible: advancedState.setOverlaysVisible,
     zoom,
     setBackground: advancedState.setBackground,
     setAudio: advancedState.setAudio,
@@ -234,6 +232,49 @@ function useReviewEditorState(resource: LoadedReview) {
       selected,
       snapshot.document.annotations
     ),
+  };
+}
+
+/** Keyboard binding assembled from the composed actions; shortcuts stay one wiring owner. */
+function reviewShortcutBinding(args: {
+  time: number;
+  busy: boolean;
+  seek(value: number): void;
+  play(): void;
+  cutting: boolean;
+  exporter: {
+    phase: 'idle' | 'exporting' | 'publishing';
+    index: { boundaries: number[] } | null;
+  };
+  selection: ReviewAnchor;
+  setSelection(value: ReviewAnchor): void;
+  composer: { annotation: ReviewAnnotation | null };
+  cuts: Pick<ReturnType<typeof useReviewEdits>, 'setCutting' | 'remove' | 'toggle'>;
+  comments: Pick<ReturnType<typeof useReviewCommentActions>, 'add'>;
+  run(action: () => Promise<unknown>): Promise<unknown>;
+  session: ReturnType<
+    typeof import('../../workflows/video-review/session').createVideoReviewSession
+  >;
+}) {
+  return {
+    time: args.time,
+    seek: args.seek,
+    play: args.play,
+    composerAnnotation: args.composer.annotation,
+    busy: args.busy,
+    exporterPhase: args.exporter.phase,
+    exporterAvailable: !!args.exporter.index,
+    boundaries: args.cutting && args.exporter.index ? args.exporter.index.boundaries : undefined,
+    run: args.run,
+    session: args.session,
+    cancelDrawing: () => {
+      args.cuts.setCutting(false);
+      args.setSelection({ kind: 'point', time: args.time });
+    },
+    pointTool: () => args.cuts.setCutting(false),
+    remove: () => args.cuts.remove(),
+    addComment: () => args.comments.add(args.selection),
+    toggleCut: () => args.cuts.toggle('cut'),
   };
 }
 
@@ -297,9 +338,47 @@ type InspectorState = Pick<
   | 'zoom'
   | 'setBackground'
   | 'setAudio'
+  | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'flushAdvanced'
 >;
+
+/** Export control strip: one presentation owner for phase, progress, and blocker hints. */
+function ReviewInspectorActions({
+  editing,
+  snapshot,
+  busy,
+  composerBusy,
+  onExport,
+}: {
+  editing: InspectorState['editing'];
+  snapshot: InspectorState['snapshot'];
+  busy: boolean;
+  composerBusy: boolean;
+  onExport(): void;
+}) {
+  return (
+    <ReviewEditActions
+      available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
+      hasEdits={snapshot.document.edits.length > 0}
+      busy={busy || composerBusy}
+      phase={editing.exporter.phase}
+      progress={editing.exporter.progress}
+      failed={editing.exporter.failed}
+      hasResult={!!editing.exporter.result}
+      audioUnavailable={
+        !!editing.exporter.index?.audioCodec &&
+        !editing.exporter.index.processedAudioCodec &&
+        snapshot.document.edits.some((edit) => edit.kind === 'speed')
+      }
+      advancedBlockers={editing.exporter.blocked}
+      reencodeReasons={editing.exporter.reencode()}
+      onExport={onExport}
+      onCancel={editing.exporter.cancel}
+      onDownload={editing.exporter.download}
+    />
+  );
+}
 
 function ReviewInspectorBinding({
   resource,
@@ -351,27 +430,15 @@ function ReviewInspectorBinding({
       selectedId={selected?.id ?? null}
       busy={busy || editing.exporter.phase !== 'idle'}
       actions={
-        <ReviewEditActions
-          available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
-          hasEdits={snapshot.document.edits.length > 0}
-          busy={busy || !!composer.annotation}
-          phase={editing.exporter.phase}
-          progress={editing.exporter.progress}
-          failed={editing.exporter.failed}
-          hasResult={!!editing.exporter.result}
-          audioUnavailable={
-            !!editing.exporter.index?.audioCodec &&
-            !editing.exporter.index.processedAudioCodec &&
-            snapshot.document.edits.some((edit) => edit.kind === 'speed')
-          }
-          advancedBlockers={editing.exporter.blocked}
-          reencodeReasons={editing.exporter.reencode()}
+        <ReviewInspectorActions
+          editing={editing}
+          snapshot={snapshot}
+          busy={busy}
+          composerBusy={!!composer.annotation}
           onExport={() => {
             video.current?.pause();
             void editing.exporter.start();
           }}
-          onCancel={editing.exporter.cancel}
-          onDownload={editing.exporter.download}
         />
       }
       canUndo={!composer.annotation && snapshot.snapshot.workspace.cursor > 0}
@@ -384,6 +451,8 @@ function ReviewInspectorBinding({
           <ReviewCanvasCommentsSection
             {...canvasComments}
             comments={snapshot.document.canvasComments}
+            annotations={snapshot.document.annotations}
+            duration={resource.source.duration}
             busy={busy}
           />
           <ReviewAudioInspectorSection audio={audio} busy={busy} />
@@ -422,6 +491,10 @@ function ReviewInspectorBinding({
               after: null,
             })
           );
+      }}
+      onShowOnVideo={(annotation) => {
+        video.current?.pause();
+        void canvasComments.onShowOnVideo(annotation);
       }}
       onReport={(action) => {
         if (busy) return;
@@ -472,8 +545,8 @@ function ReviewCommentComposer({
   );
 }
 
-function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
-  const state = useReviewEditorState(resource);
+/** Audio lane wiring: import, recorder, and original-audio controls share one adapter. */
+function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
   const audio = useReviewAudio({
     audio: state.advanced.audio,
     setAudio: state.setAudio,
@@ -485,12 +558,18 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     time: state.time,
     resultDuration: state.timeline.resultDuration,
     toOutputTime: state.timeline.toOutputTime,
-    onCutPlacement: () => setMessage(translate('gallery.videoReview.placementOnCut')),
+    onCutPlacement: () => state.setMessage(translate('gallery.videoReview.placementOnCut')),
     video: state.video,
     run: state.run,
     flushAdvanced: state.flushAdvanced,
     audio,
   });
+  return { audio, onImportAudioFile, voiceover };
+}
+
+function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
+  const state = useReviewEditorState(resource);
+  const { audio, onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const canvasComments = useCanvasComments({
     session: state.session,
     time: state.time,
@@ -518,6 +597,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     timeline,
     setMode,
     setTrackVisibility,
+    setOverlaysVisible,
     zoom,
     busy,
     setMessage,
@@ -547,7 +627,9 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           outputTime={timeline.sceneOutputTime}
           zoomOverlay={zoomRegion ? zoom.focusOverlay(zoomRegion) : undefined}
           comments={snapshot.document.canvasComments}
+          annotations={snapshot.document.annotations}
           canvasComments={canvasComments}
+          overlaysVisible={features.overlaysVisible}
           time={time}
           busy={busy}
           onRegion={(region) => {
@@ -584,6 +666,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           onCutPlacement={() => setMessage(translate('gallery.videoReview.placementOnCut'))}
           setMode={setMode}
           setTrackVisibility={setTrackVisibility}
+          setOverlaysVisible={setOverlaysVisible}
           telemetryAvailable={!!resource.telemetry}
           time={time}
           playing={playing}

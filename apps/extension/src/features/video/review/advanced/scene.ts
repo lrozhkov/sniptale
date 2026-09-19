@@ -5,7 +5,7 @@ import type {
   QuickEditZoomRegion,
 } from './types';
 
-interface QuickEditRect {
+export interface QuickEditRect {
   x: number;
   y: number;
   width: number;

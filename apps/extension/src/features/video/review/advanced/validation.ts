@@ -65,7 +65,12 @@ function parseUiState(value: unknown): QuickEditUiState | null {
   if (!isRecord(value) || (value['mode'] !== 'basic' && value['mode'] !== 'advanced')) return null;
   const tracks = parseTrackVisibility(value['tracks']);
   if (!tracks) return null;
-  return { mode: value['mode'], tracks };
+  // Pre-overlay workspaces omit the display toggle; missing or invalid falls back on.
+  return {
+    mode: value['mode'],
+    tracks,
+    overlaysVisible: value['overlaysVisible'] === false ? false : true,
+  };
 }
 
 function parseZoomTransition(value: unknown): QuickEditZoomTransition | null {

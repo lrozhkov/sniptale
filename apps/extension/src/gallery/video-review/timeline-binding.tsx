@@ -93,6 +93,7 @@ export function ReviewTimelineBinding(props: {
   advanced: QuickEditAdvancedState;
   setMode(mode: 'basic' | 'advanced'): void;
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
+  setOverlaysVisible(visible: boolean): void;
   telemetryAvailable: boolean;
   time: number;
   playing: boolean;
@@ -142,6 +143,7 @@ export function ReviewTimelineBinding(props: {
           advanced={props.advanced}
           setMode={props.setMode}
           setTrackVisibility={props.setTrackVisibility}
+          setOverlaysVisible={props.setOverlaysVisible}
           telemetryAvailable={props.telemetryAvailable}
           onAddComment={() => props.onAddComment()}
           onAddOverlayComment={() => void props.canvasComments.onAdd()}

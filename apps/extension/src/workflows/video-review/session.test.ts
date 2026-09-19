@@ -98,7 +98,11 @@ it('saves advanced state through the revisioned queue and reports failures as co
   const snapshot = initial();
   const advanced = {
     ...createQuickEditAdvancedState(),
-    ui: { mode: 'advanced' as const, tracks: { actions: true, zoom: true, audio: false } },
+    ui: {
+      mode: 'advanced' as const,
+      tracks: { actions: true, zoom: true, audio: false },
+      overlaysVisible: true,
+    },
   };
   const saved = {
     ...snapshot,

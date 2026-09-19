@@ -11,6 +11,8 @@ import type { ReviewMediaIndex } from '../../workflows/video-review/media-index'
 import {
   Activity,
   AudioLines,
+  Eye,
+  EyeOff,
   Focus,
   MessageSquarePlus,
   SlidersHorizontal,
@@ -40,6 +42,8 @@ type ToolbarProps = {
   advanced: QuickEditAdvancedState;
   setMode(mode: 'basic' | 'advanced'): void;
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
+  /** Editor-only overlay display toggle; comment data and exports stay untouched. */
+  setOverlaysVisible(visible: boolean): void;
   telemetryAvailable: boolean;
   onAddComment(): void;
   onAddOverlayComment(): void;
@@ -146,6 +150,19 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           </ReviewButton>
         </>
       ) : null}
+      <ReviewButton
+        label={translate(
+          features.overlaysVisible
+            ? 'gallery.videoReview.hideOverlays'
+            : 'gallery.videoReview.showOverlays'
+        )}
+        aria-pressed={features.overlaysVisible}
+        className="!border-0 !bg-transparent !shadow-none
+            aria-pressed:!bg-[var(--sniptale-color-accent-soft)]"
+        onClick={() => props.setOverlaysVisible(!features.overlaysVisible)}
+      >
+        {features.overlaysVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+      </ReviewButton>
       {advanced.ui.mode === 'basic' && hasSuppressedAdvancedFeatures(advanced) ? (
         <span
           role="status"

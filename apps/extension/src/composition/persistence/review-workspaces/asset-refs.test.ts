@@ -8,7 +8,11 @@ vi.mock('../infrastructure/indexed-db/core', () => ({}));
 
 const advanced = (patch: Partial<QuickEditAdvancedState>): QuickEditAdvancedState => ({
   schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
-  ui: { mode: 'basic', tracks: { actions: true, zoom: false, audio: false } },
+  ui: {
+    mode: 'basic',
+    tracks: { actions: true, zoom: false, audio: false },
+    overlaysVisible: true,
+  },
   zoom: { enabled: false, regions: [] },
   background: { enabled: false },
   audio: { original: { muted: false, volume: 1 }, voiceover: [], music: [] },

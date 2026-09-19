@@ -2,7 +2,12 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
 import { fitVideoRect, projectVideoRegion } from '../../features/video/review/geometry';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
-import type { CanvasComment, ReviewRegion, ReviewSource } from '../../features/video/review/types';
+import type {
+  CanvasComment,
+  ReviewAnnotation,
+  ReviewRegion,
+  ReviewSource,
+} from '../../features/video/review/types';
 import {
   computeQuickEditSceneLayout,
   quickEditCanvasPointToContent,
@@ -14,7 +19,23 @@ import type {
 import { ReviewCommentOverlay } from './comment-overlay';
 import { useReviewDrawingPlane } from './stage-drawing';
 
-/** Draws in the oriented image plane, never in the player's letterbox margins. */
+/** Stage pixels: the host box measured once and on every resize. */
+function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
+  const [size, setSize] = useState({ width: 1, height: 1 });
+  useEffect(() => {
+    const node = host.current;
+    if (!node) return;
+    const measure = () =>
+      setSize({ width: Math.max(1, node.clientWidth), height: Math.max(1, node.clientHeight) });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [host]);
+  return size;
+}
+
+/** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
 export function ReviewStage(props: {
   url: string;
   source: ReviewSource;
@@ -33,6 +54,7 @@ export function ReviewStage(props: {
   };
   comments?: {
     items: readonly CanvasComment[];
+    annotations: readonly ReviewAnnotation[];
     time: number;
     background: QuickEditBackgroundSettings;
     camera: QuickEditCameraTransform | null;
@@ -40,6 +62,11 @@ export function ReviewStage(props: {
     busy: boolean;
     onSelect(id: string): void;
     onMove(id: string, position: { x: number; y: number }): void;
+    /** Reports the stage geometry for attachment switching; null hides overlays. */
+    onGeometry?(geometry: {
+      output: { width: number; height: number };
+      videoTransform: { x: number; y: number; width: number; height: number } | null;
+    }): void;
   };
   onRegion(value: ReviewRegion): void;
   onReady(): void;
@@ -49,17 +76,6 @@ export function ReviewStage(props: {
 }) {
   const host = useRef<HTMLDivElement>(null);
   const zoomDrag = useRef<{ origin: { x: number; y: number }; pointerId: number } | null>(null);
-  const [size, setSize] = useState({ width: 1, height: 1 });
-  useEffect(() => {
-    const node = host.current;
-    if (!node) return;
-    const measure = () =>
-      setSize({ width: Math.max(1, node.clientWidth), height: Math.max(1, node.clientHeight) });
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && zoomDrag.current) {
@@ -71,6 +87,7 @@ export function ReviewStage(props: {
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   });
+  const size = useStageMeasure(host);
   const sceneLayout = props.scene
     ? computeQuickEditSceneLayout({
         output: size,
@@ -92,6 +109,14 @@ export function ReviewStage(props: {
     : null;
   // Drawing maps into the represented pixels, so the post-camera rect is authoritative.
   const content = sceneLayout ? sceneLayout.videoTransform : fitVideoRect(size, props.source);
+  const reportGeometry = props.comments?.onGeometry;
+  useEffect(() => {
+    if (reportGeometry && sceneLayout)
+      reportGeometry({
+        output: size,
+        videoTransform: sceneLayout.videoTransform,
+      });
+  }, [size, sceneLayout, reportGeometry]);
   const plane = useReviewDrawingPlane({
     drawing: props.drawing,
     content,
@@ -166,6 +191,8 @@ export function ReviewStage(props: {
 function ReviewStageComments(props: {
   comments: {
     items: readonly CanvasComment[];
+    /** Linked overlays resolve their text from the annotation owner. */
+    annotations: readonly ReviewAnnotation[];
     time: number;
     background: QuickEditBackgroundSettings;
     camera: QuickEditCameraTransform | null;
@@ -180,6 +207,7 @@ function ReviewStageComments(props: {
   return (
     <ReviewCommentOverlay
       comments={props.comments.items}
+      annotations={props.comments.annotations}
       output={props.output}
       source={props.source}
       background={props.comments.background}

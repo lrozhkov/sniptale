@@ -13,6 +13,8 @@ interface QuickEditEffectiveFeatures {
   actionsTrackVisible: boolean;
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
+  /** Editor-only overlay display toggle; never mutates comment data or exports. */
+  overlaysVisible: boolean;
   /** Advanced effects are suppressed while the editor is in basic mode. */
   zoomApplied: boolean;
   backgroundApplied: boolean;
@@ -34,6 +36,7 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
+    overlaysVisible: state.ui.overlaysVisible,
     zoomApplied: advanced && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
     originalAudioApplied: advanced,
@@ -74,7 +77,7 @@ export function resolveQuickEditEffectiveState(
 export type QuickEditExportReason =
   | 'zoom'
   | 'background'
-  | 'burned-comment'
+  | 'comments'
   | 'voiceover'
   | 'music'
   | 'original-audio'
@@ -93,9 +96,9 @@ export type QuickEditExportPlan =
 
 /**
  * Export decision from the applied configuration, not lane visibility or dormant
- * settings. Pixel-changing effects route to the full frame renderer; audio-only
- * changes are processable when the capability hint allows audio encoding. Burned
- * overlays keep blocking until their renderer lands with the comments bridge.
+ * settings. Pixel-changing effects and burned overlays route to the full frame
+ * renderer; audio-only changes are processable when the capability hint allows
+ * audio encoding.
  */
 export function resolveQuickEditExportPlan(args: {
   document: Pick<ReviewDocument, 'edits' | 'canvasComments'>;
@@ -104,18 +107,24 @@ export function resolveQuickEditExportPlan(args: {
   audioProcessingAvailable?: boolean;
   videoRenderAvailable?: boolean;
 }): QuickEditExportPlan {
-  if (args.advanced.ui.mode !== 'advanced')
+  const burned = args.document.canvasComments.some((comment) => comment.renderToVideo);
+  if (args.advanced.ui.mode !== 'advanced') {
+    if (burned) {
+      if (args.videoRenderAvailable === false)
+        return { kind: 'unavailable', reasons: ['video-encoder'] };
+      return { kind: 'ready', video: 'render', audio: 'copy', reasons: ['comments'] };
+    }
     return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
+  }
   const audio: QuickEditExportReason[] = [];
   if (args.advanced.audio.voiceover.length > 0) audio.push('voiceover');
   if (args.advanced.audio.music.length > 0) audio.push('music');
   if (args.advanced.audio.original.muted || args.advanced.audio.original.volume !== 1)
     audio.push('original-audio');
-  if (args.document.canvasComments.some((comment) => comment.renderToVideo))
-    return { kind: 'unavailable', reasons: ['burned-comment', ...audio] };
   const visual: QuickEditExportReason[] = [];
   if (args.advanced.zoom.enabled) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
+  if (burned) visual.push('comments');
   if (visual.length) {
     if (args.videoRenderAvailable === false)
       return { kind: 'unavailable', reasons: ['video-encoder', ...audio] };

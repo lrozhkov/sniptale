@@ -5,8 +5,13 @@ import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
 } from '../../features/video/review/advanced/types';
-import type { CanvasComment } from '../../features/video/review/types';
-import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
+import type { CanvasComment, ReviewAnnotation } from '../../features/video/review/types';
+import {
+  CANVAS_COMMENT_BUBBLE,
+  canvasCommentText,
+  isCanvasCommentVisibleAt,
+  overlayPulsePhase,
+} from '../../features/video/review/comments';
 import {
   computeQuickEditSceneLayout,
   quickEditCanvasPointToContent,
@@ -15,15 +20,17 @@ import {
 
 type VideoRect = { x: number; y: number; width: number; height: number };
 
-/** One overlay bubble with its pulsing anchor point and pointer drag commit. */
+/** One overlay bubble with its media-time pulse and pointer drag commit. */
 function OverlayComment(props: {
   comment: CanvasComment;
+  resolvedText: string;
   scale: number;
   layer: number;
   selected: boolean;
   busy: boolean;
   videoTransform: VideoRect | null;
   output: { width: number; height: number };
+  sourceTime: number;
   onSelect(): void;
   onMove(id: string, position: { x: number; y: number }): void;
 }) {
@@ -75,6 +82,8 @@ function OverlayComment(props: {
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   }, [dragPosition]);
+  const phase = overlayPulsePhase(props.sourceTime, props.comment.start);
+  const below = props.comment.placement === 'below';
   return (
     <div
       data-ui="gallery.videoReview.canvasComment"
@@ -86,22 +95,25 @@ function OverlayComment(props: {
         zIndex: props.layer,
       }}
     >
-      {props.comment.text.trim() ? (
+      {props.resolvedText.trim() ? (
         <div
           data-ui="gallery.videoReview.canvasCommentBubble"
-          className="pointer-events-none absolute left-1/2 top-0 w-max max-w-56
-              -translate-x-1/2 -translate-y-[calc(100%+12px)] whitespace-pre-wrap break-words
+          className="pointer-events-none absolute left-1/2 w-max max-w-56
+              -translate-x-1/2 whitespace-pre-wrap break-words
               px-2.5 py-1.5 text-xs leading-snug shadow-sm"
           style={{
             background: serializePaintToCss(props.comment.style.fillPaint),
             color: props.comment.style.textColor,
             borderRadius: props.comment.style.radius,
+            ...(below
+              ? { top: `calc(100% + ${CANVAS_COMMENT_BUBBLE.gap}px)` }
+              : { bottom: `calc(100% + ${CANVAS_COMMENT_BUBBLE.gap}px)` }),
             ...(props.selected
               ? { outline: '2px solid var(--sniptale-color-accent)', outlineOffset: 1 }
               : {}),
           }}
         >
-          {props.comment.text}
+          {props.resolvedText}
         </div>
       ) : null}
       <button
@@ -134,11 +146,19 @@ function OverlayComment(props: {
           event.stopPropagation();
           finish();
         }}
-        onPointerCancel={finish}
+        onPointerCancel={() => {
+          origin.current = null;
+          dragPositionRef.current = null;
+          setDragPosition(null);
+        }}
       >
         <span
-          className="absolute inset-0 -z-10 animate-ping rounded-full
-            bg-[var(--sniptale-color-accent)] opacity-30"
+          className="absolute inset-0 -z-10 rounded-full
+            bg-[var(--sniptale-color-accent)]"
+          style={{
+            opacity: 0.35 * (1 - phase),
+            transform: `scale(${1 + 1.4 * phase})`,
+          }}
         />
       </button>
     </div>
@@ -147,10 +167,12 @@ function OverlayComment(props: {
 
 /**
  * Overlay comments in the renderer stack: content-attached bubbles ride the camera
- * transform and viewport-attached ones stay fixed to the output frame.
+ * transform and viewport-attached ones stay fixed to the output frame. The pulse
+ * phase is a function of media time, so a paused seek and the export agree.
  */
 export function ReviewCommentOverlay(props: {
   comments: readonly CanvasComment[];
+  annotations?: readonly ReviewAnnotation[];
   output: { width: number; height: number };
   source: { width: number; height: number };
   background: QuickEditBackgroundSettings;
@@ -180,12 +202,14 @@ export function ReviewCommentOverlay(props: {
             <OverlayComment
               key={comment.id}
               comment={comment}
+              resolvedText={canvasCommentText(comment, props.annotations ?? [])}
               videoTransform={content ? layout.videoTransform : null}
               scale={content ? (props.camera?.scale ?? 1) : 1}
               layer={content ? 5 : 9}
               selected={comment.id === props.selectedId}
               busy={props.busy}
               output={props.output}
+              sourceTime={props.time}
               onSelect={() => props.onSelect(comment.id)}
               onMove={props.onMove}
             />

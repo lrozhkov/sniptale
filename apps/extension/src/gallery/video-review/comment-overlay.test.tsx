@@ -173,3 +173,53 @@ it('selects a comment point on click', async () => {
   await act(async () => points[0]!.querySelector('button')!.click());
   expect(onSelect).toHaveBeenCalledWith('c1');
 });
+
+it('derives the pulse phase from media time instead of a CSS animation', () => {
+  const comment = { ...createCanvasComment({ id: 'c1', at: 2 }), text: 'Pulse' };
+  const [early] = renderOverlay([comment], 2.25);
+  const ring = early!.querySelector('span') as HTMLElement;
+  expect(ring.className).not.toContain('animate-ping');
+  expect(Number(ring.style.opacity)).toBeCloseTo(0.2625, 5);
+  const [later] = renderOverlay([comment], 2.75);
+  const laterRing = later!.querySelector('span') as HTMLElement;
+  expect(Number(laterRing.style.opacity)).toBeCloseTo(0.0875, 5);
+});
+
+it('resolves linked annotation text without copying it into the comment', () => {
+  const linked = createCanvasComment({ id: 'c1', at: 1, annotationId: 'a1' });
+  act(() => {
+    root.render(
+      <ReviewCommentOverlay
+        comments={[linked]}
+        annotations={[
+          { id: 'a1', text: 'From the annotation', anchor: { kind: 'point', time: 1 } },
+        ]}
+        output={{ width: 800, height: 450 }}
+        source={{ width: 320, height: 180 }}
+        background={{ enabled: false }}
+        camera={null}
+        time={1}
+        selectedId={null}
+        onSelect={onSelect}
+        onMove={onMove}
+        busy={false}
+      />
+    );
+  });
+  const bubble = host.querySelector('[data-ui="gallery.videoReview.canvasCommentBubble"]')!;
+  expect(bubble.textContent).toBe('From the annotation');
+});
+
+it('places below bubbles under the anchor point', () => {
+  const below = {
+    ...createCanvasComment({ id: 'c1', at: 1 }),
+    text: 'Down',
+    placement: 'below' as const,
+  };
+  const [point] = renderOverlay([below], 1);
+  const bubble = point!.querySelector(
+    '[data-ui="gallery.videoReview.canvasCommentBubble"]'
+  ) as HTMLElement;
+  expect(bubble.style.top).toBe('calc(100% + 12px)');
+  expect(bubble.style.bottom).toBe('');
+});

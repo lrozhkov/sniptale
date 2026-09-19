@@ -14,6 +14,8 @@ export interface QuickEditTrackVisibility {
 export interface QuickEditUiState {
   mode: 'basic' | 'advanced';
   tracks: QuickEditTrackVisibility;
+  /** Editor-only overlay display; the data and the export flag are untouched. */
+  overlaysVisible: boolean;
 }
 
 export interface QuickEditZoomTransition {

@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewCanvasCommentEditor, ReviewCanvasCommentsSection } from './comment-editor';
 import { createCanvasComment } from '../../features/video/review/comments';
-import type { CanvasComment } from '../../features/video/review/types';
+import type { CanvasComment, ReviewAnnotation } from '../../features/video/review/types';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -33,6 +33,10 @@ const comment = () => ({
   text: 'Hello',
 });
 
+const annotations: ReviewAnnotation[] = [
+  { id: 'a1', text: 'Saved', anchor: { kind: 'point', time: 1 } },
+];
+
 const typeValue = (input: HTMLTextAreaElement, value: string) => {
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
   setter.call(input, value);
@@ -41,13 +45,17 @@ const typeValue = (input: HTMLTextAreaElement, value: string) => {
 
 it('commits text after the debounce and switches the zoom behavior once', async () => {
   const onPatch = vi.fn((_patch: Partial<Omit<CanvasComment, 'id'>>) => undefined);
+  const onSwitch = vi.fn((_attachment: CanvasComment['attachment']) => undefined);
   const onDelete = vi.fn();
   act(() => {
     root.render(
       <ReviewCanvasCommentEditor
         comment={comment()}
+        annotations={annotations}
+        duration={10}
         busy={false}
         onPatch={onPatch}
+        onSwitchAttachment={onSwitch}
         onDelete={onDelete}
       />
     );
@@ -69,7 +77,7 @@ it('commits text after the debounce and switches the zoom behavior once', async 
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.stayOnScreen"]')!
       .click()
   );
-  expect(onPatch).toHaveBeenCalledWith({ attachment: 'viewport' });
+  expect(onSwitch).toHaveBeenCalledWith('viewport');
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!
@@ -101,11 +109,14 @@ it('lists overlay comments, selects them, and adds through the section button', 
     root.render(
       <ReviewCanvasCommentsSection
         comments={comments}
+        annotations={annotations}
+        duration={10}
         selectedId={null}
         busy={false}
         onSelect={onSelect}
         onAdd={onAdd}
         onPatch={vi.fn()}
+        onSwitchAttachment={vi.fn()}
         onDraft={vi.fn()}
         onDelete={vi.fn()}
         flushTexts={vi.fn(async () => undefined)}
@@ -132,8 +143,11 @@ it('keeps the typed draft when the acknowledged text arrives and commits it late
       root.render(
         <ReviewCanvasCommentEditor
           comment={{ ...comment(), text }}
+          annotations={annotations}
+          duration={10}
           busy={false}
           onPatch={onPatch}
+          onSwitchAttachment={vi.fn()}
           onDraft={onDraft}
           onDelete={vi.fn()}
         />
@@ -158,8 +172,11 @@ it('commits pending text when the editor unmounts', async () => {
     root.render(
       <ReviewCanvasCommentEditor
         comment={comment()}
+        annotations={annotations}
+        duration={10}
         busy={false}
         onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
         onDelete={vi.fn()}
       />
     );

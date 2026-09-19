@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { createCanvasComment } from '../../features/video/review/comments';
 import {
   drawReviewSceneFrame,
   drainSegmentAudio,
@@ -84,6 +85,9 @@ const realCreateImageBitmap = globalThis.createImageBitmap;
 function contextFixture() {
   return {
     fillStyle: '',
+    globalAlpha: 1,
+    font: '',
+    textBaseline: '',
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
@@ -91,6 +95,11 @@ function contextFixture() {
     roundRect: vi.fn(),
     clip: vi.fn(),
     fillRect: vi.fn(),
+    fill: vi.fn(),
+    stroke: vi.fn(),
+    arc: vi.fn(),
+    fillText: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
     drawImage: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
 }
@@ -314,6 +323,7 @@ describe('renderRenderWindowFrames', () => {
         },
       ],
       background: { enabled: false },
+      comments: [],
       canvas: { width: 320, height: 180 } as HTMLCanvasElement,
       context: contextFixture(),
       image: null,
@@ -340,6 +350,7 @@ describe('renderRenderWindowFrames', () => {
         fragmentOffset: 0,
         zoomRegions: [],
         background: { enabled: false },
+        comments: [],
         canvas: { width: 320, height: 180 } as HTMLCanvasElement,
         context: contextFixture(),
         image: null,
@@ -443,4 +454,72 @@ describe('writeReviewFrames', () => {
       reasons: ['asset-missing'],
     });
   });
+});
+
+it('burns visible comments inside the clip and viewport comments after restore', async () => {
+  const calls: string[] = [];
+  const context = {
+    ...contextFixture(),
+    save: vi.fn(() => calls.push('save')),
+    clip: vi.fn(() => calls.push('clip')),
+    restore: vi.fn(() => calls.push('restore')),
+    arc: vi.fn(() => calls.push('point')),
+    fillText: vi.fn(() => calls.push('text')),
+    roundRect: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const frameSink = {
+    samplesAtTimestamps: async function* (times: readonly number[]) {
+      for (const _time of times) yield { draw: vi.fn(), close: vi.fn() } as never;
+    },
+  };
+  const videoOut = { add: vi.fn(async () => undefined), close: vi.fn() };
+  await renderRenderWindowFrames({
+    window: { segment: segmentStub(0, 1), timestamps: [0], sourceTimes: [0.5] },
+    fps: 2,
+    fragmentOffset: 0,
+    zoomRegions: [],
+    background: { enabled: false },
+    comments: [
+      { ...createCanvasComment({ id: 'in', at: 0 }), resolvedText: 'burn me' },
+      { ...createCanvasComment({ id: 'out', at: 0.9 }), resolvedText: 'too late' },
+      {
+        ...createCanvasComment({ id: 'flat', at: 0 }),
+        renderToVideo: false,
+        resolvedText: 'never',
+      },
+    ] as never,
+    canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+    context,
+    image: null,
+    frameSink: frameSink as never,
+    videoOut,
+    resultDuration: 1,
+    onProgress: undefined,
+    signal: new AbortController().signal,
+  });
+  expect(calls.filter((call) => call === 'point')).toHaveLength(2);
+  expect(calls.filter((call) => call === 'text')).toHaveLength(1);
+  expect(calls.indexOf('clip')).toBeLessThan(calls.indexOf('point'));
+});
+
+it('draws below-placed bubbles under the anchor point', () => {
+  const context = contextFixture();
+  drawReviewSceneFrame(context, {
+    canvas: { width: 176, height: 104 },
+    layout: {
+      contentRect: { x: 8, y: 8, width: 160, height: 88 },
+      videoRect: { x: 8, y: 8, width: 160, height: 88 },
+      videoTransform: { x: 4, y: 2, width: 168, height: 104 },
+    },
+    background: { enabled: false },
+    image: null,
+    sample: { draw: vi.fn() } as never,
+    comments: [
+      { ...createCanvasComment({ id: 'c', at: 0 }), placement: 'below', resolvedText: 'Hi' },
+    ],
+    sourceTime: 0,
+    cameraScale: 1,
+  });
+  const boxY = vi.mocked(context.roundRect).mock.calls[0]![1] as number;
+  expect(boxY).toBeGreaterThan(60);
 });

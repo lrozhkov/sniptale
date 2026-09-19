@@ -174,6 +174,16 @@ function parseCanvasComment(value: unknown, duration: number): CanvasComment | n
   if (start !== undefined && end !== undefined && start >= end) return null;
   if (typeof value['visible'] !== 'boolean' || typeof value['renderToVideo'] !== 'boolean')
     return null;
+  const annotationId =
+    value['annotationId'] === undefined || value['annotationId'] === null
+      ? undefined
+      : value['annotationId'];
+  if (annotationId !== undefined && !identity(annotationId)) return null;
+  const placement =
+    value['placement'] === undefined || value['placement'] === null
+      ? undefined
+      : value['placement'];
+  if (placement !== undefined && placement !== 'above' && placement !== 'below') return null;
   const style = value['style'];
   if (
     !isRecord(style) ||
@@ -188,6 +198,7 @@ function parseCanvasComment(value: unknown, duration: number): CanvasComment | n
     return null;
   return {
     id: value['id'],
+    ...(annotationId === undefined ? {} : { annotationId }),
     text: value['text'],
     ...(start === undefined ? {} : { start }),
     ...(end === undefined ? {} : { end }),
@@ -195,6 +206,7 @@ function parseCanvasComment(value: unknown, duration: number): CanvasComment | n
     renderToVideo: value['renderToVideo'],
     attachment: value['attachment'],
     position: { x: value['position']['x'], y: value['position']['y'] },
+    ...(placement === undefined ? {} : { placement }),
     style: {
       fillPaint: parsePaint(style['fillPaint'])!,
       textColor: style['textColor'],

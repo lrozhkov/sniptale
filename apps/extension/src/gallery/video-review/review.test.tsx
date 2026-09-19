@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
 import { parseReviewOperation } from '../../features/video/review/validation';
-import type { ReviewAnchor } from '../../features/video/review/types';
+import type { CanvasComment, ReviewAnchor } from '../../features/video/review/types';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -593,6 +593,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     expect(fixture.snapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
       tracks: { actions: true, zoom: true, audio: false },
+      overlaysVisible: true,
     });
     expect(integration.advanced).toHaveBeenCalled();
     await click('advancedEditing');
@@ -633,7 +634,7 @@ it('adds an overlay comment, drags it on the stage and deletes it via the editor
     expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('canvasComment');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
       attachment: 'content',
-      position: { x: 0.5, y: 0.5 },
+      position: { x: 0.44, y: 0.5 },
       start: 0,
     });
     expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).not.toBeNull();
@@ -656,9 +657,9 @@ it('adds an overlay comment, drags it on the stage and deletes it via the editor
         );
       });
     await drag(160, 90);
-    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
-      position: { x: 0.75, y: 0.75 },
-    });
+    const dragged = fixture.snapshot.workspace.history.at(-1)?.after as CanvasComment | undefined;
+    expect(dragged?.position.x).toBeCloseTo(0.69, 5);
+    expect(dragged?.position.y).toBeCloseTo(0.75, 5);
 
     await click('stayOnScreen');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({

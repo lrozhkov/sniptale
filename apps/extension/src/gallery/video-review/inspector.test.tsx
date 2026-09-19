@@ -42,6 +42,7 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
           onEdit={onEdit}
           onHover={onHover}
           onDelete={vi.fn()}
+          onShowOnVideo={vi.fn()}
           onReport={vi.fn()}
         >
           {null}

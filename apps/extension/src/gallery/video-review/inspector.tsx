@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Pencil, Trash2, Copy, Download, ArrowLeft } from 'lucide-react';
+import { Undo2, Redo2, Pencil, Trash2, Copy, Download, ArrowLeft, Video } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
@@ -21,6 +21,8 @@ export function ReviewInspector(props: {
   onHover(value: ReviewAnnotation | null): void;
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
+  /** Shows a saved annotation as a burned overlay without retyping its text. */
+  onShowOnVideo(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
   children: ReactNode;
   actions?: ReactNode;
@@ -78,6 +80,7 @@ export function ReviewInspector(props: {
           onHover={props.onHover}
           onEdit={props.onEdit}
           onDelete={props.onDelete}
+          onShowOnVideo={props.onShowOnVideo}
         />
         {props.canvas}
       </div>
@@ -128,6 +131,7 @@ function ReviewAnnotationList(props: {
   onHover(value: ReviewAnnotation | null): void;
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
+  onShowOnVideo(value: ReviewAnnotation): void;
 }) {
   return (
     <ol className="space-y-2">
@@ -158,6 +162,14 @@ function ReviewAnnotationList(props: {
             </span>
           </button>
           <div className="absolute right-1 top-1 flex gap-1">
+            <ReviewButton
+              label={translate('gallery.videoReview.showOnVideo')}
+              disabled={props.busy}
+              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+              onClick={() => props.onShowOnVideo(annotation)}
+            >
+              <Video size={16} />
+            </ReviewButton>
             <ReviewButton
               label={translate('gallery.videoReview.editComment')}
               disabled={props.busy}

@@ -39,7 +39,11 @@ const audioClip = (id: string) => ({
 
 const advanced = (): QuickEditAdvancedState => ({
   schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
-  ui: { mode: 'advanced', tracks: { actions: false, zoom: true, audio: true } },
+  ui: {
+    mode: 'advanced',
+    tracks: { actions: false, zoom: true, audio: true },
+    overlaysVisible: true,
+  },
   zoom: {
     enabled: true,
     regions: [
@@ -200,15 +204,39 @@ describe('rejects malformed persisted state', () => {
     expect(
       loadQuickEditAdvancedState({
         ...structuredClone(advanced()),
-        ui: { mode: 'pro', tracks: { actions: true, zoom: true, audio: true } },
+        ui: {
+          mode: 'pro',
+          tracks: { actions: true, zoom: true, audio: true },
+          overlaysVisible: true,
+        },
       })
     ).toBeNull();
     expect(
       loadQuickEditAdvancedState({
         ...structuredClone(advanced()),
-        ui: { mode: 'advanced', tracks: { actions: 1, zoom: true, audio: true } },
+        ui: {
+          mode: 'advanced',
+          tracks: { actions: 1, zoom: true, audio: true },
+          overlaysVisible: true,
+        },
       })
     ).toBeNull();
+  });
+
+  it('falls legacy workspaces back to visible overlays', () => {
+    const legacy = structuredClone(advanced()) as unknown as Record<string, unknown>;
+    delete (legacy['ui'] as Record<string, unknown>)['overlaysVisible'];
+    const loaded = loadQuickEditAdvancedState(legacy);
+    expect(loaded?.ui.overlaysVisible).toBe(true);
+    const hidden = loadQuickEditAdvancedState({
+      ...structuredClone(advanced()),
+      ui: {
+        mode: 'advanced',
+        tracks: { actions: false, zoom: true, audio: true },
+        overlaysVisible: false,
+      },
+    });
+    expect(hidden?.ui.overlaysVisible).toBe(false);
   });
 
   it('rejects out-of-range camera transforms', () => {

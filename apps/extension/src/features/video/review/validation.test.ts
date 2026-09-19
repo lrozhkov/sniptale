@@ -147,3 +147,25 @@ it('parses canvas comment operations and rejects unbounded or malformed overlay 
     )
   ).toBeNull();
 });
+
+it('round-trips linked overlays: annotation link and placement survive parsing', () => {
+  const linked = {
+    ...createCanvasComment({ id: 'c1', at: 2, annotationId: 'a1', placement: 'below' as const }),
+    text: '',
+  };
+  const op = { id: 'op9', at: 3, target: 'canvasComment', before: null, after: linked };
+  expect(parseReviewOperation(op, 10)).toEqual(op);
+  const legacy = { ...createCanvasComment({ id: 'c2', at: 2 }) };
+  const legacyOp = { id: 'op10', at: 3, target: 'canvasComment', before: null, after: legacy };
+  expect(parseReviewOperation(legacyOp, 10)).toEqual(legacyOp);
+  const parsedLegacy = parseReviewOperation(legacyOp, 10);
+  expect('annotationId' in ((parsedLegacy?.after ?? {}) as Record<string, unknown>)).toBe(false);
+  for (const patch of [{ annotationId: 42 }, { placement: 'side' }]) {
+    expect(
+      parseReviewOperation(
+        { id: 'op9', at: 3, target: 'canvasComment', before: null, after: { ...linked, ...patch } },
+        10
+      )
+    ).toBeNull();
+  }
+});

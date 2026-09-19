@@ -22,8 +22,16 @@ import type {
 import {
   computeQuickEditSceneLayout,
   evaluateQuickEditCameraAtTime,
+  quickEditContentPointToCanvas,
 } from '../../features/video/review/advanced/scene';
+import {
+  CANVAS_COMMENT_BUBBLE,
+  isCanvasCommentVisibleAt,
+  overlayPulsePhase,
+  type CanvasCommentExport,
+} from '../../features/video/review/comments';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
 import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
@@ -77,6 +85,8 @@ export async function writeReviewFrames(args: {
   /** Fragment-local edits; `fragmentOffset` maps local time back to global output time. */
   edits: readonly ReviewEdit[];
   advanced: QuickEditAdvancedState;
+  /** Text-resolved overlays; burning follows each comment's own renderToVideo flag. */
+  comments?: readonly CanvasCommentExport[];
   fragmentOffset: number;
   writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
   signal: AbortSignal;
@@ -153,6 +163,7 @@ export async function writeReviewFrames(args: {
         fragmentOffset: args.fragmentOffset,
         zoomRegions: preparation.effective.zoomRegions,
         background: preparation.effective.background,
+        comments: args.comments ?? [],
         canvas: source.canvas,
         context: source.context,
         image: source.image,
@@ -365,6 +376,7 @@ export async function renderRenderWindowFrames(args: {
   fragmentOffset: number;
   zoomRegions: readonly QuickEditZoomRegion[];
   background: QuickEditAdvancedState['background'];
+  comments: readonly CanvasCommentExport[];
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
@@ -387,12 +399,20 @@ export async function renderRenderWindowFrames(args: {
       background: args.background,
       camera,
     });
+    const burned = args.comments.filter(
+      (comment) =>
+        comment.renderToVideo &&
+        isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
+    );
     drawReviewSceneFrame(context, {
       canvas,
       layout,
       background: args.background,
       image: args.image,
       sample,
+      comments: burned,
+      sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
+      cameraScale: camera.scale,
     });
     const encoded = new VideoSample(canvas, { timestamp, duration: 1 / fps });
     try {
@@ -425,8 +445,9 @@ async function loadBackgroundImage(
 
 /**
  * One scene draw for export: full-canvas paint, rounded content clip, and the
- * camera-transformed frame. Mirrors the preview stage so decoded frames and
- * preview stay comparable.
+ * camera-transformed frame. Content-attached overlays burn inside the content
+ * clip; viewport-attached ones burn onto the composition frame after the clip.
+ * Mirrors the preview stage so decoded frames and preview stay comparable.
  */
 export function drawReviewSceneFrame(
   context: CanvasRenderingContext2D,
@@ -436,9 +457,12 @@ export function drawReviewSceneFrame(
     background: QuickEditAdvancedState['background'];
     image: ImageBitmap | null;
     sample: Pick<VideoSample, 'draw'>;
+    comments?: readonly CanvasCommentExport[];
+    sourceTime?: number;
+    cameraScale?: number;
   }
 ) {
-  const { canvas, layout, background, image, sample } = args;
+  const { canvas, layout, background, image, sample, comments, sourceTime } = args;
   if (background.enabled) {
     if (background.type === 'solid') {
       context.fillStyle = background.color;
@@ -449,6 +473,11 @@ export function drawReviewSceneFrame(
       drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
     }
   }
+  const visible = (comments ?? []).filter(
+    (comment) =>
+      comment.renderToVideo &&
+      (sourceTime === undefined || isCanvasCommentVisibleAt(comment, sourceTime))
+  );
   context.save();
   context.beginPath();
   const clip = background.enabled ? background.layout : null;
@@ -476,7 +505,118 @@ export function drawReviewSceneFrame(
     layout.videoTransform.width,
     layout.videoTransform.height
   );
+  const cameraScale = args.cameraScale ?? 1;
+  for (const comment of visible) {
+    if (comment.attachment === 'content')
+      drawReviewComment(context, comment, {
+        canvas,
+        videoTransform: layout.videoTransform,
+        scale: cameraScale,
+        sourceTime,
+      });
+  }
   context.restore();
+  for (const comment of visible) {
+    if (comment.attachment !== 'content')
+      drawReviewComment(context, comment, {
+        canvas,
+        videoTransform: null,
+        scale: 1,
+        sourceTime,
+      });
+  }
+}
+
+/** The design token value the preview paints with `--sniptale-color-accent`. */
+const CANVAS_COMMENT_ACCENT = '#f97316';
+
+/** One burned overlay: pulsing point plus the wrapped bubble, in output pixels. */
+function drawReviewComment(
+  context: CanvasRenderingContext2D,
+  comment: CanvasCommentExport,
+  args: {
+    canvas: { width: number; height: number };
+    videoTransform: { x: number; y: number; width: number; height: number } | null;
+    scale: number;
+    sourceTime: number | undefined;
+  }
+) {
+  const point = args.videoTransform
+    ? quickEditContentPointToCanvas(comment.position, args.videoTransform)
+    : { x: comment.position.x * args.canvas.width, y: comment.position.y * args.canvas.height };
+  const bubble = CANVAS_COMMENT_BUBBLE;
+  const pointRadius = bubble.pointRadius * args.scale;
+  const phase = overlayPulsePhase(args.sourceTime ?? 0, comment.start);
+  context.save();
+  if (phase > 0 && phase < 1) {
+    const ringRadius = pointRadius * (1 + 1.4 * phase);
+    context.globalAlpha = 0.35 * (1 - phase);
+    context.fillStyle = CANVAS_COMMENT_ACCENT;
+    context.beginPath();
+    context.arc(point.x, point.y, ringRadius, 0, Math.PI * 2);
+    context.fill();
+    context.globalAlpha = 1;
+  }
+  context.fillStyle = CANVAS_COMMENT_ACCENT;
+  context.strokeStyle = '#ffffff';
+  context.lineWidth = 2 * args.scale;
+  context.beginPath();
+  context.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  const text = comment.resolvedText;
+  if (text.trim()) {
+    const fontSize = bubble.fontSize * args.scale;
+    const lineHeight = bubble.lineHeight * args.scale;
+    const maxWidth = bubble.maxWidth * args.scale;
+    const paddingX = bubble.paddingX * args.scale;
+    const paddingY = bubble.paddingY * args.scale;
+    const radius = comment.style.radius * args.scale;
+    context.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
+    const lines = wrapCanvasText(context, text, maxWidth - paddingX * 2);
+    const textWidth = Math.max(...lines.map((line) => context.measureText(line).width));
+    const boxWidth = textWidth + paddingX * 2;
+    const boxHeight = lines.length * lineHeight + paddingY * 2;
+    const below = comment.placement === 'below';
+    const boxX = point.x - boxWidth / 2;
+    const boxY = below
+      ? point.y + pointRadius + bubble.gap * args.scale
+      : point.y - pointRadius - bubble.gap * args.scale - boxHeight;
+    context.fillStyle = serializePaintToCss(comment.style.fillPaint);
+    context.beginPath();
+    context.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+    context.fill();
+    context.stroke();
+    context.fillStyle = comment.style.textColor;
+    context.textBaseline = 'top';
+    lines.forEach((line, index) => {
+      context.fillText(line, boxX + paddingX, boxY + paddingY + index * lineHeight);
+    });
+  }
+  context.restore();
+}
+
+/** Word-wraps explicit paragraphs into lines that fit the measured width. */
+function wrapCanvasText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): string[] {
+  const lines: string[] = [];
+  for (const paragraph of text.split('\n')) {
+    let current = '';
+    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (current && context.measureText(candidate).width > maxWidth) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    lines.push(current);
+  }
+  return lines;
 }
 
 function drawFittedImage(

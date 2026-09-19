@@ -286,24 +286,48 @@ it('blocks visual changes without a video encoder and never stages bytes', async
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
 });
 
-it('blocks burned comments with their applied reasons and never stages bytes', async () => {
-  const { args, deps } = fixture();
+it('burns comments through the full frame renderer with annotation-resolved text', async () => {
+  const { args, deps, writer } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
   advanced.zoom.enabled = true;
-  args.snapshot.workspace.history.push({
-    id: 'op-comment',
-    at: 3,
-    target: 'canvasComment',
-    before: null,
-    after: { ...createCanvasComment({ id: 'c' }), text: 'note' },
-  });
-  args.snapshot.workspace.cursor = 2;
-  await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
-    name: 'QuickEditExportUnavailable',
-    reasons: expect.arrayContaining(['burned-comment']),
-  });
-  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+  args.index = {
+    ...args.index,
+    processedVideoCodec: 'vp9',
+    frameRate: 30,
+  };
+  args.snapshot.workspace.history.push(
+    {
+      id: 'op-annotation',
+      at: 3,
+      target: 'annotation',
+      before: null,
+      after: { id: 'a1', text: 'Look at this', anchor: { kind: 'point', time: 2 } },
+    },
+    {
+      id: 'op-comment',
+      at: 4,
+      target: 'canvasComment',
+      before: null,
+      after: { ...createCanvasComment({ id: 'c', at: 1, annotationId: 'a1' }) },
+    }
+  );
+  args.snapshot.workspace.cursor = 3;
+  deps.writeReviewFrames = vi.fn(async () => ({
+    videoPackets: 90,
+    audioPackets: 0,
+    resultDuration: 4,
+    audioRanges: [],
+  }));
+  await exportReviewedVideo(args, deps);
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      fragmentOffset: 0,
+      comments: [expect.objectContaining({ annotationId: 'a1', resolvedText: 'Look at this' })],
+    })
+  );
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  expect(writer.abort).not.toHaveBeenCalled();
 });
 
 it('shifts fragment clip placements across a leading cut to global output time', async () => {

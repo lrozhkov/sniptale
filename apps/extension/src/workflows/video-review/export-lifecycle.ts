@@ -16,6 +16,7 @@ import {
   type QuickEditAudioPlanEntry,
 } from '../../features/video/review/advanced/audio-plan';
 import { resolveQuickEditExportPlan } from '../../features/video/review/advanced/effective';
+import { resolveOverlayComments } from '../../features/video/review/comments';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
 import { resolveReviewAssetBytes } from './asset-bytes';
 import { loadVideoReviewSource } from './source';
@@ -202,6 +203,7 @@ export async function exportReviewedVideo(
             index,
             edits,
             advanced: workspace.advanced,
+            comments: resolveOverlayComments(document),
             fragmentOffset,
             writer,
             signal,

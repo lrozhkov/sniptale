@@ -7,6 +7,7 @@ export function createQuickEditAdvancedState(): QuickEditAdvancedState {
     ui: {
       mode: 'basic',
       tracks: { actions: true, zoom: false, audio: false },
+      overlaysVisible: true,
     },
     zoom: { enabled: false, regions: [] },
     background: { enabled: false },
