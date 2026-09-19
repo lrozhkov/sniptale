@@ -44,6 +44,7 @@ export type QuickEditZoomRegionPatch = {
   centerY?: number;
   enter?: QuickEditZoomTransition;
   exit?: QuickEditZoomTransition;
+  linkTo?: string | null;
 };
 
 /** Inspector edits clamp into the persisted contract; timing fields never reorder regions. */
@@ -54,8 +55,11 @@ export function updateQuickEditZoomRegion(
 ): QuickEditZoomRegion[] {
   return regions.map((region) => {
     if (region.id !== id) return region;
+    const { linkTo: previousLink, ...rest } = region;
+    const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
     return {
-      ...region,
+      ...rest,
+      ...(linkTo ? { linkTo } : {}),
       ...(patch.start === undefined ? {} : { start: Math.max(0, patch.start) }),
       ...(patch.end === undefined ? {} : { end: Math.max(0, patch.end) }),
       transform: {

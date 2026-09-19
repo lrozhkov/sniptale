@@ -58,7 +58,17 @@ export function computeQuickEditSceneLayout(input: {
   videoRect: QuickEditRect;
   videoTransform: QuickEditRect;
 } {
-  const contentRect = computeQuickEditContentRect(input.output, input.background);
+  const scale = input.output.width / Math.max(1, input.source.width);
+  const background = input.background.enabled
+    ? {
+        ...input.background,
+        layout: {
+          padding: input.background.layout.padding * scale,
+          cornerRadius: input.background.layout.cornerRadius * scale,
+        },
+      }
+    : input.background;
+  const contentRect = computeQuickEditContentRect(input.output, background);
   const fitted = fitVideoRect(contentRect, input.source);
   const videoRect = {
     x: contentRect.x + fitted.x,
@@ -164,7 +174,24 @@ export function evaluateQuickEditCameraAtTime(
   regions: readonly QuickEditZoomRegion[],
   timelineTime: number
 ): QuickEditCameraTransform {
-  for (const region of regions) {
+  const active = regions.filter((region) => !region.dormant);
+  for (let index = 0; index < active.length; index++) {
+    const region = active[index]!;
+    const next = active[index + 1];
+    const previous = active[index - 1];
+    const linkedNext = next && region.linkTo === next.id && next.start > region.end;
+    const linkedPrevious = previous?.linkTo === region.id && region.start > previous.end;
+    if (linkedNext && timelineTime >= region.end && timelineTime < next.start) {
+      const progress = easing(
+        (timelineTime - region.end) / (next.start - region.end),
+        'ease-in-out'
+      );
+      return {
+        scale: lerp(region.transform.scale, next.transform.scale, progress),
+        centerX: lerp(region.transform.centerX, next.transform.centerX, progress),
+        centerY: lerp(region.transform.centerY, next.transform.centerY, progress),
+      };
+    }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
     const normalized = normalizeQuickEditZoomTransitions(region);
     const scaled: QuickEditZoomRegion = {
@@ -173,8 +200,8 @@ export function evaluateQuickEditCameraAtTime(
       exit: { ...region.exit, duration: normalized.exit },
     };
     const progress = Math.min(
-      cameraProgress(scaled, timelineTime, 'enter'),
-      cameraProgress(scaled, timelineTime, 'exit')
+      linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter'),
+      linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit')
     );
     return {
       scale: lerp(1, region.transform.scale, progress),

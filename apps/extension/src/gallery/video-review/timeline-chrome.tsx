@@ -59,8 +59,13 @@ export function ReviewToolbar(props: {
   onZoom(value: number): void;
 }) {
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 py-1">
-      <div className="flex min-w-0 flex-wrap items-center gap-1">{props.tools}</div>
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2">
+      <div
+        className="col-span-2 flex min-w-0 flex-wrap items-center gap-1 border-b
+          border-[var(--sniptale-color-border-soft)] pb-2"
+      >
+        {props.tools}
+      </div>
       <div className="flex items-center gap-1">
         <span className="min-w-8 text-right text-xs tabular-nums">
           {reviewTimeLabel(props.time)}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   inspectReviewMedia,
   type ReviewMediaIndex,
+  type ReviewRenderSettings,
 } from '../../workflows/video-review/media-index';
 import {
   exportReviewedVideo,
@@ -37,11 +38,21 @@ export function prepareReviewExporter(
     ...exporter,
     start,
     downloadSelection: (selection) => start('download', selection),
+    download: async () => {
+      await run(async () => {
+        await flushPending();
+        await exporter.download();
+      });
+    },
   };
 }
 
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
+  const [renderSettings, setRenderSettings] = useState<ReviewRenderSettings>({
+    quality: 'high',
+    frameRate: 0,
+  });
   const [index, setIndex] = useState<ReviewMediaIndex | null>(null);
   const [indexing, setIndexing] = useState(true);
   const [phase, setPhase] = useState<'idle' | 'exporting' | 'publishing'>('idle');
@@ -73,22 +84,7 @@ export function useReviewExport(resource: LoadedReview) {
     };
   }, [resource.file]);
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
-  const plan = (): QuickEditExportPlan => {
-    const state = resource.session.getSnapshot();
-    return resolveQuickEditExportPlan({
-      document: state.document,
-      advanced: {
-        ...state.snapshot.workspace.advanced,
-        zoom: state.document.advancedContent.zoom,
-        background: state.document.advancedContent.background,
-        audio: state.document.advancedContent.audio,
-      },
-      // A source audio track with a probed unavailable codec is a known blocker;
-      // clips-only exports defer the authoritative probe to the exporter.
-      ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
-      videoRenderAvailable: !!index?.processedVideoCodec,
-    });
-  };
+  const plan = () => reviewExportPlan(resource, index);
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
@@ -108,6 +104,7 @@ export function useReviewExport(resource: LoadedReview) {
     setProgress(0);
     try {
       const value = await exportReviewedVideo({
+        renderSettings,
         snapshot: resource.session.getSnapshot().snapshot,
         index,
         signal: controller.signal,
@@ -148,6 +145,8 @@ export function useReviewExport(resource: LoadedReview) {
     blocked,
     result,
     plan,
+    renderSettings,
+    setRenderSettings,
     /** Ready-plan reasons worth an applied-changes hint; null while nothing is applied. */
     reencode: (): readonly QuickEditExportReason[] | null => {
       const current = plan();
@@ -163,7 +162,7 @@ export function useReviewExport(resource: LoadedReview) {
     cancel: () => {
       if (!publishing.current) active.current?.abort();
     },
-    download: () => {
+    download: async () => {
       const currentPlan = plan();
       if (currentPlan.kind === 'unavailable') {
         setBlocked(currentPlan.reasons);
@@ -175,7 +174,28 @@ export function useReviewExport(resource: LoadedReview) {
         currentPlan.audio === 'process' ||
         state.document.edits.length > 0;
       if (!applied) downloadGalleryBlob(resource.file, resource.filename);
-      else void start('download');
+      else await start('download');
     },
   };
+}
+
+/** One applied-state capability plan for all export entry points. */
+function reviewExportPlan(
+  resource: LoadedReview,
+  index: ReviewMediaIndex | null
+): QuickEditExportPlan {
+  const state = resource.session.getSnapshot();
+  return resolveQuickEditExportPlan({
+    document: state.document,
+    advanced: {
+      ...state.snapshot.workspace.advanced,
+      zoom: state.document.advancedContent.zoom,
+      background: state.document.advancedContent.background,
+      audio: state.document.advancedContent.audio,
+    },
+    // A source audio track with a probed unavailable codec is a known blocker;
+    // clips-only exports defer the authoritative probe to the exporter.
+    ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
+    videoRenderAvailable: !!index?.processedVideoCodec,
+  });
 }

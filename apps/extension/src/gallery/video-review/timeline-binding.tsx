@@ -40,6 +40,7 @@ function ReviewZoomLane(props: {
       toOutputTime={props.toOutputTime}
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}
+      onLink={(id, linkTo) => props.zoom.change(id, { linkTo })}
       onAdd={props.onAdd}
       onDragCommit={props.zoom.commitDrag}
     />
@@ -48,6 +49,7 @@ function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
+  snapTimes: readonly number[];
   audioState: QuickEditAudioState;
   resultDuration: number;
   audio: ReturnType<typeof useReviewAudio>;
@@ -57,6 +59,7 @@ function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      snapTimes={props.snapTimes}
       audio={props.audioState}
       duration={props.resultDuration}
       selectedId={props.audio.selectedId}
@@ -90,7 +93,6 @@ type TimelineBindingProps = {
   selection: ReviewAnchor;
   setSelection(value: ReviewAnchor): void;
   advanced: QuickEditAdvancedState;
-  setMode(mode: 'basic' | 'advanced'): void;
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
   setOverlaysVisible(visible: boolean): void;
   telemetryAvailable: boolean;
@@ -136,7 +138,6 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
         selection={props.selection}
         edits={props.edits}
         advanced={props.advanced}
-        setMode={props.setMode}
         setTrackVisibility={props.setTrackVisibility}
         setOverlaysVisible={props.setOverlaysVisible}
         telemetryAvailable={props.telemetryAvailable}
@@ -162,6 +163,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
       duration={props.source.duration}
       volume={props.volume}
       onVolume={props.onVolume}
@@ -189,6 +191,18 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                snapTimes={[
+                  ...(props.outputTime === null ? [] : [props.outputTime]),
+                  ...props.edits
+                    .flatMap((edit) => [
+                      props.toOutputTime(edit.start),
+                      props.toOutputTime(edit.end),
+                    ])
+                    .filter((time): time is number => time !== null),
+                  ...props.advanced.zoom.regions
+                    .filter((region) => !region.dormant)
+                    .flatMap((region) => [region.start, region.end]),
+                ]}
                 audioState={props.audioState}
                 resultDuration={props.resultDuration}
                 audio={props.audio}

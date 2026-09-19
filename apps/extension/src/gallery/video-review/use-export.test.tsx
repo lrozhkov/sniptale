@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
+import { ReviewRenderOptions } from './edit-actions';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';
-import { useReviewExport } from './use-export';
+import { prepareReviewExporter, useReviewExport } from './use-export';
 const mocks = vi.hoisted(() => ({ index: vi.fn(), export: vi.fn(), download: vi.fn() }));
 vi.mock('../../workflows/video-review/media-index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/media-index')>()),
@@ -19,7 +20,10 @@ vi.mock('../shared/download', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/download')>()),
   downloadGalleryBlob: mocks.download,
 }));
-function setup(apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState>) => void) {
+function setup(
+  apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState>) => void,
+  showOptions = false
+) {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const source = { duration: 6, width: 160, height: 90, mimeType: 'video/webm', size: 5 };
@@ -57,13 +61,15 @@ function setup(apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState
     rotation: 0,
     processedVideoCodec: 'vp9',
   });
-  const root = createRoot(document.createElement('div'));
+  const host = document.createElement('div');
+  const root = createRoot(host);
   let hook!: ReturnType<typeof useReviewExport>;
   function Harness() {
     hook = useReviewExport(resource);
-    return null;
+    return showOptions ? <ReviewRenderOptions exporter={hook} busy={false} /> : null;
   }
   return {
+    host,
     root,
     Harness,
     resource,
@@ -193,6 +199,64 @@ it('downloads the rendered result when only visual effects are applied', async (
       undefined,
       expect.any(Function)
     );
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('passes the selected render options through the real export hook', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+    advanced.background = {
+      enabled: true,
+      type: 'solid',
+      color: '#112233ff',
+      layout: { padding: 8, cornerRadius: 4 },
+    };
+  }, true);
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const selects = fixture.host.querySelectorAll('select');
+    expect(selects).toHaveLength(3);
+    for (const [index, value] of [
+      [0, 'vp9'],
+      [1, '24'],
+      [2, 'standard'],
+    ] as const) {
+      await act(async () => {
+        selects[index]!.value = value;
+        selects[index]!.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+    await act(async () => fixture.hook.start());
+    expect(mocks.export.mock.calls[0]![0].renderSettings).toEqual({
+      codec: 'vp9',
+      frameRate: 24,
+      quality: 'standard',
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+it('flushes pending edits before the download entry point', async () => {
+  const fixture = setup();
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const order: string[] = [];
+    mocks.download.mockImplementation(() => {
+      order.push('download');
+    });
+    const exporter = prepareReviewExporter(
+      fixture.hook,
+      async (action) => {
+        await action();
+      },
+      async () => {
+        order.push('flush');
+      }
+    );
+    await act(async () => exporter.download());
+    expect(order).toEqual(['flush', 'download']);
   } finally {
     await fixture.cleanup();
   }

@@ -36,7 +36,7 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
-    overlaysVisible: state.ui.overlaysVisible,
+    overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
     originalAudioApplied: advanced,
@@ -109,11 +109,6 @@ export function resolveQuickEditExportPlan(args: {
 }): QuickEditExportPlan {
   const burned = args.document.canvasComments.some((comment) => comment.renderToVideo);
   if (args.advanced.ui.mode !== 'advanced') {
-    if (burned) {
-      if (args.videoRenderAvailable === false)
-        return { kind: 'unavailable', reasons: ['video-encoder'] };
-      return { kind: 'ready', video: 'render', audio: 'copy', reasons: ['comments'] };
-    }
     return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
   }
   const audio: QuickEditExportReason[] = [];

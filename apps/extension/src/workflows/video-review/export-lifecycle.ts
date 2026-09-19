@@ -1,3 +1,4 @@
+import type { ReviewRenderSettings } from './media-index';
 import { isSafeArchiveEntryLeafFilename } from '@sniptale/platform/data/zip-profile/entry-filenames';
 import {
   assertAssetWriteAdmission,
@@ -113,6 +114,7 @@ async function buildReviewExportClipPlan(args: {
 export async function exportReviewedVideo(
   args: {
     snapshot: VideoWorkspaceSnapshot;
+    renderSettings?: ReviewRenderSettings;
     index: ReviewMediaIndex;
     signal: AbortSignal;
     destination?: 'gallery' | 'download';
@@ -214,6 +216,7 @@ export async function exportReviewedVideo(
     const packetReceipt =
       plan.video === 'render'
         ? await deps.writeReviewFrames({
+            renderSettings: args.renderSettings,
             file: original.file,
             index,
             edits,

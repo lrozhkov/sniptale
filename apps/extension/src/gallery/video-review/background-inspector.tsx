@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditBackgroundLayout,
@@ -34,9 +35,11 @@ function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
 
 /** Canvas background owner: kind, paint, and layout belong to the whole frame. */
 export function ReviewBackgroundInspector(props: {
+  onImportImage?: ((file: File) => void) | undefined;
   background: QuickEditBackgroundSettings;
   onChange(patch: QuickEditBackgroundPatch): void;
 }) {
+  const fileInput = useRef<HTMLInputElement>(null);
   const { presets } = useGradientPresetCatalog('highlighter-frame-fill');
   const { background, onChange } = props;
   const paint = backgroundPaint(background);
@@ -67,10 +70,21 @@ export function ReviewBackgroundInspector(props: {
     >
       <h4 className="text-sm font-semibold">{translate('gallery.videoReview.canvas')}</h4>
       <div
-        className="flex flex-wrap gap-2"
+        className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--sniptale-color-surface-canvas)] p-1"
         role="group"
         aria-label={translate('gallery.videoReview.background')}
       >
+        <input
+          ref={fileInput}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = '';
+            if (file) props.onImportImage?.(file);
+          }}
+        />
         {kinds.map((kind) => (
           <ReviewButton
             key={kind.key}
@@ -80,7 +94,8 @@ export function ReviewBackgroundInspector(props: {
                 ? !background.enabled
                 : background.enabled && background.type === kind.key
             }
-            className="!text-xs"
+            className="!text-xs aria-pressed:!bg-[var(--sniptale-color-accent-soft)]
+              aria-pressed:!text-[var(--sniptale-color-accent-emphasis)]"
             onClick={() =>
               onChange(
                 kind.key === 'none'
@@ -96,6 +111,13 @@ export function ReviewBackgroundInspector(props: {
             {translate(kind.label)}
           </ReviewButton>
         ))}
+        <ReviewButton
+          label={translate('gallery.videoReview.backgroundImage')}
+          className="!text-xs aria-pressed:!bg-[var(--sniptale-color-accent-soft)]
+            aria-pressed:!text-[var(--sniptale-color-accent-emphasis)]"
+          aria-pressed={background.enabled && background.type === 'image'}
+          onClick={() => fileInput.current?.click()}
+        />
       </div>
       {background.enabled && background.type === 'gradient' ? (
         <div className="grid grid-cols-5 gap-2" role="group">
@@ -125,7 +147,7 @@ export function ReviewBackgroundInspector(props: {
             ))}
         </div>
       ) : null}
-      {background.enabled ? (
+      {background.enabled && background.type !== 'image' ? (
         <CompactPaintSelector
           label={translate('gallery.videoReview.background')}
           title={translate('gallery.videoReview.background')}
@@ -140,10 +162,12 @@ export function ReviewBackgroundInspector(props: {
           }
         />
       ) : null}
-      <div className="grid grid-cols-2 gap-2">
-        {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
-        {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
-      </div>
+      {background.enabled ? (
+        <div className="grid grid-cols-2 gap-2">
+          {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
+          {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
+        </div>
+      ) : null}
     </div>
   );
 }

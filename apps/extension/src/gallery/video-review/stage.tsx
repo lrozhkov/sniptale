@@ -37,6 +37,7 @@ function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
 
 /** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
 export function ReviewStage(props: {
+  backgroundImageUrl?: string | undefined;
   url: string;
   source: ReviewSource;
   video: RefObject<HTMLVideoElement | null>;
@@ -87,36 +88,10 @@ export function ReviewStage(props: {
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   });
-  const size = useStageMeasure(host);
-  const sceneLayout = props.scene
-    ? computeQuickEditSceneLayout({
-        output: size,
-        source: props.source,
-        background: props.scene.background,
-        camera: props.scene.camera,
-      })
-    : null;
-  const zoomLayout = props.zoom
-    ? computeQuickEditSceneLayout({
-        output: size,
-        source: props.source,
-        background: props.scene?.background ?? { enabled: false },
-        camera: props.zoom.camera,
-      })
-    : null;
-  const backgroundPaint = props.scene?.background.enabled
-    ? backgroundPaintOf(props.scene.background)
-    : null;
-  // Drawing maps into the represented pixels, so the post-camera rect is authoritative.
-  const content = sceneLayout ? sceneLayout.videoTransform : fitVideoRect(size, props.source);
-  const reportGeometry = props.comments?.onGeometry;
-  useEffect(() => {
-    if (reportGeometry && sceneLayout)
-      reportGeometry({
-        output: size,
-        videoTransform: sceneLayout.videoTransform,
-      });
-  }, [size, sceneLayout, reportGeometry]);
+  const { size, sceneLayout, zoomLayout, backgroundPaint, content } = useReviewStageGeometry(
+    props,
+    host
+  );
   const plane = useReviewDrawingPlane({
     drawing: props.drawing,
     content,
@@ -142,47 +117,66 @@ export function ReviewStage(props: {
   return (
     <div
       ref={host}
-      data-ui="gallery.videoReview.stage"
-      className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)] bg-black"
-      style={{
-        cursor: props.drawing ? 'crosshair' : 'default',
-        touchAction: props.drawing ? 'none' : 'auto',
-        ...(backgroundPaint && props.scene?.background.enabled
-          ? {
-              background: backgroundPaint,
-              borderRadius: props.scene.background.layout.cornerRadius,
-            }
-          : {}),
-      }}
-      onPointerDown={plane.onPointerDown}
-      onPointerMove={plane.onPointerMove}
-      onPointerUp={plane.onPointerUp}
-      onPointerCancel={plane.onPointerCancel}
+      className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]
+          bg-[var(--sniptale-color-surface-canvas)]"
     >
-      <ReviewSceneVideo
-        url={props.url}
-        video={props.video}
-        {...(props.scene ? { scene: props.scene } : {})}
-        layout={sceneLayout}
-        drawing={props.drawing}
-        projected={projected}
-        onReady={props.onReady}
-        onTime={props.onTime}
-        onPlaying={props.onPlaying}
-        onError={props.onError}
-      />
-      {props.comments && props.comments.items.length ? (
-        <ReviewStageComments comments={props.comments} output={size} source={props.source} />
-      ) : null}
-      {zoomFocus && props.zoom && zoomLayout ? (
-        <ReviewZoomTarget
-          focus={zoomFocus}
-          camera={props.zoom.camera}
-          videoTransform={zoomLayout.videoTransform}
-          onDrag={props.zoom.onDrag}
-          zoomDrag={zoomDrag}
+      <div
+        data-ui="gallery.videoReview.stage"
+        className="absolute overflow-hidden bg-black"
+        style={{
+          left: size.x,
+          top: size.y,
+          width: size.width,
+          height: size.height,
+          cursor: props.drawing ? 'crosshair' : 'default',
+          touchAction: props.drawing ? 'none' : 'auto',
+          ...(backgroundPaint && props.scene?.background.enabled
+            ? {
+                background: backgroundPaint,
+              }
+            : {}),
+        }}
+        onPointerDown={plane.onPointerDown}
+        onPointerMove={plane.onPointerMove}
+        onPointerUp={plane.onPointerUp}
+        onPointerCancel={plane.onPointerCancel}
+      >
+        {props.backgroundImageUrl &&
+        props.scene?.background.enabled &&
+        props.scene.background.type === 'image' ? (
+          <img
+            src={props.backgroundImageUrl}
+            alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            style={{ objectFit: props.scene.background.imageFit }}
+          />
+        ) : null}
+        <ReviewSceneVideo
+          url={props.url}
+          video={props.video}
+          {...(props.scene ? { scene: props.scene } : {})}
+          layout={sceneLayout}
+          previewScale={size.width / Math.max(1, props.source.width)}
+          drawing={props.drawing}
+          projected={projected}
+          onReady={props.onReady}
+          onTime={props.onTime}
+          onPlaying={props.onPlaying}
+          onError={props.onError}
         />
-      ) : null}
+        {props.comments && props.comments.items.length ? (
+          <ReviewStageComments comments={props.comments} output={size} source={props.source} />
+        ) : null}
+        {zoomFocus && props.zoom && zoomLayout ? (
+          <ReviewZoomTarget
+            focus={zoomFocus}
+            camera={props.zoom.camera}
+            videoTransform={zoomLayout.videoTransform}
+            onDrag={props.zoom.onDrag}
+            zoomDrag={zoomDrag}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -230,6 +224,7 @@ function ReviewSceneVideo(props: {
     camera: QuickEditCameraTransform;
   };
   layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
+  previewScale: number;
   drawing: boolean;
   projected: ReviewRegion | null;
   onReady(): void;
@@ -247,7 +242,7 @@ function ReviewSceneVideo(props: {
         width: props.layout?.contentRect.width ?? undefined,
         height: props.layout?.contentRect.height ?? undefined,
         overflow: 'hidden',
-        borderRadius: clip?.cornerRadius,
+        borderRadius: clip ? clip.cornerRadius * props.previewScale : undefined,
       }}
     >
       <video
@@ -398,4 +393,43 @@ function ReviewZoomTarget(props: {
       }}
     />
   );
+}
+
+/** Measures and projects the preview through the same scene model as export. */
+function useReviewStageGeometry(
+  props: Parameters<typeof ReviewStage>[0],
+  host: RefObject<HTMLDivElement | null>
+) {
+  const viewport = useStageMeasure(host);
+  const size = fitVideoRect(viewport, props.source);
+  const sceneLayout = props.scene
+    ? computeQuickEditSceneLayout({
+        output: size,
+        source: props.source,
+        background: props.scene.background,
+        camera: props.scene.camera,
+      })
+    : null;
+  const zoomLayout = props.zoom
+    ? computeQuickEditSceneLayout({
+        output: size,
+        source: props.source,
+        background: props.scene?.background ?? { enabled: false },
+        camera: props.zoom.camera,
+      })
+    : null;
+  const backgroundPaint = props.scene?.background.enabled
+    ? backgroundPaintOf(props.scene.background)
+    : null;
+  // Drawing maps into the represented pixels, so the post-camera rect is authoritative.
+  const content = sceneLayout ? sceneLayout.videoTransform : fitVideoRect(size, props.source);
+  const reportGeometry = props.comments?.onGeometry;
+  useEffect(() => {
+    if (reportGeometry && sceneLayout)
+      reportGeometry({
+        output: size,
+        videoTransform: sceneLayout.videoTransform,
+      });
+  }, [size, sceneLayout, reportGeometry]);
+  return { size, sceneLayout, zoomLayout, backgroundPaint, content };
 }

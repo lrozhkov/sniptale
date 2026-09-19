@@ -153,14 +153,20 @@ it('plans render requirements and audio-only processing from applied changes', (
   expect(
     resolveQuickEditExportPlan({
       document: document(true),
-      advanced: createQuickEditAdvancedState(),
+      advanced: {
+        ...createQuickEditAdvancedState(),
+        ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
+      },
       videoRenderAvailable: false,
     })
   ).toMatchObject({ kind: 'unavailable', reasons: ['video-encoder'] });
   expect(
     resolveQuickEditExportPlan({
       document: document(true),
-      advanced: createQuickEditAdvancedState(),
+      advanced: {
+        ...createQuickEditAdvancedState(),
+        ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
+      },
     })
   ).toMatchObject({ kind: 'ready', video: 'render', audio: 'copy', reasons: ['comments'] });
   expect(
@@ -264,3 +270,14 @@ function regionStub() {
 function voiceClipStub() {
   return { ...musicStub(), id: 'v' };
 }
+
+it('temporarily excludes burned overlays in basic mode without deleting them', () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'basic';
+  const comment = createCanvasComment({ id: 'overlay', at: 0, position: { x: 0.5, y: 0.5 } });
+  expect(resolveQuickEditEffectiveFeatures(advanced).overlaysVisible).toBe(false);
+  expect(
+    resolveQuickEditExportPlan({ document: { edits: [], canvasComments: [comment] }, advanced })
+  ).toMatchObject({ video: 'copy', reasons: [] });
+  expect(comment.renderToVideo).toBe(true);
+});

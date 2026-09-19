@@ -252,3 +252,21 @@ it('normalizes over-long transitions so a short region reaches its target (Z4)',
   ];
   expect(evaluateQuickEditCameraAtTime(short, 0.05)).toEqual(short[0]!.transform);
 });
+
+it('connects two zoom targets through the gap without returning to the full frame', () => {
+  const first = { ...region({ id: 'first', start: 0, end: 2 }), linkTo: 'next' };
+  const next = region({
+    id: 'next',
+    start: 4,
+    end: 6,
+    transform: { scale: 3, centerX: 0.75, centerY: 0.25 },
+  });
+  expect(evaluateQuickEditCameraAtTime([first, next], 2)).toEqual(first.transform);
+  expect(evaluateQuickEditCameraAtTime([first, next], 3)).toEqual({
+    scale: 2.5,
+    centerX: 0.5,
+    centerY: 0.5,
+  });
+  expect(evaluateQuickEditCameraAtTime([first, next], 4)).toEqual(next.transform);
+  expect(evaluateQuickEditCameraAtTime([first], 3).scale).toBe(1);
+});

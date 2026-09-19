@@ -523,3 +523,14 @@ it('draws below-placed bubbles under the anchor point', () => {
   const boxY = vi.mocked(context.roundRect).mock.calls[0]![1] as number;
   expect(boxY).toBeGreaterThan(60);
 });
+
+it('uses the selected render frame rate and rejects an unprobed codec', async () => {
+  const args = argsFixture();
+  state.encoded.length = 0;
+  await writeReviewFrames({ ...args, renderSettings: { quality: 'standard', frameRate: 24 } });
+  expect(state.encoded).toHaveLength(48);
+  expect(state.encoded[1]!.timestamp).toBeCloseTo(1 / 24);
+  await expect(
+    writeReviewFrames({ ...args, renderSettings: { quality: 'high', frameRate: 30, codec: 'avc' } })
+  ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable' });
+});

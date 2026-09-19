@@ -6,7 +6,11 @@ import {
   readVideoReviewForBackup,
 } from './backup-restore';
 import type { VideoWorkspace } from './contracts';
-import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { collectReviewAssetReferences, encodePortableReviewAssetRefs } from './asset-refs';
+import {
+  createQuickEditAdvancedState,
+  createQuickEditAdvancedContent,
+} from '../../../features/video/review/advanced/defaults';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
 const workspace: VideoWorkspace = {
@@ -146,3 +150,48 @@ function snapshotDatabase(raw: unknown, rawDraft: unknown) {
     }),
   };
 }
+
+it('backs up disabled image history and restores it with newly allocated asset references', async () => {
+  const initial = createQuickEditAdvancedState();
+  const baseline = createQuickEditAdvancedContent();
+  const image = {
+    ...baseline,
+    background: {
+      enabled: true as const,
+      type: 'image' as const,
+      imageFit: 'cover' as const,
+      assetId: 'project-asset:background',
+      layout: { padding: 8, cornerRadius: 12 },
+    },
+  };
+  const stored: VideoWorkspace = {
+    ...workspace,
+    advanced: initial,
+    cursor: 0,
+    history: [{ id: 'image', at: 2, target: 'advancedContent', before: baseline, after: image }],
+  };
+  const review = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(review!);
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([['background', 'new-background']]),
+  });
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:new-background'])
+  );
+  expect(restored.workspace.cursor).toBe(0);
+  expect(restored.workspace.advanced.background).toEqual({ enabled: false });
+  const workspaces = { put: vi.fn() },
+    drafts = { put: vi.fn(), delete: vi.fn() };
+  await putVideoReviewRestore({ review: restored, workspaces, drafts });
+  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+});

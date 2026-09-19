@@ -41,6 +41,8 @@ export interface QuickEditZoomRegion {
   transform: QuickEditCameraTransform;
   enter: QuickEditZoomTransition;
   exit: QuickEditZoomTransition;
+  /** Optional smooth connection to the next region; ignored if that target is no longer adjacent. */
+  linkTo?: string;
   /** Kept but not applied: its interval could not be proven in result time. */
   dormant?: boolean;
 }

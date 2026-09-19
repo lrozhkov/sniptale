@@ -104,18 +104,18 @@ it('paints the scene background and crops the video to the content rect', async 
   const stageNode = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
   expect(stageNode.style.background).toBe('rgb(17, 34, 51)');
   const clip = stage.video.parentElement!;
-  expect(clip.style.left).toBe('40px');
-  expect(clip.style.top).toBe('40px');
-  expect(clip.style.width).toBe('720px');
-  expect(clip.style.height).toBe('370px');
+  expect(clip.style.left).toBe('100px');
+  expect(clip.style.top).toBe('100px');
+  expect(clip.style.width).toBe('600px');
+  expect(clip.style.height).toBe('250px');
   expect(clip.style.overflow).toBe('hidden');
   // Fitted video inside the padded content rect (letterboxed horizontally).
   const left = Number(stage.video.style.left.replace('px', ''));
   const width = Number(stage.video.style.width.replace('px', ''));
-  expect(left).toBeCloseTo(31.11, 1);
+  expect(left).toBeCloseTo(77.78, 1);
   expect(Number(stage.video.style.top.replace('px', ''))).toBeCloseTo(0, 6);
-  expect(width).toBeCloseTo(657.78, 1);
-  expect(Number(stage.video.style.height.replace('px', ''))).toBeCloseTo(370, 6);
+  expect(width).toBeCloseTo(444.44, 1);
+  expect(Number(stage.video.style.height.replace('px', ''))).toBeCloseTo(250, 6);
 });
 
 it('keeps the scene applied when the zoom selection is absent (R05)', async () => {
@@ -160,4 +160,21 @@ it('maps canvas target drags into normalized content points and restores on esca
   await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(onDrag).toHaveBeenLastCalledWith({ x: 0.3, y: 0.4 });
   await stage.event(target, 'pointerup', bounds.left + 400, bounds.top + 180);
+});
+
+it('uses export-space padding and radius at every preview size', () => {
+  const stage = renderStage({
+    scene: {
+      background: {
+        enabled: true,
+        type: 'solid',
+        color: '#112233ff',
+        layout: { padding: 40, cornerRadius: 12 },
+      },
+      camera: identity,
+    },
+  });
+  const scale = 800 / source.width;
+  expect(Number.parseFloat(stage.video.parentElement!.style.left)).toBe(40 * scale);
+  expect(Number.parseFloat(stage.video.parentElement!.style.borderRadius)).toBe(12 * scale);
 });

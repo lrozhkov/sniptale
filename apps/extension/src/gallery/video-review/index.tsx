@@ -3,6 +3,8 @@ import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewButton } from './controls';
+import { ReviewModeControl } from './review-toolbar';
+import { useReviewBackgroundImport } from './use-review-background';
 import { ReviewCanvasCommentsSection } from './comment-editor';
 import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewStageBinding } from './stage-binding';
@@ -18,8 +20,7 @@ import {
 import { exportReviewReport } from './report-actions';
 import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
-import { ReviewEditActions } from './edit-actions';
-import type { useReviewEdits } from './use-edits';
+import { ReviewRenderOptions, ReviewEditActions } from './edit-actions';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
 import { ReviewAdvancedPanels } from './advanced-panels';
@@ -44,12 +45,19 @@ function useReviewEditorState(resource: LoadedReview) {
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
   const { selection: activeSelection, setSelection: setActiveSelection } = useReviewSelection();
-  const { busy, setBusy, message, setMessage, run } = useReviewActionStatus();
-  const canStart = () => {
-    if (!composer.annotation) return true;
-    setMessage(translate('gallery.videoReview.finishComment'));
-    return false;
-  };
+  const { actionBusy, setBusy, message, setMessage, run, canStart } = useReviewActionStatus(
+    composer.annotation
+  );
+  const backgroundImport = useReviewBackgroundImport({
+    advanced: advancedState,
+    session,
+    allowed: () =>
+      !actionBusy &&
+      exporter.phase === 'idle' &&
+      !composer.annotation &&
+      advanced.ui.mode === 'advanced',
+  });
+  const busy = actionBusy || backgroundImport.pending;
   const onTransportFailure = () => setMessage(translate('gallery.videoReview.playbackFailed'));
   const { video, time, onTime, playing, setPlaying, seek, play, timeline } = useReviewTransport({
     resource,
@@ -109,12 +117,9 @@ function useReviewEditorState(resource: LoadedReview) {
     cuts,
   });
   const { audio, canvasComments, comments, telemetry, projected } = wiring;
-  const editing: ReturnType<typeof useReviewEdits> & { exporter: typeof exporter } = {
-    ...cuts,
-    exporter: wiring.exporter,
-  };
   return {
-    editing,
+    editing: { ...cuts, exporter: wiring.exporter },
+    backgroundImport,
     session,
     source,
     snapshot,
@@ -136,14 +141,8 @@ function useReviewEditorState(resource: LoadedReview) {
     advanced,
     features,
     timeline,
-    setMode: advancedState.setMode,
-    setTrackVisibility: advancedState.setTrackVisibility,
-    setOverlaysVisible: advancedState.setOverlaysVisible,
+    ...reviewAdvancedControls(advancedState, setActiveSelection),
     zoom,
-    setBackground: advancedState.setBackground,
-    setAudio: advancedState.setAudio,
-    resetAdvanced: advancedState.reset,
-    flushAdvanced: advancedState.flush,
     projected,
     busy,
     setBusy,
@@ -168,8 +167,29 @@ function useReviewEditorState(resource: LoadedReview) {
   };
 }
 
+/** Keeps mode changes and the controls for dormant advanced content together. */
+function reviewAdvancedControls(
+  advancedState: ReturnType<typeof useReviewAdvanced>,
+  setActiveSelection: ReturnType<typeof useReviewSelection>['setSelection']
+) {
+  return {
+    setMode: (mode: 'basic' | 'advanced') => {
+      setActiveSelection({ kind: 'none' });
+      advancedState.setMode(mode);
+    },
+    setTrackVisibility: advancedState.setTrackVisibility,
+    setOverlaysVisible: advancedState.setOverlaysVisible,
+    setBackground: advancedState.setBackground,
+    resetAdvanced: advancedState.reset,
+    flushAdvanced: advancedState.flush,
+    advancedPending: advancedState.pending,
+    advancedFailed: advancedState.saveFailed,
+    retryAdvanced: advancedState.retry,
+  };
+}
+
 /** Reports explicit UI action status separately from field recovery; the session serializes writes. */
-function useReviewActionStatus() {
+function useReviewActionStatus(annotation: ReviewAnnotation | null) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const run = async (action: () => Promise<unknown>, success?: string) => {
@@ -185,7 +205,12 @@ function useReviewActionStatus() {
       setBusy(false);
     }
   };
-  return { busy, setBusy, message, setMessage, run };
+  const canStart = () => {
+    if (!annotation) return true;
+    setMessage(translate('gallery.videoReview.finishComment'));
+    return false;
+  };
+  return { actionBusy: busy, setBusy, message, setMessage, run, canStart };
 }
 
 /** Draft and hover overlays take precedence; saved selections follow current history. */
@@ -207,6 +232,13 @@ function reviewRegion(
 
 type InspectorState = Pick<
   ReturnType<typeof useReviewEditorState>,
+  | 'advancedPending'
+  | 'advancedFailed'
+  | 'retryAdvanced'
+  | 'setMode'
+  | 'backgroundImport'
+  | 'activeSelection'
+  | 'setActiveSelection'
   | 'editing'
   | 'session'
   | 'snapshot'
@@ -227,7 +259,6 @@ type InspectorState = Pick<
   | 'advanced'
   | 'zoom'
   | 'setBackground'
-  | 'setAudio'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'flushAdvanced'
@@ -248,25 +279,31 @@ function ReviewInspectorActions({
   onExport(): void;
 }) {
   return (
-    <ReviewEditActions
-      available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
-      hasEdits={snapshot.document.edits.length > 0}
-      busy={busy || composerBusy}
-      phase={editing.exporter.phase}
-      progress={editing.exporter.progress}
-      failed={editing.exporter.failed}
-      hasResult={!!editing.exporter.result}
-      audioUnavailable={
-        !!editing.exporter.index?.audioCodec &&
-        !editing.exporter.index.processedAudioCodec &&
-        snapshot.document.edits.some((edit) => edit.kind === 'speed')
-      }
-      advancedBlockers={editing.exporter.blocked}
-      reencodeReasons={editing.exporter.reencode()}
-      onExport={onExport}
-      onCancel={editing.exporter.cancel}
-      onDownload={editing.exporter.download}
-    />
+    <>
+      <ReviewRenderOptions
+        exporter={editing.exporter}
+        busy={busy || composerBusy || editing.exporter.phase !== 'idle'}
+      />
+      <ReviewEditActions
+        available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
+        hasEdits={snapshot.document.edits.length > 0}
+        busy={busy || composerBusy}
+        phase={editing.exporter.phase}
+        progress={editing.exporter.progress}
+        failed={editing.exporter.failed}
+        hasResult={!!editing.exporter.result}
+        audioUnavailable={
+          !!editing.exporter.index?.audioCodec &&
+          !editing.exporter.index.processedAudioCodec &&
+          snapshot.document.edits.some((edit) => edit.kind === 'speed')
+        }
+        advancedBlockers={editing.exporter.blocked}
+        reencodeReasons={editing.exporter.reencode()}
+        onExport={onExport}
+        onCancel={editing.exporter.cancel}
+        onDownload={editing.exporter.download}
+      />
+    </>
   );
 }
 
@@ -304,33 +341,12 @@ function ReviewInspectorBinding({
   audio: ReturnType<typeof useReviewAudio>;
   onBack(): void;
 }) {
-  const {
-    editing,
-    session,
-    snapshot,
-    composer,
-    video,
-    selected,
-    setHovered,
-    busy,
-    setBusy,
-    message,
-    setMessage,
-    run,
-    canStart,
-    selectComment,
-    add,
-    advanced,
-    zoom,
-    setBackground,
-    resetAdvanced,
-    flushAdvanced,
-  } = state;
+  const { editing, session, snapshot, composer, video, busy, run } = state;
   const onHistory = (direction: 'undo' | 'redo') =>
     void run(() =>
       moveReviewHistory({
         direction,
-        flushAdvanced,
+        flushAdvanced: state.flushAdvanced,
         flushTexts: canvasComments.flushTexts,
         session,
       })
@@ -339,7 +355,7 @@ function ReviewInspectorBinding({
     <ReviewInspector
       filename={resource.filename}
       annotations={snapshot.document.annotations}
-      selectedId={selected?.id ?? null}
+      selectedId={state.selected?.id ?? null}
       busy={busy || editing.exporter.phase !== 'idle'}
       actions={
         <ReviewInspectorActions
@@ -358,24 +374,59 @@ function ReviewInspectorBinding({
         !composer.annotation &&
         snapshot.snapshot.workspace.cursor < snapshot.snapshot.workspace.history.length
       }
-      canvas={
-        <>
-          <ReviewCanvasCommentsSection
-            {...canvasComments}
-            comments={snapshot.document.canvasComments}
-            annotations={snapshot.document.annotations}
-            duration={resource.source.duration}
-            busy={busy}
-          />
-          <ReviewAudioInspectorSection audio={audio} busy={busy} />
-        </>
+      settingsAvailable={state.advanced.ui.mode === 'advanced'}
+      contextKey={reviewInspectorContext(state)}
+      composer={
+        composer.annotation ? (
+          <ReviewCommentComposer state={state} annotation={composer.annotation} />
+        ) : null
       }
-      message={snapshot.error ? reviewErrorMessage(snapshot.error) : message}
+      canvas={
+        state.advanced.ui.mode === 'advanced' ? (
+          <>
+            <ReviewCanvasCommentsSection
+              view="list"
+              {...canvasComments}
+              onAdd={() => {
+                state.setMode('advanced');
+                void canvasComments.onAdd();
+              }}
+              comments={snapshot.document.canvasComments}
+              annotations={snapshot.document.annotations}
+              duration={resource.source.duration}
+              busy={busy}
+            />
+          </>
+        ) : null
+      }
+      saveStatus={
+        state.advancedFailed
+          ? 'failed'
+          : state.advancedPending || snapshot.pending > 0
+            ? 'saving'
+            : 'saved'
+      }
+      onRetry={() => void run(state.retryAdvanced)}
+      recovery={
+        snapshot.error === 'conflict' ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.reload')}
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await composer.reload();
+                state.resetAdvanced();
+              })
+            }
+          />
+        ) : null
+      }
+      message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
       onBack={() => {
         video.current?.pause();
         void run(async () => {
           await composer.flush();
-          await flushAdvanced();
+          await state.flushAdvanced();
           await canvasComments.flushTexts();
           await session.flush();
           onBack();
@@ -383,17 +434,17 @@ function ReviewInspectorBinding({
       }}
       onUndo={() => onHistory('undo')}
       onRedo={() => onHistory('redo')}
-      onAdd={() => add()}
-      onSelect={selectComment}
-      onHover={setHovered}
+      onAdd={state.add}
+      onSelect={state.selectComment}
+      onHover={state.setHovered}
       onEdit={(annotation) => {
-        if (canStart()) {
-          selectComment(annotation);
+        if (state.canStart()) {
+          state.selectComment(annotation);
           composer.change(annotation, annotation);
         }
       }}
       onDelete={(annotation) => {
-        if (canStart())
+        if (state.canStart())
           void run(() =>
             session.commit({
               id: crypto.randomUUID(),
@@ -406,33 +457,24 @@ function ReviewInspectorBinding({
       }}
       onShowOnVideo={(annotation) => {
         video.current?.pause();
+        state.setMode('advanced');
         void canvasComments.onShowOnVideo(annotation);
       }}
       onReport={(action) => {
         if (busy) return;
-        setBusy(true);
-        setMessage(null);
+        state.setBusy(true);
+        state.setMessage(null);
         void exportReviewReport(resource, action, editing.exporter.result?.receipt)
-          .catch(() => setMessage(translate('gallery.videoReview.reportFailed')))
-          .finally(() => setBusy(false));
+          .catch(() => state.setMessage(translate('gallery.videoReview.reportFailed')))
+          .finally(() => state.setBusy(false));
       }}
     >
-      <ReviewAdvancedPanels advanced={advanced} zoom={zoom} setBackground={setBackground} />
-      {snapshot.error === 'conflict' ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.reload')}
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              await composer.reload();
-              resetAdvanced();
-            })
-          }
-        />
-      ) : null}
-      {composer.annotation ? (
-        <ReviewCommentComposer state={state} annotation={composer.annotation} />
-      ) : null}
+      <ReviewSelectedProperties
+        state={state}
+        canvasComments={canvasComments}
+        audio={audio}
+        duration={resource.source.duration}
+      />
     </ReviewInspector>
   );
 }
@@ -512,12 +554,18 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
   const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
   return (
     <div
-      className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_360px] max-[799px]:grid-cols-1
-          max-[799px]:grid-rows-[minmax(360px,45%)_minmax(440px,1fr)]
+      className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px] max-[799px]:grid-cols-1
+          max-[799px]:grid-rows-[minmax(360px,55dvh)_minmax(360px,1fr)]
           max-[799px]:overflow-y-auto"
     >
-      <main className="flex min-h-0 min-w-0 flex-col overflow-y-auto p-4">
+      <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
+        <ReviewModeControl
+          advanced={advanced}
+          busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
+          setMode={setMode}
+        />
         <ReviewStageBinding
+          backgroundPending={state.backgroundImport.pending}
           url={resource.url}
           source={source}
           video={video}
@@ -565,7 +613,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           outputTime={timeline.outputTime}
           toOutputTime={timeline.toOutputTime}
           onCutPlacement={() => setMessage(translate('gallery.videoReview.placementOnCut'))}
-          setMode={setMode}
           setTrackVisibility={setTrackVisibility}
           setOverlaysVisible={setOverlaysVisible}
           telemetryAvailable={!!resource.telemetry}
@@ -648,4 +695,66 @@ export function VideoReview({ aggregateId, onBack }: { aggregateId: string; onBa
       )}
     </dialog>
   );
+}
+
+/** Selected-object properties share the selection owner, separately from session actions. */
+function ReviewSelectedProperties({
+  state,
+  canvasComments,
+  audio,
+  duration,
+}: {
+  state: InspectorState;
+  canvasComments: ReturnType<typeof useCanvasComments>;
+  audio: ReturnType<typeof useReviewAudio>;
+  duration: number;
+}) {
+  const { advanced, zoom, setBackground, busy, editing, snapshot } = state;
+  return (
+    <>
+      {state.backgroundImport.pending ? (
+        <p role="status">{translate('gallery.videoReview.backgroundImporting')}</p>
+      ) : null}
+      {state.backgroundImport.failed ? (
+        <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
+      ) : null}
+      <fieldset disabled={busy || editing.exporter.phase !== 'idle'} className="min-w-0 space-y-3">
+        {advanced.ui.mode === 'advanced' && state.activeSelection.kind !== 'none' ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.canvas')}
+            onClick={() => state.setActiveSelection({ kind: 'none' })}
+          />
+        ) : null}
+        {state.activeSelection.kind === 'canvas-comment' ? (
+          <ReviewCanvasCommentsSection
+            view="selected"
+            {...canvasComments}
+            comments={snapshot.document.canvasComments}
+            annotations={snapshot.document.annotations}
+            duration={duration}
+            busy={busy}
+          />
+        ) : state.activeSelection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
+          <ReviewAudioInspectorSection audio={audio} busy={busy} />
+        ) : state.activeSelection.kind !== 'annotation' ? (
+          <ReviewAdvancedPanels
+            advanced={advanced}
+            zoom={zoom}
+            setBackground={setBackground}
+            onImportImage={state.backgroundImport.importImage}
+          />
+        ) : null}
+      </fieldset>
+    </>
+  );
+}
+
+function reviewInspectorContext(state: InspectorState): string {
+  if (state.composer.annotation) return `comments:${state.composer.annotation.id}`;
+  const selection = state.activeSelection;
+  if (selection.kind === 'annotation') return `comments:${selection.id}`;
+  if (state.advanced.ui.mode !== 'advanced' && selection.kind !== 'canvas-comment')
+    return 'comments';
+  const id = 'id' in selection ? selection.id : '';
+  return `settings:${selection.kind}:${id}`;
 }

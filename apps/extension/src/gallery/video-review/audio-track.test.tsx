@@ -61,12 +61,14 @@ const renderTrack = (
     voiceover: QuickEditAudioClip[];
     music: QuickEditAudioClip[];
   },
-  busy = false
+  busy = false,
+  snapTimes: readonly number[] = []
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
         audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
+        snapTimes={snapTimes}
         duration={10}
         selectedId={null}
         busy={busy}
@@ -262,4 +264,28 @@ it('discards a drag preview on pointer cancellation without committing it', asyn
   expect(block.style.left).toBe('20%');
   expect(onMoveClip).not.toHaveBeenCalled();
   expect(onTrimClip).not.toHaveBeenCalled();
+});
+
+it('snaps audio placement to projected edit edges and allows Shift to bypass', async () => {
+  const lanes = renderTrack(
+    { original: { muted: false, volume: 1 }, voiceover: [clip('a1', 2, 2)], music: [] },
+    false,
+    [3]
+  );
+  const lane = lanes[1]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  const send = (kind: string, x: number, shiftKey = false) =>
+    act(async () => {
+      block.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey }));
+    });
+  await send('pointerdown', 0);
+  await send('pointermove', 95);
+  await send('pointerup', 95);
+  expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 3);
+  await send('pointerdown', 0);
+  await send('pointermove', 95, true);
+  await send('pointerup', 95, true);
+  expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 2.95);
 });

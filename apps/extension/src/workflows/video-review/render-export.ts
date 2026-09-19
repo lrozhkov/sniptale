@@ -1,3 +1,4 @@
+import type { ReviewRenderSettings } from './media-index';
 import {
   ALL_FORMATS,
   BlobSource,
@@ -80,6 +81,7 @@ export function reviewRenderFrameSchedule(
  * ranges keep camera and audio on global output time while timestamps start at zero.
  */
 export async function writeReviewFrames(args: {
+  renderSettings?: ReviewRenderSettings | undefined;
   file: Blob;
   index: ReviewMediaIndex;
   /** Fragment-local edits; `fragmentOffset` maps local time back to global output time. */
@@ -125,7 +127,8 @@ export async function writeReviewFrames(args: {
           fps: preparation.fps,
           width: source.canvas.width,
           height: source.canvas.height,
-          quality: VideoQuality.HIGH,
+          quality:
+            args.renderSettings?.quality === 'standard' ? VideoQuality.MEDIUM : VideoQuality.HIGH,
         }),
       },
       onAudioPacket: (packet) => {
@@ -200,6 +203,7 @@ interface ReviewRenderPreparation {
 
 /** Render gates from the verified index: boundaries, encode codec, frame rate, windows. */
 function prepareReviewRender(args: {
+  renderSettings?: ReviewRenderSettings | undefined;
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
   advanced: QuickEditAdvancedState;
@@ -211,12 +215,24 @@ function prepareReviewRender(args: {
     )
   )
     throw new Error('Export requires verified cut boundaries.');
-  const codec = args.index.processedVideoCodec;
-  if (!codec) throw new QuickEditExportUnavailable(['video-encoder']);
+  const codec = args.renderSettings?.codec ?? args.index.processedVideoCodec;
+  const supported =
+    args.index.supportedVideoCodecs ??
+    (args.index.processedVideoCodec ? [args.index.processedVideoCodec] : []);
+  if (
+    !codec ||
+    !supported.includes(codec) ||
+    (args.index.container === 'mp4' ? codec !== 'avc' : codec === 'avc')
+  )
+    throw new QuickEditExportUnavailable(['video-encoder']);
+  const requestedFps = args.renderSettings?.frameRate;
+  if (requestedFps !== undefined && ![0, 24, 30, 60].includes(requestedFps))
+    throw new Error('Unsupported render frame rate.');
   const fps =
-    args.index.frameRate && Number.isFinite(args.index.frameRate) && args.index.frameRate > 0
+    requestedFps ||
+    (args.index.frameRate && Number.isFinite(args.index.frameRate) && args.index.frameRate > 0
       ? args.index.frameRate
-      : 30;
+      : 30);
   const windows = reviewRenderFrameSchedule(args.index.duration, args.edits, fps);
   if (!windows.length) throw new Error('The edited video is empty.');
   return {

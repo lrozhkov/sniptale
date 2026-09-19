@@ -14,6 +14,9 @@ import type {
 } from '../../features/video/review/types';
 import type { useCanvasComments } from './use-canvas-comments';
 import { ReviewStage } from './stage';
+import { useReviewBackgroundImage } from './use-review-background';
+import { ReviewButton } from './controls';
+import { translate } from '../../platform/i18n';
 
 /**
  * One stage binding: the applied scene (background plus the camera at the represented
@@ -21,6 +24,7 @@ import { ReviewStage } from './stage';
  * visibility and selection never change the applied pixels.
  */
 export function ReviewStageBinding(props: {
+  backgroundPending?: boolean;
   url: string;
   source: ReviewSource;
   video: RefObject<HTMLVideoElement | null>;
@@ -48,6 +52,7 @@ export function ReviewStageBinding(props: {
   onPlaying(value: boolean): void;
   onError(): void;
 }) {
+  const image = useReviewBackgroundImage(props.background, props.backgroundPending);
   const camera: QuickEditCameraTransform = props.zoomRegions.length
     ? evaluateQuickEditCameraAtTime(props.zoomRegions, props.outputTime)
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
@@ -77,34 +82,43 @@ export function ReviewStageBinding(props: {
     [props.canvasComments]
   );
   return (
-    <ReviewStage
-      url={props.url}
-      source={props.source}
-      video={props.video}
-      drawing={props.drawing}
-      region={props.region}
-      scene={{ background: props.background, camera }}
-      {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}
-      comments={{
-        items: props.overlaysVisible ? props.comments : [],
-        annotations: props.annotations,
-        time: props.time,
-        background: props.background,
-        camera: props.zoomRegions.length ? camera : null,
-        selectedId: props.canvasComments.selectedId,
-        busy: props.busy,
-        onSelect: props.canvasComments.onSelect,
-        onGeometry,
-        onMove: (id, position) => {
-          const comment = props.comments.find((item) => item.id === id);
-          if (comment) void props.canvasComments.onPatch(comment, { position });
-        },
-      }}
-      onRegion={props.onRegion}
-      onReady={props.onReady}
-      onTime={props.onTime}
-      onPlaying={props.onPlaying}
-      onError={props.onError}
-    />
+    <>
+      {image.failed ? (
+        <div role="alert" className="flex items-center gap-2 text-sm">
+          <span>{translate('gallery.videoReview.backgroundLoadFailed')}</span>
+          <ReviewButton label={translate('gallery.videoReview.retry')} onClick={image.retry} />
+        </div>
+      ) : null}
+      <ReviewStage
+        backgroundImageUrl={image.url}
+        url={props.url}
+        source={props.source}
+        video={props.video}
+        drawing={props.drawing}
+        region={props.region}
+        scene={{ background: props.background, camera }}
+        {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}
+        comments={{
+          items: props.overlaysVisible ? props.comments : [],
+          annotations: props.annotations,
+          time: props.time,
+          background: props.background,
+          camera: props.zoomRegions.length ? camera : null,
+          selectedId: props.canvasComments.selectedId,
+          busy: props.busy,
+          onSelect: props.canvasComments.onSelect,
+          onGeometry,
+          onMove: (id, position) => {
+            const comment = props.comments.find((item) => item.id === id);
+            if (comment) void props.canvasComments.onPatch(comment, { position });
+          },
+        }}
+        onRegion={props.onRegion}
+        onReady={props.onReady}
+        onTime={props.onTime}
+        onPlaying={props.onPlaying}
+        onError={props.onError}
+      />
+    </>
   );
 }

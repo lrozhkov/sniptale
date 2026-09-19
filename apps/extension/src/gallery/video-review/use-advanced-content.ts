@@ -136,6 +136,7 @@ export function useReviewAdvancedContent(
   return {
     content: optimistic.current?.value ?? documentContent,
     saveFailed,
+    pending: pending.current !== null,
     flush,
     reset,
     setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>

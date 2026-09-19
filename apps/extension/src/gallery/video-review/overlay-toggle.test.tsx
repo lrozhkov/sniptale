@@ -81,6 +81,7 @@ it('hides overlays in the editor without touching their data or export flag', as
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
     await click('addOverlayComment');
     expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).not.toBeNull();
     const toggle = () =>
@@ -99,6 +100,11 @@ it('hides overlays in the editor without touching their data or export flag', as
     expect((comments[0] as { after: { renderToVideo: boolean } }).after.renderToVideo).toBe(true);
     await click('showOverlays');
     expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).not.toBeNull();
+    await click('advancedEditing');
+    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
+    expect(
+      fixture.snapshot.workspace.history.filter((op) => op.target === 'canvasComment')
+    ).toHaveLength(1);
   } finally {
     await fixture.cleanup();
   }
@@ -130,6 +136,44 @@ it('links a saved annotation to a burned overlay without retyping text', async (
     ).toBe('Bridge me');
     await click('undo');
     expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps mode navigation separate from timeline tools and hides advanced content in Basic', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    const mode = fixture.button('advancedEditing');
+    expect(mode.closest('[data-ui="gallery.videoReview.timeline"]')).toBeNull();
+    expect(
+      fixture.host.querySelector('[aria-label="gallery.videoReview.addOverlayComment"]')
+    ).toBeNull();
+    await fixture.click('advancedEditing');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')
+    ).not.toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps conflict recovery accessible while a Basic comment is being edited', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('addComment');
+    await fixture.fill('Conflicting comment');
+    integration.commit.mockRejectedValueOnce({ code: 'conflict' });
+    await fixture.click('save');
+    expect(fixture.button('reload').disabled).toBe(false);
+    await fixture.click('reload');
+    expect(integration.read).toHaveBeenCalled();
   } finally {
     await fixture.cleanup();
   }

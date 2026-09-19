@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Link2, Plus } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -26,6 +26,7 @@ type ZoomTrackProps = {
   selectedId: string | null;
   onSelect(id: string | null): void;
   onAdd(): void;
+  onLink?(id: string, targetId: string | null): void;
   onDragCommit(
     id: string,
     range: { start: number; end: number },
@@ -170,6 +171,33 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       >
         {translate('gallery.videoReview.zoomTrack')}
       </div>
+      {props.regions
+        .filter((region) => !region.dormant)
+        .map((region, index, regions) => {
+          const next = regions[index + 1];
+          if (!next || next.start <= region.end || !props.onLink) return null;
+          const connected = region.linkTo === next.id;
+          return (
+            <button
+              key={`link:${region.id}`}
+              type="button"
+              aria-label={translate('gallery.videoReview.zoomConnect')}
+              aria-pressed={connected}
+              className="absolute inset-y-1 z-[6] flex items-center justify-center rounded border border-dashed
+          border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-muted)]
+          hover:bg-[var(--sniptale-color-surface-hover)] aria-pressed:border-[var(--sniptale-color-accent)]
+          aria-pressed:text-[var(--sniptale-color-accent)]"
+              style={{
+                left: percent(region.end, props.duration),
+                width: percent(next.start - region.end, props.duration),
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => props.onLink?.(region.id, connected ? null : next.id)}
+            >
+              <Link2 size={14} aria-hidden="true" />
+            </button>
+          );
+        })}
       {props.regions.map((region) => (
         <ReviewZoomRegionBlock
           key={region.id}
@@ -235,10 +263,9 @@ function ReviewZoomRegionBlock(
   const label =
     `${translate('gallery.videoReview.zoomRegionLabel')} ` +
     `${reviewTimeLabel(region.start)} – ${reviewTimeLabel(region.end)}`;
-  const accentMix = 'color-mix(in_srgb,var(--sniptale-color-accent)';
   const tone = props.selected
-    ? `border-[var(--sniptale-color-accent)] bg-[color:${accentMix}_20%,var(--sniptale-color-surface-canvas))]`
-    : `border-transparent bg-[color:${accentMix}_10%,var(--sniptale-color-surface-canvas))]`;
+    ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
+    : 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]';
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -314,8 +341,11 @@ function ReviewZoomRegionBlock(
         props.onSelect(region.id);
       }}
     >
-      <span className="absolute left-1 top-1/2 -translate-y-1/2 text-[10px] text-[var(--sniptale-color-text-muted)]">
-        {props.selected ? `${region.transform.scale}×` : ''}
+      <span
+        className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2
+          truncate text-center text-[10px]"
+      >
+        {region.transform.scale}×
       </span>
       {(['start', 'end'] as const).map((edge) => (
         <span

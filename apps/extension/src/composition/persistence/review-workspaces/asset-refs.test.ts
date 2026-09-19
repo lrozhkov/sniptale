@@ -260,3 +260,71 @@ it('collects, remaps, and portably encodes audio refs inside advancedContent his
     'project-asset:restored-take'
   );
 });
+
+it('retains and portably remaps images in current content, undo history, and recovery', () => {
+  const image = (id: string) => ({
+    enabled: true as const,
+    type: 'image' as const,
+    imageFit: 'cover' as const,
+    assetId: `project-asset:${id}`,
+    layout: { padding: 8, cornerRadius: 12 },
+  });
+  const content = (id: string) => ({ ...createQuickEditAdvancedState(), background: image(id) });
+  const snapshot: VideoWorkspaceSnapshot = {
+    workspace: {
+      aggregateId: 'recording:r',
+      sourceAssetId: 'source',
+      formatVersion: 1,
+      source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 },
+      revision: 2,
+      cursor: 0,
+      createdAt: 1,
+      updatedAt: 2,
+      advanced: {
+        ...content('current'),
+        recoveryV1: JSON.stringify({ background: image('recovery') }),
+      },
+      history: [
+        {
+          id: 'op',
+          at: 1,
+          target: 'advancedContent',
+          before: content('before'),
+          after: content('after'),
+        },
+      ],
+    },
+    draft: null,
+  };
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set([
+      'project-asset:current',
+      'project-asset:recovery',
+      'project-asset:before',
+      'project-asset:after',
+    ])
+  );
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  const map = new Map(
+    ['current', 'before', 'after', 'recovery'].map((id) => [id, `restored-${id}`])
+  );
+  const restored = remapReviewAssetReferences(snapshot, map);
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set([
+      'project-asset:restored-current',
+      'project-asset:restored-recovery',
+      'project-asset:restored-before',
+      'project-asset:restored-after',
+    ])
+  );
+  expect(collectReviewAssetReferences(snapshot.workspace)).toContain('project-asset:current');
+});

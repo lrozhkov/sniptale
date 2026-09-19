@@ -23,7 +23,7 @@ export function ReviewButton({
       aria-label={label}
       {...props}
       className={`${tone}
-      !min-h-8 !rounded-[var(--sniptale-radius-sm)]
+      !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]
       !px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)] ${className}`}
     >
       {children ?? label}

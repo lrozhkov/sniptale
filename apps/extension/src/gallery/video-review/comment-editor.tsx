@@ -335,6 +335,7 @@ function ReviewOverlayFlagRow(props: {
 
 /** Inspector section for overlay comments: the list plus the editor of the selection. */
 export function ReviewCanvasCommentsSection(props: {
+  view?: 'list' | 'selected';
   comments: readonly CanvasComment[];
   annotations: readonly ReviewAnnotation[];
   duration: number;
@@ -351,58 +352,62 @@ export function ReviewCanvasCommentsSection(props: {
   const selected = props.comments.find((comment) => comment.id === props.selectedId) ?? null;
   return (
     <div data-ui="gallery.videoReview.canvasComments" className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">
-          {translate('gallery.videoReview.overlayComments')}
-        </h3>
-        <ReviewButton
-          label={translate('gallery.videoReview.addOverlayComment')}
-          disabled={props.busy}
-          className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
-          onClick={props.onAdd}
-        >
-          <Plus size={16} />
-        </ReviewButton>
-      </div>
-      {props.comments.length ? (
-        <ol className="space-y-2">
-          {props.comments.map((comment) => {
-            const text =
-              props.annotations.find((item) => item.id === comment.annotationId)?.text ??
-              comment.text;
-            return (
-              <li
-                key={comment.id}
-                className={`rounded-lg border p-3 ${
-                  props.selectedId === comment.id
-                    ? 'border-[var(--sniptale-color-accent)]'
-                    : 'border-[var(--sniptale-color-border-soft)]'
-                }`}
-              >
-                <button
-                  type="button"
-                  className="block w-full text-left"
-                  onClick={() => props.onSelect(comment.id)}
-                >
-                  <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-                    {comment.start === undefined
-                      ? translate('gallery.videoReview.overlayComments')
-                      : reviewTimeLabel(comment.start)}
-                  </span>
-                  <span className="mt-1 block whitespace-pre-wrap break-words text-sm">
-                    {text.trim() ? text : translate('gallery.videoReview.overlayPoint')}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-      ) : (
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.overlayComments')}
-        </p>
-      )}
-      {selected ? (
+      {props.view !== 'selected' ? (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">
+              {translate('gallery.videoReview.overlayComments')}
+            </h3>
+            <ReviewButton
+              label={translate('gallery.videoReview.addOverlayComment')}
+              disabled={props.busy}
+              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+              onClick={props.onAdd}
+            >
+              <Plus size={16} />
+            </ReviewButton>
+          </div>
+          {props.comments.length ? (
+            <ol className="space-y-2">
+              {props.comments.map((comment) => {
+                const text =
+                  props.annotations.find((item) => item.id === comment.annotationId)?.text ??
+                  comment.text;
+                return (
+                  <li
+                    key={comment.id}
+                    className={`rounded-lg border p-3 ${
+                      props.selectedId === comment.id
+                        ? 'border-[var(--sniptale-color-accent)]'
+                        : 'border-[var(--sniptale-color-border-soft)]'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="block w-full text-left"
+                      onClick={() => props.onSelect(comment.id)}
+                    >
+                      <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+                        {comment.start === undefined
+                          ? translate('gallery.videoReview.overlayComments')
+                          : reviewTimeLabel(comment.start)}
+                      </span>
+                      <span className="mt-1 block whitespace-pre-wrap break-words text-sm">
+                        {text.trim() ? text : translate('gallery.videoReview.overlayPoint')}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+              {translate('gallery.videoReview.overlayComments')}
+            </p>
+          )}
+        </>
+      ) : null}
+      {selected && props.view !== 'list' ? (
         <ReviewCanvasCommentEditor
           comment={selected}
           annotations={props.annotations}

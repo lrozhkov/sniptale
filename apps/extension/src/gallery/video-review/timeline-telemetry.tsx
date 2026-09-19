@@ -1,11 +1,12 @@
 import { useMemo } from 'react';
+import { Activity } from 'lucide-react';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { layoutReviewActionLanes } from '../../features/video/review/action-lanes';
 import { reviewEventLabel, reviewTimeLabel } from './controls';
 
-const ACTION_MARKER_HEIGHT_PX = 10;
+const ACTION_MARKER_HEIGHT_PX = 20;
 const ACTION_LANE_GAP_PX = 4;
 const ACTION_LANE_PITCH_PX = ACTION_MARKER_HEIGHT_PX + ACTION_LANE_GAP_PX;
 /** ProductSelect small-trigger height; one system of numbers for every row. */
@@ -69,7 +70,8 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               title={`${reviewEventLabel(marker.eventType)} · ${reviewTimeLabel(marker.start)}`}
               onClick={() => props.onMarker(marker)}
               className={[
-                'absolute min-w-1.5 rounded-sm border transition-colors',
+                'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
+                'rounded-sm border text-[10px] transition-colors',
                 tone,
                 active ? 'ring-1 ring-[var(--sniptale-color-accent)]' : '',
               ].join(' ')}
@@ -79,7 +81,12 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
                 top: item.lane * ACTION_LANE_PITCH_PX,
                 height: ACTION_MARKER_HEIGHT_PX,
               }}
-            />
+            >
+              <Activity size={10} className="shrink-0" aria-hidden="true" />
+              {item.width >= 64 ? (
+                <span className="truncate">{reviewEventLabel(marker.eventType)}</span>
+              ) : null}
+            </button>
           );
         })}
       {layout.collapsed ? (

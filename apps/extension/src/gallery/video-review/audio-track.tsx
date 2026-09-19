@@ -20,6 +20,7 @@ import {
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
 import { ReviewButton } from './controls';
+import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import type { ReviewAudioLane } from './use-review-audio';
 
 const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
@@ -56,6 +57,7 @@ function ReviewAudioClipLane(props: {
   label: string;
   clips: readonly QuickEditAudioClip[];
   duration: number;
+  snapTimes?: readonly number[] | undefined;
   selectedId: string | null;
   busy: boolean;
   onSelect(id: string): void;
@@ -68,6 +70,7 @@ function ReviewAudioClipLane(props: {
     id: string;
     timelineStart: number;
     duration: number;
+    guide: number | null;
   } | null>(null);
   const [dropHover, setDropHover] = useState(false);
   const dropDepth = useRef(0);
@@ -173,6 +176,7 @@ function ReviewAudioClipLane(props: {
             selected={props.selectedId === clip.id}
             busy={props.busy}
             label={props.label}
+            snapTimes={props.snapTimes}
             duration={props.duration}
             drag={drag}
             lane={props.lane}
@@ -184,14 +188,11 @@ function ReviewAudioClipLane(props: {
           />
         );
       })}
-      {!props.clips.length ? (
-        <p
-          className="pointer-events-none absolute inset-0 flex items-center justify-center
-              text-[11px] text-[var(--sniptale-color-text-muted)]"
-        >
-          {translate('gallery.videoReview.audioEmpty')}
-        </p>
-      ) : null}
+      <ReviewAudioLaneStatus
+        empty={!props.clips.length}
+        guide={preview?.guide ?? null}
+        duration={props.duration}
+      />
       {props.trailing}
     </div>
   );
@@ -205,11 +206,12 @@ function ReviewAudioClipBlock(props: {
   busy: boolean;
   label: string;
   duration: number;
+  snapTimes?: readonly number[] | undefined;
   drag: MutableRefObject<AudioDragState | null>;
   lane: ReviewAudioLane;
   clips: readonly QuickEditAudioClip[];
   onSelect(id: string): void;
-  onPreview(value: { timelineStart: number; duration: number } | null): void;
+  onPreview(value: { timelineStart: number; duration: number; guide: number | null } | null): void;
   onCommit(): void;
   onCancel(): void;
 }) {
@@ -257,18 +259,44 @@ function ReviewAudioClipBlock(props: {
         const delta = ((event.clientX - current.x) / current.width) * props.duration;
         const base = props.clips.find((item) => item.id === current.id);
         if (!base) return;
+        const threshold = event.shiftKey
+          ? -1
+          : (SNAP_THRESHOLD_PX * props.duration) / current.width;
+        const candidates = [
+          ...(props.snapTimes ?? []),
+          ...props.clips
+            .filter((clip) => clip.id !== base.id && !clip.dormant)
+            .flatMap((clip) => [clip.timelineStart, clip.timelineStart + clip.duration]),
+        ];
+        const start = snapTimelineTime(base.timelineStart + delta, candidates, threshold);
+        const end = snapTimelineTime(
+          base.timelineStart + base.duration + delta,
+          candidates,
+          threshold
+        );
+        const useEnd =
+          current.edge === 'end' ||
+          (current.edge === 'move' &&
+            end.candidate !== null &&
+            (start.candidate === null ||
+              Math.abs(end.time - base.timelineStart - base.duration - delta) <
+                Math.abs(start.time - base.timelineStart - delta)));
+        const snapped = useEnd ? end : start;
         const next =
           current.edge === 'start'
-            ? trimQuickEditAudioClip(base, 'start', base.timelineStart + delta, props.duration)
+            ? trimQuickEditAudioClip(base, 'start', start.time, props.duration)
             : current.edge === 'end'
-              ? trimQuickEditAudioClip(
+              ? trimQuickEditAudioClip(base, 'end', end.time, props.duration)
+              : moveQuickEditAudioClip(
                   base,
-                  'end',
-                  base.timelineStart + base.duration + delta,
+                  useEnd ? end.time - base.duration : start.time,
                   props.duration
-                )
-              : moveQuickEditAudioClip(base, base.timelineStart + delta, props.duration);
-        props.onPreview({ timelineStart: next.timelineStart, duration: next.duration });
+                );
+        props.onPreview({
+          timelineStart: next.timelineStart,
+          duration: next.duration,
+          guide: snapped.candidate,
+        });
       }}
       onPointerUp={props.onCommit}
       onPointerCancel={props.onCancel}
@@ -296,6 +324,7 @@ function reviewClipLabel(clip: QuickEditAudioClip) {
 export function ReviewAudioTrack(props: {
   audio: QuickEditAudioState;
   duration: number;
+  snapTimes?: readonly number[] | undefined;
   selectedId: string | null;
   busy: boolean;
   onSelect(id: string | null): void;
@@ -328,6 +357,7 @@ export function ReviewAudioTrack(props: {
       />
       <ReviewClipLanes
         audio={props.audio}
+        snapTimes={props.snapTimes}
         duration={props.duration}
         selectedId={props.selectedId}
         busy={props.busy}
@@ -380,6 +410,7 @@ function ReviewOriginalLane(props: {
 function ReviewClipLanes(props: {
   audio: QuickEditAudioState;
   duration: number;
+  snapTimes?: readonly number[] | undefined;
   selectedId: string | null;
   busy: boolean;
   onSelect(id: string | null): void;
@@ -398,6 +429,7 @@ function ReviewClipLanes(props: {
           lane={lane.key}
           label={translate(lane.label)}
           clips={props.audio[lane.key]}
+          snapTimes={props.snapTimes}
           duration={props.duration}
           selectedId={props.selectedId}
           busy={props.busy}
@@ -434,6 +466,29 @@ function ReviewClipLanes(props: {
           }
         />
       ))}
+    </>
+  );
+}
+
+/** Empty-lane guidance and the current magnetic alignment share the lane coordinate scale. */
+function ReviewAudioLaneStatus(props: { empty: boolean; guide: number | null; duration: number }) {
+  return (
+    <>
+      {props.empty ? (
+        <p
+          className="pointer-events-none absolute inset-0 flex items-center justify-center
+              text-[11px] text-[var(--sniptale-color-text-muted)]"
+        >
+          {translate('gallery.videoReview.audioEmpty')}
+        </p>
+      ) : null}
+      {props.guide !== null ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 z-20 w-px bg-[var(--sniptale-color-accent)]"
+          style={{ left: percent(props.guide, props.duration) }}
+        />
+      ) : null}
     </>
   );
 }

@@ -102,6 +102,9 @@ function OverlayComment(props: {
               -translate-x-1/2 whitespace-pre-wrap break-words
               px-2.5 py-1.5 text-xs leading-snug shadow-sm"
           style={{
+            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+            fontSize: CANVAS_COMMENT_BUBBLE.fontSize,
+            lineHeight: `${CANVAS_COMMENT_BUBBLE.lineHeight}px`,
             background: serializePaintToCss(props.comment.style.fillPaint),
             color: props.comment.style.textColor,
             borderRadius: props.comment.style.radius,
@@ -204,7 +207,10 @@ export function ReviewCommentOverlay(props: {
               comment={comment}
               resolvedText={canvasCommentText(comment, props.annotations ?? [])}
               videoTransform={content ? layout.videoTransform : null}
-              scale={content ? (props.camera?.scale ?? 1) : 1}
+              scale={
+                (props.output.width / Math.max(1, props.source.width)) *
+                (content ? (props.camera?.scale ?? 1) : 1)
+              }
               layer={content ? 5 : 9}
               selected={comment.id === props.selectedId}
               busy={props.busy}

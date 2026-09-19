@@ -108,6 +108,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const enter = parseZoomTransition(value['enter']);
   const exit = parseZoomTransition(value['exit']);
   if (!transform || !enter || !exit) return null;
+  if (value['linkTo'] !== undefined && !identity(value['linkTo'])) return null;
   return {
     id: value['id'],
     start: value['start'],
@@ -115,6 +116,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     transform,
     enter,
     exit,
+    ...(identity(value['linkTo']) ? { linkTo: value['linkTo'] } : {}),
     ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
   };
 }

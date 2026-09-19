@@ -1,6 +1,27 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  backgroundImage: { ru: 'Изображение', en: 'Image' },
+  backgroundImporting: { ru: 'Загрузка фона…', en: 'Importing background…' },
+  backgroundImportFailed: {
+    ru: 'Не удалось загрузить фон. Выберите PNG, JPEG или WebP до 16 МБ и повторите попытку.',
+    en: 'Could not import the background. Choose a PNG, JPEG or WebP up to 16 MB and try again.',
+  },
+  backgroundLoadFailed: {
+    ru: 'Не удалось открыть изображение фона.',
+    en: 'Could not load the background image.',
+  },
+  saving: { ru: 'Сохранение…', en: 'Saving…' },
+  zoomConnect: { ru: 'Плавный переход между зумами', en: 'Smooth transition between zooms' },
+  exportSettings: { ru: 'Настройки экспорта', en: 'Export settings' },
+  exportCodec: { ru: 'Кодек', en: 'Codec' },
+  exportFrameRate: { ru: 'Частота кадров', en: 'Frame rate' },
+  exportSourceRate: { ru: 'Как в исходнике', en: 'Same as source' },
+  exportQuality: { ru: 'Качество', en: 'Quality' },
+  exportStandardQuality: { ru: 'Стандартное · меньше файл', en: 'Standard · smaller file' },
+  exportHighQuality: { ru: 'Высокое', en: 'High' },
+  inspector: { ru: 'Инспектор', en: 'Inspector' },
+  properties: { ru: 'Параметры', en: 'Properties' },
   cutLabel: { ru: 'Вырезано', en: 'Cut' },
   invalidEditRange: {
     ru: 'Участок должен содержать хотя бы один ключевой интервал, не пересекать другие правки и не удалять всё видео.',
@@ -107,6 +128,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   timelineZoom: { ru: 'Масштаб таймлайна', en: 'Timeline zoom' },
   enter: { ru: 'Разметить и быстро отредактировать', en: 'Annotate and quick edit' },
   title: { ru: 'Разметка видео', en: 'Video review' },
+  editorTitle: { ru: 'Редактор видео', en: 'Video editor' },
   back: { ru: 'Назад к просмотру', en: 'Back to viewer' },
   loading: {
     ru: 'Открываем видео и сохранённую сессию…',
@@ -141,7 +163,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Зум, фон, дорожки звука и расширенный экспорт',
     en: 'Zoom, background, audio tracks, and advanced export',
   },
-  zoomTrack: { ru: 'Дорожка зума', en: 'Zoom track' },
+  zoomTrack: { ru: 'Зум', en: 'Zoom' },
   zoomAdd: { ru: 'Добавить зум', en: 'Add zoom' },
   zoomRegionLabel: { ru: 'Зум', en: 'Zoom' },
   zoomEmptyHint: {
@@ -167,7 +189,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   backgroundGradient: { ru: 'Градиент', en: 'Gradient' },
   backgroundPadding: { ru: 'Отступ, px', en: 'Padding, px' },
   backgroundCornerRadius: { ru: 'Радиус, px', en: 'Corner radius, px' },
-  audioTrack: { ru: 'Дорожки звука', en: 'Audio tracks' },
+  audioTrack: { ru: 'Звук', en: 'Audio' },
   advancedSuppressedHint: {
     ru: 'Расширенные настройки сохранены и временно не применяются.',
     en: 'Advanced settings are saved and temporarily not applied.',

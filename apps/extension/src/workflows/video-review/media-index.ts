@@ -9,6 +9,13 @@ import {
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import { chooseReviewAudioCodec } from './audio-render';
 
+/** Session-local render choices; packet exports keep the source encoding. */
+export interface ReviewRenderSettings {
+  codec?: 'avc' | 'vp8' | 'vp9';
+  quality: 'standard' | 'high';
+  frameRate: 0 | 24 | 30 | 60;
+}
+
 export interface ReviewMediaIndex {
   duration: number;
   boundaries: number[];
@@ -19,6 +26,7 @@ export interface ReviewMediaIndex {
   processedAudioCodec?: 'aac' | 'opus' | null;
   /** Encoder for a full frame render; null keeps visual exports honestly blocked. */
   processedVideoCodec?: 'avc' | 'vp8' | 'vp9' | null;
+  supportedVideoCodecs?: ('avc' | 'vp8' | 'vp9')[];
   /** Probed average frame rate; the render loop quantizes output frames to it. */
   frameRate?: number;
 }
@@ -28,12 +36,20 @@ export async function chooseReviewVideoCodec(
   container: 'mp4' | 'webm',
   dimensions: { width: number; height: number }
 ): Promise<'avc' | 'vp8' | 'vp9' | null> {
-  if (typeof VideoEncoder === 'undefined') return null;
+  return (await supportedReviewVideoCodecs(container, dimensions))[0] ?? null;
+}
+
+async function supportedReviewVideoCodecs(
+  container: 'mp4' | 'webm',
+  dimensions: { width: number; height: number }
+): Promise<('avc' | 'vp8' | 'vp9')[]> {
+  if (typeof VideoEncoder === 'undefined') return [];
   const candidates = container === 'mp4' ? (['avc'] as const) : (['vp9', 'vp8'] as const);
+  const supported: ('avc' | 'vp8' | 'vp9')[] = [];
   for (const codec of candidates) {
-    if (await canEncodeVideo(codec, dimensions)) return codec;
+    if (await canEncodeVideo(codec, dimensions)) supported.push(codec);
   }
-  return null;
+  return supported;
 }
 
 /** Indexes actual independent packets; no decoded frames or retained packet payloads. */
@@ -97,9 +113,9 @@ export async function inspectReviewMedia(
       throw new Error('The first video packet is not an independent source entry point.');
     const container =
       videoCodec === 'avc' || videoCodec === 'hevc' || audioCodec === 'aac' ? 'mp4' : 'webm';
-    const [processedAudioCodec, processedVideoCodec, packetStats] = await Promise.all([
+    const [processedAudioCodec, supportedVideoCodecs, packetStats] = await Promise.all([
       chooseReviewAudioCodec(audio ?? null, container),
-      chooseReviewVideoCodec(container, {
+      supportedReviewVideoCodecs(container, {
         width: await video.getDisplayWidth(),
         height: await video.getDisplayHeight(),
       }),
@@ -113,7 +129,8 @@ export async function inspectReviewMedia(
       audioCodec,
       container,
       processedAudioCodec,
-      processedVideoCodec,
+      processedVideoCodec: supportedVideoCodecs[0] ?? null,
+      supportedVideoCodecs,
       frameRate:
         Number.isFinite(packetStats.averagePacketRate) && packetStats.averagePacketRate > 0
           ? Math.min(120, Math.max(1, Math.round(packetStats.averagePacketRate)))

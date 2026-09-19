@@ -183,13 +183,13 @@ it('splits colliding actions into lanes and collapses the dense tail into an ove
   }));
   const { host } = renderTimeline({ markers });
   const strip = host.querySelector<HTMLElement>('div.relative.mb-1')!;
-  // Three 10px lanes with 4px gaps plus the gap and full-height overflow row.
-  expect(strip.style.height).toBe('70px');
+  // Three 20px lanes with 4px gaps plus the gap and full-height overflow row.
+  expect(strip.style.height).toBe('100px');
   const markerButtons = [
     ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),
   ];
   expect(markerButtons).toHaveLength(3);
-  for (const button of markerButtons) expect(button.style.height).toBe('10px');
+  for (const button of markerButtons) expect(button.style.height).toBe('20px');
   const tops = new Set(markerButtons.map((button) => button.style.top));
   expect(tops.size).toBe(3);
   const chip = strip.querySelector<HTMLElement>('[data-ui="gallery.videoReview.actionOverflow"]')!;

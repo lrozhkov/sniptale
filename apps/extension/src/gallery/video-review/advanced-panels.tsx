@@ -7,6 +7,7 @@ import { ReviewBackgroundInspector } from './background-inspector';
 import { ReviewZoomInspector } from './zoom-inspector';
 
 type ReviewAdvancedPanelsProps = {
+  onImportImage?(file: File): void;
   advanced: QuickEditAdvancedState;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   setBackground(
@@ -45,10 +46,6 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
   const zoomRegion = args.zoom.selected(args.advanced.zoom);
   return (
     <>
-      <ReviewBackgroundInspector
-        background={args.advanced.background}
-        onChange={applyBackgroundPatch.bind(null, args)}
-      />
       {zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
@@ -56,7 +53,13 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
           onReset={resetZoomRegion.bind(null, args, zoomRegion.id)}
           onDelete={removeZoomRegion.bind(null, args, zoomRegion.id)}
         />
-      ) : null}
+      ) : (
+        <ReviewBackgroundInspector
+          onImportImage={args.onImportImage}
+          background={args.advanced.background}
+          onChange={applyBackgroundPatch.bind(null, args)}
+        />
+      )}
     </>
   );
 }

@@ -643,6 +643,7 @@ it('adds an overlay comment, drags it on the stage and deletes it via the editor
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
     await click('addOverlayComment');
     expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('canvasComment');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
@@ -765,6 +766,7 @@ it('persists a pending overlay comment draft on Back', async () => {
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
     await click('addOverlayComment');
     const area = host.querySelector<HTMLTextAreaElement>(
       '[data-ui="gallery.videoReview.overlayTextInput"]'

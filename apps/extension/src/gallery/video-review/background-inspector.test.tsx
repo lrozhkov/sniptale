@@ -105,3 +105,37 @@ it('switches the background kind and commits layout values', async () => {
   await act(async () => buttons[0]!.click());
   expect(change).toHaveBeenLastCalledWith({ enabled: false });
 });
+
+it('offers custom image backgrounds', () => {
+  act(() =>
+    root.render(<ReviewBackgroundInspector background={{ enabled: false }} onChange={vi.fn()} />)
+  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.backgroundImage"]')).not.toBeNull();
+});
+
+it('opens the image picker and forwards only a selected file', async () => {
+  const onImportImage = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ enabled: false }}
+        onChange={vi.fn()}
+        onImportImage={onImportImage}
+      />
+    )
+  );
+  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const open = vi.spyOn(input, 'click').mockImplementation(() => undefined);
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.backgroundImage"]')!
+      .click()
+  );
+  expect(open).toHaveBeenCalledOnce();
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(onImportImage).not.toHaveBeenCalled();
+  const file = new File(['image'], 'background.png', { type: 'image/png' });
+  Object.defineProperty(input, 'files', { value: [file] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(onImportImage).toHaveBeenCalledWith(file);
+});

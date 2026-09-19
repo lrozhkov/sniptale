@@ -83,6 +83,7 @@ it('edits the background paint and the selected zoom region through the panel ca
 
   await act(async () => button('addZoom').click());
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).toBeNull();
   const focusX = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;

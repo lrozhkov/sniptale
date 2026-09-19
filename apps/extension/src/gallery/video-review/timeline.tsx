@@ -10,6 +10,7 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  busy?: boolean;
   duration: number;
   time: number;
   playing: boolean;
@@ -52,7 +53,7 @@ export function ReviewTimeline(props: TimelineProps) {
   return (
     <section
       data-ui="gallery.videoReview.timeline"
-      className="@container min-w-0 max-w-full shrink-0 overflow-hidden pt-2"
+      className="@container flex min-h-0 max-h-[55%] min-w-0 max-w-full shrink-0 flex-col overflow-hidden pt-2"
     >
       <ReviewToolbar
         {...props}
@@ -63,9 +64,10 @@ export function ReviewTimeline(props: TimelineProps) {
       <div
         ref={viewport}
         data-ui="gallery.videoReview.timelineViewport"
-        className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain"
+        className="w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain"
       >
         <div
+          inert={props.busy}
           ref={plane.plane}
           data-ui="gallery.videoReview.timePlane"
           role="slider"

@@ -112,6 +112,7 @@ export function useReviewAdvanced(session: Session) {
   return {
     advanced,
     saveFailed: saveFailed || contentState.saveFailed,
+    pending: optimistic !== null || contentState.pending,
     retry: () => Promise.all([flush(), contentState.flush()]),
     setMode: (mode: 'basic' | 'advanced') =>
       stage((current) => ({ ...current, ui: { ...current.ui, mode } })),

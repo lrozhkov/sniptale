@@ -245,3 +245,84 @@ export function ReviewFragmentAction(props: {
     </ReviewButton>
   );
 }
+
+/** Render-only choices list only encoders admitted for this source container. */
+export function ReviewRenderOptions({
+  exporter,
+  busy,
+}: {
+  exporter: ReturnType<typeof import('./use-export').useReviewExport>;
+  busy: boolean;
+}) {
+  const plan = exporter.plan();
+  if (plan.kind !== 'ready' || plan.video !== 'render' || !exporter.renderSettings) return null;
+  const settings = exporter.renderSettings;
+  const codecs =
+    exporter.index?.supportedVideoCodecs ??
+    (exporter.index?.processedVideoCodec ? [exporter.index.processedVideoCodec] : []);
+  const field =
+    'mt-1 w-full rounded border border-[var(--sniptale-color-border-soft)] ' +
+    'bg-[var(--sniptale-color-surface-panel)] p-1.5 text-xs';
+  return (
+    <details className="mb-2 text-xs">
+      <summary className="cursor-pointer py-2">
+        {translate('gallery.videoReview.exportSettings')}
+      </summary>
+      <fieldset disabled={busy} className="grid grid-cols-2 gap-2 pb-2">
+        <label>
+          {translate('gallery.videoReview.exportCodec')}
+          <select
+            className={field}
+            value={settings.codec ?? exporter.index?.processedVideoCodec ?? ''}
+            onChange={(event) => {
+              const codec = codecs.find((codec) => codec === event.target.value);
+              if (codec) exporter.setRenderSettings({ ...settings, codec });
+            }}
+          >
+            {codecs.map((codec) => (
+              <option key={codec} value={codec}>
+                {codec === 'avc' ? 'H.264' : codec.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {translate('gallery.videoReview.exportFrameRate')}
+          <select
+            className={field}
+            value={settings.frameRate}
+            onChange={(event) => {
+              const frameRate = Number(event.target.value);
+              if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
+                exporter.setRenderSettings({ ...settings, frameRate });
+            }}
+          >
+            <option value={0}>{translate('gallery.videoReview.exportSourceRate')}</option>
+            {[24, 30, 60].map((fps) => (
+              <option key={fps} value={fps}>
+                {fps}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="col-span-2">
+          {translate('gallery.videoReview.exportQuality')}
+          <select
+            className={field}
+            value={settings.quality}
+            onChange={(event) => {
+              const quality = event.target.value;
+              if (quality === 'standard' || quality === 'high')
+                exporter.setRenderSettings({ ...settings, quality });
+            }}
+          >
+            <option value="standard">
+              {translate('gallery.videoReview.exportStandardQuality')}
+            </option>
+            <option value="high">{translate('gallery.videoReview.exportHighQuality')}</option>
+          </select>
+        </label>
+      </fieldset>
+    </details>
+  );
+}

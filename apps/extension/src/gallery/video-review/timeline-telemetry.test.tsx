@@ -61,10 +61,10 @@ it('separates colliding markers into disjoint lanes with a consistent pitch', ()
   ]);
   const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')];
   expect(buttons).toHaveLength(3);
-  for (const button of buttons) expect(button.style.height).toBe('10px');
+  for (const button of buttons) expect(button.style.height).toBe('20px');
   const tops = new Set(buttons.map((button) => button.style.top));
   expect(tops.has('0px')).toBe(true);
-  expect(tops.has('14px')).toBe(true);
+  expect(tops.has('24px')).toBe(true);
   expect(buttons.some((button) => button.style.top === '7px')).toBe(false);
   const laneTops = buttons.map((button) => Number(button.style.top.replace('px', '')));
   expect(new Set(laneTops).size).toBe(laneTops.length);
@@ -79,7 +79,7 @@ it('collapses the dense tail into a full-height overflow row with kind-qualified
   const chip = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.actionOverflow"]');
   expect(chip).not.toBeNull();
   const trigger = chip!.querySelector('button')!;
-  expect(trigger.style.top).toBe('42px');
+  expect(trigger.style.top).toBe('72px');
   expect(trigger.style.height).toBe('28px');
   expect(host.textContent).toContain('+2');
 });
@@ -89,4 +89,9 @@ it('reserves no lane space for an empty history', () => {
   const strip = host.firstElementChild as HTMLDivElement;
   expect(strip.style.height).toBe('0px');
   expect(host.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
+});
+
+it('exposes readable event text for a history interval with available space', () => {
+  render([{ ...marker('action', 'readable', 1, 3), eventType: 'SCROLL' }]);
+  expect(host.querySelector('button')?.textContent).toContain('gallery.videoReview.eventScroll');
 });

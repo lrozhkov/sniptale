@@ -1,5 +1,6 @@
 import { Undo2, Redo2, Pencil, Trash2, Copy, Download, ArrowLeft, Video } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import { ReviewButton, reviewTimeLabel } from './controls';
@@ -13,6 +14,7 @@ export function ReviewInspector(props: {
   canUndo: boolean;
   canRedo: boolean;
   message: string | null;
+  recovery?: ReactNode;
   onBack(): void;
   onUndo(): void;
   onRedo(): void;
@@ -27,13 +29,26 @@ export function ReviewInspector(props: {
   children: ReactNode;
   actions?: ReactNode;
   canvas?: ReactNode;
+  composer?: ReactNode;
+  contextKey?: string;
+  settingsAvailable?: boolean;
+  saveStatus?: 'saving' | 'saved' | 'failed';
+  onRetry?(): void;
 }) {
+  const contextKey = props.contextKey ?? 'comments';
+  const [section, setSection] = useState<'settings' | 'comments'>(
+    contextKey.startsWith('settings') ? 'settings' : 'comments'
+  );
+  useEffect(() => {
+    setSection(contextKey.startsWith('settings') ? 'settings' : 'comments');
+  }, [contextKey]);
   return (
     <aside
       className="flex min-h-0 flex-col gap-3 overflow-hidden border-l
           border-[var(--sniptale-color-border-soft)] p-4"
     >
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="mr-auto text-sm font-semibold">{translate('gallery.videoReview.title')}</h2>
         <ReviewButton
           label={translate('gallery.videoReview.undo')}
           disabled={props.busy || !props.canUndo}
@@ -57,67 +72,75 @@ export function ReviewInspector(props: {
           {props.filename}
         </p>
       </div>
+      {props.saveStatus ? (
+        <div
+          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-muted)]"
+          role="status"
+        >
+          <span>
+            {translate(
+              props.saveStatus === 'saving'
+                ? 'gallery.videoReview.saving'
+                : props.saveStatus === 'failed'
+                  ? 'gallery.videoReview.saveFailed'
+                  : 'gallery.videoReview.committed'
+            )}
+          </span>
+          {props.saveStatus === 'failed' ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.retry')}
+              disabled={props.busy}
+              onClick={props.onRetry}
+            />
+          ) : null}
+        </div>
+      ) : null}
       {props.message ? (
         <p role="status" className="text-sm">
           {props.message}
         </p>
       ) : null}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
-        </div>
-        {props.children}
-        {!props.annotations.length ? (
-          <p className="text-sm text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.commentsEmpty')}
-          </p>
-        ) : null}
-        <ReviewAnnotationList
-          annotations={props.annotations}
-          selectedId={props.selectedId}
-          busy={props.busy}
-          onSelect={props.onSelect}
-          onHover={props.onHover}
-          onEdit={props.onEdit}
-          onDelete={props.onDelete}
-          onShowOnVideo={props.onShowOnVideo}
+      {props.recovery}
+      {props.contextKey && props.settingsAvailable !== false ? (
+        <SegmentedSwitch
+          activeId={section}
+          ariaLabel={translate('gallery.videoReview.inspector')}
+          options={[
+            { id: 'settings', label: translate('gallery.videoReview.properties') },
+            { id: 'comments', label: translate('gallery.videoReview.comments') },
+          ]}
+          onChange={setSection}
         />
-        {props.canvas}
+      ) : null}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+        {section === 'settings' ? (
+          props.children
+        ) : (
+          <>
+            {props.composer}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
+            </div>
+            {!props.annotations.length ? (
+              <p className="text-sm text-[var(--sniptale-color-text-muted)]">
+                {translate('gallery.videoReview.commentsEmpty')}
+              </p>
+            ) : null}
+            <ReviewAnnotationList
+              annotations={props.annotations}
+              selectedId={props.selectedId}
+              busy={props.busy}
+              onSelect={props.onSelect}
+              onHover={props.onHover}
+              onEdit={props.onEdit}
+              onDelete={props.onDelete}
+              onShowOnVideo={props.onShowOnVideo}
+            />
+            {props.canvas}
+          </>
+        )}
       </div>
-      <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        {props.actions}
-        <div className="flex flex-wrap gap-2">
-          <ReviewButton
-            label={translate('gallery.videoReview.copyReport')}
-            disabled={props.busy}
-            title={translate('gallery.videoReview.reportScope')}
-            className="flex-1 !border-0 !bg-transparent !shadow-none !text-xs"
-            onClick={() => props.onReport('copy')}
-          >
-            <Copy size={14} />
-            <span>{translate('gallery.videoReview.copyReport')}</span>
-          </ReviewButton>
-          <ReviewButton
-            label={translate('gallery.videoReview.downloadReport')}
-            disabled={props.busy}
-            title={translate('gallery.videoReview.reportScope')}
-            className="flex-1 !border-0 !bg-transparent !shadow-none !text-xs"
-            onClick={() => props.onReport('download')}
-          >
-            <Download size={14} />
-            <span>{translate('gallery.videoReview.downloadReport')}</span>
-          </ReviewButton>
-        </div>
-        <ReviewButton
-          label={translate('gallery.videoReview.back')}
-          disabled={props.busy}
-          onClick={props.onBack}
-          className="w-full !border-0 !bg-transparent !shadow-none"
-        >
-          <ArrowLeft size={15} />
-          <span>{translate('gallery.videoReview.back')}</span>
-        </ReviewButton>
-      </div>
+      <ReviewInspectorFooter {...props} section={section} />
     </aside>
   );
 }
@@ -152,7 +175,7 @@ function ReviewAnnotationList(props: {
             className="block w-full text-left"
             onClick={() => props.onSelect(annotation)}
           >
-            <span className="pr-16 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+            <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
               {annotation.anchor.kind === 'point'
                 ? reviewTimeLabel(annotation.anchor.time)
                 : `${reviewTimeLabel(annotation.anchor.start)}–${reviewTimeLabel(annotation.anchor.end)}`}
@@ -161,7 +184,7 @@ function ReviewAnnotationList(props: {
               {annotation.text}
             </span>
           </button>
-          <div className="absolute right-1 top-1 flex gap-1">
+          <div className="mt-2 flex justify-end gap-1">
             <ReviewButton
               label={translate('gallery.videoReview.showOnVideo')}
               disabled={props.busy}
@@ -190,5 +213,50 @@ function ReviewAnnotationList(props: {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Export/navigation remain visible; reporting belongs to the comments view. */
+function ReviewInspectorFooter(
+  props: Parameters<typeof ReviewInspector>[0] & { section: 'settings' | 'comments' }
+) {
+  const { section } = props;
+  return (
+    <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      {props.actions}
+      {section === 'comments' ? (
+        <div className="flex flex-wrap gap-2">
+          <ReviewButton
+            label={translate('gallery.videoReview.copyReport')}
+            disabled={props.busy}
+            title={translate('gallery.videoReview.reportScope')}
+            className="flex-1 !border-0 !bg-transparent !shadow-none !text-xs"
+            onClick={() => props.onReport('copy')}
+          >
+            <Copy size={14} />
+            <span>{translate('gallery.videoReview.copyReport')}</span>
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.downloadReport')}
+            disabled={props.busy}
+            title={translate('gallery.videoReview.reportScope')}
+            className="flex-1 !border-0 !bg-transparent !shadow-none !text-xs"
+            onClick={() => props.onReport('download')}
+          >
+            <Download size={14} />
+            <span>{translate('gallery.videoReview.downloadReport')}</span>
+          </ReviewButton>
+        </div>
+      ) : null}
+      <ReviewButton
+        label={translate('gallery.videoReview.back')}
+        disabled={props.busy}
+        onClick={props.onBack}
+        className="w-full !border-0 !bg-transparent !shadow-none"
+      >
+        <ArrowLeft size={15} />
+        <span>{translate('gallery.videoReview.back')}</span>
+      </ReviewButton>
+    </div>
   );
 }
