@@ -216,17 +216,17 @@ it('passes the selected render options through the real export hook', async () =
   }, true);
   try {
     await act(async () => fixture.root.render(<fixture.Harness />));
-    const selects = fixture.host.querySelectorAll('select');
+    const selects = fixture.host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
     expect(selects).toHaveLength(3);
-    for (const [index, value] of [
-      [0, 'vp9'],
-      [1, '24'],
-      [2, 'standard'],
+    for (const [index, option] of [
+      [0, 0],
+      [1, 1],
+      [2, 0],
     ] as const) {
-      await act(async () => {
-        selects[index]!.value = value;
-        selects[index]!.dispatchEvent(new Event('change', { bubbles: true }));
-      });
+      await act(async () => selects[index]!.click());
+      await act(async () =>
+        document.querySelectorAll<HTMLButtonElement>('[role="option"]')[option]!.click()
+      );
     }
     await act(async () => fixture.hook.start());
     expect(mocks.export.mock.calls[0]![0].renderSettings).toEqual({

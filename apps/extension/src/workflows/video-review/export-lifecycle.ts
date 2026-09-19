@@ -15,10 +15,8 @@ import { createReviewFragment } from '../../features/video/review/fragment';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
-import {
-  buildQuickEditAudioPlan,
-  type QuickEditAudioPlanEntry,
-} from '../../features/video/review/advanced/audio-plan';
+import { buildQuickEditAudioPlan } from '../../features/video/review/advanced/audio-plan';
+import type { ReviewExportClipPlan } from './audio-render';
 import { resolveQuickEditExportPlan } from '../../features/video/review/advanced/effective';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
@@ -32,13 +30,7 @@ import { QuickEditExportUnavailable } from './export-unavailable';
 
 export { QuickEditExportUnavailable };
 
-export interface ReviewExportClipPlan {
-  /** Fragment-local entries: output time is already shifted into the fragment. */
-  entries: readonly QuickEditAudioPlanEntry[];
-  buffers: ReadonlyMap<string, AudioBuffer>;
-  originalVolume: number;
-  originalMuted: boolean;
-}
+export type { ReviewExportClipPlan } from './audio-render';
 
 export interface ReviewExportReceipt extends ReviewPacketReceipt {
   revision: number;

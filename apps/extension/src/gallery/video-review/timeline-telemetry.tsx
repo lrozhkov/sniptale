@@ -1,5 +1,14 @@
 import { useMemo } from 'react';
-import { Activity } from 'lucide-react';
+import {
+  Activity,
+  MousePointer2,
+  Keyboard,
+  Mouse,
+  Pause,
+  MessageSquare,
+  Clock,
+  Focus,
+} from 'lucide-react';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -82,7 +91,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
                 height: ACTION_MARKER_HEIGHT_PX,
               }}
             >
-              <Activity size={10} className="shrink-0" aria-hidden="true" />
+              <ReviewEventIcon kind={marker.eventType} />
               {item.width >= 64 ? (
                 <span className="truncate">{reviewEventLabel(marker.eventType)}</span>
               ) : null}
@@ -119,4 +128,25 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       ) : null}
     </div>
   );
+}
+
+/** Event-specific shapes remain identifiable in narrow point markers. */
+function ReviewEventIcon({ kind }: { kind: string }) {
+  const Icon =
+    kind === 'CLICK' || kind === 'DOUBLE_CLICK'
+      ? MousePointer2
+      : kind === 'typing' || kind === 'KEY'
+        ? Keyboard
+        : kind === 'SCROLL'
+          ? Mouse
+          : kind === 'PAUSE'
+            ? Pause
+            : kind === 'CALLOUT'
+              ? MessageSquare
+              : kind === 'cursor-idle'
+                ? Clock
+                : kind === 'static-frame'
+                  ? Focus
+                  : Activity;
+  return <Icon size={12} className="shrink-0" aria-hidden="true" />;
 }

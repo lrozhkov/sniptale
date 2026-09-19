@@ -1,4 +1,6 @@
+import { createGradientPaint } from '@sniptale/foundation/paint';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { parseReviewOperation } from '../../features/video/review/validation';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
@@ -533,4 +535,95 @@ it('uses the selected render frame rate and rejects an unprobed codec', async ()
   await expect(
     writeReviewFrames({ ...args, renderSettings: { quality: 'high', frameRate: 30, codec: 'avc' } })
   ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable' });
+});
+
+it('renders custom comment geometry and a real Canvas gradient', () => {
+  const context = contextFixture();
+  const stops = vi.fn();
+  const gradient = { addColorStop: stops } as unknown as CanvasGradient;
+  context.createLinearGradient = vi.fn(() => gradient);
+  context.translate = vi.fn();
+  const comment = createCanvasComment({ id: 'style', at: 0 });
+  let id = 0;
+  comment.style = {
+    ...comment.style,
+    fillPaint: createGradientPaint('#ff0000', () => `stop-${id++}`),
+    width: 320,
+    fontSize: 18,
+    padding: 12,
+    radius: 8,
+  };
+  drawReviewSceneFrame(context, {
+    canvas: { width: 160, height: 90 },
+    layout: {
+      contentRect: { x: 0, y: 0, width: 160, height: 90 },
+      videoRect: { x: 0, y: 0, width: 160, height: 90 },
+      videoTransform: { x: 0, y: 0, width: 160, height: 90 },
+    },
+    background: { enabled: false },
+    image: null,
+    sample: { draw: vi.fn() } as never,
+    comments: [{ ...comment, resolvedText: 'Hi' }],
+    sourceTime: 0,
+    cameraScale: 1,
+  });
+  expect(context.font).toBe('18px ui-sans-serif, system-ui, sans-serif');
+  expect(context.createLinearGradient).toHaveBeenCalledOnce();
+  expect(stops).toHaveBeenCalled();
+  expect(context.roundRect).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 36, 48, 8);
+});
+
+it('bounds accepted long comment dense-gradient raster work to the output frame', () => {
+  const context = contextFixture();
+  context.translate = vi.fn();
+  const allocations: number[][] = [];
+  vi.stubGlobal(
+    'OffscreenCanvas',
+    class {
+      constructor(width: number, height: number) {
+        allocations.push([width, height]);
+        if (width > 160 || height > 90) throw new Error('Unbounded comment raster');
+      }
+      getContext() {
+        return {
+          createImageData: (width: number, height: number) => ({
+            data: new Uint8ClampedArray(width * height * 4),
+          }),
+          putImageData: vi.fn(),
+        };
+      }
+    }
+  );
+  try {
+    const comment = createCanvasComment({ id: 'long', at: 0 });
+    const paint = createGradientPaint('#ff0000', () => crypto.randomUUID());
+    if (paint.kind !== 'gradient') throw new Error('Expected gradient fixture');
+    paint.gradient.repeat = { enabled: true, span: 0.01 };
+    paint.gradient.stops[1]!.position = 0.01;
+    comment.style = { ...comment.style, fillPaint: paint, fontSize: 48 };
+    comment.text = 'x\n'.repeat(40_000);
+    const parsed = parseReviewOperation(
+      { id: 'add', at: 0, target: 'canvasComment', before: null, after: comment },
+      4
+    );
+    expect(parsed).not.toBeNull();
+    drawReviewSceneFrame(context, {
+      canvas: { width: 160, height: 90 },
+      layout: {
+        contentRect: { x: 0, y: 0, width: 160, height: 90 },
+        videoRect: { x: 0, y: 0, width: 160, height: 90 },
+        videoTransform: { x: 0, y: 0, width: 160, height: 90 },
+      },
+      background: { enabled: false },
+      image: null,
+      sample: { draw: vi.fn() } as never,
+      comments: [{ ...comment, resolvedText: comment.text }],
+      sourceTime: 0,
+      cameraScale: 2,
+    });
+    expect(allocations).toHaveLength(1);
+    expect(context.fillText).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

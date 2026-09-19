@@ -1,3 +1,4 @@
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditZoomRegion,
@@ -31,25 +32,16 @@ export function ReviewZoomInspector(props: {
     <div className="flex-1 space-y-1">
       <span className="block text-xs text-[var(--sniptale-color-text-muted)]">{label}</span>
       <div className="flex gap-1">
-        <select
+        <ProductSelect<QuickEditZoomTransition['type']>
           aria-label={label}
-          className={fieldClass}
+          controlSize="sm"
           value={region[phase].type}
-          onChange={(event) =>
-            onChange({
-              [phase]: {
-                type: event.target.value as QuickEditZoomTransition['type'],
-                duration: region[phase].duration,
-              },
-            })
-          }
-        >
-          {(Object.keys(transitionLabels) as QuickEditZoomTransition['type'][]).map((type) => (
-            <option key={type} value={type}>
-              {translate(transitionLabels[type])}
-            </option>
-          ))}
-        </select>
+          options={(['none', 'linear', 'ease-in-out'] as const).map((type) => ({
+            value: type,
+            label: translate(transitionLabels[type]),
+          }))}
+          onChange={(type) => onChange({ [phase]: { type, duration: region[phase].duration } })}
+        />
         <input
           aria-label={`${label} ${translate('gallery.videoReview.zoomTransitionDuration')}`}
           className={`${fieldClass} w-16 tabular-nums`}

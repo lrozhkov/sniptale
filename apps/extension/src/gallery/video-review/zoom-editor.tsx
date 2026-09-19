@@ -195,5 +195,6 @@ export function useReviewZoomEditor(args: {
     commitDrag,
     selected,
     focusOverlay,
+    toggleEnabled: () => args.setZoom((zoom) => ({ ...zoom, enabled: !zoom.enabled })),
   };
 }

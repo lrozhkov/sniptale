@@ -87,13 +87,19 @@ const renderTrack = (
 it('shows the three semantic lanes and toggles the original mute', async () => {
   const lanes = renderTrack();
   expect(lanes).toHaveLength(3);
-  expect(lanes[0]!.textContent).toContain('gallery.videoReview.audioOriginal');
-  expect(lanes[1]!.textContent).toContain('gallery.videoReview.audioVoiceover');
-  expect(lanes[2]!.textContent).toContain('gallery.videoReview.audioMusic');
-  const mute = lanes[0]!.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.audioClipMute"]'
+  expect(lanes[0]!.parentElement!.parentElement!.textContent).toContain(
+    'gallery.videoReview.audioOriginal'
+  );
+  expect(lanes[1]!.parentElement!.parentElement!.textContent).toContain(
+    'gallery.videoReview.audioVoiceover'
+  );
+  expect(lanes[2]!.parentElement!.parentElement!.textContent).toContain(
+    'gallery.videoReview.audioMusic'
+  );
+  const mute = lanes[0]!.parentElement!.parentElement!.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.audioEnabled"]'
   )!;
-  expect(mute.getAttribute('aria-pressed')).toBe('false');
+  expect(mute.getAttribute('aria-pressed')).toBe('true');
   await act(async () => mute.click());
   expect(onOriginal).toHaveBeenCalledWith({ muted: true });
 });
@@ -175,7 +181,7 @@ it('drags clip blocks with move and trim edges and commits clamped values', asyn
   const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
   Object.assign(block, { setPointerCapture: vi.fn() });
   expect(block.style.left).toBe('20%');
-  expect(block.style.width).toBe('20%');
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   const send = (kind: string, x: number) =>
     act(async () =>
       block.dispatchEvent(
@@ -234,7 +240,7 @@ it('keeps the preview duration while moving near the timeline end (A3)', async (
     );
   await send('pointerdown', 0);
   await send('pointermove', 1950);
-  expect(block.style.width).toBe('20%');
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   expect(block.style.left).toBe('80%');
   await send('pointerup', 1950);
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 8);

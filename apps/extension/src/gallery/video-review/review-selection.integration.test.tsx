@@ -72,7 +72,7 @@ vi.mock('../shared/download', async (importOriginal) => ({
 
 async function dragRange(host: HTMLElement) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 80));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(-192, 0, 592, 80));
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,

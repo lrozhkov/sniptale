@@ -143,6 +143,8 @@ export function useReviewAudioRuntime(props: {
   onFailure(): void;
   createEngine?: (element: HTMLMediaElement | null) => ReviewAudioEngine | null;
 }) {
+  // Applied values, not transient React object identities, define a playback plan.
+  const planKey = JSON.stringify([props.voiceover, props.music]);
   const runtime = useRef<ReviewAudioRuntime | null>(null);
   const generation = useRef(0);
   const scheduledAt = useRef<{ outputTime: number; audioNow: number } | null>(null);
@@ -211,12 +213,6 @@ export function useReviewAudioRuntime(props: {
         music: current.music,
       });
       for (const entry of plan) {
-        const clipSchedule = planQuickEditClipPlayback({
-          entry,
-          outputTime: current.outputTime,
-          audioNow: engine.now(),
-        });
-        if (!clipSchedule) continue;
         const buffer = await resolveBuffer(entry);
         if (
           generationValue !== generation.current ||
@@ -225,7 +221,15 @@ export function useReviewAudioRuntime(props: {
         )
           return;
         if (!buffer) continue;
-        engine.scheduleClip(clipSchedule, buffer);
+        const anchor = scheduledAt.current;
+        if (!anchor) return;
+        const now = engine.now();
+        const clipSchedule = planQuickEditClipPlayback({
+          entry,
+          outputTime: anchor.outputTime + now - anchor.audioNow,
+          audioNow: now,
+        });
+        if (clipSchedule) engine.scheduleClip(clipSchedule, buffer);
       }
     })();
   };
@@ -246,7 +250,7 @@ export function useReviewAudioRuntime(props: {
       peekEngine()?.stopAll();
     }
     // The plan identity changes with every applied edit; reschedule then.
-  }, [props.playing, props.voiceover, props.music, props.sessionKey]);
+  }, [props.playing, planKey, props.sessionKey]);
   useEffect(() => {
     const scheduled = scheduledAt.current;
     if (!latest.current.playing || scheduled === null) return;

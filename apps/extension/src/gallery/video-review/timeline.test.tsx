@@ -56,7 +56,7 @@ type PlaneEvent = { type: string; x: number; button?: number };
 
 function planeWithMetrics(host: HTMLDivElement) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 80));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(-192, 0, 592, 80));
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     releasePointerCapture: vi.fn(),
@@ -256,8 +256,46 @@ it('renders ruler labels at the unit chosen for the current scale', () => {
     const { host } = renderTimeline();
     const ruler = host.querySelector('[data-ui="gallery.videoReview.ruler"]')!;
     expect(ruler.querySelectorAll('span').length).toBeGreaterThan(0);
-    expect(ruler.textContent).toContain('1.0');
+    expect([...ruler.querySelectorAll('span')].map((node) => node.textContent)).toEqual([
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
   } finally {
     clientWidth.mockRestore();
   }
+});
+
+it('resizes only the fixed gutter with pointer and keyboard, within bounds', () => {
+  const { host, props } = renderTimeline();
+  planeWithMetrics(host);
+  const handle = host.querySelector<HTMLButtonElement>('[role="separator"]')!;
+  Object.assign(handle, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
+  const send = (type: string, x: number) =>
+    act(() => handle.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x })));
+  send('pointerdown', 100);
+  send('pointermove', 180);
+  send('pointerup', 180);
+  expect(handle.getAttribute('aria-valuenow')).toBe('272');
+  expect(props.onSeek).not.toHaveBeenCalled();
+  act(() =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(handle.getAttribute('aria-valuenow')).toBe('280');
+  act(() =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+  );
+  expect(handle.getAttribute('aria-valuenow')).toBe('272');
+  send('pointerdown', 0);
+  send('pointermove', -1000);
+  send('pointercancel', -1000);
+  expect(handle.getAttribute('aria-valuenow')).toBe('156');
+  send('pointermove', 1000);
+  expect(handle.getAttribute('aria-valuenow')).toBe('156');
+  send('pointerdown', 0);
+  send('pointermove', 1000);
+  send('pointerup', 1000);
+  expect(handle.getAttribute('aria-valuenow')).toBe('300');
 });

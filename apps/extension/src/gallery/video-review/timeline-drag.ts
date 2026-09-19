@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type PlaneDragProps = {
+  gutter?: number;
   duration: number;
   time: number;
   selection: ReviewAnchor;
@@ -19,9 +20,15 @@ interface PlaneDragState {
   pointerId: number;
 }
 
-const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number) => {
+const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number, gutter: number) => {
   const bounds = event.currentTarget.getBoundingClientRect();
-  return Math.max(0, Math.min(duration, ((event.clientX - bounds.left) / bounds.width) * duration));
+  return Math.max(
+    0,
+    Math.min(
+      duration,
+      ((event.clientX - bounds.left - gutter) / Math.max(1, bounds.width - gutter)) * duration
+    )
+  );
 };
 
 /** Plane interaction state: seek, range dragging, and Escape restore; render stays separate. */
@@ -46,9 +53,13 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   return {
     plane,
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0 || (event.target instanceof Element && event.target.closest('button')))
+      if (
+        event.button !== 0 ||
+        (event.target instanceof Element &&
+          event.target.closest('button,[data-ui="gallery.videoReview.trackHeader"]'))
+      )
         return;
-      const time = planeTime(event, props.duration);
+      const time = planeTime(event, props.duration, props.gutter ?? 0);
       drag.current = {
         start: time,
         x: event.clientX,
@@ -69,7 +80,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
     onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
       if (!current || Math.abs(event.clientX - current.x) < 4) return;
-      const time = planeTime(event, props.duration);
+      const time = planeTime(event, props.duration, props.gutter ?? 0);
       current.range = {
         kind: 'range',
         start: Math.min(current.start, time),

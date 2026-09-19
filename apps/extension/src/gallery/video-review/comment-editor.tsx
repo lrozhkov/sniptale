@@ -1,3 +1,5 @@
+import { CompactPaintSelector } from '../../ui/paint-selector';
+import { ColorField } from '../../ui/compact-inspector-controls/controls';
 import { Plus } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
@@ -152,7 +154,7 @@ function ReviewOverlayStyleRow(props: {
   );
 }
 
-export function ReviewCanvasCommentEditor(props: {
+type CanvasCommentEditorProps = {
   comment: CanvasComment;
   annotations: readonly ReviewAnnotation[];
   duration: number;
@@ -161,7 +163,10 @@ export function ReviewCanvasCommentEditor(props: {
   onSwitchAttachment(attachment: CanvasComment['attachment']): void;
   onDraft?(id: string, text: string): void;
   onDelete(): void;
-}) {
+};
+
+/** Text draft timing is independent of the appearance and placement controls. */
+function useCommentEditorDraft(props: CanvasCommentEditorProps) {
   const linked = !!props.comment.annotationId;
   const [text, setText] = useState(props.comment.text);
   const [start, setStart] = useState(props.comment.start?.toString() ?? '');
@@ -204,9 +209,12 @@ export function ReviewCanvasCommentEditor(props: {
     if (timer.current === null && textRef.current === committed.current)
       setText(props.comment.text);
   }, [props.comment.text]);
-  const commit = (value: string) => {
+  const pause = () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
+  };
+  const commit = (value: string) => {
+    pause();
     if (value !== props.comment.text) {
       committed.current = value;
       props.onPatch({ text: value });
@@ -218,12 +226,24 @@ export function ReviewCanvasCommentEditor(props: {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => commit(value), 320);
   };
+  const patchComment = (patch: Partial<Omit<CanvasComment, 'id'>>) => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    props.onPatch({ ...patch, ...(linked ? {} : { text: textRef.current }) });
+  };
   const patchTimes = (window: { start?: number | undefined; end?: number | undefined }) => {
     const bounded = clampCanvasCommentTimes(props.comment, window, props.duration);
     setStart(bounded.start?.toString() ?? '');
     setEnd(bounded.end?.toString() ?? '');
-    props.onPatch(bounded);
+    patchComment(bounded);
   };
+  return { text, start, end, setStart, setEnd, change, commit, pause, patchComment, patchTimes };
+}
+
+export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
+  const linked = !!props.comment.annotationId;
+  const { text, start, end, setStart, setEnd, change, commit, pause, patchComment, patchTimes } =
+    useCommentEditorDraft(props);
   const toggleButton = 'aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
   return (
     <div
@@ -240,7 +260,16 @@ export function ReviewCanvasCommentEditor(props: {
           disabled={props.busy || linked}
           readOnly={linked}
           onChange={(event) => change(event.target.value)}
-          onBlur={(event) => commit(event.target.value)}
+          onBlur={(event) => {
+            if (
+              event.relatedTarget instanceof Element &&
+              event.relatedTarget.closest('[data-ui="gallery.videoReview.canvasCommentEditor"]')
+            ) {
+              pause();
+              return;
+            }
+            commit(event.target.value);
+          }}
           className="mt-1 w-full resize-none rounded-md border
               border-[var(--sniptale-color-border-soft)] p-2 text-sm"
           rows={3}
@@ -280,20 +309,116 @@ export function ReviewCanvasCommentEditor(props: {
       <ReviewOverlayPlacementFields
         placement={props.comment.placement}
         busy={props.busy}
-        onPatch={props.onPatch}
+        onPatch={patchComment}
       />
-      <ReviewOverlayStyleRow
+      <ReviewOverlayStyleRow style={props.comment.style} busy={props.busy} onPatch={patchComment} />
+      <ReviewCommentStyleFields
         style={props.comment.style}
         busy={props.busy}
-        onPatch={props.onPatch}
+        onPatch={patchComment}
       />
       <ReviewOverlayFlagRow
         comment={props.comment}
         busy={props.busy}
-        onPatch={props.onPatch}
+        onPatch={patchComment}
         onDelete={props.onDelete}
       />
     </div>
+  );
+}
+
+/** Bounded style values share the same paint/color controls as tour comments. */
+function ReviewCommentStyleFields(props: {
+  style: CanvasComment['style'];
+  busy: boolean;
+  onPatch(patch: Partial<Omit<CanvasComment, 'id'>>): void;
+}) {
+  const patch = (style: Partial<CanvasComment['style']>) =>
+    props.onPatch({ style: { ...props.style, ...style } });
+  return (
+    <fieldset disabled={props.busy} className="space-y-2">
+      <CompactPaintSelector
+        label={translate('gallery.videoReview.overlayFill')}
+        title={translate('gallery.videoReview.overlayFill')}
+        value={props.style.fillPaint}
+        disabled={props.busy}
+        onChange={(fillPaint) => patch({ fillPaint })}
+      />
+      <ColorField
+        label={translate('gallery.videoReview.overlayTextColor')}
+        title={translate('gallery.videoReview.overlayTextColor')}
+        value={props.style.textColor}
+        disabled={props.busy}
+        allowAlpha={false}
+        allowTransparent={false}
+        palette={['#111827', '#ffffff', '#334155', '#f97316']}
+        onChange={(textColor) => patch({ textColor })}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            {
+              key: 'width',
+              label: 'gallery.videoReview.overlayWidth',
+              min: 80,
+              max: 640,
+              fallback: 224,
+            },
+            {
+              key: 'fontSize',
+              label: 'gallery.videoReview.overlayFontSize',
+              min: 10,
+              max: 48,
+              fallback: 12,
+            },
+            {
+              key: 'padding',
+              label: 'gallery.videoReview.overlayPadding',
+              min: 0,
+              max: 32,
+              fallback: 10,
+            },
+            {
+              key: 'radius',
+              label: 'gallery.videoReview.overlayRadius',
+              min: 0,
+              max: 64,
+              fallback: 14,
+            },
+          ] as const
+        ).map((field) => (
+          <label key={field.key} className="text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate(field.label)}
+            <input
+              type="number"
+              min={field.min}
+              max={field.max}
+              step={1}
+              key={`${props.style[field.key] ?? field.fallback}`}
+              defaultValue={props.style[field.key] ?? field.fallback}
+              className="mt-1 w-full rounded-md border border-[var(--sniptale-color-border-soft)]
+                px-2 py-1 text-sm tabular-nums"
+              onBlur={(event) => {
+                const value = event.currentTarget.valueAsNumber;
+                const bounded = Number.isFinite(value)
+                  ? Math.max(field.min, Math.min(field.max, value))
+                  : (props.style[field.key] ?? field.fallback);
+                event.currentTarget.value = String(bounded);
+                patch({ [field.key]: bounded });
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape')
+                  event.currentTarget.value = String(props.style[field.key] ?? field.fallback);
+                if (event.key === 'Enter' || event.key === 'Escape') {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                }
+              }}
+            />
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

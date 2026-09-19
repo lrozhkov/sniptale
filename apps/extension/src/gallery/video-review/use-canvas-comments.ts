@@ -82,13 +82,8 @@ export function useCanvasComments(args: {
   const onDraft = (id: string, text: string) => {
     drafts.current.set(id, text);
   };
-  const add = async () => {
+  const insert = async (comment: CanvasComment) => {
     if (!guard()) return;
-    const comment = createCanvasComment({
-      id: crypto.randomUUID(),
-      at: args.time,
-      position: staggeredCommentPosition(args.session.getSnapshot().document.canvasComments.length),
-    });
     await args.run(() =>
       args.session.commit({
         id: crypto.randomUUID(),
@@ -99,6 +94,14 @@ export function useCanvasComments(args: {
       })
     );
     setSelectedId(comment.id);
+  };
+  const add = async () => {
+    const comment = createCanvasComment({
+      id: crypto.randomUUID(),
+      at: args.time,
+      position: staggeredCommentPosition(args.session.getSnapshot().document.canvasComments.length),
+    });
+    await insert(comment);
   };
   /**
    * Shows an existing annotation on the video: one linked overlay whose text the
@@ -112,31 +115,35 @@ export function useCanvasComments(args: {
       ...showOnVideoWindow(annotation.anchor),
       position: staggeredCommentPosition(args.session.getSnapshot().document.canvasComments.length),
     });
-    await args.run(() =>
-      args.session.commit({
-        id: crypto.randomUUID(),
-        at: Date.now(),
-        target: 'canvasComment',
-        before: null,
-        after: comment,
-      })
-    );
-    setSelectedId(comment.id);
+    await insert(comment);
   };
   const onPatch = async (comment: CanvasComment, change: Partial<Omit<CanvasComment, 'id'>>) => {
     if (!guard()) return;
-    const after = updateCanvasComment(comment, change);
-    await args.run(() =>
-      args.session
-        .commit({
-          id: crypto.randomUUID(),
-          at: Date.now(),
-          target: 'canvasComment',
-          before: comment,
-          after,
-        })
-        .then(() => drafts.current.delete(comment.id))
-    );
+    await args.run(async () => {
+      try {
+        await args.session.flush();
+      } catch (error) {
+        // A settled storage failure is retryable; conflicts still require recovery.
+        if (args.session.getSnapshot().error !== 'storage') throw error;
+      }
+      const before = args.session
+        .getSnapshot()
+        .document.canvasComments.find((item) => item.id === comment.id);
+      if (!before) return;
+      const text = drafts.current.get(comment.id);
+      const after = updateCanvasComment(before, {
+        ...change,
+        ...(text !== undefined && change.text === undefined ? { text } : {}),
+      });
+      await args.session.commit({
+        id: crypto.randomUUID(),
+        at: Date.now(),
+        target: 'canvasComment',
+        before,
+        after,
+      });
+      if (drafts.current.get(comment.id) === after.text) drafts.current.delete(comment.id);
+    });
   };
   /**
    * Attachment switch re-expresses the current visual point in the other space;
@@ -159,32 +166,6 @@ export function useCanvasComments(args: {
     );
     if (selectedId === comment.id) setSelectedId(null);
   };
-  /** Durable flush of unsent text drafts; bypasses the busy gate for lifecycle callers. */
-  const flushTexts = async () => {
-    let failure: unknown = null;
-    for (const [id, text] of [...drafts.current]) {
-      const comment = args.session
-        .getSnapshot()
-        .document.canvasComments.find((item) => item.id === id);
-      if (!comment || comment.text === text || comment.annotationId) {
-        drafts.current.delete(id);
-        continue;
-      }
-      try {
-        await args.session.commit({
-          id: crypto.randomUUID(),
-          at: Date.now(),
-          target: 'canvasComment',
-          before: comment,
-          after: updateCanvasComment(comment, { text }),
-        });
-        drafts.current.delete(id);
-      } catch (error) {
-        failure = error;
-      }
-    }
-    if (failure) throw failure;
-  };
   return {
     selectedId,
     onSelect: setSelectedId,
@@ -194,7 +175,32 @@ export function useCanvasComments(args: {
     onShowOnVideo: showOnVideo,
     onDelete,
     onDraft,
-    flushTexts,
+    flushTexts: () => flushCommentDrafts(args.session, drafts.current),
     setGeometry,
   };
+}
+
+/** Lifecycle flush persists unsent text before history, export, or closing the editor. */
+async function flushCommentDrafts(session: Session, drafts: Map<string, string>) {
+  let failure: unknown = null;
+  for (const [id, text] of [...drafts]) {
+    const comment = session.getSnapshot().document.canvasComments.find((item) => item.id === id);
+    if (!comment || comment.text === text || comment.annotationId) {
+      drafts.delete(id);
+      continue;
+    }
+    try {
+      await session.commit({
+        id: crypto.randomUUID(),
+        at: Date.now(),
+        target: 'canvasComment',
+        before: comment,
+        after: updateCanvasComment(comment, { text }),
+      });
+      drafts.delete(id);
+    } catch (error) {
+      failure = error;
+    }
+  }
+  if (failure) throw failure;
 }

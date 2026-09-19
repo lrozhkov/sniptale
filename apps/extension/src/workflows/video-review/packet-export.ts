@@ -15,7 +15,7 @@ import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
-import type { ReviewExportClipPlan } from './export-lifecycle';
+import type { ReviewExportClipPlan } from './audio-render';
 import { audioPacketDuration, chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];

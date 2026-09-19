@@ -71,7 +71,7 @@ function renderTrack(
   return {
     lane,
     blocks: [...lane.querySelectorAll<HTMLElement>('[role="button"]')],
-    add: lane.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.zoomAdd"]')!,
+    add: host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.zoomAdd"]')!,
     event: async (target: Element, kind: string, x: number, shift = false) =>
       act(async () => {
         target.dispatchEvent(
@@ -129,11 +129,10 @@ it('ignores dormant regions for snapping (R03)', async () => {
   expect(commit).toHaveBeenLastCalledWith('a', { start: 2.96, end: 4.96 }, 'move');
 });
 
-it('renders the output-time playhead only when the source point is kept (R03)', () => {
+it('leaves playhead ownership to the shared timeline across kept and removed source points', () => {
   renderTrack([zoom('a', 0, 2)], vi.fn(), vi.fn(), 6);
   const playhead = host.querySelector<HTMLElement>('[data-zoom-playhead]');
-  expect(playhead).not.toBeNull();
-  expect(playhead?.style.left).toBe('60%');
+  expect(playhead).toBeNull();
   renderTrack([zoom('a', 0, 2)], vi.fn(), vi.fn(), null);
   expect(host.querySelector('[data-zoom-playhead]')).toBeNull();
 });

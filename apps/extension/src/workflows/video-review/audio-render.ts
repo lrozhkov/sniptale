@@ -8,7 +8,15 @@ import {
 } from 'mediabunny';
 import type { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { buildQuickEditClipEnvelope } from '../../features/video/review/advanced/audio-plan';
-import type { ReviewExportClipPlan } from './export-lifecycle';
+import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
+
+export interface ReviewExportClipPlan {
+  /** Fragment-local entries: output time is already shifted into the fragment. */
+  entries: readonly QuickEditAudioPlanEntry[];
+  buffers: ReadonlyMap<string, AudioBuffer>;
+  originalVolume: number;
+  originalMuted: boolean;
+}
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 const outputRate = 48_000;

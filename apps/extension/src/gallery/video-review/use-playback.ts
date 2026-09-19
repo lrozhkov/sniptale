@@ -23,11 +23,13 @@ export function useReviewPlayback(props: {
     const next = applyEdits ? settings.time : value;
     if (node) {
       if (next !== value) node.currentTime = next;
-      node.playbackRate = settings.rate;
-      node.preservesPitch = false;
-      node.muted = settings.muted || latest.current.original.muted;
+      if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
+      if (node.preservesPitch !== false) node.preservesPitch = false;
+      const muted = settings.muted || latest.current.original.muted;
+      if (node.muted !== muted) node.muted = muted;
       // The element caps at one; the preview audio graph amplifies beyond it.
-      node.volume = Math.min(1, latest.current.original.volume);
+      const volume = Math.min(1, latest.current.original.volume);
+      if (node.volume !== volume) node.volume = volume;
       if (next >= latest.current.duration) node.pause();
     }
     setTime(next);

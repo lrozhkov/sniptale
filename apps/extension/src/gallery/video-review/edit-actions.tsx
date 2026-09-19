@@ -1,3 +1,4 @@
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useMemo } from 'react';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
@@ -72,35 +73,31 @@ export function ReviewTimelineTools(props: {
       </ReviewButton>
       {props.mode === 'speed' ? (
         <>
-          <select
+          <ProductSelect
             aria-label={translate('gallery.videoReview.speedRate')}
-            value={props.rate}
+            controlSize="sm"
+            value={String(props.rate)}
             disabled={props.busy}
-            className="h-7 rounded bg-[var(--sniptale-color-surface-panel)] text-xs"
-            onChange={(event) => {
-              const value = Number(event.currentTarget.value);
-              if (isReviewSpeedRate(value)) props.onRate(value);
+            options={REVIEW_SPEED_RATES.map((rate) => ({
+              value: String(rate),
+              label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
+            }))}
+            onChange={(value) => {
+              const rate = Number(value);
+              if (isReviewSpeedRate(rate)) props.onRate(rate);
             }}
-          >
-            {REVIEW_SPEED_RATES.map((rate) => (
-              <option key={rate} value={rate}>
-                {rate < 0.25 ? `1/${1 / rate}` : rate}×
-              </option>
-            ))}
-          </select>
-          <select
+          />
+          <ProductSelect<'speed' | 'mute'>
             aria-label={translate('gallery.videoReview.speedAudio')}
+            controlSize="sm"
             value={props.audio}
             disabled={props.busy}
-            className="h-7 max-w-28 rounded bg-[var(--sniptale-color-surface-panel)] text-xs"
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (value === 'speed' || value === 'mute') props.onAudio(value);
-            }}
-          >
-            <option value="speed">{translate('gallery.videoReview.speedSound')}</option>
-            <option value="mute">{translate('gallery.videoReview.muteSound')}</option>
-          </select>
+            onChange={props.onAudio}
+            options={[
+              { value: 'speed', label: translate('gallery.videoReview.speedSound') },
+              { value: 'mute', label: translate('gallery.videoReview.muteSound') },
+            ]}
+          />
         </>
       ) : null}
       {props.selected ? (
@@ -260,68 +257,58 @@ export function ReviewRenderOptions({
   const codecs =
     exporter.index?.supportedVideoCodecs ??
     (exporter.index?.processedVideoCodec ? [exporter.index.processedVideoCodec] : []);
-  const field =
-    'mt-1 w-full rounded border border-[var(--sniptale-color-border-soft)] ' +
-    'bg-[var(--sniptale-color-surface-panel)] p-1.5 text-xs';
   return (
     <details className="mb-2 text-xs">
       <summary className="cursor-pointer py-2">
         {translate('gallery.videoReview.exportSettings')}
       </summary>
       <fieldset disabled={busy} className="grid grid-cols-2 gap-2 pb-2">
-        <label>
-          {translate('gallery.videoReview.exportCodec')}
-          <select
-            className={field}
+        <div className="space-y-1">
+          <span>{translate('gallery.videoReview.exportCodec')}</span>
+          <ProductSelect
+            controlSize="sm"
+            aria-label={translate('gallery.videoReview.exportCodec')}
+            disabled={busy}
             value={settings.codec ?? exporter.index?.processedVideoCodec ?? ''}
-            onChange={(event) => {
-              const codec = codecs.find((codec) => codec === event.target.value);
-              if (codec) exporter.setRenderSettings({ ...settings, codec });
-            }}
-          >
-            {codecs.map((codec) => (
-              <option key={codec} value={codec}>
-                {codec === 'avc' ? 'H.264' : codec.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          {translate('gallery.videoReview.exportFrameRate')}
-          <select
-            className={field}
-            value={settings.frameRate}
-            onChange={(event) => {
-              const frameRate = Number(event.target.value);
+            options={codecs.map((codec) => ({
+              value: codec,
+              label: codec === 'avc' ? 'H.264' : codec.toUpperCase(),
+            }))}
+            onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
+          />
+        </div>
+        <div className="space-y-1">
+          <span>{translate('gallery.videoReview.exportFrameRate')}</span>
+          <ProductSelect
+            controlSize="sm"
+            aria-label={translate('gallery.videoReview.exportFrameRate')}
+            disabled={busy}
+            value={String(settings.frameRate)}
+            options={[
+              { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
+              ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
+            ]}
+            onChange={(value) => {
+              const frameRate = Number(value);
               if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
                 exporter.setRenderSettings({ ...settings, frameRate });
             }}
-          >
-            <option value={0}>{translate('gallery.videoReview.exportSourceRate')}</option>
-            {[24, 30, 60].map((fps) => (
-              <option key={fps} value={fps}>
-                {fps}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="col-span-2">
-          {translate('gallery.videoReview.exportQuality')}
-          <select
-            className={field}
+          />
+        </div>
+        <div className="col-span-2 space-y-1">
+          <span>{translate('gallery.videoReview.exportQuality')}</span>
+          <ProductSelect<'standard' | 'high'>
+            controlSize="sm"
+            aria-label={translate('gallery.videoReview.exportQuality')}
+            disabled={busy}
             value={settings.quality}
-            onChange={(event) => {
-              const quality = event.target.value;
-              if (quality === 'standard' || quality === 'high')
-                exporter.setRenderSettings({ ...settings, quality });
-            }}
-          >
-            <option value="standard">
-              {translate('gallery.videoReview.exportStandardQuality')}
-            </option>
-            <option value="high">{translate('gallery.videoReview.exportHighQuality')}</option>
-          </select>
-        </label>
+            options={[
+              { value: 'standard', label: translate('gallery.videoReview.exportStandardQuality') },
+              { value: 'high', label: translate('gallery.videoReview.exportHighQuality') },
+            ]}
+            onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
+          />
+        </div>
       </fieldset>
     </details>
   );

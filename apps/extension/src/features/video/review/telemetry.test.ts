@@ -122,3 +122,47 @@ it('projects raw capture time even when optional animation and source anchor dif
   });
   expect(event).toEqual(before);
 });
+
+it('filters positively identified nontext changes without hiding a click followed by real typing', () => {
+  const action: RecordingActionEvent = {
+    id: 'click',
+    kind: 'CLICK',
+    time: 1,
+    duration: 0.1,
+    point: null,
+    label: '',
+    data: {},
+    preset: 'NONE',
+  };
+  const signals: Parameters<typeof projectReviewTelemetry>[0]['signals'] = [
+    {
+      id: 'checkbox',
+      kind: 'typing',
+      startTime: 1,
+      endTime: 2,
+      point: null,
+      data: { targetTag: 'input', targetType: 'checkbox' },
+    },
+    {
+      id: 'select',
+      kind: 'typing',
+      startTime: 1,
+      endTime: 2,
+      point: null,
+      data: { targetTag: 'select' },
+    },
+    {
+      id: 'text',
+      kind: 'typing',
+      startTime: 1,
+      endTime: 2,
+      point: null,
+      data: { targetTag: 'input', targetType: 'text' },
+    },
+  ];
+  expect(
+    projectReviewTelemetry({ actionEvents: [action], signals, cursorTrack: null }, 4).markers.map(
+      (marker) => marker.ref.id
+    )
+  ).toEqual(['click', 'text']);
+});

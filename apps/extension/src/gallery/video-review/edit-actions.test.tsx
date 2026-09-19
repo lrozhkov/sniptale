@@ -114,17 +114,16 @@ it('edits selected speed properties and blocks unavailable editing tools', () =>
     expect(props.onToggle).toHaveBeenLastCalledWith('cut');
     act(() => button('gallery.videoReview.speedMode').click());
     expect(props.onToggle).toHaveBeenLastCalledWith('speed');
-    const [rate, audio] = Array.from(host.querySelectorAll('select'));
-    for (const value of REVIEW_SPEED_RATES.map(String))
-      act(() => {
-        rate!.value = value;
-        rate!.dispatchEvent(new Event('change', { bubbles: true }));
-      });
+    const [rate, audio] = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')
+    );
+    for (const [index] of REVIEW_SPEED_RATES.entries()) {
+      act(() => rate!.click());
+      act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[index]!.click());
+    }
     expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual([...REVIEW_SPEED_RATES]);
-    act(() => {
-      audio!.value = 'mute';
-      audio!.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    act(() => audio!.click());
+    act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click());
     expect(props.onAudio).toHaveBeenCalledWith('mute');
     act(() => button('gallery.videoReview.removeEdit').click());
     expect(props.onRemove).toHaveBeenCalledOnce();

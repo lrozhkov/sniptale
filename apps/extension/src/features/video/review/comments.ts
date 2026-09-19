@@ -32,6 +32,27 @@ export const CANVAS_COMMENT_BUBBLE = {
   pulsePeriod: 1,
 } as const;
 
+/** One resolved typography/layout contract for legacy comments, preview, and burned export. */
+export function canvasCommentBubble(
+  style: CanvasComment['style'],
+  bounds?: { width: number; height: number }
+) {
+  const fontSize = style.fontSize ?? CANVAS_COMMENT_BUBBLE.fontSize;
+  const lineHeight = (fontSize * 4) / 3;
+  const paddingY = style.padding ?? CANVAS_COMMENT_BUBBLE.paddingY;
+  const availableHeight = bounds?.height ?? Infinity;
+  const lines = Math.max(1, Math.floor((availableHeight - paddingY * 2) / lineHeight));
+  return {
+    ...CANVAS_COMMENT_BUBBLE,
+    fontSize,
+    lineHeight,
+    maxWidth: Math.min(style.width ?? CANVAS_COMMENT_BUBBLE.maxWidth, bounds?.width ?? Infinity),
+    maxHeight: Math.min(availableHeight, lines * lineHeight + paddingY * 2),
+    paddingX: style.padding ?? CANVAS_COMMENT_BUBBLE.paddingX,
+    paddingY,
+  };
+}
+
 /** Overlay comments are markers even without text; the point itself is the message. */
 export const CANVAS_COMMENT_LIMITS = { maxComments: 100, maxTextLength: 100_000 } as const;
 

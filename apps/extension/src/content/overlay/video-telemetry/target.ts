@@ -59,6 +59,7 @@ export function describeTelemetryTarget(event: Event | null): {
   const element = target?.closest(CONTROL_SELECTOR) ?? target;
   if (!element) return { element: null, data: {} };
   const data: Record<string, string> = { targetTag: element.localName };
+  if (element instanceof HTMLInputElement) data['targetType'] = element.type;
   const role = plainLabel(element.getAttribute('role'));
   if (role) data['targetRole'] = role;
   if (!element.matches(CONTROL_SELECTOR)) return { element, data };

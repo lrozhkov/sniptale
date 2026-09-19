@@ -15,6 +15,7 @@ export function ReviewInspector(props: {
   canRedo: boolean;
   message: string | null;
   recovery?: ReactNode;
+  modeControl?: ReactNode;
   onBack(): void;
   onUndo(): void;
   onRedo(): void;
@@ -48,7 +49,9 @@ export function ReviewInspector(props: {
           border-[var(--sniptale-color-border-soft)] p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-sm font-semibold">{translate('gallery.videoReview.title')}</h2>
+        <h2 className="mr-auto text-sm font-semibold">
+          {translate('gallery.videoReview.editorTitle')}
+        </h2>
         <ReviewButton
           label={translate('gallery.videoReview.undo')}
           disabled={props.busy || !props.canUndo}
@@ -64,6 +67,7 @@ export function ReviewInspector(props: {
           <Redo2 size={16} />
         </ReviewButton>
       </div>
+      {props.modeControl}
       <div>
         <p
           className="truncate text-xs text-[var(--sniptale-color-text-muted)]"

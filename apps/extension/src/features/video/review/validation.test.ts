@@ -169,3 +169,26 @@ it('round-trips linked overlays: annotation link and placement survive parsing',
     ).toBeNull();
   }
 });
+
+it('roundtrips custom comment typography and rejects malformed geometry before persistence', () => {
+  const comment = createCanvasComment({ id: 'styled', at: 1 });
+  comment.style = { ...comment.style, width: 320, fontSize: 18, padding: 12 };
+  const operation = { id: 'style', at: 1, target: 'canvasComment', before: null, after: comment };
+  expect(parseReviewOperation(JSON.parse(JSON.stringify(operation)), 10)).toEqual(operation);
+  for (const patch of [
+    { width: 79 },
+    { width: 641 },
+    { fontSize: 0 },
+    { fontSize: 49 },
+    { padding: -1 },
+    { padding: 33 },
+    { width: '320' },
+  ]) {
+    expect(
+      parseReviewOperation(
+        { ...operation, after: { ...comment, style: { ...comment.style, ...patch } } },
+        10
+      )
+    ).toBeNull();
+  }
+});

@@ -194,6 +194,12 @@ function parseCanvasComment(value: unknown, duration: number): CanvasComment | n
     !finite(style['radius']) ||
     style['radius'] < 0 ||
     style['radius'] > 64 ||
+    (style['width'] !== undefined &&
+      (!finite(style['width']) || style['width'] < 80 || style['width'] > 640)) ||
+    (style['fontSize'] !== undefined &&
+      (!finite(style['fontSize']) || style['fontSize'] < 10 || style['fontSize'] > 48)) ||
+    (style['padding'] !== undefined &&
+      (!finite(style['padding']) || style['padding'] < 0 || style['padding'] > 32)) ||
     parsePaint(style['fillPaint']) === null
   )
     return null;
@@ -212,6 +218,9 @@ function parseCanvasComment(value: unknown, duration: number): CanvasComment | n
       fillPaint: parsePaint(style['fillPaint'])!,
       textColor: style['textColor'],
       radius: style['radius'],
+      ...(style['width'] === undefined ? {} : { width: style['width'] }),
+      ...(style['fontSize'] === undefined ? {} : { fontSize: style['fontSize'] }),
+      ...(style['padding'] === undefined ? {} : { padding: style['padding'] }),
     },
   };
 }

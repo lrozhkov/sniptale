@@ -8,6 +8,7 @@ import type {
 import type { CanvasComment, ReviewAnnotation } from '../../features/video/review/types';
 import {
   CANVAS_COMMENT_BUBBLE,
+  canvasCommentBubble,
   canvasCommentText,
   isCanvasCommentVisibleAt,
   overlayPulsePhase,
@@ -19,6 +20,54 @@ import {
 } from '../../features/video/review/advanced/scene';
 
 type VideoRect = { x: number; y: number; width: number; height: number };
+
+/** Appearance and clipping share the export bubble bounds, independently of marker dragging. */
+function OverlayCommentBubble(props: {
+  comment: CanvasComment;
+  resolvedText: string;
+  scale: number;
+  output: { width: number; height: number };
+  selected: boolean;
+}) {
+  const bubble = canvasCommentBubble(props.comment.style, {
+    width: props.output.width / props.scale,
+    height: props.output.height / props.scale,
+  });
+  const below = props.comment.placement === 'below';
+  return (
+    <>
+      {props.resolvedText.trim() ? (
+        <div
+          data-ui="gallery.videoReview.canvasCommentBubble"
+          className="pointer-events-none absolute left-1/2 w-max max-w-56
+              -translate-x-1/2 whitespace-pre-wrap break-words
+              px-2.5 py-1.5 text-xs leading-snug shadow-sm"
+          style={{
+            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+            fontSize: bubble.fontSize,
+            maxWidth: bubble.maxWidth,
+            maxHeight: bubble.maxHeight,
+            overflow: 'hidden',
+            boxSizing: 'border-box',
+            padding: `${bubble.paddingY}px ${bubble.paddingX}px`,
+            lineHeight: `${bubble.lineHeight}px`,
+            background: serializePaintToCss(props.comment.style.fillPaint),
+            color: props.comment.style.textColor,
+            borderRadius: props.comment.style.radius,
+            ...(below
+              ? { top: `calc(100% + ${CANVAS_COMMENT_BUBBLE.gap}px)` }
+              : { bottom: `calc(100% + ${CANVAS_COMMENT_BUBBLE.gap}px)` }),
+            ...(props.selected
+              ? { outline: '2px solid var(--sniptale-color-accent)', outlineOffset: 1 }
+              : {}),
+          }}
+        >
+          {props.resolvedText}
+        </div>
+      ) : null}
+    </>
+  );
+}
 
 /** One overlay bubble with its media-time pulse and pointer drag commit. */
 function OverlayComment(props: {
@@ -83,7 +132,6 @@ function OverlayComment(props: {
     return () => window.removeEventListener('keydown', cancel);
   }, [dragPosition]);
   const phase = overlayPulsePhase(props.sourceTime, props.comment.start);
-  const below = props.comment.placement === 'below';
   return (
     <div
       data-ui="gallery.videoReview.canvasComment"
@@ -95,30 +143,13 @@ function OverlayComment(props: {
         zIndex: props.layer,
       }}
     >
-      {props.resolvedText.trim() ? (
-        <div
-          data-ui="gallery.videoReview.canvasCommentBubble"
-          className="pointer-events-none absolute left-1/2 w-max max-w-56
-              -translate-x-1/2 whitespace-pre-wrap break-words
-              px-2.5 py-1.5 text-xs leading-snug shadow-sm"
-          style={{
-            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
-            fontSize: CANVAS_COMMENT_BUBBLE.fontSize,
-            lineHeight: `${CANVAS_COMMENT_BUBBLE.lineHeight}px`,
-            background: serializePaintToCss(props.comment.style.fillPaint),
-            color: props.comment.style.textColor,
-            borderRadius: props.comment.style.radius,
-            ...(below
-              ? { top: `calc(100% + ${CANVAS_COMMENT_BUBBLE.gap}px)` }
-              : { bottom: `calc(100% + ${CANVAS_COMMENT_BUBBLE.gap}px)` }),
-            ...(props.selected
-              ? { outline: '2px solid var(--sniptale-color-accent)', outlineOffset: 1 }
-              : {}),
-          }}
-        >
-          {props.resolvedText}
-        </div>
-      ) : null}
+      <OverlayCommentBubble
+        comment={props.comment}
+        resolvedText={props.resolvedText}
+        scale={props.scale}
+        output={props.output}
+        selected={props.selected}
+      />
       <button
         type="button"
         aria-label={translate('gallery.videoReview.overlayPoint')}

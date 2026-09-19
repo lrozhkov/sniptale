@@ -60,7 +60,7 @@ function renderInspector(
       node.dispatchEvent(new Event('input', { bubbles: true }));
     });
   };
-  const select = host.querySelector<HTMLSelectElement>(
+  const select = host.querySelector<HTMLButtonElement>(
     '[aria-label="gallery.videoReview.zoomTransitionIn"]'
   )!;
   return { field, set, select };
@@ -84,13 +84,10 @@ it('commits camera fields, transitions, reset, and delete through the callbacks'
   expect(change).toHaveBeenLastCalledWith({ centerX: 0.3 });
   await inspector.set(inspector.field('zoomFocusY'), '0.8');
   expect(change).toHaveBeenLastCalledWith({ centerY: 0.8 });
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
-      inspector.select,
-      'linear'
-    );
-    inspector.select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await act(async () => inspector.select.click());
+  await act(async () =>
+    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
+  );
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'linear', duration: 0.3 } });
   await inspector.set(
     inspector.field('zoomTransitionIn gallery.videoReview.zoomTransitionDuration'),

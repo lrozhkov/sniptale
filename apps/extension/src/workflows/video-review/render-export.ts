@@ -26,20 +26,19 @@ import {
   quickEditContentPointToCanvas,
 } from '../../features/video/review/advanced/scene';
 import {
-  CANVAS_COMMENT_BUBBLE,
+  canvasCommentBubble,
   isCanvasCommentVisibleAt,
   overlayPulsePhase,
   type CanvasCommentExport,
 } from '../../features/video/review/comments';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
 import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
-import type { ReviewExportClipPlan } from './export-lifecycle';
+import type { ReviewExportClipPlan } from './audio-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
@@ -560,7 +559,10 @@ function drawReviewComment(
   const point = args.videoTransform
     ? quickEditContentPointToCanvas(comment.position, args.videoTransform)
     : { x: comment.position.x * args.canvas.width, y: comment.position.y * args.canvas.height };
-  const bubble = CANVAS_COMMENT_BUBBLE;
+  const bubble = canvasCommentBubble(comment.style, {
+    width: args.canvas.width / args.scale,
+    height: args.canvas.height / args.scale,
+  });
   const pointRadius = bubble.pointRadius * args.scale;
   const phase = overlayPulsePhase(args.sourceTime ?? 0, comment.start);
   context.save();
@@ -589,25 +591,40 @@ function drawReviewComment(
     const paddingY = bubble.paddingY * args.scale;
     const radius = comment.style.radius * args.scale;
     context.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-    const lines = wrapCanvasText(context, text, maxWidth - paddingX * 2);
+    const maxHeight = bubble.maxHeight * args.scale;
+    const maxLines = Math.max(1, Math.floor((maxHeight - paddingY * 2) / lineHeight));
+    const lines = wrapCanvasText(context, text, Math.max(1, maxWidth - paddingX * 2), maxLines);
     const textWidth = Math.max(...lines.map((line) => context.measureText(line).width));
-    const boxWidth = textWidth + paddingX * 2;
-    const boxHeight = lines.length * lineHeight + paddingY * 2;
+    const boxWidth = Math.min(maxWidth, textWidth + paddingX * 2);
+    const boxHeight = Math.min(maxHeight, lines.length * lineHeight + paddingY * 2);
     const below = comment.placement === 'below';
     const boxX = point.x - boxWidth / 2;
     const boxY = below
       ? point.y + pointRadius + bubble.gap * args.scale
       : point.y - pointRadius - bubble.gap * args.scale - boxHeight;
-    context.fillStyle = serializePaintToCss(comment.style.fillPaint);
+    context.save();
     context.beginPath();
     context.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
-    context.fill();
-    context.stroke();
+    context.clip();
+    const paint = comment.style.fillPaint;
+    if (paint.kind === 'solid') {
+      context.fillStyle = paint.color;
+      context.fillRect(boxX, boxY, boxWidth, boxHeight);
+    } else {
+      context.translate(boxX, boxY);
+      drawSceneGradient(context, paint.gradient, boxWidth, boxHeight);
+    }
+    context.restore();
+    context.save();
+    context.beginPath();
+    context.rect(boxX, boxY, boxWidth, boxHeight);
+    context.clip();
     context.fillStyle = comment.style.textColor;
     context.textBaseline = 'top';
     lines.forEach((line, index) => {
       context.fillText(line, boxX + paddingX, boxY + paddingY + index * lineHeight);
     });
+    context.restore();
   }
   context.restore();
 }
@@ -616,7 +633,8 @@ function drawReviewComment(
 function wrapCanvasText(
   context: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number
+  maxWidth: number,
+  maxLines: number
 ): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split('\n')) {
@@ -625,12 +643,14 @@ function wrapCanvasText(
       const candidate = current ? `${current} ${word}` : word;
       if (current && context.measureText(candidate).width > maxWidth) {
         lines.push(current);
+        if (lines.length >= maxLines) return lines;
         current = word;
       } else {
         current = candidate;
       }
     }
     lines.push(current);
+    if (lines.length >= maxLines) return lines;
   }
   return lines;
 }

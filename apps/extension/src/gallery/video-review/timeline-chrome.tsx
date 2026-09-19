@@ -59,13 +59,7 @@ export function ReviewToolbar(props: {
   onZoom(value: number): void;
 }) {
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 py-2">
-      <div
-        className="col-span-2 flex min-w-0 flex-wrap items-center gap-1 border-b
-          border-[var(--sniptale-color-border-soft)] pb-2"
-      >
-        {props.tools}
-      </div>
+    <div className="flex min-w-0 flex-wrap items-center gap-1 border-b border-[var(--sniptale-color-border-soft)] py-2">
       <div className="flex items-center gap-1">
         <span className="min-w-8 text-right text-xs tabular-nums">
           {reviewTimeLabel(props.time)}
@@ -96,7 +90,8 @@ export function ReviewToolbar(props: {
           </output>
         ) : null}
       </div>
-      <div className="flex min-w-0 flex-wrap items-center justify-end gap-0.5">
+      {props.tools}
+      <div className="ml-auto flex shrink-0 items-center gap-0.5">
         {props.onVolume ? (
           <label className="mr-2 flex items-center gap-1">
             <Volume2 size={14} aria-hidden="true" />

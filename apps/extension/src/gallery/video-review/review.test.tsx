@@ -224,7 +224,7 @@ it('offers source-load retry and surfaces playback failure without exiting', asy
 
 async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 80));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(-192, 0, 592, 80));
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,
@@ -699,7 +699,7 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     expect(lanes).toHaveLength(3);
     expect(host.querySelector('[data-ui="gallery.videoReview.audioTrack"]')).not.toBeNull();
     const mute = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.audioClipMute"]'
+      '[aria-label="gallery.videoReview.audioEnabled"]'
     )!;
     await act(async () => mute.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));

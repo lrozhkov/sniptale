@@ -42,7 +42,11 @@ it('reads associated labels without storing password, text input or editable con
     input.value = 'entered-secret';
     label.append(input);
     document.body.append(label);
-    expect(describe(input).data).toEqual({ targetTag: 'input', targetName: 'Account' });
+    expect(describe(input).data).toEqual({
+      targetTag: 'input',
+      targetType: input.type,
+      targetName: 'Account',
+    });
   }
   const editable = document.createElement('div');
   editable.setAttribute('contenteditable', 'true');
@@ -113,4 +117,22 @@ it('retains a select description without retaining selected or unselected option
   label.append(select);
   document.body.append(label);
   expect(describe(select).data).toEqual({ targetTag: 'select', targetName: 'Account' });
+});
+
+it('does not label checkbox, range, or select changes as typing', () => {
+  const state = createInitialState();
+  const listeners = createTelemetryListeners(state);
+  for (const type of ['checkbox', 'radio', 'range', 'color', 'file', 'button']) {
+    const input = document.createElement('input');
+    input.type = type;
+    input.addEventListener('input', listeners.input);
+    input.addEventListener('change', listeners.change);
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('change'));
+  }
+  const select = document.createElement('select');
+  select.addEventListener('change', listeners.change);
+  select.dispatchEvent(new Event('change'));
+  finalizeTelemetrySignals(state);
+  expect(state.signals.filter((signal) => signal.kind === 'typing')).toEqual([]);
 });

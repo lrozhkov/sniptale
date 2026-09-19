@@ -397,7 +397,7 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     expect(priorTime).toBeCloseTo(1.4, 1);
     await button('gallery.videoReview.cutMode').click();
     const initialPlane = (await dialog
-      .locator('[data-ui="gallery.videoReview.timePlane"]')
+      .locator('[data-ui="gallery.videoReview.ruler"]')
       .boundingBox())!;
     await page.mouse.move(initialPlane.x + initialPlane.width * 0.17, initialPlane.y + 10);
     await page.mouse.down();
@@ -418,9 +418,7 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
       exact: true,
     });
     const h = (await handle.boundingBox())!;
-    const plane = (await dialog
-      .locator('[data-ui="gallery.videoReview.timePlane"]')
-      .boundingBox())!;
+    const plane = (await dialog.locator('[data-ui="gallery.videoReview.ruler"]').boundingBox())!;
     await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
     await page.mouse.down();
     await page.mouse.move(plane.x + (plane.width * 6) / 12.008, h.y + h.height / 2, { steps: 6 });
@@ -531,11 +529,24 @@ for (const { container, gaps } of [
           await timelineGesture(page, 2, 4);
           await button('gallery.videoReview.speedMode').click();
           await dialog
-            .getByRole('combobox', { name: label('gallery.videoReview.speedRate'), exact: true })
-            .selectOption(String(rate));
+            .getByRole('button', { name: label('gallery.videoReview.speedRate'), exact: true })
+            .click();
+          await page
+            .getByRole('option', { name: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`, exact: true })
+            .click();
           await dialog
-            .getByRole('combobox', { name: label('gallery.videoReview.speedAudio'), exact: true })
-            .selectOption(audio);
+            .getByRole('button', { name: label('gallery.videoReview.speedAudio'), exact: true })
+            .click();
+          await page
+            .getByRole('option', {
+              name: label(
+                audio === 'mute'
+                  ? 'gallery.videoReview.muteSound'
+                  : 'gallery.videoReview.speedSound'
+              ),
+              exact: true,
+            })
+            .click();
           await timelineGesture(page, 6, 10);
           const speed = dialog.getByRole('button', {
             name: `Speed ${rate < 0.25 ? `1/${1 / rate}` : rate}× 6.0 – 10.0`,
@@ -666,7 +677,7 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.zoomTrack').click();
       await button('gallery.videoReview.audioTrack').click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await button('gallery.videoReview.zoomAdd').first().click();
       const zoomRegion = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first();
@@ -697,6 +708,75 @@ for (const variant of [
           exact: true,
         })
         .fill('8');
+      const headers = dialog.locator('[data-ui="gallery.videoReview.trackHeader"]');
+      const originalWave = dialog
+        .locator('[data-ui="gallery.videoReview.audioLane"]')
+        .first()
+        .locator('path');
+      await expect
+        .poll(async () => (await originalWave.getAttribute('d'))?.length ?? 0)
+        .toBeGreaterThan(100);
+      const wav = Buffer.alloc(44 + 48000 * 2 * 2);
+      wav.write('RIFF');
+      wav.writeUInt32LE(wav.length - 8, 4);
+      wav.write('WAVEfmt ', 8);
+      wav.writeUInt32LE(16, 16);
+      wav.writeUInt16LE(1, 20);
+      wav.writeUInt16LE(1, 22);
+      wav.writeUInt32LE(48000, 24);
+      wav.writeUInt32LE(96000, 28);
+      wav.writeUInt16LE(2, 32);
+      wav.writeUInt16LE(16, 34);
+      wav.write('data', 36);
+      wav.writeUInt32LE(wav.length - 44, 40);
+      for (let i = 0; i < 96000; i++)
+        wav.writeInt16LE(
+          Math.round(Math.sin((i / 48000) * 440 * Math.PI * 2) * (i < 48000 ? 4000 : 12000)),
+          44 + i * 2
+        );
+      await dialog
+        .locator('input[accept="audio/*"]')
+        .first()
+        .setInputFiles({ name: 'peaks.wav', mimeType: 'audio/wav', buffer: wav });
+      const music = dialog.locator('[data-ui="gallery.videoReview.audioLane"]').last();
+      await expect
+        .poll(async () => (await music.locator('path').getAttribute('d'))?.length ?? 0)
+        .toBeGreaterThan(100);
+      await button('gallery.videoReview.zoomIn').click();
+      const headerX = (await headers.last().boundingBox())!.x;
+      const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+      await viewport.evaluate((node) => {
+        node.scrollLeft = 120;
+      });
+      expect((await headers.last().boundingBox())!.x).toBeCloseTo(headerX, 1);
+      await viewport.evaluate((node) => {
+        node.scrollLeft = 0;
+      });
+      await button('gallery.videoReview.fit').click();
+      const playhead = dialog.locator('[data-ui="gallery.videoReview.playhead"]');
+      expect((await playhead.boundingBox())!.height).toBeGreaterThan(150);
+      const timePlane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+      await timePlane.focus();
+      await page.keyboard.press('Space');
+      await expect(button('gallery.videoReview.pause')).toBeVisible();
+      await expect(timePlane).toHaveCSS('outline-style', 'none');
+      await expect(timePlane).toHaveCSS('box-shadow', 'none');
+      await page.keyboard.press('Space');
+      await button('gallery.videoReview.addOverlayComment').first().click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.overlayTextInput"]')
+        .fill('Styled frame comment');
+      const fontSize = dialog.getByRole('spinbutton', {
+        name: label('gallery.videoReview.overlayFontSize'),
+        exact: true,
+      });
+      await fontSize.fill('');
+      await fontSize.pressSequentially('18', { delay: 200 });
+      await expect(fontSize).toHaveValue('18');
+      await fontSize.press('Tab');
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.canvasCommentBubble"]').first()
+      ).toHaveCSS('font-size', '18px');
       await page.screenshot({ path: testInfo.outputPath('advanced.png') });
       await page.setViewportSize({ width: 800, height: 600 });
       await expect(button('gallery.videoReview.back')).toBeInViewport();

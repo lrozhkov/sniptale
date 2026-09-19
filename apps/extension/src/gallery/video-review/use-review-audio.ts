@@ -103,6 +103,11 @@ export function useReviewAudio(args: {
       patchLane(lane, (clips) => clips.filter((clip) => clip.id !== id));
       if (selectedId === id) setSelected(null);
     },
+    toggleLaneMute: (lane: ReviewAudioLane) =>
+      patchLane(lane, (clips) => {
+        const muted = !clips.every((clip) => clip.muted);
+        return clips.map((clip) => ({ ...clip, muted }));
+      }),
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
       args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ...patch } })),
   };

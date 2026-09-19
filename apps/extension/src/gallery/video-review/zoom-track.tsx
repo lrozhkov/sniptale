@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link2, Plus } from 'lucide-react';
+import { Link2, Plus, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -13,8 +13,13 @@ import {
   snapTimelineTime,
 } from '../../features/video/review/snap';
 import { ReviewButton, reviewTimeLabel } from './controls';
+import type { ReviewTrackProjection } from './track-projection';
+import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 
 type ZoomTrackProps = {
+  projection?: ReviewTrackProjection | undefined;
+  enabled?: boolean;
+  onToggleEnabled?(): void;
   duration: number;
   /** Result-time playhead; absent while the source point was removed by a cut. */
   time: number | null;
@@ -33,11 +38,11 @@ type ZoomTrackProps = {
     edge: 'start' | 'end' | 'move'
   ): void;
 };
-const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
 
 interface ZoomDragState {
   id: string;
   x: number;
+  sourceAtPointer: number;
   width: number;
   edge: 'start' | 'end' | 'move';
   range: { start: number; end: number };
@@ -160,91 +165,97 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
     return [...values].sort((a, b) => a - b);
   }, [edits, boundaries, time, toOutputTime]);
   return (
-    <div
-      data-ui="gallery.videoReview.zoomLane"
-      className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]"
+    <ReviewTrackRow
+      label={translate('gallery.videoReview.zoomTrack')}
+      icon={<Focus size={14} aria-hidden="true" />}
+      controls={
+        <>
+          {props.onToggleEnabled ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.zoomEnabled')}
+              aria-pressed={props.enabled !== false}
+              onClick={props.onToggleEnabled}
+              className="!h-7 !min-h-7 !px-1"
+            >
+              {props.enabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
+            </ReviewButton>
+          ) : null}
+          <ReviewButton
+            label={translate('gallery.videoReview.zoomAdd')}
+            className="!h-7 !min-h-7 !px-1"
+            onClick={props.onAdd}
+          >
+            <Plus size={14} />
+          </ReviewButton>{' '}
+        </>
+      }
     >
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center gap-2 px-3
-            text-[11px] text-[var(--sniptale-color-text-muted)]"
+        data-ui="gallery.videoReview.zoomLane"
+        className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]"
       >
-        {translate('gallery.videoReview.zoomTrack')}
-      </div>
-      {props.regions
-        .filter((region) => !region.dormant)
-        .map((region, index, regions) => {
-          const next = regions[index + 1];
-          if (!next || next.start <= region.end || !props.onLink) return null;
-          const connected = region.linkTo === next.id;
-          return (
-            <button
-              key={`link:${region.id}`}
-              type="button"
-              aria-label={translate('gallery.videoReview.zoomConnect')}
-              aria-pressed={connected}
-              className="absolute inset-y-1 z-[6] flex items-center justify-center rounded border border-dashed
+        {props.regions
+          .filter((region) => !region.dormant)
+          .map((region, index, regions) => {
+            const next = regions[index + 1];
+            if (!next || next.start <= region.end || !props.onLink) return null;
+            const connected = region.linkTo === next.id;
+            return (
+              <button
+                key={`link:${region.id}`}
+                type="button"
+                aria-label={translate('gallery.videoReview.zoomConnect')}
+                aria-pressed={connected}
+                className="absolute inset-y-1 z-[6] flex items-center justify-center rounded border border-dashed
           border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-muted)]
           hover:bg-[var(--sniptale-color-surface-hover)] aria-pressed:border-[var(--sniptale-color-accent)]
           aria-pressed:text-[var(--sniptale-color-accent)]"
-              style={{
-                left: percent(region.end, props.duration),
-                width: percent(next.start - region.end, props.duration),
-              }}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={() => props.onLink?.(region.id, connected ? null : next.id)}
-            >
-              <Link2 size={14} aria-hidden="true" />
-            </button>
-          );
-        })}
-      {props.regions.map((region) => (
-        <ReviewZoomRegionBlock
-          key={region.id}
-          {...props}
-          snapEdges={snapEdges}
-          region={region}
-          range={shownRange(region)}
-          selected={props.selectedId === region.id}
-          drag={drag}
-          onPreview={(value) => setPreview(value && { id: region.id, ...value })}
-          onGuide={setGuide}
-        />
-      ))}
-      {props.time !== null ? (
-        <div
-          aria-hidden="true"
-          data-zoom-playhead="true"
-          className="pointer-events-none absolute inset-y-0 z-10 w-px
-              bg-[var(--sniptale-color-accent)]"
-          style={{ left: percent(props.time, props.duration) }}
-        />
-      ) : null}
-      {guide !== null ? (
-        <div
-          aria-hidden="true"
-          data-zoom-guide="true"
-          className="pointer-events-none absolute inset-y-0 z-20 w-px
+                style={{
+                  left: `${(props.projection?.position(region.end, 'end') ?? region.end / props.duration) * 100}%`,
+                  width: `${((props.projection?.position(next.start) ?? next.start / props.duration) - (props.projection?.position(region.end, 'end') ?? region.end / props.duration)) * 100}%`,
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={() => props.onLink?.(region.id, connected ? null : next.id)}
+              >
+                <Link2 size={14} aria-hidden="true" />
+              </button>
+            );
+          })}
+        {props.regions.map((region) => (
+          <ReviewZoomRegionBlock
+            key={region.id}
+            {...props}
+            snapEdges={snapEdges}
+            region={region}
+            range={shownRange(region)}
+            selected={props.selectedId === region.id}
+            drag={drag}
+            onPreview={(value) => setPreview(value && { id: region.id, ...value })}
+            onGuide={setGuide}
+          />
+        ))}
+        <ReviewTrackCuts projection={props.projection} />
+        {guide !== null ? (
+          <div
+            aria-hidden="true"
+            data-zoom-guide="true"
+            className="pointer-events-none absolute inset-y-0 z-20 w-px
               bg-[var(--sniptale-color-accent-emphasis)]"
-          style={{ left: percent(guide, props.duration) }}
-        />
-      ) : null}
-      {!props.regions.length ? (
-        <p
-          className="pointer-events-none absolute inset-0 flex items-center justify-center
+            style={{
+              left: `${(props.projection?.position(guide) ?? guide / props.duration) * 100}%`,
+            }}
+          />
+        ) : null}
+        {!props.regions.length ? (
+          <p
+            className="pointer-events-none absolute inset-0 flex items-center justify-center
               text-[11px] text-[var(--sniptale-color-text-muted)]"
-        >
-          {translate('gallery.videoReview.zoomEmptyHint')}
-        </p>
-      ) : null}
-      <ReviewButton
-        label={translate('gallery.videoReview.zoomAdd')}
-        className="!absolute right-1 top-1/2 z-10 !h-6 !min-h-6 -translate-y-1/2 !px-1.5"
-        onClick={props.onAdd}
-      >
-        <Plus size={14} />
-      </ReviewButton>
-    </div>
+          >
+            {translate('gallery.videoReview.zoomEmptyHint')}
+          </p>
+        ) : null}
+      </div>
+    </ReviewTrackRow>
   );
 }
 
@@ -278,6 +289,10 @@ function ReviewZoomRegionBlock(
     props.drag.current = {
       id: region.id,
       x: event.clientX,
+      sourceAtPointer:
+        ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
+          event.currentTarget.parentElement!.getBoundingClientRect().width) *
+        (props.projection?.duration ?? duration),
       width: event.currentTarget.parentElement!.getBoundingClientRect().width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
       range: { start: region.start, end: region.end },
@@ -296,8 +311,8 @@ function ReviewZoomRegionBlock(
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
       style={{
-        left: percent(props.range.start, duration),
-        width: percent(props.range.end - props.range.start, duration),
+        left: `${(props.projection?.position(props.range.start) ?? props.range.start / duration) * 100}%`,
+        width: `${((props.projection?.position(props.range.end, 'end') ?? props.range.end / duration) - (props.projection?.position(props.range.start) ?? props.range.start / duration)) * 100}%`,
       }}
       onPointerDown={begin}
       onPointerMove={(event) => {
@@ -306,7 +321,12 @@ function ReviewZoomRegionBlock(
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
         const next = zoomDragRange({
           edge: current.edge,
-          delta: ((event.clientX - current.x) / current.width) * duration,
+          delta:
+            props.projection?.delta(
+              current.sourceAtPointer,
+              event.clientX - current.x,
+              current.width
+            ) ?? ((event.clientX - current.x) / current.width) * duration,
           length: current.length,
           region,
           duration,

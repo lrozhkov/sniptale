@@ -127,6 +127,18 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   const elapsedSeconds = getElapsedSeconds(state, timestampMs);
   const lastEventTimeMs = state.typingSignal?.data.lastEventTimeMs ?? null;
   const target = describeTelemetryTarget(event);
+  const element = target.element;
+  if (element) {
+    const textInput =
+      element instanceof HTMLInputElement &&
+      ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(element.type);
+    if (
+      !textInput &&
+      !(element instanceof HTMLTextAreaElement) &&
+      !element.closest('[contenteditable]:not([contenteditable="false"])')
+    )
+      return;
+  }
 
   if (
     state.typingSignal !== null &&

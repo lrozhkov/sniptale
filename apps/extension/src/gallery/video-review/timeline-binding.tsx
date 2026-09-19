@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
+import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
+import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { ReviewTimelineToolbar } from './review-toolbar';
 import { ReviewZoomTrack } from './zoom-track';
 import { ReviewAudioTrack } from './audio-track';
@@ -22,6 +25,7 @@ type Exporter = ReturnType<typeof useReviewExport>;
 /** Zoom lane on the result-time scale with shared snap candidates. */
 function ReviewZoomLane(props: {
   advanced: QuickEditAdvancedState;
+  projection?: ReviewTrackProjection;
   resultDuration: number;
   outputTime: number | null;
   edits: readonly ReviewEdit[];
@@ -32,6 +36,9 @@ function ReviewZoomLane(props: {
 }) {
   return (
     <ReviewZoomTrack
+      projection={props.projection}
+      enabled={props.advanced.zoom.enabled}
+      onToggleEnabled={props.zoom.toggleEnabled}
       duration={props.resultDuration}
       time={props.outputTime}
       regions={props.advanced.zoom.regions}
@@ -51,6 +58,8 @@ function ReviewZoomLane(props: {
 function ReviewAudioLane(props: {
   snapTimes: readonly number[];
   audioState: QuickEditAudioState;
+  waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
+  projection?: ReviewTrackProjection;
   resultDuration: number;
   audio: ReturnType<typeof useReviewAudio>;
   busy: boolean;
@@ -59,6 +68,9 @@ function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      projection={props.projection}
+      waveforms={props.waveforms}
+      onMuteLane={props.audio.toggleLaneMute}
       snapTimes={props.snapTimes}
       audio={props.audioState}
       duration={props.resultDuration}
@@ -104,6 +116,7 @@ type TimelineBindingProps = {
   canvasComments: ReturnType<typeof useCanvasComments>;
   audio: ReturnType<typeof useReviewAudio>;
   audioState: QuickEditAudioState;
+  waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   audioVisible: boolean;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
@@ -114,7 +127,7 @@ type TimelineBindingProps = {
 };
 
 /** Toolbar lock covers every content and presentation control during blocked phases. */
-function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
+function ReviewTimelineToolsBinding(props: TimelineBindingProps & { onAddZoom(): void }) {
   return (
     <fieldset
       disabled={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -141,6 +154,8 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
         setTrackVisibility={props.setTrackVisibility}
         setOverlaysVisible={props.setOverlaysVisible}
         telemetryAvailable={props.telemetryAvailable}
+        onAddZoom={props.onAddZoom}
+        onImportAudio={(file) => props.onImportAudioFile(file, 'music')}
         onAddComment={() => props.onAddComment()}
         onAddOverlayComment={() => void props.canvasComments.onAdd()}
         onDownloadFragment={() =>
@@ -155,6 +170,10 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
 
 /** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
 export function ReviewTimelineBinding(props: TimelineBindingProps) {
+  const projection = useMemo(
+    () => createTrackProjection(props.source.duration, props.edits),
+    [props.source.duration, props.edits]
+  );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
   const onZoomAdd = () => {
     const at = props.toOutputTime(props.time);
@@ -167,11 +186,12 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       duration={props.source.duration}
       volume={props.volume}
       onVolume={props.onVolume}
-      tools={<ReviewTimelineToolsBinding {...props} />}
+      tools={<ReviewTimelineToolsBinding {...props} onAddZoom={onZoomAdd} />}
       {...(features.zoomTrackVisible
         ? {
             zoomTrack: (
               <ReviewZoomLane
+                projection={projection}
                 advanced={props.advanced}
                 resultDuration={props.resultDuration}
                 outputTime={props.outputTime}
@@ -191,6 +211,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                projection={projection}
                 snapTimes={[
                   ...(props.outputTime === null ? [] : [props.outputTime]),
                   ...props.edits
@@ -204,6 +225,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                     .flatMap((region) => [region.start, region.end]),
                 ]}
                 audioState={props.audioState}
+                waveforms={props.waveforms}
                 resultDuration={props.resultDuration}
                 audio={props.audio}
                 busy={props.busy}

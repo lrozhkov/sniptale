@@ -3,6 +3,7 @@ import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewButton } from './controls';
+import { useReviewWaveforms } from './audio-waveform';
 import { ReviewModeControl } from './review-toolbar';
 import { useReviewBackgroundImport } from './use-review-background';
 import { ReviewCanvasCommentsSection } from './comment-editor';
@@ -374,6 +375,13 @@ function ReviewInspectorBinding({
         !composer.annotation &&
         snapshot.snapshot.workspace.cursor < snapshot.snapshot.workspace.history.length
       }
+      modeControl={
+        <ReviewModeControl
+          advanced={state.advanced}
+          busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
+          setMode={state.setMode}
+        />
+      }
       settingsAvailable={state.advanced.ui.mode === 'advanced'}
       contextKey={reviewInspectorContext(state)}
       composer={
@@ -383,20 +391,14 @@ function ReviewInspectorBinding({
       }
       canvas={
         state.advanced.ui.mode === 'advanced' ? (
-          <>
-            <ReviewCanvasCommentsSection
-              view="list"
-              {...canvasComments}
-              onAdd={() => {
-                state.setMode('advanced');
-                void canvasComments.onAdd();
-              }}
-              comments={snapshot.document.canvasComments}
-              annotations={snapshot.document.annotations}
-              duration={resource.source.duration}
-              busy={busy}
-            />
-          </>
+          <ReviewCanvasCommentsSection
+            view="list"
+            {...canvasComments}
+            comments={snapshot.document.canvasComments}
+            annotations={snapshot.document.annotations}
+            duration={resource.source.duration}
+            busy={busy}
+          />
         ) : null
       }
       saveStatus={
@@ -407,20 +409,7 @@ function ReviewInspectorBinding({
             : 'saved'
       }
       onRetry={() => void run(state.retryAdvanced)}
-      recovery={
-        snapshot.error === 'conflict' ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.reload')}
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                await composer.reload();
-                state.resetAdvanced();
-              })
-            }
-          />
-        ) : null
-      }
+      recovery={<ReviewConflictRecovery state={state} />}
       message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
       onBack={() => {
         video.current?.pause();
@@ -476,6 +465,27 @@ function ReviewInspectorBinding({
         duration={resource.source.duration}
       />
     </ReviewInspector>
+  );
+}
+
+/** Conflict recovery reloads the document and its staged advanced state together. */
+function ReviewConflictRecovery({
+  state,
+}: {
+  state: Pick<InspectorState, 'snapshot' | 'busy' | 'run' | 'composer' | 'resetAdvanced'>;
+}) {
+  if (state.snapshot.error !== 'conflict') return null;
+  return (
+    <ReviewButton
+      label={translate('gallery.videoReview.reload')}
+      disabled={state.busy}
+      onClick={() =>
+        void state.run(async () => {
+          await state.composer.reload();
+          state.resetAdvanced();
+        })
+      }
+    />
   );
 }
 
@@ -538,7 +548,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     advanced,
     features,
     timeline,
-    setMode,
     setTrackVisibility,
     setOverlaysVisible,
     zoom,
@@ -551,6 +560,12 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     add,
     displayRegion,
   } = state;
+  const waveforms = useReviewWaveforms(
+    resource.file,
+    source.duration,
+    advanced.audio,
+    features.audioTrackVisible
+  );
   const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
   return (
     <div
@@ -559,11 +574,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           max-[799px]:overflow-y-auto"
     >
       <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
-        <ReviewModeControl
-          advanced={advanced}
-          busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
-          setMode={setMode}
-        />
         <ReviewStageBinding
           backgroundPending={state.backgroundImport.pending}
           url={resource.url}
@@ -624,6 +634,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           canvasComments={canvasComments}
           audio={audio}
           audioState={advanced.audio}
+          waveforms={waveforms}
           audioVisible={features.audioTrackVisible}
           onImportAudioFile={onImportAudioFile}
           onRecordVoiceover={voiceover.open}

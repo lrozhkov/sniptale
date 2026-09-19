@@ -45,6 +45,14 @@ export function projectReviewTelemetry(
   for (const event of input.actionEvents)
     add('action', event.id, event.kind, event.time, event.time + event.duration);
   for (const signal of input.signals) {
+    if (
+      signal.kind === 'typing' &&
+      (signal.data['targetTag'] === 'select' ||
+        ['checkbox', 'radio', 'range', 'color', 'file', 'button'].includes(
+          typeof signal.data['targetType'] === 'string' ? signal.data['targetType'] : ''
+        ))
+    )
+      continue;
     if (signal.kind === 'static-frame' && signal.startTime === signal.endTime) {
       if (signal.data['code'] !== undefined) warnings += 1;
       continue;

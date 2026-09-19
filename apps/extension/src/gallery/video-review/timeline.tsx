@@ -1,6 +1,8 @@
+import { GripVertical } from 'lucide-react';
+import { ReviewTrackRow } from './track-row';
 import { ReviewRuler, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -34,22 +36,23 @@ type TimelineProps = {
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
 };
-const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
 /** One source lane, with an independent ruler/playhead rather than browser slider chrome. */
 export function ReviewTimeline(props: TimelineProps) {
   const [zoom, setZoom] = useState(1);
+  const [gutter, setGutter] = useState(192);
+  const resize = useRef<{ x: number; width: number } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
-    const measure = () => setWidth(Math.max(1, node.clientWidth));
+    const measure = () => setWidth(Math.max(1, node.clientWidth - gutter));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
-  const plane = useReviewTimelinePlaneDrag(props);
+  }, [gutter]);
+  const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   return (
     <section
       data-ui="gallery.videoReview.timeline"
@@ -77,41 +80,96 @@ export function ReviewTimeline(props: TimelineProps) {
           aria-valuemax={props.duration}
           aria-valuenow={props.time}
           aria-valuetext={reviewTimeLabel(props.time)}
-          className="relative cursor-crosshair pb-4 pt-1 outline-none focus-visible:ring-1
-              focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)]"
-          style={{ width: Math.max(1, width * zoom) }}
+          className="group/plane relative cursor-crosshair pb-2 pt-1 outline-none"
+          style={
+            {
+              width: gutter + Math.max(1, width * zoom),
+              '--review-track-gutter': `${gutter}px`,
+            } as CSSProperties
+          }
           onPointerDown={plane.onPointerDown}
           onPointerMove={plane.onPointerMove}
           onPointerUp={plane.onPointerUp}
           onPointerCancel={plane.onPointerCancel}
         >
-          {props.markers.length ? (
-            <ReviewTelemetryStrip
-              markers={props.markers}
-              duration={props.duration}
-              time={props.time}
-              width={width}
-              zoom={zoom}
-              {...(props.selectedTelemetryRef
-                ? { selectedTelemetryRef: props.selectedTelemetryRef }
-                : {})}
-              onMarker={props.onMarker}
-            />
-          ) : null}
-          <div className="relative">
+          <ReviewTrackRow
+            label=""
+            controls={
+              <button
+                type="button"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label={translate('gallery.videoReview.trackControlsWidth')}
+                aria-valuemin={156}
+                aria-valuemax={300}
+                aria-valuenow={gutter}
+                title={translate('gallery.videoReview.trackControlsWidth')}
+                className="cursor-col-resize rounded p-1 text-[var(--sniptale-color-text-muted)]
+                  focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  resize.current = { x: event.clientX, width: gutter };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={(event) => {
+                  if (resize.current)
+                    setGutter(
+                      Math.max(
+                        156,
+                        Math.min(300, resize.current.width + event.clientX - resize.current.x)
+                      )
+                    );
+                }}
+                onPointerUp={(event) => {
+                  resize.current = null;
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                }}
+                onPointerCancel={() => {
+                  resize.current = null;
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setGutter((value) =>
+                      Math.max(156, Math.min(300, value + (event.key === 'ArrowRight' ? 8 : -8)))
+                    );
+                  }
+                }}
+              >
+                <GripVertical size={12} aria-hidden="true" />
+              </button>
+            }
+          >
             <ReviewRuler duration={props.duration} width={Math.max(1, width * zoom)} />
-            <ReviewSourceLane {...props} />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 z-20 w-px bg-[var(--sniptale-color-accent)]"
-              style={{ left: percent(props.time, props.duration) }}
-            >
-              <span
-                className="absolute -left-1.5 top-0 h-3 w-3 rounded-b-[5px] border
-          border-[var(--sniptale-color-border-accent-strong)]
-          bg-[var(--sniptale-color-accent-emphasis)]"
+          </ReviewTrackRow>
+          {props.markers.length ? (
+            <ReviewTrackRow label={translate('gallery.videoReview.telemetry')}>
+              <ReviewTelemetryStrip
+                markers={props.markers}
+                duration={props.duration}
+                time={props.time}
+                width={width}
+                zoom={zoom}
+                {...(props.selectedTelemetryRef
+                  ? { selectedTelemetryRef: props.selectedTelemetryRef }
+                  : {})}
+                onMarker={props.onMarker}
               />
-            </div>
+            </ReviewTrackRow>
+          ) : null}
+          <ReviewSourceLane {...props} />
+          <div
+            aria-hidden="true"
+            data-ui="gallery.videoReview.playhead"
+            className="pointer-events-none absolute bottom-2 top-1 z-20 w-px bg-[var(--sniptale-color-accent-emphasis)]"
+            style={{ left: gutter + (props.time / props.duration) * width * zoom }}
+          >
+            <span
+              className="absolute -left-1 top-0 h-2 w-2 bg-[var(--sniptale-color-accent-emphasis)]
+              group-focus-visible/plane:brightness-125 group-focus-visible/plane:scale-150
+              [clip-path:polygon(0_0,100%_0,50%_100%)]"
+            />
           </div>
           {props.zoomTrack}
           {props.audioTrack}

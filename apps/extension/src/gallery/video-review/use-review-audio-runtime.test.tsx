@@ -547,3 +547,49 @@ it('skips clips whose asset is missing', async () => {
   });
   expect(engine.scheduled).toHaveLength(0);
 });
+
+it('keeps continuous audio alive when effective clip arrays are recreated on each frame', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    music: [clip()],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => {
+    root.render(<Harness />);
+  });
+  const stops = engine.stops;
+  for (let frame = 1; frame <= 10; frame++) {
+    engine.currentTime = 100 + frame / 60;
+    await act(async () => {
+      root.render(<Harness outputTime={3 + frame / 60} music={[clip()]} voiceover={[]} />);
+    });
+  }
+  expect(engine.stops).toBe(stops);
+  expect(engine.scheduled).toHaveLength(1);
+});
+
+it('accounts for elapsed decoding time instead of starting late audio from its old offset', async () => {
+  const engine = new FakeEngine();
+  let resolve!: (blob: Blob) => void;
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    music: [clip()],
+    resolveAsset: () =>
+      new Promise<Blob>((done) => {
+        resolve = done;
+      }),
+  });
+  await act(async () => {
+    root.render(<Harness />);
+  });
+  engine.currentTime = 101;
+  await act(async () => {
+    resolve(new Blob());
+  });
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 101, offset: 2, duration: 2 });
+});

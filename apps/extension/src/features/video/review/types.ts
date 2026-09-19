@@ -69,7 +69,14 @@ export interface CanvasComment {
   /** Bubble placement relative to the anchor point; missing means above. */
   placement?: 'above' | 'below';
   /** Bubble surface colors and corner rounding. */
-  style: { fillPaint: Paint; textColor: string; radius: number };
+  style: {
+    fillPaint: Paint;
+    textColor: string;
+    radius: number;
+    width?: number;
+    fontSize?: number;
+    padding?: number;
+  };
 }
 
 /** One user commit; before/after values make linear undo deterministic after a restart. */

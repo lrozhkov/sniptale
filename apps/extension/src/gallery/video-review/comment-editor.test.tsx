@@ -83,13 +83,13 @@ it('commits text after the debounce and switches the zoom behavior once', async 
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!
       .click()
   );
-  expect(onPatch).toHaveBeenCalledWith({ visible: false });
+  expect(onPatch).toHaveBeenCalledWith({ visible: false, text: 'Hello there' });
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayRenderToVideo"]')!
       .click()
   );
-  expect(onPatch).toHaveBeenCalledWith({ renderToVideo: false });
+  expect(onPatch).toHaveBeenCalledWith({ renderToVideo: false, text: 'Hello there' });
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayDelete"]')!
@@ -184,4 +184,44 @@ it('commits pending text when the editor unmounts', async () => {
   typeValue(host.querySelector('textarea') as HTMLTextAreaElement, 'Draft');
   await act(async () => root.unmount());
   expect(onPatch).toHaveBeenCalledWith({ text: 'Draft' });
+});
+
+it('keeps intermediate numeric input and commits the complete style with pending text on blur', async () => {
+  const onPatch = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const area = host.querySelector('textarea')!;
+  const input = host.querySelector<HTMLInputElement>('input[min="10"]')!;
+  await act(async () => {
+    area.focus();
+    typeValue(area, 'New text');
+    input.focus();
+  });
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  for (const value of ['', '1', '18']) {
+    await act(async () => {
+      setter.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(input.value).toBe(value);
+    expect(onPatch).not.toHaveBeenCalled();
+  }
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 340)));
+  expect(onPatch).not.toHaveBeenCalled();
+  await act(async () => input.blur());
+  expect(onPatch).toHaveBeenCalledWith({
+    text: 'New text',
+    style: { ...comment().style, fontSize: 18 },
+  });
 });

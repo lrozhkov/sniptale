@@ -8,6 +8,7 @@ import {
   snapTimelineTime,
 } from '../../features/video/review/snap';
 import { reviewTimeLabel } from './controls';
+import { ReviewTrackRow } from './track-row';
 
 type SelectionProps = {
   duration: number;
@@ -28,42 +29,39 @@ const percent = (time: number, duration: number) => `${(time / duration) * 100}%
 export function ReviewSourceLane(props: SelectionProps) {
   const [guide, setGuide] = useState<number | null>(null);
   return (
-    <div
-      data-ui="gallery.videoReview.sourceLane"
-      className="relative mt-1 h-12 rounded bg-[var(--sniptale-color-surface-hover)]"
+    <ReviewTrackRow
+      label={translate('gallery.videoReview.sourceVideo')}
+      icon={<Film size={14} aria-hidden="true" />}
     >
-      {guide !== null ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0 z-20 w-px
-              bg-[var(--sniptale-color-accent-emphasis)]"
-          style={{ left: percent(guide, props.duration) }}
-        />
-      ) : null}
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 flex items-center gap-2 overflow-hidden px-3
-            text-[11px] text-[var(--sniptale-color-text-muted)]"
+        data-ui="gallery.videoReview.sourceLane"
+        className="relative mt-1 h-12 rounded bg-[var(--sniptale-color-surface-hover)]"
       >
-        <Film size={14} />
-        <span>{translate('gallery.videoReview.sourceVideo')}</span>
-      </div>
-      {props.selection.kind === 'range' ? (
-        <div
-          className="pointer-events-none absolute inset-y-0 border-x-2
+        {guide !== null ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 z-20 w-px
+              bg-[var(--sniptale-color-accent-emphasis)]"
+            style={{ left: percent(guide, props.duration) }}
+          />
+        ) : null}
+        {props.selection.kind === 'range' ? (
+          <div
+            className="pointer-events-none absolute inset-y-0 border-x-2
               border-[var(--sniptale-color-accent)]
               bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]"
-          style={{
-            left: percent(props.selection.start, props.duration),
-            width: percent(props.selection.end - props.selection.start, props.duration),
-          }}
-        />
-      ) : null}
-      {props.edits?.map((edit) => (
-        <ReviewEditBlock key={edit.id} {...props} onSnap={setGuide} edit={edit} />
-      ))}
-      <ReviewCommentMarkers {...props} />
-    </div>
+            style={{
+              left: percent(props.selection.start, props.duration),
+              width: percent(props.selection.end - props.selection.start, props.duration),
+            }}
+          />
+        ) : null}
+        {props.edits?.map((edit) => (
+          <ReviewEditBlock key={edit.id} {...props} onSnap={setGuide} edit={edit} />
+        ))}
+        <ReviewCommentMarkers {...props} />
+      </div>
+    </ReviewTrackRow>
   );
 }
 

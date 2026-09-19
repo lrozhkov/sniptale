@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import {
   hasSuppressedAdvancedFeatures,
@@ -10,6 +11,7 @@ import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import {
   Activity,
+  Plus,
   AudioLines,
   Eye,
   EyeOff,
@@ -44,6 +46,8 @@ type ToolbarProps = {
   /** Editor-only overlay display toggle; comment data and exports stay untouched. */
   setOverlaysVisible(visible: boolean): void;
   telemetryAvailable: boolean;
+  onAddZoom?(): void;
+  onImportAudio?(file: File): void;
   onAddComment(): void;
   onAddOverlayComment(): void;
   onDownloadFragment(): void;
@@ -81,7 +85,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           className="!border-0 !bg-transparent !shadow-none !text-xs"
         >
           <MessageSquarePlus size={16} />
-          <span className="hidden @[720px]:inline">
+          <span className="sr-only">
             {translate(
               props.selection.kind === 'range'
                 ? 'gallery.videoReview.commentRange'
@@ -97,10 +101,31 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             className="!border-0 !bg-transparent !shadow-none !text-xs"
           >
             <StickyNote size={16} />
-            <span className="hidden @[720px]:inline">
-              {translate('gallery.videoReview.addOverlayComment')}
-            </span>
+            <span className="sr-only">{translate('gallery.videoReview.addOverlayComment')}</span>
           </ReviewButton>
+        ) : null}
+        {features.mode === 'advanced' && props.onAddZoom ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.zoomAdd')}
+            disabled={busy}
+            onClick={() => {
+              props.setTrackVisibility('zoom', true);
+              props.onAddZoom?.();
+            }}
+            className="!border-0 !bg-transparent !shadow-none !text-xs"
+          >
+            <Focus size={16} />
+            <Plus size={10} />
+          </ReviewButton>
+        ) : null}
+        {features.mode === 'advanced' && props.onImportAudio ? (
+          <ReviewToolbarAudioImport
+            busy={busy}
+            onImport={(file) => {
+              props.setTrackVisibility('audio', true);
+              props.onImportAudio?.(file);
+            }}
+          />
         ) : null}
         <ReviewFragmentAction
           selection={props.selection}
@@ -111,7 +136,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         />
       </div>
       <div
-        className="ml-auto flex flex-wrap items-center gap-1 border-l
+        className="flex flex-wrap items-center gap-1 border-l
           border-[var(--sniptale-color-border-soft)] pl-2"
       >
         {props.telemetryAvailable ? (
@@ -123,7 +148,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             onClick={() => props.setTrackVisibility('actions', !advanced.ui.tracks.actions)}
           >
             <Activity size={16} aria-hidden="true" />
-            <span>{translate('gallery.videoReview.telemetry')}</span>
+            <span className="sr-only">{translate('gallery.videoReview.telemetry')}</span>
           </ReviewButton>
         ) : null}
         {features.mode === 'advanced' ? (
@@ -136,7 +161,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
               onClick={() => props.setTrackVisibility('zoom', !advanced.ui.tracks.zoom)}
             >
               <Focus size={16} aria-hidden="true" />
-              <span>{translate('gallery.videoReview.zoomTrack')}</span>
+              <span className="sr-only">{translate('gallery.videoReview.zoomTrack')}</span>
             </ReviewButton>
             <ReviewButton
               label={translate('gallery.videoReview.audioTrack')}
@@ -146,7 +171,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
               onClick={() => props.setTrackVisibility('audio', !advanced.ui.tracks.audio)}
             >
               <AudioLines size={16} aria-hidden="true" />
-              <span>{translate('gallery.videoReview.audioTrack')}</span>
+              <span className="sr-only">{translate('gallery.videoReview.audioTrack')}</span>
             </ReviewButton>
           </>
         ) : null}
@@ -178,14 +203,13 @@ export function ReviewModeControl(props: {
 }) {
   const advanced = props.advanced.ui.mode === 'advanced';
   return (
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 pb-3">
-      <h1 className="text-sm font-semibold">{translate('gallery.videoReview.editorTitle')}</h1>
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
       <ReviewButton
         label={translate('gallery.videoReview.advancedEditing')}
         title={translate('gallery.videoReview.advancedEditingHint')}
         aria-pressed={advanced}
         disabled={props.busy}
-        className="!border !border-[var(--sniptale-color-border-soft)]
+        className="w-full !border !border-[var(--sniptale-color-border-soft)]
           aria-pressed:!bg-[var(--sniptale-color-accent-soft)]
           aria-pressed:!text-[var(--sniptale-color-accent-emphasis)]"
         onClick={() => props.setMode(advanced ? 'basic' : 'advanced')}
@@ -198,6 +222,35 @@ export function ReviewModeControl(props: {
           {translate('gallery.videoReview.advancedSuppressedHint')}
         </span>
       ) : null}
-    </header>
+    </div>
+  );
+}
+
+/** File selection has its own transient input; cancellation never creates an empty track. */
+function ReviewToolbarAudioImport(props: { busy: boolean; onImport(file: File): void }) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={input}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = '';
+          if (file) props.onImport(file);
+        }}
+      />
+      <ReviewButton
+        label={translate('gallery.videoReview.audioImport')}
+        disabled={props.busy}
+        onClick={() => input.current?.click()}
+        className="!border-0 !bg-transparent !shadow-none !text-xs"
+      >
+        <AudioLines size={16} />
+        <Plus size={10} />
+      </ReviewButton>
+    </>
   );
 }
