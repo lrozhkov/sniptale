@@ -263,3 +263,14 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
   await commit(field('gallery.videoReview.focusBlurRadius'));
   expect(spotlight).toMatchObject({ effect: 'blur', blur: 8, reveal: 'contract' });
 });
+
+it('uses a precise transition slider while preserving longer typed durations', async () => {
+  const change = vi.fn();
+  renderInspector(change);
+  const phase = host.querySelector('fieldset')!;
+  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('3');
+  const duration = phase.querySelector<HTMLInputElement>('input')!;
+  await type(duration, '12');
+  await commit(duration);
+  expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 12 } });
+});

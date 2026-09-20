@@ -172,3 +172,22 @@ it('explains cut suppression without changing the authored mute flag or deleting
   renderEditor(clip);
   expect(host.querySelector('[role="status"]')).toBeNull();
 });
+
+it('keeps long fades available by typing while using a five-second slider', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'music',
+    assetId: 'long-music',
+    timelineStart: 0,
+    duration: 120,
+    endMax: 120,
+  });
+  renderEditor(clip);
+  const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
+  expect(ranges.slice(1).map((range) => range.max)).toEqual(['5', '5']);
+  const fade = host.querySelector<HTMLInputElement>(
+    '[aria-label="gallery.videoReview.audioFadeOut"]'
+  )!;
+  setValue(fade, '20');
+  act(() => fade.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(onPatch).toHaveBeenLastCalledWith({ fadeOut: 20 });
+});

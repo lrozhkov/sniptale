@@ -46,6 +46,7 @@ export interface GalleryGridMetrics {
 }
 
 export interface GalleryPreviewSessionState {
+  initialMode?: 'edit';
   inspectorCollapsed: boolean;
   item: GalleryItem | null;
   url: string | null;

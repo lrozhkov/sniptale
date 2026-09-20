@@ -10,6 +10,7 @@ interface PreviewNavigationProps {
 }
 
 export interface PreviewPanelProps {
+  initialMode?: 'edit';
   allTags?: string[];
   hasChanges?: boolean;
   item: GalleryItem;

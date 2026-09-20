@@ -115,6 +115,7 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     ru: 'Открыть в библиотеке',
     en: 'Open in library',
   },
+  postRecordQuickEdit: { ru: 'Быстрое редактирование', en: 'Quick edit' },
   postRecordOpenEditor: {
     ru: 'Открыть в видеоредакторе',
     en: 'Open in video editor',

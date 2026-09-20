@@ -94,7 +94,7 @@ it('renders post-record actions as a single column and runs one explicit decisio
 
   expect(container?.querySelector('[data-busy="false"]')?.className).toContain('grid-cols-1');
   expect(Array.from(container?.querySelectorAll('button') ?? [])[0]?.textContent).toBe(
-    'popup.video.postRecordOpenEditor'
+    'popup.video.postRecordQuickEdit'
   );
 
   await act(async () => {
@@ -186,4 +186,15 @@ it('does not delete when the destructive action is cancelled', async () => {
   });
 
   expect(deleteVideoPostRecordResultMock).not.toHaveBeenCalled();
+});
+
+it('opens the primary recording directly in quick edit and acknowledges only success', async () => {
+  const { onAcknowledge } = await renderPanel();
+  openLatestRecordingInGalleryMock.mockRejectedValueOnce(new Error('tab failed'));
+  await act(async () => clickButton('popup.video.postRecordQuickEdit'));
+  expect(onAcknowledge).not.toHaveBeenCalled();
+  expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () => clickButton('popup.video.postRecordQuickEdit'));
+  expect(openLatestRecordingInGalleryMock).toHaveBeenLastCalledWith('recording-1', true);
+  expect(onAcknowledge).toHaveBeenCalledOnce();
 });

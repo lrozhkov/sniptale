@@ -1,4 +1,4 @@
-import { Download, Film, Images, Trash2, X } from 'lucide-react';
+import { Download, Film, Clapperboard, Images, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n/popup';
@@ -151,6 +151,14 @@ function PostRecordActionGrid({
       className="grid grid-cols-1 gap-2 opacity-100 data-[busy=true]:pointer-events-none data-[busy=true]:opacity-60"
       data-busy={isBusy}
     >
+      <PostRecordActionButton
+        disabled={isBusy}
+        icon={Clapperboard}
+        label={translate('popup.video.postRecordQuickEdit')}
+        onClick={() =>
+          runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId, true))
+        }
+      />
       <PostRecordActionButton
         disabled={isBusy}
         icon={Film}

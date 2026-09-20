@@ -5,6 +5,8 @@ import {
 } from '@sniptale/ui/control-language';
 import {
   ArrowUpRight,
+  Clapperboard,
+  Film,
   Copy,
   Download,
   FileDown,
@@ -304,7 +306,7 @@ export function PreviewTagEditor(props: {
   );
 }
 
-export function PreviewActions(props: PreviewPanelProps) {
+export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
   const { item, onCopy, onDelete, onDownload, onEdit, onResetChanges } = props;
   const canEditMetadata = isMetadataEditable(item);
   const canDelete = !isGalleryScenarioExportItem(item);
@@ -317,8 +319,13 @@ export function PreviewActions(props: PreviewPanelProps) {
     isGalleryMediaItem(item) &&
     item.recordingGroupView?.projectId !== null &&
     item.recordingGroupView?.projectId !== undefined;
+  const canOpenVideo = isGalleryMediaItem(item) && item.source.kind === 'recording';
   const canOpenPrimaryAction =
-    isGalleryScenarioItem(item) || canCopy || canOpenWebSnapshot || canOpenRecordingGroup;
+    isGalleryScenarioItem(item) ||
+    canCopy ||
+    canOpenWebSnapshot ||
+    canOpenRecordingGroup ||
+    canOpenVideo;
   const hasFileActions =
     canDownload ||
     canCopy ||
@@ -335,15 +342,32 @@ export function PreviewActions(props: PreviewPanelProps) {
         {translate('gallery.preview.actions')}
       </div>
       <div className="space-y-3">
+        {props.onReview ? (
+          <button
+            type="button"
+            data-ui="gallery.videoReview.enter"
+            onClick={props.onReview}
+            className={previewPrimaryActionButtonClassName}
+          >
+            <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {translate('gallery.videoReview.enter')}
+          </button>
+        ) : null}
         {canOpenPrimaryAction ? (
           <button type="button" onClick={onEdit} className={previewPrimaryActionButtonClassName}>
-            <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {canOpenVideo ? (
+              <Film className="h-4 w-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            )}
             {translate(
-              canOpenWebSnapshot
-                ? 'gallery.preview.openSnapshot'
-                : canOpenRecordingGroup
-                  ? 'gallery.preview.openRecordingGroup'
-                  : 'gallery.preview.openInEditor'
+              canOpenVideo
+                ? 'gallery.videoReview.openVideoEditor'
+                : canOpenWebSnapshot
+                  ? 'gallery.preview.openSnapshot'
+                  : canOpenRecordingGroup
+                    ? 'gallery.preview.openRecordingGroup'
+                    : 'gallery.preview.openInEditor'
             )}
           </button>
         ) : null}

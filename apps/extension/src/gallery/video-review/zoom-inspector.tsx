@@ -53,6 +53,7 @@ function ZoomTransitionSection(props: {
         unit="s"
         min={0}
         max={60}
+        scrubMax={3}
         step={0.1}
         precision={2}
         scrubStep={0.1}

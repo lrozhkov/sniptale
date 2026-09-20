@@ -69,11 +69,13 @@ function buildVideoEditorProjectUrl(
 function buildGalleryPageUrl(options: {
   folder?: string | null;
   recordingId?: string | null;
+  quickEdit?: boolean;
   scope?: 'library' | 'temporary';
 }) {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/gallery/index.html'));
   if (options.recordingId) {
     url.searchParams.set('recordingId', options.recordingId);
+    if (options.quickEdit) url.searchParams.set('mode', 'edit');
   } else {
     if (options.folder) url.searchParams.set('folder', options.folder);
     if (options.scope) url.searchParams.set('scope', options.scope);
@@ -155,6 +157,7 @@ export async function openGalleryPage(
   options: {
     folder?: 'screenshot' | 'recording';
     recordingId?: string | null;
+    quickEdit?: boolean;
     scope?: 'library' | 'temporary';
   } = {}
 ): Promise<void> {

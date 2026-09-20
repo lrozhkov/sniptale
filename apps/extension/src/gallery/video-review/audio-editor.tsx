@@ -51,6 +51,7 @@ export function ReviewAudioClipEditor(props: {
           unit="s"
           min={0}
           max={Math.min(60, props.clip.duration)}
+          scrubMax={Math.min(5, props.clip.duration)}
           step={0.1}
           precision={2}
           value={props.clip[key]}
