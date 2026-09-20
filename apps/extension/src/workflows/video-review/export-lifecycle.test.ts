@@ -172,6 +172,7 @@ it('mixes applied external audio and original settings into an audio-only export
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
   advanced.audio.music = [
     {
       id: 'm',
@@ -217,6 +218,7 @@ it('blocks the export when an applied clip asset is missing or undecodable', asy
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
   advanced.audio.music = [
     {
       id: 'm',
@@ -254,6 +256,7 @@ it('routes visual changes to the full frame renderer and stages the encoded resu
   const { args, deps, writer } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
   advanced.zoom.enabled = true;
   args.index = {
     ...args.index,
@@ -279,6 +282,7 @@ it('blocks visual changes without a video encoder and never stages bytes', async
   const { args, deps } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
   advanced.zoom.enabled = true;
   await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
     name: 'QuickEditExportUnavailable',
@@ -291,6 +295,7 @@ it('keeps stored in-frame comments out of rendered exports while the feature is 
   const { args, deps, writer } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
   advanced.zoom.enabled = true;
   args.index = {
     ...args.index,
@@ -351,6 +356,7 @@ it('shifts fragment clip placements across a leading cut to global output time',
   });
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
   advanced.audio.music = [
     {
       id: 'm',
@@ -498,4 +504,31 @@ it('plans exact advanced fragment cuts before selecting the frame renderer', asy
   );
   expect(args.snapshot).toEqual(before);
   expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+});
+
+it('does not load hidden audio assets or render hidden focus during export', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks = { actions: true, zoom: false, audio: false };
+  advanced.zoom.enabled = true;
+  advanced.audio.music = [
+    {
+      id: 'hidden',
+      assetId: 'missing',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  deps.readProjectAsset.mockResolvedValue(null);
+  await exportReviewedVideo(args, deps);
+  expect(deps.writeReviewPackets).toHaveBeenCalledOnce();
+  expect(deps.writeReviewFrames).not.toHaveBeenCalled();
+  expect(deps.readProjectAsset).not.toHaveBeenCalled();
+  expect(advanced.audio.music).toHaveLength(1);
 });

@@ -141,3 +141,29 @@ it('opens the image picker and forwards only a selected file', async () => {
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   expect(onImportImage).toHaveBeenCalledWith(file);
 });
+
+it('uses precise layout sliders without limiting typed high-resolution values', async () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ enabled: true, type: 'solid', color: '#000000ff', layout }}
+        onChange={change}
+      />
+    )
+  );
+  const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
+  expect(ranges.map((input) => [input.max, input.step])).toEqual([
+    ['200', '1'],
+    ['100', '1'],
+  ]);
+  const padding = host.querySelector<HTMLInputElement>(
+    'input[type="text"][aria-label="gallery.videoReview.backgroundPadding"]'
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(padding, '512');
+    padding.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => padding.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(change).toHaveBeenLastCalledWith({ layout: { padding: 512, cornerRadius: 12 } });
+});

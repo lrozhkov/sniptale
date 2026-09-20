@@ -5,13 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadReviewWaveform, type ReviewWaveform } from '../../workflows/video-review/waveform';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
-import type { QuickEditAudioState } from '../../features/video/review/advanced/types';
+import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 
 /** A disposable waveform cache; stale reads cannot update a replaced editor. */
 export function useReviewWaveforms(
   source: Blob,
   duration: number,
-  audio: QuickEditAudioState,
+  audio: { voiceover: readonly QuickEditAudioClip[]; music: readonly QuickEditAudioClip[] },
   enabled: boolean,
   hasOriginalAudio = true
 ) {

@@ -1,3 +1,4 @@
+import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   QuickEditAdvancedContent,
@@ -18,13 +19,16 @@ type PendingContent = {
 
 async function commitPendingContent(session: Session, sent: PendingContent): Promise<void> {
   const document = session.getSnapshot().document;
-  if (JSON.stringify(sent.value) === JSON.stringify(document.advancedContent)) return;
+  const value = loadQuickEditAdvancedContentState(sent.value);
+  if (!value) throw new Error('Advanced content is invalid.');
+  // Compare the same canonical shape the history boundary will persist.
+  if (JSON.stringify(value) === JSON.stringify(document.advancedContent)) return;
   await session.commit({
     id: crypto.randomUUID(),
     at: Date.now(),
     target: 'advancedContent',
     before: document.advancedContent,
-    after: sent.value,
+    after: value,
   });
 }
 

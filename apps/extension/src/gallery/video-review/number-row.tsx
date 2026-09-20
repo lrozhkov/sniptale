@@ -28,6 +28,7 @@ export function ReviewNumberRow(props: {
   step: number;
   precision?: number;
   scrubStep?: number;
+  scrubMax?: number;
   disabled?: boolean;
   onChange(value: number): void;
 }) {
@@ -44,7 +45,11 @@ export function ReviewNumberRow(props: {
       unit={props.unit}
       value={props.value}
       disabled={props.disabled}
-      scrub={{ min: props.min, max: props.max, step: props.scrubStep ?? props.step }}
+      scrub={{
+        min: props.min,
+        max: props.scrubMax ?? props.max,
+        step: props.scrubStep ?? props.step,
+      }}
       onPreviewValue={apply}
       onCommitValue={apply}
     />

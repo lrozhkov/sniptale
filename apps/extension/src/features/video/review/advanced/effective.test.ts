@@ -85,12 +85,12 @@ it('returns the applied configuration for stage, mixer, and exporter (R04)', () 
   expect(basic.voiceover).toEqual([]);
   expect(basic.music).toEqual([]);
 
-  // Track visibility alone never changes the applied configuration.
+  // Hidden effect lanes are suppressed without changing the stored content.
   const hidden = resolveQuickEditEffectiveState({
     ...stored,
     ui: { ...stored.ui, tracks: { actions: true, zoom: false, audio: false } },
   });
-  expect(hidden.zoomRegions).toEqual(stored.zoom.regions);
+  expect(hidden.zoomRegions).toEqual([]);
   expect(hidden.background).toEqual(stored.background);
 
   // Dormant placements stay stored but never apply.
@@ -323,4 +323,47 @@ it('renders exact cuts between keyframes even after returning to basic mode', ()
       })
     ).toMatchObject({ video: 'copy' });
   }
+});
+
+it('suppresses disabled focus and added audio in preview/export while retaining original audio', () => {
+  const state = advancedWithContent();
+  state.zoom.regions = [regionStub()];
+  state.background = { enabled: false };
+  state.audio.voiceover = [voiceClipStub()];
+  state.audio.music = [musicStub()];
+  state.audio.original = { muted: true, volume: 0.4 };
+  const content = structuredClone({ zoom: state.zoom, audio: state.audio });
+  state.ui.tracks.zoom = false;
+  state.ui.tracks.audio = false;
+  const applied = resolveQuickEditEffectiveState(state);
+  expect(applied).toMatchObject({
+    zoomApplied: false,
+    voiceoverApplied: false,
+    musicApplied: false,
+    zoomRegions: [],
+    voiceover: [],
+    music: [],
+    originalAudio: state.audio.original,
+  });
+  expect(
+    resolveQuickEditExportPlan({ advanced: state, document: { edits: [], canvasComments: [] } })
+  ).toEqual({ kind: 'ready', video: 'copy', audio: 'process', reasons: ['original-audio'] });
+  state.audio.original = { muted: false, volume: 1 };
+  expect(
+    resolveQuickEditExportPlan({
+      advanced: state,
+      document: { edits: [], canvasComments: [] },
+      audioProcessingAvailable: false,
+      videoRenderAvailable: false,
+    })
+  ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+  state.audio.original = content.audio.original;
+  state.ui.tracks.zoom = true;
+  state.ui.tracks.audio = true;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    zoomRegions: content.zoom.regions,
+    voiceover: content.audio.voiceover,
+    music: content.audio.music,
+  });
+  expect({ zoom: state.zoom, audio: state.audio }).toEqual(content);
 });

@@ -5,10 +5,14 @@ import {
 } from '../../features/video/review/advanced/effective';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { reviewIconButtonClassName, ReviewButton } from './controls';
+import {
+  reviewTrackStatusButtonClassName,
+  reviewIconButtonClassName,
+  ReviewButton,
+} from './controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
-import { Activity, AudioLines, Focus, SlidersHorizontal } from 'lucide-react';
+import { Activity, AudioLines, Focus, PanelsTopLeft } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
 const plain = reviewIconButtonClassName;
@@ -33,9 +37,7 @@ type ToolbarProps = {
   selection: ReviewAnchor;
   edits: readonly ReviewEdit[];
   advanced: QuickEditAdvancedState;
-  setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
   setMode(mode: 'basic' | 'advanced'): void;
-  telemetryAvailable: boolean;
   onDownloadFragment(): void;
 };
 
@@ -43,7 +45,6 @@ type ToolbarProps = {
 export function ReviewTimelineToolbar(props: ToolbarProps) {
   const busy = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
   const advanced = props.advanced;
-  const features = resolveQuickEditEffectiveFeatures(advanced);
   return (
     <>
       <div
@@ -51,36 +52,6 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         data-ui="gallery.videoReview.workspaceTools"
       >
         <ReviewModeControl advanced={advanced} busy={busy} setMode={props.setMode} />
-        {props.telemetryAvailable ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.telemetry')}
-            aria-pressed={features.actionsTrackVisible}
-            className={plain}
-            onClick={() => props.setTrackVisibility('actions', !advanced.ui.tracks.actions)}
-          >
-            <Activity size={16} aria-hidden="true" />
-          </ReviewButton>
-        ) : null}
-        {features.mode === 'advanced' ? (
-          <>
-            <ReviewButton
-              label={translate('gallery.videoReview.zoomTrack')}
-              aria-pressed={features.zoomTrackVisible}
-              className={plain}
-              onClick={() => props.setTrackVisibility('zoom', !advanced.ui.tracks.zoom)}
-            >
-              <Focus size={16} aria-hidden="true" />
-            </ReviewButton>
-            <ReviewButton
-              label={translate('gallery.videoReview.audioTrack')}
-              aria-pressed={features.audioTrackVisible}
-              className={plain}
-              onClick={() => props.setTrackVisibility('audio', !advanced.ui.tracks.audio)}
-            >
-              <AudioLines size={16} aria-hidden="true" />
-            </ReviewButton>
-          </>
-        ) : null}
       </div>
       <div
         className="flex min-w-max flex-1 flex-nowrap items-center justify-center gap-0.5 px-2"
@@ -129,10 +100,62 @@ function ReviewModeControl(props: {
       )}
       aria-pressed={advanced}
       disabled={props.busy}
-      className={plain}
+      className={`${plain} !w-auto gap-2`}
       onClick={() => props.setMode(advanced ? 'basic' : 'advanced')}
     >
-      <SlidersHorizontal size={16} aria-hidden="true" />
+      <PanelsTopLeft size={16} className="shrink-0" aria-hidden="true" />
+      <span className="hidden @[1100px]:inline text-xs">
+        {translate('gallery.videoReview.advancedEditing')}
+      </span>
     </ReviewButton>
+  );
+}
+
+/** Compact lane switches live in the sticky gutter beside the time ruler. */
+export function ReviewTrackControls(props: {
+  advanced: QuickEditAdvancedState;
+  telemetryAvailable: boolean;
+  busy: boolean;
+  setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
+}) {
+  const advanced = props.advanced;
+  const features = resolveQuickEditEffectiveFeatures(advanced);
+  return (
+    <fieldset
+      disabled={props.busy}
+      data-ui="gallery.videoReview.trackControls"
+      className="flex items-center gap-1"
+    >
+      {props.telemetryAvailable ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.telemetry')}
+          aria-pressed={features.actionsTrackVisible}
+          className={`${reviewTrackStatusButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+          onClick={() => props.setTrackVisibility('actions', !advanced.ui.tracks.actions)}
+        >
+          <Activity size={14} aria-hidden="true" />
+        </ReviewButton>
+      ) : null}
+      {features.mode === 'advanced' ? (
+        <>
+          <ReviewButton
+            label={translate('gallery.videoReview.zoomTrack')}
+            aria-pressed={features.zoomTrackVisible}
+            className={`${reviewTrackStatusButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+            onClick={() => props.setTrackVisibility('zoom', !advanced.ui.tracks.zoom)}
+          >
+            <Focus size={14} aria-hidden="true" />
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.audioTrack')}
+            aria-pressed={features.audioTrackVisible}
+            className={`${reviewTrackStatusButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+            onClick={() => props.setTrackVisibility('audio', !advanced.ui.tracks.audio)}
+          >
+            <AudioLines size={14} aria-hidden="true" />
+          </ReviewButton>
+        </>
+      ) : null}
+    </fieldset>
   );
 }

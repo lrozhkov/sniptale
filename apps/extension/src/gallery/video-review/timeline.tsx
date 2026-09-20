@@ -21,6 +21,7 @@ type TimelineProps = {
   edits?: readonly ReviewEdit[];
   historyControls?: ReactNode;
   tools?: ReactNode;
+  trackControls?: ReactNode;
   expandedTools?: boolean;
   zoomTrack?: ReactNode;
   audioTrack?: ReactNode;
@@ -112,7 +113,7 @@ export function ReviewTimeline(props: TimelineProps) {
           onPointerUp={plane.onPointerUp}
           onPointerCancel={plane.onPointerCancel}
         >
-          <ReviewTrackRow label="">
+          <ReviewTrackRow label="" icon={props.trackControls}>
             <ReviewRuler duration={props.duration} width={Math.max(1, width * zoom)} />
           </ReviewTrackRow>
           <div inert={props.busy}>

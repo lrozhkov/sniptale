@@ -209,11 +209,9 @@ function handlePreviewKeyDown(
 }
 
 export function PreviewPanel(props: PreviewPanelProps) {
-  const { item, previewUrl } = props;
+  const { item, previewUrl, navigation, onClose } = props;
   const [review, setReview] = useState(false);
   const opener = useRef<HTMLElement | null>(null);
-  const navigation = props.navigation;
-  const onClose = props.onClose;
 
   useEffect(() => {
     if (review) return;
@@ -228,6 +226,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
     return (
       <VideoReview
         aggregateId={item.id}
+        onClose={onClose}
         onBack={() => {
           setReview(false);
           requestAnimationFrame(() => {
@@ -265,7 +264,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
             inspectorCollapsed={props.inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
             onInspectorToggle={props.onInspectorToggle}
-            onClose={props.onClose}
+            onClose={onClose}
           />
           {props.inspectorCollapsed ? null : (
             <PreviewPanelSidebar

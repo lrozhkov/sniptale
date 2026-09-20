@@ -149,15 +149,6 @@ export function useReviewExport(resource: LoadedReview) {
     plan,
     renderSettings,
     setRenderSettings,
-    /** Ready-plan reasons worth an applied-changes hint; null while nothing is applied. */
-    reencode: (): readonly QuickEditExportReason[] | null => {
-      const current = plan();
-      return current.kind === 'ready' &&
-        (current.video === 'render' || current.audio === 'process') &&
-        current.reasons.length
-        ? current.reasons
-        : null;
-    },
     start,
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
       start('download', selection),

@@ -311,7 +311,6 @@ function ReviewInspectorActions({
           snapshot.document.edits.some((edit) => edit.kind === 'speed')
         }
         advancedBlockers={editing.exporter.blocked}
-        reencodeReasons={editing.exporter.reencode()}
         onExport={onExport}
         onCancel={editing.exporter.cancel}
         onDownload={editing.exporter.download}
@@ -333,6 +332,7 @@ function ReviewInspectorBinding({
   canvasComments,
   audio,
   onBack,
+  onClose,
   fullHeight,
   onToggleHeight,
 }: {
@@ -343,8 +343,19 @@ function ReviewInspectorBinding({
   canvasComments: ReturnType<typeof useCanvasComments>;
   audio: ReturnType<typeof useReviewAudio>;
   onBack(): void;
+  onClose(): void;
 }) {
   const { editing, session, snapshot, composer, video, busy, run } = state;
+  const leave = (done: () => void) => {
+    video.current?.pause();
+    void run(async () => {
+      await composer.flush();
+      await state.flushAdvanced();
+      await canvasComments.flushTexts();
+      await session.flush();
+      done();
+    });
+  };
   return (
     <ReviewInspector
       fullHeight={fullHeight}
@@ -401,16 +412,8 @@ function ReviewInspectorBinding({
       onRetry={() => void run(state.retryAdvanced)}
       recovery={<ReviewConflictRecovery state={state} />}
       message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
-      onBack={() => {
-        video.current?.pause();
-        void run(async () => {
-          await composer.flush();
-          await state.flushAdvanced();
-          await canvasComments.flushTexts();
-          await session.flush();
-          onBack();
-        });
-      }}
+      onBack={() => leave(onBack)}
+      onClose={() => leave(onClose)}
       rangeSelected={state.selection.kind === 'range'}
       onAdd={state.add}
       onSelect={state.selectComment}
@@ -524,7 +527,15 @@ function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
   return { onImportAudioFile, voiceover };
 }
 
-function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
+function ReviewEditor({
+  resource,
+  onBack,
+  onClose,
+}: {
+  resource: LoadedReview;
+  onBack(): void;
+  onClose(): void;
+}) {
   const state = useReviewEditorState(resource);
   const [fullHeight, setFullHeight] = useState(false);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
@@ -533,8 +544,8 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
   const waveforms = useReviewWaveforms(
     resource.file,
     state.source.duration,
-    advanced.audio,
-    features.audioTrackVisible,
+    { voiceover: features.voiceover, music: features.music },
+    features.mode === 'advanced',
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
   const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
@@ -595,6 +606,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
         canvasComments={canvasComments}
         audio={audio}
         onBack={onBack}
+        onClose={onClose}
       />
       <div
         className={
@@ -638,7 +650,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           audio={audio}
           audioState={advanced.audio}
           waveforms={waveforms}
-          audioVisible={features.audioTrackVisible}
           onImportAudioFile={onImportAudioFile}
           onRecordVoiceover={voiceover.open}
           onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
@@ -665,14 +676,22 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
   );
 }
 
-/** Native modal owns focus/inert; Escape cancels drawing, Back alone exits after recovery flush. */
-export function VideoReview({ aggregateId, onBack }: { aggregateId: string; onBack(): void }) {
+/** Native modal owns focus/inert; Escape cancels drawing, header navigation exits after recovery flush. */
+export function VideoReview({
+  aggregateId,
+  onBack,
+  onClose = onBack,
+}: {
+  aggregateId: string;
+  onBack(): void;
+  onClose?(): void;
+}) {
   useAppLocale();
   const { resource, failed, retry } = useLoadedReview(aggregateId);
   return (
     <ReviewDialog>
       {resource ? (
-        <ReviewEditor resource={resource} onBack={onBack} />
+        <ReviewEditor resource={resource} onBack={onBack} onClose={onClose} />
       ) : (
         <div className="space-y-4 p-4">
           <ReviewButton label={translate('gallery.videoReview.back')} onClick={onBack} />

@@ -1,3 +1,5 @@
+import { SelectField } from '../../ui/compact-inspector-controls';
+import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useMemo, useState, useId, type ReactNode } from 'react';
 import { createReviewFragment } from '../../features/video/review/fragment';
@@ -153,7 +155,6 @@ export function ReviewEditActions(props: {
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
   /** Ready-plan reasons worth an applied-changes line; null while nothing is applied. */
-  reencodeReasons?: readonly QuickEditExportReason[] | null;
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
@@ -224,12 +225,6 @@ export function ReviewEditActions(props: {
       {props.audioUnavailable ? (
         <p role="status" className="text-xs">
           {translate('gallery.videoReview.speedAudioUnavailable')}
-        </p>
-      ) : null}
-      {!blocked && props.reencodeReasons?.length ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.exportApplied')}{' '}
-          {props.reencodeReasons.map((reason) => translate(REASON_LABEL[reason])).join(' · ')}
         </p>
       ) : null}
       {blocked ? (
@@ -303,53 +298,47 @@ export function ReviewRenderOptions({
     (exporter.index?.processedVideoCodec ? [exporter.index.processedVideoCodec] : []);
   return (
     <div className="pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
-      <fieldset disabled={busy} className="grid grid-cols-2 gap-2 pb-2">
-        <div className="space-y-1">
-          <span>{translate('gallery.videoReview.exportCodec')}</span>
-          <ProductSelect
-            controlSize="sm"
-            aria-label={translate('gallery.videoReview.exportCodec')}
-            disabled={busy}
-            value={settings.codec ?? exporter.index?.processedVideoCodec ?? ''}
-            options={codecs.map((codec) => ({
-              value: codec,
-              label: codec === 'avc' ? 'H.264' : codec.toUpperCase(),
-            }))}
-            onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
-          />
-        </div>
-        <div className="space-y-1">
-          <span>{translate('gallery.videoReview.exportFrameRate')}</span>
-          <ProductSelect
-            controlSize="sm"
-            aria-label={translate('gallery.videoReview.exportFrameRate')}
-            disabled={busy}
-            value={String(settings.frameRate)}
-            options={[
-              { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
-              ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
-            ]}
-            onChange={(value) => {
-              const frameRate = Number(value);
-              if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
-                exporter.setRenderSettings({ ...settings, frameRate });
-            }}
-          />
-        </div>
-        <div className="col-span-2 space-y-1">
-          <span>{translate('gallery.videoReview.exportQuality')}</span>
-          <ProductSelect<'standard' | 'high'>
-            controlSize="sm"
-            aria-label={translate('gallery.videoReview.exportQuality')}
-            disabled={busy}
-            value={settings.quality}
-            options={[
-              { value: 'standard', label: translate('gallery.videoReview.exportStandardQuality') },
-              { value: 'high', label: translate('gallery.videoReview.exportHighQuality') },
-            ]}
-            onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
-          />
-        </div>
+      <fieldset
+        disabled={busy}
+        className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3 pb-2"
+      >
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.exportCodec')}
+          disabled={busy}
+          value={settings.codec ?? exporter.index?.processedVideoCodec ?? ''}
+          options={codecs.map((codec) => ({
+            value: codec,
+            label: codec === 'avc' ? 'H.264' : codec.toUpperCase(),
+          }))}
+          onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.exportFrameRate')}
+          disabled={busy}
+          value={String(settings.frameRate)}
+          options={[
+            { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
+            ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
+          ]}
+          onChange={(value) => {
+            const frameRate = Number(value);
+            if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
+              exporter.setRenderSettings({ ...settings, frameRate });
+          }}
+        />
+        <SelectField<'standard' | 'high'>
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.exportQuality')}
+          disabled={busy}
+          value={settings.quality}
+          options={[
+            { value: 'standard', label: translate('gallery.videoReview.exportStandardQuality') },
+            { value: 'high', label: translate('gallery.videoReview.exportHighQuality') },
+          ]}
+          onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
+        />
       </fieldset>
     </div>
   );

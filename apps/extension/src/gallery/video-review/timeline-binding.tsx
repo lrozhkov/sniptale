@@ -2,7 +2,7 @@ import { useMemo, type ReactNode } from 'react';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
-import { ReviewTimelineToolbar } from './review-toolbar';
+import { ReviewTimelineToolbar, ReviewTrackControls } from './review-toolbar';
 import { ReviewZoomTrack } from './zoom-track';
 import { ReviewAudioTrack } from './audio-track';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
@@ -58,6 +58,7 @@ function ReviewZoomLane(props: {
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
   hasOriginalAudio: boolean;
+  showAddedAudio: boolean;
   snapTimes: readonly number[];
   audioState: QuickEditAudioState;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
@@ -71,6 +72,7 @@ function ReviewAudioLane(props: {
   return (
     <ReviewAudioTrack
       hasOriginalAudio={props.hasOriginalAudio}
+      showAddedAudio={props.showAddedAudio}
       projection={props.projection}
       waveforms={props.waveforms}
       assets={props.audio.assets}
@@ -119,7 +121,6 @@ type TimelineBindingProps = {
   audio: ReturnType<typeof useReviewAudio>;
   audioState: QuickEditAudioState;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
-  audioVisible: boolean;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
   onMarker(marker: ReviewTelemetryMarker): void;
@@ -130,7 +131,7 @@ type TimelineBindingProps = {
 };
 
 /** Toolbar lock covers every content and presentation control during blocked phases. */
-function ReviewTimelineToolsBinding(props: TimelineBindingProps & { onAddZoom(): void }) {
+function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
   return (
     <fieldset
       disabled={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -154,9 +155,7 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps & { onAddZoom():
         selection={props.selection}
         edits={props.edits}
         advanced={props.advanced}
-        setTrackVisibility={props.setTrackVisibility}
         setMode={props.setMode}
-        telemetryAvailable={props.telemetryAvailable}
         onDownloadFragment={() =>
           props.selection.kind === 'range'
             ? props.editing.exporter.downloadSelection(props.selection)
@@ -185,7 +184,16 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
       duration={props.source.duration}
-      tools={<ReviewTimelineToolsBinding {...props} onAddZoom={onZoomAdd} />}
+      tools={<ReviewTimelineToolsBinding {...props} />}
+      trackControls={
+        <ReviewTrackControls
+          advanced={props.advanced}
+          telemetryAvailable={props.telemetryAvailable}
+          setTrackVisibility={props.setTrackVisibility}
+          busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
+        />
+      }
+
       {...(features.zoomTrackVisible
         ? {
             zoomTrack: (
@@ -206,10 +214,14 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
         ? { boundaries: props.editing.exporter.index.boundaries }
         : {})}
-      {...(props.audioVisible
+      {...(features.mode === 'advanced' &&
+      (features.audioTrackVisible ||
+        props.editing.exporter.index === null ||
+        !!props.editing.exporter.index.audioCodec)
         ? {
             audioTrack: (
               <ReviewAudioLane
+                showAddedAudio={features.audioTrackVisible}
                 hasOriginalAudio={
                   props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
                 }

@@ -675,6 +675,19 @@ for (const variant of [
       await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
       await page.screenshot({ path: testInfo.outputPath('basic.png') });
       await button('gallery.videoReview.advancedEditing').click();
+      const laneControls = dialog.locator('[data-ui="gallery.videoReview.trackControls"]');
+      await expect(laneControls).toBeInViewport();
+      await expect(laneControls.getByRole('button')).toHaveCount(3);
+      expect(
+        await button('gallery.videoReview.zoomTrack').evaluate(
+          (node) => !!node.closest('[data-ui="gallery.videoReview.trackHeader"]')
+        )
+      ).toBe(true);
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.workspaceTools"] button')
+      ).toHaveCount(1);
+      await expect(button('gallery.videoReview.advancedEditing').locator('span')).toBeVisible();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(1);
       await button('gallery.videoReview.zoomTrack').click();
       await button('gallery.videoReview.audioTrack').click();
       await button('gallery.videoReview.zoomAdd').first().click();
@@ -711,6 +724,55 @@ for (const variant of [
       await dialog
         .getByRole('textbox', { name: label('gallery.videoReview.backgroundPadding'), exact: true })
         .press('Tab');
+      const mode = button('gallery.videoReview.advancedEditing');
+      await page.mouse.move(0, 0);
+      await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(mode).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await mode.hover();
+      await expect(mode).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await page.mouse.move(0, 0);
+      await expect(mode).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+      const heading = inspector.locator('header h2');
+      const backBox = await button('gallery.videoReview.back').boundingBox();
+      const titleBox = await heading.boundingBox();
+      const closeBox = await button('common.actions.close').boundingBox();
+      expect(
+        Math.abs(backBox!.y + backBox!.height / 2 - titleBox!.y - titleBox!.height / 2)
+      ).toBeLessThan(2);
+      expect(closeBox!.x).toBeGreaterThan(titleBox!.x + titleBox!.width);
+      const format = button('videoEditor.sidebar.canvasFormatLabel');
+      const formatRow = format.locator('xpath=../..');
+      expect((await formatRow.boundingBox())!.height).toBeLessThan(40);
+      const padding = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await expect(padding).toHaveCSS('font-size', '12px');
+      await expect(format).toHaveCSS('font-size', '12px');
+      await expect(formatRow.locator(':scope > span')).toHaveCSS('font-size', '12px');
+      const mute = button('gallery.videoReview.audioEnabled').first();
+      const enabledColor = await mute.evaluate((node) => getComputedStyle(node).color);
+      await mute.click();
+      await expect(mute).toHaveAttribute('aria-pressed', 'false');
+      await expect
+        .poll(() => mute.evaluate((node) => getComputedStyle(node).color))
+        .not.toBe(enabledColor);
+      await mute.click();
+      await expect(mute).toHaveAttribute('aria-pressed', 'true');
+      await page.mouse.move(0, 0);
+      await expect(mute).toHaveCSS('color', enabledColor);
+      await inspector
+        .locator('[data-ui="gallery.videoReview.canvasSettings"]')
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath('scene-inspector.png') });
+      await button('gallery.videoReview.audioTrack').click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(1);
+      await expect(dialog.locator('[data-audio-lane="music"]')).toHaveCount(0);
+      await button('gallery.videoReview.audioTrack').click();
+      await expect(dialog.locator('[data-audio-lane="music"]')).toBeVisible();
+
       const headers = dialog.locator('[data-ui="gallery.videoReview.trackHeader"]');
       const originalWave = dialog
         .locator('[data-ui="gallery.videoReview.audioLane"]')
@@ -811,6 +873,10 @@ for (const variant of [
       await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] img')).toHaveCount(1);
       await button('gallery.videoReview.exportVideo').click();
       await expect.poll(() => recordingCount(page)).toBe(2);
+      await expect(button('common.actions.close')).toBeEnabled();
+      await button('common.actions.close').click();
+      await expect(page.locator('[data-ui="gallery.videoReview.dialog"]')).toHaveCount(0);
+      await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toHaveCount(0);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

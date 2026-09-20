@@ -10,7 +10,7 @@ import type {
 
 interface QuickEditEffectiveFeatures {
   mode: 'basic' | 'advanced';
-  /** Track visibility is layout-only and never turns an effect off. */
+  /** Track toggles control both visibility and application; original audio is independent. */
   actionsTrackVisible: boolean;
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
@@ -38,17 +38,17 @@ export function resolveQuickEditEffectiveFeatures(
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
     overlaysVisible: false,
-    zoomApplied: advanced && state.zoom.enabled,
+    zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
     originalAudioApplied: advanced,
-    voiceoverApplied: advanced,
-    musicApplied: advanced,
+    voiceoverApplied: advanced && state.ui.tracks.audio,
+    musicApplied: advanced && state.ui.tracks.audio,
   };
 }
 
 /**
  * Applied configuration for stage, mixer, and exporter: every render/audio branch
- * consumes this instead of the stored state or lane visibility.
+ * consumes this instead of interpreting stored settings independently.
  */
 interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   zoomRegions: readonly QuickEditZoomRegion[];
@@ -64,21 +64,22 @@ export function resolveQuickEditEffectiveState(
   state: QuickEditAdvancedState
 ): QuickEditEffectiveState {
   const advanced = state.ui.mode === 'advanced';
+  const features = resolveQuickEditEffectiveFeatures(state);
   return {
-    ...resolveQuickEditEffectiveFeatures(state),
-    zoomRegions: (advanced && state.zoom.enabled ? state.zoom.regions : []).filter(
+    ...features,
+    zoomRegions: (features.zoomApplied ? state.zoom.regions : []).filter(
       (region) => !region.dormant
     ),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     originalAudio: advanced ? state.audio.original : { muted: false, volume: 1 },
-    voiceover: (advanced ? state.audio.voiceover : [])
+    voiceover: (features.voiceoverApplied ? state.audio.voiceover : [])
       .filter((clip) => !clip.dormant)
       .map((clip) => ({
         ...clip,
         volume: clip.volume * (state.audio.laneVolumes?.voiceover ?? 1),
       })),
-    music: (advanced ? state.audio.music : [])
+    music: (features.musicApplied ? state.audio.music : [])
       .filter((clip) => !clip.dormant)
       .map((clip) => ({ ...clip, volume: clip.volume * (state.audio.laneVolumes?.music ?? 1) })),
   };
@@ -107,10 +108,8 @@ export type QuickEditExportPlan =
     };
 
 /**
- * Export decision from the applied configuration, not lane visibility or dormant
- * settings. Pixel-changing effects and burned overlays route to the full frame
- * renderer; audio-only changes are processable when the capability hint allows
- * audio encoding.
+ * Export decisions follow effective track enablement and stored content. Visual
+ * changes route to the frame renderer; audio-only changes require audio encoding.
  */
 export function resolveQuickEditExportPlan(args: {
   document: Pick<ReviewDocument, 'edits' | 'canvasComments'>;
@@ -135,14 +134,16 @@ export function resolveQuickEditExportPlan(args: {
         : { kind: 'ready', video: 'render', audio: 'copy', reasons: ['precise-edits'] };
     return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
   }
+  const features = resolveQuickEditEffectiveFeatures(args.advanced);
   const audio: QuickEditExportReason[] = [];
-  if (args.advanced.audio.voiceover.length > 0) audio.push('voiceover');
-  if (args.advanced.audio.music.length > 0) audio.push('music');
+  if (features.voiceoverApplied && args.advanced.audio.voiceover.length > 0)
+    audio.push('voiceover');
+  if (features.musicApplied && args.advanced.audio.music.length > 0) audio.push('music');
   if (args.advanced.audio.original.muted || args.advanced.audio.original.volume !== 1)
     audio.push('original-audio');
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (args.advanced.canvas) visual.push('canvas');
-  if (args.advanced.zoom.enabled) visual.push('zoom');
+  if (features.zoomApplied) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
   if (visual.length) {
     if (args.videoRenderAvailable === false)

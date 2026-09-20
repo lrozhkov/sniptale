@@ -19,7 +19,11 @@ import {
   moveQuickEditAudioClip,
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
-import { reviewIconButtonClassName, ReviewButton } from './controls';
+import {
+  reviewTrackStatusButtonClassName,
+  reviewIconButtonClassName,
+  ReviewButton,
+} from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewAudioWaveform } from './audio-waveform';
@@ -332,6 +336,7 @@ function ReviewAudioClipBlock(props: {
 export function ReviewAudioTrack(props: {
   audio: QuickEditAudioState;
   hasOriginalAudio?: boolean;
+  showAddedAudio?: boolean;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
@@ -377,24 +382,26 @@ export function ReviewAudioTrack(props: {
           onOriginal={props.onOriginal}
         />
       ) : null}
-      <ReviewClipLanes
-        audio={props.audio}
-        assets={props.assets}
-        waveforms={props.waveforms}
-        onMuteLane={props.onMuteLane}
-        projection={props.projection}
-        snapTimes={props.snapTimes}
-        duration={props.duration}
-        selectedId={props.selectedId}
-        busy={props.busy}
-        onSelect={props.onSelect}
-        onMoveClip={props.onMoveClip}
-        onTrimClip={props.onTrimClip}
-        onImportFile={props.onImportFile}
-        onRecordVoiceover={props.onRecordVoiceover}
-        pickerLane={picker}
-        pickerInput={input}
-      />
+      {props.showAddedAudio !== false ? (
+        <ReviewClipLanes
+          audio={props.audio}
+          assets={props.assets}
+          waveforms={props.waveforms}
+          onMuteLane={props.onMuteLane}
+          projection={props.projection}
+          snapTimes={props.snapTimes}
+          duration={props.duration}
+          selectedId={props.selectedId}
+          busy={props.busy}
+          onSelect={props.onSelect}
+          onMoveClip={props.onMoveClip}
+          onTrimClip={props.onTrimClip}
+          onImportFile={props.onImportFile}
+          onRecordVoiceover={props.onRecordVoiceover}
+          pickerLane={picker}
+          pickerInput={input}
+        />
+      ) : null}
     </div>
   );
 }
@@ -414,7 +421,7 @@ function ReviewOriginalLane(props: {
           label={translate('gallery.videoReview.audioEnabled')}
           aria-pressed={!props.original.muted}
           disabled={props.busy}
-          className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
           onClick={() => props.onOriginal({ muted: !props.original.muted })}
         >
           {props.original.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
@@ -512,7 +519,7 @@ function ReviewClipLanes(props: {
                     props.audio[lane.key].some((clip) => !clip.muted)
                   }
                   disabled={props.busy || !props.audio[lane.key].length}
-                  className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+                  className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
                   onClick={() => props.onMuteLane?.(lane.key)}
                 >
                   {props.audio[lane.key].length > 0 &&

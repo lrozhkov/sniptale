@@ -1,3 +1,4 @@
+import { reviewSelectFieldClassName } from './controls';
 import { translate } from '../../platform/i18n';
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { ReviewNumberRow } from './number-row';
@@ -19,6 +20,7 @@ export function ReviewSpotlightInspector(props: {
   return (
     <div className="space-y-3">
       <SelectField
+        className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.focusOutside')}
         value={value.effect}
         options={[
@@ -51,6 +53,7 @@ export function ReviewSpotlightInspector(props: {
         />
       )}
       <SelectField
+        className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.focusReveal')}
         value={value.reveal}
         options={[

@@ -1,6 +1,7 @@
-import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
-import { NumericRow } from '../../ui/compact-inspector-controls';
+import { SelectField } from '../../ui/compact-inspector-controls';
+import { ReviewNumberRow } from './number-row';
+import { reviewSelectFieldClassName } from './controls';
 import { quickEditCanvasPreset } from '../../features/video/review/advanced/canvas';
 import type {
   QuickEditAudioState,
@@ -36,49 +37,39 @@ export function ReviewCanvasSettings(props: {
   return (
     <section className="space-y-3" data-ui="gallery.videoReview.canvasSettings">
       <h4 className="text-sm font-semibold">{translate('gallery.videoReview.canvas')}</h4>
-      <div className="space-y-1">
-        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('videoEditor.sidebar.canvasFormatLabel')}
-        </p>
-        <ProductSelect
-          aria-label={translate('videoEditor.sidebar.canvasFormatLabel')}
-          controlSize="sm"
-          value={!props.canvas ? 'source' : (format?.id ?? 'custom')}
-          options={[
-            { value: 'source', label: translate('gallery.videoReview.canvasSource') },
-            ...FORMATS.map((item) => ({ value: item.id, label: `${item.x}:${item.y}` })),
-            ...(props.canvas && !format
-              ? [{ value: 'custom', label: translate('videoEditor.sidebar.canvasCustom') }]
-              : []),
-          ]}
-          onChange={(id) => {
-            if (id === 'source') return props.onChange(undefined);
-            const next = FORMATS.find((item) => item.id === id);
-            if (next)
-              props.onChange(
-                quickEditCanvasPreset(next.x, next.y, Math.min(size.width, size.height))
-              );
-          }}
-        />
-      </div>
-      <div className="space-y-1">
-        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('videoEditor.sidebar.canvasResolutionLabel')}
-        </p>
-        <ProductSelect
-          aria-label={translate('videoEditor.sidebar.canvasResolutionLabel')}
-          controlSize="sm"
-          value={resolution?.value ?? 'current'}
-          options={[
-            ...resolutions,
-            ...(!resolution ? [{ value: 'current', label: `${size.width} × ${size.height}` }] : []),
-          ]}
-          onChange={(value) => {
-            const next = resolutions.find((item) => item.value === value);
-            if (next) props.onChange(next.canvas);
-          }}
-        />
-      </div>
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('videoEditor.sidebar.canvasFormatLabel')}
+        value={!props.canvas ? 'source' : (format?.id ?? 'custom')}
+        options={[
+          { value: 'source', label: translate('gallery.videoReview.canvasSource') },
+          ...FORMATS.map((item) => ({ value: item.id, label: `${item.x}:${item.y}` })),
+          ...(props.canvas && !format
+            ? [{ value: 'custom', label: translate('videoEditor.sidebar.canvasCustom') }]
+            : []),
+        ]}
+        onChange={(id) => {
+          if (id === 'source') return props.onChange(undefined);
+          const next = FORMATS.find((item) => item.id === id);
+          if (next)
+            props.onChange(
+              quickEditCanvasPreset(next.x, next.y, Math.min(size.width, size.height))
+            );
+        }}
+      />
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('videoEditor.sidebar.canvasResolutionLabel')}
+        value={resolution?.value ?? 'current'}
+        options={[
+          ...resolutions,
+          ...(!resolution ? [{ value: 'current', label: `${size.width} × ${size.height}` }] : []),
+        ]}
+        onChange={(value) => {
+          const next = resolutions.find((item) => item.value === value);
+          if (next) props.onChange(next.canvas);
+        }}
+      />
     </section>
   );
 }
@@ -121,19 +112,15 @@ export function ReviewSceneAudio(props: {
             ? props.onOriginal(value / 100)
             : props.onLaneVolume(lane.key, value / 100);
         return (
-          <NumericRow
+          <ReviewNumberRow
             key={lane.key}
-            appearance="plain"
-            className="w-full grid-cols-[minmax(0,1fr)_auto]!"
             label={translate(lane.label)}
             unit="%"
             value={Math.round(lane.volume * 100)}
             min={0}
             max={200}
             step={1}
-            scrub={{ min: 0, max: 200, step: 1 }}
-            onPreviewValue={change}
-            onCommitValue={change}
+            onChange={change}
           />
         );
       })}

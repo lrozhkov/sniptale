@@ -86,7 +86,12 @@ export function ReviewSceneProperties(props: {
   ): void;
 }) {
   return (
-    <fieldset disabled={props.busy} className="min-w-0 space-y-4">
+    <fieldset
+      disabled={props.busy}
+      className="min-w-0 space-y-4 [&>section+*]:border-t [&>section+*]:pt-4
+        [&>div+section]:border-t [&>div+section]:pt-4
+        [&>*]:border-[var(--sniptale-color-border-soft)]"
+    >
       <ReviewCanvasSettings source={props.source} canvas={props.canvas} onChange={props.onCanvas} />
       {props.pending ? (
         <p role="status">{translate('gallery.videoReview.backgroundImporting')}</p>

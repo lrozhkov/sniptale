@@ -5,11 +5,29 @@ import {
   getControlSecondaryButtonClassName,
 } from '@sniptale/ui/control-language';
 
-/** Quiet icon controls share selection and disabled tones with the main video editor. */
+const iconButtonBase =
+  '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +
+  '!bg-transparent !text-[var(--sniptale-color-text-secondary)] ' +
+  'enabled:hover:!border-[var(--sniptale-color-border-strong)] ' +
+  'enabled:hover:!text-[var(--sniptale-color-text-primary)] enabled:hover:[&_svg]:stroke-[2.5] ' +
+  'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
+
+/** Selected tools use an accent icon; only hover draws a border. */
 export const reviewIconButtonClassName =
-  '!border-0 !bg-transparent !shadow-none !h-8 !w-8 !min-h-8 ' +
-  '!text-[var(--sniptale-color-text-secondary)] aria-pressed:!text-[var(--sniptale-color-accent)] ' +
-  'disabled:!text-[var(--sniptale-color-text-muted)] disabled:opacity-40';
+  iconButtonBase +
+  ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
+  'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';
+
+/** Lane status highlights suppression; aria-pressed still reports whether the lane is enabled. */
+export const reviewTrackStatusButtonClassName =
+  iconButtonBase +
+  ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
+  'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
+
+/** Inline parameter selectors use the same geometry and typography as numeric rows. */
+export const reviewSelectFieldClassName =
+  '!min-h-8 !rounded-none !border-0 !bg-transparent !px-0 !py-0 ' +
+  '[&>span]:!whitespace-normal [&>span]:!overflow-visible [&>span]:!text-xs';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({

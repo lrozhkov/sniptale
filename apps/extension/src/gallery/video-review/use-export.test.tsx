@@ -182,6 +182,7 @@ it('downloads a selection without replacing the full-result report receipt', asy
 it('downloads the rendered result when only visual effects are applied', async () => {
   const fixture = setup((advanced) => {
     advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
     advanced.zoom.enabled = true;
   });
   mocks.export.mockResolvedValue({

@@ -13,7 +13,12 @@ import {
   getSnapCandidates,
   snapTimelineTime,
 } from '../../features/video/review/snap';
-import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
+import {
+  reviewTrackStatusButtonClassName,
+  reviewIconButtonClassName,
+  ReviewButton,
+  reviewTimeLabel,
+} from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 
@@ -186,7 +191,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
               label={translate('gallery.videoReview.zoomEnabled')}
               aria-pressed={props.enabled !== false}
               onClick={props.onToggleEnabled}
-              className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+              className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
             >
               {props.enabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
             </ReviewButton>

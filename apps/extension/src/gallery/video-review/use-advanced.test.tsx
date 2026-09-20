@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import {
+  createQuickEditZoomRegion,
+  updateQuickEditZoomRegion,
+} from '../../features/video/review/advanced/zoom';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -237,4 +241,57 @@ it('persists canvas and lane gains through content history and clears an overrid
   expect(advanced.advanced.canvas).toBeUndefined();
   expect(session.getSnapshot().document.advancedContent.canvas).toBeUndefined();
   expect(session.getSnapshot().document.advancedContent.audio.laneVolumes?.music).toBe(0.2);
+});
+
+it('flushes a remove/reconnect burst without committing a canonical no-op', async () => {
+  const { session, deps } = setup();
+  act(() =>
+    advanced.setZoom(() => ({
+      enabled: true,
+      regions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'a', at: 0, duration: 1 }),
+          linkTo: 'b',
+          linkEasing: 'linear',
+        },
+        createQuickEditZoomRegion({ id: 'b', at: 2, duration: 1 }),
+      ],
+    }))
+  );
+  await act(async () => advanced.flush());
+  const saved = session.getSnapshot().document.advancedContent;
+  act(() => {
+    advanced.setZoom((zoom) => ({
+      ...zoom,
+      regions: updateQuickEditZoomRegion(zoom.regions, 'a', { linkTo: null }),
+    }));
+    advanced.setZoom((zoom) => ({
+      ...zoom,
+      regions: updateQuickEditZoomRegion(zoom.regions, 'a', { linkTo: 'b' }),
+    }));
+  });
+  await act(async () => {
+    await expect(advanced.flush()).resolves.toBeUndefined();
+  });
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
+  expect(session.getSnapshot().document.advancedContent).toEqual(saved);
+  expect(advanced.saveFailed).toBe(false);
+});
+
+it('rejects malformed staged content without losing the pending edit and allows correction', async () => {
+  const { session, deps } = setup();
+  act(() => advanced.setCanvas({ width: 0, height: 1080 }));
+  await act(async () => {
+    await expect(advanced.flush()).rejects.toThrow('Advanced content is invalid');
+  });
+  expect(advanced.saveFailed).toBe(true);
+  expect(advanced.advanced.canvas).toEqual({ width: 0, height: 1080 });
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  act(() => advanced.setCanvas({ width: 1920, height: 1080 }));
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.canvas).toEqual({
+    width: 1920,
+    height: 1080,
+  });
+  expect(advanced.saveFailed).toBe(false);
 });

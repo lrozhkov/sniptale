@@ -21,10 +21,10 @@ it('groups workspace toggles before editing tools and switches mode without chan
           advanced={advanced}
           busy={false}
           composerBusy={false}
-          telemetryAvailable={false}
+
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
-          setTrackVisibility={setTrackVisibility}
+
           setMode={setMode}
           onDownloadFragment={vi.fn()}
           editing={{

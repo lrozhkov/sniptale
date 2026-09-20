@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   Plus,
   FileDown,
+  X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
@@ -27,6 +28,7 @@ export function ReviewInspector(props: {
   scene?: ReactNode;
   selectionLabel?: string | undefined;
   onBack(): void;
+  onClose?(): void;
   rangeSelected?: boolean;
   onAdd(): void;
   onSelect(value: ReviewAnnotation): void;
@@ -75,29 +77,13 @@ export function ReviewInspector(props: {
     <aside
       data-ui="gallery.videoReview.inspector"
       className={`flex min-h-0 flex-col gap-2 overflow-hidden border-l
-        border-[var(--sniptale-color-border-soft)] p-3 ${
+        border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
           props.fullHeight
             ? 'min-[800px]:col-start-2 min-[800px]:row-start-1 min-[800px]:row-span-2'
             : ''
         }`}
     >
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-sm font-semibold">
-          {translate('gallery.videoReview.editorTitle')}
-        </h2>
-        <ReviewButton
-          label={translate(
-            props.fullHeight
-              ? 'videoEditor.app.panelRestoreHeight'
-              : 'videoEditor.app.panelFullHeight'
-          )}
-          aria-pressed={!!props.fullHeight}
-          className={reviewIconButtonClassName}
-          onClick={props.onToggleHeight}
-        >
-          {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
-        </ReviewButton>
-      </div>
+      <ReviewInspectorHeader {...props} />
       <div className="shrink-0">
         <p
           className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
@@ -240,16 +226,7 @@ function ReviewInspectorFooter(
   return (
     <div className="shrink-0 space-y-1 border-t border-[var(--sniptale-color-border-soft)] pt-2">
       {props.actions}
-      <div className="flex items-center gap-1">
-        <ReviewButton
-          label={translate('gallery.videoReview.back')}
-          disabled={props.busy}
-          onClick={props.onBack}
-          className="min-w-0 flex-1 !border-0 !bg-transparent !shadow-none"
-        >
-          <ArrowLeft size={15} />
-          <span>{translate('gallery.videoReview.back')}</span>
-        </ReviewButton>
+      <div className="flex items-center justify-end gap-1">
         {section === 'comments' ? (
           <>
             <ReviewButton
@@ -321,5 +298,44 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
         onDelete={props.onDelete}
       />
     </>
+  );
+}
+
+/** Header exits share the flush owner; Back restores the viewer, Close dismisses it. */
+function ReviewInspectorHeader(props: Parameters<typeof ReviewInspector>[0]) {
+  return (
+    <header className="flex shrink-0 items-center gap-1">
+      <ReviewButton
+        label={translate('gallery.videoReview.back')}
+        disabled={props.busy}
+        onClick={props.onBack}
+        className={reviewIconButtonClassName}
+      >
+        <ArrowLeft size={16} aria-hidden="true" />
+      </ReviewButton>
+      <h2 className="min-w-0 flex-1 text-sm font-semibold">
+        {translate('gallery.videoReview.editorTitle')}
+      </h2>
+      <ReviewButton
+        label={translate(
+          props.fullHeight
+            ? 'videoEditor.app.panelRestoreHeight'
+            : 'videoEditor.app.panelFullHeight'
+        )}
+        aria-pressed={!!props.fullHeight}
+        className={reviewIconButtonClassName}
+        onClick={props.onToggleHeight}
+      >
+        {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
+      </ReviewButton>
+      <ReviewButton
+        label={translate('common.actions.close')}
+        disabled={props.busy}
+        onClick={props.onClose ?? props.onBack}
+        className={reviewIconButtonClassName}
+      >
+        <X size={16} aria-hidden="true" />
+      </ReviewButton>
+    </header>
   );
 }

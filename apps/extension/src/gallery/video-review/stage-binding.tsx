@@ -20,8 +20,8 @@ import { translate } from '../../platform/i18n';
 
 /**
  * One stage binding: the applied scene (background plus the camera at the represented
- * frame), the selected zoom focus handle, and the overlay comment stack. Lane
- * visibility and selection never change the applied pixels.
+ * frame), the selected focus handle, and the overlay stack. Effective regions already
+ * exclude disabled lanes; selection itself never changes the applied pixels.
  */
 export function ReviewStageBinding(props: {
   backgroundPending?: boolean;

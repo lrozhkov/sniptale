@@ -1,3 +1,4 @@
+import { reviewSelectFieldClassName } from './controls';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import { ReviewSpotlightInspector } from './spotlight-inspector';
 import type { ReactNode } from 'react';
@@ -26,11 +27,13 @@ function ZoomTransitionSection(props: {
   onChange(next: QuickEditZoomTransition): void;
 }) {
   return (
-    <fieldset aria-label={props.label} className="min-w-0 space-y-2">
-      <legend className="mb-1 text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {props.label}
-      </legend>
+    <fieldset
+      aria-label={props.label}
+      className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
+    >
+      <legend className="float-left mb-2 w-full text-sm font-semibold">{props.label}</legend>
       <SelectField<QuickEditZoomTransition['type']>
+        className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.zoomTransitionType')}
         value={props.value.type}
         options={(['none', 'linear', 'ease-in-out'] as const).map((type) => ({
@@ -77,6 +80,7 @@ export function ReviewZoomInspector(props: {
         </h4>
       </div>
       <SelectField<'zoom' | 'spotlight'>
+        className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.focusType')}
         value={region.spotlight ? 'spotlight' : 'zoom'}
         options={[
@@ -174,6 +178,7 @@ export function ReviewZoomLinkInspector(props: {
     <div data-ui="gallery.videoReview.zoomLinkInspector" className="min-w-0 space-y-3">
       <h4 className="text-sm font-semibold">{translate('gallery.videoReview.zoomLinkSettings')}</h4>
       <SelectField<QuickEditZoomLinkEasing>
+        className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.zoomLinkEasing')}
         value={props.link.source.linkEasing ?? 'ease-in-out'}
         options={(['ease-in-out', 'linear'] as const).map((easing) => ({

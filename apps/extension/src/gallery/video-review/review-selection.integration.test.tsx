@@ -282,3 +282,32 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
     await fixture.cleanup();
   }
 });
+
+it('closes the preview only after saving the note and preserves it when saving fails', async () => {
+  const fixture = createEditorFixture(integration);
+  const onClose = vi.fn();
+  try {
+    await act(async () =>
+      fixture.root.render(
+        <VideoReview aggregateId="recording:r" onBack={fixture.back} onClose={onClose} />
+      )
+    );
+    await fixture.click('addComment');
+    await fixture.fill('Keep this note');
+    integration.draft.mockRejectedValueOnce(new Error('Write failed'));
+    const close = fixture.host.querySelector<HTMLButtonElement>(
+      'header [aria-label="common.actions.close"]'
+    )!;
+    expect(close).not.toBeNull();
+    expect(fixture.button('back').closest('header')).not.toBeNull();
+    await act(async () => close.click());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(fixture.host.querySelector('textarea')?.value).toBe('Keep this note');
+    await act(async () => close.click());
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(fixture.back).not.toHaveBeenCalled();
+    expect(fixture.snapshot.draft?.annotation.text).toBe('Keep this note');
+  } finally {
+    await fixture.cleanup();
+  }
+});

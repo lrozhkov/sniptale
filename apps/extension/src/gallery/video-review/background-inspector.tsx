@@ -44,7 +44,8 @@ export function ReviewBackgroundInspector(props: {
       unit="px"
       min={0}
       max={4096}
-      step={2}
+      scrubMax={key === 'padding' ? 200 : 100}
+      step={1}
       value={background.enabled ? background.layout[key] : 0}
       onChange={(value) => onChange({ layout: { ...backgroundLayout(background), [key]: value } })}
     />
@@ -132,6 +133,8 @@ export function ReviewBackgroundInspector(props: {
       ) : null}
       {background.enabled && background.type !== 'image' ? (
         <CompactPaintSelector
+          className="relative w-full min-w-0 [&>button>span>span]:text-xs
+            [&>button>span>span]:font-semibold"
           label={translate('gallery.videoReview.background')}
           title={translate('gallery.videoReview.background')}
           value={paint}

@@ -31,12 +31,10 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
           annotations={[annotation]}
           selectedId={null}
           busy={false}
-          canUndo={true}
-          canRedo={false}
+
           message={null}
           onBack={vi.fn()}
-          onUndo={vi.fn()}
-          onRedo={vi.fn()}
+
           onAdd={vi.fn()}
           onSelect={onSelect}
           onEdit={onEdit}
@@ -79,12 +77,10 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         annotations={[]}
         selectedId={null}
         busy={false}
-        canUndo={false}
-        canRedo={false}
+
         message={null}
         onBack={vi.fn()}
-        onUndo={vi.fn()}
-        onRedo={vi.fn()}
+
         onAdd={vi.fn()}
         onSelect={vi.fn()}
         onHover={vi.fn()}

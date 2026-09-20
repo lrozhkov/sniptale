@@ -426,7 +426,7 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2);
-    // Track visibility is layout-only: basic mode hides the lane and keeps the region.
+    // Basic mode suppresses the lane and its effect while preserving the stored region.
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
@@ -666,7 +666,7 @@ it('opens the shared voiceover recorder from the audio lane', async () => {
     expect(modal).not.toBeNull();
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
     await act(async () =>
-      host
+      modal!
         .querySelector<HTMLButtonElement>('sniptale-modal-close, [title="common.actions.close"]')!
         .click()
     );
