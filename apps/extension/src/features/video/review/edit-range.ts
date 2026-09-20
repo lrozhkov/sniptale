@@ -22,9 +22,16 @@ export function reviewEditEdgeLimits(args: {
   );
   const maxLength =
     edit.kind === 'cut'
-      ? duration -
-        others.reduce((sum, item) => sum + (item.kind === 'cut' ? item.end - item.start : 0), 0) -
-        0.01
+      ? Math.max(
+          // Preserve already admitted precise ranges, even when the retained tail is below the UI step.
+          edit.end - edit.start,
+          duration -
+            others.reduce(
+              (sum, item) => sum + (item.kind === 'cut' ? item.end - item.start : 0),
+              0
+            ) -
+            0.01
+        )
       : duration;
   const min = edge === 'start' ? Math.max(before, edit.end - maxLength) : edit.start + minimum;
   const max = edge === 'start' ? edit.end - minimum : Math.min(after, edit.start + maxLength);

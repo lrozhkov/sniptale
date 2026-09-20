@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { reviewEditEdgeLimits } from './edit-range';
+import { createReviewCut } from './cuts';
 import type { ReviewEdit } from './types';
 
 const edit: ReviewEdit = {
@@ -10,6 +11,26 @@ const edit: ReviewEdit = {
   requestedStart: 2,
   requestedEnd: 6,
 };
+
+it('keeps an admitted subcentisecond remainder inside the editable bounds', () => {
+  const retained = createReviewCut({
+    id: 'short-tail',
+    selection: { kind: 'range', start: 0.002, end: 1 },
+    duration: 1,
+    boundaries: [0, 1],
+    snapToKeyframes: false,
+    edits: [],
+  })!;
+  expect(retained).not.toBeNull();
+  const limits = reviewEditEdgeLimits({
+    edit: retained,
+    edits: [retained],
+    edge: 'start',
+    duration: 1,
+  });
+  expect(limits.min).toBeLessThanOrEqual(retained.start + 1e-9);
+  expect(limits.max).toBeGreaterThanOrEqual(retained.start);
+});
 it('excludes neighbouring edits and keeps an ordered nonempty interval', () => {
   const edits = [edit, { ...edit, id: 'next', start: 7, end: 9 }];
   expect(reviewEditEdgeLimits({ edit, edits, edge: 'end', duration: 10 })).toMatchObject({

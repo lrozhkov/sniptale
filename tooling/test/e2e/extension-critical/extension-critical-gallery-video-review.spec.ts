@@ -585,6 +585,21 @@ for (const { container, gaps } of [
           await page
             .getByRole('option', { name: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`, exact: true })
             .click();
+          if (rate === 4 && audio === 'speed') {
+            const positions = await page.evaluate(async () => {
+              const toolbar = document.querySelector<HTMLElement>(
+                '[data-ui="gallery.videoReview.toolbar"]'
+              )!;
+              const leading = toolbar.querySelector('[data-toolbar-side="leading"]')!;
+              const samples: number[] = [];
+              for (let frame = 0; frame < 20; frame++) {
+                await new Promise(requestAnimationFrame);
+                samples.push(leading.getBoundingClientRect().width);
+              }
+              return samples;
+            });
+            expect(Math.max(...positions) - Math.min(...positions)).toBeLessThan(0.5);
+          }
           await dialog
             .getByRole('button', { name: label('gallery.videoReview.speedAudio'), exact: true })
             .click();

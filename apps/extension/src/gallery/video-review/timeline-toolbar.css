@@ -22,6 +22,8 @@
     gap: 6px;
     font-size: var(--review-toolbar-font);
     white-space: nowrap;
+    /* Size transitions feed intermediate widths back into the responsive layout observer. */
+    transition-property: color, background-color, border-color, box-shadow, opacity;
   }
   .review-timeline-toolbar [data-review-toolbar-button] > svg {
     flex-shrink: 0;
