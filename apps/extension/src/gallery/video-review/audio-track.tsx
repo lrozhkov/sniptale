@@ -450,25 +450,6 @@ function ReviewClipLanes(props: {
           }
           trailing={
             <>
-              {props.onMuteLane ? (
-                <ReviewButton
-                  label={translate('gallery.videoReview.audioEnabled')}
-                  aria-pressed={
-                    props.audio[lane.key].length > 0 &&
-                    props.audio[lane.key].some((clip) => !clip.muted)
-                  }
-                  disabled={props.busy || !props.audio[lane.key].length}
-                  className="!h-7 !min-h-7 !px-1"
-                  onClick={() => props.onMuteLane?.(lane.key)}
-                >
-                  {props.audio[lane.key].length > 0 &&
-                  props.audio[lane.key].every((clip) => clip.muted) ? (
-                    <VolumeX size={14} />
-                  ) : (
-                    <Volume2 size={14} />
-                  )}
-                </ReviewButton>
-              ) : null}
               {lane.key === 'voiceover' && (
                 <ReviewButton
                   label={translate('gallery.videoReview.recordVoiceover')}
@@ -490,6 +471,25 @@ function ReviewClipLanes(props: {
               >
                 <Plus size={14} />
               </ReviewButton>
+              {props.onMuteLane ? (
+                <ReviewButton
+                  label={translate('gallery.videoReview.audioEnabled')}
+                  aria-pressed={
+                    props.audio[lane.key].length > 0 &&
+                    props.audio[lane.key].some((clip) => !clip.muted)
+                  }
+                  disabled={props.busy || !props.audio[lane.key].length}
+                  className="!h-7 !min-h-7 !px-1"
+                  onClick={() => props.onMuteLane?.(lane.key)}
+                >
+                  {props.audio[lane.key].length > 0 &&
+                  props.audio[lane.key].every((clip) => clip.muted) ? (
+                    <VolumeX size={14} />
+                  ) : (
+                    <Volume2 size={14} />
+                  )}
+                </ReviewButton>
+              ) : null}
             </>
           }
         />

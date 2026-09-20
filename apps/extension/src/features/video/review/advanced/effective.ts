@@ -13,7 +13,7 @@ interface QuickEditEffectiveFeatures {
   actionsTrackVisible: boolean;
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
-  /** Editor-only overlay display toggle; never mutates comment data or exports. */
+  /** In-frame comments are unavailable; stored comment data remains intact. */
   overlaysVisible: boolean;
   /** Advanced effects are suppressed while the editor is in basic mode. */
   zoomApplied: boolean;
@@ -36,7 +36,7 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
-    overlaysVisible: advanced && state.ui.overlaysVisible,
+    overlaysVisible: false,
     zoomApplied: advanced && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
     originalAudioApplied: advanced,
@@ -109,7 +109,6 @@ export function resolveQuickEditExportPlan(args: {
   videoRenderAvailable?: boolean;
   videoCopyBoundaries?: readonly number[];
 }): QuickEditExportPlan {
-  const burned = args.document.canvasComments.some((comment) => comment.renderToVideo);
   const preciseEdits =
     args.videoCopyBoundaries !== undefined &&
     args.document.edits.some((edit) =>
@@ -133,7 +132,6 @@ export function resolveQuickEditExportPlan(args: {
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (args.advanced.zoom.enabled) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
-  if (burned) visual.push('comments');
   if (visual.length) {
     if (args.videoRenderAvailable === false)
       return { kind: 'unavailable', reasons: ['video-encoder', ...audio] };

@@ -286,7 +286,7 @@ it('blocks visual changes without a video encoder and never stages bytes', async
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
 });
 
-it('burns comments through the full frame renderer with annotation-resolved text', async () => {
+it('keeps stored in-frame comments out of rendered exports while the feature is unavailable', async () => {
   const { args, deps, writer } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
@@ -323,11 +323,12 @@ it('burns comments through the full frame renderer with annotation-resolved text
   expect(deps.writeReviewFrames).toHaveBeenCalledWith(
     expect.objectContaining({
       fragmentOffset: 0,
-      comments: [expect.objectContaining({ annotationId: 'a1', resolvedText: 'Look at this' })],
+      comments: [],
     })
   );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
   expect(writer.abort).not.toHaveBeenCalled();
+  expect(args.snapshot.workspace.history.at(-1)?.target).toBe('canvasComment');
 });
 
 it('shifts fragment clip placements across a leading cut to global output time', async () => {

@@ -138,7 +138,7 @@ it('plans render requirements and audio-only processing from applied changes', (
     kind: 'ready',
     video: 'render',
     audio: 'copy',
-    reasons: expect.arrayContaining(['comments', 'zoom', 'background']),
+    reasons: ['zoom', 'background'],
   });
   const visual = resolveQuickEditExportPlan({
     document: document(false),
@@ -159,7 +159,7 @@ it('plans render requirements and audio-only processing from applied changes', (
       },
       videoRenderAvailable: false,
     })
-  ).toMatchObject({ kind: 'unavailable', reasons: ['video-encoder'] });
+  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
   expect(
     resolveQuickEditExportPlan({
       document: document(true),
@@ -168,7 +168,7 @@ it('plans render requirements and audio-only processing from applied changes', (
         ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
       },
     })
-  ).toMatchObject({ kind: 'ready', video: 'render', audio: 'copy', reasons: ['comments'] });
+  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
   expect(
     resolveQuickEditExportPlan({
       document: document(false),

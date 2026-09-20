@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
+import { translate } from '../../platform/i18n';
 import type {
   QuickEditAdvancedState,
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
-import type { QuickEditBackgroundPatch } from '../../features/video/review/advanced/background';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
@@ -12,24 +12,11 @@ import { ReviewBackgroundInspector } from './background-inspector';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 
 type ReviewAdvancedPanelsProps = {
-  onImportImage?(file: File): void;
   advanced: QuickEditAdvancedState;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   /** Optional framing preview mounted inside the selected region inspector. */
   zoomPreview?(region: QuickEditZoomRegion): ReactNode;
-  setBackground(
-    update: (
-      background: QuickEditAdvancedState['background']
-    ) => QuickEditAdvancedState['background']
-  ): void;
 };
-
-function applyBackgroundPatch(
-  args: ReviewAdvancedPanelsProps,
-  patch: QuickEditBackgroundPatch
-): void {
-  args.setBackground((background) => updateQuickEditBackground(background, patch));
-}
 
 function applyZoomRegionPatch(
   args: ReviewAdvancedPanelsProps,
@@ -74,13 +61,37 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
           onReset={resetZoomRegion.bind(null, args, zoomRegion.id)}
           onDelete={removeZoomRegion.bind(null, args, zoomRegion.id)}
         />
-      ) : (
-        <ReviewBackgroundInspector
-          onImportImage={args.onImportImage}
-          background={args.advanced.background}
-          onChange={applyBackgroundPatch.bind(null, args)}
-        />
-      )}
+      ) : null}
     </>
+  );
+}
+
+/** Scene controls are independent of the selected zoom and its property panel. */
+export function ReviewSceneProperties(props: {
+  background: QuickEditAdvancedState['background'];
+  busy: boolean;
+  pending: boolean;
+  failed: boolean;
+  onImportImage(file: File): void;
+  setBackground(
+    update: (current: QuickEditAdvancedState['background']) => QuickEditAdvancedState['background']
+  ): void;
+}) {
+  return (
+    <fieldset disabled={props.busy} className="min-w-0 space-y-3">
+      {props.pending ? (
+        <p role="status">{translate('gallery.videoReview.backgroundImporting')}</p>
+      ) : null}
+      {props.failed ? (
+        <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
+      ) : null}
+      <ReviewBackgroundInspector
+        background={props.background}
+        onImportImage={props.onImportImage}
+        onChange={(patch) =>
+          props.setBackground((current) => updateQuickEditBackground(current, patch))
+        }
+      />
+    </fieldset>
   );
 }

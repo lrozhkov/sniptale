@@ -13,7 +13,6 @@ import type {
 } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio, ReviewAudioLane } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
 import type { useReviewExport } from './use-export';
@@ -102,22 +101,19 @@ type TimelineBindingProps = {
   toOutputTime(source: number): number | null;
   onCutPlacement(): void;
   annotations: readonly ReviewAnnotation[];
-  volume: number;
-  onVolume(value: number): void;
   busy: boolean;
   composerBusy: boolean;
   selection: ReviewAnchor;
   setSelection(value: ReviewAnchor): void;
   advanced: QuickEditAdvancedState;
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
-  setOverlaysVisible(visible: boolean): void;
+  setMode(mode: 'basic' | 'advanced'): void;
   telemetryAvailable: boolean;
   time: number;
   playing: boolean;
   markers: readonly ReviewTelemetryMarker[];
   selectedTelemetryRef: ReviewTelemetryMarker['ref'] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
-  canvasComments: ReturnType<typeof useCanvasComments>;
   audio: ReturnType<typeof useReviewAudio>;
   audioState: QuickEditAudioState;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
@@ -156,12 +152,8 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps & { onAddZoom():
         edits={props.edits}
         advanced={props.advanced}
         setTrackVisibility={props.setTrackVisibility}
-        setOverlaysVisible={props.setOverlaysVisible}
+        setMode={props.setMode}
         telemetryAvailable={props.telemetryAvailable}
-        onAddZoom={props.onAddZoom}
-        onImportAudio={(file) => props.onImportAudioFile(file, 'music')}
-        onAddComment={() => props.onAddComment()}
-        onAddOverlayComment={() => void props.canvasComments.onAdd()}
         onDownloadFragment={() =>
           props.selection.kind === 'range'
             ? props.editing.exporter.downloadSelection(props.selection)
@@ -188,8 +180,6 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     <ReviewTimeline
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
       duration={props.source.duration}
-      volume={props.volume}
-      onVolume={props.onVolume}
       tools={<ReviewTimelineToolsBinding {...props} onAddZoom={onZoomAdd} />}
       {...(features.zoomTrackVisible
         ? {

@@ -56,7 +56,10 @@ type PlaneEvent = { type: string; x: number; button?: number };
 
 function planeWithMetrics(host: HTMLDivElement) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(-192, 0, 592, 80));
+  const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(-gutter, 0, gutter + 400, 80)
+  );
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     releasePointerCapture: vi.fn(),
@@ -90,9 +93,7 @@ it('keeps original time coordinates through zoom and preserves separate comment 
   const { host, props } = renderTimeline({ annotations: [annotation], markers: [marker] });
   expect(host.querySelector('[aria-label="gallery.videoReview.point"]')).toBeNull();
   expect(host.querySelector('input[type="number"]')).toBeNull();
-  act(() =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.zoomIn"]')!.click()
-  );
+  changeZoom(host, '25');
   expect(
     host.querySelector('[aria-label="gallery.videoReview.position"]')?.getAttribute('aria-valuemax')
   ).toBe('4');
@@ -101,7 +102,9 @@ it('keeps original time coordinates through zoom and preserves separate comment 
   expect(props.onSeek).toHaveBeenCalledWith(3);
   expect(props.onSelect).toHaveBeenCalledWith({ kind: 'point', time: 3 });
   act(() =>
-    host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.eventClick · 1.0"]')!.click()
+    host
+      .querySelector<HTMLButtonElement>('[title="gallery.videoReview.eventClick · 1.0–1.1"]')!
+      .click()
   );
   expect(props.onMarker).toHaveBeenCalledWith(marker);
   act(() => host.querySelector<HTMLButtonElement>('[title="Comment"]')!.click());
@@ -215,11 +218,11 @@ it('highlights the selected action and the action under the playhead', () => {
   expect(scrolled?.className).toContain('ring-1');
 });
 
-it('exposes transport, volume, zoom range, and edited result duration in the toolbar', () => {
+it('exposes transport, continuous zoom and fit without a volume control', () => {
   const edits = [
     { id: 'c', kind: 'cut' as const, start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
   ];
-  const { host, props } = renderTimeline({ edits, volume: 0.5, onVolume: vi.fn() });
+  const { host, props } = renderTimeline({ edits });
   act(() =>
     host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.play"]')!.click()
   );
@@ -227,24 +230,14 @@ it('exposes transport, volume, zoom range, and edited result duration in the too
   expect(
     host.querySelector('output[title="gallery.videoReview.resultDuration"]')?.textContent
   ).toBe('→ 3.0');
-  const volume = host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.volume"]')!;
-  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-  act(() => {
-    setValue.call(volume, '0.25');
-    volume.dispatchEvent(new Event('input', { bubbles: true }));
-  });
-  expect(props.onVolume).toHaveBeenCalledWith(0.25);
-  act(() =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.zoomIn"]')!.click()
-  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.volume"]')).toBeNull();
+  changeZoom(host, '25');
   act(() =>
     host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.fit"]')!.click()
   );
-  const zoomOut = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.zoomOut"]'
-  )!;
-  expect(zoomOut.disabled).toBe(true);
-  act(() => zoomOut.click());
+  expect(
+    host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!.value
+  ).toBe('0');
 });
 
 it('renders ruler labels at the unit chosen for the current scale', () => {
@@ -254,47 +247,40 @@ it('renders ruler labels at the unit chosen for the current scale', () => {
     const ruler = host.querySelector('[data-ui="gallery.videoReview.ruler"]')!;
     expect(ruler.querySelectorAll('span').length).toBeGreaterThan(0);
     expect([...ruler.querySelectorAll('span')].map((node) => node.textContent)).toEqual([
-      '0',
-      '1',
-      '2',
-      '3',
-      '4',
+      '0.0',
+      '0.5',
+      '1.0',
+      '1.5',
+      '2.0',
+      '2.5',
+      '3.0',
+      '3.5',
+      '4.0',
     ]);
   } finally {
     clientWidth.mockRestore();
   }
 });
 
-it('resizes only the fixed gutter with pointer and keyboard, within bounds', () => {
-  const { host, props } = renderTimeline();
-  planeWithMetrics(host);
-  const handle = host.querySelector<HTMLButtonElement>('[role="separator"]')!;
-  Object.assign(handle, { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() });
-  const send = (type: string, x: number) =>
-    act(() => handle.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x })));
-  send('pointerdown', 100);
-  send('pointermove', 180);
-  send('pointerup', 180);
-  expect(handle.getAttribute('aria-valuenow')).toBe('272');
-  expect(props.onSeek).not.toHaveBeenCalled();
-  act(() =>
-    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  );
-  expect(handle.getAttribute('aria-valuenow')).toBe('280');
-  act(() =>
-    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-  );
-  expect(handle.getAttribute('aria-valuenow')).toBe('272');
-  send('pointerdown', 0);
-  send('pointermove', -1000);
-  send('pointercancel', -1000);
-  expect(handle.getAttribute('aria-valuenow')).toBe('156');
-  send('pointermove', 1000);
-  expect(handle.getAttribute('aria-valuenow')).toBe('156');
-  send('pointerdown', 0);
-  send('pointermove', 1000);
-  send('pointerup', 1000);
-  expect(handle.getAttribute('aria-valuenow')).toBe('300');
+it('sizes the fixed gutter from natural label and control widths without a resize handle', () => {
+  const metric = vi
+    .spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+    .mockImplementation(function (this: HTMLElement) {
+      return this.hasAttribute('data-track-label')
+        ? 130
+        : this.hasAttribute('data-track-controls')
+          ? 64
+          : 0;
+    });
+  try {
+    const { host, props } = renderTimeline();
+    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+    expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('238px');
+    expect(host.querySelector('[role="separator"]')).toBeNull();
+    expect(props.onSeek).not.toHaveBeenCalled();
+  } finally {
+    metric.mockRestore();
+  }
 });
 
 it('keeps the whole playhead inside the plane at the final frame', () => {
@@ -304,3 +290,11 @@ it('keeps the whole playhead inside the plane at the final frame', () => {
   expect(Number.parseFloat(playhead.style.left)).toBeLessThan(Number.parseFloat(plane.style.width));
   expect(playhead.style.clipPath).toBeTruthy();
 });
+
+function changeZoom(host: HTMLElement, value: string) {
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(slider, value);
+    slider.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}

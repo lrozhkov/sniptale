@@ -1,4 +1,4 @@
-import { Undo2, Redo2, Pencil, Trash2, Copy, Download, ArrowLeft, Video } from 'lucide-react';
+import { Undo2, Redo2, Pencil, Trash2, Copy, Download, ArrowLeft, Plus } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
@@ -15,21 +15,20 @@ export function ReviewInspector(props: {
   canRedo: boolean;
   message: string | null;
   recovery?: ReactNode;
-  modeControl?: ReactNode;
+  scene?: ReactNode;
+  selectionLabel?: string | undefined;
   onBack(): void;
   onUndo(): void;
   onRedo(): void;
+  rangeSelected?: boolean;
   onAdd(): void;
   onSelect(value: ReviewAnnotation): void;
   onHover(value: ReviewAnnotation | null): void;
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
-  /** Shows a saved annotation as a burned overlay without retyping its text. */
-  onShowOnVideo(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
   children: ReactNode;
   actions?: ReactNode;
-  canvas?: ReactNode;
   composer?: ReactNode;
   contextKey?: string;
   settingsAvailable?: boolean;
@@ -37,12 +36,22 @@ export function ReviewInspector(props: {
   onRetry?(): void;
 }) {
   const contextKey = props.contextKey ?? 'comments';
-  const [section, setSection] = useState<'settings' | 'comments'>(
-    contextKey.startsWith('settings') ? 'settings' : 'comments'
-  );
+  type Section = 'scene' | 'selected' | 'comments';
+  const contextSection: Section =
+    !props.settingsAvailable || contextKey.startsWith('comments')
+      ? 'comments'
+      : props.selectionLabel
+        ? 'selected'
+        : 'scene';
+  const [section, setSection] = useState<Section>(contextSection);
   useEffect(() => {
-    setSection(contextKey.startsWith('settings') ? 'settings' : 'comments');
-  }, [contextKey]);
+    setSection(contextSection);
+  }, [contextKey, contextSection]);
+  const shown = !props.settingsAvailable
+    ? 'comments'
+    : section === 'selected' && !props.selectionLabel
+      ? 'scene'
+      : section;
   return (
     <aside
       className="flex min-h-0 flex-col gap-3 overflow-hidden border-l
@@ -67,7 +76,6 @@ export function ReviewInspector(props: {
           <Redo2 size={16} />
         </ReviewButton>
       </div>
-      {props.modeControl}
       <div>
         <p
           className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
@@ -76,20 +84,12 @@ export function ReviewInspector(props: {
           {props.filename}
         </p>
       </div>
-      {props.saveStatus ? (
+      {props.saveStatus === 'failed' ? (
         <div
           className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-muted)]"
           role="status"
         >
-          <span>
-            {translate(
-              props.saveStatus === 'saving'
-                ? 'gallery.videoReview.saving'
-                : props.saveStatus === 'failed'
-                  ? 'gallery.videoReview.saveFailed'
-                  : 'gallery.videoReview.committed'
-            )}
-          </span>
+          <span>{translate('gallery.videoReview.saveFailed')}</span>
           {props.saveStatus === 'failed' ? (
             <ReviewButton
               label={translate('gallery.videoReview.retry')}
@@ -105,46 +105,32 @@ export function ReviewInspector(props: {
         </p>
       ) : null}
       {props.recovery}
-      {props.contextKey && props.settingsAvailable !== false ? (
-        <SegmentedSwitch
-          activeId={section}
+      {props.settingsAvailable ? (
+        <SegmentedSwitch<Section>
+          wrap
+          density="compact"
+          activeId={shown}
           ariaLabel={translate('gallery.videoReview.inspector')}
           options={[
-            { id: 'settings', label: translate('gallery.videoReview.properties') },
             { id: 'comments', label: translate('gallery.videoReview.comments') },
+            { id: 'scene', label: translate('gallery.videoReview.scene') },
+            ...(props.selectionLabel
+              ? [{ id: 'selected' as const, label: props.selectionLabel }]
+              : []),
           ]}
           onChange={setSection}
         />
       ) : null}
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-        {section === 'settings' ? (
+        {shown === 'scene' ? (
+          props.scene
+        ) : shown === 'selected' ? (
           props.children
         ) : (
-          <>
-            {props.composer}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
-            </div>
-            {!props.annotations.length ? (
-              <p className="text-sm text-[var(--sniptale-color-text-muted)]">
-                {translate('gallery.videoReview.commentsEmpty')}
-              </p>
-            ) : null}
-            <ReviewAnnotationList
-              annotations={props.annotations}
-              selectedId={props.selectedId}
-              busy={props.busy}
-              onSelect={props.onSelect}
-              onHover={props.onHover}
-              onEdit={props.onEdit}
-              onDelete={props.onDelete}
-              onShowOnVideo={props.onShowOnVideo}
-            />
-            {props.canvas}
-          </>
+          <ReviewNotes {...props} />
         )}
       </div>
-      <ReviewInspectorFooter {...props} section={section} />
+      <ReviewInspectorFooter {...props} section={shown} />
     </aside>
   );
 }
@@ -158,7 +144,6 @@ function ReviewAnnotationList(props: {
   onHover(value: ReviewAnnotation | null): void;
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
-  onShowOnVideo(value: ReviewAnnotation): void;
 }) {
   return (
     <ol className="space-y-2">
@@ -190,14 +175,6 @@ function ReviewAnnotationList(props: {
           </button>
           <div className="mt-2 flex justify-end gap-1">
             <ReviewButton
-              label={translate('gallery.videoReview.showOnVideo')}
-              disabled={props.busy}
-              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
-              onClick={() => props.onShowOnVideo(annotation)}
-            >
-              <Video size={16} />
-            </ReviewButton>
-            <ReviewButton
               label={translate('gallery.videoReview.editComment')}
               disabled={props.busy}
               className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
@@ -222,7 +199,7 @@ function ReviewAnnotationList(props: {
 
 /** Export/navigation remain visible; reporting belongs to the comments view. */
 function ReviewInspectorFooter(
-  props: Parameters<typeof ReviewInspector>[0] & { section: 'settings' | 'comments' }
+  props: Parameters<typeof ReviewInspector>[0] & { section: 'scene' | 'selected' | 'comments' }
 ) {
   const { section } = props;
   return (
@@ -262,5 +239,45 @@ function ReviewInspectorFooter(
         <span>{translate('gallery.videoReview.back')}</span>
       </ReviewButton>
     </div>
+  );
+}
+
+/** The note feed owns note creation, empty state and row actions. */
+function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
+  return (
+    <>
+      {props.composer}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {!props.settingsAvailable ? (
+          <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
+        ) : null}
+        <ReviewButton
+          label={translate(
+            props.rangeSelected
+              ? 'gallery.videoReview.commentRange'
+              : 'gallery.videoReview.addComment'
+          )}
+          disabled={props.busy || !!props.composer}
+          className="ml-auto !border-0 !bg-transparent !shadow-none"
+          onClick={() => props.onAdd()}
+        >
+          <Plus size={16} />
+        </ReviewButton>
+      </div>
+      {!props.annotations.length ? (
+        <p className="text-sm text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.commentsEmpty')}
+        </p>
+      ) : null}
+      <ReviewAnnotationList
+        annotations={props.annotations}
+        selectedId={props.selectedId}
+        busy={props.busy}
+        onSelect={props.onSelect}
+        onHover={props.onHover}
+        onEdit={props.onEdit}
+        onDelete={props.onDelete}
+      />
+    </>
   );
 }

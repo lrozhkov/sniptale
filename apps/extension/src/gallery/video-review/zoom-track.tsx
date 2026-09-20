@@ -173,6 +173,13 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       icon={<Focus size={14} aria-hidden="true" />}
       controls={
         <>
+          <ReviewButton
+            label={translate('gallery.videoReview.zoomAdd')}
+            className="!h-7 !min-h-7 !px-1"
+            onClick={props.onAdd}
+          >
+            <Plus size={14} />
+          </ReviewButton>
           {props.onToggleEnabled ? (
             <ReviewButton
               label={translate('gallery.videoReview.zoomEnabled')}
@@ -183,13 +190,6 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
               {props.enabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
             </ReviewButton>
           ) : null}
-          <ReviewButton
-            label={translate('gallery.videoReview.zoomAdd')}
-            className="!h-7 !min-h-7 !px-1"
-            onClick={props.onAdd}
-          >
-            <Plus size={14} />
-          </ReviewButton>{' '}
         </>
       }
     >

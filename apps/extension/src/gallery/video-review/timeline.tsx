@@ -1,4 +1,4 @@
-import { GripVertical } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewRuler, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -16,8 +16,6 @@ type TimelineProps = {
   duration: number;
   time: number;
   playing: boolean;
-  volume?: number;
-  onVolume?(value: number): void;
   selection: ReviewAnchor;
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
@@ -40,23 +38,43 @@ type TimelineProps = {
 export function ReviewTimeline(props: TimelineProps) {
   const [zoom, setZoom] = useState(1);
   const [gutter, setGutter] = useState(192);
-  const resize = useRef<{ x: number; width: number } | null>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
+  const audioVisible = !!props.audioTrack;
+  const zoomVisible = !!props.zoomTrack;
   useEffect(() => {
     const node = viewport.current;
     if (!node) return;
-    const measure = () => setWidth(Math.max(1, node.clientWidth - gutter));
+    const measure = () => {
+      const headers = node.querySelectorAll<HTMLElement>(
+        '[data-ui="gallery.videoReview.trackHeader"]'
+      );
+      const natural = Math.max(
+        120,
+        ...Array.from(headers, (header) => {
+          const label = header.querySelector<HTMLElement>('[data-track-label]');
+          const controls = header.querySelector<HTMLElement>('[data-track-controls]');
+          return (label?.scrollWidth ?? 0) + (controls?.scrollWidth ?? 0) + 44;
+        })
+      );
+      const next = Math.min(Math.round(node.clientWidth * 0.4) || 260, Math.ceil(natural));
+      setGutter(next);
+      setWidth(Math.max(1, node.clientWidth - next));
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
+    node
+      .querySelectorAll('[data-track-label], [data-track-controls]')
+      .forEach((item) => observer.observe(item));
     return () => observer.disconnect();
-  }, [gutter]);
+  }, [audioVisible, zoomVisible, props.markers.length]);
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   return (
     <section
       data-ui="gallery.videoReview.timeline"
-      className="@container flex min-h-0 max-h-[55%] min-w-0 max-w-full shrink-0 flex-col overflow-hidden pt-2"
+      className="@container flex min-h-0 max-h-[42dvh] min-w-0 max-w-full shrink-0 flex-col
+        overflow-hidden border-t border-[var(--sniptale-color-border-soft)]"
     >
       <ReviewToolbar
         {...props}
@@ -92,59 +110,14 @@ export function ReviewTimeline(props: TimelineProps) {
           onPointerUp={plane.onPointerUp}
           onPointerCancel={plane.onPointerCancel}
         >
-          <ReviewTrackRow
-            label=""
-            controls={
-              <button
-                type="button"
-                role="separator"
-                aria-orientation="vertical"
-                aria-label={translate('gallery.videoReview.trackControlsWidth')}
-                aria-valuemin={156}
-                aria-valuemax={300}
-                aria-valuenow={gutter}
-                title={translate('gallery.videoReview.trackControlsWidth')}
-                className="cursor-col-resize rounded p-1 text-[var(--sniptale-color-text-muted)]
-                  focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]"
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                  resize.current = { x: event.clientX, width: gutter };
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                }}
-                onPointerMove={(event) => {
-                  if (resize.current)
-                    setGutter(
-                      Math.max(
-                        156,
-                        Math.min(300, resize.current.width + event.clientX - resize.current.x)
-                      )
-                    );
-                }}
-                onPointerUp={(event) => {
-                  resize.current = null;
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }}
-                onPointerCancel={() => {
-                  resize.current = null;
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    setGutter((value) =>
-                      Math.max(156, Math.min(300, value + (event.key === 'ArrowRight' ? 8 : -8)))
-                    );
-                  }
-                }}
-              >
-                <GripVertical size={12} aria-hidden="true" />
-              </button>
-            }
-          >
+          <ReviewTrackRow label="">
             <ReviewRuler duration={props.duration} width={Math.max(1, width * zoom)} />
           </ReviewTrackRow>
           {props.markers.length ? (
-            <ReviewTrackRow label={translate('gallery.videoReview.telemetry')}>
+            <ReviewTrackRow
+              label={translate('gallery.videoReview.telemetry')}
+              icon={<Activity size={14} aria-hidden="true" />}
+            >
               <ReviewTelemetryStrip
                 markers={props.markers}
                 duration={props.duration}

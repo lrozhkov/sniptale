@@ -42,7 +42,6 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
           onEdit={onEdit}
           onHover={onHover}
           onDelete={vi.fn()}
-          onShowOnVideo={vi.fn()}
           onReport={vi.fn()}
         >
           {null}
@@ -65,6 +64,75 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
     expect(onEdit).toHaveBeenCalledWith(annotation);
   } finally {
     act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps scene navigation independent of selection and resets Basic to notes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const render = (advanced: boolean, contextKey: string, selectionLabel?: string) =>
+    root.render(
+      <ReviewInspector
+        filename="clip.webm"
+        annotations={[]}
+        selectedId={null}
+        busy={false}
+        canUndo={false}
+        canRedo={false}
+        message={null}
+        onBack={vi.fn()}
+        onUndo={vi.fn()}
+        onRedo={vi.fn()}
+        onAdd={vi.fn()}
+        onSelect={vi.fn()}
+        onHover={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onReport={vi.fn()}
+        settingsAvailable={advanced}
+        contextKey={contextKey}
+        {...(selectionLabel ? { selectionLabel } : {})}
+        scene={<p>Scene controls</p>}
+        saveStatus="saved"
+      >
+        <p>Selected controls</p>
+      </ReviewInspector>
+    );
+  try {
+    await act(async () => render(false, 'comments'));
+    expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
+    expect(host.textContent).not.toContain('gallery.videoReview.committed');
+    await act(async () => render(true, 'settings:none:'));
+    expect(host.textContent).toContain('Scene controls');
+    await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
+    expect(host.textContent).toContain('Selected controls');
+    const tabs = () =>
+      Array.from(
+        host.querySelectorAll<HTMLButtonElement>(
+          '[aria-label="gallery.videoReview.inspector"] button'
+        )
+      );
+    await act(async () =>
+      tabs()
+        .find((button) => button.textContent === 'gallery.videoReview.scene')!
+        .click()
+    );
+    expect(host.textContent).toContain('Scene controls');
+    expect(tabs().some((button) => button.textContent === 'Zoom')).toBe(true);
+    await act(async () =>
+      tabs()
+        .find((button) => button.textContent === 'Zoom')!
+        .click()
+    );
+    expect(host.textContent).toContain('Selected controls');
+    await act(async () => render(false, 'comments'));
+    expect(host.textContent).not.toContain('Selected controls');
+    expect(host.textContent).not.toContain('Scene controls');
+    expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
 });

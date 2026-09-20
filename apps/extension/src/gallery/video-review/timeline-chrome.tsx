@@ -1,5 +1,5 @@
-import { Play, Pause, Minus, Plus, Scan, Volume2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { Play, Pause, Scan } from 'lucide-react';
+import type { ReactNode, CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import { ReviewButton, reviewTimeLabel } from './controls';
@@ -51,16 +51,19 @@ export function ReviewToolbar(props: {
   time: number;
   playing: boolean;
   resultDuration?: number;
-  volume?: number;
-  onVolume?(value: number): void;
   tools?: ReactNode;
   onPlay(): void;
   zoom: number;
   onZoom(value: number): void;
 }) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1 border-b border-[var(--sniptale-color-border-soft)] py-2">
-      <div className="flex items-center gap-1">
+    <div
+      data-ui="gallery.videoReview.toolbar"
+      className="flex min-w-0 flex-wrap items-center gap-1 border-b border-[var(--sniptale-color-border-soft)]
+        px-2 py-1"
+    >
+      {props.tools}
+      <div className="mx-auto flex shrink-0 items-center gap-1">
         <span className="min-w-8 text-right text-xs tabular-nums">
           {reviewTimeLabel(props.time)}
         </span>
@@ -90,38 +93,19 @@ export function ReviewToolbar(props: {
           </output>
         ) : null}
       </div>
-      {props.tools}
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
-        {props.onVolume ? (
-          <label className="mr-2 flex items-center gap-1">
-            <Volume2 size={14} aria-hidden="true" />
-            <CompactRange
-              aria-label={translate('gallery.videoReview.volume')}
-              min={0}
-              max={1}
-              step={0.05}
-              value={props.volume ?? 1}
-              onChange={(event) => props.onVolume?.(event.currentTarget.valueAsNumber)}
-              style={{ width: 48, minWidth: 48 }}
-            />
-          </label>
-        ) : null}
-        <ReviewButton
-          label={translate('gallery.videoReview.zoomOut')}
-          disabled={props.zoom === 1}
-          className={plain}
-          onClick={() => props.onZoom(Math.max(1, props.zoom / 2))}
-        >
-          <Minus size={14} />
-        </ReviewButton>
-        <ReviewButton
-          label={translate('gallery.videoReview.zoomIn')}
-          disabled={props.zoom === 16}
-          className={plain}
-          onClick={() => props.onZoom(Math.min(16, props.zoom * 2))}
-        >
-          <Plus size={14} />
-        </ReviewButton>
+        <CompactRange
+          aria-label={translate('videoEditor.timeline.zoom')}
+          title={translate('videoEditor.timeline.zoom')}
+          min={0}
+          max={100}
+          step={0.1}
+          value={Math.log2(props.zoom) * 25}
+          onChange={(event) => props.onZoom(2 ** (event.currentTarget.valueAsNumber / 25))}
+          style={
+            { width: 80, minWidth: 80, '--sniptale-range-track-height': '3px' } as CSSProperties
+          }
+        />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}
           className={plain}

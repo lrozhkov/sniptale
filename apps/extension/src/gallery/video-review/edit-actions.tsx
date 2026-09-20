@@ -77,6 +77,8 @@ export function ReviewTimelineTools(props: {
           <ProductSelect
             aria-label={translate('gallery.videoReview.speedRate')}
             controlSize="sm"
+            className="!h-8 !min-h-8 !py-0"
+            containerClassName="w-16"
             value={String(props.rate)}
             disabled={props.busy}
             options={REVIEW_SPEED_RATES.map((rate) => ({
@@ -91,6 +93,8 @@ export function ReviewTimelineTools(props: {
           <ProductSelect<'speed' | 'mute'>
             aria-label={translate('gallery.videoReview.speedAudio')}
             controlSize="sm"
+            className="!h-8 !min-h-8 !py-0"
+            containerClassName="max-w-36"
             value={props.audio}
             disabled={props.busy}
             onChange={props.onAudio}

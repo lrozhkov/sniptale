@@ -17,8 +17,11 @@ import type { ReviewAnchor } from '../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import { buildQuickEditAudioPlan } from '../../features/video/review/advanced/audio-plan';
 import type { ReviewExportClipPlan } from './audio-render';
-import { resolveQuickEditExportPlan } from '../../features/video/review/advanced/effective';
 import { resolveOverlayComments } from '../../features/video/review/comments';
+import {
+  resolveQuickEditExportPlan,
+  resolveQuickEditEffectiveFeatures,
+} from '../../features/video/review/advanced/effective';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
 import { resolveReviewAssetBytes } from './asset-bytes';
 import { loadVideoReviewSource } from './source';
@@ -214,7 +217,9 @@ export async function exportReviewedVideo(
             index,
             edits,
             advanced,
-            comments: resolveOverlayComments(document),
+            comments: resolveQuickEditEffectiveFeatures(advanced).overlaysVisible
+              ? resolveOverlayComments(document)
+              : [],
             fragmentOffset,
             writer,
             signal,

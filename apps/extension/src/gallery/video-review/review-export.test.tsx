@@ -42,7 +42,10 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (original
 
 async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(-192, 0, 592, 80));
+  const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(-gutter, 0, gutter + 400, 80)
+  );
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,
@@ -110,7 +113,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     expect(target()).toBeNull();
     expect(preview.tabIndex).toBe(-1);
     expect(fixture.button('undo').disabled).toBe(true);
-    for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack', 'hideOverlays'])
+    for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack'])
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();

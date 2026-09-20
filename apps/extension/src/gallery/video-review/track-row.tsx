@@ -16,10 +16,14 @@ export function ReviewTrackRow(props: {
         onPointerDown={(event) => event.stopPropagation()}
       >
         {props.icon}
-        <span className="min-w-0 flex-1 truncate text-[11px]" title={props.label}>
-          {props.label}
+        <span className="min-w-0 flex-1 text-[11px]" title={props.label}>
+          <span data-track-label className="inline-block whitespace-nowrap">
+            {props.label}
+          </span>
         </span>
-        <div className="flex shrink-0 items-center">{props.controls}</div>
+        <div data-track-controls className="flex shrink-0 items-center">
+          {props.controls}
+        </div>
       </div>
       <div className="min-w-0">{props.children}</div>
     </div>

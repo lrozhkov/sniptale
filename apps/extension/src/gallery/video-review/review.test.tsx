@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
 import { parseReviewOperation } from '../../features/video/review/validation';
-import type { CanvasComment, ReviewAnchor } from '../../features/video/review/types';
+import type { ReviewAnchor } from '../../features/video/review/types';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -224,7 +224,10 @@ it('offers source-load retry and surfaces playback failure without exiting', asy
 
 async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(-192, 0, 592, 80));
+  const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(-gutter, 0, gutter + 400, 80)
+  );
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,
@@ -590,56 +593,6 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
   }
 });
 
-it('adds an overlay comment, drags it on the stage and deletes it via the editor', async () => {
-  const fixture = createEditorFixture(integration);
-  const { host, root, click, back } = fixture;
-  try {
-    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
-    await click('advancedEditing');
-    await click('addOverlayComment');
-    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('canvasComment');
-    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
-      attachment: 'content',
-      position: { x: 0.44, y: 0.5 },
-      start: 0,
-    });
-    expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).not.toBeNull();
-    expect(host.querySelector('[data-ui="gallery.videoReview.canvasComments"]')).not.toBeNull();
-
-    const point = host.querySelector<HTMLButtonElement>(
-      '[data-ui="gallery.videoReview.canvasComment"] button'
-    )!;
-    Object.assign(point, { setPointerCapture: vi.fn() });
-    const drag = async (dx: number, dy: number) =>
-      act(async () => {
-        point.dispatchEvent(
-          new MouseEvent('pointerdown', { bubbles: true, clientX: 0, clientY: 0, button: 0 })
-        );
-        point.dispatchEvent(
-          new MouseEvent('pointermove', { bubbles: true, clientX: dx, clientY: dy, button: 0 })
-        );
-        point.dispatchEvent(
-          new MouseEvent('pointerup', { bubbles: true, clientX: dx, clientY: dy, button: 0 })
-        );
-      });
-    await drag(160, 90);
-    const dragged = fixture.snapshot.workspace.history.at(-1)?.after as CanvasComment | undefined;
-    expect(dragged?.position.x).toBeCloseTo(0.69, 5);
-    expect(dragged?.position.y).toBeCloseTo(0.75, 5);
-
-    await click('stayOnScreen');
-    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
-      attachment: 'viewport',
-    });
-    await click('undo');
-    await click('overlayDelete');
-    expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
-    expect(host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')).toBeNull();
-  } finally {
-    await fixture.cleanup();
-  }
-});
-
 it('reveals the three audio lanes and persists the original audio gate', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
@@ -716,31 +669,6 @@ it('opens the shared voiceover recorder from the audio lane', async () => {
         .click()
     );
     expect(host.querySelector('[role="dialog"]')).toBeNull();
-  } finally {
-    await fixture.cleanup();
-  }
-});
-
-it('persists a pending overlay comment draft on Back', async () => {
-  const fixture = createEditorFixture(integration);
-  const { host, root, click, back } = fixture;
-  try {
-    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
-    await click('advancedEditing');
-    await click('addOverlayComment');
-    const area = host.querySelector<HTMLTextAreaElement>(
-      '[data-ui="gallery.videoReview.overlayTextInput"]'
-    )!;
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-      area,
-      'Saved draft'
-    );
-    area.dispatchEvent(new Event('input', { bubbles: true }));
-    await click('back');
-    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
-      text: 'Saved draft',
-    });
-    expect(back).toHaveBeenCalledOnce();
   } finally {
     await fixture.cleanup();
   }

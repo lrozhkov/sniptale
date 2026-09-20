@@ -2,7 +2,7 @@
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ReviewAdvancedPanels } from './advanced-panels';
+import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
 import { useReviewZoomEditor } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
@@ -60,7 +60,17 @@ function Harness() {
         }
       />
       <button type="button" aria-label="addZoom" onClick={() => zoom.add(3, 10)} />
-      <ReviewAdvancedPanels advanced={advanced} zoom={zoom} setBackground={setBackground} />
+      {advanced.ui.mode === 'advanced' ? (
+        <ReviewSceneProperties
+          background={advanced.background}
+          busy={false}
+          pending={false}
+          failed={false}
+          onImportImage={vi.fn()}
+          setBackground={setBackground}
+        />
+      ) : null}
+      <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />
     </>
   );
 }
@@ -83,7 +93,7 @@ it('edits the background paint and the selected zoom region through the panel ca
 
   await act(async () => button('addZoom').click());
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).not.toBeNull();
-  expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).not.toBeNull();
   const focusX = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;

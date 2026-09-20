@@ -6,13 +6,13 @@ import { ReviewTimelineToolbar } from './review-toolbar';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { translate } from '../../platform/i18n';
 
-it('opens the audio picker, reveals the imported lane, and keeps cancellation empty', async () => {
+it('groups workspace toggles before editing tools and switches mode without changing lane visibility', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
-  const onImportAudio = vi.fn();
+  const setMode = vi.fn();
   const setTrackVisibility = vi.fn();
   try {
     await act(async () =>
@@ -24,11 +24,8 @@ it('opens the audio picker, reveals the imported lane, and keeps cancellation em
           telemetryAvailable={false}
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
-          onImportAudio={onImportAudio}
           setTrackVisibility={setTrackVisibility}
-          setOverlaysVisible={vi.fn()}
-          onAddComment={vi.fn()}
-          onAddOverlayComment={vi.fn()}
+          setMode={setMode}
           onDownloadFragment={vi.fn()}
           editing={{
             mode: null,
@@ -45,24 +42,16 @@ it('opens the audio picker, reveals the imported lane, and keeps cancellation em
         />
       )
     );
-    const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-    const open = vi.spyOn(input, 'click');
-    await act(async () =>
-      host
-        .querySelector<HTMLButtonElement>(
-          `[aria-label="${translate('gallery.videoReview.audioImport')}"]`
-        )!
-        .click()
-    );
-    expect(open).toHaveBeenCalledOnce();
-    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-    expect(onImportAudio).not.toHaveBeenCalled();
+    const tools = host.querySelector('[data-ui="gallery.videoReview.workspaceTools"]')!;
+    const mode = tools.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`
+    )!;
+    expect(mode.getAttribute('aria-pressed')).toBe('true');
+    await act(async () => mode.click());
+    expect(setMode).toHaveBeenCalledWith('basic');
     expect(setTrackVisibility).not.toHaveBeenCalled();
-    const file = new File(['audio'], 'music.wav', { type: 'audio/wav' });
-    Object.defineProperty(input, 'files', { value: [file] });
-    await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-    expect(onImportAudio).toHaveBeenCalledWith(file);
-    expect(setTrackVisibility).toHaveBeenCalledWith('audio', true);
+    expect(host.querySelector('input[type="file"]')).toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.editingTools"]')).not.toBeNull();
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();
