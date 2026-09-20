@@ -347,6 +347,8 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       anchor: { kind: 'point', time: 1.4 },
     });
     await click('undo');
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
+    await click('cutMode');
     await dragTimePlane(host, 0);
     await key('ArrowLeft');
     expect(video.currentTime).toBe(0);

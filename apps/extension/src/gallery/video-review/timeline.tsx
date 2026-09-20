@@ -20,6 +20,7 @@ type TimelineProps = {
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
   tools?: ReactNode;
+  expandedTools?: boolean;
   zoomTrack?: ReactNode;
   audioTrack?: ReactNode;
   boundaries?: readonly number[];
@@ -74,7 +75,7 @@ export function ReviewTimeline(props: TimelineProps) {
   return (
     <section
       data-ui="gallery.videoReview.timeline"
-      className="@container flex min-h-0 max-h-[42dvh] min-w-0 max-w-full shrink-0 flex-col
+      className="@container flex min-h-0 max-h-[min(42dvh,calc(100dvh-420px))] min-w-0 max-w-full shrink-0 flex-col
         overflow-hidden border-t border-[var(--sniptale-color-border-soft)]"
     >
       <ReviewToolbar

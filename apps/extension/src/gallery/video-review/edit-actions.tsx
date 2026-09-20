@@ -1,5 +1,5 @@
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
-import { useMemo } from 'react';
+import { useMemo, useState, useId, type ReactNode } from 'react';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
@@ -8,14 +8,22 @@ import {
   isReviewSpeedRate,
   type ReviewSpeedRate,
 } from '../../features/video/review/speed';
-import { Scissors, Download, FileVideo, Gauge, MousePointer2, Trash2 } from 'lucide-react';
+import {
+  Scissors,
+  Download,
+  FileVideo,
+  Gauge,
+  MousePointer2,
+  Trash2,
+  Settings2,
+} from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
 import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   canvas: 'gallery.videoReview.canvas',
-  'precise-edits': 'gallery.videoReview.cutLabel',
+  'precise-edits': 'gallery.videoReview.exportPreciseEdits',
   zoom: 'gallery.videoReview.exportBlockerZoom',
   background: 'gallery.videoReview.exportBlockerBackground',
   comments: 'gallery.videoReview.exportBlockerComments',
@@ -139,6 +147,7 @@ export function ReviewEditActions(props: {
   progress: number;
   failed: boolean;
   hasResult: boolean;
+  settings?: ReactNode;
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
   /** Ready-plan reasons worth an applied-changes line; null while nothing is applied. */
@@ -147,11 +156,25 @@ export function ReviewEditActions(props: {
   onCancel(): void;
   onDownload(): void;
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsId = useId();
   const running = props.phase !== 'idle';
   const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1">
+        {props.settings ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.exportSettings')}
+            className={plain}
+            aria-expanded={settingsOpen}
+            aria-controls={settingsId}
+            aria-pressed={settingsOpen}
+            onClick={() => setSettingsOpen(!settingsOpen)}
+          >
+            <Settings2 size={16} />
+          </ReviewButton>
+        ) : null}
         <ReviewButton
           label={translate('gallery.videoReview.exportVideo')}
           primary
@@ -175,6 +198,7 @@ export function ReviewEditActions(props: {
           <Download size={16} />
         </ReviewButton>
       </div>
+      {props.settings && settingsOpen ? <div id={settingsId}>{props.settings}</div> : null}
       {running ? (
         <div className="flex items-center justify-between gap-2 text-xs" role="status">
           <span>
@@ -219,6 +243,7 @@ export function ReviewEditActions(props: {
 /** A range-only download affordance; unavailable or fully removed intervals cannot be exported. */
 export function ReviewFragmentAction(props: {
   selection: ReviewAnchor;
+  snapToKeyframes?: boolean;
   index: ReviewMediaIndex | null;
   edits: readonly ReviewEdit[];
   busy: boolean;
@@ -232,10 +257,11 @@ export function ReviewFragmentAction(props: {
             selection,
             duration: index.duration,
             boundaries: index.boundaries,
+            snapToKeyframes: props.snapToKeyframes !== false,
             edits,
           })
         : null,
-    [selection, index, edits]
+    [selection, index, edits, props.snapToKeyframes]
   );
   if (selection.kind !== 'range') return null;
   const audioUnavailable =
@@ -274,10 +300,7 @@ export function ReviewRenderOptions({
     exporter.index?.supportedVideoCodecs ??
     (exporter.index?.processedVideoCodec ? [exporter.index.processedVideoCodec] : []);
   return (
-    <details className="mb-2 text-xs">
-      <summary className="cursor-pointer py-2">
-        {translate('gallery.videoReview.exportSettings')}
-      </summary>
+    <div className="pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
       <fieldset disabled={busy} className="grid grid-cols-2 gap-2 pb-2">
         <div className="space-y-1">
           <span>{translate('gallery.videoReview.exportCodec')}</span>
@@ -326,6 +349,6 @@ export function ReviewRenderOptions({
           />
         </div>
       </fieldset>
-    </details>
+    </div>
   );
 }

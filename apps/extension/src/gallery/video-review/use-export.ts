@@ -1,3 +1,4 @@
+import { createReviewFragment } from '../../features/video/review/fragment';
 import { useEffect, useRef, useState } from 'react';
 import {
   inspectReviewMedia,
@@ -84,13 +85,14 @@ export function useReviewExport(resource: LoadedReview) {
     };
   }, [resource.file]);
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
-  const plan = () => reviewExportPlan(resource, index);
+  const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
+    reviewExportPlan(resource, index, selection);
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
     if (active.current || !index) return;
-    const currentPlan = plan();
+    const currentPlan = plan(selection);
     if (currentPlan.kind === 'unavailable') {
       setBlocked(currentPlan.reasons);
       return;
@@ -182,11 +184,22 @@ export function useReviewExport(resource: LoadedReview) {
 /** One applied-state capability plan for all export entry points. */
 function reviewExportPlan(
   resource: LoadedReview,
-  index: ReviewMediaIndex | null
+  index: ReviewMediaIndex | null,
+  selection?: Extract<ReviewAnchor, { kind: 'range' }>
 ): QuickEditExportPlan {
   const state = resource.session.getSnapshot();
+  const fragment =
+    selection && index
+      ? createReviewFragment({
+          selection,
+          duration: index.duration,
+          boundaries: index.boundaries,
+          snapToKeyframes: state.snapshot.workspace.advanced.ui.mode !== 'advanced',
+          edits: state.document.edits,
+        })
+      : null;
   return resolveQuickEditExportPlan({
-    document: state.document,
+    document: fragment ? { ...state.document, edits: fragment.edits } : state.document,
     advanced: {
       ui: state.snapshot.workspace.advanced.ui,
       ...state.document.advancedContent,

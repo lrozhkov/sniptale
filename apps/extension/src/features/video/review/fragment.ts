@@ -7,12 +7,13 @@ export function createReviewFragment(args: {
   selection: ReviewAnchor;
   duration: number;
   boundaries: readonly number[];
+  snapToKeyframes?: boolean;
   edits: readonly ReviewEdit[];
 }): { start: number; end: number; edits: ReviewEdit[] } | null {
   const { selection, duration, boundaries } = args;
   if (
     selection.kind !== 'range' ||
-    !boundaries.length ||
+    (args.snapToKeyframes !== false && !boundaries.length) ||
     !Number.isFinite(duration) ||
     duration <= 0
   )
@@ -25,8 +26,14 @@ export function createReviewFragment(args: {
     selection.start >= selection.end
   )
     return null;
-  const start = nearestReviewBoundary(selection.start, boundaries);
-  const end = nearestReviewBoundary(selection.end, boundaries);
+  const start =
+    args.snapToKeyframes === false
+      ? selection.start
+      : nearestReviewBoundary(selection.start, boundaries);
+  const end =
+    args.snapToKeyframes === false
+      ? selection.end
+      : nearestReviewBoundary(selection.end, boundaries);
   if (start < 0 || end > duration || start >= end) return null;
   const edits = args.edits
     .filter((edit) => edit.start < end && edit.end > start)

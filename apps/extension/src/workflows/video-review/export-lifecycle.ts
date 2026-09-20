@@ -141,8 +141,20 @@ export async function exportReviewedVideo(
     ui: workspace.advanced.ui,
     ...document.advancedContent,
   };
+  const fragment = args.selection
+    ? createReviewFragment({
+        selection: args.selection,
+        duration: index.duration,
+        boundaries: index.boundaries,
+        snapToKeyframes: advanced.ui.mode !== 'advanced',
+        edits: document.edits,
+      })
+    : null;
+  if (args.selection && (!fragment || args.destination !== 'download'))
+    throw new Error('A nonempty fragment requires a temporary download.');
+  const edits = fragment?.edits ?? document.edits;
   const plan = resolveQuickEditExportPlan({
-    document,
+    document: { ...document, edits },
     advanced,
     // A source audio track with a probed unavailable codec is a known blocker;
     // clips-only exports defer the authoritative probe to the exporter.
@@ -155,17 +167,6 @@ export async function exportReviewedVideo(
     throw new QuickEditExportUnavailable(['audio-encoder']);
   if (plan.video === 'render' && !index.processedVideoCodec)
     throw new QuickEditExportUnavailable(['video-encoder']);
-  const fragment = args.selection
-    ? createReviewFragment({
-        selection: args.selection,
-        duration: index.duration,
-        boundaries: index.boundaries,
-        edits: document.edits,
-      })
-    : null;
-  if (args.selection && (!fragment || args.destination !== 'download'))
-    throw new Error('A nonempty fragment requires a temporary download.');
-  const edits = fragment?.edits ?? document.edits;
   const fragmentOffset = fragment
     ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
     : 0;

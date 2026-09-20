@@ -201,20 +201,26 @@ interface ReviewRenderPreparation {
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;
 }
 
-/** Render gates from the verified index: boundaries, encode codec, frame rate, windows. */
+/** Frame rendering validates ranges, while packet copying alone requires keyframes. */
 function prepareReviewRender(args: {
   renderSettings?: ReviewRenderSettings | undefined;
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
   advanced: QuickEditAdvancedState;
 }): ReviewRenderPreparation {
+  const ordered = [...args.edits].sort((left, right) => left.start - right.start);
   if (
-    args.edits.some(
-      (edit) =>
-        !args.index.boundaries.includes(edit.start) || !args.index.boundaries.includes(edit.end)
+    ordered.some(
+      (edit, index) =>
+        !Number.isFinite(edit.start) ||
+        !Number.isFinite(edit.end) ||
+        edit.start < 0 ||
+        edit.end > args.index.duration ||
+        edit.start >= edit.end ||
+        (index > 0 && edit.start < ordered[index - 1]!.end)
     )
   )
-    throw new Error('Export requires verified cut boundaries.');
+    throw new Error('Export requires valid non-overlapping edit ranges.');
   const codec = args.renderSettings?.codec ?? args.index.processedVideoCodec;
   const supported =
     args.index.supportedVideoCodecs ??

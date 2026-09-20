@@ -13,6 +13,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   },
   saving: { ru: 'Сохранение…', en: 'Saving…' },
   zoomConnect: { ru: 'Плавный переход между зумами', en: 'Smooth transition between zooms' },
+  exportPreciseEdits: { ru: 'Точный монтаж', en: 'Frame-accurate edits' },
   exportSettings: { ru: 'Настройки экспорта', en: 'Export settings' },
   exportCodec: { ru: 'Кодек', en: 'Codec' },
   exportFrameRate: { ru: 'Частота кадров', en: 'Frame rate' },

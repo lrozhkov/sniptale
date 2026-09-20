@@ -179,6 +179,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
       duration={props.source.duration}
       tools={<ReviewTimelineToolsBinding {...props} onAddZoom={onZoomAdd} />}

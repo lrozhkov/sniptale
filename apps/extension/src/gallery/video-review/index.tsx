@@ -153,8 +153,8 @@ function useReviewEditorState(resource: LoadedReview) {
     run,
     canStart,
     selectComment: (annotation: ReviewAnnotation) => {
-      setActiveSelection({ kind: 'annotation', id: annotation.id });
       comments.select(annotation);
+      setActiveSelection({ kind: 'annotation', id: annotation.id });
     },
     add: (marker?: ReviewTelemetryMarker) => comments.add(selection, marker),
     displayRegion: reviewRegion(
@@ -283,13 +283,18 @@ function ReviewInspectorActions({
   composerBusy: boolean;
   onExport(): void;
 }) {
-  return (
-    <>
+  const plan = editing.exporter.plan();
+  const settings =
+    plan.kind === 'ready' && plan.video === 'render' ? (
       <ReviewRenderOptions
         exporter={editing.exporter}
         busy={busy || composerBusy || editing.exporter.phase !== 'idle'}
       />
+    ) : null;
+  return (
+    <>
       <ReviewEditActions
+        settings={settings}
         available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
         hasEdits={snapshot.document.edits.length > 0}
         busy={busy || composerBusy}
@@ -497,7 +502,7 @@ function ReviewCommentComposer({
   state,
   annotation,
 }: {
-  state: Pick<InspectorState, 'composer' | 'busy' | 'run'>;
+  state: Pick<InspectorState, 'composer' | 'busy' | 'run' | 'selectComment'>;
   annotation: ReviewAnnotation;
 }) {
   const { composer, busy, run } = state;
@@ -507,7 +512,12 @@ function ReviewCommentComposer({
       annotation={annotation}
       busy={busy}
       onChange={composer.change}
-      onSave={() => void run(composer.save)}
+      onSave={() =>
+        void run(async () => {
+          await composer.save();
+          state.selectComment(annotation);
+        })
+      }
       onDiscard={() => void run(composer.discard)}
     />
   );

@@ -101,6 +101,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         />
         <ReviewFragmentAction
           selection={props.selection}
+          snapToKeyframes={advanced.ui.mode !== 'advanced'}
           index={props.editing.exporter.index}
           edits={props.edits}
           busy={busy}

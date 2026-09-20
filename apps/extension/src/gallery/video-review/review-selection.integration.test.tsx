@@ -235,3 +235,34 @@ it('edits a selected speed range from its inspector through the same reversible 
     await fixture.cleanup();
   }
 });
+
+it('keeps a newly saved note selected and visible after leaving another inspector section', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await act(async () =>
+      [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
+        .find((button) => button.textContent === 'gallery.videoReview.comments')!
+        .click()
+    );
+    await fixture.click('addComment');
+    const field = fixture.host.querySelector<HTMLTextAreaElement>('textarea')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        field,
+        'Keep this note visible'
+      );
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await fixture.click('save');
+    expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    expect(fixture.host.querySelector('ol li')?.className).toContain(
+      'border-[var(--sniptale-color-accent)]'
+    );
+  } finally {
+    await fixture.cleanup();
+  }
+});

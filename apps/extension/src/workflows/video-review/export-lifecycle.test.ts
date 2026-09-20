@@ -468,3 +468,34 @@ it('publishes the effective canvas dimensions instead of the original source met
     }),
   ]);
 });
+
+it('plans exact advanced fragment cuts before selecting the frame renderer', async () => {
+  const { args, deps } = fixture();
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.history = [];
+  args.snapshot.workspace.cursor = 0;
+  args.index.processedVideoCodec = 'vp8';
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 20,
+    audioPackets: 0,
+    resultDuration: 2,
+    audioRanges: [],
+  });
+  const before = structuredClone(args.snapshot);
+  const result = await exportReviewedVideo(
+    { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
+    deps
+  );
+  expect(result.receipt.filename).toBe('clip-fragment-0.100-2.100.webm');
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      edits: [
+        expect.objectContaining({ kind: 'cut', start: 0, end: 0.1 }),
+        expect.objectContaining({ kind: 'cut', start: 2.1, end: 6 }),
+      ],
+    })
+  );
+  expect(args.snapshot).toEqual(before);
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+});

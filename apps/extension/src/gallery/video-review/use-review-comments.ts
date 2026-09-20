@@ -27,6 +27,7 @@ export function useReviewCommentActions(args: {
   };
   const add = (selection: ReviewAnchor, marker?: ReviewTelemetryMarker) => {
     if (args.busy || args.exporterPhase !== 'idle' || !args.canStart()) return;
+    args.setCutting(false);
     args.video.current?.pause();
     const anchor = marker ? { kind: 'point' as const, time: marker.start } : selection;
     args.seek(anchor.kind === 'point' ? anchor.time : anchor.start, false);

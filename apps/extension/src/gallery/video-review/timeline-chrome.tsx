@@ -1,3 +1,4 @@
+import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import { Play, BetweenHorizontalStart } from 'lucide-react';
 import type { ReactNode, CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
@@ -52,6 +53,7 @@ export function ReviewToolbar(props: {
   playing: boolean;
   resultDuration?: number;
   tools?: ReactNode;
+  expandedTools?: boolean;
   onPlay(): void;
   zoom: number;
   onZoom(value: number): void;
@@ -63,7 +65,13 @@ export function ReviewToolbar(props: {
         border-b border-[var(--sniptale-color-border-soft)]
         px-2 py-1"
     >
-      <div className="flex min-w-0 items-center @max-[1050px]:col-span-3 @max-[1050px]:row-start-2">
+      <div
+        className={`flex min-w-0 items-center ${
+          props.expandedTools
+            ? '@max-[1050px]:col-span-3 @max-[1050px]:row-start-2'
+            : '@max-[700px]:col-span-3 @max-[700px]:row-start-2'
+        }`}
+      >
         {props.tools}
       </div>
       <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-center gap-2">
@@ -85,7 +93,7 @@ export function ReviewToolbar(props: {
           )}
         </ReviewButton>
         <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
-          {reviewTimeLabel(props.time)} / {reviewTimeLabel(props.duration)}
+          {formatPreciseTime(props.time)} / {formatPreciseTime(props.duration)}
         </span>
         {props.resultDuration !== undefined &&
         Math.abs(props.resultDuration - props.duration) > 0.05 ? (

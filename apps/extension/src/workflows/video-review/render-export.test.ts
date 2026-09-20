@@ -416,11 +416,11 @@ describe('writeReviewFrames', () => {
     ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable', reasons: ['video-encoder'] });
   });
 
-  it('blocks unverifiable cut boundaries before staging', async () => {
+  it('blocks invalid edit ranges before staging', async () => {
     const args = argsFixture();
-    args.edits = [cutEdit(0.5, 1.5)] as ReviewEdit[];
+    args.edits = [cutEdit(-0.5, 1.5)] as ReviewEdit[];
     await expect(writeReviewFrames(args)).rejects.toThrow(
-      'Export requires verified cut boundaries.'
+      'Export requires valid non-overlapping edit ranges.'
     );
   });
 
@@ -649,4 +649,13 @@ it('encodes the selected portrait canvas while fitting the native landscape sour
   expect(state.encoded.length).toBeGreaterThan(0);
   expect(state.encoded.every((frame) => frame.width === 1080 && frame.height === 1920)).toBe(true);
   expect(state.drawn[0]?.draw).toHaveBeenCalledWith(expect.anything(), 0, 656.25, 1080, 607.5);
+});
+
+it('renders exact non-keyframe cuts while keeping output timestamps continuous', async () => {
+  state.encoded.length = 0;
+  const args = argsFixture();
+  args.edits = [cutEdit(0, 0.25), cutEdit(1.75, 2)];
+  const receipt = await writeReviewFrames(args);
+  expect(receipt.resultDuration).toBeCloseTo(1.5);
+  expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1]);
 });
