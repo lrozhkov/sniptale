@@ -59,6 +59,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   resizeEnd: { ru: 'Изменить конец участка', en: 'Resize interval end' },
   cutMode: { ru: 'Вырезание', en: 'Cut mode' },
   applyCut: { ru: 'Вырезать диапазон', en: 'Cut range' },
+  applyRange: { ru: 'Применить интервал', en: 'Apply range' },
   removeEdit: { ru: 'Удалить правку', en: 'Remove edit' },
   speedMode: { ru: 'Скорость', en: 'Speed' },
   applySpeed: { ru: 'Применить скорость', en: 'Apply speed' },

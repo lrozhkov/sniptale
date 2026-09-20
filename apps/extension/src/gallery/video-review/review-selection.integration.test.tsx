@@ -222,11 +222,15 @@ it('edits a selected speed range from its inspector through the same reversible 
       'aside input[aria-label="gallery.videoReview.rangeEnd"]'
     )!;
     expect(input).not.toBeNull();
+    const historyLength = fixture.snapshot.workspace.history.length;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2.5');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
+    await fixture.click('applyRange');
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength + 1);
     const operation = fixture.snapshot.workspace.history.at(-1);
     expect(operation).toMatchObject({
       target: 'edit',

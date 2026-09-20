@@ -9,7 +9,7 @@ import type { LoadedReview } from './use-session';
 import type { useReviewAudio } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
 import type { useReviewExport } from './use-export';
-import { ReviewNumberRow } from './number-row';
+import { ReviewEditRangeFields } from './edit-range-fields';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
 import { Trash2 } from 'lucide-react';
@@ -101,30 +101,16 @@ export function ReviewSelectedProperties(props: {
                 />
               </div>
             ) : null}
-            {(['start', 'end'] as const).map((edge) => (
-              <ReviewNumberRow
-                key={edge}
-                label={translate(
-                  edge === 'start'
-                    ? 'gallery.videoReview.rangeStart'
-                    : 'gallery.videoReview.rangeEnd'
-                )}
-                unit="s"
-                min={0}
-                max={resource.source.duration}
-                step={0.01}
-                precision={2}
-                value={editing.selected![edge]}
-                onChange={(value) => {
-                  const edit = editing.selected;
-                  if (edit)
-                    void editing.commitRange(
-                      { kind: 'range', start: edit.start, end: edit.end, [edge]: value },
-                      edit
-                    );
-                }}
-              />
-            ))}
+            <ReviewEditRangeFields
+              key={`${editing.selected.id}:${editing.selected.start}:${editing.selected.end}`}
+              edit={editing.selected}
+              edits={resource.session.getSnapshot().document.edits}
+              duration={resource.source.duration}
+              boundaries={
+                advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
+              }
+              onApply={(range) => editing.commitRange(range, editing.selected)}
+            />
             <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
               <ReviewButton
                 label={translate('gallery.videoReview.removeEdit')}

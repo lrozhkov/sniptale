@@ -2475,3 +2475,126 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`quick editor range drafts and export fit (${variant.locale}, ${variant.theme})`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      for (const tool of [
+        'gallery.videoReview.speedMode',
+        'gallery.videoReview.cutMode',
+      ] as const) {
+        await button('gallery.videoReview.pointerTool').click();
+        await source.click({ position: { x: 2, y: 2 } });
+        await button(tool).click();
+        const box = (await source.boundingBox())!;
+        await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2, { steps: 8 });
+        await page.mouse.up();
+        const fields = dialog.locator('[data-ui="gallery.videoReview.editRangeFields"]');
+        const input = fields.getByRole('textbox', {
+          name: label('gallery.videoReview.rangeStart'),
+          exact: true,
+        });
+        const original = await input.inputValue();
+        const row = input.locator(
+          'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"]'
+        );
+        await row.hover();
+        const slider = row.locator('input[type="range"]');
+        const sliderBox = (await slider.boundingBox())!;
+        await page.mouse.move(
+          sliderBox.x + sliderBox.width * 0.35,
+          sliderBox.y + sliderBox.height / 2
+        );
+        await page.mouse.down();
+        await page.mouse.move(
+          sliderBox.x + sliderBox.width * 0.5,
+          sliderBox.y + sliderBox.height / 2,
+          { steps: 15 }
+        );
+        await expect(slider).toBeEnabled();
+        await expect(input).not.toHaveValue(original);
+        await page.mouse.up();
+        const steppedFrom = Number(await input.inputValue());
+        const increase = fields.getByRole('button', {
+          name: `${label('gallery.videoReview.rangeStart')} increase`,
+          exact: true,
+        });
+        await increase.hover();
+        await page.mouse.down();
+        await page.waitForTimeout(700);
+        await page.mouse.up();
+        expect(Number(await input.inputValue())).toBeGreaterThan(steppedFrom);
+        await input.click();
+        await row.hover();
+        await expect(row).toHaveAttribute('data-range-visible', 'false');
+        await expect(
+          row.locator('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+        ).toHaveAttribute('aria-hidden', 'true');
+        await button('gallery.videoReview.applyRange').click();
+        await expect(dialog.getByRole('alert')).toHaveCount(0);
+        await expect(button('gallery.videoReview.undo')).toBeEnabled();
+        await button('gallery.videoReview.undo').click();
+        await expect(input).toHaveValue(original);
+        await dialog
+          .locator('aside')
+          .getByRole('button', { name: label('gallery.videoReview.removeEdit'), exact: true })
+          .click();
+      }
+      await button('gallery.videoReview.scene').click();
+      await button('gallery.videoReview.backgroundGradient').click();
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button')
+      ).toHaveCount(10);
+      await button('gallery.videoReview.exportSettings').click();
+      const exporting = dialog.locator('[data-ui="gallery.videoReview.exportSettings"]');
+      await expect(exporting).toBeVisible();
+      for (const width of [1920, 1280, 900]) {
+        await page.setViewportSize({ width, height: width === 1920 ? 1080 : 720 });
+        await expect
+          .poll(() =>
+            dialog.locator('aside').evaluate((node) => {
+              const nodes = [
+                node,
+                ...node.querySelectorAll(
+                  '[data-ui="gallery.videoReview.exportFooter"], [data-ui="gallery.videoReview.exportSettings"], fieldset'
+                ),
+              ];
+              return Math.max(...nodes.map((item) => item.scrollWidth - item.clientWidth));
+            })
+          )
+          .toBeLessThanOrEqual(1);
+        await page.screenshot({ path: testInfo.outputPath(`export-fit-${width}.png`) });
+      }
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

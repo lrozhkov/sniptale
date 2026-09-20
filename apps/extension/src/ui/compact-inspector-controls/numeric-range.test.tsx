@@ -112,6 +112,20 @@ afterEach(() => {
   container = null;
 });
 
+it('hides the hover scrub while typing and restores it after leaving the text field', () => {
+  renderNumericRow();
+  const row = container!.querySelector('[data-ui="shared.ui.compact-inspector.numeric-row"]')!;
+  const input = container!.querySelector<HTMLInputElement>('input[type="text"]')!;
+  act(() => row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true })));
+  expect(row.getAttribute('data-range-visible')).toBe('true');
+  act(() => input.focus());
+  act(() => row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true })));
+  expect(row.getAttribute('data-range-visible')).toBe('false');
+  expect(getRange().tabIndex).toBe(-1);
+  act(() => input.blur());
+  expect(row.getAttribute('data-range-visible')).toBe('true');
+});
+
 it('previews and commits range changes on the numeric row lower edge', () => {
   const { onCommitValue, onPreviewValue } = renderNumericRow();
   const range = getRange();

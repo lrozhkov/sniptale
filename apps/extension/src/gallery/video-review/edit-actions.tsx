@@ -344,8 +344,8 @@ export function ReviewRenderOptions({
   const format = settings.format ?? exporter.index.container;
   const codecs = reviewOutputCodecs(exporter.index, format);
   return (
-    <div className="pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
-      <fieldset disabled={busy} className="space-y-2 pb-2">
+    <div className="min-w-0 max-w-full pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
+      <fieldset disabled={busy} className="min-w-0 space-y-2 pb-2">
         <SelectField
           className={reviewSelectFieldClassName}
           label={translate('videoEditor.exportDialog.formatLabel')}

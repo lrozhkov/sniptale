@@ -15,6 +15,8 @@ export interface NumericValueFieldProps {
   max?: number | undefined;
   min?: number | undefined;
   normalizeValue?: ((value: number) => number) | undefined;
+  /** Optional domain step mapping, e.g. the next irregular media boundary. */
+  getStepValue?: ((value: number, direction: 1 | -1) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
   precision?: number | undefined;
@@ -31,6 +33,7 @@ export function NumericValueField(props: NumericValueFieldProps) {
     max: props.max,
     min: props.min,
     normalizeValue: props.normalizeValue,
+    getStepValue: props.getStepValue,
     onCommitValue: props.onCommitValue,
     onPreviewValue: props.onPreviewValue,
     precision: props.precision,
@@ -161,6 +164,14 @@ export function NumericRow({
       data-range-visible={range.visible ? 'true' : 'false'}
       onPointerMove={range.show}
       onPointerLeave={range.hide}
+      onFocusCapture={(event) => {
+        if (event.target instanceof HTMLInputElement && event.target.type === 'text')
+          range.setTextFocused(true);
+      }}
+      onBlurCapture={(event) => {
+        if (event.target instanceof HTMLInputElement && event.target.type === 'text')
+          range.setTextFocused(false);
+      }}
       className={cx(
         'group/compact-numeric-row relative min-h-10 items-center gap-2',
         appearance === 'surface' &&
@@ -205,6 +216,7 @@ function useNumericRowRangeState(
 ) {
   const [hot, setHot] = useState(false);
   const [active, setActive] = useState(false);
+  const [textFocused, setTextFocused] = useState(false);
   const show = () => {
     if (!scrub || disabled) {
       return;
@@ -215,7 +227,14 @@ function useNumericRowRangeState(
     setHot(false);
   };
 
-  return { active, hide, setActive, show, visible: hot || active };
+  return {
+    active,
+    hide,
+    setActive,
+    setTextFocused,
+    show,
+    visible: !textFocused && (hot || active),
+  };
 }
 
 function NumericRowLabel({

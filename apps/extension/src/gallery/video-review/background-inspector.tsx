@@ -102,11 +102,15 @@ export function ReviewBackgroundInspector(props: {
         />
       </div>
       {background.enabled && background.type === 'gradient' ? (
-        <div className="grid grid-cols-5 gap-2" role="group">
+        <div
+          className="grid grid-cols-5 gap-2"
+          role="group"
+          data-ui="gallery.videoReview.gradientPresets"
+        >
           {presets
             .filter((preset) => preset.enabled)
             .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.order - b.order)
-            .slice(0, 5)
+            .slice(0, 10)
             .map((preset) => (
               <button
                 key={preset.id}
