@@ -251,7 +251,15 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       (!before && !after)
     )
       return null;
-    return { ...metadata, target: 'edit', before, after };
+    if (value['preserveFocusAnchors'] !== undefined && value['preserveFocusAnchors'] !== true)
+      return null;
+    return {
+      ...metadata,
+      target: 'edit',
+      before,
+      after,
+      ...(value['preserveFocusAnchors'] === true ? { preserveFocusAnchors: true as const } : {}),
+    };
   }
   if (value['target'] === 'canvasComment') {
     const before = value['before'] === null ? null : parseCanvasComment(value['before'], duration);

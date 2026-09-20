@@ -208,8 +208,10 @@ export async function commitVideoWorkspace(args: {
       args.expectedRevision,
       args.expectedSourceAssetId
     );
-    const operation = parseReviewOperation(args.operation, workspace.source.duration);
-    if (!operation) throw new VideoWorkspaceError('invalid');
+    const parsed = parseReviewOperation(args.operation, workspace.source.duration);
+    if (!parsed) throw new VideoWorkspaceError('invalid');
+    const operation =
+      parsed.target === 'edit' ? { ...parsed, preserveFocusAnchors: true as const } : parsed;
     if (
       args.consumeDraftRevision !== undefined &&
       (!draft ||

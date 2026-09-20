@@ -192,3 +192,52 @@ describe('advancedContent operations', () => {
     ).toThrow('no change');
   });
 });
+
+it('keeps historical focus snapshots replayable while new edits atomically anchor focus', () => {
+  const baseline = createQuickEditAdvancedContent();
+  baseline.zoom.regions = [
+    {
+      id: 'focus',
+      start: 6,
+      end: 8,
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'linear', duration: 0.3 },
+      exit: { type: 'linear', duration: 0.3 },
+    },
+  ];
+  const cut: ReviewOperation = {
+    id: 'old-cut',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: { id: 'cut', kind: 'cut', start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
+  };
+  const changed = structuredClone(baseline);
+  changed.zoom.regions[0]!.transform.scale = 3;
+  const history: ReviewOperation[] = [
+    cut,
+    { id: 'snapshot', at: 2, target: 'advancedContent', before: baseline, after: changed },
+  ];
+  expect(replayReviewHistory(history, 2, source, baseline).advancedContent).toEqual(changed);
+  history.push({
+    id: 'remove-cut',
+    at: 3,
+    target: 'edit',
+    before: cut.after,
+    after: null,
+    preserveFocusAnchors: true,
+  });
+  const result = replayReviewHistory(history, 3, source, baseline);
+  expect(result.advancedContent.zoom.regions[0]).toMatchObject({ start: 8, end: 10 });
+  const next = structuredClone(result.advancedContent);
+  next.zoom.regions[0]!.transform.scale = 2;
+  history.push({
+    id: 'new-snapshot',
+    at: 4,
+    target: 'advancedContent',
+    before: result.advancedContent,
+    after: next,
+  });
+  expect(replayReviewHistory(history, 4, source, baseline).advancedContent).toEqual(next);
+  expect(replayReviewHistory(history, 2, source, baseline).advancedContent).toEqual(changed);
+});

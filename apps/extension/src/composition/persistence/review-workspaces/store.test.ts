@@ -566,3 +566,64 @@ it('keeps schema version constant in stored advanced state', async () => {
   });
   expect(saved.workspace.advanced.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
 });
+
+it('commits cut focus cleanup atomically and restores source anchors through undo and reload', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const advanced = createQuickEditAdvancedState();
+  const first = {
+    ...createQuickEditZoomRegion({ id: 'first', at: 0, duration: 1 }),
+    linkTo: 'removed',
+  };
+  const removed = { ...createQuickEditZoomRegion({ id: 'removed', at: 3 }), linkTo: 'last' };
+  const last = createQuickEditZoomRegion({ id: 'last', at: 9 });
+  advanced.zoom.regions = [first, removed, last];
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    advanced,
+  });
+  const args = {
+    aggregateId: id,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    operation: {
+      id: 'cut-focus',
+      at: 10,
+      target: 'edit',
+      before: null,
+      after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    },
+  };
+  harness.failure = true;
+  await expect(commitVideoWorkspace(args)).rejects.toBeDefined();
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(saved.workspace);
+  harness.failure = false;
+  const committed = await commitVideoWorkspace(args);
+  const { replayReviewHistory, reviewAdvancedContentBaseline } =
+    await import('../../../features/video/review/document');
+  const derive = (workspace: typeof saved.workspace) =>
+    replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    ).advancedContent.zoom.regions;
+  expect(derive(committed.workspace)).toEqual([
+    createQuickEditZoomRegion({ id: 'first', at: 0, duration: 1 }),
+    { ...last, start: 7, end: 9 },
+  ]);
+  expect((await openVideoWorkspace(id, source)).workspace).toEqual(committed.workspace);
+  const undone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: committed.workspace.revision,
+    direction: 'undo',
+  });
+  expect(derive(undone.workspace)).toEqual([first, removed, last]);
+  const redone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(derive(redone.workspace)).toEqual(derive(committed.workspace));
+});

@@ -82,7 +82,13 @@ export interface CanvasComment {
 /** One user commit; before/after values make linear undo deterministic after a restart. */
 export type ReviewOperation = { id: string; at: number } & (
   | { target: 'annotation'; before: ReviewAnnotation | null; after: ReviewAnnotation | null }
-  | { target: 'edit'; before: ReviewEdit | null; after: ReviewEdit | null }
+  | {
+      target: 'edit';
+      before: ReviewEdit | null;
+      after: ReviewEdit | null;
+      /** Commit-time policy; absent on historical operations with fixed result-time focus. */
+      preserveFocusAnchors?: true;
+    }
   | {
       target: 'canvasComment';
       before: CanvasComment | null;

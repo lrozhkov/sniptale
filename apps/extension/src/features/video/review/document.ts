@@ -1,3 +1,4 @@
+import { reconcileReviewFocus } from './focus-edits';
 import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
@@ -91,7 +92,22 @@ export function applyReviewOperation(
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
   if (removed >= source.duration) throw new Error('Review cuts remove the entire video.');
-  return { ...document, edits };
+  const advancedContent = operation.preserveFocusAnchors
+    ? {
+        ...document.advancedContent,
+        zoom: {
+          ...document.advancedContent.zoom,
+          regions: reconcileReviewFocus({
+            regions: document.advancedContent.zoom.regions,
+            duration: source.duration,
+            before: document.edits,
+            after: edits,
+            edit: operation.after,
+          }),
+        },
+      }
+    : document.advancedContent;
+  return { ...document, edits, advancedContent };
 }
 
 /** Reconstructs the selected history position. Redo entries remain in the stored history. */
