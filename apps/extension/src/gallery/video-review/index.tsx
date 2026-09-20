@@ -1,11 +1,11 @@
+import { ReviewSelectedProperties } from './selected-properties';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import { ReviewButton, reviewTimeLabel } from './controls';
+import { ReviewButton } from './controls';
 import { useReviewWaveforms } from './audio-waveform';
 import { useReviewBackgroundImport } from './use-review-background';
-import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewStageBinding } from './stage-binding';
 import { ReviewTimelineBinding } from './timeline-binding';
 import { ReviewInspector } from './inspector';
@@ -22,15 +22,13 @@ import { useReviewAdvanced } from './use-advanced';
 import { ReviewRenderOptions, ReviewEditActions } from './edit-actions';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
-import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
+import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import { useReviewSelection } from './use-review-selection';
 import type { useReviewAudio } from './use-review-audio';
 import { ReviewVoiceoverRecording, useReviewEditorAudio } from './voiceover-recording';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
-import { ReviewZoomPreview } from './zoom-preview';
-import { useZoomPreviewSource } from './use-zoom-preview-source';
 
 function useReviewEditorState(resource: LoadedReview) {
   const { session, source } = resource;
@@ -242,6 +240,7 @@ type InspectorState = Pick<
   | 'setMode'
   | 'backgroundImport'
   | 'activeSelection'
+  | 'projected'
   | 'setActiveSelection'
   | 'editing'
   | 'session'
@@ -458,7 +457,17 @@ function ReviewInspectorBinding({
           .finally(() => state.setBusy(false));
       }}
     >
-      <ReviewSelectedProperties state={state} resource={resource} audio={audio} />
+      <ReviewSelectedProperties
+        advanced={state.advanced}
+        selection={state.activeSelection}
+        editing={state.editing}
+        zoom={state.zoom}
+        busy={state.busy}
+        markers={state.projected.markers}
+        toSourceTime={state.timeline.timeMap.timelineToSource}
+        resource={resource}
+        audio={audio}
+      />
     </ReviewInspector>
   );
 }
@@ -538,7 +547,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     setPlaying,
     selection,
     setSelection,
-    selected,
     telemetry,
     advanced,
     features,
@@ -551,7 +559,6 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     seek,
     play,
     selectComment,
-    add,
     displayRegion,
   } = state;
   const waveforms = useReviewWaveforms(
@@ -637,7 +644,9 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           time={time}
           playing={playing}
           markers={telemetry ? projected.markers : []}
-          selectedTelemetryRef={selected?.telemetryRef}
+          selectedTelemetryRef={
+            state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
+          }
           zoom={zoom}
           audio={audio}
           audioState={advanced.audio}
@@ -645,7 +654,12 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           audioVisible={features.audioTrackVisible}
           onImportAudioFile={onImportAudioFile}
           onRecordVoiceover={voiceover.open}
-          onAddComment={add}
+          onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
+          onMarker={(marker) => {
+            if (!state.canStart()) return;
+            seek(marker.start, false);
+            state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
+          }}
           onComment={selectComment}
           onSeek={seek}
           onPlay={play}
@@ -708,66 +722,11 @@ export function VideoReview({ aggregateId, onBack }: { aggregateId: string; onBa
   );
 }
 
-/** Selected-object properties share the selection owner, separately from session actions. */
-function ReviewSelectedProperties({
-  state,
-  resource,
-  audio,
-}: {
-  state: InspectorState;
-  resource: LoadedReview;
-  audio: ReturnType<typeof useReviewAudio>;
-}) {
-  const { advanced, zoom, busy, editing } = state;
-  const previewLoader = useZoomPreviewSource(resource.file);
-  return (
-    <>
-      <fieldset disabled={busy || editing.exporter.phase !== 'idle'} className="min-w-0 space-y-3">
-        {state.activeSelection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
-          <ReviewAudioInspectorSection audio={audio} busy={busy} />
-        ) : state.activeSelection.kind === 'edit' && editing.selected ? (
-          <div className="space-y-3">
-            <p className="text-sm tabular-nums">
-              {reviewTimeLabel(editing.selected.start)} – {reviewTimeLabel(editing.selected.end)}
-            </p>
-            {editing.selected.kind === 'speed' ? (
-              <p className="text-sm">{editing.selected.rate}×</p>
-            ) : null}
-            <ReviewButton
-              label={translate('gallery.videoReview.removeEdit')}
-              onClick={editing.remove}
-            />
-          </div>
-        ) : state.activeSelection.kind === 'zoom' || state.activeSelection.kind === 'zoom-link' ? (
-          <ReviewAdvancedPanels
-            advanced={advanced}
-            zoom={zoom}
-            zoomPreview={(region) => (
-              <ReviewZoomPreview
-                key={region.id}
-                disabled={busy || editing.exporter.phase !== 'idle'}
-                region={region}
-                background={advanced.background}
-                source={resource.source}
-                canvas={advanced.canvas}
-                sourceTime={state.timeline.timeMap.timelineToSource(
-                  (region.start + region.end) / 2
-                )}
-                loadFrame={previewLoader}
-                onChange={(patch) => zoom.change(region.id, patch)}
-              />
-            )}
-          />
-        ) : null}
-      </fieldset>
-    </>
-  );
-}
-
 function reviewInspectorContext(state: InspectorState): string {
   if (state.composer.annotation) return `comments:${state.composer.annotation.id}`;
   const selection = state.activeSelection;
   if (selection.kind === 'annotation') return `comments:${selection.id}`;
+  if (selection.kind === 'telemetry') return `action:${selection.ref.kind}:${selection.ref.id}`;
   if (state.advanced.ui.mode !== 'advanced') return 'comments';
   const id = 'id' in selection ? selection.id : '';
   return `settings:${selection.kind}:${id}`;
@@ -775,6 +734,7 @@ function reviewInspectorContext(state: InspectorState): string {
 
 function reviewSelectionLabel(state: InspectorState): string | undefined {
   const selection = state.activeSelection;
+  if (selection.kind === 'telemetry') return translate('gallery.videoReview.telemetry');
   if (selection.kind === 'zoom') return translate('gallery.videoReview.zoomTrack');
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
   if (selection.kind === 'audio')

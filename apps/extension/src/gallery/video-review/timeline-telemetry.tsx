@@ -49,8 +49,6 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
     laneCount === 0
       ? 0
       : laneCount * ACTION_MARKER_HEIGHT_PX + (laneCount - 1) * ACTION_LANE_GAP_PX;
-  const isActive = (marker: ReviewTelemetryMarker) =>
-    props.time >= marker.start && props.time < Math.max(marker.end, marker.start + 0.05);
   return (
     <div className="relative mb-1 overflow-x-hidden overflow-y-auto" style={{ height }}>
       {layout.items.map((item) => {
@@ -59,14 +57,14 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           props.selectedTelemetryRef !== undefined &&
           marker.ref.kind === props.selectedTelemetryRef.kind &&
           marker.ref.id === props.selectedTelemetryRef.id;
-        const active = isActive(marker);
         const tone = selected
-          ? 'border-[var(--sniptale-color-accent-emphasis)] bg-[var(--sniptale-color-accent-emphasis)]'
-          : 'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)]';
+          ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
+          : 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-hover)]';
         return (
           <button
             key={`${marker.ref.kind}:${marker.ref.id}`}
             type="button"
+            aria-pressed={selected}
             aria-label={[
               translate('gallery.videoReview.telemetry'),
               reviewEventLabel(marker.eventType),
@@ -87,7 +85,6 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
               'rounded-sm border text-[10px] transition-colors',
               tone,
-              active ? 'ring-1 ring-[var(--sniptale-color-accent)]' : '',
             ].join(' ')}
             style={{
               left: item.left,

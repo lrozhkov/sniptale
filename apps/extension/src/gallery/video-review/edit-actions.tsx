@@ -11,7 +11,7 @@ import {
 import { Scissors, Download, FileVideo, Gauge, MousePointer2, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
-import { ReviewButton, reviewTimeLabel } from './controls';
+import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   canvas: 'gallery.videoReview.canvas',
@@ -27,8 +27,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   'asset-missing': 'gallery.videoReview.exportBlockerAssetMissing',
 };
 
-const plain =
-  '!border-0 !bg-transparent !shadow-none !h-8 !w-8 aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
+const plain = reviewIconButtonClassName;
 
 /** The timeline owns the editing tools; a drag applies the current tool directly. */
 export function ReviewTimelineTools(props: {
@@ -73,39 +72,7 @@ export function ReviewTimelineTools(props: {
       >
         <Gauge size={16} />
       </ReviewButton>
-      {props.mode === 'speed' ? (
-        <>
-          <ProductSelect
-            aria-label={translate('gallery.videoReview.speedRate')}
-            controlSize="sm"
-            className="!h-8 !min-h-8 !py-0"
-            containerClassName="w-16"
-            value={String(props.rate)}
-            disabled={props.busy}
-            options={REVIEW_SPEED_RATES.map((rate) => ({
-              value: String(rate),
-              label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
-            }))}
-            onChange={(value) => {
-              const rate = Number(value);
-              if (isReviewSpeedRate(rate)) props.onRate(rate);
-            }}
-          />
-          <ProductSelect<'speed' | 'mute'>
-            aria-label={translate('gallery.videoReview.speedAudio')}
-            controlSize="sm"
-            className="!h-8 !min-h-8 !py-0"
-            containerClassName="max-w-36"
-            value={props.audio}
-            disabled={props.busy}
-            onChange={props.onAudio}
-            options={[
-              { value: 'speed', label: translate('gallery.videoReview.speedSound') },
-              { value: 'mute', label: translate('gallery.videoReview.muteSound') },
-            ]}
-          />
-        </>
-      ) : null}
+      {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
       {props.selected ? (
         <ReviewButton
           label={translate('gallery.videoReview.removeEdit')}
@@ -116,6 +83,49 @@ export function ReviewTimelineTools(props: {
           <Trash2 size={15} />
         </ReviewButton>
       ) : null}
+    </>
+  );
+}
+
+/** Compact speed choices shared by the timeline tool and selected-edit inspector. */
+export function ReviewSpeedOptions(props: {
+  rate: number;
+  audio: 'speed' | 'mute';
+  busy: boolean;
+  onRate(value: ReviewSpeedRate): void;
+  onAudio(value: 'speed' | 'mute'): void;
+}) {
+  return (
+    <>
+      <ProductSelect
+        aria-label={translate('gallery.videoReview.speedRate')}
+        controlSize="sm"
+        className="!h-8 !min-h-8 !w-auto !min-w-0 !py-0"
+        containerClassName="!w-auto !min-w-0 shrink-0"
+        value={String(props.rate)}
+        disabled={props.busy}
+        options={REVIEW_SPEED_RATES.map((rate) => ({
+          value: String(rate),
+          label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
+        }))}
+        onChange={(value) => {
+          const rate = Number(value);
+          if (isReviewSpeedRate(rate)) props.onRate(rate);
+        }}
+      />
+      <ProductSelect<'speed' | 'mute'>
+        aria-label={translate('gallery.videoReview.speedAudio')}
+        controlSize="sm"
+        className="!h-8 !min-h-8 !w-auto !min-w-0 !py-0"
+        containerClassName="!w-auto !min-w-0 shrink-0"
+        value={props.audio}
+        disabled={props.busy}
+        onChange={props.onAudio}
+        options={[
+          { value: 'speed', label: translate('gallery.videoReview.speedSound') },
+          { value: 'mute', label: translate('gallery.videoReview.muteSound') },
+        ]}
+      />
     </>
   );
 }

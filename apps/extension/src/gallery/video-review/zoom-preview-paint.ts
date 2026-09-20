@@ -21,15 +21,15 @@ export function paintZoomPreview(
     cornerRadius?: number;
   }
 ) {
-  const { contentRect, videoRect, videoTransform } = args.layout;
+  const { videoRect, videoTransform } = args.layout;
   context.clearRect(0, 0, args.width, args.height);
   context.save();
   context.beginPath();
   context.roundRect(
-    contentRect.x,
-    contentRect.y,
-    contentRect.width,
-    contentRect.height,
+    videoRect.x,
+    videoRect.y,
+    videoRect.width,
+    videoRect.height,
     args.cornerRadius ?? 0
   );
   context.clip();
@@ -43,13 +43,11 @@ export function paintZoomPreview(
   context.restore();
   if (args.view === 'area') {
     const footprint: QuickEditRect = {
-      x:
-        videoRect.x + ((contentRect.x - videoTransform.x) / videoTransform.width) * videoRect.width,
+      x: videoRect.x + ((videoRect.x - videoTransform.x) / videoTransform.width) * videoRect.width,
       y:
-        videoRect.y +
-        ((contentRect.y - videoTransform.y) / videoTransform.height) * videoRect.height,
-      width: contentRect.width / args.camera.scale,
-      height: contentRect.height / args.camera.scale,
+        videoRect.y + ((videoRect.y - videoTransform.y) / videoTransform.height) * videoRect.height,
+      width: videoRect.width / args.camera.scale,
+      height: videoRect.height / args.camera.scale,
     };
     context.strokeStyle = args.accent;
     context.lineWidth = 2;

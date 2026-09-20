@@ -509,18 +509,18 @@ export function drawReviewSceneFrame(
   const clip = background.enabled ? background.layout : null;
   if (clip && clip.cornerRadius > 0) {
     context.roundRect(
-      layout.contentRect.x,
-      layout.contentRect.y,
-      layout.contentRect.width,
-      layout.contentRect.height,
-      Math.min(clip.cornerRadius, Math.min(layout.contentRect.width, layout.contentRect.height) / 2)
+      layout.videoRect.x,
+      layout.videoRect.y,
+      layout.videoRect.width,
+      layout.videoRect.height,
+      Math.min(clip.cornerRadius, Math.min(layout.videoRect.width, layout.videoRect.height) / 2)
     );
   } else {
     context.rect(
-      layout.contentRect.x,
-      layout.contentRect.y,
-      layout.contentRect.width,
-      layout.contentRect.height
+      layout.videoRect.x,
+      layout.videoRect.y,
+      layout.videoRect.width,
+      layout.videoRect.height
     );
   }
   context.clip();

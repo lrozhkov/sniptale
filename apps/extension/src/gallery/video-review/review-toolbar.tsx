@@ -5,14 +5,13 @@ import {
 } from '../../features/video/review/advanced/effective';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { ReviewButton } from './controls';
+import { reviewIconButtonClassName, ReviewButton } from './controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import { Activity, AudioLines, Focus, SlidersHorizontal } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
-const plain =
-  '!border-0 !bg-transparent !shadow-none !w-8 aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
+const plain = reviewIconButtonClassName;
 
 type Editing = ReturnType<typeof useReviewEdits>;
 
@@ -84,7 +83,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         ) : null}
       </div>
       <div
-        className="flex min-w-0 flex-wrap items-center gap-0.5 border-l border-[var(--sniptale-color-border-soft)] pl-1"
+        className="flex min-w-max flex-1 flex-nowrap items-center justify-center gap-0.5 px-2"
         data-ui="gallery.videoReview.editingTools"
       >
         <ReviewTimelineTools

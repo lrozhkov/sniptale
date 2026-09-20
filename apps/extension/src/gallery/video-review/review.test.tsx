@@ -165,8 +165,8 @@ it('integrates selection, recoverable text, drawing, history and report actions 
         .querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventCursorIdle"]')!
         .click()
     );
-    expect(host.querySelector('textarea')).not.toBeNull();
-    await click('discard');
+    expect(host.querySelector('textarea')).toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.actionProperties"]')).not.toBeNull();
     await click('telemetry');
     await click('back');
     expect(back).toHaveBeenCalledOnce();

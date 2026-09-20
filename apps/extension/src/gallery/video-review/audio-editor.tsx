@@ -1,12 +1,9 @@
+import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { reviewTimeLabel } from './controls';
 import { ReviewButton } from './controls';
 import type { useReviewAudio } from './use-review-audio';
-
-const fieldClass =
-  'w-full rounded-md border border-[var(--sniptale-color-border-soft)] bg-transparent px-2 py-1 text-sm';
-const number = (value: string) => (value === '' ? undefined : Number(value));
 
 /** Editor for the selected audio clip: level, mute, fades, and the delete action. */
 export function ReviewAudioClipEditor(props: {
@@ -17,70 +14,39 @@ export function ReviewAudioClipEditor(props: {
   onDelete(): void;
 }) {
   return (
-    <div
-      data-ui="gallery.videoReview.audioInspector"
-      className="space-y-3 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3"
-    >
-      <h4 className="truncate text-sm font-semibold">
+    <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">
+      <h4 className="text-sm font-semibold">
         {props.laneLabel} {reviewTimeLabel(props.clip.timelineStart)}–
         {reviewTimeLabel(props.clip.timelineStart + props.clip.duration)}
       </h4>
-      <div className="grid grid-cols-3 gap-2">
-        <label className="space-y-1">
-          <span className="block text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.audioClipVolume')}
-          </span>
-          <input
-            aria-label={translate('gallery.videoReview.audioClipVolume')}
-            className={`${fieldClass} tabular-nums`}
-            type="number"
-            min={0}
-            max={2}
-            step={0.05}
-            value={props.clip.volume}
-            onChange={(event) => {
-              const volume = number(event.target.value);
-              if (volume !== undefined) props.onPatch({ volume });
-            }}
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.audioFadeIn')}
-          </span>
-          <input
-            aria-label={translate('gallery.videoReview.audioFadeIn')}
-            className={`${fieldClass} tabular-nums`}
-            type="number"
-            min={0}
-            max={60}
-            step={0.1}
-            value={props.clip.fadeIn}
-            onChange={(event) => {
-              const fadeIn = number(event.target.value);
-              if (fadeIn !== undefined) props.onPatch({ fadeIn });
-            }}
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="block text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('gallery.videoReview.audioFadeOut')}
-          </span>
-          <input
-            aria-label={translate('gallery.videoReview.audioFadeOut')}
-            className={`${fieldClass} tabular-nums`}
-            type="number"
-            min={0}
-            max={60}
-            step={0.1}
-            value={props.clip.fadeOut}
-            onChange={(event) => {
-              const fadeOut = number(event.target.value);
-              if (fadeOut !== undefined) props.onPatch({ fadeOut });
-            }}
-          />
-        </label>
-      </div>
+      <ReviewNumberRow
+        label={translate('gallery.videoReview.audioClipVolume')}
+        unit="%"
+        min={0}
+        max={200}
+        step={1}
+        value={props.clip.volume * 100}
+        disabled={props.busy}
+        onChange={(value) => props.onPatch({ volume: value / 100 })}
+      />
+      {(['fadeIn', 'fadeOut'] as const).map((key) => (
+        <ReviewNumberRow
+          key={key}
+          label={translate(
+            key === 'fadeIn'
+              ? 'gallery.videoReview.audioFadeIn'
+              : 'gallery.videoReview.audioFadeOut'
+          )}
+          unit="s"
+          min={0}
+          max={Math.min(60, props.clip.duration)}
+          step={0.1}
+          precision={2}
+          value={props.clip[key]}
+          disabled={props.busy}
+          onChange={(value) => props.onPatch({ [key]: value })}
+        />
+      ))}
       <div className="flex flex-wrap gap-2">
         <ReviewButton
           label={translate('gallery.videoReview.audioClipMute')}

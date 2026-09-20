@@ -202,7 +202,7 @@ it('splits colliding actions into lanes and scrolls the dense tail inside a boun
   expect(props.onMarker).toHaveBeenCalledWith(markers.at(-1));
 });
 
-it('highlights the selected action and the action under the playhead', () => {
+it('highlights only the explicitly selected action, independently of playback', () => {
   const markers = [
     { ref: { kind: 'action' as const, id: 'a' }, eventType: 'CLICK', start: 1, end: 1 },
     { ref: { kind: 'action' as const, id: 'b' }, eventType: 'SCROLL', start: 2, end: 2.5 },
@@ -214,8 +214,11 @@ it('highlights the selected action and the action under the playhead', () => {
   });
   const strip = host.querySelector('div.relative.mb-1')!;
   const [selected, scrolled] = [...strip.querySelectorAll<HTMLButtonElement>('button')];
-  expect(selected?.className).toContain('bg-[var(--sniptale-color-accent-emphasis)]');
-  expect(scrolled?.className).toContain('ring-1');
+  expect(selected?.getAttribute('aria-pressed')).toBe('true');
+  expect(selected?.className).toContain('border-[var(--sniptale-color-accent)]');
+  expect(scrolled?.getAttribute('aria-pressed')).toBe('false');
+  expect(scrolled?.className).not.toContain('accent');
+  expect(scrolled?.className).not.toContain('ring-');
 });
 
 it('exposes transport, continuous zoom and fit without a volume control', () => {
@@ -298,3 +301,14 @@ function changeZoom(host: HTMLElement, value: string) {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
+
+it('clears object selection on empty-plane seek, leaving interactive action clicks alone', () => {
+  const clear = vi.fn();
+  const { host } = renderTimeline({ onClearSelection: clear });
+  const plane = planeWithMetrics(host);
+  dispatchPlane(plane, [
+    { type: 'pointerdown', x: 300 },
+    { type: 'pointerup', x: 300 },
+  ]);
+  expect(clear).toHaveBeenCalledTimes(1);
+});

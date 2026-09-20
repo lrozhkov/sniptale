@@ -7,6 +7,7 @@ type PlaneDragProps = {
   time: number;
   selection: ReviewAnchor;
   onSeek(time: number, snap?: boolean): void;
+  onClearSelection?(): void;
   onSelect(value: ReviewAnchor): void;
   onRangeCommit?(range: ReviewAnchor): void;
 };
@@ -59,6 +60,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
           event.target.closest('button,[data-ui="gallery.videoReview.trackHeader"]'))
       )
         return;
+      props.onClearSelection?.();
       const time = planeTime(event, props.duration, props.gutter ?? 0);
       drag.current = {
         start: time,

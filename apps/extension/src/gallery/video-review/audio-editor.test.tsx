@@ -66,11 +66,14 @@ it('patches volume and fades from numeric fields', () => {
   const { field } = renderEditor(clip);
   setValue(field('audioClipVolume'), '');
   expect(onPatch).not.toHaveBeenCalled();
-  setValue(field('audioClipVolume'), '1.5');
+  setValue(field('audioClipVolume'), '150');
+  act(() => field('audioClipVolume').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ volume: 1.5 });
   setValue(field('audioFadeIn'), '0.5');
+  act(() => field('audioFadeIn').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ fadeIn: 0.5 });
   setValue(field('audioFadeOut'), '0.3');
+  act(() => field('audioFadeOut').dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenCalledWith({ fadeOut: 0.3 });
 });
 

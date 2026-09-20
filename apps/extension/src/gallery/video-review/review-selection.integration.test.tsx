@@ -153,3 +153,85 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
     await fixture.cleanup();
   }
 });
+
+it('selects captured actions without creating notes and clears the selection on empty timeline', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const action = fixture.host.querySelector<HTMLButtonElement>(
+      '[aria-label^="gallery.videoReview.telemetry ·"]'
+    )!;
+    expect(action).not.toBeNull();
+    await act(async () => action.click());
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.actionProperties"]')
+    ).not.toBeNull();
+    expect(action.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.snapshot.draft).toBeNull();
+    expect(integration.draft).not.toHaveBeenCalled();
+    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
+    expect(action.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.snapshot.workspace.history).toHaveLength(0);
+    const plane = fixture.host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.timePlane"]'
+    )!;
+    Object.assign(plane, { setPointerCapture: vi.fn(), hasPointerCapture: () => false });
+    await act(async () =>
+      plane.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 300, button: 0 }))
+    );
+    expect(action.getAttribute('aria-pressed')).toBe('false');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.actionProperties"]')
+    ).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('edits a selected speed range from its inspector through the same reversible history', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('speedMode');
+    await dragRange(fixture.host);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
+    const input = fixture.host.querySelector<HTMLInputElement>(
+      'aside input[aria-label="gallery.videoReview.rangeEnd"]'
+    )!;
+    expect(input).not.toBeNull();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2.5');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    const operation = fixture.snapshot.workspace.history.at(-1);
+    expect(operation).toMatchObject({
+      target: 'edit',
+      after: { kind: 'speed', start: 1, end: 2.5 },
+    });
+    const remove = fixture.host.querySelector<HTMLButtonElement>(
+      'aside button[aria-label="gallery.videoReview.removeEdit"]'
+    )!;
+    await act(async () => remove.click());
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'edit',
+      after: null,
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});

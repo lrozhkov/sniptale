@@ -4,6 +4,7 @@ import type {
   ReviewOperation,
   ReviewSelection,
 } from '../../features/video/review/types';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
 
@@ -30,9 +31,14 @@ export function selectedHistoryRemoval(
 export function reviewSelectionExists(
   selection: ReviewSelection,
   document: ReviewDocument,
-  advanced: QuickEditAdvancedState
+  advanced: QuickEditAdvancedState,
+  markers: readonly ReviewTelemetryMarker[] = []
 ): boolean {
   if (selection.kind === 'none') return false;
+  if (selection.kind === 'telemetry')
+    return markers.some(
+      (marker) => marker.ref.kind === selection.ref.kind && marker.ref.id === selection.ref.id
+    );
   if (selection.kind === 'edit') return document.edits.some((item) => item.id === selection.id);
   if (selection.kind === 'annotation')
     return document.annotations.some((item) => item.id === selection.id);
@@ -63,6 +69,7 @@ export function useReviewSelectionLifecycle(args: {
   setSelection(selection: ReviewSelection): void;
   document: ReviewDocument;
   advanced: QuickEditAdvancedState;
+  markers?: readonly ReviewTelemetryMarker[];
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
@@ -72,7 +79,7 @@ export function useReviewSelectionLifecycle(args: {
   clearAnnotation(): void;
 }) {
   const remove = () => {
-    if (args.selection.kind === 'none') return;
+    if (args.selection.kind === 'none' || args.selection.kind === 'telemetry') return;
     const historyRemoval = selectedHistoryRemoval(args.selection, args.document);
     if (historyRemoval) void args.run(() => args.commit(historyRemoval));
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
@@ -85,7 +92,7 @@ export function useReviewSelectionLifecycle(args: {
   useEffect(() => {
     if (
       args.selection.kind !== 'none' &&
-      !reviewSelectionExists(args.selection, args.document, args.advanced)
+      !reviewSelectionExists(args.selection, args.document, args.advanced, args.markers)
     )
       args.setSelection({ kind: 'none' });
   }, [args]);

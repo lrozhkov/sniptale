@@ -19,7 +19,7 @@ import {
   moveQuickEditAudioClip,
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
-import { ReviewButton } from './controls';
+import { reviewIconButtonClassName, ReviewButton } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewAudioWaveform } from './audio-waveform';
@@ -389,7 +389,7 @@ function ReviewOriginalLane(props: {
           label={translate('gallery.videoReview.audioEnabled')}
           aria-pressed={!props.original.muted}
           disabled={props.busy}
-          className="!h-7 !min-h-7 !px-1"
+          className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
           onClick={() => props.onOriginal({ muted: !props.original.muted })}
         >
           {props.original.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
@@ -454,7 +454,7 @@ function ReviewClipLanes(props: {
                 <ReviewButton
                   label={translate('gallery.videoReview.recordVoiceover')}
                   disabled={props.busy}
-                  className="!h-7 !min-h-7 !px-1"
+                  className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
                   onClick={props.onRecordVoiceover}
                 >
                   <Mic size={14} />
@@ -463,7 +463,7 @@ function ReviewClipLanes(props: {
               <ReviewButton
                 label={translate('gallery.videoReview.audioImport')}
                 disabled={props.busy}
-                className="!h-7 !min-h-7 !px-1"
+                className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
                 onClick={() => {
                   props.pickerLane.current = lane.key;
                   props.pickerInput.current?.click();
@@ -479,7 +479,7 @@ function ReviewClipLanes(props: {
                     props.audio[lane.key].some((clip) => !clip.muted)
                   }
                   disabled={props.busy || !props.audio[lane.key].length}
-                  className="!h-7 !min-h-7 !px-1"
+                  className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
                   onClick={() => props.onMuteLane?.(lane.key)}
                 >
                   {props.audio[lane.key].length > 0 &&

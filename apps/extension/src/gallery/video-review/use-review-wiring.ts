@@ -96,6 +96,7 @@ export function useReviewEditorWiring(args: {
   };
   const removeSelection = useReviewSelectionLifecycle({
     selection: args.activeSelection,
+    markers: projected.markers,
     setSelection: args.setActiveSelection,
     document: args.document,
     advanced: args.advanced,

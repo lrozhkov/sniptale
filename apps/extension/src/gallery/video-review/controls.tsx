@@ -5,6 +5,12 @@ import {
   getControlSecondaryButtonClassName,
 } from '@sniptale/ui/control-language';
 
+/** Quiet icon controls share selection and disabled tones with the main video editor. */
+export const reviewIconButtonClassName =
+  '!border-0 !bg-transparent !shadow-none !h-8 !w-8 !min-h-8 ' +
+  '!text-[var(--sniptale-color-text-secondary)] aria-pressed:!text-[var(--sniptale-color-accent)] ' +
+  'disabled:!text-[var(--sniptale-color-text-muted)] disabled:opacity-40';
+
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({
   label,

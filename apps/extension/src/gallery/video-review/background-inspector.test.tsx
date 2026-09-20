@@ -81,6 +81,7 @@ it('switches the background kind and commits layout values', async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(padding, '60');
     padding.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await act(async () => padding.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(change).toHaveBeenLastCalledWith({
     layout: { padding: 60, cornerRadius: 12 },
   });
@@ -98,6 +99,7 @@ it('switches the background kind and commits layout values', async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(corner, '24');
     corner.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await act(async () => corner.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(change).toHaveBeenLastCalledWith({
     layout: { padding: 60, cornerRadius: 24 },
   });

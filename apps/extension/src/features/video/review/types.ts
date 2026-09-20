@@ -103,6 +103,7 @@ export type ReviewOperation = { id: string; at: number } & (
  */
 export type ReviewSelection =
   | { kind: 'none' }
+  | { kind: 'telemetry'; ref: NonNullable<ReviewAnnotation['telemetryRef']> }
   | { kind: 'edit'; id: string }
   | { kind: 'annotation'; id: string }
   | { kind: 'canvas-comment'; id: string }

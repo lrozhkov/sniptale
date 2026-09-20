@@ -235,14 +235,22 @@ function ReviewSceneVideo(props: {
   onError(): void;
 }) {
   const clip = props.scene?.background.enabled ? props.scene.background.layout : null;
+  const translation = props.layout
+    ? {
+        x: props.layout.videoTransform.x - props.layout.videoRect.x,
+        y: props.layout.videoTransform.y - props.layout.videoRect.y,
+      }
+    : { x: 0, y: 0 };
+  const scale = props.scene?.camera.scale ?? 1;
+  const videoTransform = `translate3d(${translation.x}px, ${translation.y}px, 0) scale(${scale})`;
   return (
     <div
       style={{
         position: 'absolute',
-        left: props.layout?.contentRect.x ?? 0,
-        top: props.layout?.contentRect.y ?? 0,
-        width: props.layout?.contentRect.width ?? undefined,
-        height: props.layout?.contentRect.height ?? undefined,
+        left: props.layout?.videoRect.x ?? 0,
+        top: props.layout?.videoRect.y ?? 0,
+        width: props.layout?.videoRect.width ?? undefined,
+        height: props.layout?.videoRect.height ?? undefined,
         overflow: 'hidden',
         borderRadius: clip ? clip.cornerRadius * props.previewScale : undefined,
       }}
@@ -258,10 +266,12 @@ function ReviewSceneVideo(props: {
           props.layout
             ? {
                 position: 'absolute',
-                left: props.layout.videoTransform.x - props.layout.contentRect.x,
-                top: props.layout.videoTransform.y - props.layout.contentRect.y,
-                width: props.layout.videoTransform.width,
-                height: props.layout.videoTransform.height,
+                left: 0,
+                top: 0,
+                width: props.layout.videoRect.width,
+                height: props.layout.videoRect.height,
+                transformOrigin: '0 0',
+                transform: videoTransform,
                 maxWidth: 'none',
                 pointerEvents: 'none',
               }
@@ -286,7 +296,7 @@ function ReviewSceneVideo(props: {
           drawing={props.drawing}
           offset={
             props.layout
-              ? { x: props.layout.contentRect.x, y: props.layout.contentRect.y }
+              ? { x: props.layout.videoRect.x, y: props.layout.videoRect.y }
               : { x: 0, y: 0 }
           }
           projected={props.projected}

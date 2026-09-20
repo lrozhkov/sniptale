@@ -1,3 +1,4 @@
+import { ReviewNumberRow } from './number-row';
 import { useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import type {
@@ -9,12 +10,6 @@ import { serializePaintToCss, createSolidPaint, type Paint } from '@sniptale/fou
 import { useGradientPresetCatalog } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
 import { CompactPaintSelector } from '../../ui/paint-selector';
 import { ReviewButton } from './controls';
-
-const fieldClass =
-  'w-full rounded-[var(--sniptale-radius-sm)] border border-[var(--sniptale-color-border-soft)] ' +
-  'bg-[var(--sniptale-color-surface-canvas)] px-2 py-1 text-sm outline-none ' +
-  'focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]';
-const number = (value: string) => (value === '' ? undefined : Number(value));
 
 const kinds = [
   { key: 'none', label: 'gallery.videoReview.backgroundNone' },
@@ -44,31 +39,19 @@ export function ReviewBackgroundInspector(props: {
   const { background, onChange } = props;
   const paint = backgroundPaint(background);
   const layoutField = (key: keyof QuickEditBackgroundLayout, label: string) => (
-    <label className="space-y-1">
-      <span className="block text-xs text-[var(--sniptale-color-text-muted)]">{label}</span>
-      <input
-        aria-label={label}
-        className={`${fieldClass} tabular-nums`}
-        type="number"
-        min={0}
-        max={4096}
-        step={2}
-        value={background.enabled ? background.layout[key] : 0}
-        onChange={(event) => {
-          const value = number(event.target.value);
-          if (value !== undefined) {
-            onChange({ layout: { ...backgroundLayout(background), [key]: value } });
-          }
-        }}
-      />
-    </label>
+    <ReviewNumberRow
+      label={label}
+      unit="px"
+      min={0}
+      max={4096}
+      step={2}
+      value={background.enabled ? background.layout[key] : 0}
+      onChange={(value) => onChange({ layout: { ...backgroundLayout(background), [key]: value } })}
+    />
   );
   return (
-    <div
-      data-ui="gallery.videoReview.backgroundInspector"
-      className="space-y-3 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3"
-    >
-      <h4 className="text-sm font-semibold">{translate('gallery.videoReview.canvas')}</h4>
+    <div data-ui="gallery.videoReview.backgroundInspector" className="min-w-0 space-y-3">
+      <h4 className="text-sm font-semibold">{translate('gallery.videoReview.background')}</h4>
       <div
         className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--sniptale-color-surface-canvas)] p-1"
         role="group"
@@ -163,7 +146,7 @@ export function ReviewBackgroundInspector(props: {
         />
       ) : null}
       {background.enabled ? (
-        <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-2">
           {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
           {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
         </div>

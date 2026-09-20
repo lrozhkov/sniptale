@@ -318,3 +318,25 @@ it('moves rendered translation and scale together toward an off-center crop', ()
     expect(actual.width).toBeCloseTo(900 * (1 + 2 * progress));
   }
 });
+
+it('keeps rendered translation and scale monotonic across a long slow camera transition', () => {
+  const zoom = region({
+    start: 0,
+    end: 90,
+    enter: { type: 'ease-in-out', duration: 60 },
+    exit: { type: 'none', duration: 0 },
+    transform: { scale: 2.7, centerX: 0.8, centerY: 0.3 },
+  });
+  let previous = { x: 0, y: 0, width: 1920, height: 1080 };
+  for (let frame = 0; frame <= 3600; frame++) {
+    const camera = evaluateQuickEditCameraAtTime([zoom], frame / 60);
+    const next = computeQuickEditVideoTransform({
+      videoRect: { x: 0, y: 0, width: 1920, height: 1080 },
+      camera,
+    });
+    expect(next.x).toBeLessThanOrEqual(previous.x + 1e-9);
+    expect(next.y).toBeLessThanOrEqual(previous.y + 1e-9);
+    expect(next.width).toBeGreaterThanOrEqual(previous.width - 1e-9);
+    previous = next;
+  }
+});

@@ -86,10 +86,10 @@ it('applies the scene camera transform to the video element (R05)', async () => 
   });
   // Fitted rect for an 800x450 host and a 320x180 source fills the host; a 2x
   // camera scales the video around the focus and crops to the content rect.
-  expect(stage.video.style.left).toBe('-400px');
-  expect(stage.video.style.top).toBe('-225px');
-  expect(stage.video.style.width).toBe('1600px');
-  expect(stage.video.style.height).toBe('900px');
+  expect(stage.video.style.transform).toBe('translate3d(-400px, -225px, 0) scale(2)');
+  expect(stage.video.style.top).toBe('0px');
+  expect(stage.video.style.width).toBe('800px');
+  expect(stage.video.style.height).toBe('450px');
   expect(stage.video.style.maxWidth).toBe('none');
 });
 
@@ -108,15 +108,15 @@ it('paints the scene background and crops the video to the content rect', async 
   const stageNode = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
   expect(stageNode.style.background).toBe('rgb(17, 34, 51)');
   const clip = stage.video.parentElement!;
-  expect(clip.style.left).toBe('100px');
+  expect(Number.parseFloat(clip.style.left)).toBeCloseTo(177.7778);
   expect(clip.style.top).toBe('100px');
-  expect(clip.style.width).toBe('600px');
+  expect(Number.parseFloat(clip.style.width)).toBeCloseTo(444.4444);
   expect(clip.style.height).toBe('250px');
   expect(clip.style.overflow).toBe('hidden');
   // Fitted video inside the padded content rect (letterboxed horizontally).
   const left = Number(stage.video.style.left.replace('px', ''));
   const width = Number(stage.video.style.width.replace('px', ''));
-  expect(left).toBeCloseTo(77.78, 1);
+  expect(left).toBe(0);
   expect(Number(stage.video.style.top.replace('px', ''))).toBeCloseTo(0, 6);
   expect(width).toBeCloseTo(444.44, 1);
   expect(Number(stage.video.style.height.replace('px', ''))).toBeCloseTo(250, 6);
@@ -127,7 +127,7 @@ it('keeps the scene applied when the zoom selection is absent (R05)', async () =
     scene: { background: disabled, camera: { scale: 2, centerX: 0.3, centerY: 0.4 } },
   });
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]')).toBeNull();
-  expect(stage.video.style.width).toBe('1600px');
+  expect(stage.video.style.width).toBe('800px');
 });
 
 it('keeps the identity scene for basic mode without advanced content', async () => {
@@ -179,7 +179,7 @@ it('uses export-space padding and radius at every preview size', () => {
     },
   });
   const scale = 800 / source.width;
-  expect(Number.parseFloat(stage.video.parentElement!.style.left)).toBe(40 * scale);
+  expect(Number.parseFloat(stage.video.parentElement!.style.top)).toBe(40 * scale);
   expect(Number.parseFloat(stage.video.parentElement!.style.borderRadius)).toBe(12 * scale);
 });
 
@@ -194,5 +194,25 @@ it('fits a landscape source inside the selected portrait canvas without stretchi
   expect(
     Number.parseFloat(result.video.style.width) / Number.parseFloat(result.video.style.height)
   ).toBeCloseTo(16 / 9);
-  expect(Number.parseFloat(result.video.style.top)).toBeGreaterThan(0);
+  expect(Number.parseFloat(result.video.parentElement!.style.top)).toBeGreaterThan(0);
+});
+
+it('keeps video layout fixed throughout slow zoom and clips its fitted corners at rest', () => {
+  const background: QuickEditBackgroundSettings = {
+    enabled: true,
+    type: 'solid',
+    color: '#112233ff',
+    layout: { padding: 40, cornerRadius: 12 },
+  };
+  const first = renderStage({ scene: { background, camera: identity } });
+  const width = first.video.style.width;
+  expect(Number.parseFloat(first.video.parentElement!.style.width)).toBeCloseTo(
+    Number.parseFloat(width)
+  );
+  const next = renderStage({
+    scene: { background, camera: { scale: 1.001, centerX: 0.5001, centerY: 0.5 } },
+  });
+  expect(next.video.style.width).toBe(width);
+  expect(next.video.style.transform).toContain('scale(1.001)');
+  expect(next.video.style.transformOrigin).toBe('0 0');
 });

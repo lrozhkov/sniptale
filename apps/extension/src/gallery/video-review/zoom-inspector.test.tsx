@@ -113,27 +113,27 @@ it('commits percent-mapped focus fields and dedupes a repeated commit', async ()
 it('edits transition type and duration in separate enter/exit sections', async () => {
   const change = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
   const inspector = renderInspector(change);
-  const typeIn = inspector.select(
-    'gallery.videoReview.zoomTransitionIn gallery.videoReview.zoomTransitionType'
-  );
-  const typeOut = inspector.select(
-    'gallery.videoReview.zoomTransitionOut gallery.videoReview.zoomTransitionType'
-  );
+  const typeIn = host.querySelector<HTMLButtonElement>(
+    'fieldset[aria-label$="zoomTransitionIn"] button[aria-label$="zoomTransitionType"]'
+  )!;
+  const typeOut = host.querySelector<HTMLButtonElement>(
+    'fieldset[aria-label$="zoomTransitionOut"] button[aria-label$="zoomTransitionType"]'
+  )!;
   expect(typeIn).not.toBe(typeOut);
   await act(async () => typeIn.click());
   await act(async () =>
     document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
   );
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'linear', duration: 0.3 } });
-  const durationIn = inspector.field(
-    'gallery.videoReview.zoomTransitionIn gallery.videoReview.zoomTransitionDuration'
-  );
+  const durationIn = host.querySelector<HTMLInputElement>(
+    'fieldset[aria-label$="zoomTransitionIn"] input[aria-label$="zoomTransitionDuration"]'
+  )!;
   await inspector.type(durationIn, '0.5');
   await inspector.commit(durationIn);
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 0.5 } });
-  const durationOut = inspector.field(
-    'gallery.videoReview.zoomTransitionOut gallery.videoReview.zoomTransitionDuration'
-  );
+  const durationOut = host.querySelector<HTMLInputElement>(
+    'fieldset[aria-label$="zoomTransitionOut"] input[aria-label$="zoomTransitionDuration"]'
+  )!;
   await inspector.type(durationOut, '1');
   await inspector.commit(durationOut);
   expect(change).toHaveBeenLastCalledWith({ exit: { type: 'ease-in-out', duration: 1 } });

@@ -120,7 +120,8 @@ type TimelineBindingProps = {
   audioVisible: boolean;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
-  onAddComment(marker?: ReviewTelemetryMarker): void;
+  onMarker(marker: ReviewTelemetryMarker): void;
+  onClearSelection(): void;
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
   onPlay(): void;
@@ -264,7 +265,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onSeek={props.onSeek}
       onSelect={props.setSelection}
       onPlay={props.onPlay}
-      onMarker={props.onAddComment}
+      onMarker={props.onMarker}
+      onClearSelection={props.onClearSelection}
       onComment={props.onComment}
     />
   );

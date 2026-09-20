@@ -127,7 +127,10 @@ export function ReviewInspector(props: {
         ) : shown === 'selected' ? (
           props.children
         ) : (
-          <ReviewNotes {...props} />
+          <>
+            {!props.settingsAvailable && props.selectionLabel ? props.children : null}
+            <ReviewNotes {...props} />
+          </>
         )}
       </div>
       <ReviewInspectorFooter {...props} section={shown} />
@@ -262,6 +265,13 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
           onClick={() => props.onAdd()}
         >
           <Plus size={16} />
+          <span>
+            {translate(
+              props.rangeSelected
+                ? 'gallery.videoReview.commentRange'
+                : 'gallery.videoReview.addComment'
+            )}
+          </span>
         </ReviewButton>
       </div>
       {!props.annotations.length ? (

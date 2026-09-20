@@ -1,8 +1,8 @@
-import { Play, Pause, Scan } from 'lucide-react';
+import { Play, BetweenHorizontalStart } from 'lucide-react';
 import type { ReactNode, CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
-import { ReviewButton, reviewTimeLabel } from './controls';
+import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 
 /** Useful ruler units at the current zoom; labels do not contribute to canvas width. */
 export function ReviewRuler({ duration, width }: { duration: number; width: number }) {
@@ -43,7 +43,7 @@ export function ReviewRuler({ duration, width }: { duration: number; width: numb
   );
 }
 
-const plain = '!border-0 !bg-transparent !shadow-none !h-8 !w-8 !min-h-8';
+const plain = reviewIconButtonClassName;
 
 /** Editing tools, centered transport and viewport controls share one quiet toolbar. */
 export function ReviewToolbar(props: {
@@ -59,29 +59,33 @@ export function ReviewToolbar(props: {
   return (
     <div
       data-ui="gallery.videoReview.toolbar"
-      className="flex min-w-0 flex-wrap items-center gap-1 border-b border-[var(--sniptale-color-border-soft)]
+      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1
+        border-b border-[var(--sniptale-color-border-soft)]
         px-2 py-1"
     >
-      {props.tools}
-      <div className="mx-auto flex shrink-0 items-center gap-1">
-        <span className="min-w-8 text-right text-xs tabular-nums">
-          {reviewTimeLabel(props.time)}
-        </span>
+      <div className="flex min-w-0 items-center @max-[1050px]:col-span-3 @max-[1050px]:row-start-2">
+        {props.tools}
+      </div>
+      <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-center gap-2">
         <ReviewButton
           label={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
           onClick={props.onPlay}
           className={plain}
+          aria-pressed={props.playing}
         >
           {props.playing ? (
-            <Pause size={18} fill="currentColor" />
+            <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden="true">
+              <rect x="4" y="3" width="2" height="10" />
+              <rect x="10" y="3" width="2" height="10" />
+            </svg>
           ) : (
-            <Play size={18} fill="currentColor" />
+            <Play size={16} strokeWidth={2.2} />
           )}
         </ReviewButton>
-        <span className="min-w-8 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-          {reviewTimeLabel(props.duration)}
+        <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
+          {reviewTimeLabel(props.time)} / {reviewTimeLabel(props.duration)}
         </span>
         {props.resultDuration !== undefined &&
         Math.abs(props.resultDuration - props.duration) > 0.05 ? (
@@ -93,7 +97,7 @@ export function ReviewToolbar(props: {
           </output>
         ) : null}
       </div>
-      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+      <div className="col-start-3 row-start-1 flex min-w-0 items-center justify-end gap-0.5">
         <CompactRange
           aria-label={translate('videoEditor.timeline.zoom')}
           title={translate('videoEditor.timeline.zoom')}
@@ -111,7 +115,7 @@ export function ReviewToolbar(props: {
           className={plain}
           onClick={() => props.onZoom(1)}
         >
-          <Scan size={14} />
+          <BetweenHorizontalStart size={16} strokeWidth={2} />
         </ReviewButton>
       </div>
     </div>

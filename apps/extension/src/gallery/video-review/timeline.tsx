@@ -29,6 +29,7 @@ type TimelineProps = {
   markers: readonly ReviewTelemetryMarker[];
   selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
   onSeek(time: number, snap?: boolean): void;
+  onClearSelection?(): void;
   onSelect(value: ReviewAnchor): void;
   onPlay(): void;
   onMarker(marker: ReviewTelemetryMarker): void;
