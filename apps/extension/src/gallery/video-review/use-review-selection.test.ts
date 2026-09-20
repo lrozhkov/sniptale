@@ -38,6 +38,15 @@ describe('review selection owner', () => {
         transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
         enter: { type: 'none', duration: 0 },
         exit: { type: 'none', duration: 0 },
+        linkTo: 'z2',
+      },
+      {
+        id: 'z2',
+        start: 2,
+        end: 3,
+        transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
       },
     ];
     advanced.audio.music = [
@@ -58,11 +67,14 @@ describe('review selection owner', () => {
       { kind: 'annotation', id: 'a' },
       { kind: 'canvas-comment', id: 'c' },
       { kind: 'zoom', id: 'z' },
+      { kind: 'zoom-link', id: 'z' },
       { kind: 'audio', lane: 'music', id: 'm' },
     ];
     for (const selection of live)
       expect(reviewSelectionExists(selection, document, advanced)).toBe(true);
     expect(reviewSelectionExists({ kind: 'none' }, document, advanced)).toBe(false);
+    // A stale or non-adjacent link selection is not live.
+    expect(reviewSelectionExists({ kind: 'zoom-link', id: 'z2' }, document, advanced)).toBe(false);
     expect(
       reviewSelectionExists({ kind: 'zoom-link', id: 'unsupported' }, document, advanced)
     ).toBe(false);

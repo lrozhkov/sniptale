@@ -5,6 +5,7 @@ import {
   createQuickEditZoomRegion,
   insertQuickEditZoomRegion,
   moveQuickEditZoomRegion,
+  resolveQuickEditZoomLink,
   trimQuickEditZoomRegion,
   updateQuickEditZoomRegion,
 } from './zoom';
@@ -78,6 +79,60 @@ describe('updateQuickEditZoomRegion', () => {
     expect(next.enter).toEqual({ type: 'linear', duration: 0.5 });
     expect(next.exit).toEqual({ type: 'ease-in-out', duration: 0.3 });
     expect(next.transform).toEqual(region('a', 0, 4).transform);
+  });
+
+  it('stores and clears the outgoing link and its easing', () => {
+    const regions = [region('a', 0, 2), region('b', 4, 6)];
+    const linked = updateQuickEditZoomRegion(regions, 'a', {
+      linkTo: 'b',
+      linkEasing: 'linear',
+    })[0]!;
+    expect(linked).toMatchObject({ linkTo: 'b', linkEasing: 'linear' });
+    const smooth = updateQuickEditZoomRegion(regions, 'a', { linkTo: 'b' })[0]!;
+    expect(smooth.linkTo).toBe('b');
+    expect(smooth.linkEasing).toBeUndefined();
+    const unlinked = updateQuickEditZoomRegion([linked, regions[1]!], 'a', {
+      linkTo: null,
+    })[0]!;
+    expect(unlinked.linkTo).toBeUndefined();
+    expect(unlinked.linkEasing).toBe('linear');
+  });
+});
+
+describe('resolveQuickEditZoomLink', () => {
+  const linked = (
+    id: string,
+    start: number,
+    end: number,
+    target: string,
+    extra?: Partial<QuickEditZoomRegion>
+  ): QuickEditZoomRegion => ({ ...region(id, start, end), linkTo: target, ...extra });
+
+  it('resolves a live link between adjacent active regions with a real gap', () => {
+    const regions = [linked('a', 0, 2, 'b'), region('b', 4, 6)];
+    const link = resolveQuickEditZoomLink(regions, 'a');
+    expect(link?.source.id).toBe('a');
+    expect(link?.target.id).toBe('b');
+  });
+
+  it('rejects dormant sources, stale targets, touching edges, and missing links', () => {
+    const dormant = resolveQuickEditZoomLink(
+      [linked('a', 0, 2, 'b', { dormant: true }), region('b', 4, 6)],
+      'a'
+    );
+    expect(dormant).toBeNull();
+    // A dormant target is skipped: the link only resolves to the next active region.
+    const dormantTarget = resolveQuickEditZoomLink(
+      [linked('a', 0, 2, 'c'), { ...region('b', 3, 3.5), dormant: true }, region('c', 4, 6)],
+      'a'
+    );
+    expect(dormantTarget?.target.id).toBe('c');
+    expect(resolveQuickEditZoomLink([linked('a', 0, 2, 'b'), region('b', 4, 6)], 'b')).toBeNull();
+    expect(resolveQuickEditZoomLink([linked('a', 0, 2, 'b'), region('b', 2, 6)], 'a')).toBeNull();
+    expect(resolveQuickEditZoomLink([region('a', 0, 2), region('b', 4, 6)], 'a')).toBeNull();
+    expect(
+      resolveQuickEditZoomLink([linked('a', 0, 2, 'c'), region('b', 4, 6), region('c', 8, 10)], 'a')
+    ).toBeNull();
   });
 });
 

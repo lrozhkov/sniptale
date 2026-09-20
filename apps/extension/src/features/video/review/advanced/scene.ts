@@ -184,7 +184,7 @@ export function evaluateQuickEditCameraAtTime(
     if (linkedNext && timelineTime >= region.end && timelineTime < next.start) {
       const progress = easing(
         (timelineTime - region.end) / (next.start - region.end),
-        'ease-in-out'
+        region.linkEasing ?? 'ease-in-out'
       );
       return {
         scale: lerp(region.transform.scale, next.transform.scale, progress),

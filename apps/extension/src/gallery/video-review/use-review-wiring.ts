@@ -106,6 +106,7 @@ export function useReviewEditorWiring(args: {
       if (comment) void canvasComments.onDelete(comment);
     },
     deleteZoom: args.zoom.remove,
+    deleteZoomLink: (id) => args.zoom.change(id, { linkTo: null }),
     deleteAudio: audio.removeClip,
     clearAnnotation: () => args.clearAnnotation(null),
   });

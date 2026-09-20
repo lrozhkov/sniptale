@@ -31,6 +31,8 @@ import type { useReviewAudio } from './use-review-audio';
 import { ReviewVoiceoverRecording, useReviewEditorAudio } from './voiceover-recording';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
+import { ReviewZoomPreview } from './zoom-preview';
+import { useZoomPreviewSource } from './use-zoom-preview-source';
 
 function useReviewEditorState(resource: LoadedReview) {
   const { session, source } = resource;
@@ -259,6 +261,7 @@ type InspectorState = Pick<
   | 'add'
   | 'advanced'
   | 'zoom'
+  | 'timeline'
   | 'setBackground'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
@@ -460,6 +463,7 @@ function ReviewInspectorBinding({
     >
       <ReviewSelectedProperties
         state={state}
+        resource={resource}
         canvasComments={canvasComments}
         audio={audio}
         duration={resource.source.duration}
@@ -584,7 +588,11 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           zoomRegions={features.zoomRegions}
           background={features.background}
           outputTime={timeline.sceneOutputTime}
-          zoomOverlay={zoomRegion ? zoom.focusOverlay(zoomRegion) : undefined}
+          zoomOverlay={
+            zoomRegion && !busy && editing.exporter.phase === 'idle'
+              ? zoom.focusOverlay(zoomRegion)
+              : undefined
+          }
           comments={snapshot.document.canvasComments}
           annotations={snapshot.document.annotations}
           canvasComments={canvasComments}
@@ -711,16 +719,19 @@ export function VideoReview({ aggregateId, onBack }: { aggregateId: string; onBa
 /** Selected-object properties share the selection owner, separately from session actions. */
 function ReviewSelectedProperties({
   state,
+  resource,
   canvasComments,
   audio,
   duration,
 }: {
   state: InspectorState;
+  resource: LoadedReview;
   canvasComments: ReturnType<typeof useCanvasComments>;
   audio: ReturnType<typeof useReviewAudio>;
   duration: number;
 }) {
   const { advanced, zoom, setBackground, busy, editing, snapshot } = state;
+  const previewLoader = useZoomPreviewSource(resource.file);
   return (
     <>
       {state.backgroundImport.pending ? (
@@ -753,6 +764,20 @@ function ReviewSelectedProperties({
             zoom={zoom}
             setBackground={setBackground}
             onImportImage={state.backgroundImport.importImage}
+            zoomPreview={(region) => (
+              <ReviewZoomPreview
+                key={region.id}
+                disabled={busy || editing.exporter.phase !== 'idle'}
+                region={region}
+                background={advanced.background}
+                source={resource.source}
+                sourceTime={state.timeline.timeMap.timelineToSource(
+                  (region.start + region.end) / 2
+                )}
+                loadFrame={previewLoader}
+                onChange={(patch) => zoom.change(region.id, patch)}
+              />
+            )}
           />
         ) : null}
       </fieldset>

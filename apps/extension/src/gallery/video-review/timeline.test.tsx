@@ -174,32 +174,29 @@ it('groups cursor telemetry and deduplicates dense cursor samples', () => {
   expect(props.onMarker).toHaveBeenCalledWith(action);
 });
 
-it('splits colliding actions into lanes and collapses the dense tail into an overflow chip', () => {
+it('splits colliding actions into lanes and scrolls the dense tail inside a bounded strip', () => {
   const markers = [0, 1, 2, 3, 4].map((index) => ({
     ref: { kind: 'action' as const, id: `click${index}` },
     eventType: 'CLICK',
     start: 1 + index * 0.01,
     end: 1 + index * 0.01,
   }));
-  const { host } = renderTimeline({ markers });
+  const { host, props } = renderTimeline({ markers });
   const strip = host.querySelector<HTMLElement>('div.relative.mb-1')!;
-  // Three 20px lanes with 4px gaps plus the gap and full-height overflow row.
-  expect(strip.style.height).toBe('100px');
+  // The lane stack is capped at three visible 20px lanes with 4px gaps; the rest scrolls.
+  expect(strip.style.height).toBe('68px');
+  expect(strip.className).toContain('overflow-y-auto');
   const markerButtons = [
     ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),
   ];
-  expect(markerButtons).toHaveLength(3);
+  // Every marker stays rendered and clickable; no overflow selector exists.
+  expect(markerButtons).toHaveLength(5);
   for (const button of markerButtons) expect(button.style.height).toBe('20px');
   const tops = new Set(markerButtons.map((button) => button.style.top));
-  expect(tops.size).toBe(3);
-  const chip = strip.querySelector<HTMLElement>('[data-ui="gallery.videoReview.actionOverflow"]')!;
-  expect(chip.textContent).toContain('+2');
-  // Choosing an action from the overflow chip selects it through the same handler.
-  act(() =>
-    chip.dispatchEvent(
-      new CustomEvent('change', { bubbles: true, detail: { value: 'action:click3' } })
-    )
-  );
+  expect(tops.size).toBe(5);
+  expect(strip.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
+  act(() => markerButtons.at(-1)!.click());
+  expect(props.onMarker).toHaveBeenCalledWith(markers.at(-1));
 });
 
 it('highlights the selected action and the action under the playhead', () => {

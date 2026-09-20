@@ -286,6 +286,44 @@ describe('rejects malformed persisted state', () => {
     expect(loadQuickEditAdvancedState(overlapping)).toBeNull();
   });
 
+  it('round-trips link easing and rejects unsupported values while legacy links still parse', () => {
+    const withEasing: unknown = {
+      ...structuredClone(advanced()),
+      zoom: {
+        enabled: true,
+        regions: [
+          { ...zoomRegion('a', 0, 2), linkTo: 'b', linkEasing: 'linear' },
+          zoomRegion('b', 4, 6),
+        ],
+      },
+    };
+    const parsed = loadQuickEditAdvancedState(withEasing);
+    expect(parsed?.zoom.regions[0]).toMatchObject({ linkTo: 'b', linkEasing: 'linear' });
+    expect(loadQuickEditAdvancedState(structuredClone({ ...parsed }))).toEqual(parsed);
+    // Documents written before the setting existed keep the implicit smooth default.
+    const legacy: unknown = {
+      ...structuredClone(advanced()),
+      zoom: {
+        enabled: true,
+        regions: [{ ...zoomRegion('a', 0, 2), linkTo: 'b' }, zoomRegion('b', 4, 6)],
+      },
+    };
+    const parsedLegacy = loadQuickEditAdvancedState(legacy);
+    expect(parsedLegacy?.zoom.regions[0]).toMatchObject({ linkTo: 'b' });
+    expect(parsedLegacy?.zoom.regions[0]?.linkEasing).toBeUndefined();
+    const hostile: unknown = {
+      ...structuredClone(advanced()),
+      zoom: {
+        enabled: true,
+        regions: [
+          { ...zoomRegion('a', 0, 2), linkTo: 'b', linkEasing: 'bounce' },
+          zoomRegion('b', 4, 6),
+        ],
+      },
+    };
+    expect(loadQuickEditAdvancedState(hostile)).toBeNull();
+  });
+
   it('rejects malformed transitions', () => {
     const negative: unknown = {
       ...structuredClone(advanced()),

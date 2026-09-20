@@ -270,3 +270,29 @@ it('connects two zoom targets through the gap without returning to the full fram
   expect(evaluateQuickEditCameraAtTime([first, next], 4)).toEqual(next.transform);
   expect(evaluateQuickEditCameraAtTime([first], 3).scale).toBe(1);
 });
+
+it('applies the stored link easing and keeps the legacy smooth default', () => {
+  const next = region({
+    id: 'next',
+    start: 4,
+    end: 6,
+    transform: { scale: 3, centerX: 0.5, centerY: 0.5 },
+  });
+  // t=2.5 sits at gap progress 0.25: linear lerps exactly a quarter of the way.
+  const linear = {
+    ...region({ id: 'first', start: 0, end: 2 }),
+    linkTo: 'next',
+    linkEasing: 'linear' as const,
+  };
+  const linearCamera = evaluateQuickEditCameraAtTime([linear, next], 2.5);
+  expect(linearCamera.scale).toBeCloseTo(2.25);
+  expect(linearCamera.centerX).toBeCloseTo(0.3125);
+  expect(linearCamera.centerY).toBeCloseTo(0.6875);
+  // Missing linkEasing keeps the pre-setting smooth curve: smoothstep(0.25)=0.15625.
+  const legacy = { ...region({ id: 'first', start: 0, end: 2 }), linkTo: 'next' };
+  const legacyCamera = evaluateQuickEditCameraAtTime([legacy, next], 2.5);
+  expect(legacyCamera.scale).toBeCloseTo(2 + 0.15625);
+  expect(legacyCamera.centerX).toBeCloseTo(0.25 + 0.25 * 0.15625);
+  const smooth = { ...legacy, linkEasing: 'ease-in-out' as const };
+  expect(evaluateQuickEditCameraAtTime([smooth, next], 2.5)).toEqual(legacyCamera);
+});

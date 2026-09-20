@@ -48,6 +48,8 @@ function ReviewZoomLane(props: {
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}
       onLink={(id, linkTo) => props.zoom.change(id, { linkTo })}
+      linkSelectedId={props.zoom.linkSelection}
+      onSelectLink={props.zoom.setLinkSelection}
       onAdd={props.onAdd}
       onDragCommit={props.zoom.commitDrag}
     />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link2, Plus, Focus, Eye, EyeOff } from 'lucide-react';
+import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -32,6 +32,9 @@ type ZoomTrackProps = {
   onSelect(id: string | null): void;
   onAdd(): void;
   onLink?(id: string, targetId: string | null): void;
+  /** Transient connection-settings selection; a linked gap opens it instead of unlinking. */
+  linkSelectedId?: string | null;
+  onSelectLink?(id: string): void;
   onDragCommit(
     id: string,
     range: { start: number; end: number },
@@ -196,31 +199,19 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       >
         {props.regions
           .filter((region) => !region.dormant)
-          .map((region, index, regions) => {
-            const next = regions[index + 1];
-            if (!next || next.start <= region.end || !props.onLink) return null;
-            const connected = region.linkTo === next.id;
-            return (
-              <button
-                key={`link:${region.id}`}
-                type="button"
-                aria-label={translate('gallery.videoReview.zoomConnect')}
-                aria-pressed={connected}
-                className="absolute inset-y-1 z-[6] flex items-center justify-center rounded border border-dashed
-          border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-muted)]
-          hover:bg-[var(--sniptale-color-surface-hover)] aria-pressed:border-[var(--sniptale-color-accent)]
-          aria-pressed:text-[var(--sniptale-color-accent)]"
-                style={{
-                  left: `${(props.projection?.position(region.end, 'end') ?? region.end / props.duration) * 100}%`,
-                  width: `${((props.projection?.position(next.start) ?? next.start / props.duration) - (props.projection?.position(region.end, 'end') ?? region.end / props.duration)) * 100}%`,
-                }}
-                onPointerDown={(event) => event.stopPropagation()}
-                onClick={() => props.onLink?.(region.id, connected ? null : next.id)}
-              >
-                <Link2 size={14} aria-hidden="true" />
-              </button>
-            );
-          })}
+          .map((region, index, regions) => (
+            <ReviewZoomGapLink
+              key={`link:${region.id}`}
+              duration={props.duration}
+              enabled={props.enabled}
+              linkSelectedId={props.linkSelectedId}
+              next={regions[index + 1]}
+              projection={props.projection}
+              region={region}
+              onLink={props.onLink}
+              onSelectLink={props.onSelectLink}
+            />
+          ))}
         {props.regions.map((region) => (
           <ReviewZoomRegionBlock
             key={region.id}
@@ -256,6 +247,72 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
         ) : null}
       </div>
     </ReviewTrackRow>
+  );
+}
+
+/**
+ * One gap affordance between active consecutive regions: an unlinked gap connects on
+ * click; a connected gap selects its link settings instead of silently unlinking.
+ */
+function ReviewZoomGapLink(props: {
+  duration: number;
+  enabled?: boolean | undefined;
+  linkSelectedId?: string | null | undefined;
+  next: QuickEditZoomRegion | undefined;
+  projection: ReviewTrackProjection | undefined;
+  region: QuickEditZoomRegion;
+  onLink: ((id: string, targetId: string | null) => void) | undefined;
+  onSelectLink: ((id: string) => void) | undefined;
+}) {
+  const { next, region } = props;
+  if (!next || next.start <= region.end) return null;
+  if (props.enabled === false || (!props.onLink && !props.onSelectLink)) return null;
+  const left = props.projection?.position(region.end, 'end') ?? region.end / props.duration;
+  const right = props.projection?.position(next.start) ?? next.start / props.duration;
+  if (!(right - left > 0)) return null;
+  const connected = region.linkTo === next.id;
+  return (
+    <button
+      type="button"
+      data-ui="gallery.videoReview.zoomLink"
+      data-connected={connected ? 'true' : 'false'}
+      aria-label={translate(
+        connected ? 'gallery.videoReview.zoomLinkSettings' : 'gallery.videoReview.zoomConnect'
+      )}
+      aria-pressed={connected}
+      className={`group absolute inset-y-1 z-[6] flex items-center justify-center rounded border
+        focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]
+        ${
+          connected
+            ? `border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]
+              bg-[var(--sniptale-color-accent-soft)] ${
+                props.linkSelectedId === region.id
+                  ? 'ring-1 ring-[var(--sniptale-color-accent-emphasis)]'
+                  : ''
+              }`
+            : `border-dashed border-transparent hover:border-[var(--sniptale-color-border-soft)]
+              focus-visible:border-[var(--sniptale-color-border-soft)]
+              text-[var(--sniptale-color-text-muted)]
+              hover:bg-[var(--sniptale-color-surface-hover)]`
+        }`}
+      style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%` }}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={() => {
+        if (!connected) props.onLink?.(region.id, next.id);
+        props.onSelectLink?.(region.id);
+      }}
+    >
+      {connected ? (
+        <MoveRight size={14} aria-hidden="true" />
+      ) : (
+        <MoveRight
+          size={14}
+          aria-hidden="true"
+          className="opacity-0 transition-opacity group-hover:opacity-100
+            group-focus-visible:opacity-100"
+        />
+      )}
+    </button>
   );
 }
 

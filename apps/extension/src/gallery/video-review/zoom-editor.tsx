@@ -123,12 +123,21 @@ export function useReviewZoomEditor(args: {
   timelineDuration: number;
   selection?: string | null;
   onSelectionChange?(id: string | null): void;
+  /** Transient gap-link selection; lives beside the region selection, never persisted. */
+  linkSelection?: string | null;
+  onLinkSelectionChange?(id: string | null): void;
 }) {
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const selection = args.selection === undefined ? localSelection : args.selection;
   const setSelection = (id: string | null) => {
     if (args.selection === undefined) setLocalSelection(id);
     args.onSelectionChange?.(id);
+  };
+  const [localLinkSelection, setLocalLinkSelection] = useState<string | null>(null);
+  const linkSelection = args.linkSelection === undefined ? localLinkSelection : args.linkSelection;
+  const setLinkSelection = (id: string | null) => {
+    if (args.linkSelection === undefined) setLocalLinkSelection(id);
+    args.onLinkSelectionChange?.(id);
   };
   // A revived placement must fit among active neighbors or it stays dormant.
   const add = (at: number, timelineDuration: number) => {
@@ -188,6 +197,8 @@ export function useReviewZoomEditor(args: {
   return {
     selection,
     setSelection,
+    linkSelection,
+    setLinkSelection,
     add,
     remove,
     resetPosition,

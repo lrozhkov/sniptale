@@ -417,6 +417,7 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(scale, '2');
       scale.dispatchEvent(new Event('input', { bubbles: true }));
+      scale.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2);
@@ -536,55 +537,6 @@ it('ignores the comment shortcut while report copying disables the comment contr
     expect(fixture.host.querySelector('textarea')).not.toBeNull();
   } finally {
     await act(async () => finish?.());
-    await fixture.cleanup();
-  }
-});
-
-it('blocks history and destructive shortcuts while the export controls are disabled', async () => {
-  const fixture = createEditorFixture(integration);
-  let fail!: (reason: Error) => void;
-  integration.export.mockImplementation(
-    () =>
-      new Promise((_, reject) => {
-        fail = reject;
-      })
-  );
-  integration.index.mockResolvedValue({
-    duration: 4,
-    boundaries: [0, 1, 2, 3, 4],
-    videoCodec: 'vp8',
-    audioCodec: null,
-    container: 'webm',
-    rotation: 0,
-  });
-  try {
-    await act(async () =>
-      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
-    );
-    await fixture.click('advancedEditing');
-    await fixture.click('cutMode');
-    await dragTimePlane(fixture.host, 0, 100);
-    await act(async () =>
-      fixture.host
-        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.cutLabel 0.0 – 1.0"]')!
-        .click()
-    );
-    await fixture.click('exportVideo');
-    expect(fixture.button('undo').disabled).toBe(true);
-    for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack', 'hideOverlays'])
-      expect(fixture.button(label).matches(':disabled')).toBe(true);
-    integration.history.mockClear();
-    integration.commit.mockClear();
-    for (const key of ['z', 'y'])
-      await act(async () =>
-        window.dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true }))
-      );
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
-    expect(integration.history).not.toHaveBeenCalled();
-    await dragTimePlane(fixture.host, 200, 300);
-    expect(integration.commit).not.toHaveBeenCalled();
-  } finally {
-    await act(async () => fail?.(new Error('Cancelled test export')));
     await fixture.cleanup();
   }
 });

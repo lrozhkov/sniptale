@@ -1,4 +1,8 @@
-import type { QuickEditZoomRegion, QuickEditZoomTransition } from './types';
+import type {
+  QuickEditZoomLinkEasing,
+  QuickEditZoomRegion,
+  QuickEditZoomTransition,
+} from './types';
 
 /** Renderer-consistent camera magnification bounds, matching the persisted validation. */
 const MIN_CAMERA_SCALE = 1;
@@ -45,6 +49,7 @@ export type QuickEditZoomRegionPatch = {
   enter?: QuickEditZoomTransition;
   exit?: QuickEditZoomTransition;
   linkTo?: string | null;
+  linkEasing?: QuickEditZoomLinkEasing;
 };
 
 /** Inspector edits clamp into the persisted contract; timing fields never reorder regions. */
@@ -72,8 +77,27 @@ export function updateQuickEditZoomRegion(
       },
       ...(patch.enter === undefined ? {} : { enter: patch.enter }),
       ...(patch.exit === undefined ? {} : { exit: patch.exit }),
+      ...(patch.linkEasing === undefined ? {} : { linkEasing: patch.linkEasing }),
     };
   });
+}
+
+/**
+ * A live outgoing link: the source is active, its stored target is the next active
+ * region, and a real gap separates them. Dormant, adjacent-touching, or stale links
+ * leave nothing to select or evaluate.
+ */
+export function resolveQuickEditZoomLink(
+  regions: readonly QuickEditZoomRegion[],
+  id: string
+): { source: QuickEditZoomRegion; target: QuickEditZoomRegion } | null {
+  const active = regions.filter((region) => !region.dormant);
+  const index = active.findIndex((region) => region.id === id);
+  const source = index >= 0 ? active[index] : undefined;
+  const target = index >= 0 ? active[index + 1] : undefined;
+  if (!source?.linkTo || !target || source.linkTo !== target.id || target.start <= source.end)
+    return null;
+  return { source, target };
 }
 
 /**

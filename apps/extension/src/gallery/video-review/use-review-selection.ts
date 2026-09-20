@@ -5,6 +5,7 @@ import type {
   ReviewSelection,
 } from '../../features/video/review/types';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
 
 /** Builds the history deletion represented by a text or edit selection. */
 export function selectedHistoryRemoval(
@@ -39,6 +40,8 @@ export function reviewSelectionExists(
     return document.canvasComments.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom')
     return advanced.zoom.regions.some((item) => item.id === selection.id);
+  if (selection.kind === 'zoom-link')
+    return resolveQuickEditZoomLink(advanced.zoom.regions, selection.id) !== null;
   if (selection.kind === 'audio')
     return advanced.audio[selection.lane].some((item) => item.id === selection.id);
   return false;
@@ -64,6 +67,7 @@ export function useReviewSelectionLifecycle(args: {
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
   deleteZoom(id: string): void;
+  deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
   clearAnnotation(): void;
 }) {
@@ -73,6 +77,7 @@ export function useReviewSelectionLifecycle(args: {
     if (historyRemoval) void args.run(() => args.commit(historyRemoval));
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
     else if (args.selection.kind === 'zoom') args.deleteZoom(args.selection.id);
+    else if (args.selection.kind === 'zoom-link') args.deleteZoomLink(args.selection.id);
     else if (args.selection.kind === 'audio')
       args.deleteAudio(args.selection.lane, args.selection.id);
     args.setSelection({ kind: 'none' });

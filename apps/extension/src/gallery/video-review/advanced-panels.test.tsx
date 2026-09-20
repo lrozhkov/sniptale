@@ -87,10 +87,14 @@ it('edits the background paint and the selected zoom region through the panel ca
   const focusX = host.querySelector<HTMLInputElement>(
     '[aria-label="gallery.videoReview.zoomFocusX"]'
   )!;
-  setInputValue(focusX, '0.2');
-  expect(focusX.value).toBe('0.2');
+  expect(focusX.value).toBe('50');
+  setInputValue(focusX, '20');
+  await act(async () => {
+    focusX.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+  expect(focusX.value).toBe('20');
   await act(async () => button('gallery.videoReview.zoomResetPosition').click());
-  expect(focusX.value).toBe('0.5');
+  expect(focusX.value).toBe('50');
   await act(async () => button('gallery.videoReview.zoomDelete').click());
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
 

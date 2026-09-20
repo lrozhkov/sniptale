@@ -22,9 +22,6 @@ it('places colliding point events into separate lanes by screen width, not sourc
   );
   expect(layout.items.map((item) => item.lane)).toEqual([0, 1, 2, 3]);
   expect(layout.laneCount).toBe(4);
-  expect(layout.collapsed).toBe(true);
-  expect(layout.visibleLanes).toBe(3);
-  expect(layout.overflowCount).toBe(1);
   expect(layout.items.every((item) => item.left >= 0)).toBe(true);
   // Screen coordinates: 0.01s of source spans less than the point-event floor.
   expect(layout.items[0]!.width).toBe(REVIEW_ACTION_MIN_POINT_WIDTH_PX);
@@ -38,8 +35,6 @@ it('packs long intervals forward and splits at point-event floors', () => {
   // c starts at 30px while the point floor of b still occupies lane 0 until 39px.
   expect(layout.items.map((item) => item.lane)).toEqual([0, 0, 1]);
   expect(layout.laneCount).toBe(2);
-  expect(layout.collapsed).toBe(false);
-  expect(layout.overflowCount).toBe(0);
 });
 
 it('reuses a lane once the previous visual rect ends, measuring in pixels', () => {
@@ -78,11 +73,20 @@ it('repacks lanes when the timeline zoom changes', () => {
 
 it('rejects an invalid viewport instead of manufacturing a layout', () => {
   expect(() => layoutReviewActionLanes([], { duration: 0, width: 100, zoom: 1 })).toThrow();
-  expect(layoutReviewActionLanes([], viewport)).toEqual({
-    items: [],
-    laneCount: 0,
-    visibleLanes: 0,
-    collapsed: false,
-    overflowCount: 0,
-  });
+  expect(layoutReviewActionLanes([], viewport)).toEqual({ items: [], laneCount: 0 });
+});
+
+it('keeps every dense marker in the layout; no packed item is hidden', () => {
+  const markers = Array.from({ length: 12 }, (_, index) => marker(`e${index}`, 1 + index / 200));
+  const layout = layoutReviewActionLanes(markers, viewport);
+  expect(layout.items).toHaveLength(12);
+  expect(layout.items.map((item) => item.marker.ref.id)).toEqual(
+    markers.map((entry) => entry.ref.id)
+  );
+});
+
+it('keeps end-of-recording markers inside the scroll strip without a second horizontal axis', () => {
+  const layout = layoutReviewActionLanes([marker('end', 10)], viewport);
+  expect(layout.items[0]!.left + layout.items[0]!.width).toBeLessThanOrEqual(100);
+  expect(layout.items[0]!.width).toBe(REVIEW_ACTION_MIN_POINT_WIDTH_PX);
 });

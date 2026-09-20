@@ -48,7 +48,14 @@ function renderTrack(
   ) => void,
   onAdd = vi.fn(),
   time: number | null = 6,
-  overrides?: { edits?: ReviewEdit[]; toOutputTime?: (source: number) => number | null }
+  overrides?: {
+    edits?: ReviewEdit[];
+    toOutputTime?: (source: number) => number | null;
+    enabled?: boolean;
+    onLink?: (id: string, targetId: string | null) => void;
+    onSelectLink?: (id: string) => void;
+    linkSelectedId?: string | null;
+  }
 ) {
   act(() => {
     root.render(
@@ -63,6 +70,12 @@ function renderTrack(
         onSelect={vi.fn()}
         onAdd={onAdd}
         onDragCommit={onDragCommit}
+        {...(overrides?.enabled === undefined ? {} : { enabled: overrides.enabled })}
+        {...(overrides?.onLink ? { onLink: overrides.onLink } : {})}
+        {...(overrides?.onSelectLink ? { onSelectLink: overrides.onSelectLink } : {})}
+        {...(overrides?.linkSelectedId !== undefined
+          ? { linkSelectedId: overrides.linkSelectedId }
+          : {})}
       />
     );
   });
@@ -127,6 +140,56 @@ it('ignores dormant regions for snapping (R03)', async () => {
   await track.event(first, 'pointermove', 396);
   await track.event(first, 'pointerup', 396);
   expect(commit).toHaveBeenLastCalledWith('a', { start: 2.96, end: 4.96 }, 'move');
+});
+
+it('exposes a connect affordance on an eligible gap and creates the link', async () => {
+  const onLink = vi.fn((_id: string, _target: string | null) => undefined);
+  const onSelectLink = vi.fn((_id: string) => undefined);
+  renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, {
+    onLink,
+    onSelectLink,
+  });
+  const gap = host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]')!;
+  expect(gap.getAttribute('data-connected')).toBe('false');
+  expect(gap.getAttribute('aria-pressed')).toBe('false');
+  await act(async () => gap.click());
+  expect(onLink).toHaveBeenCalledWith('a', 'b');
+  expect(onSelectLink).toHaveBeenCalledWith('a');
+});
+
+it('keeps a connected gap visible and selects its settings instead of unlinking', async () => {
+  const onLink = vi.fn((_id: string, _target: string | null) => undefined);
+  const onSelectLink = vi.fn((_id: string) => undefined);
+  const linked: QuickEditZoomRegion = { ...zoom('a', 0, 2), linkTo: 'b' };
+  renderTrack([linked, zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, {
+    onLink,
+    onSelectLink,
+    linkSelectedId: 'a',
+  });
+  const gap = host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]')!;
+  expect(gap.getAttribute('data-connected')).toBe('true');
+  expect(gap.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => gap.click());
+  // Clicking the connected gap opens settings; it must not silently unlink.
+  expect(onSelectLink).toHaveBeenCalledWith('a');
+  expect(onLink).not.toHaveBeenCalled();
+});
+
+it('hides the affordance for dormant, touching, or disabled pairs', () => {
+  const onLink = vi.fn((_id: string, _target: string | null) => undefined);
+  // Touching edges leave no gap to link.
+  renderTrack([zoom('a', 0, 2), zoom('b', 2, 4)], vi.fn(), vi.fn(), 6, { onLink });
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
+  // A dormant source is skipped entirely.
+  const dormant: QuickEditZoomRegion = { ...zoom('a', 0, 2), dormant: true };
+  renderTrack([dormant, zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, { onLink });
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
+  // Disabled zoom lane keeps no connect control.
+  renderTrack([zoom('a', 0, 2), zoom('b', 4, 6)], vi.fn(), vi.fn(), 6, {
+    onLink,
+    enabled: false,
+  });
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
 });
 
 it('leaves playhead ownership to the shared timeline across kept and removed source points', () => {

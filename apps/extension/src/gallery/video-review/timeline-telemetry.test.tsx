@@ -70,25 +70,43 @@ it('separates colliding markers into disjoint lanes with a consistent pitch', ()
   expect(new Set(laneTops).size).toBe(laneTops.length);
 });
 
-it('collapses the dense tail into a full-height overflow row with kind-qualified keys', () => {
+it('keeps every dense marker clickable in a bounded scrollable strip', async () => {
   const markers = [0, 1, 2, 3].map((value) => marker('action', `e${value}`, 1 + value / 50));
   markers.push(marker('signal', 's1', 1.02));
-  render(markers);
-  const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')];
-  expect(buttons).toHaveLength(4);
-  const chip = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.actionOverflow"]');
-  expect(chip).not.toBeNull();
-  const trigger = chip!.querySelector('button')!;
-  expect(trigger.style.top).toBe('72px');
-  expect(trigger.style.height).toBe('28px');
-  expect(host.textContent).toContain('+2');
+  const onMarker = vi.fn();
+  act(() => {
+    root.render(
+      <ReviewTelemetryStrip
+        markers={markers}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={onMarker}
+      />
+    );
+  });
+  // All five markers render; the lane stack height stays capped at three rows.
+  const strip = host.firstElementChild as HTMLDivElement;
+  expect(strip.style.height).toBe('68px');
+  expect(strip.className).toContain('overflow-y-auto');
+  const buttons = [...strip.querySelectorAll<HTMLButtonElement>('button')];
+  expect(buttons).toHaveLength(5);
+  expect(strip.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
+  await act(async () => {
+    for (const button of buttons) button.click();
+  });
+  expect(onMarker).toHaveBeenCalledTimes(5);
+  const seen = new Set(
+    onMarker.mock.calls.map(([clicked]) => `${(clicked as ReviewTelemetryMarker).ref.id}`)
+  );
+  for (const entry of markers) expect(seen.has(entry.ref.id)).toBe(true);
 });
 
 it('reserves no lane space for an empty history', () => {
   render([]);
   const strip = host.firstElementChild as HTMLDivElement;
   expect(strip.style.height).toBe('0px');
-  expect(host.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
 });
 
 it('exposes readable event text for a history interval with available space', () => {

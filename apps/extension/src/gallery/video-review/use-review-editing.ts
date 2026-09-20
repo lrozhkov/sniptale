@@ -35,6 +35,9 @@ export function useReviewEditingTools(args: {
     selection: args.activeSelection.kind === 'zoom' ? args.activeSelection.id : null,
     onSelectionChange: (id) =>
       args.setActiveSelection(id ? { kind: 'zoom', id } : { kind: 'none' }),
+    linkSelection: args.activeSelection.kind === 'zoom-link' ? args.activeSelection.id : null,
+    onLinkSelectionChange: (id) =>
+      args.setActiveSelection(id ? { kind: 'zoom-link', id } : { kind: 'none' }),
   });
   const cuts = useReviewEdits({
     duration: args.sourceDuration,

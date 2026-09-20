@@ -109,6 +109,12 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const exit = parseZoomTransition(value['exit']);
   if (!transform || !enter || !exit) return null;
   if (value['linkTo'] !== undefined && !identity(value['linkTo'])) return null;
+  if (
+    value['linkEasing'] !== undefined &&
+    value['linkEasing'] !== 'linear' &&
+    value['linkEasing'] !== 'ease-in-out'
+  )
+    return null;
   return {
     id: value['id'],
     start: value['start'],
@@ -117,6 +123,9 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     enter,
     exit,
     ...(identity(value['linkTo']) ? { linkTo: value['linkTo'] } : {}),
+    ...(value['linkEasing'] === 'linear' || value['linkEasing'] === 'ease-in-out'
+      ? { linkEasing: value['linkEasing'] }
+      : {}),
     ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
   };
 }

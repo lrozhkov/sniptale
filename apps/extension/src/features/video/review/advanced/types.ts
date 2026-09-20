@@ -23,6 +23,9 @@ export interface QuickEditZoomTransition {
   duration: number;
 }
 
+/** Easing of an outgoing zoom link; absent on legacy documents means the smooth default. */
+export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
+
 /** Camera target in normalized content coordinates, independent of background layout. */
 export interface QuickEditCameraTransform {
   scale: number;
@@ -43,6 +46,8 @@ export interface QuickEditZoomRegion {
   exit: QuickEditZoomTransition;
   /** Optional smooth connection to the next region; ignored if that target is no longer adjacent. */
   linkTo?: string;
+  /** Link easing; absent on legacy payloads applies the smooth default. */
+  linkEasing?: QuickEditZoomLinkEasing;
   /** Kept but not applied: its interval could not be proven in result time. */
   dormant?: boolean;
 }

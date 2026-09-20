@@ -797,3 +797,137 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`quick editor zoom preview and connections (${variant.locale}, ${variant.theme})`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await expect(page.locator('html')).toHaveAttribute('data-theme', variant.theme);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(
+        page,
+        'review-vp8-opus.webm',
+        { width: 160, height: 90, duration: 12 },
+        false,
+        true
+      );
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.zoomTrack').click();
+      // Two active regions with a real gap between them.
+      await button('gallery.videoReview.zoomAdd').first().click();
+      await timelineGesture(page, 5);
+      await expect
+        .poll(async () =>
+          Number(
+            await dialog
+              .locator('[data-ui="gallery.videoReview.timePlane"]')
+              .getAttribute('aria-valuenow')
+          )
+        )
+        .toBeGreaterThan(4);
+      await button('gallery.videoReview.zoomAdd').first().click();
+      const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
+      await expect(link).toHaveCount(1);
+      await expect(link).toHaveAttribute('data-connected', 'false');
+      // The selected region shows the framing preview with a real source frame.
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      await expect(inspector).toBeVisible();
+      const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+      await expect(preview).toHaveAttribute('data-status', 'ready', { timeout: 15000 });
+      const focusX = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomFocusX'),
+        exact: true,
+      });
+      await expect(focusX).toHaveValue('50');
+      // Keyboard nudge on the preview moves the stored camera center.
+      await preview.locator('canvas').focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(focusX).toHaveValue('51');
+      const scale = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomScale'),
+        exact: true,
+      });
+      await scale.fill('');
+      await scale.pressSequentially('2.25');
+      await scale.press('Tab');
+      await expect(scale).toHaveValue('2.25');
+      await page.setViewportSize({ width: 800, height: 600 });
+      await preview.scrollIntoViewIfNeeded();
+      await expect(preview).toBeInViewport();
+      await page.screenshot({ path: testInfo.outputPath('zoom-preview-minimum.png') });
+      await page.setViewportSize({ width: 1280, height: 720 });
+      // Area/Result switch re-projects the footprint over the same frame.
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.zoomPreviewResult'), exact: true })
+        .click();
+      await expect(preview).toHaveAttribute('data-view', 'result');
+      await page.screenshot({ path: testInfo.outputPath('zoom-preview.png') });
+      // Hover/focus reveals the connect affordance in the eligible gap.
+      await link.hover();
+      await link.click();
+      await expect(link).toHaveAttribute('data-connected', 'true');
+      // Selecting a connected gap opens link settings instead of unlinking.
+      await link.click();
+      const linkInspector = dialog.locator('[data-ui="gallery.videoReview.zoomLinkInspector"]');
+      await expect(linkInspector).toBeVisible();
+      await expect(
+        linkInspector.locator('[data-ui="gallery.videoReview.zoomLinkDuration"]')
+      ).not.toBeEmpty();
+      const easing = linkInspector.getByRole('button', {
+        name: label('gallery.videoReview.zoomLinkEasing'),
+        exact: true,
+      });
+      await easing.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.transitionLinear'), exact: true })
+        .click();
+      await expect(easing).toContainText(label('gallery.videoReview.transitionLinear'));
+      await page.screenshot({ path: testInfo.outputPath('zoom-link.png') });
+      // The inspector removes the connection explicitly.
+      await linkInspector
+        .getByRole('button', { name: label('gallery.videoReview.zoomLinkRemove'), exact: true })
+        .click();
+      await expect(link).toHaveAttribute('data-connected', 'false');
+      // The connected transition persists into the exported edit state.
+      await link.click();
+      await expect(link).toHaveAttribute('data-connected', 'true');
+      await page.setViewportSize({ width: 800, height: 600 });
+      await expect(link).toBeVisible();
+      await link.click();
+      await expect(linkInspector).toBeVisible();
+      await page.screenshot({ path: testInfo.outputPath('zoom-link-minimum.png') });
+      // Reopen the persisted edit and verify the authored connection parameters.
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(link).toHaveAttribute('data-connected', 'true');
+      await link.click();
+      await expect(easing).toContainText(label('gallery.videoReview.transitionLinear'));
+      await button('gallery.videoReview.exportVideo').click();
+      await expect.poll(() => recordingCount(page)).toBe(2);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

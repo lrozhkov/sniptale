@@ -2,8 +2,6 @@ import type { ReviewTelemetryMarker } from './telemetry';
 
 /** Visual floor for point events so screen-colliding starts cannot share one lane. */
 export const REVIEW_ACTION_MIN_POINT_WIDTH_PX = 14;
-/** Rows shown individually; the dense tail collapses into one overflow chip. */
-const REVIEW_ACTION_MAX_LANES = 3;
 const CURSOR_BUCKET_DENSITY = 120;
 
 interface ReviewActionLaneItem {
@@ -11,22 +9,19 @@ interface ReviewActionLaneItem {
   lane: number;
   left: number;
   width: number;
-  visible: boolean;
 }
 
 interface ReviewActionLaneLayout {
   items: ReviewActionLaneItem[];
   laneCount: number;
-  visibleLanes: number;
-  collapsed: boolean;
-  overflowCount: number;
 }
 
 /**
  * Pure lane packing for the action history track. Intervals are measured in screen
  * pixels — point events claim the minimum visual width — and each item takes the first
  * lane without a screen intersection with earlier items. Cursor samples dedupe per
- * bucket exactly like the previous display grouping.
+ * bucket exactly like the previous display grouping. Every packed marker stays
+ * clickable; the strip bounds the lane stack height and scrolls the dense tail.
  */
 export function layoutReviewActionLanes(
   markers: readonly ReviewTelemetryMarker[],
@@ -47,7 +42,6 @@ export function layoutReviewActionLanes(
   const cursorBuckets = new Set<number>();
   const sorted = [...markers].sort((a, b) => a.start - b.start || a.ref.id.localeCompare(b.ref.id));
   for (const marker of sorted) {
-    const left = marker.start * (planeWidth / viewport.duration);
     const natural = (marker.end - marker.start) * (planeWidth / viewport.duration);
     if (marker.ref.kind === 'cursor') {
       const bucket = Math.floor(
@@ -56,12 +50,16 @@ export function layoutReviewActionLanes(
       if (cursorBuckets.has(bucket)) continue;
       cursorBuckets.add(bucket);
     }
+    const width = Math.min(planeWidth, Math.max(natural, REVIEW_ACTION_MIN_POINT_WIDTH_PX));
+    const left = Math.max(
+      0,
+      Math.min(marker.start * (planeWidth / viewport.duration), planeWidth - width)
+    );
     const item: ReviewActionLaneItem = {
       marker,
       lane: 0,
       left,
-      width: Math.max(natural, REVIEW_ACTION_MIN_POINT_WIDTH_PX),
-      visible: false,
+      width,
     };
     let lane = laneRights.findIndex((right) => left >= right);
     if (lane === -1) {
@@ -73,14 +71,5 @@ export function layoutReviewActionLanes(
     item.lane = lane;
     items.push(item);
   }
-  const laneCount = laneRights.length;
-  const collapsed = laneCount > REVIEW_ACTION_MAX_LANES;
-  for (const item of items) item.visible = item.lane < REVIEW_ACTION_MAX_LANES;
-  return {
-    items,
-    laneCount,
-    visibleLanes: Math.min(laneCount, REVIEW_ACTION_MAX_LANES),
-    collapsed,
-    overflowCount: collapsed ? items.filter((item) => !item.visible).length : 0,
-  };
+  return { items, laneCount: laneRights.length };
 }
