@@ -259,6 +259,22 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
     });
     await fixture.click('save');
     expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    await fixture.click('editComment');
+    expect(fixture.host.querySelector('ol li textarea')?.textContent).toBe(
+      'Keep this note visible'
+    );
+    expect(
+      fixture.host.querySelectorAll('[data-ui="gallery.videoReview.commentComposer"]')
+    ).toHaveLength(1);
+    await fixture.click('discard');
+    expect(fixture.host.querySelector('textarea')).toBeNull();
+    expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    expect(fixture.host.querySelector('aside [aria-label="gallery.videoReview.undo"]')).toBeNull();
+    expect(
+      fixture.host.querySelector(
+        '[data-ui="gallery.videoReview.toolbar"] [aria-label="gallery.videoReview.undo"]'
+      )
+    ).not.toBeNull();
     expect(fixture.host.querySelector('ol li')?.className).toContain(
       'border-[var(--sniptale-color-accent)]'
     );

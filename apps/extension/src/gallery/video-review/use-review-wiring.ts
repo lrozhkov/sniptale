@@ -111,6 +111,10 @@ export function useReviewEditorWiring(args: {
     deleteAudio: audio.removeClip,
     clearAnnotation: () => args.clearAnnotation(null),
   });
+  const moveHistory = async (direction: 'undo' | 'redo') => {
+    await flushPendingContent();
+    await args.session.history(direction);
+  };
   useReviewEditorShortcuts({
     time: args.time,
     seek: args.seek,
@@ -122,14 +126,8 @@ export function useReviewEditorWiring(args: {
     boundaries:
       args.cuts.cutting && args.exporter.index ? args.exporter.index.boundaries : undefined,
     run: args.run,
-    undo: async () => {
-      await flushPendingContent();
-      await args.session.history('undo');
-    },
-    redo: async () => {
-      await flushPendingContent();
-      await args.session.history('redo');
-    },
+    undo: () => moveHistory('undo'),
+    redo: () => moveHistory('redo'),
     cancelDrawing: () => {
       args.cuts.setCutting(false);
       args.setTimelineSelection({ kind: 'point', time: args.time });
@@ -146,6 +144,7 @@ export function useReviewEditorWiring(args: {
     telemetry: args.telemetry ? args.actionsVisible : false,
     projected,
     flushPendingContent,
+    moveHistory: (direction: 'undo' | 'redo') => void args.run(() => moveHistory(direction)),
     removeSelection,
     exporter: prepareReviewExporter(args.exporter, args.run, flushPendingContent),
   };

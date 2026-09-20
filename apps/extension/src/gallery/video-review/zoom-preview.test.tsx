@@ -52,6 +52,7 @@ function renderPreview(args: {
   region?: QuickEditZoomRegion;
   sourceTime?: number | null;
   loadFrame?: (sourceTime: number, signal: AbortSignal) => Promise<ZoomPreviewFrame>;
+  onInteract?: (time: number) => void;
   onChange?: (patch: QuickEditZoomRegionPatch) => void;
 }) {
   const onChange = args.onChange ?? vi.fn();
@@ -64,6 +65,7 @@ function renderPreview(args: {
         source={{ width: 640, height: 360 }}
         sourceTime={args.sourceTime === undefined ? 3 : args.sourceTime}
         loadFrame={loadFrame}
+        onInteract={args.onInteract}
         onChange={onChange}
       />
     );
@@ -202,4 +204,20 @@ it('skips the load and explains the state when the midpoint has no source frame'
   expect(host.querySelector('[role="status"]')?.textContent).toContain(
     'gallery.videoReview.zoomPreviewUnavailable'
   );
+});
+
+it('synchronizes framing gestures to the displayed source frame, not unrelated keys', async () => {
+  const onInteract = vi.fn();
+  const view = renderPreview({ sourceTime: 7.25, onInteract });
+  expect(onInteract).not.toHaveBeenCalled();
+  await act(async () => Promise.resolve());
+  await act(async () =>
+    view.canvas().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(onInteract).toHaveBeenCalledWith(7.25);
+  onInteract.mockClear();
+  await act(async () =>
+    view.canvas().dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))
+  );
+  expect(onInteract).not.toHaveBeenCalled();
 });

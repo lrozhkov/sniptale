@@ -1,0 +1,9 @@
+@layer base {
+  /* Playback retains the focused element and Tab position, without incidental keyboard chrome. */
+  [data-ui='gallery.videoReview.dialog'][data-playback-focus='true']:focus-visible,
+  [data-ui='gallery.videoReview.dialog'][data-playback-focus='true'] :focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+}

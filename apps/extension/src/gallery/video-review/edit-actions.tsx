@@ -110,6 +110,7 @@ export function ReviewSpeedOptions(props: {
         controlSize="sm"
         className="!h-8 !min-h-8 !w-auto !min-w-0 !py-0"
         containerClassName="!w-auto !min-w-0 shrink-0"
+        menuWidth={112}
         value={String(props.rate)}
         disabled={props.busy}
         options={REVIEW_SPEED_RATES.map((rate) => ({
@@ -126,6 +127,7 @@ export function ReviewSpeedOptions(props: {
         controlSize="sm"
         className="!h-8 !min-h-8 !w-auto !min-w-0 !py-0"
         containerClassName="!w-auto !min-w-0 shrink-0"
+        menuWidth={180}
         value={props.audio}
         disabled={props.busy}
         onChange={props.onAudio}

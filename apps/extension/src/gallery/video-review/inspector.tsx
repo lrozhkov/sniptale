@@ -1,4 +1,13 @@
-import { Undo2, Redo2, Pencil, Trash2, Copy, ArrowLeft, Plus, FileDown } from 'lucide-react';
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Pencil,
+  Trash2,
+  Copy,
+  ArrowLeft,
+  Plus,
+  FileDown,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
@@ -11,15 +20,13 @@ export function ReviewInspector(props: {
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
   busy: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
+  fullHeight?: boolean;
+  onToggleHeight?(): void;
   message: string | null;
   recovery?: ReactNode;
   scene?: ReactNode;
   selectionLabel?: string | undefined;
   onBack(): void;
-  onUndo(): void;
-  onRedo(): void;
   rangeSelected?: boolean;
   onAdd(): void;
   onSelect(value: ReviewAnnotation): void;
@@ -30,6 +37,7 @@ export function ReviewInspector(props: {
   children: ReactNode;
   actions?: ReactNode;
   composer?: ReactNode;
+  editingId?: string | undefined;
   contextKey?: string;
   settingsAvailable?: boolean;
   saveStatus?: 'saving' | 'saved' | 'failed';
@@ -65,26 +73,29 @@ export function ReviewInspector(props: {
       : section;
   return (
     <aside
-      className="flex min-h-0 flex-col gap-2 overflow-hidden border-l
-          border-[var(--sniptale-color-border-soft)] p-3"
+      data-ui="gallery.videoReview.inspector"
+      className={`flex min-h-0 flex-col gap-2 overflow-hidden border-l
+        border-[var(--sniptale-color-border-soft)] p-3 ${
+          props.fullHeight
+            ? 'min-[800px]:col-start-2 min-[800px]:row-start-1 min-[800px]:row-span-2'
+            : ''
+        }`}
     >
       <div className="flex shrink-0 flex-wrap items-center gap-2">
         <h2 className="mr-auto text-sm font-semibold">
           {translate('gallery.videoReview.editorTitle')}
         </h2>
         <ReviewButton
-          label={translate('gallery.videoReview.undo')}
-          disabled={props.busy || !props.canUndo}
-          onClick={props.onUndo}
+          label={translate(
+            props.fullHeight
+              ? 'videoEditor.app.panelRestoreHeight'
+              : 'videoEditor.app.panelFullHeight'
+          )}
+          aria-pressed={!!props.fullHeight}
+          className={reviewIconButtonClassName}
+          onClick={props.onToggleHeight}
         >
-          <Undo2 size={16} />
-        </ReviewButton>
-        <ReviewButton
-          label={translate('gallery.videoReview.redo')}
-          disabled={props.busy || !props.canRedo}
-          onClick={props.onRedo}
-        >
-          <Redo2 size={16} />
+          {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
         </ReviewButton>
       </div>
       <div className="shrink-0">
@@ -155,6 +166,8 @@ export function ReviewInspector(props: {
 function ReviewAnnotationList(props: {
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
+  editingId?: string | undefined;
+  composer?: ReactNode;
   busy: boolean;
   onSelect(value: ReviewAnnotation): void;
   onHover(value: ReviewAnnotation | null): void;
@@ -175,38 +188,44 @@ function ReviewAnnotationList(props: {
           onMouseEnter={() => props.onHover(annotation)}
           onMouseLeave={() => props.onHover(null)}
         >
-          <button
-            type="button"
-            className="block w-full text-left"
-            onClick={() => props.onSelect(annotation)}
-          >
-            <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-              {annotation.anchor.kind === 'point'
-                ? reviewTimeLabel(annotation.anchor.time)
-                : `${reviewTimeLabel(annotation.anchor.start)}–${reviewTimeLabel(annotation.anchor.end)}`}
-            </span>
-            <span className="mt-1 block whitespace-pre-wrap break-words text-sm">
-              {annotation.text}
-            </span>
-          </button>
-          <div className="mt-2 flex justify-end gap-1">
-            <ReviewButton
-              label={translate('gallery.videoReview.editComment')}
-              disabled={props.busy}
-              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
-              onClick={() => props.onEdit(annotation)}
-            >
-              <Pencil size={16} />
-            </ReviewButton>
-            <ReviewButton
-              label={translate('gallery.videoReview.deleteComment')}
-              disabled={props.busy}
-              className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
-              onClick={() => props.onDelete(annotation)}
-            >
-              <Trash2 size={16} />
-            </ReviewButton>
-          </div>
+          {props.editingId === annotation.id ? (
+            props.composer
+          ) : (
+            <>
+              <button
+                type="button"
+                className="block w-full text-left"
+                onClick={() => props.onSelect(annotation)}
+              >
+                <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+                  {annotation.anchor.kind === 'point'
+                    ? reviewTimeLabel(annotation.anchor.time)
+                    : `${reviewTimeLabel(annotation.anchor.start)}–${reviewTimeLabel(annotation.anchor.end)}`}
+                </span>
+                <span className="mt-1 block whitespace-pre-wrap break-words text-sm">
+                  {annotation.text}
+                </span>
+              </button>
+              <div className="mt-2 flex justify-end gap-1">
+                <ReviewButton
+                  label={translate('gallery.videoReview.editComment')}
+                  disabled={props.busy}
+                  className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+                  onClick={() => props.onEdit(annotation)}
+                >
+                  <Pencil size={16} />
+                </ReviewButton>
+                <ReviewButton
+                  label={translate('gallery.videoReview.deleteComment')}
+                  disabled={props.busy}
+                  className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+                  onClick={() => props.onDelete(annotation)}
+                >
+                  <Trash2 size={16} />
+                </ReviewButton>
+              </div>
+            </>
+          )}
         </li>
       ))}
     </ol>
@@ -260,7 +279,7 @@ function ReviewInspectorFooter(
 function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
   return (
     <>
-      {props.composer}
+      {!props.annotations.some((note) => note.id === props.editingId) ? props.composer : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {!props.settingsAvailable ? (
           <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
@@ -291,6 +310,8 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
         </p>
       ) : null}
       <ReviewAnnotationList
+        editingId={props.editingId}
+        composer={props.composer}
         annotations={props.annotations}
         selectedId={props.selectedId}
         busy={props.busy}

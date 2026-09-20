@@ -189,6 +189,7 @@ export function ReviewZoomPreview(props: {
   /** Result-time region midpoint mapped through cuts/speed; null while it has no frame. */
   sourceTime: number | null;
   loadFrame: ZoomPreviewFrameLoader | null;
+  onInteract?: ((sourceTime: number) => void) | undefined;
   onChange(patch: QuickEditZoomRegionPatch): void;
   disabled?: boolean;
 }) {
@@ -248,6 +249,11 @@ export function ReviewZoomPreview(props: {
         ) : null}
       </div>
       <div
+        {...previewInteractionHandlers(
+          !props.disabled && status === 'ready',
+          sourceTime,
+          props.onInteract
+        )}
         className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
         style={{ background: previewBackgroundPaint(background) }}
       >
@@ -330,4 +336,23 @@ function previewBackgroundPaint(background: QuickEditBackgroundSettings): string
   if (!background.enabled || background.type === 'image') return '#000000';
   if (background.type === 'solid') return background.color;
   return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
+}
+
+/** Only active framing gestures synchronize transport; loading, Tab and cancel do not seek. */
+function previewInteractionHandlers(
+  ready: boolean,
+  time: number | null,
+  onInteract: ((time: number) => void) | undefined
+) {
+  const seek = () => {
+    if (ready && time !== null) onInteract?.(time);
+  };
+  return {
+    onPointerDownCapture: (event: React.PointerEvent) => {
+      if (event.button === 0) seek();
+    },
+    onKeyDownCapture: (event: React.KeyboardEvent) => {
+      if (event.key.startsWith('Arrow')) seek();
+    },
+  };
 }

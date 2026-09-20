@@ -1,5 +1,5 @@
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
-import { Play, BetweenHorizontalStart } from 'lucide-react';
+import { Play, BetweenHorizontalStart, Undo2, Redo2 } from 'lucide-react';
 import type { ReactNode, CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
@@ -52,6 +52,7 @@ export function ReviewToolbar(props: {
   time: number;
   playing: boolean;
   resultDuration?: number;
+  historyControls?: ReactNode;
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
@@ -62,11 +63,12 @@ export function ReviewToolbar(props: {
     <div
       data-ui="gallery.videoReview.toolbar"
       className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1
+        @max-[600px]:grid-cols-[auto_minmax(0,1fr)]
         border-b border-[var(--sniptale-color-border-soft)]
         px-2 py-1"
     >
       <div
-        className={`flex min-w-0 items-center ${
+        className={`flex min-w-0 items-center @max-[600px]:col-span-2 ${
           props.expandedTools
             ? '@max-[1050px]:col-span-3 @max-[1050px]:row-start-2'
             : '@max-[700px]:col-span-3 @max-[700px]:row-start-2'
@@ -74,7 +76,7 @@ export function ReviewToolbar(props: {
       >
         {props.tools}
       </div>
-      <div className="col-start-2 row-start-1 flex shrink-0 items-center justify-center gap-2">
+      <div className="col-start-2 @max-[600px]:col-start-1 row-start-1 flex shrink-0 items-center justify-center gap-2">
         <ReviewButton
           label={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
@@ -105,7 +107,8 @@ export function ReviewToolbar(props: {
           </output>
         ) : null}
       </div>
-      <div className="col-start-3 row-start-1 flex min-w-0 items-center justify-end gap-0.5">
+      <div className="col-start-3 @max-[600px]:col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-0.5">
+        <div className="flex flex-1 items-center justify-center">{props.historyControls}</div>
         <CompactRange
           aria-label={translate('videoEditor.timeline.zoom')}
           title={translate('videoEditor.timeline.zoom')}
@@ -127,5 +130,31 @@ export function ReviewToolbar(props: {
         </ReviewButton>
       </div>
     </div>
+  );
+}
+
+/** History commands share the session transaction path used by keyboard shortcuts. */
+export function ReviewHistoryControls(props: {
+  busy: boolean;
+  cursor: number;
+  length: number;
+  onHistory(direction: 'undo' | 'redo'): void;
+}) {
+  return (
+    <>
+      {(['undo', 'redo'] as const).map((direction) => (
+        <ReviewButton
+          key={direction}
+          label={translate(`gallery.videoReview.${direction}`)}
+          className={plain}
+          disabled={
+            props.busy || (direction === 'undo' ? props.cursor === 0 : props.cursor >= props.length)
+          }
+          onClick={() => props.onHistory(direction)}
+        >
+          {direction === 'undo' ? <Undo2 size={16} /> : <Redo2 size={16} />}
+        </ReviewButton>
+      ))}
+    </>
   );
 }

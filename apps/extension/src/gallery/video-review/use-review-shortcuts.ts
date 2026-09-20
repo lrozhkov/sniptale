@@ -26,6 +26,10 @@ function useReviewKeys({
 }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return;
+      const key = event.code.startsWith('Key')
+        ? event.code.slice(3).toLowerCase()
+        : event.key.toLowerCase();
       if (event.key === 'Escape') {
         event.preventDefault();
         cancelDrawing();
@@ -37,9 +41,9 @@ function useReviewKeys({
         (target.closest('input,textarea,select') || target.isContentEditable)
       )
         return;
-      if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
+      if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(key)) {
         event.preventDefault();
-        if (event.key.toLowerCase() === 'y' || event.shiftKey) redo();
+        if (key === 'y' || event.shiftKey) redo();
         else undo();
         return;
       }
@@ -54,14 +58,14 @@ function useReviewKeys({
         remove();
         return;
       }
-      if (event.key.toLowerCase() === 'm') {
+      if (key === 'm') {
         event.preventDefault();
         add();
         return;
       }
-      if (event.key.toLowerCase() === 'c' || event.key.toLowerCase() === 'v') {
+      if (key === 'c' || key === 'v') {
         event.preventDefault();
-        tool(event.key.toLowerCase() === 'c' ? 'c' : 'v');
+        tool(key === 'c' ? 'c' : 'v');
         return;
       }
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {

@@ -1,5 +1,7 @@
+import { ReviewDialog } from './review-dialog';
+import { ReviewHistoryControls } from './timeline-chrome';
 import { ReviewSelectedProperties } from './selected-properties';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -119,6 +121,7 @@ function useReviewEditorState(resource: LoadedReview) {
   const { audio, canvasComments, comments, telemetry, projected } = wiring;
   return {
     editing: { ...cuts, exporter: wiring.exporter },
+    moveHistory: wiring.moveHistory,
     backgroundImport,
     session,
     source,
@@ -317,20 +320,6 @@ function ReviewInspectorActions({
   );
 }
 
-async function moveReviewHistory(args: {
-  direction: 'undo' | 'redo';
-  flushAdvanced(): Promise<void>;
-  flushTexts(): Promise<void>;
-  session: ReturnType<
-    typeof import('../../workflows/video-review/session').createVideoReviewSession
-  >;
-}) {
-  await args.flushAdvanced();
-  await args.flushTexts();
-  await args.session.flush();
-  await args.session.history(args.direction);
-}
-
 function reviewErrorMessage(error: ReturnType<typeof useReviewEditorState>['snapshot']['error']) {
   if (error === 'conflict') return translate('gallery.videoReview.conflict');
   if (error === 'changed-source') return translate('gallery.videoReview.sourceChanged');
@@ -344,7 +333,11 @@ function ReviewInspectorBinding({
   canvasComments,
   audio,
   onBack,
+  fullHeight,
+  onToggleHeight,
 }: {
+  fullHeight: boolean;
+  onToggleHeight(): void;
   resource: LoadedReview;
   state: InspectorState;
   canvasComments: ReturnType<typeof useCanvasComments>;
@@ -352,17 +345,10 @@ function ReviewInspectorBinding({
   onBack(): void;
 }) {
   const { editing, session, snapshot, composer, video, busy, run } = state;
-  const onHistory = (direction: 'undo' | 'redo') =>
-    void run(() =>
-      moveReviewHistory({
-        direction,
-        flushAdvanced: state.flushAdvanced,
-        flushTexts: canvasComments.flushTexts,
-        session,
-      })
-    );
   return (
     <ReviewInspector
+      fullHeight={fullHeight}
+      onToggleHeight={onToggleHeight}
       filename={resource.filename}
       annotations={snapshot.document.annotations}
       selectedId={state.selected?.id ?? null}
@@ -379,13 +365,9 @@ function ReviewInspectorBinding({
           }}
         />
       }
-      canUndo={!composer.annotation && snapshot.snapshot.workspace.cursor > 0}
-      canRedo={
-        !composer.annotation &&
-        snapshot.snapshot.workspace.cursor < snapshot.snapshot.workspace.history.length
-      }
       settingsAvailable={state.advanced.ui.mode === 'advanced'}
       contextKey={reviewInspectorContext(state)}
+      editingId={composer.annotation?.id}
       composer={
         composer.annotation ? (
           <ReviewCommentComposer state={state} annotation={composer.annotation} />
@@ -429,8 +411,6 @@ function ReviewInspectorBinding({
           onBack();
         });
       }}
-      onUndo={() => onHistory('undo')}
-      onRedo={() => onHistory('redo')}
       rangeSelected={state.selection.kind === 'range'}
       onAdd={state.add}
       onSelect={state.selectComment}
@@ -469,6 +449,10 @@ function ReviewInspectorBinding({
         zoom={state.zoom}
         busy={state.busy}
         markers={state.projected.markers}
+        onPreviewFrame={(time) => {
+          video.current?.pause();
+          state.seek(time, false);
+        }}
         toSourceTime={state.timeline.timeMap.timelineToSource}
         resource={resource}
         audio={audio}
@@ -542,38 +526,13 @@ function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
 
 function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): void }) {
   const state = useReviewEditorState(resource);
+  const [fullHeight, setFullHeight] = useState(false);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
-  const {
-    audio,
-    canvasComments,
-    editing,
-    source,
-    snapshot,
-    composer,
-    video,
-    time,
-    onTime,
-    playing,
-    setPlaying,
-    selection,
-    setSelection,
-    telemetry,
-    advanced,
-    features,
-    timeline,
-    setTrackVisibility,
-    zoom,
-    busy,
-    setMessage,
-    projected,
-    seek,
-    play,
-    selectComment,
-    displayRegion,
-  } = state;
+  const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
+    state;
   const waveforms = useReviewWaveforms(
     resource.file,
-    source.duration,
+    state.source.duration,
     advanced.audio,
     features.audioTrackVisible,
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
@@ -590,14 +549,14 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
         <ReviewStageBinding
           backgroundPending={state.backgroundImport.pending}
           url={resource.url}
-          source={source}
+          source={state.source}
           canvas={features.canvas}
-          video={video}
-          drawing={!!composer.annotation && !playing && !busy}
-          region={displayRegion}
+          video={state.video}
+          drawing={!!composer.annotation && !state.playing && !busy}
+          region={state.displayRegion}
           zoomRegions={features.zoomRegions}
           background={features.background}
-          outputTime={timeline.sceneOutputTime}
+          outputTime={state.timeline.sceneOutputTime}
           zoomOverlay={
             zoomRegion && !busy && editing.exporter.phase === 'idle'
               ? zoomRegion.spotlight
@@ -609,53 +568,69 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           annotations={snapshot.document.annotations}
           canvasComments={canvasComments}
           overlaysVisible={features.overlaysVisible}
-          time={time}
+          time={state.time}
           busy={busy}
           onRegion={(region) => {
             if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
           }}
           onReady={() => {
             const anchor = composer.annotation?.anchor;
-            if (anchor) seek(anchor.kind === 'point' ? anchor.time : anchor.start);
+            if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
           }}
           onTime={(value) => {
-            const next = onTime(value);
-            setSelection((current) =>
+            const next = state.onTime(value);
+            state.setSelection((current) =>
               current.kind === 'point' ? { kind: 'point', time: next } : current
             );
           }}
-          onPlaying={setPlaying}
-          onError={() => setMessage(translate('gallery.videoReview.playbackFailed'))}
+          onPlaying={state.setPlaying}
+          onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
         />
       </main>
       <ReviewInspectorBinding
+        fullHeight={fullHeight}
+        onToggleHeight={() => setFullHeight((value) => !value)}
         resource={resource}
         state={state}
         canvasComments={canvasComments}
         audio={audio}
         onBack={onBack}
       />
-      <div className="col-span-full min-h-0 min-w-0">
+      <div
+        className={
+          fullHeight
+            ? 'col-start-1 row-start-2 min-h-0 min-w-0 max-[799px]:row-start-3'
+            : 'col-span-full min-h-0 min-w-0'
+        }
+      >
         <ReviewTimelineBinding
+          historyControls={
+            <ReviewHistoryControls
+              busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
+              cursor={snapshot.snapshot.workspace.cursor}
+              length={snapshot.snapshot.workspace.history.length}
+              onHistory={state.moveHistory}
+            />
+          }
           editing={editing}
           edits={snapshot.document.edits}
           annotations={snapshot.document.annotations}
-          source={source}
+          source={state.source}
           busy={busy}
           composerBusy={!!composer.annotation}
-          selection={selection}
-          setSelection={setSelection}
+          selection={state.selection}
+          setSelection={state.setSelection}
           advanced={advanced}
-          resultDuration={timeline.resultDuration}
-          outputTime={timeline.outputTime}
-          toOutputTime={timeline.toOutputTime}
-          onCutPlacement={() => setMessage(translate('gallery.videoReview.placementOnCut'))}
-          setTrackVisibility={setTrackVisibility}
+          resultDuration={state.timeline.resultDuration}
+          outputTime={state.timeline.outputTime}
+          toOutputTime={state.timeline.toOutputTime}
+          onCutPlacement={() => state.setMessage(translate('gallery.videoReview.placementOnCut'))}
+          setTrackVisibility={state.setTrackVisibility}
           setMode={state.setMode}
-          telemetryAvailable={projected.markers.length > 0}
-          time={time}
-          playing={playing}
-          markers={telemetry ? projected.markers : []}
+          telemetryAvailable={state.projected.markers.length > 0}
+          time={state.time}
+          playing={state.playing}
+          markers={state.telemetry ? state.projected.markers : []}
           selectedTelemetryRef={
             state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
           }
@@ -669,18 +644,18 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
           onMarker={(marker) => {
             if (!state.canStart()) return;
-            seek(marker.start, false);
+            state.seek(marker.start, false);
             state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
           }}
-          onComment={selectComment}
-          onSeek={seek}
-          onPlay={play}
+          onComment={state.selectComment}
+          onSeek={state.seek}
+          onPlay={state.play}
         />
       </div>
       <ReviewVoiceoverRecording
         isOpen={voiceover.recording}
-        playhead={voiceover.takeStart ?? time}
-        timelineDuration={source.duration}
+        playhead={voiceover.takeStart ?? state.time}
+        timelineDuration={state.source.duration}
         onClose={voiceover.close}
         onSyncStart={voiceover.syncStart}
         onSyncStop={voiceover.syncStop}
@@ -693,30 +668,9 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
 /** Native modal owns focus/inert; Escape cancels drawing, Back alone exits after recovery flush. */
 export function VideoReview({ aggregateId, onBack }: { aggregateId: string; onBack(): void }) {
   useAppLocale();
-  const dialog = useRef<HTMLDialogElement>(null);
   const { resource, failed, retry } = useLoadedReview(aggregateId);
-  useEffect(() => {
-    const node = dialog.current;
-    node?.showModal();
-    return () => {
-      node?.close();
-    };
-  }, []);
   return (
-    <dialog
-      ref={dialog}
-      aria-label={translate('gallery.videoReview.title')}
-      onCancel={(event) => event.preventDefault()}
-      style={{
-        backgroundColor: 'var(--sniptale-color-surface-canvas)',
-        backgroundImage:
-          'linear-gradient(var(--sniptale-color-surface-panel), var(--sniptale-color-surface-panel))',
-      }}
-      className="fixed inset-0 m-auto h-[calc(100dvh-24px)] max-h-none w-[calc(100vw-24px)] max-w-none
-          overflow-hidden rounded-[var(--sniptale-radius-lg)] border
-          border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
-          p-0 text-[var(--sniptale-color-text-primary)] backdrop:bg-black/60"
-    >
+    <ReviewDialog>
       {resource ? (
         <ReviewEditor resource={resource} onBack={onBack} />
       ) : (
@@ -730,7 +684,7 @@ export function VideoReview({ aggregateId, onBack }: { aggregateId: string; onBa
           ) : null}
         </div>
       )}
-    </dialog>
+    </ReviewDialog>
   );
 }
 

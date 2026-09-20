@@ -24,6 +24,7 @@ export function ReviewSelectedProperties(props: {
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
   markers: readonly ReviewTelemetryMarker[];
+  onPreviewFrame?(time: number): void;
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
   audio: ReturnType<typeof useReviewAudio>;
@@ -101,6 +102,7 @@ export function ReviewSelectedProperties(props: {
                 source={resource.source}
                 canvas={advanced.canvas}
                 sourceTime={props.toSourceTime((region.start + region.end) / 2)}
+                onInteract={props.onPreviewFrame}
                 loadFrame={previewLoader}
                 onChange={(patch) => zoom.change(region.id, patch)}
               />

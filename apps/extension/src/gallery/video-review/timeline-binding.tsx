@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -103,6 +103,7 @@ type TimelineBindingProps = {
   annotations: readonly ReviewAnnotation[];
   busy: boolean;
   composerBusy: boolean;
+  historyControls?: ReactNode;
   selection: ReviewAnchor;
   setSelection(value: ReviewAnchor): void;
   advanced: QuickEditAdvancedState;
@@ -179,6 +180,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      historyControls={props.historyControls}
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
       duration={props.source.duration}

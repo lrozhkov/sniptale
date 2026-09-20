@@ -867,10 +867,15 @@ for (const variant of [
         exact: true,
       });
       await expect(focusX).toHaveValue('50');
-      // Keyboard nudge on the preview moves the stored camera center.
+      // Framing seeks the main player to the source frame shown in the mini-preview.
+      const beforeFraming = await dialog.locator('video').evaluate((video) => video.currentTime);
       await preview.locator('canvas').focus();
       await page.keyboard.press('ArrowRight');
       await expect(focusX).toHaveValue('51');
+      await expect
+        .poll(() => dialog.locator('video').evaluate((video) => video.currentTime))
+        .toBeGreaterThan(beforeFraming);
+      expect(await dialog.locator('video').evaluate((video) => video.paused)).toBe(true);
       const scale = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.zoomScale'),
         exact: true,
@@ -1013,6 +1018,50 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
     await speed.click();
     await expect(page.getByRole('option', { name: '2×', exact: true })).toBeInViewport();
     await page.keyboard.press('Escape');
+    await speed.click();
+    const menu = page.getByRole('listbox');
+    await expect(menu).toBeVisible();
+    expect((await menu.boundingBox())!.width).toBeGreaterThanOrEqual(112);
+    for (const option of await menu.getByRole('option').all()) {
+      expect(
+        await option.locator('.sniptale-select-option-copy').evaluate((node) => {
+          const style = getComputedStyle(node);
+          return node.getBoundingClientRect().height <= parseFloat(style.lineHeight) + 1;
+        })
+      ).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await button('gallery.videoReview.pointerTool').focus();
+    await page.keyboard.press('Space');
+    await expect(dialog).toHaveAttribute('data-playback-focus', 'true');
+    expect(
+      await button('gallery.videoReview.pointerTool').evaluate(
+        (node) => getComputedStyle(node).boxShadow
+      )
+    ).toBe('none');
+    await page.keyboard.press('Space');
+    await page.keyboard.press('Tab');
+    await expect(dialog).not.toHaveAttribute('data-playback-focus');
+    const toolbar = dialog.locator('[data-ui="gallery.videoReview.toolbar"]');
+    await expect(
+      toolbar.getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
+    ).toBeVisible();
+    await button('videoEditor.app.panelFullHeight').click();
+    const dock = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+    const dockBox = (await dock.boundingBox())!;
+    const timelineBox = (await dialog
+      .locator('[data-ui="gallery.videoReview.timeline"]')
+      .boundingBox())!;
+    expect(dockBox.y + dockBox.height).toBeGreaterThanOrEqual(
+      timelineBox.y + timelineBox.height - 2
+    );
+    expect(timelineBox.x + timelineBox.width).toBeLessThanOrEqual(dockBox.x + 2);
+    await page.setViewportSize({ width: 800, height: 600 });
+    for (const control of await toolbar.getByRole('button').all())
+      await expect(control).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath('full-height-inspector.png') });
+    await button('videoEditor.app.panelRestoreHeight').click();
+    await page.setViewportSize({ width: 1280, height: 720 });
     await button('gallery.videoReview.pointerTool').click();
     await button('videoEditor.sidebar.canvasFormatLabel').click();
     await page.getByRole('option', { name: '9:16', exact: true }).click();
