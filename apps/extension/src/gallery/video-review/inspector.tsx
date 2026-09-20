@@ -259,9 +259,8 @@ function ReviewInspectorFooter(
         </div>
       ) : null}
       <div
-        className={
-          props.showReports ? 'border-t border-[var(--sniptale-color-border-soft)] pt-2' : undefined
-        }
+        data-ui="gallery.videoReview.exportFooter"
+        className="border-t border-[var(--sniptale-color-border-soft)] pt-2"
       >
         {props.actions}
       </div>

@@ -197,7 +197,12 @@ function interpolateCamera(
 export function sampleQuickEditFocusAtTime(
   regions: readonly QuickEditZoomRegion[],
   timelineTime: number
-): { from: QuickEditZoomRegion | null; to: QuickEditZoomRegion; progress: number } | null {
+): {
+  from: QuickEditZoomRegion | null;
+  to: QuickEditZoomRegion;
+  progress: number;
+  phase: 'enter' | 'exit' | 'link';
+} | null {
   const active = regions.filter((region) => !region.dormant);
   for (let index = 0; index < active.length; index++) {
     const region = active[index]!;
@@ -217,7 +222,7 @@ export function sampleQuickEditFocusAtTime(
         (timelineTime - region.end) / (next.start - region.end),
         region.linkEasing ?? 'ease-in-out'
       );
-      return { from: region, to: next, progress };
+      return { from: region, to: next, progress, phase: 'link' };
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
     const normalized = normalizeQuickEditZoomTransitions(region);
@@ -226,11 +231,14 @@ export function sampleQuickEditFocusAtTime(
       enter: { ...region.enter, duration: normalized.enter },
       exit: { ...region.exit, duration: normalized.exit },
     };
-    const progress = Math.min(
-      linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter'),
-      linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit')
-    );
-    return { from: null, to: region, progress };
+    const entering = linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter');
+    const exiting = linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit');
+    return {
+      from: null,
+      to: region,
+      progress: Math.min(entering, exiting),
+      phase: exiting < entering ? 'exit' : 'enter',
+    };
   }
   return null;
 }

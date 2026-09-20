@@ -247,9 +247,14 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
     roundness: 0.12,
     area: { x: 0.1, y: 0.2, width: 0.6, height: 0.7 },
   });
-  const choose = async (label: string, option: string) => {
+  const choose = async (label: string, option: string, phase?: string) => {
+    const section = phase
+      ? host.querySelector(`fieldset[aria-label="gallery.videoReview.${phase}"]`)!
+      : host;
     await act(async () =>
-      host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!.click()
+      section
+        .querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!
+        .click()
     );
     await act(async () =>
       [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
@@ -257,7 +262,11 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
         .click()
     );
   };
-  await choose('focusReveal', 'focusContract');
+  expect(host.querySelector('details')?.open).toBe(false);
+  await choose('focusReveal', 'focusContract', 'zoomTransitionIn');
+  expect(spotlight.exitReveal).toBe('fade');
+  await choose('focusReveal', 'focusExpand', 'zoomTransitionOut');
+  expect(spotlight.exitReveal).toBe('contract');
   await choose('focusOutside', 'focusBlur');
   await type(field('gallery.videoReview.focusBlurRadius'), '8');
   await commit(field('gallery.videoReview.focusBlurRadius'));

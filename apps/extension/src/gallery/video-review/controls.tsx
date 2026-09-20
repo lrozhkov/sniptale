@@ -1,5 +1,6 @@
 import { translate } from '../../platform/i18n';
-import type { ButtonHTMLAttributes } from 'react';
+import { ChevronRight } from 'lucide-react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import {
   getControlPrimaryButtonClassName,
   getControlSecondaryButtonClassName,
@@ -65,10 +66,15 @@ export const reviewSelectFieldClassName =
 export function ReviewButton({
   label,
   primary = false,
+  toolbarLabel,
   children,
   className = '',
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; primary?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  primary?: boolean;
+  toolbarLabel?: string | undefined;
+}) {
   const tone = primary
     ? getControlPrimaryButtonClassName()
     : getControlSecondaryButtonClassName({ density: 'compact' });
@@ -77,12 +83,18 @@ export function ReviewButton({
       type="button"
       title={label}
       aria-label={label}
+      data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
       {...props}
       className={`${tone}
       !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]
       !px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)] ${className}`}
     >
       {children ?? label}
+      {toolbarLabel !== undefined ? (
+        <span data-review-toolbar-label aria-hidden="true">
+          {toolbarLabel}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -111,5 +123,22 @@ export function reviewEventLabel(kind: string): string {
   } as const;
   return translate(
     Object.hasOwn(keys, kind) ? keys[kind as keyof typeof keys] : 'gallery.videoReview.telemetry'
+  );
+}
+
+/** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
+export function ReviewDetails({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="group min-w-0">
+      <summary
+        className="flex cursor-pointer list-none items-center gap-2 py-2 text-xs font-semibold
+        text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]
+        focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)] [&::-webkit-details-marker]:hidden"
+      >
+        <ChevronRight size={14} aria-hidden="true" className="shrink-0 group-open:rotate-90" />
+        {label}
+      </summary>
+      <div className="space-y-3 pt-2">{children}</div>
+    </details>
   );
 }

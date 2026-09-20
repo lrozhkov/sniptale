@@ -90,6 +90,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewButton
             label={translate('gallery.videoReview.focusRangeTool')}
+            toolbarLabel={translate('gallery.videoReview.zoomTrack')}
             title={translate('gallery.videoReview.focusRangeHint')}
             aria-pressed={props.focusTool.active}
             className={plain}
@@ -104,6 +105,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         props.originalAudioEditor ? (
           <ReviewButton
             label={translate('gallery.videoReview.originalAudioRange')}
+            toolbarLabel={translate('gallery.videoReview.volume')}
             title={translate('gallery.videoReview.originalAudioRangeHint')}
             aria-pressed={props.originalAudioEditor.originalTool}
             className={plain}
@@ -149,6 +151,7 @@ function ReviewModeControl(props: {
   return (
     <ReviewButton
       label={translate('gallery.videoReview.advancedEditing')}
+      toolbarLabel={translate('gallery.videoReview.advancedEditing')}
       title={translate(
         !advanced && hasSuppressedAdvancedFeatures(props.advanced)
           ? 'gallery.videoReview.advancedSuppressedHint'
@@ -160,9 +163,6 @@ function ReviewModeControl(props: {
       onClick={() => props.setMode(advanced ? 'basic' : 'advanced')}
     >
       <PanelsTopLeft size={16} className="shrink-0" aria-hidden="true" />
-      <span className="hidden @[1100px]:inline text-xs">
-        {translate('gallery.videoReview.advancedEditing')}
-      </span>
     </ReviewButton>
   );
 }
@@ -218,6 +218,7 @@ function ReviewHistoryTrackControl(
   return (
     <ReviewButton
       label={translate('gallery.videoReview.telemetry')}
+      toolbarLabel={props.compact ? undefined : translate('gallery.videoReview.telemetry')}
       aria-pressed={props.advanced.ui.tracks.actions}
       disabled={props.busy}
       className={`${plain} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : ''}`}

@@ -1,6 +1,6 @@
 import { reviewSelectFieldClassName } from './controls';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
-import { ReviewSpotlightInspector } from './spotlight-inspector';
+import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
 import type { ReactNode } from 'react';
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
@@ -15,6 +15,7 @@ import { SelectField } from '../../ui/compact-inspector-controls';
 import {
   ReviewButton,
   ReviewInterval,
+  ReviewDetails,
   reviewTimeLabel,
   reviewTextButtonClassName,
   reviewDeleteButtonClassName,
@@ -31,6 +32,7 @@ function ZoomTransitionSection(props: {
   label: string;
   value: QuickEditZoomTransition;
   onChange(next: QuickEditZoomTransition): void;
+  children?: ReactNode;
 }) {
   return (
     <fieldset
@@ -38,6 +40,7 @@ function ZoomTransitionSection(props: {
       className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
     >
       <legend className="float-left mb-2 w-full text-sm font-semibold">{props.label}</legend>
+      {props.children}
       <SelectField<QuickEditZoomTransition['type']>
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.zoomTransitionType')}
@@ -109,38 +112,56 @@ export function ReviewZoomInspector(props: {
             value={region.transform.scale}
             onChange={(scale) => onChange({ scale })}
           />
-          <ReviewNumberRow
-            label={translate('gallery.videoReview.zoomFocusX')}
-            unit="%"
-            min={0}
-            max={100}
-            step={1}
-            precision={1}
-            value={region.transform.centerX * 100}
-            onChange={(value) => onChange({ centerX: value / 100 })}
-          />
-          <ReviewNumberRow
-            label={translate('gallery.videoReview.zoomFocusY')}
-            unit="%"
-            min={0}
-            max={100}
-            step={1}
-            precision={1}
-            value={region.transform.centerY * 100}
-            onChange={(value) => onChange({ centerY: value / 100 })}
-          />
+          <ReviewDetails label={translate('gallery.videoReview.precisePosition')}>
+            <ReviewNumberRow
+              label={translate('gallery.videoReview.zoomFocusX')}
+              unit="%"
+              min={0}
+              max={100}
+              step={1}
+              precision={1}
+              value={region.transform.centerX * 100}
+              onChange={(value) => onChange({ centerX: value / 100 })}
+            />
+            <ReviewNumberRow
+              label={translate('gallery.videoReview.zoomFocusY')}
+              unit="%"
+              min={0}
+              max={100}
+              step={1}
+              precision={1}
+              value={region.transform.centerY * 100}
+              onChange={(value) => onChange({ centerY: value / 100 })}
+            />
+          </ReviewDetails>
         </>
       )}
       <ZoomTransitionSection
         label={translate('gallery.videoReview.zoomTransitionIn')}
         value={region.enter}
         onChange={(enter) => onChange({ enter })}
-      />
+      >
+        {region.spotlight ? (
+          <ReviewSpotlightAnimation
+            value={region.spotlight}
+            phase="enter"
+            onChange={(spotlight) => onChange({ spotlight })}
+          />
+        ) : null}
+      </ZoomTransitionSection>
       <ZoomTransitionSection
         label={translate('gallery.videoReview.zoomTransitionOut')}
         value={region.exit}
         onChange={(exit) => onChange({ exit })}
-      />
+      >
+        {region.spotlight ? (
+          <ReviewSpotlightAnimation
+            value={region.spotlight}
+            phase="exit"
+            onChange={(spotlight) => onChange({ spotlight })}
+          />
+        ) : null}
+      </ZoomTransitionSection>
       <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.zoomResetPosition')}

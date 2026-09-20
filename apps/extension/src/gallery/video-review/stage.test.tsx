@@ -270,6 +270,7 @@ it('moves and resizes spotlight on the stage with live preview and one durable c
         blur: 12,
         roundness: 0.04,
         reveal: 'fade',
+        exitReveal: 'fade',
       },
     },
     onPreview,

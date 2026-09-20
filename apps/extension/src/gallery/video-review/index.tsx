@@ -620,6 +620,7 @@ function ReviewEditor({
               cursor={snapshot.snapshot.workspace.cursor}
               length={snapshot.snapshot.workspace.history.length}
               onHistory={state.moveHistory}
+              onAddNote={() => state.add()}
             />
           }
           editing={editing}

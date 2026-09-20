@@ -269,7 +269,7 @@ for (const variant of [
       await expect
         .poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime))
         .toBeCloseTo(2.5, 1);
-      await button('gallery.videoReview.addComment').click();
+      await button('gallery.videoReview.addComment').and(dialog.locator('aside button')).click();
       const field = dialog.getByRole('textbox', {
         name: label('gallery.videoReview.commentText'),
         exact: true,
@@ -348,7 +348,9 @@ for (const variant of [
       await timelineGesture(page, 1, 4);
       await expect(button('gallery.videoReview.commentRange')).toBeVisible();
       await timelineGesture(page, 7);
-      await expect(button('gallery.videoReview.addComment')).toBeVisible();
+      await expect(
+        button('gallery.videoReview.addComment').and(dialog.locator('aside button'))
+      ).toBeVisible();
       await timelineGesture(page, 1, 4);
       await button('gallery.videoReview.commentRange').click();
       await field.fill('Interval with region');
@@ -910,7 +912,7 @@ for (const variant of [
       await expect(button('gallery.videoReview.addOverlayComment')).toHaveCount(0);
       await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
       await button('gallery.videoReview.comments').click();
-      const addNote = button('gallery.videoReview.addComment');
+      const addNote = button('gallery.videoReview.addComment').and(dialog.locator('aside button'));
       const noteBounds = (await addNote.boundingBox())!;
       const listBounds = (await dialog.locator('aside ol').boundingBox())!;
       expect(noteBounds.width).toBeCloseTo(listBounds.width, 0);
@@ -1008,6 +1010,10 @@ for (const variant of [
       await expect(inspector).toBeVisible();
       const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready', { timeout: 15000 });
+      await inspector
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.precisePosition') })
+        .click();
       const focusX = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.zoomFocusX'),
         exact: true,
@@ -1361,6 +1367,10 @@ for (const variant of [
           exact: true,
         });
       await expect(opening).toBeVisible();
+      await dialog
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.preciseArea') })
+        .click();
       await opening.focus();
       await page.keyboard.press('ArrowRight');
       await expect(
@@ -1706,7 +1716,7 @@ test('quick editor continues playback after a fractional cut and accepts navigat
     expect(await video.evaluate((node) => node.paused)).toBe(false);
     await button('gallery.videoReview.pause').click();
     await button('gallery.videoReview.comments').click();
-    await button('gallery.videoReview.addComment').click();
+    await button('gallery.videoReview.addComment').and(dialog.locator('aside button')).click();
     const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
     for (const time of [4, 6, 3, 5]) {
       await plane.focus();
@@ -1809,7 +1819,7 @@ for (const variant of [
       await expect(lanes.first().locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
       await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
       await button('gallery.videoReview.comments').click();
-      const addNote = button('gallery.videoReview.addComment');
+      const addNote = button('gallery.videoReview.addComment').and(dialog.locator('aside button'));
       const noteBounds = (await addNote.boundingBox())!;
       const listBounds = (await dialog.locator('aside ol').boundingBox())!;
       expect(noteBounds.width).toBeCloseTo(listBounds.width, 0);
@@ -2266,6 +2276,159 @@ for (const variant of [
       await expect(button('gallery.videoReview.focusRangeTool')).toBeInViewport();
       await expect(button('gallery.videoReview.originalAudioRange').first()).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('lane-tools-compact.png') });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`quick editor responsive captions and inspector disclosure (${variant.locale}, ${variant.theme})`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      const toolbar = dialog.locator('[data-ui="gallery.videoReview.toolbar"]');
+      const pointer = button('gallery.videoReview.pointerTool');
+      await button('gallery.videoReview.advancedEditing').click();
+      for (const [width, height, size] of [
+        [1280, 720, 32],
+        [1920, 1080, 36],
+        [2560, 1440, 40],
+        [3840, 2160, 44],
+        [900, 720, 28],
+      ] as const) {
+        await page.setViewportSize({ width, height });
+        await expect(pointer).toHaveCSS('height', `${size}px`);
+        await expect(toolbar).toHaveAttribute('data-labels', width >= 1920 ? 'shown' : 'hidden');
+        const geometry = await toolbar.evaluate((node) => ({
+          width: node.clientWidth,
+          content: node.scrollWidth,
+        }));
+        expect(geometry.content).toBeLessThanOrEqual(geometry.width + 1);
+        if (width >= 1280) await expect(toolbar).not.toHaveAttribute('data-layout', 'stacked');
+        await expect(pointer).toBeInViewport();
+        if ([1280, 1920, 3840].includes(width))
+          await page.screenshot({ path: testInfo.outputPath(`toolbar-${width}.png`) });
+        await button('gallery.videoReview.speedMode').click();
+        if (width !== 1920)
+          await expect(toolbar).toHaveAttribute('data-labels', width < 1920 ? 'hidden' : 'shown');
+        const speedGeometry = await toolbar.evaluate((node) => {
+          const leading = node.querySelector('[data-toolbar-side="leading"]')!;
+          const transport = node.querySelector('[data-toolbar-transport]')!;
+          const trailing = node.querySelector('[data-toolbar-side="trailing"]')!;
+          return {
+            overflow: node.scrollWidth - node.clientWidth,
+            leadingRight: leading.getBoundingClientRect().right,
+            transportLeft: transport.getBoundingClientRect().left,
+            transportRight: transport.getBoundingClientRect().right,
+            trailingLeft: trailing.getBoundingClientRect().left,
+          };
+        });
+        expect(speedGeometry.overflow).toBeLessThanOrEqual(1);
+        if (width >= 1280) {
+          expect(speedGeometry.leadingRight).toBeLessThanOrEqual(speedGeometry.transportLeft + 1);
+          expect(speedGeometry.transportRight).toBeLessThanOrEqual(speedGeometry.trailingLeft + 1);
+        }
+        if (width >= 1280) await expect(toolbar).not.toHaveAttribute('data-layout', 'stacked');
+        await expect(button('gallery.videoReview.fit')).toBeInViewport();
+        await pointer.click();
+      }
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      await button('gallery.videoReview.zoomAdd').click();
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      const position = inspector.locator('details');
+      await expect(position).not.toHaveAttribute('open', '');
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.zoomFocusX'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await position.locator('summary').click();
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.zoomFocusX'),
+          exact: true,
+        })
+      ).toBeVisible();
+      await position.locator('summary').click();
+      await button('gallery.videoReview.focusType').click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+        .click();
+      await expect(inspector.locator('details')).not.toHaveAttribute('open', '');
+      const entry = inspector.getByRole('group', {
+        name: label('gallery.videoReview.zoomTransitionIn'),
+        exact: true,
+      });
+      const exit = inspector.getByRole('group', {
+        name: label('gallery.videoReview.zoomTransitionOut'),
+        exact: true,
+      });
+      await entry
+        .getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusContract'), exact: true })
+        .click();
+      await expect(
+        exit.getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
+      ).toContainText(label('gallery.videoReview.focusFade'));
+      await exit
+        .getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusExpand'), exact: true })
+        .click();
+      const footer = dialog.locator('[data-ui="gallery.videoReview.exportFooter"]');
+      await expect(footer).toHaveCount(1);
+      await expect(footer).toHaveCSS('border-top-width', '1px');
+      const noteGroup = toolbar.locator('[data-ui="gallery.videoReview.noteHistoryTools"]');
+      await expect(noteGroup.locator('button').first()).toHaveAttribute(
+        'aria-label',
+        label('gallery.videoReview.addComment')
+      );
+      await expect(noteGroup.locator('button').nth(1)).toHaveAttribute(
+        'aria-label',
+        label('gallery.videoReview.undo')
+      );
+      await noteGroup
+        .getByRole('button', { name: label('gallery.videoReview.addComment'), exact: true })
+        .click();
+      const text = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.commentText'),
+        exact: true,
+      });
+      await expect(text).toBeFocused();
+      await text.fill('Toolbar note');
+      await button('gallery.videoReview.save').click();
+      await expect(footer).toHaveCSS('border-top-width', '1px');
+      await expect(dialog.locator('[data-ui="gallery.videoReview.reportActions"]')).toBeVisible();
+      await button('gallery.videoReview.scene').click();
+      await expect(footer).toHaveCSS('border-top-width', '1px');
+      await expect(dialog.locator('[data-ui="gallery.videoReview.reportActions"]')).toHaveCount(0);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

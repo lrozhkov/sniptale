@@ -102,9 +102,16 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).not.toContain('gallery.videoReview.committed');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).not.toBeNull();
     await act(async () => render(true, 'settings:none:'));
+    expect(host.querySelectorAll('[data-ui="gallery.videoReview.exportFooter"]')).toHaveLength(1);
+    expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')?.className).toContain(
+      'border-t'
+    );
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
+    expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')?.className).toContain(
+      'border-t'
+    );
     expect(host.textContent).toContain('Selected controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     const tabs = () =>

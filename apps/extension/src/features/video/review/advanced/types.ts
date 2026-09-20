@@ -45,6 +45,7 @@ export interface QuickEditSpotlight {
   blur: number;
   roundness: number;
   reveal: 'fade' | 'contract';
+  exitReveal: 'fade' | 'contract';
 }
 
 export interface QuickEditZoomRegion {

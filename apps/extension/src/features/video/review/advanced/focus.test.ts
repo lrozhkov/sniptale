@@ -1,3 +1,4 @@
+import type { QuickEditSpotlight } from './types';
 import { expect, it } from 'vitest';
 import {
   createQuickEditSpotlight,
@@ -88,4 +89,44 @@ it('moves linked openings and blends dim into blur without a camera jump', () =>
   expect(frame.dim).toBeCloseTo(0.325);
   expect(frame.blur).toBe(3);
   expect(evaluateQuickEditCameraAtTime([a, b], 3).scale).toBe(1);
+});
+
+it('animates entry and exit openings independently with the shared phase clock', () => {
+  const spotlight: QuickEditSpotlight = {
+    ...createQuickEditSpotlight(),
+    reveal: 'contract',
+    exitReveal: 'fade',
+  };
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'asymmetric', at: 0, duration: 10 }),
+    enter: { type: 'linear' as const, duration: 2 },
+    exit: { type: 'linear' as const, duration: 2 },
+    spotlight,
+  };
+  const sample = (time: number) =>
+    evaluateQuickEditSpotlightAtTime({
+      regions: [region],
+      time,
+      output: { width: 1000, height: 800 },
+      video: { x: 100, y: 100, width: 800, height: 600 },
+      scale: 1,
+    })!;
+  expect(sample(1).opening.width).toBe(700);
+  expect(sample(9).opening.width).toBe(400);
+  region.spotlight.reveal = 'fade';
+  region.spotlight.exitReveal = 'contract';
+  expect(sample(1).opening.width).toBe(400);
+  expect(sample(9).opening.width).toBe(700);
+});
+
+it('defaults a saved single animation at ingress and rejects malformed exit animation', () => {
+  const { exitReveal: _exit, ...saved } = createQuickEditSpotlight();
+  expect(parseQuickEditSpotlight({ ...saved, reveal: 'contract' })).toMatchObject({
+    reveal: 'contract',
+    exitReveal: 'contract',
+  });
+  expect(parseQuickEditSpotlight({ ...saved, exitReveal: 'unknown' })).toBeNull();
+  expect(parseQuickEditSpotlight({ ...saved, exitReveal: null })).toBeNull();
+  const value = { ...createQuickEditSpotlight(), exitReveal: 'contract' as const };
+  expect(parseQuickEditSpotlight(value)).toEqual(value);
 });

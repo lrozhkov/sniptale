@@ -281,6 +281,7 @@ function focusRevision(region: QuickEditZoomRegion | undefined): string {
       mask.blur,
       mask.roundness,
       mask.reveal,
+      mask.exitReveal,
       mask.area.x,
       mask.area.y,
       mask.area.width,

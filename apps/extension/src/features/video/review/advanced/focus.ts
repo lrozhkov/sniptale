@@ -18,7 +18,10 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
     !isBoundedNumber(value['strength'], 0, 1) ||
     !isBoundedNumber(value['blur'], 0, 40) ||
     !isBoundedNumber(value['roundness'], 0, 0.5) ||
-    (value['reveal'] !== 'fade' && value['reveal'] !== 'contract')
+    (value['reveal'] !== 'fade' && value['reveal'] !== 'contract') ||
+    (value['exitReveal'] !== undefined &&
+      value['exitReveal'] !== 'fade' &&
+      value['exitReveal'] !== 'contract')
   )
     return null;
   return {
@@ -28,6 +31,7 @@ export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | nu
     blur: value['blur'],
     roundness: value['roundness'],
     reveal: value['reveal'],
+    exitReveal: value['exitReveal'] ?? value['reveal'],
   };
 }
 
@@ -40,6 +44,7 @@ export function createQuickEditSpotlight(): QuickEditSpotlight {
     blur: 12,
     roundness: 0.04,
     reveal: 'fade',
+    exitReveal: 'fade',
   };
 }
 
@@ -94,11 +99,12 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   const sample = sampleQuickEditFocusAtTime(args.regions, args.time);
   if (!sample?.to.spotlight) return null;
   const end = targetFrame(sample.to.spotlight, args.video, args.scale);
+  const animation =
+    sample.phase === 'exit' ? sample.to.spotlight.exitReveal : sample.to.spotlight.reveal;
   const start = sample.from?.spotlight
     ? targetFrame(sample.from.spotlight, args.video, args.scale)
     : {
-        opening:
-          sample.to.spotlight.reveal === 'contract' ? { x: 0, y: 0, ...args.output } : end.opening,
+        opening: animation === 'contract' ? { x: 0, y: 0, ...args.output } : end.opening,
         radius: 0,
         dim: 0,
         blur: 0,

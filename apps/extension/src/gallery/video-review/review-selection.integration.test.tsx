@@ -572,3 +572,32 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
     await fixture.cleanup();
   }
 });
+
+it('adds a note from the centered toolbar group and focuses the notes composer', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('zoomAdd');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')
+    ).not.toBeNull();
+    const group = fixture.host.querySelector('[data-ui="gallery.videoReview.noteHistoryTools"]')!;
+    const buttons = group.querySelectorAll<HTMLButtonElement>('button');
+    expect(buttons[0]?.getAttribute('aria-label')).toBe('gallery.videoReview.addComment');
+    expect(buttons[1]?.getAttribute('aria-label')).toBe('gallery.videoReview.undo');
+    await act(async () => buttons[0]!.click());
+    const field = fixture.host.querySelector('textarea');
+    expect(field).not.toBeNull();
+    expect(document.activeElement).toBe(field);
+    expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
+    expect(buttons[0]!.disabled).toBe(true);
+    expect(
+      fixture.host.querySelectorAll('[data-ui="gallery.videoReview.commentComposer"]')
+    ).toHaveLength(1);
+  } finally {
+    await fixture.cleanup();
+  }
+});

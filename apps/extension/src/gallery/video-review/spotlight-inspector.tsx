@@ -1,4 +1,4 @@
-import { reviewSelectFieldClassName } from './controls';
+import { reviewSelectFieldClassName, ReviewDetails } from './controls';
 import { translate } from '../../platform/i18n';
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { ReviewNumberRow } from './number-row';
@@ -52,34 +52,26 @@ export function ReviewSpotlightInspector(props: {
           onChange={(blur) => onChange({ ...value, blur })}
         />
       )}
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.focusReveal')}
-        value={value.reveal}
-        options={[
-          { value: 'fade', label: translate('gallery.videoReview.focusFade') },
-          { value: 'contract', label: translate('gallery.videoReview.focusContract') },
-        ]}
-        onChange={(reveal: QuickEditSpotlight['reveal']) => onChange({ ...value, reveal })}
-      />
-      {fields.map(([field, label]) => (
-        <ReviewNumberRow
-          key={field}
-          label={translate(`gallery.videoReview.${label}`)}
-          min={field === 'x' || field === 'y' ? 0 : 1}
-          max={100}
-          step={1}
-          precision={1}
-          unit="%"
-          value={value.area[field] * 100}
-          onChange={(next) =>
-            onChange({
-              ...value,
-              area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
-            })
-          }
-        />
-      ))}
+      <ReviewDetails label={translate('gallery.videoReview.preciseArea')}>
+        {fields.map(([field, label]) => (
+          <ReviewNumberRow
+            key={field}
+            label={translate(`gallery.videoReview.${label}`)}
+            min={field === 'x' || field === 'y' ? 0 : 1}
+            max={100}
+            step={1}
+            precision={1}
+            unit="%"
+            value={value.area[field] * 100}
+            onChange={(next) =>
+              onChange({
+                ...value,
+                area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
+              })
+            }
+          />
+        ))}
+      </ReviewDetails>
       <ReviewNumberRow
         label={translate('gallery.videoReview.focusRoundness')}
         min={0}
@@ -91,5 +83,35 @@ export function ReviewSpotlightInspector(props: {
         onChange={(roundness) => onChange({ ...value, roundness: roundness / 100 })}
       />
     </div>
+  );
+}
+
+/** Area animation belongs to the phase whose easing and duration follow it. */
+export function ReviewSpotlightAnimation(props: {
+  value: QuickEditSpotlight;
+  phase: 'enter' | 'exit';
+  onChange(value: QuickEditSpotlight): void;
+}) {
+  const field = props.phase === 'enter' ? 'reveal' : 'exitReveal';
+  return (
+    <SelectField
+      className={reviewSelectFieldClassName}
+      label={translate('gallery.videoReview.focusReveal')}
+      value={props.value[field]}
+      options={[
+        { value: 'fade', label: translate('gallery.videoReview.focusFade') },
+        {
+          value: 'contract',
+          label: translate(
+            props.phase === 'enter'
+              ? 'gallery.videoReview.focusContract'
+              : 'gallery.videoReview.focusExpand'
+          ),
+        },
+      ]}
+      onChange={(animation: QuickEditSpotlight['reveal']) =>
+        props.onChange({ ...props.value, [field]: animation })
+      }
+    />
   );
 }

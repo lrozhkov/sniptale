@@ -69,6 +69,7 @@ export function ReviewTimelineTools(props: {
     <>
       <ReviewButton
         label={translate('gallery.videoReview.pointerTool')}
+        toolbarLabel={translate('gallery.videoReview.toolbarPointer')}
         aria-pressed={props.mode === null}
         className={plain}
         onClick={props.onPointer}
@@ -77,6 +78,7 @@ export function ReviewTimelineTools(props: {
       </ReviewButton>
       <ReviewButton
         label={translate('gallery.videoReview.cutMode')}
+        toolbarLabel={translate('gallery.videoReview.toolbarCut')}
         title={translate('gallery.videoReview.cutGesture')}
         aria-pressed={props.mode === 'cut'}
         className={plain}
@@ -87,6 +89,7 @@ export function ReviewTimelineTools(props: {
       </ReviewButton>
       <ReviewButton
         label={translate('gallery.videoReview.speedMode')}
+        toolbarLabel={translate('gallery.videoReview.speedMode')}
         aria-pressed={props.mode === 'speed'}
         className={plain}
         disabled={!props.available || props.busy || props.speedAvailable === false}
@@ -98,6 +101,7 @@ export function ReviewTimelineTools(props: {
       {props.selected ? (
         <ReviewButton
           label={translate('gallery.videoReview.removeEdit')}
+          toolbarLabel={translate('gallery.videoReview.removeEdit')}
           className={plain}
           disabled={props.busy}
           onClick={props.onRemove}
@@ -316,6 +320,7 @@ export function ReviewFragmentAction(props: {
   return (
     <ReviewButton
       label={translate('gallery.videoReview.downloadSelection')}
+      toolbarLabel={translate('gallery.videoReview.toolbarFragment')}
       title={rangeLabel + hint}
       disabled={!fragment || props.busy || audioUnavailable}
       className={plain}

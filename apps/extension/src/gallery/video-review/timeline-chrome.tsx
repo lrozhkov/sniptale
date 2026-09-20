@@ -1,5 +1,7 @@
+import './timeline-toolbar.css';
+import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
-import { Play, BetweenHorizontalStart, Undo2, Redo2 } from 'lucide-react';
+import { Play, BetweenHorizontalStart, Undo2, Redo2, StickyNote } from 'lucide-react';
 import type { ReactNode, CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
@@ -59,26 +61,18 @@ export function ReviewToolbar(props: {
   zoom: number;
   onZoom(value: number): void;
 }) {
+  const toolbar = useReviewToolbarLayout();
   return (
-    <div
-      data-ui="gallery.videoReview.toolbar"
-      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1
-        @max-[600px]:grid-cols-[auto_minmax(0,1fr)]
-        border-b border-[var(--sniptale-color-border-soft)]
-        px-2 py-1"
-    >
-      <div
-        className={`flex min-w-0 items-center @max-[600px]:col-span-2 ${
-          props.expandedTools
-            ? '@max-[1050px]:col-span-3 @max-[1050px]:row-start-2'
-            : '@max-[700px]:col-span-3 @max-[700px]:row-start-2'
-        }`}
-      >
+    <div ref={toolbar} data-ui="gallery.videoReview.toolbar" className="review-timeline-toolbar">
+      <div data-toolbar-side="leading" className="flex min-w-0 items-center">
         {props.tools}
       </div>
-      <div className="col-start-2 @max-[600px]:col-start-1 row-start-1 flex shrink-0 items-center justify-center gap-2">
+      <div data-toolbar-transport className="flex shrink-0 items-center justify-center gap-2">
         <ReviewButton
           label={translate(
+            props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
+          )}
+          toolbarLabel={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
           onClick={props.onPlay}
@@ -107,8 +101,13 @@ export function ReviewToolbar(props: {
           </output>
         ) : null}
       </div>
-      <div className="col-start-3 @max-[600px]:col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-0.5">
-        <div className="flex flex-1 items-center justify-center">{props.historyControls}</div>
+      <div data-toolbar-side="trailing" className="flex min-w-0 items-center justify-end gap-0.5">
+        <div
+          data-ui="gallery.videoReview.noteHistoryTools"
+          className="flex min-w-max flex-1 items-center justify-center"
+        >
+          {props.historyControls}
+        </div>
         <CompactRange
           aria-label={translate('videoEditor.timeline.zoom')}
           title={translate('videoEditor.timeline.zoom')}
@@ -123,6 +122,7 @@ export function ReviewToolbar(props: {
         />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}
+          toolbarLabel={translate('gallery.videoReview.fit')}
           className={plain}
           onClick={() => props.onZoom(1)}
         >
@@ -139,13 +139,30 @@ export function ReviewHistoryControls(props: {
   cursor: number;
   length: number;
   onHistory(direction: 'undo' | 'redo'): void;
+  onAddNote?(): void;
 }) {
   return (
     <>
+      {props.onAddNote ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.addComment')}
+          toolbarLabel={translate('gallery.videoReview.toolbarNote')}
+          className={plain}
+          disabled={props.busy}
+          onClick={props.onAddNote}
+        >
+          <StickyNote size={16} aria-hidden="true" />
+        </ReviewButton>
+      ) : null}
       {(['undo', 'redo'] as const).map((direction) => (
         <ReviewButton
           key={direction}
           label={translate(`gallery.videoReview.${direction}`)}
+          toolbarLabel={translate(
+            direction === 'undo'
+              ? 'gallery.videoReview.toolbarUndo'
+              : 'gallery.videoReview.toolbarRedo'
+          )}
           className={plain}
           disabled={
             props.busy || (direction === 'undo' ? props.cursor === 0 : props.cursor >= props.length)
