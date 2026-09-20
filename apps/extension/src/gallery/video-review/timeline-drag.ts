@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type PlaneDragProps = {
+  busy?: boolean | undefined;
   gutter?: number;
   duration: number;
   time: number;
@@ -60,8 +61,14 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
           event.target.closest('button,[data-ui="gallery.videoReview.trackHeader"]'))
       )
         return;
+      const gutter = props.gutter ?? 0;
+      if (event.clientX < event.currentTarget.getBoundingClientRect().left + gutter) return;
+      const time = planeTime(event, props.duration, gutter);
+      if (props.busy) {
+        props.onSeek(time, false);
+        return;
+      }
       props.onClearSelection?.();
-      const time = planeTime(event, props.duration, props.gutter ?? 0);
       drag.current = {
         start: time,
         x: event.clientX,

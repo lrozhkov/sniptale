@@ -63,3 +63,53 @@ it('previews cuts, speed and mute in source time, restores audio, and cancels it
     vi.unstubAllGlobals();
   }
 });
+
+it.each([2.123456789, 0.12956810631229235])(
+  'lands past fractional cut end %s without an endless seek loop',
+  (end) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const root = createRoot(document.createElement('div'));
+    let hook!: ReturnType<typeof useReviewPlayback>;
+    function Harness() {
+      hook = useReviewPlayback({
+        duration: 10,
+        boundaries: () => undefined,
+        edits: [
+          {
+            id: 'cut',
+            kind: 'cut',
+            start: end / 2,
+            end,
+            requestedStart: end / 2,
+            requestedEnd: end,
+          },
+        ],
+        onSeek: vi.fn(),
+        onFailure: vi.fn(),
+        original: { muted: true, volume: 1 },
+      });
+      return <video ref={hook.video} />;
+    }
+    try {
+      act(() => root.render(<Harness />));
+      let currentTime = end / 2 + 0.01;
+      const seek = vi.fn((value: number) => {
+        currentTime = Math.floor(value * 1e6) / 1e6;
+      });
+      Object.defineProperty(hook.video.current!, 'currentTime', {
+        get: () => currentTime,
+        set: seek,
+      });
+      act(() => hook.setPlaying(true));
+      act(() => hook.onTime(currentTime));
+      act(() => hook.onTime(currentTime));
+      expect(currentTime).toBeGreaterThanOrEqual(end);
+      expect(seek).toHaveBeenCalledTimes(1);
+    } finally {
+      act(() => root.unmount());
+      vi.unstubAllGlobals();
+    }
+  }
+);

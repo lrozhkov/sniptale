@@ -217,7 +217,8 @@ it('places the take at its start plus the trim offset after the transport advanc
       timelineDuration: 10,
     }),
     'voiceover',
-    2
+    2,
+    'a.webm'
   );
   expect(flushAdvanced).toHaveBeenCalledOnce();
 });
@@ -235,7 +236,8 @@ it('places the take through the output-time map (R03)', async () => {
   expect(harness.audio.addImported).toHaveBeenCalledWith(
     expect.objectContaining({ atTime: 2, timelineDuration: 10 }),
     'voiceover',
-    2
+    2,
+    'a.webm'
   );
 });
 

@@ -1,5 +1,6 @@
 import {
-  RECORDING_TYPING_MIN_SECONDS,
+  RECORDING_TYPING_FRAGMENT_MIN_SECONDS,
+  normalizeRecordingSignals,
   RECORDING_TYPING_GAP_SECONDS,
 } from '../../../features/video/project/recording-actions';
 import { describeTelemetryTarget } from './target';
@@ -52,12 +53,17 @@ function pushCompletedSignal(
   });
 }
 
-function finalizeTypingSignal(state: TelemetryState, timestampMs: number): void {
+/** Ends one raw input burst before cross-field grouping. */
+export function finalizeTypingSignal(state: TelemetryState, timestampMs: number): void {
+  state.typingTarget = null;
   if (state.typingSignal === null) {
     return;
   }
 
-  if (state.typingSignal.endTime >= state.typingSignal.startTime + RECORDING_TYPING_MIN_SECONDS)
+  if (
+    state.typingSignal.endTime >=
+    state.typingSignal.startTime + RECORDING_TYPING_FRAGMENT_MIN_SECONDS
+  )
     pushCompletedSignal(state, state.typingSignal, timestampMs);
   state.typingSignal = null;
 }
@@ -138,6 +144,8 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   const lastEventTimeMs = state.typingSignal?.data.lastEventTimeMs ?? null;
   const target = describeTelemetryTarget(event);
   const element = target.element;
+  const inputTarget =
+    element?.closest('input,textarea,[contenteditable]:not([contenteditable="false"])') ?? element;
   if (element) {
     const textInput =
       element instanceof HTMLInputElement &&
@@ -152,6 +160,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
 
   if (
     state.typingSignal !== null &&
+    state.typingTarget === inputTarget &&
     lastEventTimeMs !== null &&
     timestampMs - lastEventTimeMs < TYPING_MERGE_GAP_MS
   ) {
@@ -168,6 +177,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   }
 
   finalizeTypingSignal(state, timestampMs);
+  state.typingTarget = inputTarget;
   state.typingSignal = {
     id: crypto.randomUUID(),
     kind: RecordingTelemetrySignalKind.TYPING,
@@ -252,5 +262,6 @@ export function finalizeTelemetrySignals(state: TelemetryState): void {
   const timestampMs = performance.now();
   finalizeTypingSignal(state, timestampMs);
   finalizeCursorIdleSignal(state, timestampMs);
+  state.signals = normalizeRecordingSignals(state.signals);
   state.captureSegment += 1;
 }

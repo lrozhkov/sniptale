@@ -26,7 +26,7 @@ type TimelineProps = {
   audioTrack?: ReactNode;
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
-  onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void;
+  onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onEdit?(edit: ReviewEdit): void;
   markers: readonly ReviewTelemetryMarker[];
   selectedTelemetryRef?: ReviewTelemetryMarker['ref'];
@@ -91,7 +91,6 @@ export function ReviewTimeline(props: TimelineProps) {
         className="w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain"
       >
         <div
-          inert={props.busy}
           ref={plane.plane}
           data-ui="gallery.videoReview.timePlane"
           role="slider"
@@ -116,25 +115,27 @@ export function ReviewTimeline(props: TimelineProps) {
           <ReviewTrackRow label="">
             <ReviewRuler duration={props.duration} width={Math.max(1, width * zoom)} />
           </ReviewTrackRow>
-          {props.markers.length ? (
-            <ReviewTrackRow
-              label={translate('gallery.videoReview.telemetry')}
-              icon={<Activity size={14} aria-hidden="true" />}
-            >
-              <ReviewTelemetryStrip
-                markers={props.markers}
-                duration={props.duration}
-                time={props.time}
-                width={width}
-                zoom={zoom}
-                {...(props.selectedTelemetryRef
-                  ? { selectedTelemetryRef: props.selectedTelemetryRef }
-                  : {})}
-                onMarker={props.onMarker}
-              />
-            </ReviewTrackRow>
-          ) : null}
-          <ReviewSourceLane {...props} />
+          <div inert={props.busy}>
+            {props.markers.length ? (
+              <ReviewTrackRow
+                label={translate('gallery.videoReview.telemetry')}
+                icon={<Activity size={14} aria-hidden="true" />}
+              >
+                <ReviewTelemetryStrip
+                  markers={props.markers}
+                  duration={props.duration}
+                  time={props.time}
+                  width={width}
+                  zoom={zoom}
+                  {...(props.selectedTelemetryRef
+                    ? { selectedTelemetryRef: props.selectedTelemetryRef }
+                    : {})}
+                  onMarker={props.onMarker}
+                />
+              </ReviewTrackRow>
+            ) : null}
+            <ReviewSourceLane {...props} />
+          </div>
           <div
             aria-hidden="true"
             data-ui="gallery.videoReview.playhead"
@@ -149,8 +150,10 @@ export function ReviewTimeline(props: TimelineProps) {
               clipPath: 'polygon(0 0, 100% 0, 55% 8px, 55% 100%, 45% 100%, 45% 8px)',
             }}
           />
-          {props.zoomTrack}
-          {props.audioTrack}
+          <div inert={props.busy}>
+            {props.zoomTrack}
+            {props.audioTrack}
+          </div>
         </div>
       </div>
     </section>

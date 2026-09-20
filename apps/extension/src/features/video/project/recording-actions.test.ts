@@ -67,3 +67,18 @@ it('retains a double-click as one captured action with its click count', () => {
   expect(result).toHaveLength(1);
   expect(result[0]).toMatchObject({ id: 'a', data: { clickCount: 2 } });
 });
+
+it('drops sub-500ms fragments before grouping, including bridges between real inputs', () => {
+  const noise = Array.from({ length: 8 }, (_, i) => typing(`noise-${i}`, i * 0.6, i * 0.6 + 0.4));
+  expect(normalizeRecordingSignals(noise)).toEqual([]);
+  expect(
+    normalizeRecordingSignals([
+      typing('real-a', 0, 1.5),
+      typing('noise', 2, 2.4),
+      typing('real-b', 3, 4.5),
+    ])
+  ).toEqual([]);
+  expect(
+    normalizeRecordingSignals([typing('a', 0, 0.5), typing('b', 1, 3), typing('noise', 3.5, 3.9)])
+  ).toMatchObject([{ id: 'a', startTime: 0, endTime: 3, data: { eventCount: 4 } }]);
+});

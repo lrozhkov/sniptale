@@ -54,6 +54,8 @@ export type TelemetryState = {
   segmentStartedAtTimestamp: number;
   signals: RecordingTelemetrySnapshot['signals'];
   typingSignal: TypingTelemetrySignal | null;
+  /** Disposable target identity; never serialized into telemetry. */
+  typingTarget: Element | null;
   viewportObservation: RecordingTelemetrySnapshot['viewportObservation'];
   viewportObserver: (() => void) | null;
   viewport: RecordingTelemetrySnapshot['viewport'];

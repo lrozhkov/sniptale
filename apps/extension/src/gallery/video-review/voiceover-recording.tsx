@@ -52,7 +52,8 @@ export function useReviewVoiceoverRecording(args: {
           args.audio.addImported(
             importedAudioClip(assetId, duration, at, args.resultDuration),
             'voiceover',
-            duration
+            duration,
+            file.name
           );
           return args.flushAdvanced();
         },
@@ -130,7 +131,8 @@ export function useReviewEditorAudio(args: {
           args.audio.addImported(
             importedAudioClip(assetId, duration, at, args.resultDuration),
             lane,
-            duration
+            duration,
+            file.name
           );
           return args.flushAdvanced();
         },

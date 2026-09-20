@@ -18,7 +18,7 @@ type SelectionProps = {
   edits?: readonly ReviewEdit[];
   boundaries?: readonly number[];
   onEdit?(edit: ReviewEdit): void;
-  onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void;
+  onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onSeek(time: number): void;
   onSelect(value: ReviewAnchor): void;
   onComment(annotation: ReviewAnnotation): void;
@@ -94,6 +94,7 @@ function ReviewEditBlock(
     window.addEventListener('keydown', cancel, true);
     return () => window.removeEventListener('keydown', cancel, true);
   }, [onSnap]);
+  const committing = useRef(false);
   const range = preview ?? edit;
   const label =
     edit.kind === 'cut'
@@ -109,7 +110,7 @@ function ReviewEditBlock(
         backgroundColor: `color-mix(in srgb, var(${tone}) 28%, var(--sniptale-color-surface-canvas))`,
       }}
       onPointerDown={(event) => {
-        if (event.button !== 0) return;
+        if (event.button !== 0 || committing.current) return;
         event.stopPropagation();
         const target = event.target;
         const edge =
@@ -164,14 +165,19 @@ function ReviewEditBlock(
           setPreview(current.range);
         }
       }}
-      onPointerUp={(event) => {
+      onPointerUp={async (event) => {
         const current = drag.current;
         drag.current = null;
-        setPreview(null);
         onSnap(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        if (current?.moved) props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
+        committing.current = true;
+        try {
+          if (current?.moved) await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
+        } finally {
+          committing.current = false;
+          setPreview(null);
+        }
       }}
       onPointerCancel={() => {
         drag.current = null;

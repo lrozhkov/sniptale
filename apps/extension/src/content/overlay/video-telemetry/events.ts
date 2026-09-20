@@ -8,6 +8,7 @@ import {
 import type { TelemetryListeners, TelemetryState } from './types';
 import {
   finalizeTelemetrySignals,
+  finalizeTypingSignal,
   recordKeyboardShortcut,
   recordTypingActivity,
   tickCursorIdleTelemetry,
@@ -160,6 +161,7 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
       recordKeyboardShortcut(state, event);
     },
     pointerDown: (event) => {
+      finalizeTypingSignal(state, event.timeStamp);
       updatePointerIdleAnchor(state, event as PointerEvent, { reset: true });
       recordCursorSample(state, event as PointerEvent, { force: true });
     },

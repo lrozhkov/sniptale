@@ -20,7 +20,12 @@ export function useReviewPlayback(props: {
   const synchronize = (value: number, applyEdits: boolean) => {
     const node = video.current;
     const settings = reviewPlaybackSettings(value, latest.current.edits);
-    const next = applyEdits ? settings.time : value;
+    // Media clocks quantize seeks to microseconds. Round cut destinations forward
+    // so truncation cannot land inside the same cut and seek on every frame.
+    const next =
+      applyEdits && settings.time !== value
+        ? Math.min(latest.current.duration, cutSeekTarget(settings.time))
+        : value;
     if (node) {
       if (next !== value) node.currentTime = next;
       if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
@@ -77,4 +82,10 @@ export function useReviewPlayback(props: {
       } else node.pause();
     },
   };
+}
+
+/** Account for binary floating-point truncation when Chromium converts seconds to microseconds. */
+function cutSeekTarget(time: number): number {
+  const rounded = Math.ceil(time * 1e6) / 1e6;
+  return Math.floor(rounded * 1e6) / 1e6 < time ? rounded + 1e-6 : rounded;
 }

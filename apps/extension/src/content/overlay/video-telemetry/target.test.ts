@@ -94,14 +94,17 @@ it('merges fast form entry while publishing only scalar target metadata', () => 
     input.value = 'never retained';
     document.body.append(input);
     input.addEventListener('input', listeners.input);
-    const event = new Event('input', { bubbles: true });
-    Object.defineProperty(event, 'timeStamp', { value: 1000 + index * 800 });
-    input.dispatchEvent(event);
+    for (const offset of [0, 500]) {
+      const event = new Event('input', { bubbles: true });
+      Object.defineProperty(event, 'timeStamp', { value: 1000 + index * 800 + offset });
+      input.dispatchEvent(event);
+    }
   }
   finalizeTelemetrySignals(state);
   expect(state.signals).toHaveLength(1);
   expect(state.signals.map((signal) => signal.data['targetName'])).toEqual(['First field']);
   expect(state.typingSignal).toBeNull();
+  expect(state.typingTarget).toBeNull();
   expect(JSON.stringify(state.signals)).not.toContain('never retained');
   expect(
     state.signals

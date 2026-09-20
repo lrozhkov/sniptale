@@ -68,8 +68,7 @@ function normalizeFades(clip: QuickEditAudioClip): QuickEditAudioClip {
 /**
  * Bounded edge trim: a left trim advances into the asset instead of inventing
  * audio before the file, and a right trim is bounded by the known asset length
- * as well as the timeline. Without a known asset duration only the timeline
- * bounds apply.
+ * as well as the timeline. Unknown assets conservatively retain their existing source end.
  */
 export function trimQuickEditAudioClip(
   clip: QuickEditAudioClip,
@@ -79,8 +78,7 @@ export function trimQuickEditAudioClip(
   assetDuration?: number
 ): QuickEditAudioClip {
   if (edge === 'start') {
-    const minStart =
-      assetDuration === undefined ? 0 : Math.max(0, clip.timelineStart - clip.sourceOffset);
+    const minStart = Math.max(0, clip.timelineStart - clip.sourceOffset);
     const nextStart = clamp(
       timelineTime,
       minStart,
@@ -101,7 +99,7 @@ export function trimQuickEditAudioClip(
   }
   const assetMax =
     assetDuration === undefined
-      ? Infinity
+      ? clip.duration
       : Math.max(MIN_CLIP_SECONDS, assetDuration - clip.sourceOffset);
   const maxDuration = Math.min(assetMax, timelineDuration - clip.timelineStart);
   const duration = clamp(timelineTime - clip.timelineStart, MIN_CLIP_SECONDS, maxDuration);

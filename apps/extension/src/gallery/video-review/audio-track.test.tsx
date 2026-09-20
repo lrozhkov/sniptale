@@ -63,11 +63,13 @@ const renderTrack = (
   },
   busy = false,
   snapTimes: readonly number[] = [],
-  hasOriginalAudio = true
+  hasOriginalAudio = true,
+  assets?: Parameters<typeof ReviewAudioTrack>[0]['assets']
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
+        assets={assets}
         hasOriginalAudio={hasOriginalAudio}
         audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
         snapTimes={snapTimes}
@@ -221,7 +223,7 @@ it('trims the right edge through its drag handle', async () => {
   await send('pointerdown', edge, 0);
   await send('pointermove', edge, 100);
   await send('pointerup', block, 100);
-  expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 7);
+  expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 6, undefined);
 });
 
 it('keeps the preview duration while moving near the timeline end (A3)', async () => {
@@ -301,4 +303,33 @@ it('snaps audio placement to projected edit edges and allows Shift to bypass', a
 it('omits original audio controls when the indexed source has no audio stream', () => {
   expect(renderTrack(undefined, false, [], false)).toHaveLength(2);
   expect(host.textContent).not.toContain('gallery.videoReview.audioOriginal');
+});
+
+it('shows filenames and visible handles, and clamps the preview to the original audio duration', async () => {
+  const lanes = renderTrack(
+    { original: { muted: false, volume: 1 }, voiceover: [clip('a1', 2, 2)], music: [] },
+    false,
+    [],
+    true,
+    new Map([['asset:1', { filename: 'voice.wav', duration: 3 }]])
+  );
+  const lane = lanes[1]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 48));
+  const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+  expect(block.title).toBe('voice.wav');
+  expect(block.textContent?.trim()).toBe('');
+  expect(block.querySelectorAll('[data-audio-edge] span')).toHaveLength(2);
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  const edge = block.querySelector('[data-audio-edge="end"]')!;
+  await act(async () =>
+    edge.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 400 }))
+  );
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 900 }))
+  );
+  expect(block.style.width).toBe('30%');
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 900 }))
+  );
+  expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 5, 3);
 });

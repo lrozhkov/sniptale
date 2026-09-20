@@ -17,7 +17,7 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
       onKeyDownCapture={(event) => {
         const target = event.target;
         if (
-          event.key === ' ' &&
+          [' ', 'ArrowLeft', 'ArrowRight'].includes(event.key) &&
           !event.altKey &&
           !event.ctrlKey &&
           !event.metaKey &&
@@ -27,10 +27,10 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
           !target.isContentEditable
         ) {
           event.currentTarget.dataset['playbackFocus'] = 'true';
-        } else if (event.key !== ' ') delete event.currentTarget.dataset['playbackFocus'];
+        } else if (event.key === 'Tab') delete event.currentTarget.dataset['playbackFocus'];
       }}
       onPointerDownCapture={(event) => {
-        delete event.currentTarget.dataset['playbackFocus'];
+        event.currentTarget.dataset['playbackFocus'] = 'true';
       }}
       aria-label={translate('gallery.videoReview.title')}
       onCancel={(event) => event.preventDefault()}

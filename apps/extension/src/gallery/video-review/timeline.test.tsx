@@ -312,3 +312,19 @@ it('clears object selection on empty-plane seek, leaving interactive action clic
   ]);
   expect(clear).toHaveBeenCalledTimes(1);
 });
+
+it('allows seeking while writes lock track editing, without creating a new range', () => {
+  const { props, host } = renderTimeline({ busy: true });
+  const plane = planeWithMetrics(host);
+  expect(plane.hasAttribute('inert')).toBe(false);
+  expect(
+    host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')?.closest('[inert]')
+  ).not.toBeNull();
+  dispatchPlane(plane, [
+    { type: 'pointerdown', x: 300 },
+    { type: 'pointermove', x: 350 },
+    { type: 'pointerup', x: 350 },
+  ]);
+  expect(props.onSeek).toHaveBeenCalledWith(3, false);
+  expect(props.onSelect).not.toHaveBeenCalled();
+});

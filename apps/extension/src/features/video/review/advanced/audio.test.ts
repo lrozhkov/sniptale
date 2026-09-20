@@ -158,3 +158,19 @@ it('moves a clip without changing its duration (A3)', () => {
   expect(moveQuickEditAudioClip(clip, -4, 20).timelineStart).toBe(0);
   expect(moveQuickEditAudioClip(clip, -4, 20).duration).toBe(2);
 });
+
+it('never invents audio outside known bounds while asset metadata is unavailable', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'a',
+    assetId: 'a',
+    timelineStart: 3,
+    duration: 2,
+    endMax: 20,
+  });
+  expect(trimQuickEditAudioClip(clip, 'start', 0, 20)).toMatchObject({
+    timelineStart: 3,
+    sourceOffset: 0,
+    duration: 2,
+  });
+  expect(trimQuickEditAudioClip(clip, 'end', 15, 20)).toMatchObject({ duration: 2 });
+});

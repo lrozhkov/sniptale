@@ -25,7 +25,7 @@ import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
-import type { ReviewAudioLane } from './use-review-audio';
+import type { ReviewAudioLane, ReviewAudioAsset } from './use-review-audio';
 
 const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
 
@@ -65,11 +65,18 @@ function ReviewAudioClipLane(props: {
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
+  assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
   selectedId: string | null;
   busy: boolean;
   onSelect(id: string): void;
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
-  onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
+  onTrimClip(
+    lane: ReviewAudioLane,
+    id: string,
+    edge: 'start' | 'end',
+    timelineTime: number,
+    assetDuration?: number
+  ): void;
   onDropFile?: (file: File, timelineTime: number) => void;
   trailing?: ReactNode;
 }) {
@@ -105,10 +112,19 @@ function ReviewAudioClipLane(props: {
     drag.current = null;
     setPreview(null);
     if (!current || !shown || !current.moved) return;
+    const assetId = props.clips.find((clip) => clip.id === current.id)?.assetId ?? '';
+    const assetDuration =
+      props.assets?.get(assetId)?.duration ?? props.waveforms?.get(assetId)?.duration;
     if (current.edge === 'start')
-      props.onTrimClip(current.lane, current.id, 'start', shown.timelineStart);
+      props.onTrimClip(current.lane, current.id, 'start', shown.timelineStart, assetDuration);
     else if (current.edge === 'end')
-      props.onTrimClip(current.lane, current.id, 'end', shown.timelineStart + shown.duration);
+      props.onTrimClip(
+        current.lane,
+        current.id,
+        'end',
+        shown.timelineStart + shown.duration,
+        assetDuration
+      );
     else props.onMoveClip(current.lane, current.id, shown.timelineStart);
   };
   return (
@@ -131,6 +147,7 @@ function ReviewAudioClipLane(props: {
               selected={props.selectedId === clip.id}
               busy={props.busy}
               label={props.label}
+              assets={props.assets}
               waveforms={props.waveforms}
               projection={props.projection}
               snapTimes={props.snapTimes}
@@ -171,6 +188,7 @@ function ReviewAudioClipBlock(props: {
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
+  assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
   drag: MutableRefObject<AudioDragState | null>;
   lane: ReviewAudioLane;
   clips: readonly QuickEditAudioClip[];
@@ -180,6 +198,9 @@ function ReviewAudioClipBlock(props: {
   onCancel(): void;
 }) {
   const clip = props.clip;
+  const asset = props.assets?.get(clip.assetId);
+  const assetDuration = asset?.duration ?? props.waveforms?.get(clip.assetId)?.duration;
+  const filename = asset?.filename || props.label;
   const start =
     props.projection?.position(props.shown.timelineStart) ??
     props.shown.timelineStart / props.duration;
@@ -189,7 +210,8 @@ function ReviewAudioClipBlock(props: {
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${props.label} ${reviewClipLabel(clip)}`}
+      aria-label={`${props.label} · ${filename}`}
+      title={filename}
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab overflow-hidden rounded border
           text-xs active:cursor-grabbing ${
@@ -259,9 +281,9 @@ function ReviewAudioClipBlock(props: {
         const snapped = useEnd ? end : start;
         const next =
           current.edge === 'start'
-            ? trimQuickEditAudioClip(base, 'start', start.time, props.duration)
+            ? trimQuickEditAudioClip(base, 'start', start.time, props.duration, assetDuration)
             : current.edge === 'end'
-              ? trimQuickEditAudioClip(base, 'end', end.time, props.duration)
+              ? trimQuickEditAudioClip(base, 'end', end.time, props.duration, assetDuration)
               : moveQuickEditAudioClip(
                   base,
                   useEnd ? end.time - base.duration : start.time,
@@ -292,23 +314,18 @@ function ReviewAudioClipBlock(props: {
         fadeIn={clip.fadeIn}
         fadeOut={clip.fadeOut}
       />
-      <span
-        data-audio-edge="start"
-        className="absolute inset-y-0 left-0 z-10 w-2 cursor-ew-resize"
-      />
-      <span
-        data-audio-edge="end"
-        className="absolute inset-y-0 right-0 z-10 w-2 cursor-ew-resize"
-      />
-      <span className="pointer-events-none relative block truncate px-3 text-[10px]">
-        {reviewClipLabel(clip)}
-      </span>
+      {(['start', 'end'] as const).map((edge) => (
+        <span
+          key={edge}
+          data-audio-edge={edge}
+          className={`absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center
+            bg-black/10 ${edge === 'start' ? 'left-0' : 'right-0'}`}
+        >
+          <span className="h-4 w-px bg-current opacity-60" />
+        </span>
+      ))}
     </div>
   );
-}
-
-function reviewClipLabel(clip: QuickEditAudioClip) {
-  return `${clip.timelineStart.toFixed(1)} +${clip.duration.toFixed(1)}`;
 }
 
 /** The three semantic audio lanes; the original stays bound to the video structure. */
@@ -319,11 +336,18 @@ export function ReviewAudioTrack(props: {
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
+  assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
   selectedId: string | null;
   busy: boolean;
   onSelect(id: string | null): void;
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
-  onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
+  onTrimClip(
+    lane: ReviewAudioLane,
+    id: string,
+    edge: 'start' | 'end',
+    timelineTime: number,
+    assetDuration?: number
+  ): void;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
@@ -355,6 +379,7 @@ export function ReviewAudioTrack(props: {
       ) : null}
       <ReviewClipLanes
         audio={props.audio}
+        assets={props.assets}
         waveforms={props.waveforms}
         onMuteLane={props.onMuteLane}
         projection={props.projection}
@@ -417,11 +442,18 @@ function ReviewClipLanes(props: {
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
+  assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
   selectedId: string | null;
   busy: boolean;
   onSelect(id: string | null): void;
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
-  onTrimClip(lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number): void;
+  onTrimClip(
+    lane: ReviewAudioLane,
+    id: string,
+    edge: 'start' | 'end',
+    timelineTime: number,
+    assetDuration?: number
+  ): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
@@ -436,6 +468,7 @@ function ReviewClipLanes(props: {
           lane={lane.key}
           label={translate(lane.label)}
           clips={props.audio[lane.key]}
+          assets={props.assets}
           waveforms={props.waveforms}
           projection={props.projection}
           snapTimes={props.snapTimes}

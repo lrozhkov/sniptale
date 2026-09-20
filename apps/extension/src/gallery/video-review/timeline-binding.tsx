@@ -73,6 +73,7 @@ function ReviewAudioLane(props: {
       hasOriginalAudio={props.hasOriginalAudio}
       projection={props.projection}
       waveforms={props.waveforms}
+      assets={props.audio.assets}
       onMuteLane={props.audio.toggleLaneMute}
       snapTimes={props.snapTimes}
       audio={props.audioState}
@@ -239,7 +240,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onRangeCommit={(range) => {
         if (props.editing.mode) void props.editing.commitRange(range);
       }}
-      onChangeEdit={(edit, range) => void props.editing.commitRange(range, edit)}
+      onChangeEdit={(edit, range) => props.editing.commitRange(range, edit)}
       time={props.time}
       playing={props.playing}
       selection={

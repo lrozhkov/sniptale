@@ -22,6 +22,7 @@ export function createInitialState(): TelemetryState {
     segmentStartedAtTimestamp: 0,
     signals: [],
     typingSignal: null,
+    typingTarget: null,
     viewport: null,
     viewportObservation: null,
     viewportObserver: null,
@@ -92,6 +93,7 @@ export function resetTelemetryState(
   state.segmentStartedAtTimestamp = performance.now();
   state.signals = [];
   state.typingSignal = null;
+  state.typingTarget = null;
   state.viewport = buildViewportSnapshot();
   state.viewportObservation = { initial: buildRecordingViewportGeometry(), stable: true };
   observeViewportGeometry(state);

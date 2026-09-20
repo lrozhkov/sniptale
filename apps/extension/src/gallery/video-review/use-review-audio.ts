@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   QuickEditAudioClip,
   QuickEditAudioState,
@@ -11,6 +11,8 @@ import {
   updateQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
 import { listMediaLibrary } from '../../composition/persistence/media-library';
+
+export type ReviewAudioAsset = { filename: string; duration?: number };
 
 export type ReviewAudioLane = 'voiceover' | 'music';
 
@@ -33,19 +35,25 @@ export function useReviewAudio(args: {
       );
     args.onSelectionChange?.(id && resolvedLane ? { lane: resolvedLane, id } : null);
   };
-  const assetDurations = useRef(new Map<string, number>());
+  const [assets, setAssets] = useState<ReadonlyMap<string, ReviewAudioAsset>>(new Map());
   useEffect(() => {
     let active = true;
     void listMediaLibrary()
       .then((items) => {
         if (!active) return;
-        for (const item of items) {
-          if (item.source.kind === 'project-asset' && item.duration !== null)
-            assetDurations.current.set(
-              `project-asset:${item.source.projectAssetId}`,
-              item.duration
-            );
-        }
+        setAssets((current) => {
+          const next = new Map(current);
+          for (const item of items) {
+            if (item.source.kind !== 'project-asset') continue;
+            const id = `project-asset:${item.source.projectAssetId}`;
+            if (!next.has(id))
+              next.set(id, {
+                filename: item.filename,
+                ...(item.duration !== null ? { duration: item.duration } : {}),
+              });
+          }
+          return next;
+        });
       })
       .catch(() => undefined);
     return () => {
@@ -72,11 +80,22 @@ export function useReviewAudio(args: {
       })
     );
   return {
+    assets,
     selectedId,
     setSelectedId: setSelected,
     selected: selected ?? null,
-    addImported: (clip: QuickEditAudioClip, lane: ReviewAudioLane, assetDuration?: number) => {
-      if (assetDuration !== undefined) assetDurations.current.set(clip.assetId, assetDuration);
+    addImported: (
+      clip: QuickEditAudioClip,
+      lane: ReviewAudioLane,
+      assetDuration?: number,
+      filename = ''
+    ) => {
+      setAssets((current) =>
+        new Map(current).set(clip.assetId, {
+          filename,
+          ...(assetDuration !== undefined ? { duration: assetDuration } : {}),
+        })
+      );
       patchLane(lane, (clips) => [...clips, clip]);
       setSelected(clip.id, lane);
     },
@@ -84,14 +103,20 @@ export function useReviewAudio(args: {
       updateClip(lane, id, (clip) =>
         moveQuickEditAudioClip(clip, timelineStart, args.timelineDuration)
       ),
-    trimClip: (lane: ReviewAudioLane, id: string, edge: 'start' | 'end', timelineTime: number) =>
+    trimClip: (
+      lane: ReviewAudioLane,
+      id: string,
+      edge: 'start' | 'end',
+      timelineTime: number,
+      assetDuration?: number
+    ) =>
       updateClip(lane, id, (clip) =>
         trimQuickEditAudioClip(
           clip,
           edge,
           timelineTime,
           args.timelineDuration,
-          assetDurations.current.get(clip.assetId)
+          assetDuration ?? assets.get(clip.assetId)?.duration
         )
       ),
     patchClip: (

@@ -178,3 +178,23 @@ it('snaps boundary drags to candidates inside the pixel threshold with a shift b
   await lane.event(lane.block, 'pointerup', 605);
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6.05 });
 });
+
+it('keeps resize geometry while a deferred commit is pending and restores it on rejection', async () => {
+  let settle!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    settle = resolve;
+  });
+  const lane = renderLane({
+    edits: [cut(2, 4)],
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    onChangeEdit: () => pending,
+  });
+  await lane.event(lane.end, 'pointerdown', 400);
+  await lane.event(lane.block, 'pointermove', 600, { shiftKey: true });
+  expect(lane.block.style.width).toBe('40%');
+  await lane.event(lane.block, 'pointerup', 600);
+  expect(lane.block.style.width).toBe('40%');
+  await act(async () => settle());
+  expect(lane.block.style.width).toBe('20%');
+});

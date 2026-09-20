@@ -745,6 +745,19 @@ for (const variant of [
       await expect
         .poll(async () => (await music.locator('path').getAttribute('d'))?.length ?? 0)
         .toBeGreaterThan(100);
+      const audioClip = music.locator('[role="button"]').first();
+      await expect(audioClip).toHaveAttribute('title', 'peaks.wav');
+      await expect(audioClip).toHaveText('');
+      const originalClipBox = (await audioClip.boundingBox())!;
+      const handle = audioClip.locator('[data-audio-edge="end"]');
+      await expect(handle.locator('span')).toBeVisible();
+      const handleBox = (await handle.boundingBox())!;
+      await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(handleBox.x + 150, handleBox.y + handleBox.height / 2, { steps: 3 });
+      expect((await audioClip.boundingBox())!.width).toBeLessThanOrEqual(originalClipBox.width + 1);
+      await page.mouse.up();
+      expect((await audioClip.boundingBox())!.width).toBeLessThanOrEqual(originalClipBox.width + 1);
       const zoomControl = dialog.getByRole('slider', {
         name: label('videoEditor.timeline.zoom'),
         exact: true,
@@ -1042,6 +1055,18 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
     await page.keyboard.press('Space');
     await page.keyboard.press('Tab');
     await expect(dialog).not.toHaveAttribute('data-playback-focus');
+    await page.keyboard.press('ArrowRight');
+    await timelineGesture(page, 4);
+    await expect
+      .poll(async () =>
+        Number(
+          await dialog
+            .locator('[data-ui="gallery.videoReview.timePlane"]')
+            .getAttribute('aria-valuenow')
+        )
+      )
+      .toBeGreaterThan(3);
+
     const toolbar = dialog.locator('[data-ui="gallery.videoReview.toolbar"]');
     await expect(
       toolbar.getByRole('button', { name: label('gallery.videoReview.undo'), exact: true })
@@ -1415,3 +1440,55 @@ for (const variant of [
     }
   });
 }
+
+test('quick editor continues playback after a fractional cut and accepts navigation during a note draft', async ({
+  page,
+}) => {
+  const host = await startHostServer();
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'ru' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('dialog');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: label(key), exact: true });
+    await button('gallery.videoReview.advancedEditing').click();
+    await button('gallery.videoReview.cutMode').click();
+    await timelineGesture(page, 0.4, 2.123456789);
+    await expect(button('gallery.videoReview.undo')).toBeEnabled();
+    await button('gallery.videoReview.pointerTool').click();
+    await timelineGesture(page, 0);
+    await button('gallery.videoReview.play').click();
+    const video = dialog.locator('video');
+    await expect
+      .poll(() => video.evaluate((node) => node.currentTime), { timeout: 8000 })
+      .toBeGreaterThan(3);
+    expect(await video.evaluate((node) => node.paused)).toBe(false);
+    await button('gallery.videoReview.pause').click();
+    await button('gallery.videoReview.comments').click();
+    await button('gallery.videoReview.addComment').click();
+    const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+    for (const time of [4, 6, 3, 5]) {
+      await plane.focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(dialog).toHaveAttribute('data-playback-focus', 'true');
+      await timelineGesture(page, time);
+      await expect
+        .poll(async () => Number(await plane.getAttribute('aria-valuenow')))
+        .toBeCloseTo(time, 0);
+      expect(await dialog.evaluate((node) => getComputedStyle(node).outlineStyle)).toBe('none');
+    }
+    await expect(dialog.locator('textarea')).toBeVisible();
+    await button('gallery.videoReview.discard').click();
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

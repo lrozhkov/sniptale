@@ -1,6 +1,7 @@
 import type { RecordingActionEvent, RecordingTelemetrySignal } from './types';
 
-export const RECORDING_TYPING_MIN_SECONDS = 3;
+const RECORDING_TYPING_MIN_SECONDS = 3;
+export const RECORDING_TYPING_FRAGMENT_MIN_SECONDS = 0.5;
 export const RECORDING_TYPING_GAP_SECONDS = 1;
 const RECORDING_CLICK_GAP_SECONDS = 0.5;
 
@@ -48,7 +49,7 @@ function isTextInput(signal: RecordingTelemetrySignal): boolean {
   );
 }
 
-/** Merge before filtering; captureSegment prevents joining across recording pauses. */
+/** Discard tiny fragments before grouping; captureSegment prevents joining across recording pauses. */
 export function normalizeRecordingSignals(
   signals: readonly RecordingTelemetrySignal[]
 ): RecordingTelemetrySignal[] {
@@ -59,7 +60,12 @@ export function normalizeRecordingSignals(
       result.push(pending);
   };
   for (const signal of signals
-    .filter((item) => item.kind === 'typing' && isTextInput(item))
+    .filter(
+      (item) =>
+        item.kind === 'typing' &&
+        item.endTime >= item.startTime + RECORDING_TYPING_FRAGMENT_MIN_SECONDS &&
+        isTextInput(item)
+    )
     .sort((a, b) => a.startTime - b.startTime)) {
     if (
       pending &&

@@ -37,6 +37,10 @@ it('retains focus during Space playback and restores keyboard modality on Tab', 
     expect(dialog.dataset['playbackFocus']).toBeUndefined();
     button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    expect(dialog.dataset['playbackFocus']).toBe('true');
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(dialog.dataset['playbackFocus']).toBe('true');
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     expect(dialog.dataset['playbackFocus']).toBeUndefined();
   } finally {
     act(() => root.unmount());
