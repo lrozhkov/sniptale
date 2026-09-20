@@ -2,7 +2,7 @@ import { ScanEye } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import type { ReviewEdit } from '../../features/video/review/types';
+import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import {
   moveQuickEditZoomRegion,
@@ -23,6 +23,7 @@ import type { ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 
 type ZoomTrackProps = {
+  sourceSelection?: ReviewAnchor | undefined;
   projection?: ReviewTrackProjection | undefined;
   enabled?: boolean;
   onToggleEnabled?(): void;
@@ -138,6 +139,7 @@ function zoomDragRange(args: {
 
 /** Zoom regions on their own lane; drags snap to shared candidates and never overlap. */
 export function ReviewZoomTrack(props: ZoomTrackProps) {
+  const sourceDuration = props.projection?.duration ?? props.duration;
   const [guide, setGuide] = useState<number | null>(null);
   const [preview, setPreview] = useState<{ id: string; start: number; end: number } | null>(null);
   const drag = useRef<ZoomDragState | null>(null);
@@ -231,6 +233,18 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
             onGuide={setGuide}
           />
         ))}
+        {props.sourceSelection?.kind === 'range' ? (
+          <div
+            aria-hidden="true"
+            data-ui="gallery.videoReview.focusRangePreview"
+            className="pointer-events-none absolute inset-y-0 z-20 border
+              border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent)]/10"
+            style={{
+              left: `${(props.sourceSelection.start / sourceDuration) * 100}%`,
+              width: `${((props.sourceSelection.end - props.sourceSelection.start) / sourceDuration) * 100}%`,
+            }}
+          />
+        ) : null}
         <ReviewTrackCuts projection={props.projection} />
         {guide !== null ? (
           <div

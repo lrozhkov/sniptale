@@ -148,7 +148,8 @@ it('ignores pointer traffic without a drag and secondary buttons', () => {
     { type: 'pointercancel', x: 300 },
     { type: 'pointerup', x: 300 },
   ]);
-  expect(props.onSeek).toHaveBeenCalledTimes(1);
+  expect(props.onSeek).toHaveBeenCalledTimes(2);
+  expect(props.onSeek).toHaveBeenLastCalledWith(2, false);
 });
 
 it('groups cursor telemetry and deduplicates dense cursor samples', () => {
@@ -327,4 +328,47 @@ it('allows seeking while writes lock track editing, without creating a new range
   ]);
   expect(props.onSeek).toHaveBeenCalledWith(3, false);
   expect(props.onSelect).not.toHaveBeenCalled();
+});
+
+it.each(['zoomLane', 'audioLane'])('seeks without selecting a range on an idle %s', (laneName) => {
+  const onRangeCommit = vi.fn();
+  const { host, props } = renderTimeline({
+    onRangeCommit,
+    zoomTrack: <div data-ui={`gallery.videoReview.${laneName}`} />,
+  });
+  const plane = planeWithMetrics(host);
+  const lane = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${laneName}"]`)!;
+  dispatchPlane(lane, [{ type: 'pointerdown', x: 100 }]);
+  dispatchPlane(plane, [
+    { type: 'pointermove', x: 250 },
+    { type: 'pointerup', x: 250 },
+  ]);
+  expect(props.onSeek).toHaveBeenCalledWith(1);
+  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
+  expect(onRangeCommit).not.toHaveBeenCalled();
+});
+
+it('routes focus drawing to its own tool and cancels without committing', () => {
+  const onFocusRangeCommit = vi.fn();
+  const onRangeCommit = vi.fn();
+  const { host, props } = renderTimeline({
+    onFocusRangeCommit,
+    onRangeCommit,
+    zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
+  });
+  const plane = planeWithMetrics(host);
+  const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
+  dispatchPlane(lane, [{ type: 'pointerdown', x: 250 }]);
+  dispatchPlane(plane, [
+    { type: 'pointermove', x: 100 },
+    { type: 'pointerup', x: 100 },
+  ]);
+  expect(onFocusRangeCommit).toHaveBeenCalledExactlyOnceWith({ kind: 'range', start: 1, end: 2.5 });
+  expect(onRangeCommit).not.toHaveBeenCalled();
+  expect(props.onSelect).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  dispatchPlane(lane, [{ type: 'pointerdown', x: 250 }]);
+  dispatchPlane(plane, [{ type: 'pointermove', x: 100 }]);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  dispatchPlane(plane, [{ type: 'pointerup', x: 100 }]);
+  expect(onFocusRangeCommit).toHaveBeenCalledTimes(1);
 });

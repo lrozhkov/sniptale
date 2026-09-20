@@ -73,7 +73,10 @@ vi.mock('../shared/download', async (importOriginal) => ({
   downloadGalleryBlob: integration.download,
 }));
 
-async function dragRange(host: HTMLElement) {
+async function dragRange(
+  host: HTMLElement,
+  options: { lane?: 'zoomLane'; start?: number; end?: number } = {}
+) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
   vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(
@@ -85,12 +88,15 @@ async function dragRange(host: HTMLElement) {
     releasePointerCapture: vi.fn(),
   });
   for (const [type, x] of [
-    ['pointerdown', 100],
-    ['pointermove', 200],
-    ['pointerup', 200],
+    ['pointerdown', options.start ?? 100],
+    ['pointermove', options.end ?? 200],
+    ['pointerup', options.end ?? 200],
   ] as const)
     await act(async () =>
-      plane.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
+      (type === 'pointerdown' && options.lane
+        ? host.querySelector(`[data-ui="gallery.videoReview.${options.lane}"]`)!
+        : plane
+      ).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
     );
 }
 
@@ -423,6 +429,145 @@ it('creates a source-audio mute from a range, opens properties and restores it t
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
     ).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('draws focus in source coordinates, selects it and keeps drawing tools mutually exclusive', async () => {
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'speed-op',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'speed',
+          kind: 'speed',
+          start: 0,
+          end: 1,
+          requestedStart: 0,
+          requestedEnd: 1,
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+    ],
+  });
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: 'opus',
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('focusRangeTool');
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('false');
+    await act(async () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'м', code: 'KeyV', bubbles: true }))
+    );
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('true');
+    await fixture.click('focusRangeTool');
+    await fixture.click('originalAudioRange');
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
+    await fixture.click('focusRangeTool');
+    expect(fixture.button('originalAudioRange').getAttribute('aria-pressed')).toBe('false');
+    const plane = fixture.host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.timePlane"]'
+    )!;
+    const lane = fixture.host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.zoomLane"]'
+    )!;
+    const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+    vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(-gutter, 0, gutter + 400, 100)
+    );
+    Object.assign(plane, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    for (const [target, type, x] of [
+      [lane, 'pointerdown', 100],
+      [plane, 'pointermove', 200],
+      [plane, 'pointerup', 200],
+    ] as const) {
+      await act(async () =>
+        target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
+      );
+      if (type === 'pointermove')
+        expect(
+          fixture.host.querySelector('[data-ui="gallery.videoReview.focusRangePreview"]')
+        ).not.toBeNull();
+    }
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('true');
+    const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
+    expect(inspector).not.toBeNull();
+    expect(
+      inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
+    ).toContain('0.5 – 1.5');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 350)));
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'advancedContent',
+      after: { zoom: { regions: [expect.objectContaining({ start: 0.5, end: 1.5 })] } },
+    });
+    expect(fixture.button('focusRangeTool').disabled).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('rejects focus over a cut and applies the focus tool immediately to an available selection', async () => {
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'cut-op',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'cut',
+          kind: 'cut',
+          start: 1.5,
+          end: 2.5,
+          requestedStart: 1.5,
+          requestedEnd: 2.5,
+        },
+      },
+    ],
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('focusRangeTool');
+    await dragRange(fixture.host, { lane: 'zoomLane' });
+    expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
+    await dragRange(fixture.host);
+    expect(fixture.button('focusRangeTool').disabled).toBe(true);
+    await dragRange(fixture.host, { start: 25, end: 75 });
+    expect(fixture.button('focusRangeTool').disabled).toBe(false);
+    await fixture.click('focusRangeTool');
+    const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
+    expect(inspector).not.toBeNull();
+    expect(
+      inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
+    ).toContain('0.3 – 0.8');
   } finally {
     await fixture.cleanup();
   }

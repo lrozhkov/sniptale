@@ -17,6 +17,7 @@ const plain = reviewIconButtonClassName;
 type Editing = ReturnType<typeof useReviewEdits>;
 
 type ToolbarProps = {
+  focusTool?: { active: boolean; available: boolean; onToggle(): void };
   originalAudioEditor?: ReturnType<typeof useReviewAudio>;
   editing: {
     mode: 'cut' | 'speed' | null;
@@ -60,7 +61,13 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         data-ui="gallery.videoReview.editingTools"
       >
         <ReviewTimelineTools
-          mode={props.editing.mode}
+          mode={
+            props.focusTool?.active
+              ? 'focus'
+              : props.originalAudioEditor?.originalTool
+                ? 'audio'
+                : props.editing.mode
+          }
           available={!!props.editing.exporter.index}
           cutAvailable={
             !props.originalAudioEditor?.originalRangeSelected &&
@@ -80,6 +87,18 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           onAudio={props.editing.changeAudio}
           onRemove={props.editing.remove}
         />
+        {advanced.ui.mode === 'advanced' && props.focusTool ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.focusRangeTool')}
+            title={translate('gallery.videoReview.focusRangeHint')}
+            aria-pressed={props.focusTool.active}
+            className={plain}
+            disabled={busy || !props.focusTool.available}
+            onClick={props.focusTool.onToggle}
+          >
+            <Focus size={16} aria-hidden="true" />
+          </ReviewButton>
+        ) : null}
         {advanced.ui.mode === 'advanced' &&
         props.editing.exporter.index?.audioCodec &&
         props.originalAudioEditor ? (
@@ -90,12 +109,15 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             className={plain}
             disabled={
               busy ||
-              (props.selection.kind === 'range' &&
+              (!props.originalAudioEditor.originalTool &&
+                props.selection.kind === 'range' &&
                 !props.originalAudioEditor.canAddOriginal(props.selection))
             }
             onClick={() => {
               props.editing.setCutting(false);
-              if (props.selection.kind === 'range')
+              if (props.originalAudioEditor?.originalTool)
+                props.originalAudioEditor.setOriginalTool(false);
+              else if (props.selection.kind === 'range')
                 props.originalAudioEditor?.addOriginal(props.selection);
               else
                 props.originalAudioEditor?.setOriginalTool(!props.originalAudioEditor.originalTool);

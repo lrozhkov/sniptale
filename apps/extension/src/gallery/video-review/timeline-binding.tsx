@@ -1,4 +1,5 @@
-import { useMemo, type ReactNode } from 'react';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -31,11 +32,13 @@ function ReviewZoomLane(props: {
   boundaries: readonly number[] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   onAdd(): void;
+  sourceSelection?: ReviewAnchor | undefined;
   toOutputTime(source: number): number | null;
 }) {
   return (
     <ReviewZoomTrack
       projection={props.projection}
+      sourceSelection={props.sourceSelection}
       enabled={props.advanced.zoom.enabled}
       onToggleEnabled={props.zoom.toggleEnabled}
       duration={props.resultDuration}
@@ -138,7 +141,12 @@ type TimelineBindingProps = {
 };
 
 /** Toolbar lock covers every content and presentation control during blocked phases. */
-function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
+function ReviewTimelineToolsBinding(
+  props: TimelineBindingProps & {
+    focusTool: { active: boolean; available: boolean; onToggle(): void };
+    clearFocusTool(): void;
+  }
+) {
   return (
     <fieldset
       disabled={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -146,6 +154,7 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
     >
       <ReviewTimelineToolbar
         originalAudioEditor={props.audio}
+        focusTool={props.focusTool}
         editing={{
           mode: props.editing.mode,
           rate: props.editing.rate,
@@ -153,10 +162,12 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
           selected: !!props.editing.selected,
           exporter: props.editing.exporter,
           setCutting: (value) => {
+            props.clearFocusTool();
             props.audio.setOriginalTool(false);
             props.editing.setCutting(value);
           },
           toggle: (kind) => {
+            props.clearFocusTool();
             props.audio.setOriginalTool(false);
             void props.editing.toggle(kind);
           },
@@ -190,7 +201,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     [props.source.duration, props.edits]
   );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
+  const focus = useFocusPlacement(props, projection);
   const onZoomAdd = () => {
+    focus.clear();
+    props.audio.setOriginalTool(false);
     const at = props.toOutputTime(props.time);
     if (at === null) props.onCutPlacement();
     else props.zoom.add(at, props.resultDuration);
@@ -201,7 +215,14 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
       duration={props.source.duration}
-      tools={<ReviewTimelineToolsBinding {...props} />}
+      tools={
+        <ReviewTimelineToolsBinding
+          {...props}
+          focusTool={focus.tool}
+          clearFocusTool={focus.clear}
+        />
+      }
+      onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
       trackControls={
         <ReviewTrackControls
           advanced={props.advanced}
@@ -216,6 +237,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
             zoomTrack: (
               <ReviewZoomLane
                 projection={projection}
+                sourceSelection={focus.tool.active ? props.selection : undefined}
                 advanced={props.advanced}
                 resultDuration={props.resultDuration}
                 outputTime={props.outputTime}
@@ -313,4 +335,67 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onComment={props.onComment}
     />
   );
+}
+
+/** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */
+function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackProjection) {
+  const { drawing: enabled, setDrawing: setEnabled } = props.zoom;
+  const visible = resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible;
+  const active = enabled && visible && !props.audio.originalTool && !props.editing.mode;
+  useEffect(() => {
+    if (!visible || props.audio.originalTool || props.editing.mode) setEnabled(false);
+  }, [visible, props.audio.originalTool, props.editing.mode, setEnabled]);
+  const candidate = (range: ReviewAnchor) => {
+    if (
+      range.kind !== 'range' ||
+      range.end - range.start < 0.001 ||
+      props.edits.some(
+        (edit) => edit.kind === 'cut' && edit.start < range.end && edit.end > range.start
+      )
+    )
+      return null;
+    const start = projection.output(range.start);
+    const end = projection.output(range.end);
+    if (
+      end - start < 0.001 ||
+      props.advanced.zoom.regions.some(
+        (region) => !region.dormant && region.start < end && region.end > start
+      )
+    )
+      return null;
+    return createQuickEditZoomRegion({
+      id: 'draft',
+      at: start,
+      duration: end - start,
+      endMax: end,
+    });
+  };
+  const commit = (range: ReviewAnchor) => {
+    const region = candidate(range);
+    if (!region) return;
+    if (props.zoom.addRegion(region)) {
+      setEnabled(false);
+      props.onSeek(range.kind === 'range' ? range.start : props.time);
+    }
+  };
+  return {
+    clear: () => setEnabled(false),
+    commit,
+    tool: {
+      active,
+      available: active || props.selection.kind !== 'range' || !!candidate(props.selection),
+      onToggle: () => {
+        props.audio.setOriginalTool(false);
+        props.editing.setCutting(false);
+        if (active) setEnabled(false);
+        else if (props.selection.kind === 'range') {
+          props.setTrackVisibility('zoom', true);
+          commit(props.selection);
+        } else {
+          props.setTrackVisibility('zoom', true);
+          setEnabled(true);
+        }
+      },
+    },
+  };
 }

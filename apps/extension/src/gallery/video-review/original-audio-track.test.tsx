@@ -146,7 +146,7 @@ it('draws in source time, trims both edges, cancels gestures and follows a linke
   }
 });
 
-it('selects a range before applying, ignores tiny/overlapping ranges and edits inspector gain', () => {
+it('requires the audio tool for drawing, ignores overlapping ranges and edits inspector gain', () => {
   const f = setup();
   try {
     f.send('pointerdown', 200);
@@ -155,7 +155,7 @@ it('selects a range before applying, ignores tiny/overlapping ranges and edits i
     f.send('pointerdown', 500);
     f.send('pointermove', 200);
     f.send('pointerup', 200);
-    expect(f.onRange).toHaveBeenLastCalledWith({ kind: 'range', start: 2, end: 5 });
+    expect(f.onRange).not.toHaveBeenCalled();
     expect(f.editor.selectedOriginal).toBeNull();
     act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 5 }));
     const id = f.editor.selectedOriginal!.id;
@@ -212,6 +212,30 @@ it('selects a range before applying, ignores tiny/overlapping ranges and edits i
         .click()
     );
     expect(f.editor.selectedOriginal).toBeNull();
+  } finally {
+    f.close();
+  }
+});
+
+it('moves the range body without changing duration and bounds movement by neighbors', () => {
+  const f = setup();
+  try {
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 4 }));
+    const id = f.editor.selectedOriginal!.id;
+    act(() => f.editor.addOriginal({ kind: 'range', start: 6, end: 7 }));
+    const range = f.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')!;
+    f.send('pointerdown', 300, range);
+    f.send('pointermove', 500);
+    f.send('pointerup', 500);
+    expect(f.editor.selectedOriginal).toMatchObject({ id, start: 4, end: 6 });
+    f.send('pointerdown', 500, range);
+    f.send('pointermove', 950);
+    f.send('pointerup', 950);
+    expect(f.editor.selectedOriginal).toMatchObject({ id, start: 4, end: 6 });
+    f.send('pointerdown', 500, range);
+    f.send('pointermove', 0);
+    f.send('pointerup', 0);
+    expect(f.editor.selectedOriginal).toMatchObject({ id, start: 0, end: 2 });
   } finally {
     f.close();
   }

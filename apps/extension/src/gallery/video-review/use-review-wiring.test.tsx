@@ -78,7 +78,7 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     advanced,
     advancedState,
     exporter: { phase: 'idle', index: { boundaries: [0, 1] } },
-    zoom: { remove: vi.fn() },
+    zoom: { remove: vi.fn(), setDrawing: vi.fn() },
     activeSelection: { kind: 'canvas-comment', id: 'canvas-a' } satisfies ReviewSelection,
     setActiveSelection,
     clearAnnotation: vi.fn(),
@@ -138,6 +138,8 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     expect(setTimelineSelection).toHaveBeenCalledWith({ kind: 'point', time: 1 });
     expect(comments.add).toHaveBeenCalledWith(args.timelineSelection);
     expect(cuts.toggle).toHaveBeenCalledWith('cut');
+    expect(args.zoom.setDrawing).toHaveBeenCalledTimes(3);
+    expect(args.zoom.setDrawing).toHaveBeenLastCalledWith(false);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

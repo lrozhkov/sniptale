@@ -27,6 +27,7 @@ type TimelineProps = {
   audioTrack?: ReactNode;
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
+  onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onEdit?(edit: ReviewEdit): void;
   markers: readonly ReviewTelemetryMarker[];
@@ -101,7 +102,7 @@ export function ReviewTimeline(props: TimelineProps) {
           aria-valuemax={props.duration}
           aria-valuenow={props.time}
           aria-valuetext={reviewTimeLabel(props.time)}
-          className="group/plane relative cursor-crosshair overflow-clip pb-2 pt-1 outline-none"
+          className="group/plane relative cursor-crosshair overflow-clip pb-2 outline-none"
           style={
             {
               width: gutter + Math.max(1, width * zoom),
@@ -140,7 +141,7 @@ export function ReviewTimeline(props: TimelineProps) {
           <div
             aria-hidden="true"
             data-ui="gallery.videoReview.playhead"
-            className="pointer-events-none absolute bottom-2 top-1 z-20
+            className="pointer-events-none absolute bottom-2 top-0 z-20
               bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125"
             style={{
               left:

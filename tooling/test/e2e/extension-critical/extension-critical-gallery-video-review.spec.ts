@@ -2161,3 +2161,113 @@ async function measureColorExport(page: Page, encoded: string, sourceEncoded: st
     { encoded, sourceEncoded }
   );
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`quick editor lane drawing tools and range dragging (${variant.locale}, ${variant.theme})`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      const audio = dialog.locator('[data-original-audio-lane]');
+      const focus = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const audioBox = (await audio.boundingBox())!;
+      const focusBox = (await focus.boundingBox())!;
+      const drag = async (
+        box: { x: number; y: number; width: number; height: number },
+        from: number,
+        to: number
+      ) => {
+        await page.mouse.move(box.x + box.width * from, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width * to, box.y + box.height / 2, { steps: 10 });
+        await page.mouse.up();
+      };
+      const ranges = dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
+      await drag(audioBox, 0.1, 0.2);
+      await drag(focusBox, 0.1, 0.2);
+      await expect(ranges).toHaveCount(0);
+      await expect(dialog.locator('[data-ui="gallery.videoReview.focusRangePreview"]')).toHaveCount(
+        0
+      );
+      await expect(button('gallery.videoReview.downloadSelection')).toHaveCount(0);
+      await button('gallery.videoReview.originalAudioRange').click();
+      await expect(button('gallery.videoReview.pointerTool')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+      await drag(audioBox, 0.2, 0.4);
+      await expect(ranges).toHaveCount(1);
+      await expect(ranges).toHaveAttribute('aria-pressed', 'true');
+      const original = (await ranges.boundingBox())!;
+      await drag(audioBox, 0.3, 0.5);
+      await expect
+        .poll(async () => (await ranges.boundingBox())!.x)
+        .toBeGreaterThan(original.x + audioBox.width * 0.18);
+      expect(Math.abs((await ranges.boundingBox())!.width - original.width)).toBeLessThan(2);
+      const handle = ranges.locator('[data-audio-edge="end"]');
+      expect((await handle.boundingBox())!.width).toBe(12);
+      await handle.hover();
+      await page.mouse.down();
+      await page.mouse.move(audioBox.x + audioBox.width * 0.7, audioBox.y + audioBox.height / 2, {
+        steps: 10,
+      });
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await ranges.boundingBox())!.width)
+        .toBeGreaterThan(original.width + audioBox.width * 0.08);
+      // A plain click clears the former interval before arming the focus tool.
+      await focus.click({ position: { x: focusBox.width * 0.1, y: focusBox.height / 2 } });
+      await button('gallery.videoReview.focusRangeTool').click();
+      await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await drag(focusBox, 0.1, 0.3);
+      await expect(dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]')).toBeVisible();
+      await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+      const plane = (await dialog
+        .locator('[data-ui="gallery.videoReview.timePlane"]')
+        .boundingBox())!;
+      const playhead = (await dialog
+        .locator('[data-ui="gallery.videoReview.playhead"]')
+        .boundingBox())!;
+      const header = (await dialog
+        .locator('[data-ui="gallery.videoReview.trackHeader"]')
+        .first()
+        .boundingBox())!;
+      expect(playhead.y).toBe(plane.y);
+      expect(header.y).toBe(plane.y);
+      await page.screenshot({ path: testInfo.outputPath('lane-tools.png') });
+      await page.setViewportSize({ width: 900, height: 720 });
+      await expect(button('gallery.videoReview.focusRangeTool')).toBeInViewport();
+      await expect(button('gallery.videoReview.originalAudioRange').first()).toBeInViewport();
+      await page.screenshot({ path: testInfo.outputPath('lane-tools-compact.png') });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

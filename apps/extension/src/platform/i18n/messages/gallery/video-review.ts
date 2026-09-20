@@ -194,6 +194,11 @@ export const galleryVideoReviewMessages = defineMessageSource({
   },
   zoomTrack: { ru: 'Фокусировка', en: 'Focus' },
   zoomAdd: { ru: 'Добавить фокусировку', en: 'Add focus' },
+  focusRangeTool: { ru: 'Фокусировка на интервале', en: 'Focus on a range' },
+  focusRangeHint: {
+    ru: 'Выделите интервал на дорожке фокусировки или примените к выбранному интервалу',
+    en: 'Draw a range on the focus track or apply to the selected range',
+  },
   zoomRegionLabel: { ru: 'Приближение', en: 'Zoom' },
   zoomEmptyHint: {
     ru: 'Установите указатель времени и добавьте фокусировку.',

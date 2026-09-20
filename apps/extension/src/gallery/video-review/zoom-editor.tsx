@@ -133,6 +133,7 @@ export function useReviewZoomEditor(args: {
     patch: QuickEditZoomRegionPatch;
     base: string;
   } | null>(null);
+  const [drawing, setDrawing] = useState(false);
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const selection = args.selection === undefined ? localSelection : args.selection;
   useEffect(() => {
@@ -223,6 +224,8 @@ export function useReviewZoomEditor(args: {
   const selected = (zoom: ZoomState): QuickEditZoomRegion | null =>
     zoom.regions.find((item) => item.id === selection) ?? null;
   return {
+    drawing,
+    setDrawing,
     selection,
     setSelection,
     linkSelection,

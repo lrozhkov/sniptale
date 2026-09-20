@@ -11,9 +11,11 @@ type PlaneDragProps = {
   onClearSelection?(): void;
   onSelect(value: ReviewAnchor): void;
   onRangeCommit?(range: ReviewAnchor): void;
+  onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
 };
 
 interface PlaneDragState {
+  lane: 'source' | 'focus' | 'seek';
   start: number;
   x: number;
   range: ReviewAnchor | null;
@@ -68,8 +70,19 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         props.onSeek(time, false);
         return;
       }
+      const target = event.target instanceof Element ? event.target : null;
+      const focusLane = !!target?.closest('[data-ui="gallery.videoReview.zoomLane"]');
+      const audioLane = !!target?.closest('[data-ui="gallery.videoReview.audioLane"]');
+      const lane = focusLane
+        ? props.onFocusRangeCommit
+          ? 'focus'
+          : 'seek'
+        : audioLane
+          ? 'seek'
+          : 'source';
       props.onClearSelection?.();
       drag.current = {
+        lane,
         start: time,
         x: event.clientX,
         range: null,
@@ -80,6 +93,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
       event.currentTarget.setPointerCapture(event.pointerId);
       props.onSeek(time);
       if (
+        lane !== 'source' ||
         props.selection.kind !== 'range' ||
         time < props.selection.start ||
         time > props.selection.end
@@ -88,7 +102,13 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
     },
     onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
-      if (!current || Math.abs(event.clientX - current.x) < 4) return;
+      if (
+        !current ||
+        event.pointerId !== current.pointerId ||
+        current.lane === 'seek' ||
+        Math.abs(event.clientX - current.x) < 4
+      )
+        return;
       const time = planeTime(event, props.duration, props.gutter ?? 0);
       current.range = {
         kind: 'range',
@@ -99,13 +119,22 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
     },
     onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
+      if (!current || event.pointerId !== current.pointerId) return;
       drag.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId))
         event.currentTarget.releasePointerCapture(event.pointerId);
-      if (current?.range) props.onRangeCommit?.(current.range);
+      if (!props.busy && current.range) {
+        if (current.lane === 'focus') props.onFocusRangeCommit?.(current.range);
+        else props.onRangeCommit?.(current.range);
+      }
     },
     onPointerCancel: () => {
+      const current = drag.current;
       drag.current = null;
+      if (current) {
+        props.onSeek(current.time, false);
+        props.onSelect(current.selection);
+      }
     },
   };
 }

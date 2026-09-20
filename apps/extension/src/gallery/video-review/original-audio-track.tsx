@@ -11,7 +11,19 @@ import { ReviewAudioWaveform } from './audio-waveform';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewButton, reviewTrackStatusButtonClassName } from './controls';
 
-type Drag = { pointerId: number; from: number; to: number; id?: string; edge?: 'start' | 'end' };
+type Drag = {
+  pointerId: number;
+  node: HTMLDivElement;
+  from: number;
+  to: number;
+  at: number;
+  start: number;
+  end: number;
+  min: number;
+  max: number;
+  id?: string;
+  edge?: 'start' | 'end' | 'move';
+};
 
 /** Source-time automation shares video coordinates and never affects added audio clips. */
 export function ReviewOriginalAudioTrack(props: {
@@ -77,16 +89,17 @@ export function ReviewOriginalAudioTrack(props: {
               aria-label={translate('gallery.videoReview.originalAudioRange')}
               title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
               data-ui="gallery.videoReview.originalAudioRange"
-              className={`absolute inset-y-0 z-10 flex items-center justify-center rounded border bg-transparent ${
-                selected
-                  ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
-                  : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]'
-              }`}
-              style={rectStyle(range.start, range.end)}
-              onPointerDown={(event) => {
-                if (!(event.target instanceof HTMLElement && event.target.dataset['audioEdge']))
-                  event.stopPropagation();
-              }}
+              data-audio-id={range.id}
+              className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
+                rounded border bg-transparent ${
+                  selected
+                    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
+                    : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]'
+                }`}
+              style={rectStyle(
+                preview?.id === range.id ? preview.from : range.start,
+                preview?.id === range.id ? preview.to : range.end
+              )}
               onClick={(event) => {
                 event.stopPropagation();
                 props.editor?.selectOriginal(range.id);
@@ -98,10 +111,11 @@ export function ReviewOriginalAudioTrack(props: {
                   key={edge}
                   data-audio-edge={edge}
                   data-audio-id={range.id}
-                  className={`absolute inset-y-0 w-2 cursor-ew-resize border-[var(--sniptale-color-text-muted)] ${
-                    edge === 'start' ? 'left-0 border-l-2' : 'right-0 border-r-2'
-                  }`}
-                />
+                  className={`absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center
+                    bg-black/10 ${edge === 'start' ? 'left-0' : 'right-0'}`}
+                >
+                  <span className="h-4 w-px bg-current opacity-60" />
+                </span>
               ))}
             </button>
           );
@@ -130,7 +144,7 @@ export function ReviewOriginalAudioTrack(props: {
               <Link2 size={12} />
             </button>
           ))}
-        {preview ? (
+        {preview && !preview.id ? (
           <div
             className="pointer-events-none absolute inset-y-0 z-30 border border-[var(--sniptale-color-accent)]"
             style={rectStyle(
@@ -155,9 +169,14 @@ function useOriginalAudioGesture(
   useEffect(() => {
     if (!preview) return;
     const cancel = (event: KeyboardEvent) => {
-      if (event.code === 'Escape') {
+      if (event.code === 'Escape' && drag.current) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const current = drag.current;
         drag.current = null;
         setPreview(null);
+        if (current.node.hasPointerCapture?.(current.pointerId))
+          current.node.releasePointerCapture(current.pointerId);
       }
     };
     document.addEventListener('keydown', cancel, true);
@@ -176,20 +195,38 @@ function useOriginalAudioGesture(
       onPointerDown: (event: PointerEvent<HTMLDivElement>) => {
         if (props.busy || event.button !== 0 || !props.editor) return;
         const target = event.target;
-        const handle =
-          target instanceof Element ? target.closest<HTMLElement>('[data-audio-edge]') : null;
-        if (!handle && target instanceof Element && target.closest('button')) return;
+        const item =
+          target instanceof Element ? target.closest<HTMLElement>('[data-audio-id]') : null;
+        if (!item && !props.editor.originalTool) return;
         event.stopPropagation();
         event.preventDefault();
         const at = position(event);
-        const id = handle?.dataset['audioId'];
-        const edge = handle?.dataset['audioEdge'];
+        const id = item?.dataset['audioId'];
+        const edge = item?.dataset['audioEdge'];
         const range = props.original.ranges?.find((item) => item.id === id);
+        const neighbors = props.original.ranges?.filter((other) => other.id !== id) ?? [];
+        if (id) props.editor.selectOriginal(id);
         drag.current = {
+          node: event.currentTarget,
+          at,
+          start: range?.start ?? at,
+          end: range?.end ?? at,
+          min: Math.max(
+            0,
+            ...neighbors
+              .filter((other) => other.end <= (range?.start ?? at))
+              .map((other) => other.end)
+          ),
+          max: Math.min(
+            duration,
+            ...neighbors
+              .filter((other) => other.start >= (range?.end ?? at))
+              .map((other) => other.start)
+          ),
           pointerId: event.pointerId,
           from: range?.start ?? at,
           to: range?.end ?? at,
-          ...(id && (edge === 'start' || edge === 'end') ? { id, edge } : {}),
+          ...(id ? { id, edge: edge === 'start' || edge === 'end' ? edge : 'move' } : {}),
         };
         event.currentTarget.setPointerCapture(event.pointerId);
         setPreview(drag.current);
@@ -197,10 +234,25 @@ function useOriginalAudioGesture(
       onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
         if (!drag.current || event.pointerId !== drag.current.pointerId) return;
         const at = position(event);
-        drag.current = {
-          ...drag.current,
-          ...(drag.current.edge === 'start' ? { from: at } : { to: at }),
-        };
+        const current = drag.current;
+        const length = current.end - current.start;
+        if (current.edge === 'move') {
+          const from = Math.max(
+            current.min,
+            Math.min(current.max - length, current.start + at - current.at)
+          );
+          drag.current = { ...current, from, to: from + length };
+        } else if (current.edge === 'start') {
+          drag.current = {
+            ...current,
+            from: Math.max(current.min, Math.min(current.end - 0.001, at)),
+          };
+        } else if (current.edge === 'end') {
+          drag.current = {
+            ...current,
+            to: Math.max(current.start + 0.001, Math.min(current.max, at)),
+          };
+        } else drag.current = { ...current, to: at };
         setPreview(drag.current);
       },
       onPointerUp: (event: PointerEvent<HTMLDivElement>) => {
@@ -214,6 +266,7 @@ function useOriginalAudioGesture(
         if (current.id)
           props.editor?.patchOriginal(current.id, { start: current.from, end: current.to });
         else {
+          if (!props.editor?.originalTool) return;
           const range: ReviewAnchor = {
             kind: 'range',
             start: Math.min(current.from, current.to),

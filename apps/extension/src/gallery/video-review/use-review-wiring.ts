@@ -137,18 +137,15 @@ export function useReviewEditorWiring(args: {
     undo: () => moveHistory('undo'),
     redo: () => moveHistory('redo'),
     cancelDrawing: () => {
-      args.cuts.setCutting(false);
-      audio.setOriginalTool(false);
+      selectReviewPointer(args, audio);
       args.setTimelineSelection({ kind: 'point', time: args.time });
     },
-    pointTool: () => {
-      args.cuts.setCutting(false);
-      audio.setOriginalTool(false);
-    },
+    pointTool: () => selectReviewPointer(args, audio),
     remove: removeSelection,
     addComment: () => comments.add(args.timelineSelection),
     toggleCut: () => {
       if (audio.originalRangeSelected) return;
+      args.zoom.setDrawing(false);
       audio.setOriginalTool(false);
       void args.cuts.toggle('cut');
     },
@@ -164,6 +161,16 @@ export function useReviewEditorWiring(args: {
     removeSelection,
     exporter: prepareReviewExporter(args.exporter, args.run, flushPendingContent),
   };
+}
+
+/** Pointer selection and Escape share the same reset across the three editing tools. */
+function selectReviewPointer(
+  { cuts, zoom }: Pick<Parameters<typeof useReviewEditorWiring>[0], 'cuts' | 'zoom'>,
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'setOriginalTool'>
+): void {
+  zoom.setDrawing(false);
+  cuts.setCutting(false);
+  audio.setOriginalTool(false);
 }
 
 /** Clear the source-audio gesture target when another editor context takes over. */

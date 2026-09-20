@@ -51,7 +51,7 @@ const plain = reviewIconButtonClassName;
 
 /** The timeline owns the editing tools; a drag applies the current tool directly. */
 export function ReviewTimelineTools(props: {
-  mode: 'cut' | 'speed' | null;
+  mode: 'cut' | 'speed' | 'audio' | 'focus' | null;
   available: boolean;
   cutAvailable?: boolean;
   speedAvailable?: boolean;
