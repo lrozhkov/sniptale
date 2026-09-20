@@ -206,3 +206,19 @@ it('round-trips the focus anchor policy and rejects malformed policy values', ()
   for (const invalid of [false, 'true', 1, null])
     expect(parseReviewOperation({ ...operation, preserveFocusAnchors: invalid }, 12)).toBeNull();
 });
+
+it('preserves the voiceover anchor policy and rejects invalid policy values', () => {
+  const operation = {
+    id: 'voice-cut',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    preserveVoiceoverAnchors: true,
+  };
+  expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  for (const invalid of [false, 'true', null])
+    expect(
+      parseReviewOperation({ ...operation, preserveVoiceoverAnchors: invalid }, 12)
+    ).toBeNull();
+});

@@ -1,3 +1,7 @@
+import {
+  anchorReviewVoiceover,
+  isReviewVoiceoverCut,
+} from '../../features/video/review/voiceover-edits';
 import { useEffect, useState } from 'react';
 import type {
   QuickEditAudioClip,
@@ -35,31 +39,7 @@ export function useReviewAudio(args: {
       );
     args.onSelectionChange?.(id && resolvedLane ? { lane: resolvedLane, id } : null);
   };
-  const [assets, setAssets] = useState<ReadonlyMap<string, ReviewAudioAsset>>(new Map());
-  useEffect(() => {
-    let active = true;
-    void listMediaLibrary()
-      .then((items) => {
-        if (!active) return;
-        setAssets((current) => {
-          const next = new Map(current);
-          for (const item of items) {
-            if (item.source.kind !== 'project-asset') continue;
-            const id = `project-asset:${item.source.projectAssetId}`;
-            if (!next.has(id))
-              next.set(id, {
-                filename: item.filename,
-                ...(item.duration !== null ? { duration: item.duration } : {}),
-              });
-          }
-          return next;
-        });
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
+  const [assets, setAssets] = useReviewAudioAssets();
   const selected = (['voiceover', 'music'] as const)
     .flatMap((lane) => args.audio[lane].map((clip) => ({ lane, clip })))
     .find((item) => item.clip.id === selectedId);
@@ -67,6 +47,10 @@ export function useReviewAudio(args: {
     lane: ReviewAudioLane,
     patch: (clips: QuickEditAudioClip[]) => QuickEditAudioClip[]
   ) => args.setAudio((audio) => ({ ...audio, [lane]: patch(audio[lane]) }));
+  const laneDuration = (lane: ReviewAudioLane) =>
+    lane === 'voiceover' && args.audio.voiceoverSegments
+      ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
+      : args.timelineDuration;
   const updateClip = (
     lane: ReviewAudioLane,
     id: string,
@@ -76,14 +60,21 @@ export function useReviewAudio(args: {
       clips.map((clip) => {
         if (clip.id !== id) return clip;
         const next = patch(clip);
-        return next.id === id ? clampQuickEditAudioClip(next, args.timelineDuration) : next;
+        return next.id === id ? clampQuickEditAudioClip(next, laneDuration(lane)) : next;
       })
     );
   return {
     assets,
     selectedId,
     setSelectedId: setSelected,
-    selected: selected ?? null,
+    selected: selected
+      ? {
+          ...selected,
+          cutSuppressed:
+            selected.lane === 'voiceover' &&
+            isReviewVoiceoverCut(selected.clip, args.audio.voiceoverSegments),
+        }
+      : null,
     addImported: (
       clip: QuickEditAudioClip,
       lane: ReviewAudioLane,
@@ -96,12 +87,17 @@ export function useReviewAudio(args: {
           ...(assetDuration !== undefined ? { duration: assetDuration } : {}),
         })
       );
-      patchLane(lane, (clips) => [...clips, clip]);
+      patchLane(lane, (clips) => [
+        ...clips,
+        lane === 'voiceover' && args.audio.voiceoverSegments
+          ? anchorReviewVoiceover(clip, args.audio.voiceoverSegments)
+          : clip,
+      ]);
       setSelected(clip.id, lane);
     },
     moveClip: (lane: ReviewAudioLane, id: string, timelineStart: number) =>
       updateClip(lane, id, (clip) =>
-        moveQuickEditAudioClip(clip, timelineStart, args.timelineDuration)
+        moveQuickEditAudioClip(clip, timelineStart, laneDuration(lane))
       ),
     trimClip: (
       lane: ReviewAudioLane,
@@ -115,7 +111,7 @@ export function useReviewAudio(args: {
           clip,
           edge,
           timelineTime,
-          args.timelineDuration,
+          laneDuration(lane),
           assetDuration ?? assets.get(clip.assetId)?.duration
         )
       ),
@@ -147,4 +143,34 @@ export function useReviewAudio(args: {
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
       args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ...patch } })),
   };
+}
+
+/** Resolves library metadata independently of selection and timeline mutations. */
+function useReviewAudioAssets() {
+  const [assets, setAssets] = useState<ReadonlyMap<string, ReviewAudioAsset>>(new Map());
+  useEffect(() => {
+    let active = true;
+    void listMediaLibrary()
+      .then((items) => {
+        if (!active) return;
+        setAssets((current) => {
+          const next = new Map(current);
+          for (const item of items) {
+            if (item.source.kind !== 'project-asset') continue;
+            const id = `project-asset:${item.source.projectAssetId}`;
+            if (!next.has(id))
+              next.set(id, {
+                filename: item.filename,
+                ...(item.duration !== null ? { duration: item.duration } : {}),
+              });
+          }
+          return next;
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+  return [assets, setAssets] as const;
 }

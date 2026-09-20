@@ -381,6 +381,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
   addOverlayComment: { ru: 'Комментарий на кадре', en: 'Frame comment' },
   audioOriginal: { ru: 'Оригинал', en: 'Original' },
   audioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
+  voiceoverCut: {
+    ru: 'Запись временно выключена: она пересекает вырезанный участок.',
+    en: 'Recording temporarily silenced because it overlaps a cut.',
+  },
   audioMusic: { ru: 'Музыка', en: 'Music' },
   audioImport: { ru: 'Добавить аудиофайл', en: 'Add audio file' },
   audioEmpty: { ru: 'Перетащите сюда аудиофайл', en: 'Drop an audio file here' },

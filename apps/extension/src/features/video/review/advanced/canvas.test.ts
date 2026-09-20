@@ -29,6 +29,7 @@ it('bounds even canvas overrides and retains explicit size through the history p
 it('applies the canvas and lane gains only in advanced mode without rewriting clip gains', () => {
   const state = createQuickEditAdvancedState();
   state.ui.mode = 'advanced';
+  state.ui.tracks.audio = true;
   state.canvas = { width: 1080, height: 1920 };
   state.audio.laneVolumes = { voiceover: 0.25, music: 0.5 };
   state.audio.music = [

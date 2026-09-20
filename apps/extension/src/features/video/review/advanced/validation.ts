@@ -1,3 +1,4 @@
+import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
 import { parseQuickEditSpotlight } from './focus';
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
 import { isBoundedNumber, isUnitInterval } from '../../project/validation/primitives';
@@ -216,7 +217,13 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     !isBoundedNumber(value['fadeOut'], 0, MAX_QUICK_EDIT_TRANSITION)
   )
     return null;
+  const sourceAnchor =
+    value['sourceAnchor'] === undefined
+      ? undefined
+      : parseVoiceoverAnchors(value['sourceAnchor'], value['timelineStart'], value['duration']);
+  if (sourceAnchor === null) return null;
   return {
+    ...(sourceAnchor ? { sourceAnchor } : {}),
     id: value['id'],
     assetId: value['assetId'],
     timelineStart: value['timelineStart'],
@@ -257,8 +264,19 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
   const voiceover = parseAudioClips(value['voiceover']);
   const music = parseAudioClips(value['music']);
   if (!original || !voiceover || !music) return null;
+  const segments =
+    value['voiceoverSegments'] === undefined
+      ? undefined
+      : parseVoiceoverSegments(value['voiceoverSegments']);
+  if (
+    segments === null ||
+    (voiceover.some((clip) => clip.sourceAnchor) && !segments) ||
+    music.some((clip) => clip.sourceAnchor)
+  )
+    return null;
+  const timing = segments ? { voiceoverSegments: segments } : {};
   const gains = value['laneVolumes'];
-  if (gains === undefined) return { original, voiceover, music };
+  if (gains === undefined) return { original, voiceover, music, ...timing };
   if (!isRecord(gains)) return null;
   const voiceoverVolume = gains['voiceover'];
   const musicVolume = gains['music'];
@@ -272,6 +290,7 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
     voiceover,
     music,
     laneVolumes: { voiceover: voiceoverVolume, music: musicVolume },
+    ...timing,
   };
 }
 

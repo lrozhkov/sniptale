@@ -253,12 +253,20 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       return null;
     if (value['preserveFocusAnchors'] !== undefined && value['preserveFocusAnchors'] !== true)
       return null;
+    if (
+      value['preserveVoiceoverAnchors'] !== undefined &&
+      value['preserveVoiceoverAnchors'] !== true
+    )
+      return null;
     return {
       ...metadata,
       target: 'edit',
       before,
       after,
       ...(value['preserveFocusAnchors'] === true ? { preserveFocusAnchors: true as const } : {}),
+      ...(value['preserveVoiceoverAnchors'] === true
+        ? { preserveVoiceoverAnchors: true as const }
+        : {}),
     };
   }
   if (value['target'] === 'canvasComment') {

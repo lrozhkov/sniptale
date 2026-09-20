@@ -96,7 +96,16 @@ export type QuickEditBackgroundSettings =
     };
 
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
+export interface QuickEditVoiceoverAnchor {
+  start: number;
+  end: number;
+  offset: number;
+  duration: number;
+}
+
 export interface QuickEditAudioClip {
+  /** Lossless source-video placement; audio offsets remain relative to the intact recording. */
+  sourceAnchor?: QuickEditVoiceoverAnchor[];
   id: string;
   assetId: string;
   /** Kept but not applied: its start could not be proven in result time. */
@@ -122,6 +131,8 @@ export interface QuickEditCanvasSize {
 }
 
 export interface QuickEditAudioState {
+  /** Current video mapping used only to project anchored voiceover into playback slices. */
+  voiceoverSegments?: import('../timeline').ReviewTimeSegment[];
   /** Master gains multiply individual clip gains; omitted means unity. */
   laneVolumes?: { voiceover: number; music: number };
   original: QuickEditOriginalAudio;

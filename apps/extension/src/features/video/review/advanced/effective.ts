@@ -1,3 +1,4 @@
+import { projectReviewVoiceover } from '../voiceover-edits';
 import type { ReviewDocument } from '../types';
 import type {
   QuickEditAdvancedState,
@@ -73,7 +74,10 @@ export function resolveQuickEditEffectiveState(
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     originalAudio: advanced ? state.audio.original : { muted: false, volume: 1 },
-    voiceover: (features.voiceoverApplied ? state.audio.voiceover : [])
+    voiceover: projectReviewVoiceover(
+      features.voiceoverApplied ? state.audio.voiceover : [],
+      state.audio.voiceoverSegments
+    )
       .filter((clip) => !clip.dormant)
       .map((clip) => ({
         ...clip,

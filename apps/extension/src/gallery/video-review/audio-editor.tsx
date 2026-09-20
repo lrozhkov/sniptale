@@ -1,3 +1,4 @@
+import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
@@ -14,15 +15,21 @@ import type { useReviewAudio } from './use-review-audio';
 export function ReviewAudioClipEditor(props: {
   clip: QuickEditAudioClip;
   busy: boolean;
+  cutSuppressed?: boolean;
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
 }) {
   return (
     <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">
       <ReviewInterval
-        start={props.clip.timelineStart}
-        end={props.clip.timelineStart + props.clip.duration}
+        start={reviewVoiceoverRange(props.clip).start}
+        end={reviewVoiceoverRange(props.clip).end}
       />
+      {props.cutSuppressed ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.voiceoverCut')}
+        </p>
+      ) : null}
       <ReviewNumberRow
         label={translate('gallery.videoReview.audioClipVolume')}
         unit="%"
@@ -86,6 +93,7 @@ export function ReviewAudioInspectorSection(props: {
   return (
     <ReviewAudioClipEditor
       clip={selected.clip}
+      cutSuppressed={selected.cutSuppressed}
       busy={props.busy}
       onPatch={(patch) => void props.audio.patchClip(selected.lane, selected.clip.id, patch)}
       onDelete={() => void props.audio.removeClip(selected.lane, selected.clip.id)}

@@ -64,6 +64,7 @@ export function useReviewWaveforms(
 
 /** Peak envelope uses the actual trimmed source window; no decorative waveform is fabricated. */
 export function ReviewAudioWaveform(props: {
+  sampleTime?: ((fraction: number) => number) | undefined;
   projection?: ReviewTrackProjection | undefined;
   timelineStart?: number;
   waveform?: ReviewWaveform | undefined;
@@ -76,15 +77,16 @@ export function ReviewAudioWaveform(props: {
 }) {
   const viewport = useWaveformViewport();
   const wave = props.waveform;
+  const { sampleTime, projection, duration, timelineStart } = props;
   const localAt = useCallback(
     (fraction: number) => {
-      const projection = props.projection;
-      if (!projection) return fraction * props.duration;
-      const start = projection.source(props.timelineStart ?? 0);
-      const end = projection.source((props.timelineStart ?? 0) + props.duration, 'end');
-      return projection.output(start + fraction * (end - start)) - (props.timelineStart ?? 0);
+      if (sampleTime) return sampleTime(fraction);
+      if (!projection) return fraction * duration;
+      const start = projection.source(timelineStart ?? 0);
+      const end = projection.source((timelineStart ?? 0) + duration, 'end');
+      return projection.output(start + fraction * (end - start)) - (timelineStart ?? 0);
     },
-    [props.projection, props.duration, props.timelineStart]
+    [projection, duration, timelineStart, sampleTime]
   );
   const start = Math.max(0, Math.floor((props.offset ?? 0) + localAt(viewport.start)));
   const end = Math.min(wave?.duration ?? 0, Math.ceil((props.offset ?? 0) + localAt(viewport.end)));

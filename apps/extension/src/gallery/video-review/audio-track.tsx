@@ -1,4 +1,9 @@
 import {
+  isReviewVoiceoverCut,
+  reviewVoiceoverRange,
+  reviewVoiceoverOffset,
+} from '../../features/video/review/voiceover-edits';
+import {
   useCallback,
   useEffect,
   useRef,
@@ -83,6 +88,7 @@ function ReviewAudioClipLane(props: {
   ): void;
   onDropFile?: (file: File, timelineTime: number) => void;
   trailing?: ReactNode;
+  cutsProjection?: ReviewTrackProjection | undefined;
 }) {
   const [preview, setPreview] = useState<{
     id: string;
@@ -142,7 +148,10 @@ function ReviewAudioClipLane(props: {
           const shown =
             preview?.id === clip.id
               ? preview
-              : { timelineStart: clip.timelineStart, duration: clip.duration };
+              : {
+                  timelineStart: reviewVoiceoverRange(clip).start,
+                  duration: reviewVoiceoverRange(clip).end - reviewVoiceoverRange(clip).start,
+                };
           return (
             <ReviewAudioClipBlock
               key={clip.id}
@@ -150,6 +159,7 @@ function ReviewAudioClipLane(props: {
               shown={shown}
               selected={props.selectedId === clip.id}
               busy={props.busy}
+              cutSuppressed={isReviewVoiceoverCut(clip, props.cutsProjection?.cuts)}
               label={props.label}
               assets={props.assets}
               waveforms={props.waveforms}
@@ -166,7 +176,7 @@ function ReviewAudioClipLane(props: {
             />
           );
         })}
-        <ReviewTrackCuts projection={props.projection} />
+        <ReviewTrackCuts projection={props.cutsProjection ?? props.projection} />
         <ReviewAudioLaneStatus
           empty={!props.clips.length}
           guide={
@@ -184,6 +194,7 @@ function ReviewAudioClipLane(props: {
 /** One draggable clip block; edges trim, the body moves, and Escape cancels the preview. */
 function ReviewAudioClipBlock(props: {
   clip: QuickEditAudioClip;
+  cutSuppressed: boolean;
   shown: { timelineStart: number; duration: number };
   selected: boolean;
   busy: boolean;
@@ -215,10 +226,14 @@ function ReviewAudioClipBlock(props: {
       role="button"
       tabIndex={0}
       aria-label={`${props.label} · ${filename}`}
-      title={filename}
+      title={
+        props.cutSuppressed
+          ? `${filename} · ${translate('gallery.videoReview.voiceoverCut')}`
+          : filename
+      }
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab overflow-hidden rounded border
-          text-xs active:cursor-grabbing ${
+          text-xs active:cursor-grabbing ${props.cutSuppressed ? 'opacity-45' : ''} ${
             props.selected
               ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
               : 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]'
@@ -258,8 +273,10 @@ function ReviewAudioClipBlock(props: {
             event.clientX - current.x,
             current.width
           ) ?? ((event.clientX - current.x) / current.width) * props.duration;
-        const base = props.clips.find((item) => item.id === current.id);
-        if (!base) return;
+        const original = props.clips.find((item) => item.id === current.id);
+        if (!original) return;
+        const range = reviewVoiceoverRange(original);
+        const base = { ...original, timelineStart: range.start, duration: range.end - range.start };
         const threshold = event.shiftKey
           ? -1
           : (SNAP_THRESHOLD_PX * props.duration) / current.width;
@@ -267,7 +284,7 @@ function ReviewAudioClipBlock(props: {
           ...(props.snapTimes ?? []),
           ...props.clips
             .filter((clip) => clip.id !== base.id && !clip.dormant)
-            .flatMap((clip) => [clip.timelineStart, clip.timelineStart + clip.duration]),
+            .flatMap((clip) => [reviewVoiceoverRange(clip).start, reviewVoiceoverRange(clip).end]),
         ];
         const start = snapTimelineTime(base.timelineStart + delta, candidates, threshold);
         const end = snapTimelineTime(
@@ -294,30 +311,15 @@ function ReviewAudioClipBlock(props: {
                   props.duration
                 );
         props.onPreview({
-          timelineStart: next.timelineStart,
-          duration: next.duration,
+          timelineStart: reviewVoiceoverRange(next).start,
+          duration: reviewVoiceoverRange(next).end - reviewVoiceoverRange(next).start,
           guide: snapped.candidate,
         });
       }}
       onPointerUp={props.onCommit}
       onPointerCancel={props.onCancel}
     >
-      <ReviewAudioWaveform
-        waveform={props.waveforms?.get(clip.assetId)}
-        projection={props.projection}
-        timelineStart={props.shown.timelineStart}
-        offset={
-          clip.sourceOffset +
-          (props.shown.duration !== clip.duration
-            ? props.shown.timelineStart - clip.timelineStart
-            : 0)
-        }
-        duration={props.shown.duration}
-        volume={clip.volume}
-        muted={clip.muted}
-        fadeIn={clip.fadeIn}
-        fadeOut={clip.fadeOut}
-      />
+      <ReviewClipWaveform {...props} />
       {(['start', 'end'] as const).map((edge) => (
         <span
           key={edge}
@@ -480,16 +482,33 @@ function ReviewClipLanes(props: {
           clips={props.audio[lane.key]}
           assets={props.assets}
           waveforms={props.waveforms}
-          projection={props.projection}
-          snapTimes={props.snapTimes}
-          duration={props.duration}
+          projection={
+            lane.key === 'voiceover' && props.audio.voiceoverSegments ? undefined : props.projection
+          }
+          cutsProjection={props.projection}
+          snapTimes={
+            lane.key === 'voiceover' && props.audio.voiceoverSegments
+              ? props.snapTimes?.map((time) => props.projection?.source(time) ?? time)
+              : props.snapTimes
+          }
+          duration={
+            lane.key === 'voiceover' && props.audio.voiceoverSegments
+              ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
+              : props.duration
+          }
           selectedId={props.selectedId}
           busy={props.busy}
           onSelect={props.onSelect}
           onMoveClip={props.onMoveClip}
           onTrimClip={props.onTrimClip}
           onDropFile={(file: File, timelineTime: number) =>
-            props.onImportFile(file, lane.key, timelineTime)
+            props.onImportFile(
+              file,
+              lane.key,
+              lane.key === 'voiceover' && props.audio.voiceoverSegments
+                ? (props.projection?.output(timelineTime) ?? timelineTime)
+                : timelineTime
+            )
           }
           trailing={
             <>
@@ -626,4 +645,43 @@ function useAudioLaneDrop(props: {
     : {
         className: 'relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]',
       };
+}
+
+/** Maps retained source-time recordings to their original waveform samples. */
+function ReviewClipWaveform(
+  props: Pick<
+    Parameters<typeof ReviewAudioClipBlock>[0],
+    'clip' | 'shown' | 'projection' | 'waveforms' | 'cutSuppressed'
+  >
+) {
+  const clip = props.clip;
+  const sampleTime = useCallback(
+    (fraction: number) =>
+      clip.sourceAnchor
+        ? reviewVoiceoverOffset(clip, props.shown.timelineStart + fraction * props.shown.duration) -
+          reviewVoiceoverOffset(clip, props.shown.timelineStart)
+        : fraction * props.shown.duration,
+    [clip, props.shown.timelineStart, props.shown.duration]
+  );
+  return (
+    <ReviewAudioWaveform
+      waveform={props.waveforms?.get(clip.assetId)}
+      projection={props.projection}
+      timelineStart={props.shown.timelineStart}
+      offset={
+        clip.sourceAnchor
+          ? clip.sourceOffset + reviewVoiceoverOffset(clip, props.shown.timelineStart)
+          : clip.sourceOffset +
+            (props.shown.duration !== clip.duration
+              ? props.shown.timelineStart - clip.timelineStart
+              : 0)
+      }
+      duration={clip.sourceAnchor ? clip.duration : props.shown.duration}
+      sampleTime={clip.sourceAnchor ? sampleTime : undefined}
+      volume={clip.volume}
+      muted={clip.muted || props.cutSuppressed}
+      fadeIn={clip.fadeIn}
+      fadeOut={clip.fadeOut}
+    />
+  );
 }

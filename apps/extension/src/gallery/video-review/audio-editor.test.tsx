@@ -139,3 +139,36 @@ it('binds inspector actions to the selected lane without duplicating its heading
   );
   expect(host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')).toBeNull();
 });
+
+it('explains cut suppression without changing the authored mute flag or deleting the recording', () => {
+  const clip = createQuickEditAudioClip({
+    id: 'voice',
+    assetId: 'voice-asset',
+    timelineStart: 1,
+    duration: 4,
+    endMax: 10,
+  });
+  act(() =>
+    root.render(
+      <ReviewAudioClipEditor
+        clip={clip}
+        cutSuppressed
+        busy={false}
+        onPatch={onPatch}
+        onDelete={onDelete}
+      />
+    )
+  );
+  expect(host.querySelector('[role="status"]')?.textContent).toContain(
+    'gallery.videoReview.voiceoverCut'
+  );
+  expect(
+    host
+      .querySelector('[aria-label="gallery.videoReview.audioClipMute"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('false');
+  expect(onPatch).not.toHaveBeenCalled();
+  expect(onDelete).not.toHaveBeenCalled();
+  renderEditor(clip);
+  expect(host.querySelector('[role="status"]')).toBeNull();
+});

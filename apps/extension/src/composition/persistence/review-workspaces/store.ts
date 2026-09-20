@@ -211,7 +211,13 @@ export async function commitVideoWorkspace(args: {
     const parsed = parseReviewOperation(args.operation, workspace.source.duration);
     if (!parsed) throw new VideoWorkspaceError('invalid');
     const operation =
-      parsed.target === 'edit' ? { ...parsed, preserveFocusAnchors: true as const } : parsed;
+      parsed.target === 'edit'
+        ? {
+            ...parsed,
+            preserveFocusAnchors: true as const,
+            preserveVoiceoverAnchors: true as const,
+          }
+        : parsed;
     if (
       args.consumeDraftRevision !== undefined &&
       (!draft ||

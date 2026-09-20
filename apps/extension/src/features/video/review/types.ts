@@ -88,6 +88,8 @@ export type ReviewOperation = { id: string; at: number } & (
       after: ReviewEdit | null;
       /** Commit-time policy; absent on historical operations with fixed result-time focus. */
       preserveFocusAnchors?: true;
+      /** Preserves whole voiceover records in source coordinates; playback alone is projected. */
+      preserveVoiceoverAnchors?: true;
     }
   | {
       target: 'canvasComment';
