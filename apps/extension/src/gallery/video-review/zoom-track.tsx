@@ -1,3 +1,4 @@
+import { reviewTimelineItemTone } from './controls';
 import { ScanEye } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
@@ -304,11 +305,9 @@ function ReviewZoomGapLink(props: {
         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]
         ${
           props.linkSelectedId === region.id
-            ? `border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]
-                text-[var(--sniptale-color-accent)]`
+            ? reviewTimelineItemTone(true)
             : connected
-              ? `border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
-                  text-[var(--sniptale-color-text-secondary)]`
+              ? reviewTimelineItemTone(false)
               : `border-dashed border-transparent hover:border-[var(--sniptale-color-border-soft)]
                   focus-visible:border-[var(--sniptale-color-border-soft)]
                   text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]`
@@ -349,9 +348,7 @@ function ReviewZoomRegionBlock(
   const label =
     `${translate(region.spotlight ? 'gallery.videoReview.focusSpotlight' : 'gallery.videoReview.zoomRegionLabel')} ` +
     `${reviewTimeLabel(region.start)} – ${reviewTimeLabel(region.end)}`;
-  const tone = props.selected
-    ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
-    : 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]';
+  const tone = reviewTimelineItemTone(props.selected);
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
@@ -383,6 +380,7 @@ function ReviewZoomRegionBlock(
       role="button"
       tabIndex={0}
       aria-label={label}
+      aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
       style={{

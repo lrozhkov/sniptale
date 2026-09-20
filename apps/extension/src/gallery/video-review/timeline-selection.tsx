@@ -1,3 +1,4 @@
+import { reviewTimelineItemTone } from './controls';
 import { useEffect, useRef, useState } from 'react';
 import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -16,6 +17,7 @@ type SelectionProps = {
   selection: ReviewAnchor;
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
+  selectedEditId?: string | undefined;
   boundaries?: readonly number[];
   onEdit?(edit: ReviewEdit): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
@@ -45,11 +47,11 @@ export function ReviewSourceLane(props: SelectionProps) {
             style={{ left: percent(guide, props.duration) }}
           />
         ) : null}
-        {props.selection.kind === 'range' ? (
+        {props.selection.kind === 'range' && !props.selectedEditId ? (
           <div
-            className="pointer-events-none absolute inset-y-0 border-x-2
-              border-[var(--sniptale-color-accent)]
-              bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_14%,transparent)]"
+            data-ui="gallery.videoReview.sourceRange"
+            className="pointer-events-none absolute inset-y-0 border
+              border-[var(--sniptale-color-accent)] bg-transparent"
             style={{
               left: percent(props.selection.start, props.duration),
               width: percent(props.selection.end - props.selection.start, props.duration),
@@ -100,14 +102,14 @@ function ReviewEditBlock(
     edit.kind === 'cut'
       ? translate('gallery.videoReview.cutLabel')
       : `${translate('gallery.videoReview.speedMode')} ${edit.rate < 0.25 ? `1/${1 / edit.rate}` : edit.rate}×`;
-  const tone = edit.kind === 'cut' ? '--sniptale-color-danger' : '--sniptale-color-accent';
+  const selected = props.selectedEditId === edit.id;
   return (
     <div
-      className="absolute inset-y-1 z-[5] rounded text-xs text-[var(--sniptale-color-text-primary)]"
+      data-ui="gallery.videoReview.editBlock"
+      className={`absolute inset-y-1 z-[5] rounded border text-xs ${reviewTimelineItemTone(selected)}`}
       style={{
         left: percent(range.start, duration),
         width: percent(range.end - range.start, duration),
-        backgroundColor: `color-mix(in srgb, var(${tone}) 28%, var(--sniptale-color-surface-canvas))`,
       }}
       onPointerDown={(event) => {
         if (event.button !== 0 || committing.current) return;
@@ -188,6 +190,7 @@ function ReviewEditBlock(
       <button
         type="button"
         aria-label={`${label} ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`}
+        aria-pressed={selected}
         className="absolute inset-0 flex cursor-grab items-center justify-center gap-1
             overflow-hidden px-3 active:cursor-grabbing"
         onClick={(event) => {

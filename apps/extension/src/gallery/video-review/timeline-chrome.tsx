@@ -117,7 +117,12 @@ export function ReviewToolbar(props: {
           value={Math.log2(props.zoom) * 25}
           onChange={(event) => props.onZoom(2 ** (event.currentTarget.valueAsNumber / 25))}
           style={
-            { width: 80, minWidth: 80, '--sniptale-range-track-height': '3px' } as CSSProperties
+            {
+              width: 80,
+              minWidth: 80,
+              '--sniptale-range-track-height': '3px',
+              '--sniptale-color-accent': 'var(--sniptale-color-text-dim)',
+            } as CSSProperties
           }
         />
         <ReviewButton

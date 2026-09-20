@@ -19,6 +19,7 @@ type TimelineProps = {
   selection: ReviewAnchor;
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
+  selectedEditId?: string | undefined;
   historyControls?: ReactNode;
   tools?: ReactNode;
   trackControls?: ReactNode;

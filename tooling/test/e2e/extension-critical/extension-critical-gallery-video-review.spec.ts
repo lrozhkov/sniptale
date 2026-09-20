@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import {
   ALL_FORMATS,
@@ -17,6 +17,20 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+async function expectTimelineSelection(item: Locator) {
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  await expect(item).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(item).toHaveCSS('border-top-width', '1px');
+  await expect
+    .poll(() =>
+      item.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return style.borderTopColor === style.color;
+      })
+    )
+    .toBe(true);
+}
 
 async function seedReviewVideo(
   page: Page,
@@ -728,7 +742,8 @@ for (const variant of [
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.workspaceTools"] button')
       ).toHaveCount(1);
-      await expect(button('gallery.videoReview.advancedEditing').locator('span')).toBeVisible();
+      await expect(button('gallery.videoReview.advancedEditing')).toBeInViewport();
+      await expect(button('gallery.videoReview.advancedEditing').locator('span')).toBeHidden();
       await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(3);
       await expect(button('gallery.videoReview.zoomTrack')).toHaveAttribute('aria-pressed', 'true');
       await expect(button('gallery.videoReview.audioTrack')).toHaveAttribute(
@@ -739,7 +754,7 @@ for (const variant of [
       const zoomRegion = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first();
-      await expect(zoomRegion).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expectTimelineSelection(zoomRegion);
       await expect(dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]')).toBeVisible();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.backgroundInspector"]')
@@ -876,6 +891,7 @@ for (const variant of [
       await page.mouse.up();
       expect((await audioClip.boundingBox())!.width).toBeLessThanOrEqual(originalClipBox.width + 1);
       await audioClip.click();
+      await expectTimelineSelection(audioClip);
       const clipMute = button('gallery.videoReview.audioClipMute');
       await clipMute.click();
       await page.mouse.move(0, 0);
@@ -1148,6 +1164,7 @@ for (const variant of [
       await link.click();
       const linkInspector = dialog.locator('[data-ui="gallery.videoReview.zoomLinkInspector"]');
       await expect(linkInspector).toBeVisible();
+      await expectTimelineSelection(link);
       await expect(
         linkInspector.locator('[data-ui="gallery.videoReview.zoomLinkDuration"]')
       ).not.toBeEmpty();
@@ -1773,6 +1790,7 @@ for (const variant of [
         .locator(`[aria-label^="${label('gallery.videoReview.telemetry')} ·"]`)
         .first();
       await action.click();
+      await expectTimelineSelection(action);
       await expect(
         dialog
           .locator('aside')
@@ -2229,6 +2247,7 @@ for (const variant of [
       await drag(audioBox, 0.2, 0.4);
       await expect(ranges).toHaveCount(1);
       await expect(ranges).toHaveAttribute('aria-pressed', 'true');
+      await expectTimelineSelection(ranges);
       const original = (await ranges.boundingBox())!;
       await drag(audioBox, 0.3, 0.5);
       await expect
@@ -2255,6 +2274,11 @@ for (const variant of [
       );
       await drag(focusBox, 0.1, 0.3);
       await expect(dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]')).toBeVisible();
+      await expectTimelineSelection(focus.locator('[role="button"][aria-pressed="true"]'));
+      await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0)'
+      );
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
         'aria-pressed',
         'false'
@@ -2276,6 +2300,23 @@ for (const variant of [
       await expect(button('gallery.videoReview.focusRangeTool')).toBeInViewport();
       await expect(button('gallery.videoReview.originalAudioRange').first()).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('lane-tools-compact.png') });
+      await button('gallery.videoReview.speedMode').click();
+      const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      await drag((await source.boundingBox())!, 0.75, 0.9);
+      const editLabel = await source
+        .locator('[data-ui="gallery.videoReview.editBlock"] button[aria-pressed]')
+        .first()
+        .getAttribute('aria-label');
+      const edit = source.getByRole('button', { name: editLabel!, exact: true }).locator('..');
+      await edit.click();
+      await expect(edit.locator('button[aria-pressed="true"]')).toHaveCount(1);
+      await expect(edit).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(edit).toHaveCSS('border-top-width', '1px');
+      const selectedBorder = await edit.evaluate((node) => getComputedStyle(node).borderTopColor);
+      await button('gallery.videoReview.pointerTool').click();
+      await source.click({ position: { x: 3, y: 3 } });
+      await expect(edit.locator('button[aria-pressed="true"]')).toHaveCount(0);
+      await expect(edit).not.toHaveCSS('border-top-color', selectedBorder);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

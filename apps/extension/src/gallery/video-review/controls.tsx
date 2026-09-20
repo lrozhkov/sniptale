@@ -1,10 +1,18 @@
 import { translate } from '../../platform/i18n';
 import { ChevronRight } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+
 import {
   getControlPrimaryButtonClassName,
   getControlSecondaryButtonClassName,
 } from '@sniptale/ui/control-language';
+
+/** Timeline objects share a thin selection border, never an accent fill. */
+export function reviewTimelineItemTone(selected: boolean): string {
+  return selected
+    ? 'bg-transparent border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
+    : 'bg-transparent border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
+}
 
 const iconButtonBase =
   '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +

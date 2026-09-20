@@ -1,3 +1,4 @@
+import { reviewTimelineItemTone } from './controls';
 import { useMemo } from 'react';
 import {
   Activity,
@@ -57,9 +58,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           props.selectedTelemetryRef !== undefined &&
           marker.ref.kind === props.selectedTelemetryRef.kind &&
           marker.ref.id === props.selectedTelemetryRef.id;
-        const tone = selected
-          ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
-          : 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-hover)]';
+        const tone = reviewTimelineItemTone(selected);
         return (
           <button
             key={`${marker.ref.kind}:${marker.ref.id}`}

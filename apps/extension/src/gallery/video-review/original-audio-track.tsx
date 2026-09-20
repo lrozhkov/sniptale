@@ -1,3 +1,4 @@
+import { reviewTimelineItemTone } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Volume2, VolumeX, Link2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -34,6 +35,7 @@ export function ReviewOriginalAudioTrack(props: {
   busy: boolean;
   editor?: ReturnType<typeof useReviewAudio> | undefined;
   edits?: readonly ReviewEdit[] | undefined;
+  selectedEditId?: string | undefined;
   onRange?: ((range: ReviewAnchor) => void) | undefined;
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
@@ -91,11 +93,7 @@ export function ReviewOriginalAudioTrack(props: {
               data-ui="gallery.videoReview.originalAudioRange"
               data-audio-id={range.id}
               className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
-                rounded border bg-transparent ${
-                  selected
-                    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
-                    : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]'
-                }`}
+                rounded border bg-transparent ${reviewTimelineItemTone(selected)}`}
               style={rectStyle(
                 preview?.id === range.id ? preview.from : range.start,
                 preview?.id === range.id ? preview.to : range.end
@@ -130,9 +128,9 @@ export function ReviewOriginalAudioTrack(props: {
               title={translate('gallery.videoReview.audioMutedBySpeed')}
               aria-label={translate('gallery.videoReview.audioMutedBySpeed')}
               data-ui="gallery.videoReview.speedAudioMute"
-              className="absolute inset-y-0 z-20 flex items-center justify-center gap-1 rounded border border-dashed
-                border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]/80
-                text-[var(--sniptale-color-text-secondary)]"
+              aria-pressed={props.selectedEditId === edit.id}
+              className={`absolute inset-y-0 z-20 flex items-center justify-center gap-1 rounded border
+                ${reviewTimelineItemTone(props.selectedEditId === edit.id)}`}
               style={rectStyle(edit.start, edit.end)}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {

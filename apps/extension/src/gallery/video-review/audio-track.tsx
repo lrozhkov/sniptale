@@ -1,3 +1,4 @@
+import { reviewTimelineItemTone } from './controls';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { useReviewAudio } from './use-review-audio';
@@ -236,11 +237,9 @@ function ReviewAudioClipBlock(props: {
       }
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab overflow-hidden rounded border
-          text-xs active:cursor-grabbing ${props.cutSuppressed ? 'opacity-45' : ''} ${
+          text-xs active:cursor-grabbing ${props.cutSuppressed ? 'opacity-45' : ''} ${reviewTimelineItemTone(
             props.selected
-              ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
-              : 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]'
-          }`}
+          )}`}
       style={{ left: `${start * 100}%`, width: `${(end - start) * 100}%` }}
       onPointerDown={(event) => {
         if (event.button !== 0 || props.busy) return;
@@ -340,6 +339,7 @@ function ReviewAudioClipBlock(props: {
 /** The three semantic audio lanes; the original stays bound to the video structure. */
 export function ReviewAudioTrack(props: {
   originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
+  selectedEditId?: string | undefined;
   edits?: readonly ReviewEdit[] | undefined;
   onOriginalRange?: ((range: ReviewAnchor) => void) | undefined;
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
@@ -387,6 +387,7 @@ export function ReviewAudioTrack(props: {
         <ReviewOriginalAudioTrack
           duration={props.duration}
           editor={props.originalEditor}
+          selectedEditId={props.selectedEditId}
           edits={props.edits}
           onRange={props.onOriginalRange}
           onSelectSpeed={props.onSelectSpeed}

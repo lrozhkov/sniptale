@@ -61,6 +61,7 @@ function ReviewZoomLane(props: {
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
   edits: readonly ReviewEdit[];
+  selectedEditId: string | undefined;
   onOriginalRange(range: ReviewAnchor): void;
   onSelectSpeed(edit: ReviewEdit): void;
   hasOriginalAudio: boolean;
@@ -78,6 +79,7 @@ function ReviewAudioLane(props: {
   return (
     <ReviewAudioTrack
       originalEditor={props.audio}
+      selectedEditId={props.selectedEditId}
       edits={props.edits}
       onOriginalRange={props.onOriginalRange}
       onSelectSpeed={props.onSelectSpeed}
@@ -260,6 +262,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                selectedEditId={props.editing.selected?.id}
                 edits={props.edits}
                 onOriginalRange={(range) => {
                   props.onClearSelection();
@@ -321,6 +324,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       }
       edits={props.edits}
       onEdit={props.editing.select}
+      selectedEditId={props.editing.selected?.id}
       annotations={props.annotations}
       markers={props.markers}
       {...(props.selectedTelemetryRef ? { selectedTelemetryRef: props.selectedTelemetryRef } : {})}

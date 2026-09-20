@@ -217,6 +217,8 @@ it('highlights only the explicitly selected action, independently of playback', 
   const [selected, scrolled] = [...strip.querySelectorAll<HTMLButtonElement>('button')];
   expect(selected?.getAttribute('aria-pressed')).toBe('true');
   expect(selected?.className).toContain('border-[var(--sniptale-color-accent)]');
+  expect(selected?.className).not.toContain('bg-[var(--sniptale-color-accent');
+  expect(selected?.className).toContain('bg-transparent');
   expect(scrolled?.getAttribute('aria-pressed')).toBe('false');
   expect(scrolled?.className).not.toContain('accent');
   expect(scrolled?.className).not.toContain('ring-');
@@ -235,6 +237,11 @@ it('exposes transport, continuous zoom and fit without a volume control', () => 
     host.querySelector('output[title="gallery.videoReview.resultDuration"]')?.textContent
   ).toBe('→ 3.0');
   expect(host.querySelector('[aria-label="gallery.videoReview.volume"]')).toBeNull();
+  expect(
+    host
+      .querySelector<HTMLElement>('[aria-label="videoEditor.timeline.zoom"]')!
+      .style.getPropertyValue('--sniptale-color-accent')
+  ).toBe('var(--sniptale-color-text-dim)');
   changeZoom(host, '25');
   act(() =>
     host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.fit"]')!.click()
@@ -242,6 +249,36 @@ it('exposes transport, continuous zoom and fit without a volume control', () => 
   expect(
     host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!.value
   ).toBe('0');
+});
+
+it('marks the selected source edit without filling its range or other edits', () => {
+  const edits = [
+    { id: 'cut', kind: 'cut' as const, start: 1, end: 2, requestedStart: 1, requestedEnd: 2 },
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 2,
+      end: 3,
+      requestedStart: 2,
+      requestedEnd: 3,
+      rate: 2 as const,
+      audio: 'mute' as const,
+    },
+  ];
+  const { host } = renderTimeline({
+    edits,
+    selectedEditId: 'speed',
+    selection: { kind: 'range', start: 2, end: 3 },
+  });
+  const blocks = host.querySelectorAll<HTMLElement>('[data-ui="gallery.videoReview.editBlock"]');
+  expect(blocks[0]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
+  expect(blocks[1]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('true');
+  expect(blocks[1]!.className).toContain('border-[var(--sniptale-color-accent)]');
+  for (const block of blocks) {
+    expect(block.className).toContain('bg-transparent');
+    expect(block.style.backgroundColor).toBe('');
+  }
+  expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
 });
 
 it('renders ruler labels at the unit chosen for the current scale', () => {
