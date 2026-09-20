@@ -127,7 +127,7 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
     await dragRange(host);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
     expect(cutCount()).toBe(1);
-    const music = host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')[2]!;
+    const music = host.querySelector('[data-audio-lane="music"]')!;
     music.dispatchEvent(dragEvent('dragenter'));
     music.dispatchEvent(dragEvent('drop'));
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));

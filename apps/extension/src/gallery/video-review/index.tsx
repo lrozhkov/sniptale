@@ -298,9 +298,10 @@ function ReviewInspectorActions({
         failed={editing.exporter.failed}
         hasResult={!!editing.exporter.result}
         audioUnavailable={
-          !!editing.exporter.index?.audioCodec &&
-          !editing.exporter.index.processedAudioCodec &&
-          snapshot.document.edits.some((edit) => edit.kind === 'speed')
+          editing.exporter.index === null ||
+          (!!editing.exporter.index.audioCodec &&
+            !editing.exporter.index.processedAudioCodec &&
+            snapshot.document.edits.some((edit) => edit.kind === 'speed'))
         }
         advancedBlockers={editing.exporter.blocked}
         reencodeReasons={editing.exporter.reencode()}
@@ -569,7 +570,8 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
     resource.file,
     source.duration,
     advanced.audio,
-    features.audioTrackVisible
+    features.audioTrackVisible,
+    editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
   const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
   return (

@@ -642,6 +642,14 @@ it('adds an overlay comment, drags it on the stage and deletes it via the editor
 
 it('reveals the three audio lanes and persists the original audio gate', async () => {
   const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 2, 4],
+    videoCodec: 'vp8',
+    audioCodec: 'opus',
+    container: 'webm',
+    rotation: 0,
+  });
   const { host, root, click, back } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -668,7 +676,7 @@ it('imports a file dropped on the music lane at the drop point', async () => {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
     await click('audioTrack');
-    const music = host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')[2]!;
+    const music = host.querySelector('[data-audio-lane="music"]')!;
     vi.spyOn(music, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 32));
     const file = new File([new Uint8Array(4)], 'song.mp3', { type: 'audio/mpeg' });
     const dragEvent = (type: string, files: File[]) => {
@@ -733,6 +741,24 @@ it('persists a pending overlay comment draft on Back', async () => {
       text: 'Saved draft',
     });
     expect(back).toHaveBeenCalledOnce();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps original audio controls when the export index cannot inspect the source', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockRejectedValue(new Error('Unsupported packet audio codec'));
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('audioTrack');
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')).toHaveLength(
+      3
+    );
+    expect(fixture.host.textContent).toContain('gallery.videoReview.audioOriginal');
   } finally {
     await fixture.cleanup();
   }

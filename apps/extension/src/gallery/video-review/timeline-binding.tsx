@@ -58,6 +58,7 @@ function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
+  hasOriginalAudio: boolean;
   snapTimes: readonly number[];
   audioState: QuickEditAudioState;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
@@ -70,6 +71,7 @@ function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      hasOriginalAudio={props.hasOriginalAudio}
       projection={props.projection}
       waveforms={props.waveforms}
       onMuteLane={props.audio.toggleLaneMute}
@@ -213,6 +215,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                hasOriginalAudio={
+                  props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
+                }
                 projection={projection}
                 snapTimes={[
                   ...(props.outputTime === null ? [] : [props.outputTime]),

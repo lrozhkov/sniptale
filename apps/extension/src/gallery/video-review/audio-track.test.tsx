@@ -62,11 +62,13 @@ const renderTrack = (
     music: QuickEditAudioClip[];
   },
   busy = false,
-  snapTimes: readonly number[] = []
+  snapTimes: readonly number[] = [],
+  hasOriginalAudio = true
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
+        hasOriginalAudio={hasOriginalAudio}
         audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
         snapTimes={snapTimes}
         duration={10}
@@ -294,4 +296,9 @@ it('snaps audio placement to projected edit edges and allows Shift to bypass', a
   await send('pointermove', 95, true);
   await send('pointerup', 95, true);
   expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 2.95);
+});
+
+it('omits original audio controls when the indexed source has no audio stream', () => {
+  expect(renderTrack(undefined, false, [], false)).toHaveLength(2);
+  expect(host.textContent).not.toContain('gallery.videoReview.audioOriginal');
 });

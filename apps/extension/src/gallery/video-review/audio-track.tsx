@@ -117,7 +117,7 @@ function ReviewAudioClipLane(props: {
       icon={<AudioLines size={14} aria-hidden="true" />}
       controls={props.trailing}
     >
-      <div data-ui="gallery.videoReview.audioLane" {...dropTarget}>
+      <div data-ui="gallery.videoReview.audioLane" data-audio-lane={props.lane} {...dropTarget}>
         {props.clips.map((clip) => {
           const shown =
             preview?.id === clip.id
@@ -314,6 +314,7 @@ function reviewClipLabel(clip: QuickEditAudioClip) {
 /** The three semantic audio lanes; the original stays bound to the video structure. */
 export function ReviewAudioTrack(props: {
   audio: QuickEditAudioState;
+  hasOriginalAudio?: boolean;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
@@ -331,7 +332,7 @@ export function ReviewAudioTrack(props: {
   const input = useRef<HTMLInputElement>(null);
   const picker = useRef<ReviewAudioLane | null>(null);
   return (
-    <div data-ui="gallery.videoReview.audioTrack" className="space-y-1">
+    <div data-ui="gallery.videoReview.audioTrack">
       <input
         ref={input}
         type="file"
@@ -344,12 +345,14 @@ export function ReviewAudioTrack(props: {
           picker.current = null;
         }}
       />
-      <ReviewOriginalLane
-        waveform={props.waveforms?.get('original')}
-        original={props.audio.original}
-        busy={props.busy}
-        onOriginal={props.onOriginal}
-      />
+      {props.hasOriginalAudio !== false ? (
+        <ReviewOriginalLane
+          waveform={props.waveforms?.get('original')}
+          original={props.audio.original}
+          busy={props.busy}
+          onOriginal={props.onOriginal}
+        />
+      ) : null}
       <ReviewClipLanes
         audio={props.audio}
         waveforms={props.waveforms}
