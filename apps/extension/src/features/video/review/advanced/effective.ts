@@ -3,6 +3,7 @@ import type {
   QuickEditAdvancedState,
   QuickEditAudioClip,
   QuickEditBackgroundSettings,
+  QuickEditCanvasSize,
   QuickEditOriginalAudio,
   QuickEditZoomRegion,
 } from './types';
@@ -52,6 +53,7 @@ export function resolveQuickEditEffectiveFeatures(
 interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   zoomRegions: readonly QuickEditZoomRegion[];
   background: QuickEditBackgroundSettings;
+  canvas: QuickEditCanvasSize | undefined;
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -68,13 +70,22 @@ export function resolveQuickEditEffectiveState(
       (region) => !region.dormant
     ),
     background: advanced ? state.background : { enabled: false },
+    canvas: advanced ? state.canvas : undefined,
     originalAudio: advanced ? state.audio.original : { muted: false, volume: 1 },
-    voiceover: (advanced ? state.audio.voiceover : []).filter((clip) => !clip.dormant),
-    music: (advanced ? state.audio.music : []).filter((clip) => !clip.dormant),
+    voiceover: (advanced ? state.audio.voiceover : [])
+      .filter((clip) => !clip.dormant)
+      .map((clip) => ({
+        ...clip,
+        volume: clip.volume * (state.audio.laneVolumes?.voiceover ?? 1),
+      })),
+    music: (advanced ? state.audio.music : [])
+      .filter((clip) => !clip.dormant)
+      .map((clip) => ({ ...clip, volume: clip.volume * (state.audio.laneVolumes?.music ?? 1) })),
   };
 }
 
 export type QuickEditExportReason =
+  | 'canvas'
   | 'precise-edits'
   | 'zoom'
   | 'background'
@@ -130,6 +141,7 @@ export function resolveQuickEditExportPlan(args: {
   if (args.advanced.audio.original.muted || args.advanced.audio.original.volume !== 1)
     audio.push('original-audio');
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
+  if (args.advanced.canvas) visual.push('canvas');
   if (args.advanced.zoom.enabled) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
   if (visual.length) {
@@ -155,6 +167,7 @@ export function resolveQuickEditExportPlan(args: {
 /** Non-empty advanced content worth a "saved and temporarily not applied" hint. */
 export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): boolean {
   return (
+    !!state.canvas ||
     state.zoom.regions.length > 0 ||
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||

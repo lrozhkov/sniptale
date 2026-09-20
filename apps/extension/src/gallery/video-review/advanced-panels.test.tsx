@@ -63,6 +63,13 @@ function Harness() {
       {advanced.ui.mode === 'advanced' ? (
         <ReviewSceneProperties
           background={advanced.background}
+          canvas={advanced.canvas}
+          source={{ width: 320, height: 180 }}
+          onCanvas={vi.fn()}
+          audio={advanced.audio}
+          hasOriginalAudio={true}
+          onOriginalVolume={vi.fn()}
+          onLaneVolume={vi.fn()}
           busy={false}
           pending={false}
           failed={false}

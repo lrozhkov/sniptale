@@ -167,6 +167,7 @@ export async function writeReviewFrames(args: {
         background: preparation.effective.background,
         comments: args.comments ?? [],
         canvas: source.canvas,
+        sourceSize: source.sourceSize,
         context: source.context,
         image: source.image,
         frameSink,
@@ -264,6 +265,7 @@ interface ReviewRenderSource {
   processedAudio: 'aac' | 'opus' | null;
   sampleRate: number;
   canvas: HTMLCanvasElement;
+  sourceSize: { width: number; height: number };
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
 }
@@ -298,9 +300,13 @@ async function openReviewRenderSource(
     ? await chooseReviewAudioCodec(audio ?? null, index.container)
     : null;
   if (processing && !processedAudio) throw new Error('Audio processing is unavailable.');
+  const sourceSize = {
+    width: Math.round(await video.getDisplayWidth()),
+    height: Math.round(await video.getDisplayHeight()),
+  };
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(await video.getDisplayWidth());
-  canvas.height = Math.round(await video.getDisplayHeight());
+  canvas.width = preparation.effective.canvas?.width ?? sourceSize.width;
+  canvas.height = preparation.effective.canvas?.height ?? sourceSize.height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Canvas context is unavailable.');
   context.imageSmoothingEnabled = true;
@@ -321,6 +327,7 @@ async function openReviewRenderSource(
     processedAudio,
     sampleRate: audio ? await audio.getSampleRate() : 0,
     canvas,
+    sourceSize,
     context,
     image: backgroundImage,
   };
@@ -393,6 +400,7 @@ export async function renderRenderWindowFrames(args: {
   background: QuickEditAdvancedState['background'];
   comments: readonly CanvasCommentExport[];
   canvas: HTMLCanvasElement;
+  sourceSize: { width: number; height: number };
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
   frameSink: VideoSampleSink;
@@ -410,7 +418,8 @@ export async function renderRenderWindowFrames(args: {
     const camera = evaluateQuickEditCameraAtTime(args.zoomRegions, timestamp + args.fragmentOffset);
     const layout = computeQuickEditSceneLayout({
       output: canvas,
-      source: { width: canvas.width, height: canvas.height },
+      source: args.sourceSize,
+      canvas,
       background: args.background,
       camera,
     });
@@ -478,6 +487,8 @@ export function drawReviewSceneFrame(
   }
 ) {
   const { canvas, layout, background, image, sample, comments, sourceTime } = args;
+  context.fillStyle = '#000000';
+  context.fillRect(0, 0, canvas.width, canvas.height);
   if (background.enabled) {
     if (background.type === 'solid') {
       context.fillStyle = background.color;

@@ -186,6 +186,7 @@ it('mixes applied external audio and original settings into an audio-only export
     },
   ];
   advanced.audio.original = { muted: false, volume: 1.5 };
+  advanced.audio.laneVolumes = { voiceover: 1, music: 0.4 };
   class FakeOfflineContext {
     async decodeAudioData() {
       return { duration: 2, numberOfChannels: 2, getChannelData: () => new Float32Array(96_000) };
@@ -204,7 +205,7 @@ it('mixes applied external audio and original settings into an audio-only export
       originalMuted: false,
     });
     expect(exported.exportAudio!.entries).toEqual([
-      expect.objectContaining({ clipId: 'm', timelineStart: 1, volume: 0.5 }),
+      expect.objectContaining({ clipId: 'm', timelineStart: 1, volume: 0.2 }),
     ]);
     expect(exported.exportAudio!.buffers.get('project-asset:m')).toBeDefined();
   } finally {
@@ -447,4 +448,23 @@ it('completes the publication transaction even if the page cancels at its bounda
   );
   expect(result.receipt.mediaId).toMatch(/^recording:/);
   expect(writer.abort).not.toHaveBeenCalled();
+});
+
+it('publishes the effective canvas dimensions instead of the original source metadata', async () => {
+  const { args, deps } = fixture();
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.advanced.canvas = { width: 1080, height: 1920 };
+  args.index.processedVideoCodec = 'vp8';
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 40,
+    audioPackets: 0,
+    resultDuration: 4,
+    audioRanges: [],
+  });
+  await exportReviewedVideo(args, deps);
+  expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledWith([
+    expect.objectContaining({
+      mediaMetadata: { kind: 'video', width: 1080, height: 1920, duration: 4 },
+    }),
+  ]);
 });

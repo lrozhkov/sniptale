@@ -370,7 +370,12 @@ it('commits advanced content as a fixed-point history payload and reopens its ba
   const before = createQuickEditAdvancedContent();
   const after = {
     ...before,
-    audio: { ...before.audio, original: { muted: true, volume: 0.5 } },
+    canvas: { width: 1080, height: 1920 },
+    audio: {
+      ...before.audio,
+      original: { muted: true, volume: 0.5 },
+      laneVolumes: { voiceover: 0.8, music: 0.4 },
+    },
   };
   const committed = await commitVideoWorkspace({
     aggregateId: id,
@@ -391,6 +396,7 @@ it('commits advanced content as a fixed-point history payload and reopens its ba
   });
   expect((await readVideoWorkspace(id))?.workspace).toEqual(committed.workspace);
   expect(parseVideoWorkspace(committed.workspace)).toEqual(committed.workspace);
+  expect(committed.workspace.history[0]?.after).toEqual(after);
 });
 
 it('migrates a v1 advanced payload on load and keeps the workspace writable (R03)', async () => {

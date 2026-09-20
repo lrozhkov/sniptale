@@ -44,7 +44,11 @@ const identity: QuickEditCameraTransform = { scale: 1, centerX: 0.5, centerY: 0.
 const disabled: QuickEditBackgroundSettings = { enabled: false };
 
 const renderStage = (props: {
-  scene?: { background: QuickEditBackgroundSettings; camera: QuickEditCameraTransform };
+  scene?: {
+    background: QuickEditBackgroundSettings;
+    camera: QuickEditCameraTransform;
+    canvas?: { width: number; height: number };
+  };
   zoom?: { camera: QuickEditCameraTransform; onDrag: (point: { x: number; y: number }) => void };
 }) => {
   act(() => {
@@ -177,4 +181,18 @@ it('uses export-space padding and radius at every preview size', () => {
   const scale = 800 / source.width;
   expect(Number.parseFloat(stage.video.parentElement!.style.left)).toBe(40 * scale);
   expect(Number.parseFloat(stage.video.parentElement!.style.borderRadius)).toBe(12 * scale);
+});
+
+it('fits a landscape source inside the selected portrait canvas without stretching it', () => {
+  const result = renderStage({
+    scene: { background: disabled, camera: identity, canvas: { width: 1080, height: 1920 } },
+  });
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  expect(Number.parseFloat(stage.style.width) / Number.parseFloat(stage.style.height)).toBeCloseTo(
+    9 / 16
+  );
+  expect(
+    Number.parseFloat(result.video.style.width) / Number.parseFloat(result.video.style.height)
+  ).toBeCloseTo(16 / 9);
+  expect(Number.parseFloat(result.video.style.top)).toBeGreaterThan(0);
 });

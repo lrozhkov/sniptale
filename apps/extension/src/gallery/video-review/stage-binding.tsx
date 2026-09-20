@@ -27,6 +27,7 @@ export function ReviewStageBinding(props: {
   backgroundPending?: boolean;
   url: string;
   source: ReviewSource;
+  canvas?: { width: number; height: number } | undefined;
   video: RefObject<HTMLVideoElement | null>;
   drawing: boolean;
   region: ReviewRegion | undefined;
@@ -96,7 +97,7 @@ export function ReviewStageBinding(props: {
         video={props.video}
         drawing={props.drawing}
         region={props.region}
-        scene={{ background: props.background, camera }}
+        scene={{ background: props.background, camera, canvas: props.canvas }}
         {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}
         comments={{
           items: props.overlaysVisible ? props.comments : [],

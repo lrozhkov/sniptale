@@ -104,7 +104,15 @@ export interface QuickEditOriginalAudio {
   volume: number;
 }
 
+/** An explicit output size; absence means the native source canvas. */
+export interface QuickEditCanvasSize {
+  width: number;
+  height: number;
+}
+
 export interface QuickEditAudioState {
+  /** Master gains multiply individual clip gains; omitted means unity. */
+  laneVolumes?: { voiceover: number; music: number };
   original: QuickEditOriginalAudio;
   voiceover: QuickEditAudioClip[];
   music: QuickEditAudioClip[];
@@ -116,6 +124,7 @@ export interface QuickEditAdvancedState {
   ui: QuickEditUiState;
   zoom: QuickEditZoomState;
   background: QuickEditBackgroundSettings;
+  canvas?: QuickEditCanvasSize;
   audio: QuickEditAudioState;
   /** Raw v1 payload retained by the deterministic load-time migration. */
   recoveryV1?: string;
@@ -131,5 +140,6 @@ export interface QuickEditAdvancedContent {
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
   zoom: QuickEditZoomState;
   background: QuickEditBackgroundSettings;
+  canvas?: QuickEditCanvasSize;
   audio: QuickEditAudioState;
 }

@@ -102,12 +102,11 @@ export function useReviewAdvanced(session: Session) {
     }
   }, [contentState, session]);
   const content = contentState.content;
+  const { canvas: _baselineCanvas, ...workspaceState } = persisted;
   const advanced: QuickEditAdvancedState = {
-    ...persisted,
+    ...workspaceState,
     ui: optimistic?.value.ui ?? persisted.ui,
-    zoom: content.zoom,
-    background: content.background,
-    audio: content.audio,
+    ...content,
   };
   return {
     advanced,
@@ -124,6 +123,7 @@ export function useReviewAdvanced(session: Session) {
     setOverlaysVisible: (visible: boolean) =>
       stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
     setZoom: contentState.setZoom,
+    setCanvas: contentState.setCanvas,
     setBackground: contentState.setBackground,
     setAudio: contentState.setAudio,
     flush: async () => {

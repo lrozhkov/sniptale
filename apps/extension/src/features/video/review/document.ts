@@ -11,12 +11,14 @@ export function reviewAdvancedContentBaseline(state: {
   zoom: QuickEditAdvancedContent['zoom'];
   background: QuickEditAdvancedContent['background'];
   audio: QuickEditAdvancedContent['audio'];
+  canvas?: QuickEditAdvancedContent['canvas'];
 }): QuickEditAdvancedContent {
   return {
     schemaVersion: state.schemaVersion,
     zoom: state.zoom,
     background: state.background,
     audio: state.audio,
+    ...(state.canvas ? { canvas: state.canvas } : {}),
   };
 }
 

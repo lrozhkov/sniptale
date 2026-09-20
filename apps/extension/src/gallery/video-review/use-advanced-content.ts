@@ -146,6 +146,11 @@ export function useReviewAdvancedContent(
         background: QuickEditAdvancedState['background']
       ) => QuickEditAdvancedState['background']
     ) => stage((content) => ({ ...content, background: update(content.background) })),
+    setCanvas: (canvas: QuickEditAdvancedState['canvas']) =>
+      stage((content) => {
+        const { canvas: _previous, ...rest } = content;
+        return canvas ? { ...rest, canvas } : rest;
+      }),
     setAudio: (
       update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio']
     ) => stage((content) => ({ ...content, audio: update(content.audio) })),

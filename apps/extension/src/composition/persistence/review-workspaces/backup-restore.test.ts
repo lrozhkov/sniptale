@@ -156,6 +156,8 @@ it('backs up disabled image history and restores it with newly allocated asset r
   const baseline = createQuickEditAdvancedContent();
   const image = {
     ...baseline,
+    canvas: { width: 1080, height: 1920 },
+    audio: { ...baseline.audio, laneVolumes: { voiceover: 0.5, music: 0.3 } },
     background: {
       enabled: true as const,
       type: 'image' as const,
@@ -189,6 +191,10 @@ it('backs up disabled image history and restores it with newly allocated asset r
     new Set(['project-asset:new-background'])
   );
   expect(restored.workspace.cursor).toBe(0);
+  expect(restored.workspace.history[0]?.after).toMatchObject({
+    canvas: { width: 1080, height: 1920 },
+    audio: { laneVolumes: { voiceover: 0.5, music: 0.3 } },
+  });
   expect(restored.workspace.advanced.background).toEqual({ enabled: false });
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };

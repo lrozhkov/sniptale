@@ -182,6 +182,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setBackground: advancedState.setBackground,
+    setCanvas: advancedState.setCanvas,
     resetAdvanced: advancedState.reset,
     flushAdvanced: advancedState.flush,
     advancedPending: advancedState.pending,
@@ -263,6 +264,7 @@ type InspectorState = Pick<
   | 'zoom'
   | 'timeline'
   | 'setBackground'
+  | 'setCanvas'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'flushAdvanced'
@@ -389,6 +391,13 @@ function ReviewInspectorBinding({
       scene={
         <ReviewSceneProperties
           background={state.advanced.background}
+          canvas={state.advanced.canvas}
+          source={resource.source}
+          onCanvas={state.setCanvas}
+          audio={state.advanced.audio}
+          hasOriginalAudio={editing.exporter.index === null || !!editing.exporter.index.audioCodec}
+          onOriginalVolume={(volume) => audio.setOriginal({ volume })}
+          onLaneVolume={audio.setLaneVolume}
           busy={busy || editing.exporter.phase !== 'idle'}
           pending={state.backgroundImport.pending}
           failed={state.backgroundImport.failed}
@@ -565,6 +574,7 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           backgroundPending={state.backgroundImport.pending}
           url={resource.url}
           source={source}
+          canvas={features.canvas}
           video={video}
           drawing={!!composer.annotation && !playing && !busy}
           region={displayRegion}
@@ -739,6 +749,7 @@ function ReviewSelectedProperties({
                 region={region}
                 background={advanced.background}
                 source={resource.source}
+                canvas={advanced.canvas}
                 sourceTime={state.timeline.timeMap.timelineToSource(
                   (region.start + region.end) / 2
                 )}

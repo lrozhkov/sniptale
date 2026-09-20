@@ -14,6 +14,7 @@ import type { QuickEditExportReason } from '../../features/video/review/advanced
 import { ReviewButton, reviewTimeLabel } from './controls';
 
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
+  canvas: 'gallery.videoReview.canvas',
   'precise-edits': 'gallery.videoReview.cutLabel',
   zoom: 'gallery.videoReview.exportBlockerZoom',
   background: 'gallery.videoReview.exportBlockerBackground',

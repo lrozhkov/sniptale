@@ -215,3 +215,26 @@ it('keeps the pending edit after a save failure, rejects flush, and retries (S3)
   };
   expect(write.advanced.ui.mode).toBe('advanced');
 });
+
+it('persists canvas and lane gains through content history and clears an override back to native', async () => {
+  const { session, deps, build } = setup();
+  act(() => {
+    advanced.setCanvas({ width: 1080, height: 1920 });
+    advanced.setAudio((audio) => ({ ...audio, laneVolumes: { voiceover: 0.7, music: 0.2 } }));
+  });
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent).toMatchObject({
+    canvas: { width: 1080, height: 1920 },
+    audio: { laneVolumes: { voiceover: 0.7, music: 0.2 } },
+  });
+  const reopened = createVideoReviewSession(build(), deps);
+  expect(reopened.getSnapshot().document.advancedContent.canvas).toEqual({
+    width: 1080,
+    height: 1920,
+  });
+  act(() => advanced.setCanvas(undefined));
+  await act(async () => advanced.flush());
+  expect(advanced.advanced.canvas).toBeUndefined();
+  expect(session.getSnapshot().document.advancedContent.canvas).toBeUndefined();
+  expect(session.getSnapshot().document.advancedContent.audio.laneVolumes?.music).toBe(0.2);
+});

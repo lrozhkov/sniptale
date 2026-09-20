@@ -108,6 +108,17 @@ export function useReviewAudio(args: {
         const muted = !clips.every((clip) => clip.muted);
         return clips.map((clip) => ({ ...clip, muted }));
       }),
+    setLaneVolume: (lane: ReviewAudioLane, volume: number) => {
+      if (!Number.isFinite(volume)) return;
+      args.setAudio((audio) => ({
+        ...audio,
+        laneVolumes: {
+          voiceover: audio.laneVolumes?.voiceover ?? 1,
+          music: audio.laneVolumes?.music ?? 1,
+          [lane]: Math.max(0, Math.min(2, volume)),
+        },
+      }));
+    },
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
       args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ...patch } })),
   };

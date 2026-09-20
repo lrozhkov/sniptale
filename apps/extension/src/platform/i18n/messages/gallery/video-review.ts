@@ -57,7 +57,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   speedAudio: { ru: 'Звук участка', en: 'Interval audio' },
   speedSound: { ru: 'Со звуком', en: 'With audio' },
   muteSound: { ru: 'Без звука', en: 'Mute audio' },
-  volume: { ru: 'Громкость просмотра', en: 'Preview volume' },
+  volume: { ru: 'Громкость', en: 'Volume' },
   resultDuration: { ru: 'После правок', en: 'After edits' },
   speedAudioUnavailable: {
     ru: 'Этот браузер не поддерживает обработку звука для экспорта изменения скорости. Правки и разметка сохранены.',
@@ -205,6 +205,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   zoomResetPosition: { ru: 'Сбросить позицию', en: 'Reset position' },
   zoomDelete: { ru: 'Удалить зум', en: 'Delete zoom' },
   zoomStageTarget: { ru: 'Фокус кадра зума', en: 'Zoom frame focus' },
+  canvasSource: { ru: 'Как в исходном видео', en: 'Source dimensions' },
   scene: { ru: 'Сцена', en: 'Scene' },
   canvas: { ru: 'Холст', en: 'Canvas' },
   background: { ru: 'Фон', en: 'Background' },

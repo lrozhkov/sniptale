@@ -50,6 +50,7 @@ export function computeQuickEditContentRect(
  */
 export function computeQuickEditSceneLayout(input: {
   output: { width: number; height: number };
+  canvas?: { width: number; height: number } | undefined;
   source: { width: number; height: number };
   background: QuickEditBackgroundSettings;
   camera: QuickEditCameraTransform;
@@ -58,7 +59,7 @@ export function computeQuickEditSceneLayout(input: {
   videoRect: QuickEditRect;
   videoTransform: QuickEditRect;
 } {
-  const scale = input.output.width / Math.max(1, input.source.width);
+  const scale = input.output.width / Math.max(1, input.canvas?.width ?? input.source.width);
   const background = input.background.enabled
     ? {
         ...input.background,

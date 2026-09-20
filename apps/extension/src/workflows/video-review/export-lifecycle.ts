@@ -21,6 +21,7 @@ import { resolveOverlayComments } from '../../features/video/review/comments';
 import {
   resolveQuickEditExportPlan,
   resolveQuickEditEffectiveFeatures,
+  resolveQuickEditEffectiveState,
 } from '../../features/video/review/advanced/effective';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
 import { resolveReviewAssetBytes } from './asset-bytes';
@@ -79,12 +80,11 @@ async function buildReviewExportClipPlan(args: {
   signal: AbortSignal;
   readProjectAsset: (assetId: string) => Promise<Blob | null>;
 }): Promise<ReviewExportClipPlan> {
-  const filterDormant = (lane: 'voiceover' | 'music') =>
-    args.advanced.audio[lane].filter((clip) => !clip.dormant);
-  const entries = buildQuickEditAudioPlan({
-    voiceover: filterDormant('voiceover'),
-    music: filterDormant('music'),
-  }).map((entry) => ({ ...entry, timelineStart: entry.timelineStart - args.fragmentOffset }));
+  const effective = resolveQuickEditEffectiveState(args.advanced);
+  const entries = buildQuickEditAudioPlan(effective).map((entry) => ({
+    ...entry,
+    timelineStart: entry.timelineStart - args.fragmentOffset,
+  }));
   const buffers = new Map<string, AudioBuffer>();
   const decoder = new OfflineAudioContext(2, 1, 48_000);
   for (const assetId of new Set(entries.map((entry) => entry.assetId))) {
@@ -138,10 +138,8 @@ export async function exportReviewedVideo(
   );
   // Content flows through history ops; ui chrome stays with the whole-state record.
   const advanced = {
-    ...workspace.advanced,
-    zoom: document.advancedContent.zoom,
-    background: document.advancedContent.background,
-    audio: document.advancedContent.audio,
+    ui: workspace.advanced.ui,
+    ...document.advancedContent,
   };
   const plan = resolveQuickEditExportPlan({
     document,
@@ -254,6 +252,7 @@ export async function exportReviewedVideo(
     }
     args.onPublishing?.();
     publishing = true;
+    const outputSize = resolveQuickEditEffectiveState(advanced).canvas ?? workspace.source;
     await deps.saveRecordingsBatchSafely([
       {
         id,
@@ -261,8 +260,8 @@ export async function exportReviewedVideo(
         preparedAsset: prepared,
         mediaMetadata: {
           kind: 'video',
-          width: workspace.source.width,
-          height: workspace.source.height,
+          width: outputSize.width,
+          height: outputSize.height,
           duration: packetReceipt.resultDuration,
         },
       },

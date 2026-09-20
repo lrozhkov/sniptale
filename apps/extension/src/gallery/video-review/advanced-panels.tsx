@@ -8,6 +8,7 @@ import type { QuickEditZoomRegionPatch } from '../../features/video/review/advan
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
 import type { useReviewZoomEditor } from './zoom-editor';
+import { ReviewCanvasSettings, ReviewSceneAudio } from './scene-inspector';
 import { ReviewBackgroundInspector } from './background-inspector';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 
@@ -69,6 +70,13 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
   background: QuickEditAdvancedState['background'];
+  canvas: QuickEditAdvancedState['canvas'];
+  source: { width: number; height: number };
+  audio: QuickEditAdvancedState['audio'];
+  hasOriginalAudio: boolean;
+  onCanvas(canvas: QuickEditAdvancedState['canvas']): void;
+  onOriginalVolume(volume: number): void;
+  onLaneVolume(lane: 'voiceover' | 'music', volume: number): void;
   busy: boolean;
   pending: boolean;
   failed: boolean;
@@ -78,7 +86,8 @@ export function ReviewSceneProperties(props: {
   ): void;
 }) {
   return (
-    <fieldset disabled={props.busy} className="min-w-0 space-y-3">
+    <fieldset disabled={props.busy} className="min-w-0 space-y-4">
+      <ReviewCanvasSettings source={props.source} canvas={props.canvas} onChange={props.onCanvas} />
       {props.pending ? (
         <p role="status">{translate('gallery.videoReview.backgroundImporting')}</p>
       ) : null}
@@ -91,6 +100,12 @@ export function ReviewSceneProperties(props: {
         onChange={(patch) =>
           props.setBackground((current) => updateQuickEditBackground(current, patch))
         }
+      />
+      <ReviewSceneAudio
+        audio={props.audio}
+        hasOriginalAudio={props.hasOriginalAudio}
+        onOriginal={props.onOriginalVolume}
+        onLaneVolume={props.onLaneVolume}
       />
     </fieldset>
   );

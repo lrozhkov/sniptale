@@ -188,10 +188,8 @@ function reviewExportPlan(
   return resolveQuickEditExportPlan({
     document: state.document,
     advanced: {
-      ...state.snapshot.workspace.advanced,
-      zoom: state.document.advancedContent.zoom,
-      background: state.document.advancedContent.background,
-      audio: state.document.advancedContent.audio,
+      ui: state.snapshot.workspace.advanced.ui,
+      ...state.document.advancedContent,
     },
     // A source audio track with a probed unavailable codec is a known blocker;
     // clips-only exports defer the authoritative probe to the exporter.

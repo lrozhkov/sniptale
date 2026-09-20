@@ -18,6 +18,7 @@ import {
   type QuickEditZoomState,
   type QuickEditZoomTransition,
 } from './types';
+import { parseQuickEditCanvas } from './canvas';
 import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';
 import type { ReviewTimeSegment } from '../timeline';
@@ -251,7 +252,22 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
   const voiceover = parseAudioClips(value['voiceover']);
   const music = parseAudioClips(value['music']);
   if (!original || !voiceover || !music) return null;
-  return { original, voiceover, music };
+  const gains = value['laneVolumes'];
+  if (gains === undefined) return { original, voiceover, music };
+  if (!isRecord(gains)) return null;
+  const voiceoverVolume = gains['voiceover'];
+  const musicVolume = gains['music'];
+  if (
+    !isBoundedNumber(voiceoverVolume, 0, MAX_QUICK_EDIT_CLIP_VOLUME) ||
+    !isBoundedNumber(musicVolume, 0, MAX_QUICK_EDIT_CLIP_VOLUME)
+  )
+    return null;
+  return {
+    original,
+    voiceover,
+    music,
+    laneVolumes: { voiceover: voiceoverVolume, music: musicVolume },
+  };
 }
 
 /**
@@ -265,8 +281,16 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const zoom = parseZoomState(raw['zoom']);
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
+  if (canvas === null) return null;
   if (!zoom || !background || !audio) return null;
-  return { schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION, zoom, background, audio };
+  return {
+    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+    zoom,
+    background,
+    audio,
+    ...(canvas ? { canvas } : {}),
+  };
 }
 
 /**
@@ -297,6 +321,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const zoom = parseZoomState(raw['zoom']);
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
+  if (canvas === null) return null;
   const recovery = raw['recoveryV1'];
   if (recovery !== undefined && typeof recovery !== 'string') return null;
   if (!ui || !zoom || !background || !audio) return null;
@@ -306,6 +332,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ui,
     zoom,
     background,
+    ...(canvas ? { canvas } : {}),
     audio,
   };
 }

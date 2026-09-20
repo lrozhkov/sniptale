@@ -184,6 +184,7 @@ export function ReviewZoomPreview(props: {
   region: QuickEditZoomRegion;
   background: QuickEditBackgroundSettings;
   source: { width: number; height: number };
+  canvas?: { width: number; height: number } | undefined;
   /** Result-time region midpoint mapped through cuts/speed; null while it has no frame. */
   sourceTime: number | null;
   loadFrame: ZoomPreviewFrameLoader | null;
@@ -196,23 +197,22 @@ export function ReviewZoomPreview(props: {
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
 
   const output = useMemo(() => {
-    const width = Math.max(1, Math.min(PREVIEW_WIDTH_PX, Math.round(props.source.width) || 1));
-    const height = Math.max(
-      1,
-      Math.round((width * (props.source.height || 1)) / Math.max(1, props.source.width))
-    );
+    const size = props.canvas ?? props.source;
+    const width = Math.max(1, Math.min(PREVIEW_WIDTH_PX, Math.round(size.width) || 1));
+    const height = Math.max(1, Math.round((width * (size.height || 1)) / Math.max(1, size.width)));
     return { width, height };
-  }, [props.source.width, props.source.height]);
+  }, [props.source, props.canvas]);
 
   const layout = useMemo(
     () =>
       computeQuickEditSceneLayout({
         output,
+        canvas: props.canvas,
         source: props.source,
         background: props.background,
         camera: region.transform,
       }),
-    [output, props.source, props.background, region.transform]
+    [output, props.source, props.canvas, props.background, region.transform]
   );
 
   const unavailable = sourceTime === null || !loadFrame;
@@ -256,7 +256,8 @@ export function ReviewZoomPreview(props: {
           key={region.id}
           cornerRadius={
             background.enabled
-              ? (background.layout.cornerRadius * output.width) / Math.max(1, props.source.width)
+              ? (background.layout.cornerRadius * output.width) /
+                Math.max(1, props.canvas?.width ?? props.source.width)
               : 0
           }
           camera={region.transform}

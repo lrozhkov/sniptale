@@ -13,17 +13,21 @@ import {
 } from './render-export';
 
 const state = vi.hoisted(() => ({
-  encoded: [] as { timestamp: number; close: unknown }[],
+  encoded: [] as { timestamp: number; close: unknown; width: number; height: number }[],
   drawn: [] as { draw: unknown; close: unknown }[],
 }));
 
 vi.mock('mediabunny', () => {
   class VideoSample {
     timestamp: number;
+    width: number;
+    height: number;
     close = vi.fn();
     draw = vi.fn();
-    constructor(_source: unknown, init: { timestamp: number }) {
+    constructor(source: HTMLCanvasElement | null, init: { timestamp: number }) {
       this.timestamp = init.timestamp;
+      this.width = source?.width ?? 0;
+      this.height = source?.height ?? 0;
     }
   }
   class VideoSampleSink {
@@ -59,7 +63,12 @@ vi.mock('mediabunny', () => {
   }
   class VideoSampleSource {
     add = vi.fn(async (sample: VideoSample) => {
-      state.encoded.push({ timestamp: sample.timestamp, close: sample.close });
+      state.encoded.push({
+        timestamp: sample.timestamp,
+        close: sample.close,
+        width: sample.width,
+        height: sample.height,
+      });
     });
     close(): void {}
   }
@@ -327,6 +336,7 @@ describe('renderRenderWindowFrames', () => {
       background: { enabled: false },
       comments: [],
       canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+      sourceSize: { width: 320, height: 180 },
       context: contextFixture(),
       image: null,
       frameSink: frameSink as never,
@@ -354,6 +364,7 @@ describe('renderRenderWindowFrames', () => {
         background: { enabled: false },
         comments: [],
         canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+        sourceSize: { width: 320, height: 180 },
         context: contextFixture(),
         image: null,
         frameSink: frameSink as never,
@@ -491,6 +502,7 @@ it('burns visible comments inside the clip and viewport comments after restore',
       },
     ] as never,
     canvas: { width: 320, height: 180 } as HTMLCanvasElement,
+    sourceSize: { width: 320, height: 180 },
     context,
     image: null,
     frameSink: frameSink as never,
@@ -626,4 +638,15 @@ it('bounds accepted long comment dense-gradient raster work to the output frame'
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it('encodes the selected portrait canvas while fitting the native landscape source', async () => {
+  state.encoded.length = 0;
+  state.drawn.length = 0;
+  const advanced = createQuickEditAdvancedState();
+  advanced.canvas = { width: 1080, height: 1920 };
+  await writeReviewFrames(argsFixture({ advanced }));
+  expect(state.encoded.length).toBeGreaterThan(0);
+  expect(state.encoded.every((frame) => frame.width === 1080 && frame.height === 1920)).toBe(true);
+  expect(state.drawn[0]?.draw).toHaveBeenCalledWith(expect.anything(), 0, 656.25, 1080, 607.5);
 });

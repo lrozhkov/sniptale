@@ -46,6 +46,7 @@ export function ReviewStage(props: {
   /** One scene: applied background and the camera at the represented frame. */
   scene?: {
     background: QuickEditBackgroundSettings;
+    canvas?: { width: number; height: number } | undefined;
     camera: QuickEditCameraTransform;
   };
   /** Handle target for the selected zoom region, independent from the playhead camera. */
@@ -156,7 +157,7 @@ export function ReviewStage(props: {
           video={props.video}
           {...(props.scene ? { scene: props.scene } : {})}
           layout={sceneLayout}
-          previewScale={size.width / Math.max(1, props.source.width)}
+          previewScale={size.width / Math.max(1, props.scene?.canvas?.width ?? props.source.width)}
           drawing={props.drawing}
           projected={projected}
           onReady={props.onReady}
@@ -221,6 +222,7 @@ function ReviewSceneVideo(props: {
   video: RefObject<HTMLVideoElement | null>;
   scene?: {
     background: QuickEditBackgroundSettings;
+    canvas?: { width: number; height: number } | undefined;
     camera: QuickEditCameraTransform;
   };
   layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
@@ -401,10 +403,11 @@ function useReviewStageGeometry(
   host: RefObject<HTMLDivElement | null>
 ) {
   const viewport = useStageMeasure(host);
-  const size = fitVideoRect(viewport, props.source);
+  const size = fitVideoRect(viewport, props.scene?.canvas ?? props.source);
   const sceneLayout = props.scene
     ? computeQuickEditSceneLayout({
         output: size,
+        canvas: props.scene?.canvas,
         source: props.source,
         background: props.scene.background,
         camera: props.scene.camera,
@@ -413,6 +416,7 @@ function useReviewStageGeometry(
   const zoomLayout = props.zoom
     ? computeQuickEditSceneLayout({
         output: size,
+        canvas: props.scene?.canvas,
         source: props.source,
         background: props.scene?.background ?? { enabled: false },
         camera: props.zoom.camera,
