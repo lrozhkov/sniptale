@@ -1,3 +1,4 @@
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';
 import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -258,6 +259,7 @@ it('routes visual changes to the full frame renderer and stages the encoded resu
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
   advanced.zoom.enabled = true;
+  advanced.zoom.regions = [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })];
   args.index = {
     ...args.index,
     processedVideoCodec: 'vp9',
@@ -284,6 +286,7 @@ it('blocks visual changes without a video encoder and never stages bytes', async
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
   advanced.zoom.enabled = true;
+  advanced.zoom.regions = [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })];
   await expect(exportReviewedVideo(args, deps)).rejects.toMatchObject({
     name: 'QuickEditExportUnavailable',
     reasons: ['video-encoder'],
@@ -297,6 +300,7 @@ it('keeps stored in-frame comments out of rendered exports while the feature is 
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
   advanced.zoom.enabled = true;
+  advanced.zoom.regions = [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })];
   args.index = {
     ...args.index,
     processedVideoCodec: 'vp9',
@@ -512,6 +516,7 @@ it('does not load hidden audio assets or render hidden focus during export', asy
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks = { actions: true, zoom: false, audio: false };
   advanced.zoom.enabled = true;
+  advanced.zoom.regions = [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })];
   advanced.audio.music = [
     {
       id: 'hidden',

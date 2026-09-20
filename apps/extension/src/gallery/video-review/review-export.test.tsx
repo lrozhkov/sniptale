@@ -98,7 +98,6 @@ it('blocks history and destructive shortcuts while the export controls are disab
     );
     await fixture.click('pointerTool');
     await dragTimePlane(fixture.host, 200, 200);
-    await fixture.click('zoomTrack');
     await fixture.click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(fixture.button('exportVideo').disabled).toBe(false);

@@ -113,8 +113,20 @@ export function useReviewAdvanced(session: Session) {
     saveFailed: saveFailed || contentState.saveFailed,
     pending: optimistic !== null || contentState.pending,
     retry: () => Promise.all([flush(), contentState.flush()]),
-    setMode: (mode: 'basic' | 'advanced') =>
-      stage((current) => ({ ...current, ui: { ...current.ui, mode } })),
+    setMode: (mode: 'basic' | 'advanced') => {
+      if (mode === 'advanced') contentState.setZoom((zoom) => ({ ...zoom, enabled: true }));
+      stage((current) => ({
+        ...current,
+        ui: {
+          ...current.ui,
+          mode,
+          tracks:
+            mode === 'advanced'
+              ? { ...current.ui.tracks, zoom: true, audio: true }
+              : current.ui.tracks,
+        },
+      }));
+    },
     setTrackVisibility: (track: 'actions' | 'zoom' | 'audio', visible: boolean) =>
       stage((current) => ({
         ...current,

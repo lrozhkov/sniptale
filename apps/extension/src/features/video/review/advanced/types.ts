@@ -119,7 +119,16 @@ export interface QuickEditAudioClip {
   fadeOut: number;
 }
 
+export interface QuickEditOriginalAudioRange {
+  id: string;
+  start: number;
+  end: number;
+  volume: number;
+}
+
 export interface QuickEditOriginalAudio {
+  /** Source seconds, independent of result-time edits. */
+  ranges?: QuickEditOriginalAudioRange[];
   muted: boolean;
   volume: number;
 }

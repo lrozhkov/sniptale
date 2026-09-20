@@ -1,3 +1,4 @@
+import type { useReviewAudio } from './use-review-audio';
 import { translate } from '../../platform/i18n';
 import {
   hasSuppressedAdvancedFeatures,
@@ -8,7 +9,7 @@ import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types
 import { reviewIconButtonClassName, ReviewButton } from './controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
-import { Activity, AudioLines, Focus, PanelsTopLeft } from 'lucide-react';
+import { Activity, AudioLines, Focus, PanelsTopLeft, Volume2 } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
 const plain = reviewIconButtonClassName;
@@ -16,6 +17,7 @@ const plain = reviewIconButtonClassName;
 type Editing = ReturnType<typeof useReviewEdits>;
 
 type ToolbarProps = {
+  originalAudioEditor?: ReturnType<typeof useReviewAudio>;
   editing: {
     mode: 'cut' | 'speed' | null;
     rate: Editing['rate'];
@@ -61,10 +63,12 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           mode={props.editing.mode}
           available={!!props.editing.exporter.index}
           cutAvailable={
-            props.selection.kind !== 'range' || props.editing.canApply('cut', props.selection)
+            !props.originalAudioEditor?.originalRangeSelected &&
+            (props.selection.kind !== 'range' || props.editing.canApply('cut', props.selection))
           }
           speedAvailable={
-            props.selection.kind !== 'range' || props.editing.canApply('speed', props.selection)
+            !props.originalAudioEditor?.originalRangeSelected &&
+            (props.selection.kind !== 'range' || props.editing.canApply('speed', props.selection))
           }
           busy={busy}
           rate={props.editing.rate}
@@ -76,6 +80,30 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           onAudio={props.editing.changeAudio}
           onRemove={props.editing.remove}
         />
+        {advanced.ui.mode === 'advanced' &&
+        props.editing.exporter.index?.audioCodec &&
+        props.originalAudioEditor ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.originalAudioRange')}
+            title={translate('gallery.videoReview.originalAudioRangeHint')}
+            aria-pressed={props.originalAudioEditor.originalTool}
+            className={plain}
+            disabled={
+              busy ||
+              (props.selection.kind === 'range' &&
+                !props.originalAudioEditor.canAddOriginal(props.selection))
+            }
+            onClick={() => {
+              props.editing.setCutting(false);
+              if (props.selection.kind === 'range')
+                props.originalAudioEditor?.addOriginal(props.selection);
+              else
+                props.originalAudioEditor?.setOriginalTool(!props.originalAudioEditor.originalTool);
+            }}
+          >
+            <Volume2 size={16} aria-hidden="true" />
+          </ReviewButton>
+        ) : null}
         <ReviewFragmentAction
           selection={props.selection}
           snapToKeyframes={advanced.ui.mode !== 'advanced'}

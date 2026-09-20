@@ -48,6 +48,8 @@ export function reviewSelectionExists(
     return advanced.zoom.regions.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom-link')
     return resolveQuickEditZoomLink(advanced.zoom.regions, selection.id) !== null;
+  if (selection.kind === 'original-audio')
+    return !!advanced.audio.original.ranges?.some((range) => range.id === selection.id);
   if (selection.kind === 'audio')
     return advanced.audio[selection.lane].some((item) => item.id === selection.id);
   return false;
@@ -76,6 +78,7 @@ export function useReviewSelectionLifecycle(args: {
   deleteZoom(id: string): void;
   deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
+  deleteOriginalAudio?(id: string): void;
   clearAnnotation(): void;
 }) {
   const remove = () => {
@@ -85,6 +88,8 @@ export function useReviewSelectionLifecycle(args: {
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
     else if (args.selection.kind === 'zoom') args.deleteZoom(args.selection.id);
     else if (args.selection.kind === 'zoom-link') args.deleteZoomLink(args.selection.id);
+    else if (args.selection.kind === 'original-audio')
+      args.deleteOriginalAudio?.(args.selection.id);
     else if (args.selection.kind === 'audio')
       args.deleteAudio(args.selection.lane, args.selection.id);
     args.setSelection({ kind: 'none' });

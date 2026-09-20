@@ -11,10 +11,7 @@ import {
   type InputAudioTrack,
   type Output,
 } from 'mediabunny';
-import {
-  resolveVideoTargetBitrate,
-  VideoQuality,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { resolveReviewRenderBitrate } from './render-settings';
 import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -124,13 +121,15 @@ export async function writeReviewFrames(args: {
       sampleVideo: {
         codec: preparation.codec,
         frameRate: preparation.fps,
-        bitrate: resolveVideoTargetBitrate({
-          fps: preparation.fps,
-          width: source.canvas.width,
-          height: source.canvas.height,
-          quality:
-            args.renderSettings?.quality === 'standard' ? VideoQuality.MEDIUM : VideoQuality.HIGH,
-        }),
+        bitrate: resolveReviewRenderBitrate(
+          args.index,
+          {
+            fps: preparation.fps,
+            width: source.canvas.width,
+            height: source.canvas.height,
+          },
+          args.renderSettings?.quality
+        ),
       },
       onAudioPacket: (packet) => {
         receipt.audioPackets++;

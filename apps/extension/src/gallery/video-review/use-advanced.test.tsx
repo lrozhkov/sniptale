@@ -1,3 +1,4 @@
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 // @vitest-environment jsdom
 import {
   createQuickEditZoomRegion,
@@ -55,7 +56,14 @@ function setup() {
     }),
   } satisfies Parameters<typeof createVideoReviewSession>[1];
   const saveFromOtherTab = (next: QuickEditAdvancedState) => {
-    workspaceAdvanced = structuredClone(next);
+    history.push({
+      id: 'remote-content',
+      at: 2,
+      target: 'advancedContent',
+      before: session.getSnapshot().document.advancedContent,
+      after: reviewAdvancedContentBaseline(next),
+    });
+    workspaceAdvanced = { ...workspaceAdvanced, ui: structuredClone(next.ui) };
     revision += 1;
   };
   const session = createVideoReviewSession(build(), deps);
@@ -117,7 +125,7 @@ it('rebuilds writes from reloaded persisted content after a conflict recovery', 
     advanced: QuickEditAdvancedState;
   };
   expect(write.advanced.ui.mode).toBe('basic');
-  expect(write.advanced.zoom.regions).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.zoom.regions).toHaveLength(1);
 });
 
 it('composes two commands staged before the next render (S1)', async () => {

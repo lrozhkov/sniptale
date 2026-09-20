@@ -1,3 +1,4 @@
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 // @vitest-environment jsdom
 import { ReviewRenderOptions } from './edit-actions';
 import { act } from 'react';
@@ -184,6 +185,7 @@ it('downloads the rendered result when only visual effects are applied', async (
     advanced.ui.mode = 'advanced';
     advanced.ui.tracks.zoom = true;
     advanced.zoom.enabled = true;
+    advanced.zoom.regions = [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })];
   });
   mocks.export.mockResolvedValue({
     file: new File(['copy'], 'copy.webm'),

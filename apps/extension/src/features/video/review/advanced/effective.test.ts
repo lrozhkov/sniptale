@@ -188,7 +188,7 @@ it('plans render requirements and audio-only processing from applied changes', (
     kind: 'ready',
     video: 'render',
     audio: 'process',
-    reasons: ['zoom', 'background', 'music'],
+    reasons: ['background', 'music'],
   });
   expect(
     resolveQuickEditExportPlan({

@@ -115,6 +115,7 @@ export type ReviewSelection =
   | { kind: 'edit'; id: string }
   | { kind: 'annotation'; id: string }
   | { kind: 'canvas-comment'; id: string }
+  | { kind: 'original-audio'; id: string }
   | { kind: 'zoom'; id: string }
   | { kind: 'zoom-link'; id: string }
   | { kind: 'audio'; lane: 'voiceover' | 'music'; id: string };

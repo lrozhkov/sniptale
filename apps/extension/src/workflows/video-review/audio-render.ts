@@ -1,3 +1,4 @@
+import type { QuickEditOriginalAudioRange } from '../../features/video/review/advanced/types';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
 import {
   AudioSample,
@@ -16,6 +17,7 @@ export interface ReviewExportClipPlan {
   entries: readonly QuickEditAudioPlanEntry[];
   buffers: ReadonlyMap<string, AudioBuffer>;
   originalVolume: number;
+  originalRanges?: readonly QuickEditOriginalAudioRange[];
   originalMuted: boolean;
 }
 
@@ -125,6 +127,7 @@ async function renderWindow(args: AudioRenderWindow) {
       node.buffer = pcm;
     }
     node.playbackRate.value = 1;
+    applySourceRangeGains(node.buffer, args.exportAudio?.originalRanges, start, segment.rate);
     connectOriginal(node, offline, args.exportAudio);
     node.start();
   }
@@ -143,6 +146,29 @@ async function renderWindow(args: AudioRenderWindow) {
       channel
     );
   return result;
+}
+
+/** Apply source-time automation only to the original PCM, before adding external clips. */
+function applySourceRangeGains(
+  buffer: AudioBuffer,
+  ranges: ReviewExportClipPlan['originalRanges'],
+  start: number,
+  rate: number
+) {
+  for (const range of ranges ?? []) {
+    const from = Math.max(
+      0,
+      Math.ceil(((range.start - start) / rate + leadSeconds) * buffer.sampleRate)
+    );
+    const to = Math.min(
+      buffer.length,
+      Math.ceil(((range.end - start) / rate + leadSeconds) * buffer.sampleRate)
+    );
+    for (let c = 0; c < buffer.numberOfChannels; c++) {
+      const plane = buffer.getChannelData(c);
+      for (let i = from; i < to; i++) plane[i] = plane[i]! * range.volume;
+    }
+  }
 }
 
 /** The original track gain lives in the mix so amplification is not capped by the element. */

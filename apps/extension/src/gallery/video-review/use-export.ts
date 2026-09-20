@@ -51,7 +51,7 @@ export function prepareReviewExporter(
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
   const [renderSettings, setRenderSettings] = useState<ReviewRenderSettings>({
-    quality: 'high',
+    quality: 'standard',
     frameRate: 0,
   });
   const [index, setIndex] = useState<ReviewMediaIndex | null>(null);

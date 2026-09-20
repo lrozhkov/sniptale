@@ -1,4 +1,4 @@
-import { useMemo, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useMemo, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type {
   ReviewAnchor,
@@ -85,10 +85,17 @@ export function useReviewEditorWiring(args: {
     audio: args.advanced.audio,
     setAudio: args.advancedState.setAudio,
     timelineDuration: args.timelineDuration,
+    sourceDuration: args.sourceDuration,
+    edits: args.document.edits,
+    selectedOriginalId:
+      args.activeSelection.kind === 'original-audio' ? args.activeSelection.id : null,
+    onOriginalSelection: (id) =>
+      args.setActiveSelection(id ? { kind: 'original-audio', id } : { kind: 'none' }),
     selectedId: args.activeSelection.kind === 'audio' ? args.activeSelection.id : null,
     onSelectionChange: (value) =>
       args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),
   });
+  useOriginalAudioToolLifecycle(args.advanced.ui.mode, args.activeSelection.kind, audio);
   const flushPendingContent = async () => {
     await args.advancedState.flush();
     await canvasComments.flushTexts();
@@ -109,6 +116,7 @@ export function useReviewEditorWiring(args: {
     deleteZoom: args.zoom.remove,
     deleteZoomLink: (id) => args.zoom.change(id, { linkTo: null }),
     deleteAudio: audio.removeClip,
+    deleteOriginalAudio: audio.removeOriginal,
     clearAnnotation: () => args.clearAnnotation(null),
   });
   const moveHistory = async (direction: 'undo' | 'redo') => {
@@ -130,12 +138,20 @@ export function useReviewEditorWiring(args: {
     redo: () => moveHistory('redo'),
     cancelDrawing: () => {
       args.cuts.setCutting(false);
+      audio.setOriginalTool(false);
       args.setTimelineSelection({ kind: 'point', time: args.time });
     },
-    pointTool: () => args.cuts.setCutting(false),
+    pointTool: () => {
+      args.cuts.setCutting(false);
+      audio.setOriginalTool(false);
+    },
     remove: removeSelection,
     addComment: () => comments.add(args.timelineSelection),
-    toggleCut: () => args.cuts.toggle('cut'),
+    toggleCut: () => {
+      if (audio.originalRangeSelected) return;
+      audio.setOriginalTool(false);
+      void args.cuts.toggle('cut');
+    },
   });
   return {
     audio,
@@ -148,4 +164,18 @@ export function useReviewEditorWiring(args: {
     removeSelection,
     exporter: prepareReviewExporter(args.exporter, args.run, flushPendingContent),
   };
+}
+
+/** Clear the source-audio gesture target when another editor context takes over. */
+function useOriginalAudioToolLifecycle(
+  mode: QuickEditAdvancedState['ui']['mode'],
+  selectionKind: ReviewSelection['kind'],
+  { setOriginalTool, setOriginalRangeSelected }: ReturnType<typeof useReviewAudio>
+) {
+  useEffect(() => {
+    if (mode === 'advanced' && (selectionKind === 'none' || selectionKind === 'original-audio'))
+      return;
+    setOriginalTool(false);
+    setOriginalRangeSelected(false);
+  }, [mode, selectionKind, setOriginalTool, setOriginalRangeSelected]);
 }

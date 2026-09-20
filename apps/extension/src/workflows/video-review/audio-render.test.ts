@@ -475,3 +475,46 @@ it.each([48000, 44100])(
     }
   }
 );
+
+it('applies source gain inside a fragment without scaling the added music buffer', async () => {
+  const fixture = await audioFixture();
+  audioMock.packets = Array.from({ length: 50 }, (_, i) => ({
+    timestamp: 2 + i * 0.02,
+    duration: 0.02,
+    data: new Uint8Array([0xf8, 0]),
+  }));
+  audioMock.samples.mockImplementation((start: number, end: number) => [
+    decodedSample(start, end - start),
+  ]);
+  const music = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
+  music.getChannelData(0).fill(0.75);
+  try {
+    for await (const _sample of renderReviewAudio(
+      fixture.track,
+      { sourceStart: 2, sourceEnd: 3, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
+      false,
+      new AbortController().signal,
+      {
+        entries: [],
+        buffers: new Map([['music', music]]),
+        originalVolume: 1,
+        originalMuted: false,
+        originalRanges: [
+          { id: 'mute', start: 2.2, end: 2.4, volume: 0 },
+          { id: 'boost', start: 2.4, end: 2.6, volume: 2 },
+        ],
+      }
+    )) {
+      /* drain */
+    }
+    const pcm = fixture.windows[0]!.sources![0]!.buffer!.getChannelData(0);
+    const at = (time: number) => pcm[Math.round((time + 0.02) * 48_000)];
+    expect(at(0.1)).toBeCloseTo(0.25);
+    expect(at(0.3)).toBe(0);
+    expect(at(0.5)).toBeCloseTo(0.5);
+    expect(at(0.7)).toBeCloseTo(0.25);
+    expect(music.getChannelData(0)[0]).toBe(0.75);
+  } finally {
+    fixture.cleanup();
+  }
+});

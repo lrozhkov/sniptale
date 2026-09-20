@@ -1,3 +1,6 @@
+import { ReviewOriginalAudioTrack } from './original-audio-track';
+import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
+import type { useReviewAudio } from './use-review-audio';
 import {
   isReviewVoiceoverCut,
   reviewVoiceoverRange,
@@ -336,6 +339,10 @@ function ReviewAudioClipBlock(props: {
 
 /** The three semantic audio lanes; the original stays bound to the video structure. */
 export function ReviewAudioTrack(props: {
+  originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
+  edits?: readonly ReviewEdit[] | undefined;
+  onOriginalRange?: ((range: ReviewAnchor) => void) | undefined;
+  onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
   audio: QuickEditAudioState;
   hasOriginalAudio?: boolean;
   showAddedAudio?: boolean;
@@ -377,7 +384,12 @@ export function ReviewAudioTrack(props: {
         }}
       />
       {props.hasOriginalAudio !== false ? (
-        <ReviewOriginalLane
+        <ReviewOriginalAudioTrack
+          duration={props.duration}
+          editor={props.originalEditor}
+          edits={props.edits}
+          onRange={props.onOriginalRange}
+          onSelectSpeed={props.onSelectSpeed}
           waveform={props.waveforms?.get('original')}
           original={props.audio.original}
           projection={props.projection}
@@ -406,45 +418,6 @@ export function ReviewAudioTrack(props: {
         />
       ) : null}
     </div>
-  );
-}
-
-function ReviewOriginalLane(props: {
-  projection?: ReviewTrackProjection | undefined;
-  original: QuickEditOriginalAudio;
-  waveform?: ReviewWaveform | undefined;
-  busy: boolean;
-  onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
-}) {
-  return (
-    <ReviewTrackRow
-      label={translate('gallery.videoReview.audioOriginal')}
-      icon={<Volume2 size={14} aria-hidden="true" />}
-      controls={
-        <ReviewButton
-          label={translate('gallery.videoReview.audioEnabled')}
-          aria-pressed={!props.original.muted}
-          disabled={props.busy}
-          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() => props.onOriginal({ muted: !props.original.muted })}
-        >
-          {props.original.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-        </ReviewButton>
-      }
-    >
-      <div
-        data-ui="gallery.videoReview.audioLane"
-        className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)]"
-      >
-        <ReviewAudioWaveform
-          waveform={props.waveform}
-          duration={props.waveform?.duration ?? 1}
-          volume={props.original.volume}
-          muted={props.original.muted}
-        />
-        <ReviewTrackCuts projection={props.projection} />
-      </div>
-    </ReviewTrackRow>
   );
 }
 

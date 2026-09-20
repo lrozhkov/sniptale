@@ -19,7 +19,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   exportFrameRate: { ru: 'Частота кадров', en: 'Frame rate' },
   exportSourceRate: { ru: 'Как в исходнике', en: 'Same as source' },
   exportQuality: { ru: 'Качество', en: 'Quality' },
-  exportStandardQuality: { ru: 'Стандартное · меньше файл', en: 'Standard · smaller file' },
+  exportStandardQuality: { ru: 'Сбалансированное · по исходнику', en: 'Balanced · source-aware' },
   exportHighQuality: { ru: 'Высокое', en: 'High' },
   inspector: { ru: 'Инспектор', en: 'Inspector' },
   properties: { ru: 'Параметры', en: 'Properties' },
@@ -380,7 +380,18 @@ export const galleryVideoReviewMessages = defineMessageSource({
     en: 'The region must stay inside the video and have a nonzero size.',
   },
   addOverlayComment: { ru: 'Комментарий на кадре', en: 'Frame comment' },
-  audioOriginal: { ru: 'Оригинал', en: 'Original' },
+  originalAudioRange: { ru: 'Громкость участка', en: 'Range volume' },
+  originalAudioRangeHint: {
+    ru: 'Изменить громкость выбранного интервала или выделить участок на дорожке исходного аудио',
+    en: 'Adjust the selected range or draw a range on the source audio track',
+  },
+  muteAudioRange: { ru: 'Выключить звук на участке', en: 'Mute this range' },
+  audioMutedBySpeed: { ru: 'Без звука: настройка ускорения', en: 'Muted by speed change' },
+  audioRangeSpeedHint: {
+    ru: 'На пересечении с ускорением без звука этот участок не слышен. Настройка громкости сохраняется.',
+    en: 'The overlap with a muted speed change is silent. This volume setting is preserved.',
+  },
+  audioOriginal: { ru: 'Исходное аудио', en: 'Source audio' },
   audioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
   voiceoverCut: {
     ru: 'Запись временно выключена: она пересекает вырезанный участок.',

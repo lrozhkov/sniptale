@@ -101,6 +101,9 @@ async function buildReviewExportClipPlan(args: {
     entries,
     buffers,
     originalVolume: args.advanced.audio.original.volume,
+    ...(args.advanced.audio.original.ranges
+      ? { originalRanges: args.advanced.audio.original.ranges }
+      : {}),
     originalMuted: args.advanced.audio.original.muted,
   };
 }

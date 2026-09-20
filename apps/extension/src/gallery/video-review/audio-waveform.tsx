@@ -64,6 +64,7 @@ export function useReviewWaveforms(
 
 /** Peak envelope uses the actual trimmed source window; no decorative waveform is fabricated. */
 export function ReviewAudioWaveform(props: {
+  gainAt?: ((sourceTime: number) => number) | undefined;
   sampleTime?: ((fraction: number) => number) | undefined;
   projection?: ReviewTrackProjection | undefined;
   timelineStart?: number;
@@ -77,7 +78,7 @@ export function ReviewAudioWaveform(props: {
 }) {
   const viewport = useWaveformViewport();
   const wave = props.waveform;
-  const { sampleTime, projection, duration, timelineStart } = props;
+  const { sampleTime, projection, duration, timelineStart, gainAt } = props;
   const localAt = useCallback(
     (fraction: number) => {
       if (sampleTime) return sampleTime(fraction);
@@ -151,7 +152,7 @@ export function ReviewAudioWaveform(props: {
         props.fadeIn ? local / props.fadeIn : 1,
         props.fadeOut ? (props.duration - local) / props.fadeOut : 1
       );
-      const amplitude = Math.min(1, peak * props.volume * envelope) * 44;
+      const amplitude = Math.min(1, peak * props.volume * envelope * (gainAt?.(start) ?? 1)) * 44;
       const x = ((fraction + nextFraction) / 2) * 100;
       result += `M${x.toFixed(2)} ${(50 - amplitude).toFixed(2)}V${(50 + amplitude).toFixed(2)}`;
     }
@@ -166,6 +167,7 @@ export function ReviewAudioWaveform(props: {
     props.offset,
     props.duration,
     props.volume,
+    gainAt,
     props.fadeIn,
     props.fadeOut,
   ]);

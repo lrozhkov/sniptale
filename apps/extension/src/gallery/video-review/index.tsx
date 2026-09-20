@@ -729,6 +729,8 @@ function reviewSelectionLabel(state: InspectorState): string | undefined {
         : 'gallery.videoReview.zoomRegionLabel'
     );
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
+  if (selection.kind === 'original-audio')
+    return translate('gallery.videoReview.originalAudioRange');
   if (selection.kind === 'audio')
     return translate(
       selection.lane === 'voiceover'

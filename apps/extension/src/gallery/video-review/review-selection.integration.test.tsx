@@ -125,7 +125,6 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
-    await click('audioTrack');
     await click('cutMode');
     await dragRange(host);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 60)));
@@ -161,6 +160,7 @@ it('selects captured actions without creating notes and clears the selection on 
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
+    await vi.waitFor(() => expect(fixture.snapshot.workspace.history).toHaveLength(1));
     const action = fixture.host.querySelector<HTMLButtonElement>(
       '[aria-label^="gallery.videoReview.telemetry ·"]'
     )!;
@@ -174,7 +174,7 @@ it('selects captured actions without creating notes and clears the selection on 
     expect(integration.draft).not.toHaveBeenCalled();
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
     expect(action.getAttribute('aria-pressed')).toBe('true');
-    expect(fixture.snapshot.workspace.history).toHaveLength(0);
+    expect(fixture.snapshot.workspace.history).toHaveLength(1);
     const plane = fixture.host.querySelector<HTMLElement>(
       '[data-ui="gallery.videoReview.timePlane"]'
     )!;
@@ -366,6 +366,60 @@ it('creates edits from recorded actions, selects their properties and recalculat
     expect(properties.textContent).toContain('gallery.videoReview.actionRemoved');
     expect(properties.querySelectorAll('button')).toHaveLength(0);
     expect(fixture.snapshot.draft).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('creates a source-audio mute from a range, opens properties and restores it through undo/redo', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: 'opus',
+    processedAudioCodec: 'opus',
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    expect(fixture.button('audioTrack').getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.button('zoomTrack').getAttribute('aria-pressed')).toBe('true');
+    await dragRange(fixture.host);
+    await fixture.click('originalAudioRange');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(
+      fixture.host.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toHaveLength(1);
+    const range = fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')!;
+    expect(range.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.host.textContent).toContain('gallery.videoReview.muteAudioRange');
+    expect(fixture.host.querySelectorAll('[data-audio-edge]')).toHaveLength(2);
+    await act(async () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC' }))
+    );
+    expect(fixture.host.querySelector('[data-ui="gallery.videoReview.cutRegion"]')).toBeNull();
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
+    await fixture.click('undo');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toBeNull();
+    await fixture.click('redo');
+    const restored = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.originalAudioRange"]'
+    )!;
+    expect(restored).not.toBeNull();
+    await act(async () => restored.click());
+    await act(async () =>
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', code: 'Delete' }))
+    );
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toBeNull();
   } finally {
     await fixture.cleanup();
   }

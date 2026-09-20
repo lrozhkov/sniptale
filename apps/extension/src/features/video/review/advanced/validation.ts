@@ -1,3 +1,4 @@
+import { parseOriginalAudioRanges } from './original-audio';
 import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
 import { parseQuickEditSpotlight } from './focus';
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
@@ -255,7 +256,10 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
     !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME)
   )
     return null;
-  return { muted: value['muted'], volume: value['volume'] };
+  const ranges =
+    value['ranges'] === undefined ? undefined : parseOriginalAudioRanges(value['ranges']);
+  if (ranges === null) return null;
+  return { muted: value['muted'], volume: value['volume'], ...(ranges ? { ranges } : {}) };
 }
 
 function parseAudioState(value: unknown): QuickEditAudioState | null {

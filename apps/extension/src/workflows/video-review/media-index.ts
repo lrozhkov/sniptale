@@ -29,6 +29,9 @@ export interface ReviewMediaIndex {
   supportedVideoCodecs?: ('avc' | 'vp8' | 'vp9')[];
   /** Probed average frame rate; the render loop quantizes output frames to it. */
   frameRate?: number;
+  videoBitrate?: number;
+  width?: number;
+  height?: number;
 }
 
 /** Re-encode codec for one frame render; mp4 keeps the broadly supported AVC path. */
@@ -119,11 +122,14 @@ export async function inspectReviewMedia(
         width: await video.getDisplayWidth(),
         height: await video.getDisplayHeight(),
       }),
-      video.computePacketStats(256, { metadataOnly: true }),
+      video.computePacketStats(Infinity, { metadataOnly: true }),
     ]);
     signal.throwIfAborted();
     return {
       duration,
+      videoBitrate: packetStats.averageBitrate,
+      width: await video.getDisplayWidth(),
+      height: await video.getDisplayHeight(),
       boundaries: [...new Set([0, ...boundaries, duration])].sort((left, right) => left - right),
       videoCodec,
       audioCodec,

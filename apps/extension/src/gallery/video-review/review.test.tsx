@@ -403,7 +403,6 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
       root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await click('advancedEditing');
-    await click('zoomTrack');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
     await click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
@@ -477,7 +476,6 @@ it('places new zoom regions in result time after cuts and speed changes (R03)', 
     // Result of cut [0,1) + speed [1,2)x2 + keep [2,4): 2.5 s; source 3 sits at 1.5.
     await dragTimePlane(host, 300);
     await click('advancedEditing');
-    await click('zoomTrack');
     await click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
@@ -510,7 +508,6 @@ it('refuses a zoom placement while the playhead is on a removed part (R03)', asy
     );
     await dragTimePlane(host, 50);
     await click('advancedEditing');
-    await click('zoomTrack');
     await click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(0);
@@ -557,12 +554,12 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
     await click('advancedEditing');
     expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('true');
-    expect(button('zoomTrack').getAttribute('aria-pressed')).toBe('false');
-    await click('zoomTrack');
+    expect(button('zoomTrack').getAttribute('aria-pressed')).toBe('true');
+    expect(button('audioTrack').getAttribute('aria-pressed')).toBe('true');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(fixture.snapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
-      tracks: { actions: true, zoom: true, audio: false },
+      tracks: { actions: true, zoom: true, audio: true },
       overlaysVisible: true,
     });
     expect(integration.advanced).toHaveBeenCalled();
@@ -609,7 +606,6 @@ it('reveals the three audio lanes and persists the original audio gate', async (
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
-    await click('audioTrack');
     const lanes = host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]');
     expect(lanes).toHaveLength(3);
     expect(host.querySelector('[data-ui="gallery.videoReview.audioTrack"]')).not.toBeNull();
@@ -630,7 +626,6 @@ it('imports a file dropped on the music lane at the drop point', async () => {
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
-    await click('audioTrack');
     const music = host.querySelector('[data-audio-lane="music"]')!;
     vi.spyOn(music, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 32));
     const file = new File([new Uint8Array(4)], 'song.mp3', { type: 'audio/mpeg' });
@@ -660,7 +655,6 @@ it('opens the shared voiceover recorder from the audio lane', async () => {
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     await click('advancedEditing');
-    await click('audioTrack');
     await click('recordVoiceover');
     const modal = host.querySelector('[role="dialog"]');
     expect(modal).not.toBeNull();
@@ -684,7 +678,6 @@ it('keeps original audio controls when the export index cannot inspect the sourc
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
-    await fixture.click('audioTrack');
     expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')).toHaveLength(
       3
     );

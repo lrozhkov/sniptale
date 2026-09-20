@@ -57,6 +57,9 @@ function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
+  edits: readonly ReviewEdit[];
+  onOriginalRange(range: ReviewAnchor): void;
+  onSelectSpeed(edit: ReviewEdit): void;
   hasOriginalAudio: boolean;
   showAddedAudio: boolean;
   snapTimes: readonly number[];
@@ -71,6 +74,10 @@ function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      originalEditor={props.audio}
+      edits={props.edits}
+      onOriginalRange={props.onOriginalRange}
+      onSelectSpeed={props.onSelectSpeed}
       hasOriginalAudio={props.hasOriginalAudio}
       showAddedAudio={props.showAddedAudio}
       projection={props.projection}
@@ -138,14 +145,21 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
       className="contents"
     >
       <ReviewTimelineToolbar
+        originalAudioEditor={props.audio}
         editing={{
           mode: props.editing.mode,
           rate: props.editing.rate,
           audio: props.editing.audio,
           selected: !!props.editing.selected,
           exporter: props.editing.exporter,
-          setCutting: props.editing.setCutting,
-          toggle: props.editing.toggle,
+          setCutting: (value) => {
+            props.audio.setOriginalTool(false);
+            props.editing.setCutting(value);
+          },
+          toggle: (kind) => {
+            props.audio.setOriginalTool(false);
+            void props.editing.toggle(kind);
+          },
           canApply: props.editing.canApply,
           changeRate: props.editing.changeRate,
           changeAudio: props.editing.changeAudio,
@@ -224,6 +238,13 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                edits={props.edits}
+                onOriginalRange={(range) => {
+                  props.onClearSelection();
+                  props.setSelection(range);
+                  props.audio.setOriginalRangeSelected(true);
+                }}
+                onSelectSpeed={props.editing.select}
                 showAddedAudio={features.audioTrackVisible}
                 hasOriginalAudio={
                   props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
@@ -282,7 +303,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       markers={props.markers}
       {...(props.selectedTelemetryRef ? { selectedTelemetryRef: props.selectedTelemetryRef } : {})}
       onSeek={props.onSeek}
-      onSelect={props.setSelection}
+      onSelect={(range) => {
+        props.audio.setOriginalRangeSelected(false);
+        props.setSelection(range);
+      }}
       onPlay={props.onPlay}
       onMarker={props.onMarker}
       onClearSelection={props.onClearSelection}

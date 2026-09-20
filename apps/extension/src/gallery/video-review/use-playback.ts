@@ -1,3 +1,4 @@
+import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
@@ -30,22 +31,24 @@ export function useReviewPlayback(props: {
       if (next !== value) node.currentTime = next;
       if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
       if (node.preservesPitch !== true) node.preservesPitch = true;
-      const muted = settings.muted || latest.current.original.muted;
+      const gain = originalAudioGainAt(latest.current.original, next, latest.current.edits);
+      const muted = settings.muted || gain === 0;
       if (node.muted !== muted) node.muted = muted;
       // The element caps at one; the preview audio graph amplifies beyond it.
-      const volume = Math.min(1, latest.current.original.volume);
+      const volume = Math.min(1, gain);
       if (node.volume !== volume) node.volume = volume;
       if (next >= latest.current.duration) node.pause();
     }
     setTime(next);
     return next;
   };
+  const audioSettingsKey = JSON.stringify([props.original, props.edits]);
   const tick = useRef(synchronize);
   tick.current = synchronize;
   useEffect(() => {
     const node = video.current;
     if (node) tick.current(node.currentTime, false);
-  }, [props.original.volume, props.original.muted]);
+  }, [audioSettingsKey]);
   useEffect(() => {
     if (!playing) return;
     let frame = 0;

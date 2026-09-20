@@ -1,3 +1,4 @@
+import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { useEffect, useRef, type RefObject } from 'react';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import {
@@ -200,7 +201,9 @@ export function useReviewAudioRuntime(props: {
     const generationValue = ++generation.current;
     scheduledAt.current = { outputTime: current.outputTime, audioNow: engine.now() };
     engine.stopAll();
-    engine.setOriginalGain(Math.max(1, current.original.volume));
+    engine.setOriginalGain(
+      Math.max(1, originalAudioGainAt(current.original, current.video.current?.currentTime ?? 0))
+    );
     void (async () => {
       try {
         await engine.resume();
@@ -261,6 +264,11 @@ export function useReviewAudioRuntime(props: {
     schedule();
   }, [props.outputTime]);
   useEffect(() => {
-    peekEngine()?.setOriginalGain(Math.max(1, props.original.volume));
-  }, [props.original.volume, props.original.muted]);
+    peekEngine()?.setOriginalGain(
+      Math.max(
+        1,
+        originalAudioGainAt(latest.current.original, latest.current.video.current?.currentTime ?? 0)
+      )
+    );
+  }, [props.original, props.outputTime]);
 }

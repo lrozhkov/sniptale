@@ -1,3 +1,4 @@
+import { ReviewOriginalAudioInspector } from './original-audio-inspector';
 import { planReviewActionEdits } from '../../features/video/review/action-edits';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import { translate } from '../../platform/i18n';
@@ -65,6 +66,23 @@ export function ReviewSelectedProperties(props: {
             onFocus={() => {
               if (plan?.focus) props.onFocus(plan.focus);
             }}
+          />
+        ) : selection.kind === 'original-audio' && advanced.ui.mode === 'advanced' ? (
+          <ReviewOriginalAudioInspector
+            audio={audio}
+            duration={resource.source.duration}
+            speedMuted={
+              !!audio.selectedOriginal &&
+              resource.session
+                .getSnapshot()
+                .document.edits.some(
+                  (edit) =>
+                    edit.kind === 'speed' &&
+                    edit.audio === 'mute' &&
+                    edit.start < audio.selectedOriginal!.end &&
+                    edit.end > audio.selectedOriginal!.start
+                )
+            }
           />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
           <ReviewAudioInspectorSection audio={audio} busy={busy} />

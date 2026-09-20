@@ -727,9 +727,12 @@ for (const variant of [
         dialog.locator('[data-ui="gallery.videoReview.workspaceTools"] button')
       ).toHaveCount(1);
       await expect(button('gallery.videoReview.advancedEditing').locator('span')).toBeVisible();
-      await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(1);
-      await button('gallery.videoReview.zoomTrack').click();
-      await button('gallery.videoReview.audioTrack').click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.audioLane"]')).toHaveCount(3);
+      await expect(button('gallery.videoReview.zoomTrack')).toHaveAttribute('aria-pressed', 'true');
+      await expect(button('gallery.videoReview.audioTrack')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       await button('gallery.videoReview.zoomAdd').first().click();
       const zoomRegion = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
@@ -983,7 +986,6 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomTrack').click();
       // Two active regions with a real gap between them.
       await button('gallery.videoReview.zoomAdd').first().click();
       await timelineGesture(page, 5);
@@ -1341,7 +1343,6 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomTrack').click();
       await button('gallery.videoReview.zoomAdd').first().click();
       await button('gallery.videoReview.focusType').click();
       await page
@@ -1891,3 +1892,74 @@ for (const variant of [
     }
   });
 }
+
+test('quick editor source audio ranges preserve gain, selection and exported sound', async ({
+  page,
+}, testInfo) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'ru', 'sniptale-theme-preference': 'light' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('dialog');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: translate(key, 'ru'), exact: true });
+    await button('gallery.videoReview.advancedEditing').click();
+    await expect(button('gallery.videoReview.audioTrack')).toHaveAttribute('aria-pressed', 'true');
+    await button('gallery.videoReview.originalAudioRange').click();
+    const lane = dialog.locator('[data-original-audio-lane]');
+    const box = (await lane.boundingBox())!;
+    await page.mouse.move(box.x + box.width * 0.25, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2, { steps: 8 });
+    await page.mouse.up();
+    const range = dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
+    await expect(range).toHaveCount(1);
+    await expect(range).toHaveAttribute('aria-pressed', 'true');
+    await expect(button('gallery.videoReview.cutMode')).toBeDisabled();
+    await expect(button('gallery.videoReview.muteAudioRange')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('source-audio-range-ru.png') });
+    await button('gallery.videoReview.undo').click();
+    await expect(range).toHaveCount(0);
+    await button('gallery.videoReview.redo').click();
+    await expect(range).toHaveCount(1);
+    await range.click();
+    await button('gallery.videoReview.back').click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await expect(range).toHaveCount(1);
+    const downloadPromise = page.waitForEvent('download');
+    await button('gallery.videoReview.downloadVideo').click();
+    const download = await downloadPromise;
+    const bytes = await readFile(await download.path());
+    const levels = await page.evaluate(async (encoded) => {
+      const data = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
+      const context = new AudioContext({ sampleRate: 48000 });
+      try {
+        const audio = await context.decodeAudioData(data.buffer);
+        const pcm = audio.getChannelData(0);
+        return [1, 4, 7].map((time) => {
+          const from = Math.round(time * audio.sampleRate);
+          const window = pcm.subarray(from, from + 4800);
+          return Math.sqrt(
+            window.reduce((sum, sample) => sum + sample * sample, 0) / window.length
+          );
+        });
+      } finally {
+        await context.close();
+      }
+    }, bytes.toString('base64'));
+    expect(levels[0]).toBeGreaterThan(0.01);
+    expect(levels[1]).toBeLessThan(0.001);
+    expect(levels[2]).toBeGreaterThan(0.01);
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

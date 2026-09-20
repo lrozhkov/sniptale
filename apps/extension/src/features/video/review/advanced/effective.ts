@@ -143,11 +143,16 @@ export function resolveQuickEditExportPlan(args: {
   if (features.voiceoverApplied && args.advanced.audio.voiceover.length > 0)
     audio.push('voiceover');
   if (features.musicApplied && args.advanced.audio.music.length > 0) audio.push('music');
-  if (args.advanced.audio.original.muted || args.advanced.audio.original.volume !== 1)
+  if (
+    args.advanced.audio.original.muted ||
+    args.advanced.audio.original.volume !== 1 ||
+    args.advanced.audio.original.ranges?.length
+  )
     audio.push('original-audio');
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (args.advanced.canvas) visual.push('canvas');
-  if (features.zoomApplied) visual.push('zoom');
+  if (features.zoomApplied && args.advanced.zoom.regions.some((region) => !region.dormant))
+    visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
   if (visual.length) {
     if (args.videoRenderAvailable === false)
@@ -178,6 +183,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     state.audio.voiceover.length > 0 ||
     state.audio.music.length > 0 ||
     state.audio.original.muted ||
-    state.audio.original.volume !== 1
+    state.audio.original.volume !== 1 ||
+    !!state.audio.original.ranges?.length
   );
 }

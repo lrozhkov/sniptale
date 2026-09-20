@@ -1,3 +1,5 @@
+import { canPlaceOriginalAudioRange } from '../../features/video/review/advanced/original-audio';
+import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
   anchorReviewVoiceover,
   isReviewVoiceoverCut,
@@ -25,9 +27,14 @@ export function useReviewAudio(args: {
   audio: QuickEditAudioState;
   setAudio(update: (audio: QuickEditAudioState) => QuickEditAudioState): void;
   timelineDuration: number;
+  sourceDuration?: number;
+  edits?: readonly ReviewEdit[];
+  selectedOriginalId?: string | null;
+  onOriginalSelection?(id: string | null): void;
   selectedId?: string | null;
   onSelectionChange?(selection: { lane: ReviewAudioLane; id: string } | null): void;
 }) {
+  const original = useOriginalAudioRanges(args);
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const selectedId = args.selectedId === undefined ? localSelectedId : args.selectedId;
   const setSelected = (id: string | null, lane?: ReviewAudioLane) => {
@@ -64,6 +71,7 @@ export function useReviewAudio(args: {
       })
     );
   return {
+    ...original,
     assets,
     selectedId,
     setSelectedId: setSelected,
@@ -173,4 +181,69 @@ function useReviewAudioAssets() {
     };
   }, []);
   return [assets, setAssets] as const;
+}
+
+/** Source automation owns its drawing mode, selection and bounded source-time mutations. */
+function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
+  const [originalTool, setOriginalTool] = useState(false);
+  const [originalRangeSelected, setOriginalRangeSelected] = useState(false);
+  const originalRanges = args.audio.original.ranges ?? [];
+  const canAddOriginal = (range: ReviewAnchor, exceptId?: string) =>
+    range.kind === 'range' &&
+    (exceptId !== undefined || originalRanges.length < 512) &&
+    canPlaceOriginalAudioRange(
+      range,
+      originalRanges,
+      args.edits ?? [],
+      args.sourceDuration ?? args.timelineDuration,
+      exceptId
+    );
+  const updateOriginalRanges = (ranges: typeof originalRanges) =>
+    args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ranges } }));
+  return {
+    originalRangeSelected,
+    setOriginalRangeSelected,
+    originalTool,
+    setOriginalTool,
+    canAddOriginal,
+    selectedOriginal: originalRanges.find((range) => range.id === args.selectedOriginalId) ?? null,
+    selectOriginal: (id: string) => {
+      setOriginalRangeSelected(true);
+      setOriginalTool(false);
+      args.onOriginalSelection?.(id);
+    },
+    addOriginal: (range: ReviewAnchor) => {
+      if (range.kind !== 'range' || !canAddOriginal(range) || originalRanges.length >= 512) return;
+      const id = crypto.randomUUID();
+      setOriginalRangeSelected(true);
+      updateOriginalRanges(
+        [...originalRanges, { id, start: range.start, end: range.end, volume: 0 }].sort(
+          (a, b) => a.start - b.start
+        )
+      );
+      setOriginalTool(false);
+      args.onOriginalSelection?.(id);
+    },
+    patchOriginal: (id: string, patch: Partial<{ start: number; end: number; volume: number }>) => {
+      const old = originalRanges.find((range) => range.id === id);
+      if (!old) return;
+      const next = { ...old, ...patch };
+      if (
+        !Number.isFinite(next.volume) ||
+        next.volume < 0 ||
+        next.volume > 2 ||
+        !canAddOriginal({ kind: 'range', ...next }, id)
+      )
+        return;
+      updateOriginalRanges(
+        originalRanges
+          .map((range) => (range.id === id ? next : range))
+          .sort((a, b) => a.start - b.start)
+      );
+    },
+    removeOriginal: (id: string) => {
+      updateOriginalRanges(originalRanges.filter((range) => range.id !== id));
+      args.onOriginalSelection?.(null);
+    },
+  };
 }

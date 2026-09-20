@@ -44,7 +44,12 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const comments = { add: vi.fn(), select: vi.fn() };
   const canvas = { flushTexts: vi.fn(), onDelete: vi.fn() };
-  const audio = { removeClip: vi.fn() };
+  const audio = {
+    removeClip: vi.fn(),
+    removeOriginal: vi.fn(),
+    setOriginalTool: vi.fn(),
+    setOriginalRangeSelected: vi.fn(),
+  };
   const removeSelection = vi.fn();
   mocks.comments.mockReturnValue(comments);
   mocks.canvas.mockReturnValue(canvas);
