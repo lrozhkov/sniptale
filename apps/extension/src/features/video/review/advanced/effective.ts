@@ -75,6 +75,7 @@ export function resolveQuickEditEffectiveState(
 }
 
 export type QuickEditExportReason =
+  | 'precise-edits'
   | 'zoom'
   | 'background'
   | 'comments'
@@ -106,9 +107,22 @@ export function resolveQuickEditExportPlan(args: {
   /** Capability hint; undefined defers the authoritative check to the exporter. */
   audioProcessingAvailable?: boolean;
   videoRenderAvailable?: boolean;
+  videoCopyBoundaries?: readonly number[];
 }): QuickEditExportPlan {
   const burned = args.document.canvasComments.some((comment) => comment.renderToVideo);
+  const preciseEdits =
+    args.videoCopyBoundaries !== undefined &&
+    args.document.edits.some((edit) =>
+      [edit.start, edit.end].some(
+        (time) =>
+          !args.videoCopyBoundaries!.some((boundary) => Math.abs(boundary - time) < 0.000001)
+      )
+    );
   if (args.advanced.ui.mode !== 'advanced') {
+    if (preciseEdits)
+      return args.videoRenderAvailable === false
+        ? { kind: 'unavailable', reasons: ['video-encoder'] }
+        : { kind: 'ready', video: 'render', audio: 'copy', reasons: ['precise-edits'] };
     return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
   }
   const audio: QuickEditExportReason[] = [];
@@ -116,7 +130,7 @@ export function resolveQuickEditExportPlan(args: {
   if (args.advanced.audio.music.length > 0) audio.push('music');
   if (args.advanced.audio.original.muted || args.advanced.audio.original.volume !== 1)
     audio.push('original-audio');
-  const visual: QuickEditExportReason[] = [];
+  const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (args.advanced.zoom.enabled) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
   if (burned) visual.push('comments');

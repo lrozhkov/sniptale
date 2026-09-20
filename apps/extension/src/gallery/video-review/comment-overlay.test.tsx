@@ -95,8 +95,8 @@ it('renders content comments through the camera transform and viewport comments 
   };
   const points = renderOverlay([content, viewport], 3, { scale: 2, centerX: 0.3, centerY: 0.4 });
   expect(points).toHaveLength(2);
-  expect(points[0]!.style.left).toBe('160px');
-  expect(points[0]!.style.top).toBe('270px');
+  expect(points[0]!.style.left).toBe('320px');
+  expect(points[0]!.style.top).toBe('315px');
   expect(points[0]!.style.zIndex).toBe('5');
   expect(points[1]!.style.left).toBe('80px');
   expect(points[1]!.style.top).toBe('112.5px');

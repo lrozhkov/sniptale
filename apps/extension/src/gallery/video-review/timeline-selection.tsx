@@ -195,6 +195,7 @@ function ReviewEditBlock(
         <ReviewEditEdge
           key={edge}
           edge={edge}
+          duration={duration}
           edit={edit}
           boundaries={props.boundaries}
           onChangeEdit={props.onChangeEdit}
@@ -207,6 +208,7 @@ function ReviewEditBlock(
 /** Pointer and keyboard resizing of one edit edge; keyboard steps follow the media boundaries. */
 function ReviewEditEdge(props: {
   edge: 'start' | 'end';
+  duration: number;
   edit: ReviewEdit;
   boundaries: readonly number[] | undefined;
   onChangeEdit: ((edit: ReviewEdit, range: ReviewAnchor) => void) | undefined;
@@ -225,11 +227,22 @@ function ReviewEditEdge(props: {
         event.preventDefault();
         event.stopPropagation();
         const choices = props.boundaries ?? [];
-        const next =
-          event.key === 'ArrowRight'
+        const step = event.shiftKey ? 1 : 1 / 30;
+        const next = !props.boundaries
+          ? Math.max(
+              0,
+              Math.min(
+                props.duration,
+                props.edit[props.edge] + (event.key === 'ArrowRight' ? step : -step)
+              )
+            )
+          : event.key === 'ArrowRight'
             ? choices.find((value) => value > props.edit[props.edge])
             : [...choices].reverse().find((value) => value < props.edit[props.edge]);
-        if (next !== undefined)
+        if (
+          next !== undefined &&
+          (props.edge === 'start' ? next < props.edit.end : next > props.edit.start)
+        )
           props.onChangeEdit?.(props.edit, {
             kind: 'range',
             start: props.edit.start,

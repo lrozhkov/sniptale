@@ -34,5 +34,5 @@ it('projects the visible crop back through the actual off-center camera transfor
     layout,
     view: 'area',
   });
-  expect(context.strokeRect).toHaveBeenCalledWith(60, 101.25, 240, 135);
+  expect(context.strokeRect).toHaveBeenCalledWith(0, 135, 240, 135);
 });

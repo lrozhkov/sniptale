@@ -80,7 +80,7 @@ export function ReviewTimeline(props: TimelineProps) {
           aria-valuemax={props.duration}
           aria-valuenow={props.time}
           aria-valuetext={reviewTimeLabel(props.time)}
-          className="group/plane relative cursor-crosshair pb-2 pt-1 outline-none"
+          className="group/plane relative cursor-crosshair overflow-clip pb-2 pt-1 outline-none"
           style={
             {
               width: gutter + Math.max(1, width * zoom),
@@ -162,15 +162,17 @@ export function ReviewTimeline(props: TimelineProps) {
           <div
             aria-hidden="true"
             data-ui="gallery.videoReview.playhead"
-            className="pointer-events-none absolute bottom-2 top-1 z-20 w-px bg-[var(--sniptale-color-accent-emphasis)]"
-            style={{ left: gutter + (props.time / props.duration) * width * zoom }}
-          >
-            <span
-              className="absolute -left-1 top-0 h-2 w-2 bg-[var(--sniptale-color-accent-emphasis)]
-              group-focus-visible/plane:brightness-125 group-focus-visible/plane:scale-150
-              [clip-path:polygon(0_0,100%_0,50%_100%)]"
-            />
-          </div>
+            className="pointer-events-none absolute bottom-2 top-1 z-20
+              bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125"
+            style={{
+              left:
+                gutter +
+                Math.max(0, Math.min(1, props.time / props.duration)) * Math.max(1, width * zoom) -
+                5,
+              width: 10,
+              clipPath: 'polygon(0 0, 100% 0, 55% 8px, 55% 100%, 45% 100%, 45% 8px)',
+            }}
+          />
           {props.zoomTrack}
           {props.audioTrack}
         </div>

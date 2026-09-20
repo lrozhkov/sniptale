@@ -73,11 +73,11 @@ describe('computeQuickEditSceneLayout', () => {
     const smallPoint = quickEditContentPointToCanvas({ x: 0.73, y: 0.44 }, small.videoTransform);
     const largePoint = quickEditContentPointToCanvas({ x: 0.73, y: 0.44 }, large.videoTransform);
     expect(smallPoint).not.toEqual(largePoint);
-    // The same content point stays the camera focus inside its own layout.
-    expect(smallPoint).toEqual({
-      x: small.videoRect.x + 0.73 * small.videoRect.width,
-      y: small.videoRect.y + 0.44 * small.videoRect.height,
-    });
+    // The target is centered vertically and clamped against the right video edge.
+    expect(smallPoint.x).toBeCloseTo(
+      small.videoRect.x + (0.73 * 1.8 - 0.8) * small.videoRect.width
+    );
+    expect(smallPoint.y).toBeCloseTo(small.videoRect.y + 0.5 * small.videoRect.height);
   });
 
   it('uses an identical normalized model for vertical and horizontal video', () => {
@@ -96,8 +96,8 @@ describe('computeQuickEditSceneLayout', () => {
     expect(horizontal.videoRect.width / horizontal.videoRect.height).toBe(16 / 9);
     expect(vertical.videoRect.width / vertical.videoRect.height).toBe(9 / 16);
     expect(quickEditContentPointToCanvas({ x: 0.25, y: 0.75 }, horizontal.videoTransform)).toEqual({
-      x: horizontal.videoRect.x + 0.25 * horizontal.videoRect.width,
-      y: horizontal.videoRect.y + 0.75 * horizontal.videoRect.height,
+      x: horizontal.videoRect.x + 0.5 * horizontal.videoRect.width,
+      y: horizontal.videoRect.y + 0.5 * horizontal.videoRect.height,
     });
   });
 
@@ -120,10 +120,10 @@ describe('point conversion round trip', () => {
     const content = { x: 0.3, y: 0.4 };
     const canvas = quickEditContentPointToCanvas(content, transform);
     expect(quickEditCanvasPointToContent(canvas, transform)).toEqual(content);
-    // The camera focus point stays fixed relative to the unscaled video position.
+    // An in-bounds camera target is centered in the visible video.
     expect(quickEditContentPointToCanvas({ x: 0.25, y: 0.25 }, transform)).toEqual({
-      x: videoRect.x + 0.25 * videoRect.width,
-      y: videoRect.y + 0.25 * videoRect.height,
+      x: videoRect.x + 0.5 * videoRect.width,
+      y: videoRect.y + 0.5 * videoRect.height,
     });
   });
 
@@ -157,14 +157,14 @@ describe('evaluateQuickEditCameraAtTime', () => {
     });
     expect(evaluateQuickEditCameraAtTime(regions, 1.5)).toEqual({
       scale: 1.5,
-      centerX: 0.375,
-      centerY: 0.625,
+      centerX: 1 / 3,
+      centerY: 2 / 3,
     });
     expect(evaluateQuickEditCameraAtTime(regions, 2)).toEqual(regions[0]!.transform);
     expect(evaluateQuickEditCameraAtTime(regions, 4.5)).toEqual({
       scale: 1.5,
-      centerX: 0.375,
-      centerY: 0.625,
+      centerX: 1 / 3,
+      centerY: 2 / 3,
     });
     expect(evaluateQuickEditCameraAtTime(regions, 5)).toEqual({
       scale: 1,
@@ -198,8 +198,8 @@ describe('evaluateQuickEditCameraAtTime', () => {
     ];
     expect(evaluateQuickEditCameraAtTime(eased, 0.25)).toEqual({
       scale: 1 + 0.15625,
-      centerX: 0.5 - 0.25 * 0.15625,
-      centerY: 0.5 + 0.25 * 0.15625,
+      centerX: 0.5 / 1.15625,
+      centerY: (0.5 + 0.15625) / 1.15625,
     });
   });
 
@@ -264,8 +264,8 @@ it('connects two zoom targets through the gap without returning to the full fram
   expect(evaluateQuickEditCameraAtTime([first, next], 2)).toEqual(first.transform);
   expect(evaluateQuickEditCameraAtTime([first, next], 3)).toEqual({
     scale: 2.5,
-    centerX: 0.5,
-    centerY: 0.5,
+    centerX: 0.55,
+    centerY: 0.45,
   });
   expect(evaluateQuickEditCameraAtTime([first, next], 4)).toEqual(next.transform);
   expect(evaluateQuickEditCameraAtTime([first], 3).scale).toBe(1);
@@ -286,13 +286,35 @@ it('applies the stored link easing and keeps the legacy smooth default', () => {
   };
   const linearCamera = evaluateQuickEditCameraAtTime([linear, next], 2.5);
   expect(linearCamera.scale).toBeCloseTo(2.25);
-  expect(linearCamera.centerX).toBeCloseTo(0.3125);
-  expect(linearCamera.centerY).toBeCloseTo(0.6875);
+  expect(linearCamera.centerX).toBeCloseTo(0.75 / 2.25);
+  expect(linearCamera.centerY).toBeCloseTo(1.5 / 2.25);
   // Missing linkEasing keeps the pre-setting smooth curve: smoothstep(0.25)=0.15625.
   const legacy = { ...region({ id: 'first', start: 0, end: 2 }), linkTo: 'next' };
   const legacyCamera = evaluateQuickEditCameraAtTime([legacy, next], 2.5);
   expect(legacyCamera.scale).toBeCloseTo(2 + 0.15625);
-  expect(legacyCamera.centerX).toBeCloseTo(0.25 + 0.25 * 0.15625);
+  expect(legacyCamera.centerX).toBeCloseTo((0.5 + 0.15625) / 2.15625);
   const smooth = { ...legacy, linkEasing: 'ease-in-out' as const };
   expect(evaluateQuickEditCameraAtTime([smooth, next], 2.5)).toEqual(legacyCamera);
+});
+
+it('moves rendered translation and scale together toward an off-center crop', () => {
+  const zoom = region({
+    start: 0,
+    end: 4,
+    enter: { type: 'linear', duration: 1 },
+    transform: { scale: 3, centerX: 0.8, centerY: 0.2 },
+  });
+  const videoRect = { x: 20, y: 10, width: 900, height: 600 };
+  const target = computeQuickEditVideoTransform({ videoRect, camera: zoom.transform });
+  expect(target.x).toBeCloseTo(20 - 1.9 * 900);
+  expect(target.y).toBeCloseTo(10 - 0.1 * 600);
+  for (const progress of [0.1, 0.25, 0.5, 0.75]) {
+    const actual = computeQuickEditVideoTransform({
+      videoRect,
+      camera: evaluateQuickEditCameraAtTime([zoom], progress),
+    });
+    expect(actual.x).toBeCloseTo(videoRect.x + (target.x - videoRect.x) * progress);
+    expect(actual.y).toBeCloseTo(videoRect.y + (target.y - videoRect.y) * progress);
+    expect(actual.width).toBeCloseTo(900 * (1 + 2 * progress));
+  }
 });

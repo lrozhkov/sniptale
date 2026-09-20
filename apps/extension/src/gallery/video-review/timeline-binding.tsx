@@ -206,7 +206,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
             ),
           }
         : {})}
-      {...(props.editing.exporter.index
+      {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
         ? { boundaries: props.editing.exporter.index.boundaries }
         : {})}
       {...(props.audioVisible
@@ -244,7 +244,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       time={props.time}
       playing={props.playing}
       selection={
-        props.editing.cutting && props.editing.exporter.index && props.selection.kind === 'range'
+        props.advanced.ui.mode !== 'advanced' &&
+        props.editing.cutting &&
+        props.editing.exporter.index &&
+        props.selection.kind === 'range'
           ? {
               kind: 'range',
               start: nearestReviewBoundary(

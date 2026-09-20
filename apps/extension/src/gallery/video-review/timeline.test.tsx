@@ -296,3 +296,11 @@ it('resizes only the fixed gutter with pointer and keyboard, within bounds', () 
   send('pointerup', 1000);
   expect(handle.getAttribute('aria-valuenow')).toBe('300');
 });
+
+it('keeps the whole playhead inside the plane at the final frame', () => {
+  const { host } = renderTimeline({ time: 4 });
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const playhead = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
+  expect(Number.parseFloat(playhead.style.left)).toBeLessThan(Number.parseFloat(plane.style.width));
+  expect(playhead.style.clipPath).toBeTruthy();
+});

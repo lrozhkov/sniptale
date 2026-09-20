@@ -84,22 +84,19 @@ export function computeQuickEditSceneLayout(input: {
 }
 
 /**
- * Camera zoom expressed relative to the fitted video rect: the stored focus point stays
- * fixed on the canvas while the video scales around it; the background crops to
- * contentRect.
+ * Centered source viewport, clamped to the video edges like the full editor camera.
  */
 export function computeQuickEditVideoTransform(args: {
   videoRect: QuickEditRect;
   camera: QuickEditCameraTransform;
 }): QuickEditRect {
   const { camera, videoRect } = args;
-  const focusX = videoRect.x + camera.centerX * videoRect.width;
-  const focusY = videoRect.y + camera.centerY * videoRect.height;
+  const offset = cameraTranslation(camera);
   const width = videoRect.width * camera.scale;
   const height = videoRect.height * camera.scale;
   return {
-    x: focusX - camera.centerX * width,
-    y: focusY - camera.centerY * height,
+    x: videoRect.x - offset.x * videoRect.width,
+    y: videoRect.y - offset.y * videoRect.height,
     width,
     height,
   };
@@ -166,6 +163,31 @@ function normalizeQuickEditZoomTransitions(region: QuickEditZoomRegion): {
 
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
+/** Translation in units of the unscaled video; clamping prevents empty camera edges. */
+function cameraTranslation(camera: QuickEditCameraTransform) {
+  const offset = (center: number) =>
+    Math.max(0, Math.min(camera.scale - 1, center * camera.scale - 0.5));
+  return { x: offset(camera.centerX), y: offset(camera.centerY) };
+}
+
+function interpolateCamera(
+  from: QuickEditCameraTransform,
+  to: QuickEditCameraTransform,
+  progress: number
+): QuickEditCameraTransform {
+  if (progress <= 0) return from;
+  if (progress >= 1) return to;
+  const scale = lerp(from.scale, to.scale, progress);
+  const start = cameraTranslation(from);
+  const end = cameraTranslation(to);
+  // Interpolate rendered translation first, then recover a source-space center.
+  return {
+    scale,
+    centerX: (lerp(start.x, end.x, progress) + 0.5) / scale,
+    centerY: (lerp(start.y, end.y, progress) + 0.5) / scale,
+  };
+}
+
 /**
  * Camera at a timeline time over validated (ascending, non-overlapping) zoom regions.
  * Regions are half-open [start, end): adjacent regions hand over exactly at the boundary.
@@ -186,11 +208,7 @@ export function evaluateQuickEditCameraAtTime(
         (timelineTime - region.end) / (next.start - region.end),
         region.linkEasing ?? 'ease-in-out'
       );
-      return {
-        scale: lerp(region.transform.scale, next.transform.scale, progress),
-        centerX: lerp(region.transform.centerX, next.transform.centerX, progress),
-        centerY: lerp(region.transform.centerY, next.transform.centerY, progress),
-      };
+      return interpolateCamera(region.transform, next.transform, progress);
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
     const normalized = normalizeQuickEditZoomTransitions(region);
@@ -203,11 +221,7 @@ export function evaluateQuickEditCameraAtTime(
       linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter'),
       linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit')
     );
-    return {
-      scale: lerp(1, region.transform.scale, progress),
-      centerX: lerp(0.5, region.transform.centerX, progress),
-      centerY: lerp(0.5, region.transform.centerY, progress),
-    };
+    return interpolateCamera(QUICK_EDIT_IDENTITY_CAMERA, region.transform, progress);
   }
   return QUICK_EDIT_IDENTITY_CAMERA;
 }

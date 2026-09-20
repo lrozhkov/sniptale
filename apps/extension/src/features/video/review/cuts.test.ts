@@ -53,3 +53,13 @@ it('rejects empty/full or overlapping cuts and skips adjacent removed regions', 
   expect(reviewPlaybackTime(3, [second, first])).toBe(5);
   expect(reviewPlaybackTime(1, [first])).toBe(1);
 });
+
+it('keeps exact source timing when keyframe snapping is disabled', () => {
+  expect(
+    createReviewCut({
+      ...input,
+      snapToKeyframes: false,
+      selection: { kind: 'range', start: 0.3, end: 1.4 },
+    })
+  ).toMatchObject({ start: 0.3, end: 1.4 });
+});

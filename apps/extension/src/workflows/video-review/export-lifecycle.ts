@@ -146,6 +146,7 @@ export async function exportReviewedVideo(
     // A source audio track with a probed unavailable codec is a known blocker;
     // clips-only exports defer the authoritative probe to the exporter.
     ...(index.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
+    videoCopyBoundaries: index.boundaries,
     videoRenderAvailable: !!index.processedVideoCodec,
   });
   if (plan.kind === 'unavailable') throw new QuickEditExportUnavailable(plan.reasons);

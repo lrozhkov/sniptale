@@ -279,21 +279,19 @@ function ReviewZoomGapLink(props: {
       aria-label={translate(
         connected ? 'gallery.videoReview.zoomLinkSettings' : 'gallery.videoReview.zoomConnect'
       )}
-      aria-pressed={connected}
+      aria-pressed={props.linkSelectedId === region.id}
       className={`group absolute inset-y-1 z-[6] flex items-center justify-center rounded border
         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]
         ${
-          connected
-            ? `border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]
-              bg-[var(--sniptale-color-accent-soft)] ${
-                props.linkSelectedId === region.id
-                  ? 'ring-1 ring-[var(--sniptale-color-accent-emphasis)]'
-                  : ''
-              }`
-            : `border-dashed border-transparent hover:border-[var(--sniptale-color-border-soft)]
-              focus-visible:border-[var(--sniptale-color-border-soft)]
-              text-[var(--sniptale-color-text-muted)]
-              hover:bg-[var(--sniptale-color-surface-hover)]`
+          props.linkSelectedId === region.id
+            ? `border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]
+                text-[var(--sniptale-color-accent)]`
+            : connected
+              ? `border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
+                  text-[var(--sniptale-color-text-secondary)]`
+              : `border-dashed border-transparent hover:border-[var(--sniptale-color-border-soft)]
+                  focus-visible:border-[var(--sniptale-color-border-soft)]
+                  text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]`
         }`}
       style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%` }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -303,10 +301,10 @@ function ReviewZoomGapLink(props: {
       }}
     >
       {connected ? (
-        <MoveRight size={14} aria-hidden="true" />
+        <MoveRight size={16} aria-hidden="true" />
       ) : (
         <MoveRight
-          size={14}
+          size={16}
           aria-hidden="true"
           className="opacity-0 transition-opacity group-hover:opacity-100
             group-focus-visible:opacity-100"

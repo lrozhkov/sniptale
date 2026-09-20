@@ -196,6 +196,7 @@ function reviewExportPlan(
     // A source audio track with a probed unavailable codec is a known blocker;
     // clips-only exports defer the authoritative probe to the exporter.
     ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
+    ...(index ? { videoCopyBoundaries: index.boundaries } : {}),
     videoRenderAvailable: !!index?.processedVideoCodec,
   });
 }

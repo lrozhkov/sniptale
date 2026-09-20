@@ -7,6 +7,7 @@ type Speed = Extract<ReviewEdit, { kind: 'speed' }>;
 export function useReviewEdits(props: {
   duration: number;
   boundaries?: readonly number[];
+  snapToKeyframes?: boolean;
   edits: readonly ReviewEdit[];
   onInvalid?(): void;
   pause(): void;
@@ -39,6 +40,7 @@ export function useReviewEdits(props: {
       id: before?.id ?? crypto.randomUUID(),
       selection,
       boundaries: props.boundaries,
+      snapToKeyframes: props.snapToKeyframes !== false,
       duration: props.duration,
       edits: props.edits.filter((edit) => edit.id !== before?.id),
     };

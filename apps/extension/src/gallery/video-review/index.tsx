@@ -71,7 +71,8 @@ function useReviewEditorState(resource: LoadedReview) {
     onSeek: (next) => {
       if (selection.kind === 'point') setSelection({ kind: 'point', time: next });
     },
-    boundaries: () => (cuts.cutting ? exporter.index?.boundaries : undefined),
+    boundaries: () =>
+      cuts.cutting && advanced.ui.mode !== 'advanced' ? exporter.index?.boundaries : undefined,
     onTransportFailure,
   });
   const { zoom, cuts } = useReviewEditingTools({

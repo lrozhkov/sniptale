@@ -340,6 +340,13 @@ it('shifts fragment clip placements across a leading cut to global output time',
     requestedStart: 1,
     requestedEnd: 3,
   };
+  args.index.processedVideoCodec = 'vp8';
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 40,
+    audioPackets: 0,
+    resultDuration: 3,
+    audioRanges: [],
+  });
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
   advanced.audio.music = [
@@ -371,10 +378,8 @@ it('shifts fragment clip placements across a leading cut to global output time',
   } finally {
     vi.unstubAllGlobals();
   }
-  const call = (deps.writeReviewPackets.mock.calls[0] ?? []) as unknown as Record<
-    string,
-    unknown
-  >[];
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+  const call = (deps.writeReviewFrames.mock.calls[0] ?? []) as unknown as Record<string, unknown>[];
   const exported = (call[0] ?? {}) as { exportAudio?: ReviewExportClipPlan };
   // Full-output time of source 2 is 1; the clip plays at 1.5 globally → 0.5 fragment-local.
   expect(exported.exportAudio!.entries[0]).toMatchObject({ timelineStart: 0.5 });

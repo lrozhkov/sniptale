@@ -281,3 +281,46 @@ it('temporarily excludes burned overlays in basic mode without deleting them', (
   ).toMatchObject({ video: 'copy', reasons: [] });
   expect(comment.renderToVideo).toBe(true);
 });
+
+it('renders exact cuts between keyframes even after returning to basic mode', () => {
+  const advanced = createQuickEditAdvancedState();
+  const document = {
+    canvasComments: [],
+    edits: [
+      {
+        id: 'cut',
+        kind: 'cut' as const,
+        start: 0.3,
+        end: 1.4,
+        requestedStart: 0.3,
+        requestedEnd: 1.4,
+      },
+    ],
+  };
+  for (const mode of ['basic', 'advanced'] as const) {
+    advanced.ui.mode = mode;
+    expect(
+      resolveQuickEditExportPlan({
+        advanced,
+        document,
+        videoCopyBoundaries: [0, 2, 4],
+        videoRenderAvailable: true,
+      })
+    ).toMatchObject({ video: 'render', reasons: ['precise-edits'] });
+    expect(
+      resolveQuickEditExportPlan({
+        advanced,
+        document,
+        videoCopyBoundaries: [0, 2, 4],
+        videoRenderAvailable: false,
+      })
+    ).toEqual({ kind: 'unavailable', reasons: ['video-encoder'] });
+    expect(
+      resolveQuickEditExportPlan({
+        advanced,
+        document: { ...document, edits: [{ ...document.edits[0]!, start: 0, end: 2 }] },
+        videoCopyBoundaries: [0, 2, 4],
+      })
+    ).toMatchObject({ video: 'copy' });
+  }
+});

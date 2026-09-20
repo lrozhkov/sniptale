@@ -41,6 +41,7 @@ export function useReviewEditingTools(args: {
   });
   const cuts = useReviewEdits({
     duration: args.sourceDuration,
+    snapToKeyframes: args.advancedState.advanced.ui.mode !== 'advanced',
     ...(args.exporter.index ? { boundaries: args.exporter.index.boundaries } : {}),
     edits: args.edits,
     pause: args.pause,
