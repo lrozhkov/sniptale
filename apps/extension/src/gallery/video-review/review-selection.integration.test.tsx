@@ -311,3 +311,62 @@ it('closes the preview only after saving the note and preserves it when saving f
     await fixture.cleanup();
   }
 });
+
+it('creates edits from recorded actions, selects their properties and recalculates eligibility', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const selectAction = async () => {
+      const action = fixture.host.querySelector<HTMLButtonElement>(
+        '[aria-label^="gallery.videoReview.telemetry ·"]'
+      )!;
+      await act(async () => action.click());
+    };
+    await selectAction();
+    await fixture.click('actionFocus');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')
+    ).not.toBeNull();
+    await selectAction();
+    expect(fixture.button('actionFocus').disabled).toBe(true);
+    expect(fixture.button('actionSpeed').disabled).toBe(false);
+    await fixture.click('actionSpeed');
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'edit',
+      after: { kind: 'speed', start: 2, end: 3 },
+    });
+    expect(
+      fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeEnd"]')
+    ).not.toBeNull();
+    await selectAction();
+    expect(fixture.button('actionSpeed').disabled).toBe(true);
+    expect(fixture.button('actionCut').disabled).toBe(true);
+    await fixture.click('undo');
+    await selectAction();
+    await fixture.click('actionCut');
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'edit',
+      after: { kind: 'cut', start: 2, end: 3 },
+    });
+    await selectAction();
+    const properties = fixture.host.querySelector(
+      '[data-ui="gallery.videoReview.actionProperties"]'
+    )!;
+    expect(properties.textContent).toContain('gallery.videoReview.actionRemoved');
+    expect(properties.querySelectorAll('button')).toHaveLength(0);
+    expect(fixture.snapshot.draft).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});

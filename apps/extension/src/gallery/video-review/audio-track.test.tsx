@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAudioTrack } from './audio-track';
+import { createTrackProjection } from './track-projection';
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 import type {
   QuickEditAudioClip,
@@ -64,11 +65,13 @@ const renderTrack = (
   busy = false,
   snapTimes: readonly number[] = [],
   hasOriginalAudio = true,
-  assets?: Parameters<typeof ReviewAudioTrack>[0]['assets']
+  assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
+  projection?: Parameters<typeof ReviewAudioTrack>[0]['projection']
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
+        projection={projection}
         assets={assets}
         hasOriginalAudio={hasOriginalAudio}
         audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
@@ -332,4 +335,23 @@ it('shows filenames and visible handles, and clamps the preview to the original 
     block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 900 }))
   );
   expect(onTrimClip).toHaveBeenCalledWith('voiceover', 'a1', 'end', 5, 3);
+});
+
+it('marks removed source spans consistently across original, voiceover and music lanes', () => {
+  const lanes = renderTrack(
+    undefined,
+    false,
+    [],
+    true,
+    undefined,
+    createTrackProjection(10, [
+      { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    ])
+  );
+  for (const lane of lanes) {
+    const mask = lane.querySelector<HTMLElement>('[aria-hidden="true"].opacity-80');
+    expect(mask).not.toBeNull();
+    expect(mask!.style.left).toBe('20%');
+    expect(mask!.style.width).toBe('20%');
+  }
 });

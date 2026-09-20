@@ -103,7 +103,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await act(async () => host.querySelector('video')!.dispatchEvent(new Event('pause')));
     await click('addComment');
     await fill('First note');
-    expect(fixture.button('addComment').disabled).toBe(true);
+    expect(host.querySelector('[aria-label="gallery.videoReview.addComment"]')).toBeNull();
     expect(host.querySelector('input[type="number"]')).toBeNull();
     const stage = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.stage"]')!;
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 360));

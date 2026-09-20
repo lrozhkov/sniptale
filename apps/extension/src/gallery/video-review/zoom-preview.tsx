@@ -13,7 +13,7 @@ import {
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
-import { SegmentedRow } from '../../ui/compact-inspector-controls';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { ReviewButton } from './controls';
 import { paintZoomPreview, type ZoomPreviewLayout } from './zoom-preview-paint';
 import {
@@ -151,13 +151,13 @@ export function ReviewZoomPreview(props: {
           )}
         </h5>
         {!region.spotlight ? (
-          <SegmentedRow<'area' | 'result'>
+          <SegmentedSwitch<'area' | 'result'>
             ariaLabel={translate('gallery.videoReview.zoomPreview')}
-            columns={2}
-            value={view}
+            density="compact"
+            activeId={view}
             options={[
-              { value: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
-              { value: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
+              { id: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
+              { id: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
             ]}
             onChange={setView}
           />

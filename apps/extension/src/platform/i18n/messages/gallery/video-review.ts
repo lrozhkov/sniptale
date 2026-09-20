@@ -284,6 +284,39 @@ export const galleryVideoReviewMessages = defineMessageSource({
   regionHeight: { ru: 'Высота, %', en: 'Height, %' },
   undo: { ru: 'Отменить изменение', en: 'Undo change' },
   redo: { ru: 'Повторить изменение', en: 'Redo change' },
+  interval: { ru: 'Интервал', en: 'Interval' },
+  timePosition: { ru: 'Время', en: 'Time' },
+  actionCut: { ru: 'Вырезать из видео', en: 'Cut from video' },
+  actionSpeed: { ru: 'Изменить скорость', en: 'Change speed' },
+  actionFocus: { ru: 'Добавить фокусировку', en: 'Add focus' },
+  actionIndexPending: {
+    ru: 'Монтаж доступен после успешного анализа видео.',
+    en: 'Editing requires successful video analysis.',
+  },
+  actionEditOverlap: {
+    ru: 'Интервал пересекается с вырезанным участком или изменением скорости.',
+    en: 'This interval overlaps a cut or speed change.',
+  },
+  actionRangeUnavailable: {
+    ru: 'Для этого интервала действие недоступно.',
+    en: 'Unavailable for this interval.',
+  },
+  actionCutOverlap: {
+    ru: 'Часть интервала уже вырезана.',
+    en: 'Part of this interval has been cut.',
+  },
+  actionFocusOverlap: {
+    ru: 'На этом интервале уже есть фокусировка.',
+    en: 'This interval already contains focus.',
+  },
+  actionRemoved: {
+    ru: 'Это действие уже вырезано из результата.',
+    en: 'This action is already cut from the result.',
+  },
+  actionContextInterval: {
+    ru: 'Для короткого события используем участок вокруг него:',
+    en: 'For this short event, use the surrounding interval:',
+  },
   copyReport: { ru: 'Копировать Markdown', en: 'Copy Markdown' },
   downloadReport: { ru: 'Скачать отчёт', en: 'Download report' },
   reportCopied: { ru: 'Отчёт скопирован', en: 'Report copied' },

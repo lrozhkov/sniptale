@@ -378,6 +378,7 @@ export function ReviewAudioTrack(props: {
         <ReviewOriginalLane
           waveform={props.waveforms?.get('original')}
           original={props.audio.original}
+          projection={props.projection}
           busy={props.busy}
           onOriginal={props.onOriginal}
         />
@@ -407,6 +408,7 @@ export function ReviewAudioTrack(props: {
 }
 
 function ReviewOriginalLane(props: {
+  projection?: ReviewTrackProjection | undefined;
   original: QuickEditOriginalAudio;
   waveform?: ReviewWaveform | undefined;
   busy: boolean;
@@ -438,6 +440,7 @@ function ReviewOriginalLane(props: {
           volume={props.original.volume}
           muted={props.original.muted}
         />
+        <ReviewTrackCuts projection={props.projection} />
       </div>
     </ReviewTrackRow>
   );

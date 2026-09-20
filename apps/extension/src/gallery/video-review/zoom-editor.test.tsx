@@ -289,3 +289,29 @@ it('shares a disposable framing draft without writing history and rejects stale 
   expect(setZoom).toHaveBeenCalledOnce();
   expect(apply(setZoom, zoom).regions[0]!.transform.centerX).toBe(0.8);
 });
+
+it('selects a contextual focus with its supplied geometry and refuses occupied intervals', () => {
+  const zoom = { ...createQuickEditAdvancedState().zoom, regions: [region('occupied', 4, 6)] };
+  const setZoom = vi.fn(),
+    onSelectionChange = vi.fn();
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({ zoom, setZoom, timelineDuration: 10, onSelectionChange });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  expect(editor.addRegion(region('blocked', 3, 5))).toBeNull();
+  expect(editor.addRegion(region('out-of-bounds', 9, 11))).toBeNull();
+  expect(setZoom).not.toHaveBeenCalled();
+  const target = {
+    ...region('from-action', 1, 3),
+    transform: { scale: 2.5, centerX: 0.2, centerY: 0.3 },
+  };
+  act(() => {
+    expect(editor.addRegion(target)).toEqual(expect.any(String));
+  });
+  const created = apply(setZoom, zoom).regions[0]!;
+  expect(created).toMatchObject({ start: 1, end: 3, transform: target.transform });
+  expect(created.id).not.toBe(target.id);
+  expect(onSelectionChange).toHaveBeenCalledWith(created.id);
+});

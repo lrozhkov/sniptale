@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import { ReviewButton } from './controls';
+import { ReviewButton, reviewEventLabel } from './controls';
 import { useReviewWaveforms } from './audio-waveform';
 import { useReviewBackgroundImport } from './use-review-background';
 import { ReviewStageBinding } from './stage-binding';
@@ -80,6 +80,7 @@ function useReviewEditorState(resource: LoadedReview) {
     activeSelection,
     setActiveSelection,
     sourceDuration: source.duration,
+    timelineSelection: selection,
     exporter,
     edits: snapshot.document.edits,
     pause: () => video.current?.pause(),
@@ -241,6 +242,7 @@ type InspectorState = Pick<
   | 'advancedFailed'
   | 'retryAdvanced'
   | 'setMode'
+  | 'setTrackVisibility'
   | 'backgroundImport'
   | 'activeSelection'
   | 'projected'
@@ -452,6 +454,7 @@ function ReviewInspectorBinding({
         zoom={state.zoom}
         busy={state.busy}
         markers={state.projected.markers}
+        onFocus={(region) => focusRecordedAction(state, region)}
         onPreviewFrame={(time) => {
           video.current?.pause();
           state.seek(time, false);
@@ -705,6 +708,7 @@ function reviewInspectorContext(state: InspectorState): string {
   const selection = state.activeSelection;
   if (selection.kind === 'annotation') return `comments:${selection.id}`;
   if (selection.kind === 'telemetry') return `action:${selection.ref.kind}:${selection.ref.id}`;
+  if (selection.kind === 'edit') return `edit:${selection.id}`;
   if (state.advanced.ui.mode !== 'advanced') return 'comments';
   const id = 'id' in selection ? selection.id : '';
   return `settings:${selection.kind}:${id}`;
@@ -712,7 +716,12 @@ function reviewInspectorContext(state: InspectorState): string {
 
 function reviewSelectionLabel(state: InspectorState): string | undefined {
   const selection = state.activeSelection;
-  if (selection.kind === 'telemetry') return translate('gallery.videoReview.telemetry');
+  if (selection.kind === 'telemetry') {
+    const marker = state.projected.markers.find(
+      (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+    );
+    return reviewEventLabel(marker?.eventType ?? '');
+  }
   if (selection.kind === 'zoom')
     return translate(
       state.advanced.zoom.regions.find((region) => region.id === selection.id)?.spotlight
@@ -749,4 +758,20 @@ function reviewFocusOverlay(state: ReturnType<typeof useReviewEditorState>) {
       if (time !== null) state.seek(time, false);
     },
   };
+}
+
+/** Creating a focus from history enables its workspace lane and shows the authored target frame. */
+function focusRecordedAction(
+  state: InspectorState,
+  region: Parameters<InspectorState['zoom']['addRegion']>[0]
+) {
+  if (state.busy || state.editing.exporter.phase !== 'idle' || !state.canStart()) return;
+  const id = state.zoom.addRegion(region);
+  if (!id) return;
+  if (state.advanced.ui.mode !== 'advanced') state.setMode('advanced');
+  state.zoom.setSelection(id);
+  state.setTrackVisibility('zoom', true);
+  state.video.current?.pause();
+  const time = state.timeline.timeMap.timelineToSource((region.start + region.end) / 2);
+  if (time !== null) state.seek(time, false);
 }

@@ -12,7 +12,7 @@ import type {
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { Trash2, RotateCcw, Unlink } from 'lucide-react';
 import { SelectField } from '../../ui/compact-inspector-controls';
-import { ReviewButton, reviewTimeLabel } from './controls';
+import { ReviewButton, ReviewInterval, reviewTimeLabel } from './controls';
 
 const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeof translate>[0]> = {
   none: 'gallery.videoReview.transitionNone',
@@ -69,16 +69,7 @@ export function ReviewZoomInspector(props: {
   const { region, onChange } = props;
   return (
     <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold">
-          {translate(
-            region.spotlight
-              ? 'gallery.videoReview.focusSpotlight'
-              : 'gallery.videoReview.zoomRegionLabel'
-          )}{' '}
-          {reviewTimeLabel(region.start)}–{reviewTimeLabel(region.end)}
-        </h4>
-      </div>
+      <ReviewInterval start={region.start} end={region.end} />
       <SelectField<'zoom' | 'spotlight'>
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.focusType')}
@@ -176,7 +167,7 @@ export function ReviewZoomLinkInspector(props: {
   const gap = props.link.target.start - props.link.source.end;
   return (
     <div data-ui="gallery.videoReview.zoomLinkInspector" className="min-w-0 space-y-3">
-      <h4 className="text-sm font-semibold">{translate('gallery.videoReview.zoomLinkSettings')}</h4>
+      <ReviewInterval start={props.link.source.end} end={props.link.target.start} />
       <SelectField<QuickEditZoomLinkEasing>
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.zoomLinkEasing')}

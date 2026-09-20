@@ -174,3 +174,44 @@ it('filters positively identified nontext changes without hiding a click followe
     )
   ).toEqual(['click', 'text']);
 });
+
+it('uses immutable recording coordinates and only associates typing with a matching recent field click', () => {
+  const click: RecordingActionEvent = {
+    id: 'click-field',
+    kind: 'CLICK',
+    time: 2,
+    duration: 0.2,
+    point: { x: 900, y: 400 },
+    recordingPoint: { x: 0.25, y: 0.75 },
+    label: 'Field',
+    data: { targetId: 'field' },
+    preset: 'NONE',
+  };
+  const signals = [
+    {
+      id: 'typing-field',
+      kind: 'typing' as const,
+      startTime: 2.2,
+      endTime: 6,
+      point: { x: 900, y: 400 },
+      data: { targetId: 'field' },
+    },
+    {
+      id: 'other-field',
+      kind: 'typing' as const,
+      startTime: 8,
+      endTime: 12,
+      point: { x: 20, y: 10 },
+      data: { targetId: 'other' },
+    },
+  ];
+  const result = projectReviewTelemetry({ actionEvents: [click], signals, cursorTrack: null }, 15);
+  expect(result.markers[0]?.focusPoint).toEqual({ x: 0.25, y: 0.75 });
+  expect(result.markers[1]?.focusPoint).toEqual({ x: 0.25, y: 0.75 });
+  expect(result.markers[2]?.focusPoint).toBeUndefined();
+  const unknown = projectReviewTelemetry(
+    { actionEvents: [{ ...click, recordingPoint: null }], signals, cursorTrack: null },
+    15
+  );
+  expect(unknown.markers.every((item) => !item.focusPoint)).toBe(true);
+});

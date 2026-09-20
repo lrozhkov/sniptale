@@ -14,6 +14,7 @@ export function useReviewEditingTools(args: {
   advancedState: ReturnType<typeof useReviewAdvanced>;
   zoom: ReturnType<typeof useReviewAdvanced>['advanced']['zoom'];
   timelineDuration: number;
+  timelineSelection: ReviewAnchor;
   activeSelection: ReviewSelection;
   setActiveSelection: Dispatch<SetStateAction<ReviewSelection>>;
   sourceDuration: number;
@@ -41,6 +42,7 @@ export function useReviewEditingTools(args: {
   });
   const cuts = useReviewEdits({
     duration: args.sourceDuration,
+    selection: args.timelineSelection,
     snapToKeyframes: args.advancedState.advanced.ui.mode !== 'advanced',
     ...(args.exporter.index ? { boundaries: args.exporter.index.boundaries } : {}),
     edits: args.edits,
@@ -54,7 +56,11 @@ export function useReviewEditingTools(args: {
     commit: (before, after) =>
       commitReviewEdit({
         session: args.session,
-        run: args.run,
+        run: (action) =>
+          args.run(async () => {
+            await args.advancedState.flush();
+            return action();
+          }),
         busy: args.busy,
         exporterPhase: args.exporter.phase,
         canStart: args.canStart,

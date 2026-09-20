@@ -228,6 +228,21 @@ export function useReviewZoomEditor(args: {
     linkSelection,
     setLinkSelection,
     add,
+    addRegion: (region: QuickEditZoomRegion) => {
+      if (
+        !(region.start >= 0 && region.end <= args.timelineDuration && region.start < region.end) ||
+        !fitsActiveWindow(args.zoom, region.id, region.start, region.end)
+      )
+        return null;
+      const created = { ...region, id: `zoom-${crypto.randomUUID()}` };
+      args.setZoom((zoom) => ({
+        ...zoom,
+        enabled: true,
+        regions: insertQuickEditZoomRegion(zoom.regions, created),
+      }));
+      setSelection(created.id);
+      return created.id;
+    },
     remove,
     resetPosition,
     change,

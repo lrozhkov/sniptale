@@ -24,6 +24,30 @@ export const reviewTrackStatusButtonClassName =
   ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
+/** Labelled commands share the transparent timeline-button states without a fixed icon width. */
+export const reviewTextButtonClassName = reviewIconButtonClassName + ' !w-auto gap-2 !text-xs';
+
+/** Read-only timing uses the same label/value row as editable inspector parameters. */
+export function ReviewInterval({ start, end }: { start: number; end: number }) {
+  return (
+    <div
+      className="flex min-h-8 items-center justify-between gap-3 py-0.5"
+      data-ui="gallery.videoReview.interval"
+    >
+      <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate(
+          start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
+        )}
+      </span>
+      <span className="text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
+        {start === end
+          ? reviewTimeLabel(start)
+          : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`}
+      </span>
+    </div>
+  );
+}
+
 /** Inline parameter selectors use the same geometry and typography as numeric rows. */
 export const reviewSelectFieldClassName =
   '!min-h-8 !rounded-none !border-0 !bg-transparent !px-0 !py-0 ' +

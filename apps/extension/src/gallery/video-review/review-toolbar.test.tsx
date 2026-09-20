@@ -25,6 +25,8 @@ it('groups workspace toggles before editing tools and switches mode without chan
           selection={{ kind: 'point', time: 0 }}
           edits={[]}
 
+          telemetryAvailable
+          setTrackVisibility={setTrackVisibility}
           setMode={setMode}
           onDownloadFragment={vi.fn()}
           editing={{
@@ -35,6 +37,7 @@ it('groups workspace toggles before editing tools and switches mode without chan
             exporter: { index: null, phase: 'idle' },
             setCutting: vi.fn(),
             toggle: vi.fn(),
+            canApply: vi.fn(() => true),
             changeRate: vi.fn(),
             changeAudio: vi.fn(),
             remove: vi.fn(),

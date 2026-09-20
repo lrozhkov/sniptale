@@ -146,6 +146,7 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
           exporter: props.editing.exporter,
           setCutting: props.editing.setCutting,
           toggle: props.editing.toggle,
+          canApply: props.editing.canApply,
           changeRate: props.editing.changeRate,
           changeAudio: props.editing.changeAudio,
           remove: props.editing.remove,
@@ -155,6 +156,8 @@ function ReviewTimelineToolsBinding(props: TimelineBindingProps) {
         selection={props.selection}
         edits={props.edits}
         advanced={props.advanced}
+        telemetryAvailable={props.telemetryAvailable}
+        setTrackVisibility={props.setTrackVisibility}
         setMode={props.setMode}
         onDownloadFragment={() =>
           props.selection.kind === 'range'

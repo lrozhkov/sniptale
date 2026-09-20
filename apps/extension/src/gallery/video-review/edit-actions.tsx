@@ -21,7 +21,12 @@ import {
 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
-import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
+import {
+  reviewIconButtonClassName,
+  ReviewButton,
+  reviewTextButtonClassName,
+  reviewTimeLabel,
+} from './controls';
 
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   canvas: 'gallery.videoReview.canvas',
@@ -43,6 +48,8 @@ const plain = reviewIconButtonClassName;
 export function ReviewTimelineTools(props: {
   mode: 'cut' | 'speed' | null;
   available: boolean;
+  cutAvailable?: boolean;
+  speedAvailable?: boolean;
   busy: boolean;
   rate: number;
   audio: 'speed' | 'mute';
@@ -68,7 +75,7 @@ export function ReviewTimelineTools(props: {
         title={translate('gallery.videoReview.cutGesture')}
         aria-pressed={props.mode === 'cut'}
         className={plain}
-        disabled={!props.available || props.busy}
+        disabled={!props.available || props.busy || props.cutAvailable === false}
         onClick={() => props.onToggle('cut')}
       >
         <Scissors size={16} />
@@ -77,7 +84,7 @@ export function ReviewTimelineTools(props: {
         label={translate('gallery.videoReview.speedMode')}
         aria-pressed={props.mode === 'speed'}
         className={plain}
-        disabled={!props.available || props.busy}
+        disabled={!props.available || props.busy || props.speedAvailable === false}
         onClick={() => props.onToggle('speed')}
       >
         <Gauge size={16} />
@@ -165,7 +172,7 @@ export function ReviewEditActions(props: {
   const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-1">
         {props.settings ? (
           <ReviewButton
             label={translate('gallery.videoReview.exportSettings')}
@@ -180,8 +187,7 @@ export function ReviewEditActions(props: {
         ) : null}
         <ReviewButton
           label={translate('gallery.videoReview.exportVideo')}
-          primary
-          className="flex-1"
+          className={`${reviewTextButtonClassName} flex-1 justify-start`}
           disabled={!props.available || props.busy || running || props.audioUnavailable || blocked}
           onClick={props.onExport}
         >
@@ -190,6 +196,7 @@ export function ReviewEditActions(props: {
         </ReviewButton>
         <ReviewButton
           label={translate('gallery.videoReview.downloadVideo')}
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
           disabled={
             running ||
             props.busy ||
@@ -199,6 +206,7 @@ export function ReviewEditActions(props: {
           onClick={props.onDownload}
         >
           <Download size={16} />
+          <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
       </div>
       {props.settings && settingsOpen ? <div id={settingsId}>{props.settings}</div> : null}

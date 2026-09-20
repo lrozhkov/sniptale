@@ -41,13 +41,7 @@ afterEach(async () => {
 const renderEditor = (clip: QuickEditAudioClip) => {
   act(() => {
     root.render(
-      <ReviewAudioClipEditor
-        clip={clip}
-        laneLabel="gallery.videoReview.audioMusic"
-        busy={false}
-        onPatch={onPatch}
-        onDelete={onDelete}
-      />
+      <ReviewAudioClipEditor clip={clip} busy={false} onPatch={onPatch} onDelete={onDelete} />
     );
   });
   const field = (key: string) =>
@@ -100,7 +94,7 @@ it('toggles mute and deletes the clip', async () => {
   expect(onDelete).toHaveBeenCalled();
 });
 
-it('binds the inspector section to the hook selection and lane labels', async () => {
+it('binds inspector actions to the selected lane without duplicating its heading', async () => {
   const clip = createQuickEditAudioClip({
     id: 'a1',
     assetId: 'asset:1',
@@ -115,7 +109,8 @@ it('binds the inspector section to the hook selection and lane labels', async ()
     root.render(<ReviewAudioInspectorSection audio={audio as never} busy={false} />);
   });
   const editor = host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')!;
-  expect(editor!.textContent).toContain('gallery.videoReview.audioVoiceover');
+  expect(editor!.textContent).toContain('gallery.videoReview.interval');
+  expect(editor!.textContent).not.toContain('gallery.videoReview.audioVoiceover');
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipMute"]')!
@@ -132,7 +127,13 @@ it('binds the inspector section to the hook selection and lane labels', async ()
   act(() => root.render(<ReviewAudioInspectorSection audio={musicAudio as never} busy={false} />));
   expect(
     host.querySelector('[data-ui="gallery.videoReview.audioInspector"]')!.textContent
-  ).toContain('gallery.videoReview.audioMusic');
+  ).not.toContain('gallery.videoReview.audioMusic');
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioClipMute"]')!
+      .click()
+  );
+  expect(patchClip).toHaveBeenLastCalledWith('music', 'a1', { muted: true });
   act(() =>
     root.render(<ReviewAudioInspectorSection audio={{ selected: null } as never} busy={false} />)
   );

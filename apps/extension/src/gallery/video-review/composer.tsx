@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { X, SquareDashed } from 'lucide-react';
+import { SquareDashed } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { VoiceInputButton } from '../../composition/voice-input/button';
 import type { ReviewAnnotation } from '../../features/video/review/types';
-import { ReviewButton, reviewTimeLabel } from './controls';
+import { ReviewButton, ReviewInterval, reviewTextButtonClassName } from './controls';
 import { useReviewVoice } from './voice';
 
 /** Text and voice share one field; recovery stays silent and Save creates one history step. */
@@ -33,30 +33,16 @@ export function ReviewComposer(props: {
   }, [props.annotation.id]);
   const { anchor } = props.annotation;
   return (
-    <section data-ui="gallery.videoReview.commentComposer" className="space-y-2">
-      <div className="flex items-center justify-between gap-2 text-xs text-[var(--sniptale-color-text-muted)]">
-        <span>
-          {anchor.kind === 'point'
-            ? reviewTimeLabel(anchor.time)
-            : `${reviewTimeLabel(anchor.start)} – ${reviewTimeLabel(anchor.end)}`}
-        </span>
-        <ReviewButton
-          label={translate('gallery.videoReview.discard')}
-          disabled={props.busy}
-          className="!h-6 !min-h-6 !border-0 !bg-transparent !shadow-none"
-          onClick={() => {
-            voice.stop();
-            props.onDiscard();
-          }}
-        >
-          <X size={14} />
-        </ReviewButton>
-      </div>
-      <div
-        className="rounded-lg border border-[var(--sniptale-color-border-soft)]
-          bg-[var(--sniptale-color-surface-canvas)]
-          focus-within:border-[var(--sniptale-color-accent)]"
-      >
+    <section
+      data-ui="gallery.videoReview.commentComposer"
+      className="space-y-2 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3
+        focus-within:border-[var(--sniptale-color-accent)]"
+    >
+      <ReviewInterval
+        start={anchor.kind === 'point' ? anchor.time : anchor.start}
+        end={anchor.kind === 'point' ? anchor.time : anchor.end}
+      />
+      <div>
         <textarea
           ref={textarea}
           aria-label={translate('gallery.videoReview.commentText')}
@@ -64,9 +50,9 @@ export function ReviewComposer(props: {
           title={translate('gallery.videoReview.commentRegionHint')}
           value={props.annotation.text}
           disabled={props.busy}
-          rows={5}
+          rows={4}
           maxLength={100_000}
-          className="block w-full resize-y rounded-t-lg bg-transparent p-3 text-sm outline-none"
+          className="block w-full resize-y bg-transparent py-2 text-sm outline-none"
           onChange={(event) => props.onChange({ ...props.annotation, text: event.target.value })}
           onSelect={voice.moveCaret}
         />
@@ -83,15 +69,26 @@ export function ReviewComposer(props: {
             onStart={voice.start}
             onStop={voice.stop}
           />
-          <ReviewButton
-            label={translate('gallery.videoReview.save')}
-            primary
-            disabled={props.busy || !props.annotation.text.trim()}
-            onClick={() => {
-              voice.stop();
-              props.onSave();
-            }}
-          />
+          <div className="ml-auto flex items-center gap-1">
+            <ReviewButton
+              label={translate('gallery.videoReview.discard')}
+              disabled={props.busy}
+              className={reviewTextButtonClassName}
+              onClick={() => {
+                voice.stop();
+                props.onDiscard();
+              }}
+            />
+            <ReviewButton
+              label={translate('gallery.videoReview.save')}
+              className={reviewTextButtonClassName}
+              disabled={props.busy || !props.annotation.text.trim()}
+              onClick={() => {
+                voice.stop();
+                props.onSave();
+              }}
+            />
+          </div>
         </div>
       </div>
       {props.annotation.region ? (

@@ -13,7 +13,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
-import { ReviewButton, reviewTimeLabel, reviewIconButtonClassName } from './controls';
+import {
+  ReviewButton,
+  reviewTimeLabel,
+  reviewIconButtonClassName,
+  reviewTextButtonClassName,
+} from './controls';
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
@@ -138,12 +143,18 @@ export function ReviewInspector(props: {
           props.children
         ) : (
           <>
-            {!props.settingsAvailable && contextKey.startsWith('action:') ? props.children : null}
+            {!props.settingsAvailable &&
+            (contextKey.startsWith('action:') || contextKey.startsWith('edit:')) ? (
+              <section className="space-y-2 border-b border-[var(--sniptale-color-border-soft)] pb-3">
+                <h3 className="text-sm font-semibold">{props.selectionLabel}</h3>
+                {props.children}
+              </section>
+            ) : null}
             <ReviewNotes {...props} />
           </>
         )}
       </div>
-      <ReviewInspectorFooter {...props} section={shown} />
+      <ReviewInspectorFooter {...props} />
     </aside>
   );
 }
@@ -165,7 +176,7 @@ function ReviewAnnotationList(props: {
       {props.annotations.map((annotation) => (
         <li
           key={annotation.id}
-          className={`group relative rounded-lg border p-3
+          className={`group relative rounded-lg ${props.editingId === annotation.id ? '' : 'border p-3'}
               ${
                 props.selectedId === annotation.id
                   ? 'border-[var(--sniptale-color-accent)]'
@@ -218,35 +229,32 @@ function ReviewAnnotationList(props: {
   );
 }
 
-/** Export/navigation remain visible; reporting belongs to the comments view. */
-function ReviewInspectorFooter(
-  props: Parameters<typeof ReviewInspector>[0] & { section: 'scene' | 'selected' | 'comments' }
-) {
-  const { section } = props;
+/** Reports remain above the export divider; all footer commands have readable labels. */
+function ReviewInspectorFooter(props: Parameters<typeof ReviewInspector>[0]) {
   return (
-    <div className="shrink-0 space-y-1 border-t border-[var(--sniptale-color-border-soft)] pt-2">
-      {props.actions}
-      <div className="flex items-center justify-end gap-1">
-        {section === 'comments' ? (
-          <>
-            <ReviewButton
-              label={translate('gallery.videoReview.copyReport')}
-              disabled={props.busy}
-              className={reviewIconButtonClassName}
-              onClick={() => props.onReport('copy')}
-            >
-              <Copy size={15} />
-            </ReviewButton>
-            <ReviewButton
-              label={translate('gallery.videoReview.downloadReport')}
-              disabled={props.busy}
-              className={reviewIconButtonClassName}
-              onClick={() => props.onReport('download')}
-            >
-              <FileDown size={15} />
-            </ReviewButton>
-          </>
-        ) : null}
+    <div className="shrink-0 space-y-2">
+      <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
+        <ReviewButton
+          label={translate('gallery.videoReview.copyReport')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} justify-start`}
+          onClick={() => props.onReport('copy')}
+        >
+          <Copy size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.copyReport')}</span>
+        </ReviewButton>
+        <ReviewButton
+          label={translate('gallery.videoReview.downloadReport')}
+          disabled={props.busy}
+          className={`${reviewTextButtonClassName} justify-start`}
+          onClick={() => props.onReport('download')}
+        >
+          <FileDown size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.downloadReport')}</span>
+        </ReviewButton>
+      </div>
+      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-2">
+        {props.actions}
       </div>
     </div>
   );
@@ -257,31 +265,33 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
   return (
     <>
       {!props.annotations.some((note) => note.id === props.editingId) ? props.composer : null}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {!props.settingsAvailable ? (
-          <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
-        ) : null}
-        <ReviewButton
-          label={translate(
-            props.rangeSelected
-              ? 'gallery.videoReview.commentRange'
-              : 'gallery.videoReview.addComment'
-          )}
-          disabled={props.busy || !!props.composer}
-          className="ml-auto !border-0 !bg-transparent !shadow-none"
-          onClick={() => props.onAdd()}
-        >
-          <Plus size={16} />
-          <span>
-            {translate(
+      {!props.composer ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {!props.settingsAvailable ? (
+            <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
+          ) : null}
+          <ReviewButton
+            label={translate(
               props.rangeSelected
                 ? 'gallery.videoReview.commentRange'
                 : 'gallery.videoReview.addComment'
             )}
-          </span>
-        </ReviewButton>
-      </div>
-      {!props.annotations.length ? (
+            disabled={props.busy || !!props.composer}
+            className="ml-auto !border-0 !bg-transparent !shadow-none"
+            onClick={() => props.onAdd()}
+          >
+            <Plus size={16} />
+            <span>
+              {translate(
+                props.rangeSelected
+                  ? 'gallery.videoReview.commentRange'
+                  : 'gallery.videoReview.addComment'
+              )}
+            </span>
+          </ReviewButton>
+        </div>
+      ) : null}
+      {!props.annotations.length && !props.composer ? (
         <p className="text-sm text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.commentsEmpty')}
         </p>

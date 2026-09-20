@@ -1,24 +1,23 @@
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import { reviewTimeLabel } from './controls';
+import { ReviewInterval } from './controls';
 import { ReviewButton } from './controls';
 import type { useReviewAudio } from './use-review-audio';
 
 /** Editor for the selected audio clip: level, mute, fades, and the delete action. */
 export function ReviewAudioClipEditor(props: {
   clip: QuickEditAudioClip;
-  laneLabel: string;
   busy: boolean;
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
 }) {
   return (
     <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">
-      <h4 className="text-sm font-semibold">
-        {props.laneLabel} {reviewTimeLabel(props.clip.timelineStart)}–
-        {reviewTimeLabel(props.clip.timelineStart + props.clip.duration)}
-      </h4>
+      <ReviewInterval
+        start={props.clip.timelineStart}
+        end={props.clip.timelineStart + props.clip.duration}
+      />
       <ReviewNumberRow
         label={translate('gallery.videoReview.audioClipVolume')}
         unit="%"
@@ -78,11 +77,6 @@ export function ReviewAudioInspectorSection(props: {
   return (
     <ReviewAudioClipEditor
       clip={selected.clip}
-      laneLabel={
-        selected.lane === 'music'
-          ? translate('gallery.videoReview.audioMusic')
-          : translate('gallery.videoReview.audioVoiceover')
-      }
       busy={props.busy}
       onPatch={(patch) => void props.audio.patchClip(selected.lane, selected.clip.id, patch)}
       onDelete={() => void props.audio.removeClip(selected.lane, selected.clip.id)}
