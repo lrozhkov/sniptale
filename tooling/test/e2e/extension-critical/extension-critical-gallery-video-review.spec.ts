@@ -14,6 +14,7 @@ import {
 } from 'mediabunny';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
@@ -130,6 +131,39 @@ async function withAudioGaps(bytes: Uint8Array) {
   } finally {
     input.dispose();
   }
+}
+
+async function persistedFocus(page: Page) {
+  const raw = await page.evaluate(
+    async ({ databaseName, aggregateId }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      try {
+        return await new Promise<unknown>((resolve, reject) => {
+          const request = db
+            .transaction('video_workspaces')
+            .objectStore('video_workspaces')
+            .get(aggregateId);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      } finally {
+        db.close();
+      }
+    },
+    {
+      databaseName: betaV1Fixture.databaseName,
+      aggregateId: `recording:${betaV1Fixture.records.recordings[0].id}`,
+    }
+  );
+  const workspace = parseVideoWorkspace(raw);
+  const latest = workspace?.history
+    .slice(0, workspace.cursor)
+    .findLast((operation) => operation.target === 'advancedContent');
+  return latest?.target === 'advancedContent' ? latest.after.zoom.regions.at(-1) : undefined;
 }
 
 async function timelineGesture(page: Page, start: number, end?: number) {
@@ -705,6 +739,16 @@ for (const variant of [
         dialog.locator('[data-ui="gallery.videoReview.backgroundInspector"]')
       ).toHaveCount(0);
       await button('gallery.videoReview.scene').click();
+      await page.mouse.move(0, 0);
+      await expect(button('gallery.videoReview.backgroundNone')).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0)'
+      );
+      await button('gallery.videoReview.backgroundNone').hover();
+      await expect(button('gallery.videoReview.backgroundNone')).not.toHaveCSS(
+        'border-color',
+        'rgba(0, 0, 0, 0)'
+      );
       const image = await page.evaluate(() => {
         const canvas = document.createElement('canvas');
         canvas.width = 16;
@@ -825,6 +869,15 @@ for (const variant of [
       expect((await audioClip.boundingBox())!.width).toBeLessThanOrEqual(originalClipBox.width + 1);
       await page.mouse.up();
       expect((await audioClip.boundingBox())!.width).toBeLessThanOrEqual(originalClipBox.width + 1);
+      await audioClip.click();
+      const clipMute = button('gallery.videoReview.audioClipMute');
+      await clipMute.click();
+      await page.mouse.move(0, 0);
+      await expect(clipMute).toHaveAttribute('aria-pressed', 'true');
+      await expect(clipMute).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await clipMute.hover();
+      await expect(clipMute).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await clipMute.click();
       const zoomControl = dialog.getByRole('slider', {
         name: label('videoEditor.timeline.zoom'),
         exact: true,
@@ -978,6 +1031,10 @@ for (const variant of [
       });
       await enterDuration.fill('1.5');
       await enterDuration.press('Tab');
+      // The gesture below is a separate undo step from the debounced setup edits.
+      await expect
+        .poll(() => persistedFocus(page))
+        .toMatchObject({ transform: { centerX: 0.51, scale: 2.25 }, enter: { duration: 1.5 } });
       // Long-transition framing shows the final target on both surfaces, before release.
       await preview.scrollIntoViewIfNeeded();
       const canvasBounds = await preview.locator('canvas').boundingBox();
@@ -1759,6 +1816,11 @@ for (const variant of [
       const report = button('gallery.videoReview.downloadReport');
       const exporting = button('gallery.videoReview.exportVideo');
       expect((await report.boundingBox())!.y).toBeLessThan((await exporting.boundingBox())!.y);
+      const reportIconX = (await report.locator('svg').boundingBox())!.x;
+      expect((await exporting.locator('svg').boundingBox())!.x).toBeCloseTo(reportIconX, 0);
+      expect(
+        (await button('gallery.videoReview.downloadVideo').locator('svg').boundingBox())!.x
+      ).toBeCloseTo(reportIconX, 0);
       await page.mouse.move(0, 0);
       await expect(exporting).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(exporting).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
@@ -1773,6 +1835,39 @@ for (const variant of [
           .locator('aside')
           .getByRole('textbox', { name: label('gallery.videoReview.rangeStart'), exact: true })
       ).toHaveValue('5');
+      const inspector = dialog.locator('aside');
+      await expect(
+        inspector.getByText(label('gallery.videoReview.speedRate'), { exact: true })
+      ).toBeVisible();
+      await page.setViewportSize({ width: 800, height: 600 });
+      await button('gallery.videoReview.exportSettings').click();
+      const quality = button('gallery.videoReview.exportQuality');
+      await quality.scrollIntoViewIfNeeded();
+      await expect(quality).toBeInViewport();
+      expect(
+        await button('gallery.videoReview.exportFrameRate')
+          .locator('.truncate')
+          .evaluate((node) => node.scrollWidth <= node.clientWidth + 1)
+      ).toBe(true);
+      const inspectorBox = (await inspector.boundingBox())!;
+      const qualityBox = (await quality.boundingBox())!;
+      expect(qualityBox.y + qualityBox.height).toBeLessThanOrEqual(
+        inspectorBox.y + inspectorBox.height
+      );
+      await expect(exporting).toBeInViewport({ ratio: 1 });
+      await expect(button('gallery.videoReview.downloadVideo')).toBeInViewport({ ratio: 1 });
+      await expect(inspector.locator('header h2')).toBeInViewport();
+      await page.screenshot({ path: testInfo.outputPath('polish-minimum-export.png') });
+      await button('gallery.videoReview.exportSettings').click();
+      const speedValue = inspector.getByRole('button', {
+        name: label('gallery.videoReview.speedRate'),
+        exact: true,
+      });
+      await speedValue.scrollIntoViewIfNeeded();
+      await speedValue.click();
+      await expect(page.getByRole('option', { name: '2×', exact: true })).toBeInViewport();
+      await page.keyboard.press('Escape');
+      await page.screenshot({ path: testInfo.outputPath('polish-minimum-inspector.png') });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

@@ -1,8 +1,13 @@
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import { ReviewInterval } from './controls';
-import { ReviewButton } from './controls';
+import { VolumeX, Trash2 } from 'lucide-react';
+import {
+  ReviewInterval,
+  ReviewButton,
+  reviewTextButtonClassName,
+  reviewDeleteButtonClassName,
+} from './controls';
 import type { useReviewAudio } from './use-review-audio';
 
 /** Editor for the selected audio clip: level, mute, fades, and the delete action. */
@@ -46,21 +51,25 @@ export function ReviewAudioClipEditor(props: {
           onChange={(value) => props.onPatch({ [key]: value })}
         />
       ))}
-      <div className="flex flex-wrap gap-2">
+      <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.audioClipMute')}
           aria-pressed={props.clip.muted}
           disabled={props.busy}
-          className="!text-xs aria-pressed:!bg-[var(--sniptale-color-accent-soft)]"
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
           onClick={() => props.onPatch({ muted: !props.clip.muted })}
-        />
+        >
+          <VolumeX size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.audioClipMute')}</span>
+        </ReviewButton>
         <ReviewButton
           label={translate('gallery.videoReview.audioClipDelete')}
           disabled={props.busy}
-          className="!border-0 !bg-transparent !shadow-none !text-xs"
+          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
           onClick={props.onDelete}
         >
-          {translate('gallery.videoReview.audioClipDelete')}
+          <Trash2 size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.audioClipDelete')}</span>
         </ReviewButton>
       </div>
     </div>

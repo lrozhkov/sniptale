@@ -25,7 +25,13 @@ export const reviewTrackStatusButtonClassName =
   'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
 /** Labelled commands share the transparent timeline-button states without a fixed icon width. */
-export const reviewTextButtonClassName = reviewIconButtonClassName + ' !w-auto gap-2 !text-xs';
+export const reviewTextButtonClassName =
+  reviewIconButtonClassName + ' !w-auto gap-2 !text-xs [&_svg]:shrink-0';
+
+/** Reversible delete actions keep the same geometry with a distinct danger tone. */
+export const reviewDeleteButtonClassName =
+  reviewTextButtonClassName +
+  ' !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
 
 /** Read-only timing uses the same label/value row as editable inspector parameters. */
 export function ReviewInterval({ start, end }: { start: number; end: number }) {
@@ -39,7 +45,7 @@ export function ReviewInterval({ start, end }: { start: number; end: number }) {
           start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
         )}
       </span>
-      <span className="text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
+      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
         {start === end
           ? reviewTimeLabel(start)
           : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`}
@@ -51,7 +57,9 @@ export function ReviewInterval({ start, end }: { start: number; end: number }) {
 /** Inline parameter selectors use the same geometry and typography as numeric rows. */
 export const reviewSelectFieldClassName =
   '!min-h-8 !rounded-none !border-0 !bg-transparent !px-0 !py-0 ' +
-  '[&>span]:!whitespace-normal [&>span]:!overflow-visible [&>span]:!text-xs';
+  '[&>span]:!whitespace-normal [&>span]:!overflow-visible [&>span]:!text-xs ' +
+  '[&>span]:!font-semibold [&>span]:!text-[var(--sniptale-color-text-secondary)] ' +
+  '[&>div]:!w-auto [&>div]:!max-w-[65%]';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({

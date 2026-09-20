@@ -12,7 +12,13 @@ import type {
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { Trash2, RotateCcw, Unlink } from 'lucide-react';
 import { SelectField } from '../../ui/compact-inspector-controls';
-import { ReviewButton, ReviewInterval, reviewTimeLabel } from './controls';
+import {
+  ReviewButton,
+  ReviewInterval,
+  reviewTimeLabel,
+  reviewTextButtonClassName,
+  reviewDeleteButtonClassName,
+} from './controls';
 
 const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeof translate>[0]> = {
   none: 'gallery.videoReview.transitionNone',
@@ -134,21 +140,22 @@ export function ReviewZoomInspector(props: {
         value={region.exit}
         onChange={(exit) => onChange({ exit })}
       />
-      <div className="flex gap-2">
+      <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.zoomResetPosition')}
-          className="flex-1 !border-0 !bg-transparent !shadow-none !text-xs"
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
           onClick={props.onReset}
         >
-          <RotateCcw size={14} />
+          <RotateCcw size={15} aria-hidden="true" />
           <span>{translate('gallery.videoReview.zoomResetPosition')}</span>
         </ReviewButton>
         <ReviewButton
           label={translate('gallery.videoReview.zoomDelete')}
-          className="!border-0 !bg-transparent !shadow-none !text-xs !text-[var(--sniptale-color-danger)]"
+          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
           onClick={props.onDelete}
         >
-          <Trash2 size={14} />
+          <Trash2 size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.zoomDelete')}</span>
         </ReviewButton>
       </div>
     </div>
@@ -191,10 +198,10 @@ export function ReviewZoomLinkInspector(props: {
       </div>
       <ReviewButton
         label={translate('gallery.videoReview.zoomLinkRemove')}
-        className="!border-0 !bg-transparent !shadow-none !text-xs !text-[var(--sniptale-color-danger)]"
+        className={`${reviewDeleteButtonClassName} !w-full justify-start`}
         onClick={props.onRemove}
       >
-        <Unlink size={14} />
+        <Unlink size={15} aria-hidden="true" />
         <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
       </ReviewButton>
     </div>

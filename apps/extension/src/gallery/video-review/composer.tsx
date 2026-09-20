@@ -56,7 +56,7 @@ export function ReviewComposer(props: {
           onChange={(event) => props.onChange({ ...props.annotation, text: event.target.value })}
           onSelect={voice.moveCaret}
         />
-        <div className="flex items-center justify-between gap-2 px-2 pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <VoiceInputButton
             dataUi="gallery.videoReview.voice"
             disabled={props.busy}
@@ -95,7 +95,7 @@ export function ReviewComposer(props: {
         <ReviewButton
           label={translate('gallery.videoReview.removeRegion')}
           disabled={props.busy}
-          className="!border-0 !bg-transparent !shadow-none !text-xs"
+          className={reviewTextButtonClassName}
           onClick={() => {
             const { region: _region, ...annotation } = props.annotation;
             props.onChange(annotation);

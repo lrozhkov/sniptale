@@ -106,12 +106,46 @@ export function ReviewTimelineTools(props: {
 
 /** Compact speed choices shared by the timeline tool and selected-edit inspector. */
 export function ReviewSpeedOptions(props: {
+  layout?: 'toolbar' | 'inspector';
   rate: number;
   audio: 'speed' | 'mute';
   busy: boolean;
   onRate(value: ReviewSpeedRate): void;
   onAudio(value: 'speed' | 'mute'): void;
 }) {
+  const rateOptions = REVIEW_SPEED_RATES.map((rate) => ({
+    value: String(rate),
+    label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
+  }));
+  const audioOptions = [
+    { value: 'speed' as const, label: translate('gallery.videoReview.speedSound') },
+    { value: 'mute' as const, label: translate('gallery.videoReview.muteSound') },
+  ];
+  const changeRate = (value: string) => {
+    const rate = Number(value);
+    if (isReviewSpeedRate(rate)) props.onRate(rate);
+  };
+  if (props.layout === 'inspector')
+    return (
+      <>
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.speedRate')}
+          value={String(props.rate)}
+          disabled={props.busy}
+          options={rateOptions}
+          onChange={changeRate}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.speedAudio')}
+          value={props.audio}
+          disabled={props.busy}
+          options={audioOptions}
+          onChange={props.onAudio}
+        />
+      </>
+    );
   return (
     <>
       <ProductSelect
@@ -122,14 +156,8 @@ export function ReviewSpeedOptions(props: {
         menuWidth={112}
         value={String(props.rate)}
         disabled={props.busy}
-        options={REVIEW_SPEED_RATES.map((rate) => ({
-          value: String(rate),
-          label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
-        }))}
-        onChange={(value) => {
-          const rate = Number(value);
-          if (isReviewSpeedRate(rate)) props.onRate(rate);
-        }}
+        options={rateOptions}
+        onChange={changeRate}
       />
       <ProductSelect<'speed' | 'mute'>
         aria-label={translate('gallery.videoReview.speedAudio')}
@@ -140,10 +168,7 @@ export function ReviewSpeedOptions(props: {
         value={props.audio}
         disabled={props.busy}
         onChange={props.onAudio}
-        options={[
-          { value: 'speed', label: translate('gallery.videoReview.speedSound') },
-          { value: 'mute', label: translate('gallery.videoReview.muteSound') },
-        ]}
+        options={audioOptions}
       />
     </>
   );
@@ -161,7 +186,6 @@ export function ReviewEditActions(props: {
   settings?: ReactNode;
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
-  /** Ready-plan reasons worth an applied-changes line; null while nothing is applied. */
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
@@ -172,7 +196,27 @@ export function ReviewEditActions(props: {
   const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-1">
+      {props.settings && settingsOpen ? (
+        <div id={settingsId} className="border-b border-[var(--sniptale-color-border-soft)] pb-3">
+          {props.settings}
+        </div>
+      ) : null}
+      <div
+        className={
+          'sticky bottom-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 ' +
+          'bg-[var(--sniptale-color-surface-panel)]'
+        }
+      >
+        <ReviewButton
+          label={translate('gallery.videoReview.exportVideo')}
+          className={`${reviewTextButtonClassName}
+            !w-full min-w-0 justify-start !whitespace-normal !text-left !leading-tight`}
+          disabled={!props.available || props.busy || running || props.audioUnavailable || blocked}
+          onClick={props.onExport}
+        >
+          <FileVideo size={15} />
+          <span>{translate('gallery.videoReview.exportVideo')}</span>
+        </ReviewButton>
         {props.settings ? (
           <ReviewButton
             label={translate('gallery.videoReview.exportSettings')}
@@ -186,17 +230,8 @@ export function ReviewEditActions(props: {
           </ReviewButton>
         ) : null}
         <ReviewButton
-          label={translate('gallery.videoReview.exportVideo')}
-          className={`${reviewTextButtonClassName} flex-1 justify-start`}
-          disabled={!props.available || props.busy || running || props.audioUnavailable || blocked}
-          onClick={props.onExport}
-        >
-          <FileVideo size={15} />
-          <span>{translate('gallery.videoReview.exportVideo')}</span>
-        </ReviewButton>
-        <ReviewButton
           label={translate('gallery.videoReview.downloadVideo')}
-          className={`${reviewTextButtonClassName} !w-full justify-start`}
+          className={`${reviewTextButtonClassName} col-span-2 !w-full justify-start`}
           disabled={
             running ||
             props.busy ||
@@ -209,7 +244,6 @@ export function ReviewEditActions(props: {
           <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
       </div>
-      {props.settings && settingsOpen ? <div id={settingsId}>{props.settings}</div> : null}
       {running ? (
         <div className="flex items-center justify-between gap-2 text-xs" role="status">
           <span>
@@ -220,6 +254,7 @@ export function ReviewEditActions(props: {
           {props.phase === 'exporting' ? (
             <ReviewButton
               label={translate('gallery.videoReview.cancelExport')}
+              className={reviewTextButtonClassName}
               onClick={props.onCancel}
             />
           ) : null}

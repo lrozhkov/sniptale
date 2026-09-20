@@ -11,7 +11,8 @@ import type { useReviewExport } from './use-export';
 import { ReviewNumberRow } from './number-row';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
-import { ReviewButton, ReviewInterval } from './controls';
+import { Trash2 } from 'lucide-react';
+import { ReviewButton, ReviewInterval, reviewDeleteButtonClassName } from './controls';
 import { ReviewActionProperties } from './action-properties';
 import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewAdvancedPanels } from './advanced-panels';
@@ -71,8 +72,9 @@ export function ReviewSelectedProperties(props: {
           <div className="space-y-3">
             <ReviewInterval start={editing.selected.start} end={editing.selected.end} />
             {editing.selected.kind === 'speed' ? (
-              <div className="flex flex-wrap items-center gap-1">
+              <div className="space-y-3">
                 <ReviewSpeedOptions
+                  layout="inspector"
                   rate={editing.rate}
                   audio={editing.audio}
                   busy={busy}
@@ -89,6 +91,7 @@ export function ReviewSelectedProperties(props: {
                     ? 'gallery.videoReview.rangeStart'
                     : 'gallery.videoReview.rangeEnd'
                 )}
+                unit="s"
                 min={0}
                 max={resource.source.duration}
                 step={0.01}
@@ -104,10 +107,16 @@ export function ReviewSelectedProperties(props: {
                 }}
               />
             ))}
-            <ReviewButton
-              label={translate('gallery.videoReview.removeEdit')}
-              onClick={editing.remove}
-            />
+            <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+              <ReviewButton
+                label={translate('gallery.videoReview.removeEdit')}
+                className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                onClick={editing.remove}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                <span>{translate('gallery.videoReview.removeEdit')}</span>
+              </ReviewButton>
+            </div>
           </div>
         ) : selection.kind === 'zoom' || selection.kind === 'zoom-link' ? (
           <ReviewAdvancedPanels

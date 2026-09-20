@@ -18,6 +18,7 @@ import {
   reviewTimeLabel,
   reviewIconButtonClassName,
   reviewTextButtonClassName,
+  reviewDeleteButtonClassName,
 } from './controls';
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
@@ -207,7 +208,7 @@ function ReviewAnnotationList(props: {
                 <ReviewButton
                   label={translate('gallery.videoReview.editComment')}
                   disabled={props.busy}
-                  className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+                  className={reviewIconButtonClassName}
                   onClick={() => props.onEdit(annotation)}
                 >
                   <Pencil size={16} />
@@ -215,7 +216,7 @@ function ReviewAnnotationList(props: {
                 <ReviewButton
                   label={translate('gallery.videoReview.deleteComment')}
                   disabled={props.busy}
-                  className="!h-7 !min-h-7 !border-0 !bg-transparent !shadow-none"
+                  className={`${reviewDeleteButtonClassName} !w-8`}
                   onClick={() => props.onDelete(annotation)}
                 >
                   <Trash2 size={16} />
@@ -232,7 +233,7 @@ function ReviewAnnotationList(props: {
 /** Reports remain above the export divider; all footer commands have readable labels. */
 function ReviewInspectorFooter(props: Parameters<typeof ReviewInspector>[0]) {
   return (
-    <div className="shrink-0 space-y-2">
+    <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pb-20 space-y-2 overflow-y-auto">
       <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
         <ReviewButton
           label={translate('gallery.videoReview.copyReport')}
@@ -277,10 +278,10 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
                 : 'gallery.videoReview.addComment'
             )}
             disabled={props.busy || !!props.composer}
-            className="ml-auto !border-0 !bg-transparent !shadow-none"
+            className={`${reviewTextButtonClassName} ml-auto`}
             onClick={() => props.onAdd()}
           >
-            <Plus size={16} />
+            <Plus size={16} aria-hidden="true" />
             <span>
               {translate(
                 props.rangeSelected

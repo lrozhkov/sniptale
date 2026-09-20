@@ -9,7 +9,7 @@ import type { QuickEditBackgroundPatch } from '../../features/video/review/advan
 import { serializePaintToCss, createSolidPaint, type Paint } from '@sniptale/foundation/paint';
 import { useGradientPresetCatalog } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
 import { CompactPaintSelector } from '../../ui/paint-selector';
-import { ReviewButton } from './controls';
+import { ReviewButton, reviewTextButtonClassName } from './controls';
 
 const kinds = [
   { key: 'none', label: 'gallery.videoReview.backgroundNone' },
@@ -54,7 +54,7 @@ export function ReviewBackgroundInspector(props: {
     <div data-ui="gallery.videoReview.backgroundInspector" className="min-w-0 space-y-3">
       <h4 className="text-sm font-semibold">{translate('gallery.videoReview.background')}</h4>
       <div
-        className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--sniptale-color-surface-canvas)] p-1"
+        className="grid grid-cols-2 gap-1"
         role="group"
         aria-label={translate('gallery.videoReview.background')}
       >
@@ -78,8 +78,7 @@ export function ReviewBackgroundInspector(props: {
                 ? !background.enabled
                 : background.enabled && background.type === kind.key
             }
-            className="!text-xs aria-pressed:!bg-[var(--sniptale-color-accent-soft)]
-              aria-pressed:!text-[var(--sniptale-color-accent-emphasis)]"
+            className={reviewTextButtonClassName}
             onClick={() =>
               onChange(
                 kind.key === 'none'
@@ -97,8 +96,7 @@ export function ReviewBackgroundInspector(props: {
         ))}
         <ReviewButton
           label={translate('gallery.videoReview.backgroundImage')}
-          className="!text-xs aria-pressed:!bg-[var(--sniptale-color-accent-soft)]
-            aria-pressed:!text-[var(--sniptale-color-accent-emphasis)]"
+          className={reviewTextButtonClassName}
           aria-pressed={background.enabled && background.type === 'image'}
           onClick={() => fileInput.current?.click()}
         />
