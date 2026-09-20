@@ -288,12 +288,13 @@ function ReviewInspectorActions({
   composerBusy: boolean;
   onExport(): void;
 }) {
-  const plan = editing.exporter.plan();
+  const exportPlan = editing.exporter.plan();
+  const checkingCodecs = editing.exporter.checkingCodecs;
   const settings =
-    plan.kind === 'ready' && plan.video === 'render' ? (
+    snapshot.snapshot.workspace.advanced.ui.mode === 'advanced' ? (
       <ReviewRenderOptions
         exporter={editing.exporter}
-        busy={busy || composerBusy || editing.exporter.phase !== 'idle'}
+        busy={busy || composerBusy || checkingCodecs || editing.exporter.phase !== 'idle'}
       />
     ) : null;
   return (
@@ -302,17 +303,18 @@ function ReviewInspectorActions({
         settings={settings}
         available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
         hasEdits={snapshot.document.edits.length > 0}
-        busy={busy || composerBusy}
+        busy={busy || composerBusy || checkingCodecs}
         phase={editing.exporter.phase}
         progress={editing.exporter.progress}
         failed={editing.exporter.failed}
         hasResult={!!editing.exporter.result}
-        audioUnavailable={
-          !!editing.exporter.index?.audioCodec &&
-          !editing.exporter.index.processedAudioCodec &&
-          snapshot.document.edits.some((edit) => edit.kind === 'speed')
+        advancedBlockers={
+          checkingCodecs
+            ? null
+            : exportPlan.kind === 'unavailable'
+              ? exportPlan.reasons
+              : editing.exporter.blocked
         }
-        advancedBlockers={editing.exporter.blocked}
         onExport={onExport}
         onCancel={editing.exporter.cancel}
         onDownload={editing.exporter.download}

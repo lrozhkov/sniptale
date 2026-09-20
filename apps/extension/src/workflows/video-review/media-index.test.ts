@@ -1,6 +1,10 @@
 import { readFile } from 'node:fs/promises';
-import { expect, it } from 'vitest';
-import { inspectReviewMedia, chooseReviewVideoCodec } from './media-index';
+import { expect, it, vi } from 'vitest';
+import {
+  inspectReviewMedia,
+  chooseReviewVideoCodec,
+  supportedReviewVideoCodecs,
+} from './media-index';
 
 it.each(['avc-aac.mp4', 'hevc-aac.mp4', 'vp8-opus.webm', 'vp9-opus.webm', 'av1-opus.webm'])(
   'indexes independent packets in real %s',
@@ -29,4 +33,46 @@ it('honors cancellation before opening an input', async () => {
   const controller = new AbortController();
   controller.abort();
   await expect(inspectReviewMedia(new Blob(), controller.signal)).rejects.toThrow();
+});
+
+it('admits the same AVC level and 60fps configuration as the primary editor', async () => {
+  const isConfigSupported = vi.fn(async (config: VideoEncoderConfig) => ({
+    config,
+    supported: config.codec === 'avc1.64002a' && config.framerate === 60,
+  }));
+  vi.stubGlobal('VideoEncoder', { isConfigSupported });
+  try {
+    expect(
+      await supportedReviewVideoCodecs('mp4', {
+        width: 1920,
+        height: 1080,
+        bitrate: 12_000_000,
+        fps: 60,
+      })
+    ).toContain('avc');
+    expect(isConfigSupported).toHaveBeenCalledWith(
+      expect.objectContaining({ codec: 'avc1.64002a', framerate: 60, bitrateMode: 'variable' })
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('rejects normalized-away timing and isolates unsupported codec families', async () => {
+  vi.stubGlobal('VideoEncoder', {
+    isConfigSupported: async (config: VideoEncoderConfig) => {
+      if (config.codec.startsWith('hvc1')) throw new Error('Unsupported HEVC');
+      return {
+        supported: true,
+        config: config.codec.startsWith('avc1') ? { ...config, framerate: 24 } : config,
+      };
+    },
+  });
+  try {
+    expect(await supportedReviewVideoCodecs('mp4', { width: 1920, height: 1080, fps: 60 })).toEqual(
+      ['vp9']
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

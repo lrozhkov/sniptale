@@ -1,3 +1,8 @@
+import {
+  type VideoQuality,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { reviewOutputCodecs } from '../../workflows/video-review/render-settings';
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
@@ -321,7 +326,7 @@ export function ReviewFragmentAction(props: {
   );
 }
 
-/** Render-only choices list only encoders admitted for this source container. */
+/** Output choices remain reachable when a selected encoder is unavailable. */
 export function ReviewRenderOptions({
   exporter,
   busy,
@@ -329,25 +334,53 @@ export function ReviewRenderOptions({
   exporter: ReturnType<typeof import('./use-export').useReviewExport>;
   busy: boolean;
 }) {
-  const plan = exporter.plan();
-  if (plan.kind !== 'ready' || plan.video !== 'render' || !exporter.renderSettings) return null;
+  if (!exporter.index || !exporter.renderSettings) return null;
   const settings = exporter.renderSettings;
-  const codecs =
-    exporter.index?.supportedVideoCodecs ??
-    (exporter.index?.processedVideoCodec ? [exporter.index.processedVideoCodec] : []);
+  const format = settings.format ?? exporter.index.container;
+  const codecs = reviewOutputCodecs(exporter.index, format);
   return (
     <div className="pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
       <fieldset disabled={busy} className="space-y-2 pb-2">
         <SelectField
           className={reviewSelectFieldClassName}
+          label={translate('videoEditor.exportDialog.formatLabel')}
+          disabled={busy}
+          value={format}
+          options={(['mp4', 'webm'] as const).map((value) => ({
+            value,
+            label: value === 'mp4' ? 'MP4' : 'WebM',
+            disabled: reviewOutputCodecs(exporter.index!, value).length === 0,
+          }))}
+          onChange={(format) => {
+            const codec = reviewOutputCodecs(exporter.index!, format)[0];
+            if (codec) exporter.setRenderSettings({ ...settings, format, codec });
+          }}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.exportCodec')}
           disabled={busy}
-          value={settings.codec ?? exporter.index?.processedVideoCodec ?? ''}
+          value={settings.codec ?? codecs[0] ?? ''}
           options={codecs.map((codec) => ({
             value: codec,
-            label: codec === 'avc' ? 'H.264' : codec.toUpperCase(),
+            label:
+              codec === 'avc' ? 'H.264' : codec === 'hevc' ? 'H.265 / HEVC' : codec.toUpperCase(),
           }))}
           onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('videoEditor.exportDialog.resolutionLabel')}
+          disabled={busy}
+          value={settings.resolution ?? VideoResolutionPreset.SOURCE}
+          options={Object.values(VideoResolutionPreset).map((value) => ({
+            value,
+            label:
+              value === VideoResolutionPreset.SOURCE
+                ? translate('gallery.videoReview.exportSceneSize')
+                : value.toLowerCase(),
+          }))}
+          onChange={(resolution) => exporter.setRenderSettings({ ...settings, resolution })}
         />
         <SelectField
           className={reviewSelectFieldClassName}
@@ -364,14 +397,16 @@ export function ReviewRenderOptions({
               exporter.setRenderSettings({ ...settings, frameRate });
           }}
         />
-        <SelectField<'standard' | 'high'>
+        <SelectField<VideoQuality>
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.exportQuality')}
           disabled={busy}
           value={settings.quality}
           options={[
-            { value: 'standard', label: translate('gallery.videoReview.exportStandardQuality') },
-            { value: 'high', label: translate('gallery.videoReview.exportHighQuality') },
+            { value: 'LOW', label: translate('videoEditor.exportDialog.qualityLow') },
+            { value: 'MEDIUM', label: translate('videoEditor.exportDialog.qualityMedium') },
+            { value: 'HIGH', label: translate('videoEditor.exportDialog.qualityHigh') },
+            { value: 'ULTRA', label: translate('videoEditor.exportDialog.qualityUltra') },
           ]}
           onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
         />

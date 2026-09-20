@@ -26,6 +26,9 @@ vi.mock('../../workflows/video-review/export-lifecycle', async (original) => ({
 }));
 vi.mock('../../workflows/video-review/media-index', () => ({
   inspectReviewMedia: integration.index,
+  supportedReviewVideoCodecs: vi.fn(async (format: string) =>
+    format === 'mp4' ? ['avc'] : ['vp9', 'vp8']
+  ),
 }));
 vi.mock('../../workflows/video-review/source', async (original) => ({
   ...(await original<typeof import('../../workflows/video-review/source')>()),

@@ -1,18 +1,20 @@
-import {
-  ALL_FORMATS,
-  BlobSource,
-  EncodedPacketSink,
-  Input,
-  canEncodeVideo,
-  type Rotation,
-} from 'mediabunny';
+import { resolveReviewVideoEncoderConfig } from './render-settings';
+import type {
+  VideoQuality,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input, type Rotation } from 'mediabunny';
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import { chooseReviewAudioCodec } from './audio-render';
 
-/** Session-local render choices; packet exports keep the source encoding. */
+export type ReviewOutputCodec = 'avc' | 'hevc' | 'vp8' | 'vp9';
+
+/** Session-local export choices; basic mode keeps the source encoding. */
 export interface ReviewRenderSettings {
-  codec?: 'avc' | 'vp8' | 'vp9';
-  quality: 'standard' | 'high';
+  format?: 'mp4' | 'webm';
+  codec?: ReviewOutputCodec;
+  resolution?: VideoResolutionPreset;
+  quality: VideoQuality;
   frameRate: 0 | 24 | 30 | 60;
 }
 
@@ -25,11 +27,12 @@ export interface ReviewMediaIndex {
   rotation: Rotation;
   processedAudioCodec?: 'aac' | 'opus' | null;
   /** Encoder for a full frame render; null keeps visual exports honestly blocked. */
-  processedVideoCodec?: 'avc' | 'vp8' | 'vp9' | null;
-  supportedVideoCodecs?: ('avc' | 'vp8' | 'vp9')[];
+  processedVideoCodec?: ReviewOutputCodec | null;
+  supportedVideoCodecs?: ReviewOutputCodec[];
+  outputCodecs?: { mp4: ReviewOutputCodec[]; webm: ReviewOutputCodec[] };
+  outputAudioCodecs?: { mp4: 'aac' | 'opus' | null; webm: 'opus' | null };
   /** Probed average frame rate; the render loop quantizes output frames to it. */
   frameRate?: number;
-  videoBitrate?: number;
   width?: number;
   height?: number;
 }
@@ -37,20 +40,37 @@ export interface ReviewMediaIndex {
 /** Re-encode codec for one frame render; mp4 keeps the broadly supported AVC path. */
 export async function chooseReviewVideoCodec(
   container: 'mp4' | 'webm',
-  dimensions: { width: number; height: number }
-): Promise<'avc' | 'vp8' | 'vp9' | null> {
+  dimensions: { width: number; height: number; bitrate?: number; fps?: number }
+): Promise<ReviewOutputCodec | null> {
   return (await supportedReviewVideoCodecs(container, dimensions))[0] ?? null;
 }
 
-async function supportedReviewVideoCodecs(
+export async function supportedReviewVideoCodecs(
   container: 'mp4' | 'webm',
-  dimensions: { width: number; height: number }
-): Promise<('avc' | 'vp8' | 'vp9')[]> {
+  dimensions: { width: number; height: number; bitrate?: number; fps?: number }
+): Promise<ReviewOutputCodec[]> {
   if (typeof VideoEncoder === 'undefined') return [];
-  const candidates = container === 'mp4' ? (['avc'] as const) : (['vp9', 'vp8'] as const);
-  const supported: ('avc' | 'vp8' | 'vp9')[] = [];
+  const candidates =
+    container === 'mp4' ? (['avc', 'hevc', 'vp9'] as const) : (['vp9', 'vp8'] as const);
+  const supported: ReviewOutputCodec[] = [];
   for (const codec of candidates) {
-    if (await canEncodeVideo(codec, dimensions)) supported.push(codec);
+    const requested = resolveReviewVideoEncoderConfig(codec, dimensions);
+    try {
+      const { supported: available, config } = await VideoEncoder.isConfigSupported(requested);
+      if (
+        available &&
+        config &&
+        config.codec === requested.codec &&
+        config.width === requested.width &&
+        config.height === requested.height &&
+        config.framerate === requested.framerate &&
+        config.bitrate === requested.bitrate &&
+        config.bitrateMode === 'variable'
+      )
+        supported.push(codec);
+    } catch {
+      // Codec availability is independent; a rejected family must not hide other formats.
+    }
   }
   return supported;
 }
@@ -116,25 +136,32 @@ export async function inspectReviewMedia(
       throw new Error('The first video packet is not an independent source entry point.');
     const container =
       videoCodec === 'avc' || videoCodec === 'hevc' || audioCodec === 'aac' ? 'mp4' : 'webm';
-    const [processedAudioCodec, supportedVideoCodecs, packetStats] = await Promise.all([
-      chooseReviewAudioCodec(audio ?? null, container),
-      supportedReviewVideoCodecs(container, {
+    const [mp4Audio, webmAudio, mp4Video, webmVideo, packetStats] = await Promise.all([
+      chooseReviewAudioCodec(audio ?? null, 'mp4'),
+      chooseReviewAudioCodec(audio ?? null, 'webm'),
+      supportedReviewVideoCodecs('mp4', {
+        width: await video.getDisplayWidth(),
+        height: await video.getDisplayHeight(),
+      }),
+      supportedReviewVideoCodecs('webm', {
         width: await video.getDisplayWidth(),
         height: await video.getDisplayHeight(),
       }),
       video.computePacketStats(Infinity, { metadataOnly: true }),
     ]);
     signal.throwIfAborted();
+    const supportedVideoCodecs = container === 'mp4' ? mp4Video : webmVideo;
     return {
       duration,
-      videoBitrate: packetStats.averageBitrate,
       width: await video.getDisplayWidth(),
       height: await video.getDisplayHeight(),
       boundaries: [...new Set([0, ...boundaries, duration])].sort((left, right) => left - right),
       videoCodec,
       audioCodec,
       container,
-      processedAudioCodec,
+      processedAudioCodec: container === 'mp4' ? mp4Audio : webmAudio,
+      outputAudioCodecs: { mp4: mp4Audio, webm: webmAudio === 'opus' ? webmAudio : null },
+      outputCodecs: { mp4: mp4Video, webm: webmVideo },
       processedVideoCodec: supportedVideoCodecs[0] ?? null,
       supportedVideoCodecs,
       frameRate:

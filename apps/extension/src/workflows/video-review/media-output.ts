@@ -21,11 +21,12 @@ import type { ReviewMediaIndex } from './media-index';
  */
 export function createReviewMediaOutput(args: {
   index: ReviewMediaIndex;
+  container?: 'mp4' | 'webm';
   processedAudio: 'aac' | 'opus' | null;
   writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
   signal: AbortSignal;
   provenance?: string;
-  sampleVideo?: { codec: VideoCodec; frameRate: number; bitrate: number };
+  sampleVideo?: { codec: VideoCodec; fullCodecString: string; frameRate: number; bitrate: number };
   onAudioPacket(packet: EncodedPacket): void;
 }) {
   const { index, signal } = args;
@@ -41,7 +42,7 @@ export function createReviewMediaOutput(args: {
   const output = new Output({
     target,
     format:
-      index.container === 'mp4'
+      (args.container ?? index.container) === 'mp4'
         ? new Mp4OutputFormat({ fastStart: 'fragmented', minimumFragmentDuration: 1 })
         : new WebMOutputFormat({ minimumClusterDuration: 1 }),
   });
@@ -51,7 +52,12 @@ export function createReviewMediaOutput(args: {
         kind: 'sample' as const,
         source: new VideoSampleSource({
           codec: args.sampleVideo.codec,
+          fullCodecString: args.sampleVideo.fullCodecString,
           bitrate: args.sampleVideo.bitrate,
+          bitrateMode: 'variable',
+          latencyMode: 'quality',
+          hardwareAcceleration: 'no-preference',
+          keyFrameInterval: 2,
         }),
       }
     : { kind: 'copy' as const, source: new EncodedVideoPacketSource(index.videoCodec) };

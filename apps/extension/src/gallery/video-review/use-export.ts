@@ -1,3 +1,5 @@
+import { useReviewExportSettings } from './use-review-export-settings';
+import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -10,7 +12,6 @@ import {
   QuickEditExportUnavailable,
 } from '../../workflows/video-review/export-lifecycle';
 import {
-  resolveQuickEditExportPlan,
   type QuickEditExportPlan,
   type QuickEditExportReason,
 } from '../../features/video/review/advanced/effective';
@@ -50,16 +51,24 @@ export function prepareReviewExporter(
 
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
-  const [renderSettings, setRenderSettings] = useState<ReviewRenderSettings>({
-    quality: 'standard',
-    frameRate: 0,
-  });
-  const [index, setIndex] = useState<ReviewMediaIndex | null>(null);
+  const [sourceIndex, setIndex] = useState<ReviewMediaIndex | null>(null);
+  const state = resource.session.getSnapshot();
+  const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
+    sourceIndex,
+    {
+      ui: state.snapshot.workspace.advanced.ui,
+      ...state.document.advancedContent,
+    }
+  );
   const [indexing, setIndexing] = useState(true);
   const [phase, setPhase] = useState<'idle' | 'exporting' | 'publishing'>('idle');
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
-  const [blocked, setBlocked] = useState<readonly QuickEditExportReason[] | null>(null);
+  const context = reviewExportContext(resource, renderSettings);
+  const [blocked, setBlocked] = useState<{
+    context: string;
+    reasons: readonly QuickEditExportReason[];
+  } | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const active = useRef<AbortController | null>(null);
   const publishing = useRef(false);
@@ -86,15 +95,19 @@ export function useReviewExport(resource: LoadedReview) {
   }, [resource.file]);
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
-    reviewExportPlan(resource, index, selection);
+    reviewExportPlan(resource, index, renderSettings, selection);
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
-    if (active.current || !index) return;
+    if (active.current || !index || checkingCodecs) return;
+    const attemptContext = reviewExportContext(resource, renderSettings);
     const currentPlan = plan(selection);
     if (currentPlan.kind === 'unavailable') {
-      setBlocked(currentPlan.reasons);
+      setBlocked({
+        context: reviewExportContext(resource, renderSettings),
+        reasons: currentPlan.reasons,
+      });
       return;
     }
     setBlocked(null);
@@ -130,7 +143,8 @@ export function useReviewExport(resource: LoadedReview) {
       }
     } catch (error) {
       if (error instanceof QuickEditExportUnavailable) {
-        if (mounted.current && !controller.signal.aborted) setBlocked(error.reasons);
+        if (mounted.current && !controller.signal.aborted)
+          setBlocked({ context: attemptContext, reasons: error.reasons });
       } else if (mounted.current && !controller.signal.aborted) setFailed(true);
     } finally {
       active.current = null;
@@ -144,7 +158,8 @@ export function useReviewExport(resource: LoadedReview) {
     phase,
     progress,
     failed,
-    blocked,
+    blocked: blocked?.context === context ? blocked.reasons : null,
+    checkingCodecs,
     result,
     plan,
     renderSettings,
@@ -158,7 +173,10 @@ export function useReviewExport(resource: LoadedReview) {
     download: async () => {
       const currentPlan = plan();
       if (currentPlan.kind === 'unavailable') {
-        setBlocked(currentPlan.reasons);
+        setBlocked({
+          context: reviewExportContext(resource, renderSettings),
+          reasons: currentPlan.reasons,
+        });
         return;
       }
       const state = resource.session.getSnapshot();
@@ -176,6 +194,7 @@ export function useReviewExport(resource: LoadedReview) {
 function reviewExportPlan(
   resource: LoadedReview,
   index: ReviewMediaIndex | null,
+  renderSettings: ReviewRenderSettings,
   selection?: Extract<ReviewAnchor, { kind: 'range' }>
 ): QuickEditExportPlan {
   const state = resource.session.getSnapshot();
@@ -189,16 +208,26 @@ function reviewExportPlan(
           edits: state.document.edits,
         })
       : null;
-  return resolveQuickEditExportPlan({
+  return configuredReviewExportPlan({
+    index,
+    renderSettings,
     document: fragment ? { ...state.document, edits: fragment.edits } : state.document,
     advanced: {
       ui: state.snapshot.workspace.advanced.ui,
       ...state.document.advancedContent,
     },
-    // A source audio track with a probed unavailable codec is a known blocker;
-    // clips-only exports defer the authoritative probe to the exporter.
-    ...(index?.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
     ...(index ? { videoCopyBoundaries: index.boundaries } : {}),
-    videoRenderAvailable: !!index?.processedVideoCodec,
   });
+}
+
+/** Bind failures to the actual committed input after the export entry point has flushed edits. */
+function reviewExportContext(resource: LoadedReview, settings: ReviewRenderSettings): string {
+  const { workspace } = resource.session.getSnapshot().snapshot;
+  return JSON.stringify([
+    workspace.aggregateId,
+    workspace.sourceAssetId,
+    workspace.revision,
+    workspace.advanced.ui.mode,
+    settings,
+  ]);
 }

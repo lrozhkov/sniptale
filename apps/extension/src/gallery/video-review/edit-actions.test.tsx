@@ -59,6 +59,7 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
   const cancel = vi.fn();
   const props = {
     indexing: false,
+    checkingCodecs: false,
     available: true,
     cutting: true,
     cut: null,
@@ -272,15 +273,24 @@ it('applies export frame rate and quality options without adding section divider
   const host = document.createElement('div');
   const root = createRoot(host);
   const exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'] = {
-    index: null,
+    index: {
+      duration: 12,
+      boundaries: [0, 12],
+      container: 'mp4',
+      videoCodec: 'avc',
+      audioCodec: null,
+      rotation: 0,
+      processedVideoCodec: 'avc',
+    },
     indexing: false,
+    checkingCodecs: false,
     phase: 'idle',
     progress: 0,
     failed: false,
     blocked: [],
     result: null,
     plan: () => ({ kind: 'ready', video: 'render', audio: 'copy', reasons: [] }),
-    renderSettings: { frameRate: 0, quality: 'high' },
+    renderSettings: { frameRate: 0, quality: 'HIGH' },
     setRenderSettings: vi.fn(),
     start: vi.fn(async () => {}),
     downloadSelection: vi.fn(async () => {}),
@@ -289,17 +299,19 @@ it('applies export frame rate and quality options without adding section divider
   };
   try {
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy={false} />));
-    const [, rate, quality] = host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
+    const [, , , rate, quality] = host.querySelectorAll<HTMLButtonElement>(
+      '[aria-haspopup="listbox"]'
+    );
     await act(async () => rate!.click());
     await act(async () =>
       document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
     );
-    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({ frameRate: 24, quality: 'high' });
+    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({ frameRate: 24, quality: 'HIGH' });
     await act(async () => quality!.click());
     await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
     expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
       frameRate: 0,
-      quality: 'standard',
+      quality: 'LOW',
     });
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy />));
     expect(rate!.disabled).toBe(true);

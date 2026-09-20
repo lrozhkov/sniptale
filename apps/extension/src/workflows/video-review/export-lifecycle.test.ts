@@ -537,3 +537,34 @@ it('does not load hidden audio assets or render hidden focus during export', asy
   expect(deps.readProjectAsset).not.toHaveBeenCalled();
   expect(advanced.audio.music).toHaveLength(1);
 });
+
+it('publishes the chosen container, resolution and matching filename for a converted export', async () => {
+  const { args, deps } = fixture();
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.advanced.canvas = { width: 1920, height: 1080 };
+  args.index.outputCodecs = { mp4: ['avc'], webm: ['vp9'] };
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 40,
+    audioPackets: 0,
+    resultDuration: 4,
+    audioRanges: [],
+  });
+  const renderSettings = {
+    format: 'mp4' as const,
+    codec: 'avc' as const,
+    resolution: '720P' as const,
+    quality: 'HIGH' as const,
+    frameRate: 30 as const,
+  };
+  const result = await exportReviewedVideo({ ...args, renderSettings }, deps);
+  expect(result.receipt.filename).toBe('clip-edited.mp4');
+  expect(deps.createSeekableAssetObjectWriter).toHaveBeenCalledWith({ mimeType: 'video/mp4' });
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(expect.objectContaining({ renderSettings }));
+  expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledWith([
+    expect.objectContaining({
+      filename: 'clip-edited.mp4',
+      mediaMetadata: { kind: 'video', width: 1280, height: 720, duration: 4 },
+    }),
+  ]);
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+});

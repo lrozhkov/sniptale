@@ -1,3 +1,5 @@
+import { configuredReviewExportPlan } from './export-configuration';
+import { resolveReviewOutputProfile } from './render-settings';
 import type { ReviewRenderSettings } from './media-index';
 import { isSafeArchiveEntryLeafFilename } from '@sniptale/platform/data/zip-profile/entry-filenames';
 import {
@@ -19,7 +21,6 @@ import { buildQuickEditAudioPlan } from '../../features/video/review/advanced/au
 import type { ReviewExportClipPlan } from './audio-render';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import {
-  resolveQuickEditExportPlan,
   resolveQuickEditEffectiveFeatures,
   resolveQuickEditEffectiveState,
 } from '../../features/video/review/advanced/effective';
@@ -156,20 +157,24 @@ export async function exportReviewedVideo(
   if (args.selection && (!fragment || args.destination !== 'download'))
     throw new Error('A nonempty fragment requires a temporary download.');
   const edits = fragment?.edits ?? document.edits;
-  const plan = resolveQuickEditExportPlan({
+  const renderSettings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;
+  const outputProfile = resolveReviewOutputProfile(
+    {
+      ...index,
+      width: index.width ?? workspace.source.width,
+      height: index.height ?? workspace.source.height,
+    },
+    advanced,
+    renderSettings
+  );
+  const plan = configuredReviewExportPlan({
+    index,
+    renderSettings,
     document: { ...document, edits },
     advanced,
-    // A source audio track with a probed unavailable codec is a known blocker;
-    // clips-only exports defer the authoritative probe to the exporter.
-    ...(index.audioCodec ? { audioProcessingAvailable: !!index.processedAudioCodec } : {}),
     videoCopyBoundaries: index.boundaries,
-    videoRenderAvailable: !!index.processedVideoCodec,
   });
   if (plan.kind === 'unavailable') throw new QuickEditExportUnavailable(plan.reasons);
-  if (plan.audio === 'process' && index.audioCodec && !index.processedAudioCodec)
-    throw new QuickEditExportUnavailable(['audio-encoder']);
-  if (plan.video === 'render' && !index.processedVideoCodec)
-    throw new QuickEditExportUnavailable(['video-encoder']);
   const fragmentOffset = fragment
     ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
     : 0;
@@ -183,7 +188,7 @@ export async function exportReviewedVideo(
     });
   }
   const speedAudio = !!index.audioCodec && edits.some((edit) => edit.kind === 'speed');
-  if (speedAudio && !index.processedAudioCodec)
+  if (speedAudio && !(index.outputAudioCodecs?.[outputProfile.format] ?? index.processedAudioCodec))
     throw new QuickEditExportUnavailable(['audio-encoder']);
   const audioReencoded = speedAudio || !!exportAudio;
   const createdAt = Date.now();
@@ -200,21 +205,21 @@ export async function exportReviewedVideo(
   const suffix = fragment
     ? `fragment-${fragment.start.toFixed(3)}-${fragment.end.toFixed(3)}`
     : 'edited';
-  const candidate = `${original.filename.replace(/\.[^.]+$/, '')}-${suffix}.${index.container}`;
+  const candidate = `${original.filename.replace(/\.[^.]+$/, '')}-${suffix}.${outputProfile.format}`;
   const filename = isSafeArchiveEntryLeafFilename(candidate)
     ? candidate
-    : `video-edited.${index.container}`;
+    : `video-edited.${outputProfile.format}`;
   await deps.assertAssetWriteAdmission(original.file.size + 1024 * 1024);
   signal.throwIfAborted();
   const writer = await deps.createSeekableAssetObjectWriter({
-    mimeType: `video/${index.container}`,
+    mimeType: `video/${outputProfile.format}`,
   });
   let publishing = false;
   try {
     const packetReceipt =
       plan.video === 'render'
         ? await deps.writeReviewFrames({
-            renderSettings: args.renderSettings,
+            renderSettings,
             file: original.file,
             index,
             edits,
@@ -256,7 +261,7 @@ export async function exportReviewedVideo(
     }
     args.onPublishing?.();
     publishing = true;
-    const outputSize = resolveQuickEditEffectiveState(advanced).canvas ?? workspace.source;
+    const outputSize = plan.video === 'render' ? outputProfile : workspace.source;
     await deps.saveRecordingsBatchSafely([
       {
         id,

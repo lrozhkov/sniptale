@@ -1,3 +1,6 @@
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+import { drawReviewSpotlight } from './render-spotlight';
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { parseReviewOperation } from '../../features/video/review/validation';
@@ -12,8 +15,12 @@ import {
   writeReviewFrames,
 } from './render-export';
 
+vi.mock('./render-spotlight', () => ({ drawReviewSpotlight: vi.fn() }));
+
 const state = vi.hoisted(() => ({
+  configurations: [] as unknown[],
   encoded: [] as { timestamp: number; close: unknown; width: number; height: number }[],
+  composited: [] as unknown[][],
   drawn: [] as { draw: unknown; close: unknown }[],
 }));
 
@@ -62,6 +69,9 @@ vi.mock('mediabunny', () => {
     setMetadataTags = vi.fn();
   }
   class VideoSampleSource {
+    constructor(config: unknown) {
+      state.configurations.push(config);
+    }
     add = vi.fn(async (sample: VideoSample) => {
       state.encoded.push({
         timestamp: sample.timestamp,
@@ -91,6 +101,7 @@ vi.mock('mediabunny', () => {
 });
 
 const realDocument = globalThis.document;
+const realVideoEncoder = globalThis.VideoEncoder;
 const realCreateImageBitmap = globalThis.createImageBitmap;
 
 function contextFixture() {
@@ -111,11 +122,14 @@ function contextFixture() {
     arc: vi.fn(),
     fillText: vi.fn(),
     measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
-    drawImage: vi.fn(),
+    drawImage: vi.fn((...args: unknown[]) => state.composited.push(args)),
   } as unknown as CanvasRenderingContext2D;
 }
 
 beforeAll(() => {
+  globalThis.VideoEncoder = {
+    isConfigSupported: async (config: VideoEncoderConfig) => ({ config, supported: true }),
+  } as unknown as typeof VideoEncoder;
   globalThis.document = {
     createElement: () => ({ width: 0, height: 0, getContext: () => contextFixture() }),
   } as unknown as Document;
@@ -126,6 +140,7 @@ beforeAll(() => {
 
 afterAll(() => {
   globalThis.document = realDocument;
+  globalThis.VideoEncoder = realVideoEncoder;
   globalThis.createImageBitmap = realCreateImageBitmap;
 });
 
@@ -541,11 +556,11 @@ it('draws below-placed bubbles under the anchor point', () => {
 it('uses the selected render frame rate and rejects an unprobed codec', async () => {
   const args = argsFixture();
   state.encoded.length = 0;
-  await writeReviewFrames({ ...args, renderSettings: { quality: 'standard', frameRate: 24 } });
+  await writeReviewFrames({ ...args, renderSettings: { quality: 'MEDIUM', frameRate: 24 } });
   expect(state.encoded).toHaveLength(48);
   expect(state.encoded[1]!.timestamp).toBeCloseTo(1 / 24);
   await expect(
-    writeReviewFrames({ ...args, renderSettings: { quality: 'high', frameRate: 30, codec: 'avc' } })
+    writeReviewFrames({ ...args, renderSettings: { quality: 'HIGH', frameRate: 30, codec: 'avc' } })
   ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable' });
 });
 
@@ -648,7 +663,13 @@ it('encodes the selected portrait canvas while fitting the native landscape sour
   await writeReviewFrames(argsFixture({ advanced }));
   expect(state.encoded.length).toBeGreaterThan(0);
   expect(state.encoded.every((frame) => frame.width === 1080 && frame.height === 1920)).toBe(true);
-  expect(state.drawn[0]?.draw).toHaveBeenCalledWith(expect.anything(), 0, 656.25, 1080, 607.5);
+  expect(state.composited).toContainEqual([
+    expect.objectContaining({ width: 320, height: 180 }),
+    0,
+    656.25,
+    1080,
+    607.5,
+  ]);
 });
 
 it('renders exact non-keyframe cuts while keeping output timestamps continuous', async () => {
@@ -658,4 +679,57 @@ it('renders exact non-keyframe cuts while keeping output timestamps continuous',
   const receipt = await writeReviewFrames(args);
   expect(receipt.resultDuration).toBeCloseTo(1.5);
   expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1]);
+});
+
+it('isolates the visible source pixels before filtering a scaled composition', async () => {
+  state.drawn.length = 0;
+  const args = argsFixture();
+  args.advanced.canvas = { width: 1920, height: 1080 };
+  await writeReviewFrames(args);
+  expect(state.drawn[0]!.draw).toHaveBeenCalledWith(
+    expect.objectContaining({ imageSmoothingEnabled: false }),
+    0,
+    0,
+    320,
+    180
+  );
+});
+
+it('passes the calibrated variable-rate quality profile to the actual encoder source', async () => {
+  const args = argsFixture({ frameRate: 30 });
+  args.advanced.canvas = { width: 1920, height: 1080 };
+  await writeReviewFrames({
+    ...args,
+    renderSettings: { quality: 'HIGH', frameRate: 30, resolution: '720P' },
+  });
+  expect(state.configurations.at(-1)).toMatchObject({
+    codec: 'vp9',
+    bitrate: 5_000_000,
+    bitrateMode: 'variable',
+    latencyMode: 'quality',
+    hardwareAcceleration: 'no-preference',
+  });
+  expect(state.encoded.at(-1)).toMatchObject({ width: 1280, height: 720 });
+});
+
+it('scales spotlight blur with export resolution, preserving the scene effect', async () => {
+  const args = argsFixture({ frameRate: 30 });
+  args.advanced.canvas = { width: 1920, height: 1080 };
+  args.advanced.zoom.enabled = true;
+  args.advanced.ui.tracks.zoom = true;
+  const region = createQuickEditZoomRegion({ id: 'spot', at: 0, duration: 2, endMax: 2 });
+  region.spotlight = { ...createQuickEditSpotlight(), effect: 'blur', blur: 12 };
+  region.enter = { type: 'none', duration: 0 };
+  region.exit = { type: 'none', duration: 0 };
+  args.advanced.zoom.regions = [region];
+  await writeReviewFrames({
+    ...args,
+    renderSettings: { quality: 'HIGH', frameRate: 30, resolution: '720P' },
+  });
+  expect(drawReviewSpotlight).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.anything(),
+    expect.anything(),
+    expect.objectContaining({ blur: 8 })
+  );
 });

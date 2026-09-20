@@ -1,3 +1,4 @@
+import { QuickEditExportUnavailable } from '../../workflows/video-review/export-lifecycle';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 // @vitest-environment jsdom
 import { ReviewRenderOptions } from './edit-actions';
@@ -12,6 +13,9 @@ const mocks = vi.hoisted(() => ({ index: vi.fn(), export: vi.fn(), download: vi.
 vi.mock('../../workflows/video-review/media-index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/media-index')>()),
   inspectReviewMedia: mocks.index,
+  supportedReviewVideoCodecs: vi.fn(async (format: string) =>
+    format === 'mp4' ? ['avc'] : ['vp9', 'vp8']
+  ),
 }));
 vi.mock('../../workflows/video-review/export-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/export-lifecycle')>()),
@@ -220,11 +224,11 @@ it('passes the selected render options through the real export hook', async () =
   try {
     await act(async () => fixture.root.render(<fixture.Harness />));
     const selects = fixture.host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
-    expect(selects).toHaveLength(3);
+    expect(selects).toHaveLength(5);
     for (const [index, option] of [
-      [0, 0],
-      [1, 1],
-      [2, 0],
+      [1, 0],
+      [3, 1],
+      [4, 1],
     ] as const) {
       await act(async () => selects[index]!.click());
       await act(async () =>
@@ -235,7 +239,7 @@ it('passes the selected render options through the real export hook', async () =
     expect(mocks.export.mock.calls[0]![0].renderSettings).toEqual({
       codec: 'vp9',
       frameRate: 24,
-      quality: 'standard',
+      quality: 'MEDIUM',
     });
   } finally {
     await fixture.cleanup();
@@ -260,6 +264,56 @@ it('flushes pending edits before the download entry point', async () => {
     );
     await act(async () => exporter.download());
     expect(order).toEqual(['flush', 'download']);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('allows recovery from unavailable export settings after the profile changes', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+  });
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () =>
+      fixture.hook.setRenderSettings({
+        quality: 'HIGH',
+        frameRate: 30,
+        format: 'webm',
+        codec: 'avc',
+      })
+    );
+    await act(async () => fixture.hook.start());
+    expect(fixture.hook.blocked).toEqual(['video-encoder']);
+    await act(async () =>
+      fixture.hook.setRenderSettings({
+        quality: 'HIGH',
+        frameRate: 30,
+        format: 'webm',
+        codec: 'vp9',
+      })
+    );
+    expect(fixture.hook.blocked).toBeNull();
+    expect(fixture.hook.plan()).toMatchObject({ kind: 'ready', video: 'render' });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps export failure visible when pending edits were flushed after the last render', async () => {
+  const fixture = setup();
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const start = fixture.hook.start;
+    const state = fixture.resource.session.getSnapshot();
+    const snapshot = {
+      ...state.snapshot,
+      workspace: { ...state.snapshot.workspace, revision: state.snapshot.workspace.revision + 1 },
+    };
+    vi.spyOn(fixture.resource.session, 'getSnapshot').mockReturnValue({ ...state, snapshot });
+    mocks.export.mockRejectedValueOnce(new QuickEditExportUnavailable(['asset-missing']));
+    await act(async () => start());
+    expect(fixture.hook.blocked).toEqual(['asset-missing']);
   } finally {
     await fixture.cleanup();
   }

@@ -1,6 +1,10 @@
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
-import type { ReviewRenderSettings } from './media-index';
+import {
+  resolveVideoOutputDimensions,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
+import type { ReviewOutputCodec, ReviewRenderSettings } from './media-index';
 import {
   ALL_FORMATS,
   BlobSource,
@@ -11,7 +15,11 @@ import {
   type InputAudioTrack,
   type Output,
 } from 'mediabunny';
-import { resolveReviewRenderBitrate } from './render-settings';
+import {
+  resolveReviewRenderBitrate,
+  reviewOutputCodecs,
+  resolveReviewVideoEncoderConfig,
+} from './render-settings';
 import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -32,7 +40,7 @@ import {
 } from '../../features/video/review/comments';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
-import type { ReviewMediaIndex } from './media-index';
+import { supportedReviewVideoCodecs, type ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
@@ -114,15 +122,20 @@ export async function writeReviewFrames(args: {
     const clock = { time: 0 };
     const tracks = createReviewMediaOutput({
       index: args.index,
+      container: preparation.container,
       processedAudio: source.processedAudio,
       writer: args.writer,
       signal: args.signal,
       ...(args.provenance ? { provenance: args.provenance } : {}),
       sampleVideo: {
         codec: preparation.codec,
+        fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
+          width: source.canvas.width,
+          height: source.canvas.height,
+          fps: preparation.fps,
+        }).codec,
         frameRate: preparation.fps,
         bitrate: resolveReviewRenderBitrate(
-          args.index,
           {
             fps: preparation.fps,
             width: source.canvas.width,
@@ -169,6 +182,7 @@ export async function writeReviewFrames(args: {
         comments: args.comments ?? [],
         canvas: source.canvas,
         sourceSize: source.sourceSize,
+        sceneScale: source.sceneScale,
         context: source.context,
         image: source.image,
         frameSink,
@@ -196,7 +210,10 @@ export async function writeReviewFrames(args: {
 }
 
 interface ReviewRenderPreparation {
-  codec: 'avc' | 'vp8' | 'vp9';
+  codec: ReviewOutputCodec;
+  container: 'mp4' | 'webm';
+  resolution: VideoResolutionPreset;
+  quality: ReviewRenderSettings['quality'];
   fps: number;
   windows: ReviewFrameWindow[];
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;
@@ -222,16 +239,10 @@ function prepareReviewRender(args: {
     )
   )
     throw new Error('Export requires valid non-overlapping edit ranges.');
-  const codec = args.renderSettings?.codec ?? args.index.processedVideoCodec;
-  const supported =
-    args.index.supportedVideoCodecs ??
-    (args.index.processedVideoCodec ? [args.index.processedVideoCodec] : []);
-  if (
-    !codec ||
-    !supported.includes(codec) ||
-    (args.index.container === 'mp4' ? codec !== 'avc' : codec === 'avc')
-  )
-    throw new QuickEditExportUnavailable(['video-encoder']);
+  const container = args.renderSettings?.format ?? args.index.container;
+  const supported = reviewOutputCodecs(args.index, container);
+  const codec = args.renderSettings?.codec ?? supported[0];
+  if (!codec || !supported.includes(codec)) throw new QuickEditExportUnavailable(['video-encoder']);
   const requestedFps = args.renderSettings?.frameRate;
   if (requestedFps !== undefined && ![0, 24, 30, 60].includes(requestedFps))
     throw new Error('Unsupported render frame rate.');
@@ -244,6 +255,9 @@ function prepareReviewRender(args: {
   if (!windows.length) throw new Error('The edited video is empty.');
   return {
     codec,
+    container,
+    resolution: args.renderSettings?.resolution ?? VideoResolutionPreset.SOURCE,
+    quality: args.renderSettings?.quality ?? 'HIGH',
     fps,
     windows,
     effective: resolveQuickEditEffectiveState(args.advanced),
@@ -271,6 +285,7 @@ interface ReviewRenderSource {
   audioConfig: AudioDecoderConfig | null;
   processedAudio: 'aac' | 'opus' | null;
   sampleRate: number;
+  sceneScale: number;
   canvas: HTMLCanvasElement;
   sourceSize: { width: number; height: number };
   context: CanvasRenderingContext2D;
@@ -302,9 +317,12 @@ async function openReviewRenderSource(
   const speedExists = preparation.windows.some(
     (window) => window.segment.kind === 'speed' && window.segment.rate !== 1
   );
-  const processing = (speedExists && !!audio) || !!args.exportAudio;
+  const processing =
+    (speedExists && !!audio) ||
+    !!args.exportAudio ||
+    (preparation.container === 'webm' && audio?.codec === 'aac');
   const processedAudio = processing
-    ? await chooseReviewAudioCodec(audio ?? null, index.container)
+    ? await chooseReviewAudioCodec(audio ?? null, preparation.container)
     : null;
   if (processing && !processedAudio) throw new Error('Audio processing is unavailable.');
   const sourceSize = {
@@ -312,9 +330,37 @@ async function openReviewRenderSource(
     height: Math.round(await video.getDisplayHeight()),
   };
   const canvas = document.createElement('canvas');
-  canvas.width = preparation.effective.canvas?.width ?? sourceSize.width;
-  canvas.height = preparation.effective.canvas?.height ?? sourceSize.height;
-  const context = canvas.getContext('2d');
+  const dimensions = resolveVideoOutputDimensions(
+    preparation.effective.canvas?.width ?? sourceSize.width,
+    preparation.effective.canvas?.height ?? sourceSize.height,
+    preparation.resolution
+  );
+  canvas.width = dimensions.width;
+  canvas.height = dimensions.height;
+  const scale = canvas.width / (preparation.effective.canvas?.width ?? sourceSize.width);
+  const background = preparation.effective.background;
+  if (background.enabled)
+    preparation.effective.background = {
+      ...background,
+      layout: {
+        padding: background.layout.padding * scale,
+        cornerRadius: background.layout.cornerRadius * scale,
+      },
+    };
+
+  const supported = await supportedReviewVideoCodecs(preparation.container, {
+    width: canvas.width,
+    height: canvas.height,
+    fps: preparation.fps,
+    bitrate: resolveReviewRenderBitrate(
+      { width: canvas.width, height: canvas.height, fps: preparation.fps },
+      preparation.quality
+    ),
+  });
+  if (!supported.includes(preparation.codec))
+    throw new QuickEditExportUnavailable(['video-encoder']);
+  signal.throwIfAborted();
+  const context = canvas.getContext('2d', { alpha: false, colorSpace: 'srgb' });
   if (!context) throw new Error('Canvas context is unavailable.');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
@@ -335,6 +381,7 @@ async function openReviewRenderSource(
     sampleRate: audio ? await audio.getSampleRate() : 0,
     canvas,
     sourceSize,
+    sceneScale: scale,
     context,
     image: backgroundImage,
   };
@@ -408,6 +455,7 @@ export async function renderRenderWindowFrames(args: {
   comments: readonly CanvasCommentExport[];
   canvas: HTMLCanvasElement;
   sourceSize: { width: number; height: number };
+  sceneScale?: number;
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
   frameSink: VideoSampleSink;
@@ -417,6 +465,15 @@ export async function renderRenderWindowFrames(args: {
   signal: AbortSignal;
 }): Promise<number> {
   const { window, fps, canvas, context, videoOut, signal } = args;
+  // Decode surfaces may contain padded rows. Filter only the visible raster when composing,
+  // otherwise GPU interpolation can sample chroma from outside the source's visible rect.
+  const raster = document.createElement('canvas');
+  raster.width = args.sourceSize.width;
+  raster.height = args.sourceSize.height;
+  const rasterContext = raster.getContext('2d', { alpha: false, colorSpace: 'srgb' });
+  if (!rasterContext) throw new Error('Canvas context is unavailable.');
+  rasterContext.imageSmoothingEnabled = false;
+
   const scratch = args.zoomRegions.some((region) => region.spotlight?.effect === 'blur')
     ? document.createElement('canvas')
     : null;
@@ -446,12 +503,15 @@ export async function renderRenderWindowFrames(args: {
           comment.renderToVideo &&
           isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
       );
+      sample.draw(rasterContext, 0, 0, raster.width, raster.height);
       drawReviewSceneFrame(context, {
         canvas,
         layout,
         background: args.background,
         image: args.image,
-        sample,
+        sample: {
+          draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
+        },
         comments: burned,
         sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
         cameraScale: camera.scale,
@@ -465,7 +525,7 @@ export async function renderRenderWindowFrames(args: {
           time: timestamp + args.fragmentOffset,
           output: canvas,
           video: layout.videoRect,
-          scale: 1,
+          scale: args.sceneScale ?? 1,
         })
       );
       const encoded = new VideoSample(canvas, { timestamp, duration: 1 / fps });
@@ -512,7 +572,15 @@ export function drawReviewSceneFrame(
     layout: ReturnType<typeof computeQuickEditSceneLayout>;
     background: QuickEditAdvancedState['background'];
     image: ImageBitmap | null;
-    sample: Pick<VideoSample, 'draw'>;
+    sample: {
+      draw(
+        context: CanvasRenderingContext2D,
+        x: number,
+        y: number,
+        width: number,
+        height: number
+      ): void;
+    };
     comments?: readonly CanvasCommentExport[];
     sourceTime?: number;
     cameraScale?: number;
