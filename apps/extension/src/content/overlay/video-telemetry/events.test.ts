@@ -42,3 +42,22 @@ it.each([1, 2])('retains actual pointer clicks at the origin with click count %s
   );
   expect(state.actionEvents[0]).toMatchObject({ kind: 'CLICK', point: { x: 0, y: 0 } });
 });
+
+it('deduplicates the same control but retains a different control at the same position', () => {
+  const state = createInitialState();
+  const listeners = createTelemetryListeners(state);
+  const first = document.createElement('button');
+  const second = document.createElement('button');
+  for (const button of [first, second]) button.addEventListener('click', listeners.click);
+  const click = (button: HTMLButtonElement, timeStamp: number, detail = 1) => {
+    const event = new MouseEvent('click', { detail, clientX: 20, clientY: 30 });
+    Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+    button.dispatchEvent(event);
+  };
+  click(first, 1000);
+  click(first, 1200, 2);
+  click(second, 1300);
+  expect(state.actionEvents).toHaveLength(2);
+  expect(state.actionEvents[0]?.data['clickCount']).toBe(2);
+  expect(state.actionEvents[0]?.data['targetId']).not.toBe(state.actionEvents[1]?.data['targetId']);
+});

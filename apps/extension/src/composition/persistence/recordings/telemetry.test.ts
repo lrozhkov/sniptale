@@ -193,3 +193,30 @@ it('roundtrips recording-image points, unavailable geometry and raw client point
     })
   ).rejects.toThrow('Invalid recording telemetry entry.');
 });
+
+it('applies the same noise policy on publication and read without mutating stored input', async () => {
+  const db = createDb();
+  initDbMock.mockResolvedValue(db);
+  const entry: RecordingTelemetryEntry = {
+    actionEvents: [],
+    captureMode: null,
+    createdAt: 1,
+    updatedAt: 1,
+    recordingId: 'noise',
+    cursorTrack: null,
+    viewport: null,
+    signals: [
+      { id: 'a', kind: 'typing', startTime: 0, endTime: 1, point: null, data: {} },
+      { id: 'b', kind: 'typing', startTime: 1.5, endTime: 3, point: null, data: {} },
+      { id: 'short', kind: 'typing', startTime: 5, endTime: 6, point: null, data: {} },
+    ],
+  };
+  db.get.mockResolvedValue(entry);
+  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
+  await saveRecordingTelemetry(entry);
+  const read = await getRecordingTelemetry('noise');
+  expect(read?.signals).toEqual([{ ...entry.signals[0]!, endTime: 3 }]);
+  expect(db.put).toHaveBeenCalledWith('recording_telemetry', read);
+  expect(entry.signals).toHaveLength(3);
+  expect(entry.signals[0]!.endTime).toBe(1);
+});

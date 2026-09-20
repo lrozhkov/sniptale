@@ -1,3 +1,7 @@
+import {
+  normalizeRecordingActions,
+  normalizeRecordingSignals,
+} from '../../../features/video/project/recording-actions';
 import { initDB, RECORDING_TELEMETRY_STORE } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -11,7 +15,9 @@ export async function saveRecordingTelemetry(entry: RecordingTelemetryEntry): Pr
   if (!parsedEntry) {
     throw new Error('Invalid recording telemetry entry.');
   }
-  await runWithIndexedDbMutation((db) => db.put(RECORDING_TELEMETRY_STORE, parsedEntry));
+  await runWithIndexedDbMutation((db) =>
+    db.put(RECORDING_TELEMETRY_STORE, normalizeTelemetry(parsedEntry))
+  );
 }
 
 export async function getRecordingTelemetry(
@@ -27,9 +33,17 @@ export async function getRecordingTelemetry(
     });
   }
 
-  return entry?.recordingId === recordingId ? entry : undefined;
+  return entry?.recordingId === recordingId ? normalizeTelemetry(entry) : undefined;
 }
 
 export async function deleteRecordingTelemetry(recordingId: string): Promise<void> {
   await runWithIndexedDbMutation((db) => db.delete(RECORDING_TELEMETRY_STORE, recordingId));
+}
+
+function normalizeTelemetry(entry: RecordingTelemetryEntry): RecordingTelemetryEntry {
+  return {
+    ...entry,
+    actionEvents: normalizeRecordingActions(entry.actionEvents),
+    signals: normalizeRecordingSignals(entry.signals),
+  };
 }

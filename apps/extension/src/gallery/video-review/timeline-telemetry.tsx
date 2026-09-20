@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import {
   Activity,
   MousePointer2,
+  MousePointerClick,
+  Command,
   Keyboard,
   Mouse,
   Pause,
@@ -68,9 +70,18 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
             aria-label={[
               translate('gallery.videoReview.telemetry'),
               reviewEventLabel(marker.eventType),
-              reviewTimeLabel(marker.start),
-            ].join(' · ')}
-            title={`${reviewEventLabel(marker.eventType)} · ${reviewTimeLabel(marker.start)}`}
+              marker.target,
+              `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            title={[
+              reviewEventLabel(marker.eventType),
+              marker.target,
+              `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
             onClick={() => props.onMarker(marker)}
             className={[
               'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
@@ -99,20 +110,24 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
 /** Event-specific shapes remain identifiable in narrow point markers. */
 function ReviewEventIcon({ kind }: { kind: string }) {
   const Icon =
-    kind === 'CLICK' || kind === 'DOUBLE_CLICK'
-      ? MousePointer2
-      : kind === 'typing' || kind === 'KEY'
-        ? Keyboard
-        : kind === 'SCROLL'
-          ? Mouse
-          : kind === 'PAUSE'
-            ? Pause
-            : kind === 'CALLOUT'
-              ? MessageSquare
-              : kind === 'cursor-idle'
-                ? Clock
-                : kind === 'static-frame'
-                  ? Focus
-                  : Activity;
+    kind === 'DOUBLE_CLICK'
+      ? MousePointerClick
+      : kind === 'CLICK'
+        ? MousePointer2
+        : kind === 'KEY'
+          ? Command
+          : kind === 'typing'
+            ? Keyboard
+            : kind === 'SCROLL'
+              ? Mouse
+              : kind === 'PAUSE'
+                ? Pause
+                : kind === 'CALLOUT'
+                  ? MessageSquare
+                  : kind === 'cursor-idle'
+                    ? Clock
+                    : kind === 'static-frame'
+                      ? Focus
+                      : Activity;
   return <Icon size={12} className="shrink-0" aria-hidden="true" />;
 }

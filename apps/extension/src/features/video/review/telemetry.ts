@@ -1,3 +1,4 @@
+import { normalizeRecordingActions, normalizeRecordingSignals } from '../project/recording-actions';
 import type {
   RecordingTelemetrySignal,
   RecordingActionEvent,
@@ -13,6 +14,7 @@ interface ReviewTelemetryInput {
 export interface ReviewTelemetryMarker {
   ref: { kind: 'action' | 'signal' | 'cursor'; id: string };
   eventType: string;
+  target?: string;
   start: number;
   end: number;
 }
@@ -30,7 +32,8 @@ export function projectReviewTelemetry(
     id: string,
     eventType: string,
     start: number,
-    end: number
+    end: number,
+    target?: string
   ) => {
     if (
       !Number.isFinite(start) ||
@@ -40,24 +43,37 @@ export function projectReviewTelemetry(
       end < start
     )
       return;
-    markers.push({ ref: { kind, id }, eventType, start, end: Math.min(duration, end) });
+    markers.push({
+      ref: { kind, id },
+      eventType,
+      start,
+      end: Math.min(duration, end),
+      ...(target ? { target: target.slice(0, 120) } : {}),
+    });
   };
-  for (const event of input.actionEvents)
-    add('action', event.id, event.kind, event.time, event.time + event.duration);
-  for (const signal of input.signals) {
-    if (
-      signal.kind === 'typing' &&
-      (signal.data['targetTag'] === 'select' ||
-        ['checkbox', 'radio', 'range', 'color', 'file', 'button'].includes(
-          typeof signal.data['targetType'] === 'string' ? signal.data['targetType'] : ''
-        ))
-    )
-      continue;
+  for (const event of normalizeRecordingActions(input.actionEvents))
+    add(
+      'action',
+      event.id,
+      event.kind === 'CLICK' && event.data['clickCount'] === 2 ? 'DOUBLE_CLICK' : event.kind,
+      event.time,
+      event.time + event.duration,
+      event.label || undefined
+    );
+  for (const signal of normalizeRecordingSignals(input.signals)) {
     if (signal.kind === 'static-frame' && signal.startTime === signal.endTime) {
       if (signal.data['code'] !== undefined) warnings += 1;
       continue;
     }
-    add('signal', signal.id, signal.kind, signal.startTime, signal.endTime);
+    const target = signal.data['targetName'];
+    add(
+      'signal',
+      signal.id,
+      signal.kind,
+      signal.startTime,
+      signal.endTime,
+      typeof target === 'string' ? target : undefined
+    );
   }
   if (includeCursor)
     for (const sample of input.cursorTrack?.samples ?? [])

@@ -5,6 +5,7 @@ import type { TelemetryState } from './types';
 
 export function createInitialState(): TelemetryState {
   return {
+    captureSegment: 0,
     accumulatedDurationMs: 0,
     actionEvents: [],
     cursorIdleSignal: null,
@@ -21,7 +22,6 @@ export function createInitialState(): TelemetryState {
     segmentStartedAtTimestamp: 0,
     signals: [],
     typingSignal: null,
-    typingTarget: null,
     viewport: null,
     viewportObservation: null,
     viewportObserver: null,
@@ -77,6 +77,7 @@ export function resetTelemetryState(
   recordingId: string | null,
   offsetSeconds = 0
 ): void {
+  state.captureSegment = 0;
   state.accumulatedDurationMs = Math.max(0, offsetSeconds * 1000);
   state.actionEvents = [];
   state.cursorIdleSignal = null;
@@ -91,7 +92,6 @@ export function resetTelemetryState(
   state.segmentStartedAtTimestamp = performance.now();
   state.signals = [];
   state.typingSignal = null;
-  state.typingTarget = null;
   state.viewport = buildViewportSnapshot();
   state.viewportObservation = { initial: buildRecordingViewportGeometry(), stable: true };
   observeViewportGeometry(state);

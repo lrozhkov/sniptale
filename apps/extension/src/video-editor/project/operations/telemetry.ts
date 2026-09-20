@@ -1,3 +1,4 @@
+import { normalizeRecordingActions } from '../../../features/video/project/recording-actions';
 import { isRecordingPoint } from '../../../features/video/project/validation/recording-telemetry';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
@@ -108,7 +109,7 @@ export function normalizeRecordingActionEventsToProjectSpace(
   actionEvents: RecordingActionEvent[],
   _params: NormalizeRecordingTelemetryParams
 ): RecordingActionEvent[] {
-  return actionEvents.map((event) => ({
+  return normalizeRecordingActions(actionEvents).map((event) => ({
     ...event,
     point: isRecordingPoint(event.recordingPoint) ? { ...event.recordingPoint } : null,
   }));

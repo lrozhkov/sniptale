@@ -25,7 +25,7 @@ it('tracks the visible portion through scroll and resize and releases observers'
     () => new DOMRect(left, 0, width, 32)
   );
   const host = document.createElement('div');
-  host.dataset.ui = 'gallery.videoReview.timelineViewport';
+  host.dataset['ui'] = 'gallery.videoReview.timelineViewport';
   vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 500, 32));
   const removed = vi.spyOn(host, 'removeEventListener');
   const root = createRoot(host);

@@ -16,7 +16,7 @@ function telemetry(): RecordingTelemetryEntry {
     viewport: null,
     cursorTrack: null,
     actionEvents: [],
-    signals: [{ id: 'typing', kind: 'typing', startTime: 1, endTime: 3, point: null, data: {} }],
+    signals: [{ id: 'typing', kind: 'typing', startTime: 1, endTime: 4, point: null, data: {} }],
   };
 }
 
@@ -40,7 +40,7 @@ it('projects the captured typing interval into each independent appearance at it
     {
       kind: 'typing',
       startTime: 1,
-      endTime: 3,
+      endTime: 4,
       clipId: 'first',
       sourceInstanceId: 'first-instance',
       recordingId: source.recordingId,
@@ -49,7 +49,7 @@ it('projects the captured typing interval into each independent appearance at it
     {
       kind: 'typing',
       startTime: 10,
-      endTime: 11,
+      endTime: 11.5,
       clipId: 'repeat',
       sourceInstanceId: 'repeat-instance',
       signalId: 'typing',
@@ -102,8 +102,8 @@ it('keeps exact source and clip identities across a split and an independent rep
     ])
   ).toEqual([
     ['head', 1, 2, 1, 2],
-    ['tail', 2, 3, 2, 3],
-    ['repeat', 1, 3, 11, 13],
+    ['tail', 2, 4, 2, 4],
+    ['repeat', 1, 4, 11, 14],
   ]);
 });
 

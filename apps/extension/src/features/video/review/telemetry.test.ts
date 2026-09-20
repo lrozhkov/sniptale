@@ -117,7 +117,15 @@ it('projects raw capture time even when optional animation and source anchor dif
   expect(
     projectReviewTelemetry({ actionEvents: [event], signals: [], cursorTrack: null }, 10)
   ).toEqual({
-    markers: [{ ref: { kind: 'action', id: 'raw' }, eventType: 'CLICK', start: 2, end: 2.25 }],
+    markers: [
+      {
+        ref: { kind: 'action', id: 'raw' },
+        eventType: 'CLICK',
+        start: 2,
+        end: 2.25,
+        target: 'Click',
+      },
+    ],
     warnings: 0,
   });
   expect(event).toEqual(before);
@@ -155,7 +163,7 @@ it('filters positively identified nontext changes without hiding a click followe
       id: 'text',
       kind: 'typing',
       startTime: 1,
-      endTime: 2,
+      endTime: 4,
       point: null,
       data: { targetTag: 'input', targetType: 'text' },
     },

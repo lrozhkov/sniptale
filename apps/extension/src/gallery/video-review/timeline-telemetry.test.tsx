@@ -113,3 +113,12 @@ it('exposes readable event text for a history interval with available space', ()
   render([{ ...marker('action', 'readable', 1, 3), eventType: 'SCROLL' }]);
   expect(host.querySelector('button')?.textContent).toContain('gallery.videoReview.eventScroll');
 });
+
+it('describes the captured target and full interval in the action hint', () => {
+  render([{ ...marker('signal', 'typing', 1, 4), eventType: 'typing', target: 'Search projects' }]);
+  const button = host.querySelector('button')!;
+  expect(button.title).toContain('Search projects');
+  expect(button.title).toContain('1.0');
+  expect(button.title).toContain('4.0');
+  expect(button.getAttribute('aria-label')).toContain('Search projects');
+});

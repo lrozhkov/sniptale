@@ -79,24 +79,29 @@ it('bounds labels and does not copy ordinary page text or URLs', () => {
   expect(describe(link).data).toEqual({ targetTag: 'a', targetName: 'Open' });
 });
 
-it('keeps typing in different fields separate and publishes only scalar metadata', () => {
+it('merges fast form entry while publishing only scalar target metadata', () => {
   const state = createInitialState();
   const listeners = createTelemetryListeners(state);
-  for (const name of ['First field', 'Second field']) {
+  for (const [index, name] of [
+    'First field',
+    'Second field',
+    'First field',
+    'Second field',
+    'First field',
+  ].entries()) {
     const input = document.createElement('input');
     input.setAttribute('aria-label', name);
     input.value = 'never retained';
     document.body.append(input);
     input.addEventListener('input', listeners.input);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const event = new Event('input', { bubbles: true });
+    Object.defineProperty(event, 'timeStamp', { value: 1000 + index * 800 });
+    input.dispatchEvent(event);
   }
   finalizeTelemetrySignals(state);
-  expect(state.signals).toHaveLength(2);
-  expect(state.signals.map((signal) => signal.data['targetName'])).toEqual([
-    'First field',
-    'Second field',
-  ]);
-  expect(state.typingTarget).toBeNull();
+  expect(state.signals).toHaveLength(1);
+  expect(state.signals.map((signal) => signal.data['targetName'])).toEqual(['First field']);
+  expect(state.typingSignal).toBeNull();
   expect(JSON.stringify(state.signals)).not.toContain('never retained');
   expect(
     state.signals
