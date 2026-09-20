@@ -1,5 +1,5 @@
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type {
   QuickEditAdvancedState,
   QuickEditZoomRegion,
@@ -128,8 +128,16 @@ export function useReviewZoomEditor(args: {
   linkSelection?: string | null;
   onLinkSelectionChange?(id: string | null): void;
 }) {
+  const [draft, setDraft] = useState<{
+    id: string;
+    patch: QuickEditZoomRegionPatch;
+    base: string;
+  } | null>(null);
   const [localSelection, setLocalSelection] = useState<string | null>(null);
   const selection = args.selection === undefined ? localSelection : args.selection;
+  useEffect(() => {
+    setDraft(null);
+  }, [selection]);
   const setSelection = (id: string | null) => {
     if (args.selection === undefined) setLocalSelection(id);
     args.onSelectionChange?.(id);
@@ -190,8 +198,23 @@ export function useReviewZoomEditor(args: {
         }),
       };
     });
-  const change = (id: string, patch: QuickEditZoomRegionPatch) =>
+  const change = (id: string, patch: QuickEditZoomRegionPatch) => {
+    setDraft(null);
     args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch));
+  };
+  const preview = (id: string, patch: QuickEditZoomRegionPatch | null) =>
+    setDraft(
+      patch
+        ? { id, patch, base: focusRevision(args.zoom.regions.find((item) => item.id === id)) }
+        : null
+    );
+  const previewRegion = (region: QuickEditZoomRegion): QuickEditZoomRegion =>
+    draft &&
+    draft.id === selection &&
+    draft.id === region.id &&
+    draft.base === focusRevision(region)
+      ? updateQuickEditZoomRegion([region], region.id, draft.patch)[0]!
+      : region;
   const commitDrag = (
     id: string,
     range: { start: number; end: number },
@@ -199,11 +222,6 @@ export function useReviewZoomEditor(args: {
   ) => args.setZoom((zoom) => applyZoomCommit(args.timelineDuration, zoom, id, range, edge));
   const selected = (zoom: ZoomState): QuickEditZoomRegion | null =>
     zoom.regions.find((item) => item.id === selection) ?? null;
-  const focusOverlay = (region: QuickEditZoomRegion) => ({
-    camera: region.transform,
-    onDrag: (point: { x: number; y: number }) =>
-      change(region.id, { centerX: point.x, centerY: point.y }),
-  });
   return {
     selection,
     setSelection,
@@ -215,7 +233,40 @@ export function useReviewZoomEditor(args: {
     change,
     commitDrag,
     selected,
-    focusOverlay,
+    preview,
+    previewRegion,
     toggleEnabled: () => args.setZoom((zoom) => ({ ...zoom, enabled: !zoom.enabled })),
   };
+}
+
+/** Autosave acknowledgement changes object identity, not the authored focus target. */
+function focusRevision(region: QuickEditZoomRegion | undefined): string {
+  if (!region) return '';
+  const { transform: camera, spotlight: mask, enter, exit } = region;
+  return JSON.stringify([
+    region.id,
+    region.start,
+    region.end,
+    region.dormant,
+    region.linkTo,
+    region.linkEasing,
+    camera.scale,
+    camera.centerX,
+    camera.centerY,
+    enter.type,
+    enter.duration,
+    exit.type,
+    exit.duration,
+    mask && [
+      mask.effect,
+      mask.strength,
+      mask.blur,
+      mask.roundness,
+      mask.reveal,
+      mask.area.x,
+      mask.area.y,
+      mask.area.width,
+      mask.area.height,
+    ],
+  ]);
 }

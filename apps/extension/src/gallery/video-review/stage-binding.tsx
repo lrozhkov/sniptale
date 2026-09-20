@@ -14,6 +14,7 @@ import type {
 } from '../../features/video/review/types';
 import type { useCanvasComments } from './use-canvas-comments';
 import { ReviewStage } from './stage';
+import type { ReviewStageFocus } from './stage-focus';
 import { useReviewBackgroundImage } from './use-review-background';
 import { ReviewButton } from './controls';
 import { translate } from '../../platform/i18n';
@@ -21,7 +22,7 @@ import { translate } from '../../platform/i18n';
 /**
  * One stage binding: the applied scene (background plus the camera at the represented
  * frame), the selected focus handle, and the overlay stack. Effective regions already
- * exclude disabled lanes; selection itself never changes the applied pixels.
+ * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 export function ReviewStageBinding(props: {
   backgroundPending?: boolean;
@@ -34,12 +35,7 @@ export function ReviewStageBinding(props: {
   zoomRegions: readonly QuickEditZoomRegion[];
   background: QuickEditBackgroundSettings;
   outputTime: number;
-  zoomOverlay:
-    | {
-        camera: QuickEditCameraTransform;
-        onDrag(point: { x: number; y: number }): void;
-      }
-    | undefined;
+  zoomOverlay: ReviewStageFocus | undefined;
   comments: readonly CanvasComment[];
   annotations: readonly ReviewAnnotation[];
   canvasComments: ReturnType<typeof useCanvasComments>;
@@ -54,8 +50,22 @@ export function ReviewStageBinding(props: {
   onError(): void;
 }) {
   const image = useReviewBackgroundImage(props.background, props.backgroundPending);
-  const camera: QuickEditCameraTransform = props.zoomRegions.length
-    ? evaluateQuickEditCameraAtTime(props.zoomRegions, props.outputTime)
+  const selected = props.zoomOverlay?.region;
+  const framing =
+    selected &&
+    props.zoomRegions.some((region) => region.id === selected.id) &&
+    Math.abs(props.outputTime - (selected.start + selected.end) / 2) < 0.05;
+  const regions = framing
+    ? [
+        {
+          ...selected,
+          enter: { type: 'none' as const, duration: 0 },
+          exit: { type: 'none' as const, duration: 0 },
+        },
+      ]
+    : props.zoomRegions;
+  const camera: QuickEditCameraTransform = regions.length
+    ? evaluateQuickEditCameraAtTime(regions, props.outputTime)
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
   const geometryRef = useRef<{
     output: { width: number; height: number };
@@ -101,7 +111,7 @@ export function ReviewStageBinding(props: {
           background: props.background,
           camera,
           canvas: props.canvas,
-          focus: { regions: props.zoomRegions, time: props.outputTime },
+          focus: { regions, time: props.outputTime },
         }}
         {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}
         comments={{

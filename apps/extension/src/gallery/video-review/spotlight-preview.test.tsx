@@ -47,6 +47,7 @@ const output = { width: 200, height: 100 };
 const rect = { x: 0, y: 0, ...output };
 function render(disabled = false) {
   const onChange = vi.fn();
+  const onPreview = vi.fn();
   act(() =>
     root.render(
       <ReviewSpotlightPreview
@@ -59,13 +60,15 @@ function render(disabled = false) {
         scale={1}
         disabled={disabled}
         onChange={onChange}
+        onPreview={onPreview}
       />
     )
   );
   return {
     onChange,
+    onPreview,
     group: host.querySelector<HTMLElement>('[role="group"]')!,
-    plane: host.firstElementChild!,
+    plane: host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!,
   };
 }
 async function pointer(target: Element, kind: string, x: number, y = 50) {
@@ -87,6 +90,11 @@ it('commits one bounded move or resize and discards cancelled drafts', async () 
   await pointer(view.group, 'pointerdown', 50);
   await pointer(view.plane, 'pointermove', 70);
   expect(view.onChange).not.toHaveBeenCalled();
+  expect(view.onPreview).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      area: { x: 0.35, y: 0.25, width: 0.5, height: 0.5 },
+    })
+  );
   await pointer(view.plane, 'pointerup', 70);
   expect(view.onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({ area: { x: 0.35, y: 0.25, width: 0.5, height: 0.5 } })
@@ -102,6 +110,13 @@ it('commits one bounded move or resize and discards cancelled drafts', async () 
   for (const cancellation of ['pointercancel', 'lostpointercapture', 'Escape']) {
     await pointer(view.group, 'pointerdown', 50);
     await pointer(view.plane, 'pointermove', 70);
+    const arrow = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => view.group.dispatchEvent(arrow));
+    expect(arrow.defaultPrevented).toBe(true);
     if (cancellation === 'Escape') await key(view.group, 'Escape');
     else await pointer(view.plane, cancellation, 70);
     await pointer(view.plane, 'pointerup', 70);

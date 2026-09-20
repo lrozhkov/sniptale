@@ -973,6 +973,56 @@ for (const variant of [
       });
       await enterDuration.fill('1.5');
       await enterDuration.press('Tab');
+      // Long-transition framing shows the final target on both surfaces, before release.
+      await preview.scrollIntoViewIfNeeded();
+      const canvasBounds = await preview.locator('canvas').boundingBox();
+      if (!canvasBounds) throw new Error('Framing preview has no bounds');
+      const stageVideo = dialog.locator('video');
+      await page.mouse.move(
+        canvasBounds.x + canvasBounds.width * 0.51,
+        canvasBounds.y + canvasBounds.height * 0.5
+      );
+      await page.mouse.down();
+      const originTransform = await stageVideo.evaluate((node) => node.style.transform);
+      await page.mouse.move(
+        canvasBounds.x + canvasBounds.width * 0.61,
+        canvasBounds.y + canvasBounds.height * 0.5,
+        { steps: 5 }
+      );
+      await expect
+        .poll(() => stageVideo.evaluate((node) => node.style.transform))
+        .not.toBe(originTransform);
+      expect(
+        await stageVideo.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).m11)
+      ).toBeCloseTo(2.25);
+      await expect(focusX).toHaveValue('51');
+      await page.mouse.up();
+      await expect(focusX).toHaveValue('61');
+      await button('gallery.videoReview.undo').click();
+      await expect(focusX).toHaveValue('51');
+      // Main canvas grabs the image, with exact opposite camera movement and no feedback.
+      const pan = dialog.locator('[data-ui="gallery.videoReview.zoomTarget"]');
+      const panBounds = await pan.boundingBox();
+      if (!panBounds) throw new Error('Stage focus has no bounds');
+      await page.mouse.move(
+        panBounds.x + panBounds.width * 0.5,
+        panBounds.y + panBounds.height * 0.5
+      );
+      await page.mouse.down();
+      const beforePan = await stageVideo.evaluate((node) => node.style.transform);
+      await page.mouse.move(
+        panBounds.x + panBounds.width * 0.6125,
+        panBounds.y + panBounds.height * 0.5,
+        { steps: 5 }
+      );
+      await expect
+        .poll(() => stageVideo.evaluate((node) => node.style.transform))
+        .not.toBe(beforePan);
+      await expect(focusX).toHaveValue('51');
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      await expect.poll(() => stageVideo.evaluate((node) => node.style.transform)).toBe(beforePan);
+      await expect(focusX).toHaveValue('51');
       await enter.scrollIntoViewIfNeeded();
       await page.screenshot({ path: testInfo.outputPath('zoom-transition-controls.png') });
       const video = dialog.locator('video');
@@ -1234,10 +1284,12 @@ for (const variant of [
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first()
         .click();
-      const opening = dialog.getByRole('group', {
-        name: label('gallery.videoReview.focusSpotlight'),
-        exact: true,
-      });
+      const opening = dialog
+        .locator('[data-ui="gallery.videoReview.zoomPreview"]')
+        .getByRole('group', {
+          name: label('gallery.videoReview.focusSpotlight'),
+          exact: true,
+        });
       await expect(opening).toBeVisible();
       await opening.focus();
       await page.keyboard.press('ArrowRight');
@@ -1249,6 +1301,50 @@ for (const variant of [
         dialog.getByRole('textbox', { name: label('gallery.videoReview.focusAreaX'), exact: true })
       ).toHaveValue('25');
       const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      const areaX = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.focusAreaX'),
+        exact: true,
+      });
+      const stageArea = stage.getByRole('group', {
+        name: label('gallery.videoReview.focusSpotlight'),
+        exact: true,
+      });
+      const originalLeft = await stageArea.evaluate((node) => node.style.left);
+      const smallBounds = await opening.boundingBox();
+      if (!smallBounds) throw new Error('Spotlight preview has no bounds');
+      await page.mouse.move(
+        smallBounds.x + smallBounds.width / 2,
+        smallBounds.y + smallBounds.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        smallBounds.x + smallBounds.width * 0.7,
+        smallBounds.y + smallBounds.height / 2,
+        { steps: 5 }
+      );
+      await expect.poll(() => stageArea.evaluate((node) => node.style.left)).not.toBe(originalLeft);
+      await expect(areaX).toHaveValue('25');
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      await expect.poll(() => stageArea.evaluate((node) => node.style.left)).toBe(originalLeft);
+      const stageBounds = await stageArea.boundingBox();
+      if (!stageBounds) throw new Error('Spotlight stage has no bounds');
+      await page.mouse.move(
+        stageBounds.x + stageBounds.width / 2,
+        stageBounds.y + stageBounds.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        stageBounds.x + stageBounds.width * 0.7,
+        stageBounds.y + stageBounds.height / 2,
+        { steps: 5 }
+      );
+      await expect.poll(() => opening.evaluate((node) => node.style.left)).not.toBe(originalLeft);
+      await expect(areaX).toHaveValue('25');
+      await page.mouse.up();
+      await expect(areaX).toHaveValue('35');
+      await button('gallery.videoReview.undo').click();
+      await expect(areaX).toHaveValue('25');
       await timelineGesture(page, 1);
       await expect(stage.locator('[data-ui="gallery.videoReview.spotlight"]')).toHaveCSS(
         'background-color',

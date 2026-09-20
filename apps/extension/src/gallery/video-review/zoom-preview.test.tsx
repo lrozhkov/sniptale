@@ -54,6 +54,7 @@ function renderPreview(args: {
   loadFrame?: (sourceTime: number, signal: AbortSignal) => Promise<ZoomPreviewFrame>;
   onInteract?: (time: number) => void;
   onChange?: (patch: QuickEditZoomRegionPatch) => void;
+  onPreview?: (patch: QuickEditZoomRegionPatch | null) => void;
 }) {
   const onChange = args.onChange ?? vi.fn();
   const loadFrame = args.loadFrame === undefined ? vi.fn(async () => frame) : vi.fn(args.loadFrame);
@@ -67,6 +68,7 @@ function renderPreview(args: {
         loadFrame={loadFrame}
         onInteract={args.onInteract}
         onChange={onChange}
+        onPreview={args.onPreview}
       />
     );
   });
@@ -97,9 +99,10 @@ it('loads the mapped source frame once and exposes the Area/Result switch', asyn
   expect(view.section().getAttribute('data-view')).toBe('result');
 });
 
-it('moves the camera center by pointer with clamped bounds', async () => {
+it('publishes live framing without persisting until release', async () => {
   const onChange = vi.fn((_patch: QuickEditZoomRegionPatch) => undefined);
-  const view = renderPreview({ onChange });
+  const onPreview = vi.fn();
+  const view = renderPreview({ onChange, onPreview });
   await act(async () => Promise.resolve());
   const canvas = view.canvas();
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
@@ -111,8 +114,9 @@ it('moves the camera center by pointer with clamped bounds', async () => {
   await pointer(canvas, 'pointerdown', 120, 67.5);
   // Pointer movement is local until release: cancel never writes a persisted edit.
   expect(onChange).not.toHaveBeenCalled();
-  await pointer(canvas, 'pointermove', 9999, -50);
+  await pointer(canvas, 'pointermove', 9999, -500);
   expect(onChange).not.toHaveBeenCalled();
+  expect(onPreview).toHaveBeenLastCalledWith({ centerX: 1, centerY: 0 });
   await pointer(canvas, 'pointerup', 9999);
   expect(onChange).toHaveBeenLastCalledWith({ centerX: 1, centerY: 0 });
 });

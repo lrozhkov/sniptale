@@ -224,6 +224,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
   transitionSmooth: { ru: 'Плавно', en: 'Smooth' },
   zoomResetPosition: { ru: 'Сбросить позицию', en: 'Reset position' },
   zoomDelete: { ru: 'Удалить фокусировку', en: 'Delete focus' },
+  zoomPanHint: {
+    ru: 'Перетащите кадр. Стрелки уточняют фокус, Shift ускоряет. Esc отменяет перемещение.',
+    en: 'Drag the frame. Arrow keys adjust focus; Shift moves faster. Esc cancels the drag.',
+  },
   zoomStageTarget: { ru: 'Фокус кадра зума', en: 'Zoom frame focus' },
   canvasSource: { ru: 'Исходные', en: 'Original' },
   scene: { ru: 'Сцена', en: 'Scene' },

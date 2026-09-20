@@ -548,7 +548,6 @@ function ReviewEditor({
     features.mode === 'advanced',
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
-  const zoomRegion = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
   return (
     <div
       className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)_auto]
@@ -568,13 +567,7 @@ function ReviewEditor({
           zoomRegions={features.zoomRegions}
           background={features.background}
           outputTime={state.timeline.sceneOutputTime}
-          zoomOverlay={
-            zoomRegion && !busy && editing.exporter.phase === 'idle'
-              ? zoomRegion.spotlight
-                ? undefined
-                : zoom.focusOverlay(zoomRegion)
-              : undefined
-          }
+          zoomOverlay={reviewFocusOverlay(state)}
           comments={snapshot.document.canvasComments}
           annotations={snapshot.document.annotations}
           canvasComments={canvasComments}
@@ -740,4 +733,20 @@ function reviewSelectionLabel(state: InspectorState): string | undefined {
         : 'gallery.videoReview.speedMode'
     );
   return undefined;
+}
+
+/** The selected focus shares one edit transaction between the inspector and the stage. */
+function reviewFocusOverlay(state: ReturnType<typeof useReviewEditorState>) {
+  const { zoom, features, advanced, busy, playing, editing } = state;
+  const region = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
+  if (!region || busy || playing || editing.exporter.phase !== 'idle') return undefined;
+  return {
+    region: zoom.previewRegion(region),
+    onPreview: (patch: Parameters<typeof zoom.preview>[1]) => zoom.preview(region.id, patch),
+    onChange: (patch: Parameters<typeof zoom.change>[1]) => zoom.change(region.id, patch),
+    onInteract: () => {
+      const time = state.timeline.timeMap.timelineToSource((region.start + region.end) / 2);
+      if (time !== null) state.seek(time, false);
+    },
+  };
 }

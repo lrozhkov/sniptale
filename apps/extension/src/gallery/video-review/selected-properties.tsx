@@ -97,7 +97,7 @@ export function ReviewSelectedProperties(props: {
               <ReviewZoomPreview
                 key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle'}
-                region={region}
+                region={zoom.previewRegion(region)}
                 background={advanced.background}
                 source={resource.source}
                 canvas={advanced.canvas}
@@ -105,6 +105,7 @@ export function ReviewSelectedProperties(props: {
                 onInteract={props.onPreviewFrame}
                 loadFrame={previewLoader}
                 onChange={(patch) => zoom.change(region.id, patch)}
+                onPreview={(patch) => zoom.preview(region.id, patch)}
               />
             )}
           />

@@ -1,5 +1,6 @@
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
+import { ReviewStageFocusControl, type ReviewStageFocus } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
@@ -11,10 +12,7 @@ import type {
   ReviewRegion,
   ReviewSource,
 } from '../../features/video/review/types';
-import {
-  computeQuickEditSceneLayout,
-  quickEditCanvasPointToContent,
-} from '../../features/video/review/advanced/scene';
+import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
@@ -53,11 +51,8 @@ export function ReviewStage(props: {
     camera: QuickEditCameraTransform;
     focus?: { regions: readonly QuickEditZoomRegion[]; time: number };
   };
-  /** Handle target for the selected zoom region, independent from the playhead camera. */
-  zoom?: {
-    camera: QuickEditCameraTransform;
-    onDrag(point: { x: number; y: number }): void;
-  };
+  /** Selected focus controls; disabled during playback and export by the binding. */
+  zoom?: ReviewStageFocus;
   comments?: {
     items: readonly CanvasComment[];
     annotations: readonly ReviewAnnotation[];
@@ -81,18 +76,6 @@ export function ReviewStage(props: {
   onError(): void;
 }) {
   const host = useRef<HTMLDivElement>(null);
-  const zoomDrag = useRef<{ origin: { x: number; y: number }; pointerId: number } | null>(null);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && zoomDrag.current) {
-        const origin = zoomDrag.current.origin;
-        zoomDrag.current = null;
-        props.zoom?.onDrag(origin);
-      }
-    };
-    window.addEventListener('keydown', cancel);
-    return () => window.removeEventListener('keydown', cancel);
-  });
   const { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight } =
     useReviewStageGeometry(props, host);
   const plane = useReviewDrawingPlane({
@@ -107,16 +90,6 @@ export function ReviewStage(props: {
     : props.region
       ? projectVideoRegion(props.region, content)
       : null;
-  const zoomFocus = zoomLayout
-    ? {
-        x:
-          zoomLayout.videoTransform.x +
-          props.zoom!.camera.centerX * zoomLayout.videoTransform.width,
-        y:
-          zoomLayout.videoTransform.y +
-          props.zoom!.camera.centerY * zoomLayout.videoTransform.height,
-      }
-    : null;
   return (
     <div
       ref={host}
@@ -171,13 +144,12 @@ export function ReviewStage(props: {
         {props.comments && props.comments.items.length ? (
           <ReviewStageComments comments={props.comments} output={size} source={props.source} />
         ) : null}
-        {zoomFocus && props.zoom && zoomLayout ? (
-          <ReviewZoomTarget
-            focus={zoomFocus}
-            camera={props.zoom.camera}
-            videoTransform={zoomLayout.videoTransform}
-            onDrag={props.zoom.onDrag}
-            zoomDrag={zoomDrag}
+        {props.zoom && zoomLayout ? (
+          <ReviewStageFocusControl
+            key={props.zoom.region.id}
+            focus={props.zoom}
+            layout={zoomLayout}
+            output={size}
           />
         ) : null}
       </div>
@@ -359,57 +331,6 @@ function backgroundPaintOf(background: {
   return '#000000';
 }
 
-/** Draggable camera focus: the handle maps canvas movement into normalized content points. */
-function ReviewZoomTarget(props: {
-  focus: { x: number; y: number };
-  camera: QuickEditCameraTransform;
-  videoTransform: { x: number; y: number; width: number; height: number };
-  onDrag(point: { x: number; y: number }): void;
-  zoomDrag: React.RefObject<{ origin: { x: number; y: number }; pointerId: number } | null>;
-}) {
-  return (
-    <div
-      data-ui="gallery.videoReview.zoomTarget"
-      role="slider"
-      aria-label={translate('gallery.videoReview.zoomStageTarget')}
-      aria-valuemin={0}
-      aria-valuemax={1}
-      aria-valuenow={props.camera.centerX}
-      className="absolute z-10 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-move
-          items-center justify-center rounded-full border-2
-          border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]"
-      style={{ left: props.focus.x, top: props.focus.y }}
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        event.stopPropagation();
-        props.zoomDrag.current = {
-          origin: { x: props.camera.centerX, y: props.camera.centerY },
-          pointerId: event.pointerId,
-        };
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={(event) => {
-        if (!props.zoomDrag.current) return;
-        const bounds = event.currentTarget.parentElement!.getBoundingClientRect();
-        const content = quickEditCanvasPointToContent(
-          { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-          props.videoTransform
-        );
-        if (content) props.onDrag(content);
-      }}
-      onPointerUp={(event) => {
-        if (!props.zoomDrag.current) return;
-        props.zoomDrag.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          event.currentTarget.releasePointerCapture(event.pointerId);
-      }}
-      onPointerCancel={() => {
-        props.zoomDrag.current = null;
-      }}
-    />
-  );
-}
-
 /** Measures and projects the preview through the same scene model as export. */
 function useReviewStageGeometry(
   props: Parameters<typeof ReviewStage>[0],
@@ -432,7 +353,9 @@ function useReviewStageGeometry(
         canvas: props.scene?.canvas,
         source: props.source,
         background: props.scene?.background ?? { enabled: false },
-        camera: props.zoom.camera,
+        camera: props.zoom.region.spotlight
+          ? { scale: 1, centerX: 0.5, centerY: 0.5 }
+          : props.zoom.region.transform,
       })
     : null;
   const backgroundPaint = props.scene?.background.enabled

@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { ReviewStageFocus } from './stage-focus';
 import { ReviewStage } from './stage';
 import type {
   QuickEditBackgroundSettings,
@@ -49,7 +50,7 @@ const renderStage = (props: {
     camera: QuickEditCameraTransform;
     canvas?: { width: number; height: number };
   };
-  zoom?: { camera: QuickEditCameraTransform; onDrag: (point: { x: number; y: number }) => void };
+  zoom?: ReviewStageFocus;
 }) => {
   act(() => {
     root.render(
@@ -139,31 +140,64 @@ it('keeps the identity scene for basic mode without advanced content', async () 
   expect(host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]')).toBeNull();
 });
 
-it('maps canvas target drags into normalized content points and restores on escape', async () => {
-  const onDrag = vi.fn((_point: { x: number; y: number }) => undefined);
-  const stage = renderStage({
-    scene: { background: disabled, camera: identity },
-    zoom: { camera: { scale: 2, centerX: 0.3, centerY: 0.4 }, onDrag },
-  });
+it('pans the grabbed frame with stable deltas and cancels without a commit', async () => {
+  const onPreview = vi.fn(),
+    onChange = vi.fn(),
+    onInteract = vi.fn();
+  const zoom: ReviewStageFocus = {
+    region: {
+      id: 'z',
+      start: 0,
+      end: 4,
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+    },
+    onPreview,
+    onChange,
+    onInteract,
+  };
+  const stage = renderStage({ scene: { background: disabled, camera: identity }, zoom });
   const target = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomTarget"]')!;
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 450));
   Object.assign(target, {
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,
     releasePointerCapture: vi.fn(),
   });
-  const bounds = host.getBoundingClientRect();
-  vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(bounds);
-  // Drag inside the fitted video rect: the center moves toward the pointer.
-  await stage.event(target, 'pointerdown', bounds.left + 300, bounds.top + 200);
-  await stage.event(target, 'pointermove', bounds.left + 400, bounds.top + 180);
-  expect(onDrag).toHaveBeenCalled();
-  const dragged = onDrag.mock.lastCall?.[0] as { x: number; y: number };
-  expect(dragged.x).toBeGreaterThanOrEqual(0);
-  expect(dragged.x).toBeLessThanOrEqual(1);
-  // Escape restores the drag origin without committing a new point.
-  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-  expect(onDrag).toHaveBeenLastCalledWith({ x: 0.3, y: 0.4 });
-  await stage.event(target, 'pointerup', bounds.left + 400, bounds.top + 180);
+  await stage.event(target, 'pointerdown', 300, 200);
+  expect(onPreview).toHaveBeenLastCalledWith({ centerX: 0.5, centerY: 0.5 });
+  expect(onInteract).toHaveBeenCalledOnce();
+  await stage.event(target, 'pointermove', 380, 245);
+  expect(onPreview).toHaveBeenLastCalledWith({ centerX: 0.45, centerY: 0.45 });
+  renderStage({
+    scene: { background: disabled, camera: identity },
+    zoom: {
+      ...zoom,
+      region: { ...zoom.region, transform: { scale: 2, centerX: 0.45, centerY: 0.45 } },
+    },
+  });
+  await stage.event(target, 'pointermove', 460, 290);
+  expect(onPreview).toHaveBeenLastCalledWith({ centerX: 0.4, centerY: 0.4 });
+  expect(onChange).not.toHaveBeenCalled();
+  const arrow = new KeyboardEvent('keydown', {
+    key: 'ArrowRight',
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => target.dispatchEvent(arrow));
+  expect(arrow.defaultPrevented).toBe(true);
+  await act(async () =>
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+  await stage.event(target, 'pointerup', 460, 290);
+  expect(onChange).not.toHaveBeenCalled();
+  await stage.event(target, 'pointerdown', 300, 200);
+  await stage.event(target, 'pointermove', 380, 245);
+  await stage.event(target, 'pointerup', 380, 245);
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(onChange).toHaveBeenLastCalledWith({ centerX: 0.4, centerY: 0.4 });
 });
 
 it('uses export-space padding and radius at every preview size', () => {
@@ -215,4 +249,62 @@ it('keeps video layout fixed throughout slow zoom and clips its fitted corners a
   expect(next.video.style.width).toBe(width);
   expect(next.video.style.transform).toContain('scale(1.001)');
   expect(next.video.style.transformOrigin).toBe('0 0');
+});
+
+it('moves and resizes spotlight on the stage with live preview and one durable commit', async () => {
+  const onPreview = vi.fn(),
+    onChange = vi.fn(),
+    onInteract = vi.fn();
+  const zoom: ReviewStageFocus = {
+    region: {
+      id: 's',
+      start: 0,
+      end: 4,
+      transform: identity,
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      spotlight: {
+        area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+        effect: 'dim',
+        strength: 0.65,
+        blur: 12,
+        roundness: 0.04,
+        reveal: 'fade',
+      },
+    },
+    onPreview,
+    onChange,
+    onInteract,
+  };
+  const stage = renderStage({ scene: { background: disabled, camera: identity }, zoom });
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.focusArea"]')!;
+  const area = plane.querySelector<HTMLElement>('[role="group"]')!;
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 450));
+  Object.assign(plane, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await stage.event(area, 'pointerdown', 400, 225);
+  await stage.event(plane, 'pointermove', 480, 270);
+  expect(onPreview).toHaveBeenLastCalledWith({
+    spotlight: {
+      ...zoom.region.spotlight,
+      area: { x: 0.35, y: 0.35, width: 0.5, height: 0.5 },
+    },
+  });
+  expect(onChange).not.toHaveBeenCalled();
+  await stage.event(plane, 'pointercancel', 480, 270);
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+  await stage.event(area.querySelector('[data-resize]')!, 'pointerdown', 600, 338);
+  await stage.event(plane, 'pointermove', 680, 383);
+  await stage.event(plane, 'pointerup', 680, 383);
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(onChange).toHaveBeenLastCalledWith({
+    spotlight: {
+      ...zoom.region.spotlight,
+      area: { x: 0.25, y: 0.25, width: 0.6, height: 0.6 },
+    },
+  });
+  expect(onInteract).toHaveBeenCalledTimes(2);
 });

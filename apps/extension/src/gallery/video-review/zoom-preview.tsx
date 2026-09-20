@@ -1,3 +1,4 @@
+import { useReviewCameraGesture } from './camera-gesture';
 import { ReviewSpotlightPreview } from './spotlight-preview';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
@@ -10,7 +11,6 @@ import type {
 import {
   computeQuickEditSceneLayout,
   computeQuickEditVideoTransform,
-  quickEditCanvasPointToContent,
 } from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
@@ -24,11 +24,6 @@ import {
 
 /** Bounded canvas size; scene geometry scales padding into these output pixels. */
 const PREVIEW_WIDTH_PX = 480;
-const KEYBOARD_CENTER_STEP = 0.01;
-const KEYBOARD_CENTER_STEP_COARSE = 0.1;
-
-const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-
 /**
  * The interactive canvas: pointer drags and arrow keys move the stored camera center;
  * Escape and pointer cancel roll the interaction back to its captured origin.
@@ -41,11 +36,15 @@ function ZoomPreviewCanvas(props: {
   output: { width: number; height: number };
   view: 'area' | 'result';
   cornerRadius: number;
+  onPreview?: ((center: { centerX: number; centerY: number } | null) => void) | undefined;
   onCenter(center: { centerX: number; centerY: number }): void;
 }) {
-  const { onCenter, view } = props;
-  const [draft, setDraft] = useState<QuickEditZoomRegion['transform'] | null>(null);
-  const camera = draft ?? props.camera;
+  const { view } = props;
+  const { camera, handlers } = useReviewCameraGesture({
+    ...props,
+    videoRect: props.layout.videoRect,
+    onCommit: props.onCenter,
+  });
   const layout = useMemo(
     () => ({
       ...props.layout,
@@ -54,9 +53,6 @@ function ZoomPreviewCanvas(props: {
     [props.layout, camera]
   );
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drag = useRef<{ pointerId: number; target: ZoomPreviewLayout['videoRect'] } | null>(null);
-  const baseline = useRef<{ x: number; y: number } | null>(null);
-
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
@@ -74,31 +70,6 @@ function ZoomPreviewCanvas(props: {
     });
   }, [layout, props.frame, view, camera, props.cornerRadius]);
 
-  const centerFromPointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    const bounds = canvas?.getBoundingClientRect();
-    if (!canvas || !bounds || !(bounds.width > 0) || !(bounds.height > 0)) return null;
-    const point = {
-      x: (event.clientX - bounds.left) * (canvas.width / bounds.width),
-      y: (event.clientY - bounds.top) * (canvas.height / bounds.height),
-    };
-    const target =
-      drag.current?.target ?? (view === 'area' ? layout.videoRect : layout.videoTransform);
-    const content = quickEditCanvasPointToContent(point, target);
-    if (content) return { centerX: clamp01(content.x), centerY: clamp01(content.y) };
-    return {
-      centerX: clamp01((point.x - target.x) / Math.max(1, target.width)),
-      centerY: clamp01((point.y - target.y) / Math.max(1, target.height)),
-    };
-  };
-
-  const rollback = () => {
-    if (!drag.current && baseline.current)
-      onCenter({ centerX: baseline.current.x, centerY: baseline.current.y });
-    baseline.current = null;
-    drag.current = null;
-    setDraft(null);
-  };
   return (
     <canvas
       ref={canvasRef}
@@ -110,68 +81,7 @@ function ZoomPreviewCanvas(props: {
       className="relative block w-full rounded-[var(--sniptale-radius-sm)] border
         border-[var(--sniptale-color-border-soft)] outline-none
         focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]"
-      onFocus={() => {
-        baseline.current = { x: camera.centerX, y: camera.centerY };
-      }}
-      onBlur={() => {
-        baseline.current = null;
-      }}
-      onPointerDown={(event) => {
-        if (props.disabled || event.button !== 0) return;
-        baseline.current = { x: camera.centerX, y: camera.centerY };
-        drag.current = {
-          pointerId: event.pointerId,
-          target: view === 'area' ? layout.videoRect : layout.videoTransform,
-        };
-        event.currentTarget.setPointerCapture(event.pointerId);
-        const center = centerFromPointer(event);
-        if (center) setDraft({ ...camera, ...center });
-      }}
-      onPointerMove={(event) => {
-        if (!drag.current || drag.current.pointerId !== event.pointerId) return;
-        const center = centerFromPointer(event);
-        if (center) setDraft({ ...camera, ...center });
-      }}
-      onPointerUp={(event) => {
-        if (drag.current?.pointerId !== event.pointerId) return;
-        if (draft) onCenter({ centerX: draft.centerX, centerY: draft.centerY });
-        setDraft(null);
-        baseline.current = null;
-        drag.current = null;
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          event.currentTarget.releasePointerCapture(event.pointerId);
-      }}
-      onPointerCancel={rollback}
-      onLostPointerCapture={() => {
-        if (drag.current) rollback();
-      }}
-      onKeyDown={(event) => {
-        if (props.disabled) return;
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          event.stopPropagation();
-          rollback();
-          return;
-        }
-        const step = event.shiftKey ? KEYBOARD_CENTER_STEP_COARSE : KEYBOARD_CENTER_STEP;
-        const delta =
-          event.key === 'ArrowLeft'
-            ? { centerX: camera.centerX - step }
-            : event.key === 'ArrowRight'
-              ? { centerX: camera.centerX + step }
-              : event.key === 'ArrowUp'
-                ? { centerY: camera.centerY - step }
-                : event.key === 'ArrowDown'
-                  ? { centerY: camera.centerY + step }
-                  : null;
-        if (!delta) return;
-        event.preventDefault();
-        event.stopPropagation();
-        onCenter({
-          centerX: clamp01(delta.centerX ?? camera.centerX),
-          centerY: clamp01(delta.centerY ?? camera.centerY),
-        });
-      }}
+      {...handlers}
     />
   );
 }
@@ -191,6 +101,7 @@ export function ReviewZoomPreview(props: {
   loadFrame: ZoomPreviewFrameLoader | null;
   onInteract?: ((sourceTime: number) => void) | undefined;
   onChange(patch: QuickEditZoomRegionPatch): void;
+  onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
   disabled?: boolean;
 }) {
   const { loadFrame, region, sourceTime } = props;
@@ -217,6 +128,10 @@ export function ReviewZoomPreview(props: {
     [output, props.source, props.canvas, props.background, region.transform, region.spotlight]
   );
 
+  const previewScale = output.width / Math.max(1, props.canvas?.width ?? props.source.width);
+  const cornerRadius = props.background.enabled
+    ? props.background.layout.cornerRadius * previewScale
+    : 0;
   const unavailable = sourceTime === null || !loadFrame;
   const background = props.background;
   return (
@@ -273,25 +188,16 @@ export function ReviewZoomPreview(props: {
             frame={frame}
             output={output}
             layout={layout}
-            cornerRadius={
-              background.enabled
-                ? (background.layout.cornerRadius * output.width) /
-                  Math.max(1, props.canvas?.width ?? props.source.width)
-                : 0
-            }
-            scale={output.width / Math.max(1, props.canvas?.width ?? props.source.width)}
+            cornerRadius={cornerRadius}
+            scale={previewScale}
             disabled={!!props.disabled || status !== 'ready'}
             onChange={(spotlight) => props.onChange({ spotlight })}
+            onPreview={(spotlight) => props.onPreview?.(spotlight ? { spotlight } : null)}
           />
         ) : (
           <ZoomPreviewCanvas
             key={region.id}
-            cornerRadius={
-              background.enabled
-                ? (background.layout.cornerRadius * output.width) /
-                  Math.max(1, props.canvas?.width ?? props.source.width)
-                : 0
-            }
+            cornerRadius={cornerRadius}
             camera={region.transform}
             disabled={props.disabled || status !== 'ready'}
             frame={frame}
@@ -299,6 +205,7 @@ export function ReviewZoomPreview(props: {
             output={output}
             view={view}
             onCenter={props.onChange}
+            onPreview={props.onPreview}
           />
         )}
       </div>

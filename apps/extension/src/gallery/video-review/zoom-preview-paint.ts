@@ -53,6 +53,7 @@ export function paintZoomPreview(
     context.lineWidth = 2;
     context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   }
+  if (args.view !== 'area') return;
   context.fillStyle = args.accent;
   context.beginPath();
   context.arc(
