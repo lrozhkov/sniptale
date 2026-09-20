@@ -49,7 +49,7 @@ it('previews cuts, speed and mute in source time, restores audio, and cancels it
     expect(hook.time).toBe(4);
     expect(hook.video.current!.playbackRate).toBe(4);
     expect(hook.video.current!.muted).toBe(true);
-    expect(hook.video.current!.preservesPitch).toBe(false);
+    expect(hook.video.current!.preservesPitch).toBe(true);
     act(() => hook.onTime(6));
     expect(hook.video.current!.playbackRate).toBe(1);
     expect(hook.video.current!.muted).toBe(false);

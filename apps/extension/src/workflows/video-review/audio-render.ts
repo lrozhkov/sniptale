@@ -1,3 +1,4 @@
+import { createTempoProcessor } from '../../features/video/audio/tempo';
 import {
   AudioSample,
   AudioSampleSink,
@@ -53,6 +54,8 @@ export async function* renderReviewAudio(
   const sink = track ? new AudioSampleSink(track) : null;
   const sourceRate = track ? await track.getSampleRate() : outputRate;
   const channels = track ? await track.getNumberOfChannels() : 2;
+  const tempo =
+    segment.rate !== 1 ? createReviewTempo(sourceRate, channels, segment.rate) : undefined;
   let frame = Math.round(segment.resultStart * outputRate);
   const end = Math.round(segment.resultEnd * outputRate);
   while (frame < end) {
@@ -63,6 +66,7 @@ export async function* renderReviewAudio(
       track,
       sourceRate,
       channels,
+      ...(tempo ? { tempo } : {}),
       segment,
       frame,
       count,
@@ -81,7 +85,7 @@ export async function* renderReviewAudio(
   }
 }
 
-async function renderWindow(args: {
+interface AudioRenderWindow {
   sink: AudioSampleSink | null;
   track: InputAudioTrack | null;
   sourceRate: number;
@@ -92,28 +96,35 @@ async function renderWindow(args: {
   muted: boolean;
   signal: AbortSignal;
   exportAudio?: ReviewExportClipPlan;
-}) {
+  tempo?: ReturnType<typeof createReviewTempo>;
+}
+
+async function renderWindow(args: AudioRenderWindow) {
   const { segment, frame, count, channels, sourceRate, signal } = args;
   const start = segment.sourceStart + (frame / outputRate - segment.resultStart) * segment.rate;
   const windowStart = start - (paddingFrames / outputRate) * segment.rate;
   const windowEnd = start + ((count + paddingFrames) / outputRate) * segment.rate;
   const offline = new OfflineAudioContext(channels, paddingFrames + count, outputRate);
   if (!args.muted && args.sink && args.track) {
-    const pcm = offline.createBuffer(
-      channels,
-      Math.ceil((windowEnd - windowStart) * sourceRate),
-      sourceRate
-    );
-    await fillWindow(args.track, args.sink, pcm, {
-      windowStart,
-      start: Math.max(windowStart, segment.sourceStart),
-      end: Math.min(windowEnd, segment.sourceEnd),
-      signal,
-    });
-    signal.throwIfAborted();
     const node = offline.createBufferSource();
-    node.buffer = pcm;
-    node.playbackRate.value = segment.rate;
+    if (args.tempo) {
+      node.buffer = await renderTempoWindow(offline, args, args.tempo);
+    } else {
+      const pcm = offline.createBuffer(
+        channels,
+        Math.ceil((windowEnd - windowStart) * sourceRate),
+        sourceRate
+      );
+      await fillWindow(args.track, args.sink, pcm, {
+        windowStart,
+        start: Math.max(windowStart, segment.sourceStart),
+        end: Math.min(windowEnd, segment.sourceEnd),
+        signal,
+      });
+      signal.throwIfAborted();
+      node.buffer = pcm;
+    }
+    node.playbackRate.value = 1;
     connectOriginal(node, offline, args.exportAudio);
     node.start();
   }
@@ -287,4 +298,57 @@ async function fillRun(
       sample.close();
     }
   }
+}
+
+/** Keeps WSOLA overlap state across bounded decoder windows; each edit owns its own processor. */
+async function renderTempoWindow(
+  offline: OfflineAudioContext,
+  args: AudioRenderWindow,
+  tempo: ReturnType<typeof createReviewTempo>
+) {
+  const { segment, frame, count, sourceRate, channels, signal } = args;
+  const relativeFrame = frame - Math.round(segment.resultStart * outputRate);
+  const nativeCount = Math.max(
+    1,
+    Math.round(((relativeFrame + count) * sourceRate) / outputRate) -
+      Math.round((relativeFrame * sourceRate) / outputRate)
+  );
+  const needed = nativeCount + tempo.padding - tempo.pending[0]!.length;
+  const range = tempo.processor.inputRange(needed);
+  const source = offline.createBuffer(channels, range.end - range.start, sourceRate);
+  const origin = segment.sourceStart + range.start / sourceRate;
+  await fillWindow(args.track!, args.sink!, source, {
+    windowStart: origin,
+    start: origin,
+    end: Math.min(segment.sourceEnd, segment.sourceStart + range.end / sourceRate),
+    signal,
+  });
+  signal.throwIfAborted();
+  const planes = Array.from({ length: channels }, (_, c) => source.getChannelData(c));
+  const stretched = tempo.processor.render((c, i) => planes[c]![i - range.start] ?? 0, needed);
+  const result = new AudioBuffer({
+    length: nativeCount + 2 * tempo.padding,
+    numberOfChannels: channels,
+    sampleRate: sourceRate,
+  });
+  for (let c = 0; c < channels; c++) {
+    const output = result.getChannelData(c);
+    output.set(tempo.previous[c]!);
+    output.set(tempo.pending[c]!, tempo.padding);
+    output.set(stretched[c]!, tempo.padding + tempo.pending[c]!.length);
+    tempo.previous[c] = output.slice(nativeCount, nativeCount + tempo.padding);
+    tempo.pending[c] = output.slice(nativeCount + tempo.padding);
+  }
+  return result;
+}
+
+/** Native-rate context on both sides keeps the browser resampler continuous at chunk seams. */
+function createReviewTempo(sampleRate: number, channels: number, rate: number) {
+  const padding = Math.round(sampleRate * leadSeconds);
+  return {
+    processor: createTempoProcessor(sampleRate, channels, rate),
+    padding,
+    previous: Array.from({ length: channels }, () => new Float32Array(padding)),
+    pending: Array.from({ length: channels }, () => new Float32Array(0)),
+  };
 }

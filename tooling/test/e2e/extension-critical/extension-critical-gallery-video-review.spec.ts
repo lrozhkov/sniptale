@@ -591,6 +591,7 @@ for (const { container, gaps } of [
           await speed.click();
           await button('gallery.videoReview.play').click();
           await expect(dialog.locator('video')).toHaveJSProperty('playbackRate', rate);
+          await expect(dialog.locator('video')).toHaveJSProperty('preservesPitch', true);
           await expect(dialog.locator('video')).toHaveJSProperty('muted', audio === 'mute');
           await button('gallery.videoReview.pause').click();
           await button('gallery.videoReview.exportVideo').click();
@@ -646,7 +647,7 @@ for (const { container, gaps } of [
             expect(measured.gap.rms).toBeLessThan(0.001);
           }
           if (audio === 'mute') expect(measured.during.rms).toBeLessThan(0.001);
-          else expect(Math.abs(measured.during.frequency - 440 * rate)).toBeLessThan(20);
+          else expect(Math.abs(measured.during.frequency - 440)).toBeLessThan(20);
           const reportDownload = page.waitForEvent('download');
           await button('gallery.videoReview.downloadReport').click();
           const report = await readFile(await (await reportDownload).path(), 'utf8');

@@ -32,8 +32,9 @@ export async function executeOfflineAudioMixRender({
   scheduleOfflineAudioClipMix: (
     offlineContext: OfflineAudioContext,
     clip: OfflineAudioRenderableClip,
-    buffer: AudioBuffer
-  ) => void;
+    buffer: AudioBuffer,
+    signal?: AbortSignal
+  ) => void | Promise<void>;
   signal?: AbortSignal;
   throwIfAborted: (signal?: AbortSignal) => void;
 }): Promise<{
@@ -44,7 +45,8 @@ export async function executeOfflineAudioMixRender({
     throwIfAborted(signal);
 
     const buffer = await decodeClipAudioBuffer(project, clip, decodedBuffers, decodeContext);
-    scheduleOfflineAudioClipMix(offlineContext, clip, buffer);
+    await scheduleOfflineAudioClipMix(offlineContext, clip, buffer, signal);
+    throwIfAborted(signal);
   }
 
   return buildOfflineAudioMixResult(await offlineContext.startRendering());

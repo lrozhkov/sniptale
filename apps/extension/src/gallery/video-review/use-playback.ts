@@ -29,7 +29,7 @@ export function useReviewPlayback(props: {
     if (node) {
       if (next !== value) node.currentTime = next;
       if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
-      if (node.preservesPitch !== false) node.preservesPitch = false;
+      if (node.preservesPitch !== true) node.preservesPitch = true;
       const muted = settings.muted || latest.current.original.muted;
       if (node.muted !== muted) node.muted = muted;
       // The element caps at one; the preview audio graph amplifies beyond it.

@@ -89,6 +89,7 @@ function installAudioContext() {
   const windows: {
     input?: TestAudioBuffer;
     frames: number;
+    sources?: { buffer: AudioBuffer | null }[];
     rate?: number;
     gains?: Array<{
       gain: { value: number; readonlyPoints: Array<[string, number, number]> };
@@ -116,8 +117,8 @@ function installAudioContext() {
       }
       createBufferSource() {
         const window = this.window;
-        return {
-          buffer: null,
+        const source = {
+          buffer: null as AudioBuffer | null,
           playbackRate: {
             set value(rate: number) {
               window.rate = rate;
@@ -126,6 +127,9 @@ function installAudioContext() {
           connect() {},
           start() {},
         };
+        window.sources ??= [];
+        window.sources.push(source);
+        return source;
       }
       createGain() {
         const window = this.window;
@@ -262,7 +266,7 @@ it('bounds accelerated windows and emits a short final chunk without a whole-sou
       [1, 48_000],
       [2, 12_000],
     ]);
-    expect(fixture.windows.map((window) => window.rate)).toEqual([4, 4, 4]);
+    expect(fixture.windows.map((window) => window.rate)).toEqual([1, 1, 1]);
     expect(Math.max(...fixture.windows.map((window) => window.input!.length))).toBeLessThanOrEqual(
       199_681
     );
@@ -410,3 +414,64 @@ it('reads variable Opus packet durations and rejects empty or invalid frame coun
   expect(() => audioPacketDuration(packet([]), 'opus', 48_000)).toThrow('Empty Opus');
   expect(() => audioPacketDuration(packet([3, 0]), 'opus', 48_000)).toThrow('Invalid Opus');
 });
+
+it.each([48000, 44100])(
+  'feeds pitch-preserved PCM with continuous resampler context at %s Hz',
+  async (sampleRate) => {
+    const fixture = await audioFixture();
+    vi.spyOn(fixture.track, 'getSampleRate').mockResolvedValue(sampleRate);
+    audioMock.packets = Array.from({ length: 160 }, (_, i) => ({
+      timestamp: i * 0.02,
+      duration: 0.02,
+      data: new Uint8Array([0xf8, 0]),
+    }));
+    audioMock.samples.mockImplementation((start: number, end: number) => {
+      const count = Math.round((end - start) * sampleRate);
+      const data = Float32Array.from(
+        { length: count },
+        (_, i) => 0.5 * Math.sin(2 * Math.PI * 200 * (start + i / sampleRate))
+      );
+      return [
+        new AudioSample({
+          format: 'f32-planar',
+          sampleRate,
+          numberOfChannels: 1,
+          timestamp: start,
+          numberOfFrames: count,
+          data,
+        }),
+      ];
+    });
+    try {
+      for await (const _sample of renderReviewAudio(
+        fixture.track,
+        {
+          sourceStart: 0.2,
+          sourceEnd: 3.2,
+          resultStart: 0,
+          resultEnd: 1.5,
+          rate: 2,
+          kind: 'speed',
+        },
+        false,
+        new AbortController().signal
+      )) {
+        /* consume */
+      }
+      const padded = fixture.windows.map((window) => window.sources![0]!.buffer!.getChannelData(0));
+      const padding = Math.round(sampleRate * 0.02);
+      expect(padded[0]!.slice(-2 * padding)).toEqual(padded[1]!.slice(0, 2 * padding));
+      const chunks = padded.map((chunk) => chunk.subarray(padding, chunk.length - padding));
+      expect(chunks.map((chunk) => chunk.length)).toEqual([sampleRate, sampleRate / 2]);
+      for (const chunk of chunks) {
+        let crosses = 0;
+        for (let i = 4801; i < chunk.length - 4800; i++)
+          if (chunk[i - 1]! < 0 && chunk[i]! >= 0) crosses++;
+        expect((crosses * sampleRate) / (chunk.length - 9600)).toBeCloseTo(200, -1);
+      }
+      expect(Math.abs(chunks[1]![0]! - chunks[0]!.at(-1)!)).toBeLessThan(0.03);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);
