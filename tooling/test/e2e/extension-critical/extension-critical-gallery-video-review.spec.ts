@@ -904,8 +904,14 @@ for (const variant of [
       await expect(timePlane).toHaveCSS('box-shadow', 'none');
       await page.keyboard.press('Space');
       await expect(button('gallery.videoReview.addOverlayComment')).toHaveCount(0);
+      await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
       await button('gallery.videoReview.comments').click();
-      await button('gallery.videoReview.addComment').click();
+      const addNote = button('gallery.videoReview.addComment');
+      const noteBounds = (await addNote.boundingBox())!;
+      const listBounds = (await dialog.locator('aside ol').boundingBox())!;
+      expect(noteBounds.width).toBeCloseTo(listBounds.width, 0);
+      await expect(addNote).toHaveCSS('justify-content', 'center');
+      await addNote.click();
       await dialog
         .getByRole('textbox', { name: label('gallery.videoReview.commentText'), exact: true })
         .fill('Explicit note');
@@ -1799,8 +1805,14 @@ for (const variant of [
       await expect(button('gallery.videoReview.actionCut')).toHaveCount(0);
       const lanes = dialog.locator('[data-ui="gallery.videoReview.audioLane"]');
       await expect(lanes.first().locator('[aria-hidden="true"].opacity-80')).toHaveCount(1);
+      await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
       await button('gallery.videoReview.comments').click();
-      await button('gallery.videoReview.addComment').click();
+      const addNote = button('gallery.videoReview.addComment');
+      const noteBounds = (await addNote.boundingBox())!;
+      const listBounds = (await dialog.locator('aside ol').boundingBox())!;
+      expect(noteBounds.width).toBeCloseTo(listBounds.width, 0);
+      await expect(addNote).toHaveCSS('justify-content', 'center');
+      await addNote.click();
       await dialog.locator('textarea').fill('Context note');
       await button('gallery.videoReview.save').click();
       await button('gallery.videoReview.editComment').click();
@@ -1839,11 +1851,16 @@ for (const variant of [
       await expect(
         inspector.getByText(label('gallery.videoReview.speedRate'), { exact: true })
       ).toBeVisible();
+      await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
       await page.setViewportSize({ width: 800, height: 600 });
       await button('gallery.videoReview.exportSettings').click();
       const quality = button('gallery.videoReview.exportQuality');
       await quality.scrollIntoViewIfNeeded();
       await expect(quality).toBeInViewport();
+      const downloadBounds = (await button('gallery.videoReview.downloadVideo').boundingBox())!;
+      expect((await quality.boundingBox())!.y).toBeGreaterThanOrEqual(
+        downloadBounds.y + downloadBounds.height
+      );
       expect(
         await button('gallery.videoReview.exportFrameRate')
           .locator('.truncate')

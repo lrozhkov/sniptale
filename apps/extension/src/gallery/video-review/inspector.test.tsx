@@ -100,10 +100,13 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     await act(async () => render(false, 'comments'));
     expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     expect(host.textContent).not.toContain('gallery.videoReview.committed');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).not.toBeNull();
     await act(async () => render(true, 'settings:none:'));
     expect(host.textContent).toContain('Scene controls');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
     expect(host.textContent).toContain('Selected controls');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     const tabs = () =>
       Array.from(
         host.querySelectorAll<HTMLButtonElement>(
@@ -116,6 +119,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         .click()
     );
     expect(host.textContent).toContain('Scene controls');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     expect(tabs().some((button) => button.textContent === 'Zoom')).toBe(true);
     await act(async () =>
       tabs()
@@ -123,6 +127,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         .click()
     );
     expect(host.textContent).toContain('Selected controls');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     await act(async () => render(false, 'comments'));
     expect(host.textContent).not.toContain('Selected controls');
     expect(host.textContent).not.toContain('Scene controls');

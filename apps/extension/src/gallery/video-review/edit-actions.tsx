@@ -196,15 +196,10 @@ export function ReviewEditActions(props: {
   const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
-      {props.settings && settingsOpen ? (
-        <div id={settingsId} className="border-b border-[var(--sniptale-color-border-soft)] pb-3">
-          {props.settings}
-        </div>
-      ) : null}
       <div
         className={
-          'sticky bottom-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 ' +
-          'bg-[var(--sniptale-color-surface-panel)]'
+          'sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 ' +
+          'bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]'
         }
       >
         <ReviewButton
@@ -244,6 +239,7 @@ export function ReviewEditActions(props: {
           <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
       </div>
+      {props.settings && settingsOpen ? <div id={settingsId}>{props.settings}</div> : null}
       {running ? (
         <div className="flex items-center justify-between gap-2 text-xs" role="status">
           <span>
@@ -341,10 +337,7 @@ export function ReviewRenderOptions({
     (exporter.index?.processedVideoCodec ? [exporter.index.processedVideoCodec] : []);
   return (
     <div className="pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
-      <fieldset
-        disabled={busy}
-        className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3 pb-2"
-      >
+      <fieldset disabled={busy} className="space-y-2 pb-2">
         <SelectField
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.exportCodec')}

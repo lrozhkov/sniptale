@@ -74,7 +74,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
     en: 'Select a range between keyframes. Cuts cannot overlap or remove the entire video.',
   },
   exportVideo: { ru: 'Сохранить копию в галерею', en: 'Save copy to gallery' },
-  downloadVideo: { ru: 'Скачать результат', en: 'Download result' },
+  downloadVideo: { ru: 'Экспортировать видео', en: 'Export video' },
   downloadSelection: { ru: 'Скачать выделенный фрагмент', en: 'Download selected fragment' },
   downloadSelectionHint: {
     ru: 'Скачать фрагмент с текущими правками. Границы привязываются к ключевым кадрам; копия в галерее не создаётся.',

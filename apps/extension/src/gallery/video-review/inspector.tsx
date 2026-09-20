@@ -155,7 +155,7 @@ export function ReviewInspector(props: {
           </>
         )}
       </div>
-      <ReviewInspectorFooter {...props} />
+      <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
     </aside>
   );
 }
@@ -231,30 +231,38 @@ function ReviewAnnotationList(props: {
 }
 
 /** Reports remain above the export divider; all footer commands have readable labels. */
-function ReviewInspectorFooter(props: Parameters<typeof ReviewInspector>[0]) {
+function ReviewInspectorFooter(
+  props: Parameters<typeof ReviewInspector>[0] & { showReports: boolean }
+) {
   return (
-    <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pb-20 space-y-2 overflow-y-auto">
-      <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
-        <ReviewButton
-          label={translate('gallery.videoReview.copyReport')}
-          disabled={props.busy}
-          className={`${reviewTextButtonClassName} justify-start`}
-          onClick={() => props.onReport('copy')}
-        >
-          <Copy size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.copyReport')}</span>
-        </ReviewButton>
-        <ReviewButton
-          label={translate('gallery.videoReview.downloadReport')}
-          disabled={props.busy}
-          className={`${reviewTextButtonClassName} justify-start`}
-          onClick={() => props.onReport('download')}
-        >
-          <FileDown size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.downloadReport')}</span>
-        </ReviewButton>
-      </div>
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-2">
+    <div className="min-h-0 max-h-[max(10rem,40%)] shrink-0 scroll-pt-20 space-y-2 overflow-y-auto">
+      {props.showReports ? (
+        <div className="grid grid-cols-1 gap-1" data-ui="gallery.videoReview.reportActions">
+          <ReviewButton
+            label={translate('gallery.videoReview.copyReport')}
+            disabled={props.busy}
+            className={`${reviewTextButtonClassName} justify-start`}
+            onClick={() => props.onReport('copy')}
+          >
+            <Copy size={15} aria-hidden="true" />
+            <span>{translate('gallery.videoReview.copyReport')}</span>
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.downloadReport')}
+            disabled={props.busy}
+            className={`${reviewTextButtonClassName} justify-start`}
+            onClick={() => props.onReport('download')}
+          >
+            <FileDown size={15} aria-hidden="true" />
+            <span>{translate('gallery.videoReview.downloadReport')}</span>
+          </ReviewButton>
+        </div>
+      ) : null}
+      <div
+        className={
+          props.showReports ? 'border-t border-[var(--sniptale-color-border-soft)] pt-2' : undefined
+        }
+      >
         {props.actions}
       </div>
     </div>
@@ -267,7 +275,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
     <>
       {!props.annotations.some((note) => note.id === props.editingId) ? props.composer : null}
       {!props.composer ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="space-y-2">
           {!props.settingsAvailable ? (
             <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
           ) : null}
@@ -278,7 +286,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
                 : 'gallery.videoReview.addComment'
             )}
             disabled={props.busy || !!props.composer}
-            className={`${reviewTextButtonClassName} ml-auto`}
+            className={`${reviewTextButtonClassName} !w-full justify-center`}
             onClick={() => props.onAdd()}
           >
             <Plus size={16} aria-hidden="true" />
