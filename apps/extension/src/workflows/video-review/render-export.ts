@@ -1,3 +1,5 @@
+import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
+import { drawReviewSpotlight } from './render-spotlight';
 import type { ReviewRenderSettings } from './media-index';
 import {
   ALL_FORMATS,
@@ -416,39 +418,64 @@ export async function renderRenderWindowFrames(args: {
   signal: AbortSignal;
 }): Promise<number> {
   const { window, fps, canvas, context, videoOut, signal } = args;
+  const scratch = args.zoomRegions.some((region) => region.spotlight?.effect === 'blur')
+    ? document.createElement('canvas')
+    : null;
+  if (scratch) {
+    scratch.width = canvas.width;
+    scratch.height = canvas.height;
+  }
   let frame = 0;
   for await (const sample of args.frameSink.samplesAtTimestamps(window.sourceTimes)) {
     signal.throwIfAborted();
     if (!sample) throw new Error('Source frame is unavailable.');
     const timestamp = window.timestamps[frame]!;
-    const camera = evaluateQuickEditCameraAtTime(args.zoomRegions, timestamp + args.fragmentOffset);
-    const layout = computeQuickEditSceneLayout({
-      output: canvas,
-      source: args.sourceSize,
-      canvas,
-      background: args.background,
-      camera,
-    });
-    const burned = args.comments.filter(
-      (comment) =>
-        comment.renderToVideo &&
-        isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
-    );
-    drawReviewSceneFrame(context, {
-      canvas,
-      layout,
-      background: args.background,
-      image: args.image,
-      sample,
-      comments: burned,
-      sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
-      cameraScale: camera.scale,
-    });
-    const encoded = new VideoSample(canvas, { timestamp, duration: 1 / fps });
     try {
-      await videoOut.add(encoded);
+      const camera = evaluateQuickEditCameraAtTime(
+        args.zoomRegions,
+        timestamp + args.fragmentOffset
+      );
+      const layout = computeQuickEditSceneLayout({
+        output: canvas,
+        source: args.sourceSize,
+        canvas,
+        background: args.background,
+        camera,
+      });
+      const burned = args.comments.filter(
+        (comment) =>
+          comment.renderToVideo &&
+          isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
+      );
+      drawReviewSceneFrame(context, {
+        canvas,
+        layout,
+        background: args.background,
+        image: args.image,
+        sample,
+        comments: burned,
+        sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
+        cameraScale: camera.scale,
+      });
+      drawReviewSpotlight(
+        context,
+        canvas,
+        scratch,
+        evaluateQuickEditSpotlightAtTime({
+          regions: args.zoomRegions,
+          time: timestamp + args.fragmentOffset,
+          output: canvas,
+          video: layout.videoRect,
+          scale: 1,
+        })
+      );
+      const encoded = new VideoSample(canvas, { timestamp, duration: 1 / fps });
+      try {
+        await videoOut.add(encoded);
+      } finally {
+        encoded.close();
+      }
     } finally {
-      encoded.close();
       sample.close();
     }
     args.onProgress?.(Math.min(1, (timestamp + 1 / fps) / args.resultDuration));

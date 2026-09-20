@@ -189,3 +189,77 @@ it('edits link easing, shows the derived gap duration, and removes explicitly', 
   );
   expect(remove).toHaveBeenCalledOnce();
 });
+
+it('keeps spotlight settings when the active type is selected again', async () => {
+  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const change = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector
+        region={{ ...region, spotlight: { ...createQuickEditSpotlight(), strength: 0.4 } }}
+        onChange={change}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.focusType"]')!.click()
+  );
+  await act(async () =>
+    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+      .find((node) => node.textContent?.includes('gallery.videoReview.focusSpotlight'))!
+      .click()
+  );
+  expect(change).not.toHaveBeenCalled();
+});
+
+it('edits spotlight strength, area, reveal, rounding and blur through shared controls', async () => {
+  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  let spotlight = createQuickEditSpotlight();
+  const change = vi.fn((patch: QuickEditZoomRegionPatch) => {
+    if (patch.spotlight) spotlight = patch.spotlight;
+    render();
+  });
+  const render = () =>
+    root.render(
+      <ReviewZoomInspector
+        region={{ ...region, spotlight }}
+        onChange={change}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+  await act(async () => render());
+  for (const [label, value] of [
+    ['focusStrength', '40'],
+    ['focusAreaX', '10'],
+    ['focusAreaY', '20'],
+    ['focusAreaWidth', '60'],
+    ['focusAreaHeight', '70'],
+    ['focusRoundness', '12'],
+  ] as const) {
+    await type(field(`gallery.videoReview.${label}`), value);
+    await commit(field(`gallery.videoReview.${label}`));
+  }
+  expect(spotlight).toMatchObject({
+    strength: 0.4,
+    roundness: 0.12,
+    area: { x: 0.1, y: 0.2, width: 0.6, height: 0.7 },
+  });
+  const choose = async (label: string, option: string) => {
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${label}"]`)!.click()
+    );
+    await act(async () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+        .find((node) => node.textContent?.includes(`gallery.videoReview.${option}`))!
+        .click()
+    );
+  };
+  await choose('focusReveal', 'focusContract');
+  await choose('focusOutside', 'focusBlur');
+  await type(field('gallery.videoReview.focusBlurRadius'), '8');
+  await commit(field('gallery.videoReview.focusBlurRadius'));
+  expect(spotlight).toMatchObject({ effect: 'blur', blur: 8, reveal: 'contract' });
+});

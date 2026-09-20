@@ -97,7 +97,12 @@ export function ReviewStageBinding(props: {
         video={props.video}
         drawing={props.drawing}
         region={props.region}
-        scene={{ background: props.background, camera, canvas: props.canvas }}
+        scene={{
+          background: props.background,
+          camera,
+          canvas: props.canvas,
+          focus: { regions: props.zoomRegions, time: props.outputTime },
+        }}
         {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}
         comments={{
           items: props.overlaysVisible ? props.comments : [],

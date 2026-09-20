@@ -1,3 +1,4 @@
+import { ScanEye } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -265,7 +266,7 @@ function ReviewZoomGapLink(props: {
   onSelectLink: ((id: string) => void) | undefined;
 }) {
   const { next, region } = props;
-  if (!next || next.start <= region.end) return null;
+  if (!next || next.start <= region.end || !!next.spotlight !== !!region.spotlight) return null;
   if (props.enabled === false || (!props.onLink && !props.onSelectLink)) return null;
   const left = props.projection?.position(region.end, 'end') ?? region.end / props.duration;
   const right = props.projection?.position(next.start) ?? next.start / props.duration;
@@ -327,7 +328,7 @@ function ReviewZoomRegionBlock(
 ) {
   const { region, duration, snapEdges, onPreview, onGuide } = props;
   const label =
-    `${translate('gallery.videoReview.zoomRegionLabel')} ` +
+    `${translate(region.spotlight ? 'gallery.videoReview.focusSpotlight' : 'gallery.videoReview.zoomRegionLabel')} ` +
     `${reviewTimeLabel(region.start)} – ${reviewTimeLabel(region.end)}`;
   const tone = props.selected
     ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-accent-soft)]'
@@ -418,9 +419,17 @@ function ReviewZoomRegionBlock(
     >
       <span
         className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2
-          truncate text-center text-[10px]"
+          flex items-center justify-center gap-1 truncate text-center text-[10px]"
       >
-        {region.transform.scale}×
+        {region.spotlight ? (
+          <>
+            <ScanEye size={13} /> {translate('gallery.videoReview.focusSpotlight')}
+          </>
+        ) : (
+          <>
+            <Focus size={13} /> {region.transform.scale}×
+          </>
+        )}
       </span>
       {(['start', 'end'] as const).map((edge) => (
         <span

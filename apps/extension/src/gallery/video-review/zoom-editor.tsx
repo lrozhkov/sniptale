@@ -1,3 +1,4 @@
+import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import { useState } from 'react';
 import type {
   QuickEditAdvancedState,
@@ -176,10 +177,19 @@ export function useReviewZoomEditor(args: {
     setSelection(selection === id ? null : selection);
   };
   const resetPosition = (id: string) =>
-    args.setZoom((zoom) => ({
-      ...zoom,
-      regions: updateQuickEditZoomRegion(zoom.regions, id, { centerX: 0.5, centerY: 0.5 }),
-    }));
+    args.setZoom((zoom) => {
+      const spotlight = zoom.regions.find((region) => region.id === id)?.spotlight;
+      return {
+        ...zoom,
+        regions: updateQuickEditZoomRegion(zoom.regions, id, {
+          centerX: 0.5,
+          centerY: 0.5,
+          ...(spotlight
+            ? { spotlight: { ...spotlight, area: createQuickEditSpotlight().area } }
+            : {}),
+        }),
+      };
+    });
   const change = (id: string, patch: QuickEditZoomRegionPatch) =>
     args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch));
   const commitDrag = (

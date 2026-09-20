@@ -1,3 +1,5 @@
+import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';
 import {
   parsePortableVideoReview,
@@ -156,6 +158,15 @@ it('backs up disabled image history and restores it with newly allocated asset r
   const baseline = createQuickEditAdvancedContent();
   const image = {
     ...baseline,
+    zoom: {
+      enabled: true,
+      regions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'focus', at: 0 }),
+          spotlight: createQuickEditSpotlight(),
+        },
+      ],
+    },
     canvas: { width: 1080, height: 1920 },
     audio: { ...baseline.audio, laneVolumes: { voiceover: 0.5, music: 0.3 } },
     background: {
@@ -192,6 +203,7 @@ it('backs up disabled image history and restores it with newly allocated asset r
   );
   expect(restored.workspace.cursor).toBe(0);
   expect(restored.workspace.history[0]?.after).toMatchObject({
+    zoom: { regions: [{ spotlight: createQuickEditSpotlight() }] },
     canvas: { width: 1080, height: 1920 },
     audio: { laneVolumes: { voiceover: 0.5, music: 0.3 } },
   });

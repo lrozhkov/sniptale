@@ -154,12 +154,13 @@ function normalizeQuickEditZoomTransitions(region: QuickEditZoomRegion): {
   enter: number;
   exit: number;
 } {
-  const sum = region.enter.duration + region.exit.duration;
+  const enter = region.enter.type === 'none' ? 0 : region.enter.duration;
+  const exit = region.exit.type === 'none' ? 0 : region.exit.duration;
+  const sum = enter + exit;
   const available = Math.max(0, region.end - region.start);
-  if (sum <= available || sum <= 0)
-    return { enter: region.enter.duration, exit: region.exit.duration };
+  if (sum <= available || sum <= 0) return { enter, exit };
   const factor = available / sum;
-  return { enter: region.enter.duration * factor, exit: region.exit.duration * factor };
+  return { enter: enter * factor, exit: exit * factor };
 }
 
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
@@ -193,23 +194,30 @@ function interpolateCamera(
  * Camera at a timeline time over validated (ascending, non-overlapping) zoom regions.
  * Regions are half-open [start, end): adjacent regions hand over exactly at the boundary.
  */
-export function evaluateQuickEditCameraAtTime(
+export function sampleQuickEditFocusAtTime(
   regions: readonly QuickEditZoomRegion[],
   timelineTime: number
-): QuickEditCameraTransform {
+): { from: QuickEditZoomRegion | null; to: QuickEditZoomRegion; progress: number } | null {
   const active = regions.filter((region) => !region.dormant);
   for (let index = 0; index < active.length; index++) {
     const region = active[index]!;
     const next = active[index + 1];
     const previous = active[index - 1];
-    const linkedNext = next && region.linkTo === next.id && next.start > region.end;
-    const linkedPrevious = previous?.linkTo === region.id && region.start > previous.end;
+    const linkedNext =
+      next &&
+      region.linkTo === next.id &&
+      next.start > region.end &&
+      !!region.spotlight === !!next.spotlight;
+    const linkedPrevious =
+      previous?.linkTo === region.id &&
+      region.start > previous.end &&
+      !!region.spotlight === !!previous.spotlight;
     if (linkedNext && timelineTime >= region.end && timelineTime < next.start) {
       const progress = easing(
         (timelineTime - region.end) / (next.start - region.end),
         region.linkEasing ?? 'ease-in-out'
       );
-      return interpolateCamera(region.transform, next.transform, progress);
+      return { from: region, to: next, progress };
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
     const normalized = normalizeQuickEditZoomTransitions(region);
@@ -222,7 +230,21 @@ export function evaluateQuickEditCameraAtTime(
       linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter'),
       linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit')
     );
-    return interpolateCamera(QUICK_EDIT_IDENTITY_CAMERA, region.transform, progress);
+    return { from: null, to: region, progress };
   }
-  return QUICK_EDIT_IDENTITY_CAMERA;
+  return null;
+}
+
+/** Camera zoom and spotlight share one phase clock; spotlight never moves the camera. */
+export function evaluateQuickEditCameraAtTime(
+  regions: readonly QuickEditZoomRegion[],
+  timelineTime: number
+): QuickEditCameraTransform {
+  const sample = sampleQuickEditFocusAtTime(regions, timelineTime);
+  if (!sample || sample.to.spotlight) return QUICK_EDIT_IDENTITY_CAMERA;
+  return interpolateCamera(
+    sample.from?.transform ?? QUICK_EDIT_IDENTITY_CAMERA,
+    sample.to.transform,
+    sample.progress
+  );
 }

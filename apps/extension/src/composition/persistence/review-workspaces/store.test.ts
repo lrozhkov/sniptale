@@ -1,3 +1,5 @@
+import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import type { ReviewAnnotation, ReviewOperation } from '../../../features/video/review/types';
@@ -370,6 +372,15 @@ it('commits advanced content as a fixed-point history payload and reopens its ba
   const before = createQuickEditAdvancedContent();
   const after = {
     ...before,
+    zoom: {
+      enabled: true,
+      regions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'focus', at: 0 }),
+          spotlight: createQuickEditSpotlight(),
+        },
+      ],
+    },
     canvas: { width: 1080, height: 1920 },
     audio: {
       ...before.audio,

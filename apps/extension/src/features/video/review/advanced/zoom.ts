@@ -1,4 +1,5 @@
 import type {
+  QuickEditSpotlight,
   QuickEditZoomLinkEasing,
   QuickEditZoomRegion,
   QuickEditZoomTransition,
@@ -41,6 +42,7 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  spotlight?: QuickEditSpotlight | null;
   start?: number;
   end?: number;
   scale?: number;
@@ -58,12 +60,14 @@ export function updateQuickEditZoomRegion(
   id: string,
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
-  return regions.map((region) => {
+  const updated = regions.map((region) => {
     if (region.id !== id) return region;
-    const { linkTo: previousLink, ...rest } = region;
+    const { linkTo: previousLink, spotlight: previousSpotlight, ...rest } = region;
+    const spotlight = patch.spotlight === undefined ? previousSpotlight : patch.spotlight;
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
     return {
       ...rest,
+      ...(spotlight ? { spotlight } : {}),
       ...(linkTo ? { linkTo } : {}),
       ...(patch.start === undefined ? {} : { start: Math.max(0, patch.start) }),
       ...(patch.end === undefined ? {} : { end: Math.max(0, patch.end) }),
@@ -80,6 +84,13 @@ export function updateQuickEditZoomRegion(
       ...(patch.linkEasing === undefined ? {} : { linkEasing: patch.linkEasing }),
     };
   });
+  return updated.map((region) => {
+    if (!region.linkTo) return region;
+    const target = updated.find((item) => item.id === region.linkTo);
+    if (!target || !!target.spotlight === !!region.spotlight) return region;
+    const { linkTo: _linkTo, linkEasing: _linkEasing, ...unlinked } = region;
+    return unlinked;
+  });
 }
 
 /**
@@ -95,7 +106,13 @@ export function resolveQuickEditZoomLink(
   const index = active.findIndex((region) => region.id === id);
   const source = index >= 0 ? active[index] : undefined;
   const target = index >= 0 ? active[index + 1] : undefined;
-  if (!source?.linkTo || !target || source.linkTo !== target.id || target.start <= source.end)
+  if (
+    !source?.linkTo ||
+    !target ||
+    source.linkTo !== target.id ||
+    target.start <= source.end ||
+    !!source.spotlight !== !!target.spotlight
+  )
     return null;
   return { source, target };
 }

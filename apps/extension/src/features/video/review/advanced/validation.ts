@@ -1,3 +1,4 @@
+import { parseQuickEditSpotlight } from './focus';
 import { parsePaint, normalizePaintColor } from '@sniptale/foundation/paint';
 import { isBoundedNumber, isUnitInterval } from '../../project/validation/primitives';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -105,6 +106,9 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     value['start'] >= value['end']
   )
     return null;
+  const spotlight =
+    value['spotlight'] === undefined ? undefined : parseQuickEditSpotlight(value['spotlight']);
+  if (spotlight === null) return null;
   const transform = parseCameraTransform(value['transform']);
   const enter = parseZoomTransition(value['enter']);
   const exit = parseZoomTransition(value['exit']);
@@ -117,6 +121,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   )
     return null;
   return {
+    ...(spotlight ? { spotlight } : {}),
     id: value['id'],
     start: value['start'],
     end: value['end'],

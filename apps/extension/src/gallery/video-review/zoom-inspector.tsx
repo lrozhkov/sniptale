@@ -1,3 +1,5 @@
+import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+import { ReviewSpotlightInspector } from './spotlight-inspector';
 import type { ReactNode } from 'react';
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
@@ -66,42 +68,67 @@ export function ReviewZoomInspector(props: {
     <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h4 className="text-sm font-semibold">
-          {translate('gallery.videoReview.zoomRegionLabel')} {reviewTimeLabel(region.start)}–
-          {reviewTimeLabel(region.end)}
+          {translate(
+            region.spotlight
+              ? 'gallery.videoReview.focusSpotlight'
+              : 'gallery.videoReview.zoomRegionLabel'
+          )}{' '}
+          {reviewTimeLabel(region.start)}–{reviewTimeLabel(region.end)}
         </h4>
       </div>
+      <SelectField<'zoom' | 'spotlight'>
+        label={translate('gallery.videoReview.focusType')}
+        value={region.spotlight ? 'spotlight' : 'zoom'}
+        options={[
+          { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
+          { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+        ]}
+        onChange={(type) => {
+          if ((type === 'spotlight') === !!region.spotlight) return;
+          onChange({ spotlight: type === 'spotlight' ? createQuickEditSpotlight() : null });
+        }}
+      />
       {props.preview}
-      <ReviewNumberRow
-        label={translate('gallery.videoReview.zoomScale')}
-        unit="x"
-        min={1}
-        max={4}
-        step={0.1}
-        precision={2}
-        scrubStep={0.05}
-        value={region.transform.scale}
-        onChange={(scale) => onChange({ scale })}
-      />
-      <ReviewNumberRow
-        label={translate('gallery.videoReview.zoomFocusX')}
-        unit="%"
-        min={0}
-        max={100}
-        step={1}
-        precision={1}
-        value={region.transform.centerX * 100}
-        onChange={(value) => onChange({ centerX: value / 100 })}
-      />
-      <ReviewNumberRow
-        label={translate('gallery.videoReview.zoomFocusY')}
-        unit="%"
-        min={0}
-        max={100}
-        step={1}
-        precision={1}
-        value={region.transform.centerY * 100}
-        onChange={(value) => onChange({ centerY: value / 100 })}
-      />
+      {region.spotlight ? (
+        <ReviewSpotlightInspector
+          value={region.spotlight}
+          onChange={(spotlight) => onChange({ spotlight })}
+        />
+      ) : (
+        <>
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.zoomScale')}
+            unit="x"
+            min={1}
+            max={4}
+            step={0.1}
+            precision={2}
+            scrubStep={0.05}
+            value={region.transform.scale}
+            onChange={(scale) => onChange({ scale })}
+          />
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.zoomFocusX')}
+            unit="%"
+            min={0}
+            max={100}
+            step={1}
+            precision={1}
+            value={region.transform.centerX * 100}
+            onChange={(value) => onChange({ centerX: value / 100 })}
+          />
+          <ReviewNumberRow
+            label={translate('gallery.videoReview.zoomFocusY')}
+            unit="%"
+            min={0}
+            max={100}
+            step={1}
+            precision={1}
+            value={region.transform.centerY * 100}
+            onChange={(value) => onChange({ centerY: value / 100 })}
+          />
+        </>
+      )}
       <ZoomTransitionSection
         label={translate('gallery.videoReview.zoomTransitionIn')}
         value={region.enter}

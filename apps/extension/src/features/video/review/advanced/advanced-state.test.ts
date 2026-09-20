@@ -416,3 +416,13 @@ it('loads content snapshots and rejects ui leakage or schema drift', () => {
   expect(loadQuickEditAdvancedContentState({ ...state, schemaVersion: 2 })).toBeNull();
   expect(loadQuickEditAdvancedContentState(undefined)).toBeNull();
 });
+
+it('preserves spotlight settings through advanced content parsing and rejects malformed openings', async () => {
+  const { createQuickEditSpotlight } = await import('./focus');
+  const state = advanced();
+  state.zoom.regions[0]!.spotlight = createQuickEditSpotlight();
+  expect(loadQuickEditAdvancedState(state)).toEqual(state);
+  const malformed = structuredClone(state);
+  malformed.zoom.regions[0]!.spotlight!.area.width = 2;
+  expect(loadQuickEditAdvancedState(malformed)).toBeNull();
+});

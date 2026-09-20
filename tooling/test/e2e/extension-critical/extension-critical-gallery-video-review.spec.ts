@@ -1053,3 +1053,316 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`quick editor spotlight preview and export (${variant.locale}, ${variant.theme})`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.zoomTrack').click();
+      await button('gallery.videoReview.zoomAdd').first().click();
+      await button('gallery.videoReview.focusType').click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+        .click();
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
+      const opening = dialog.getByRole('group', {
+        name: label('gallery.videoReview.focusSpotlight'),
+        exact: true,
+      });
+      await expect(opening).toBeVisible();
+      await opening.focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(
+        dialog.getByRole('textbox', { name: label('gallery.videoReview.focusAreaX'), exact: true })
+      ).toHaveValue('26');
+      await button('gallery.videoReview.undo').click();
+      await expect(
+        dialog.getByRole('textbox', { name: label('gallery.videoReview.focusAreaX'), exact: true })
+      ).toHaveValue('25');
+      const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      await timelineGesture(page, 1);
+      await expect(stage.locator('[data-ui="gallery.videoReview.spotlight"]')).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0.65)'
+      );
+      const dimmed = await stage.screenshot({ path: testInfo.outputPath('spotlight-dim.png') });
+      await button('gallery.videoReview.advancedEditing').click();
+      await expect(stage.locator('[data-ui="gallery.videoReview.spotlight"]')).toHaveCount(0);
+      const plain = await stage.screenshot();
+      const pixels = await page.evaluate(
+        async ({ plain, dimmed }) => {
+          const sample = async (encoded: string) => {
+            const image = await createImageBitmap(
+              new Blob([Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))], {
+                type: 'image/png',
+              })
+            );
+            const canvas = document.createElement('canvas');
+            canvas.width = image.width;
+            canvas.height = image.height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(image, 0, 0);
+            image.close();
+            const pixel = (x: number, y: number) =>
+              Array.from(
+                ctx.getImageData(Math.floor(x * canvas.width), Math.floor(y * canvas.height), 1, 1)
+                  .data
+              ).slice(0, 3);
+            return { outside: pixel(0.15, 0.4), inside: pixel(0.4, 0.4) };
+          };
+          return { plain: await sample(plain), dimmed: await sample(dimmed) };
+        },
+        { plain: plain.toString('base64'), dimmed: dimmed.toString('base64') }
+      );
+      // Mode changes resize the stage by subpixels; allow only resampling noise.
+      for (let channel = 0; channel < 3; channel++)
+        expect(
+          Math.abs(pixels.dimmed.inside[channel]! - pixels.plain.inside[channel]!)
+        ).toBeLessThanOrEqual(3);
+      expect(pixels.dimmed.outside.reduce((a, b) => a + b, 0)).toBeLessThan(
+        pixels.plain.outside.reduce((a, b) => a + b, 0) * 0.5
+      );
+      await button('gallery.videoReview.advancedEditing').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
+      await button('gallery.videoReview.focusOutside').click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusBlur'), exact: true })
+        .click();
+      await timelineGesture(page, 1);
+      await expect(stage.locator('[data-ui="gallery.videoReview.spotlight"]')).not.toHaveCSS(
+        'backdrop-filter',
+        'none'
+      );
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      const clearPixel = await page.evaluate(
+        async (encoded) => {
+          const image = await createImageBitmap(
+            new Blob([Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))], {
+              type: 'image/png',
+            })
+          );
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(image, 0, 0);
+          image.close();
+          const pixel = (x: number) =>
+            Array.from(
+              ctx.getImageData(Math.floor(canvas.width * x), Math.floor(canvas.height * 0.4), 1, 1)
+                .data
+            ).slice(0, 3);
+          return { inside: pixel(0.4), outside: pixel(0.15) };
+        },
+        (
+          await stage.screenshot({ path: testInfo.outputPath('spotlight-blur-stage.png') })
+        ).toString('base64')
+      );
+      for (let channel = 0; channel < 3; channel++)
+        expect(
+          Math.abs(clearPixel.inside[channel]! - pixels.dimmed.inside[channel]!)
+        ).toBeLessThanOrEqual(3);
+
+      expect(
+        clearPixel.outside.reduce(
+          (sum, value, channel) => sum + Math.abs(value - pixels.plain.outside[channel]!),
+          0
+        )
+      ).toBeGreaterThan(20);
+      await page.screenshot({ path: testInfo.outputPath('spotlight-blur.png') });
+      const downloading = page.waitForEvent('download');
+      await button('gallery.videoReview.downloadVideo').click();
+      const download = await downloading;
+      await download.saveAs(testInfo.outputPath('spotlight-blur.webm'));
+      const exported = await readFile(await download.path());
+      const comparison = await page.evaluate(async (encoded) => {
+        const original = document.querySelector<HTMLVideoElement>(
+          '[data-ui="gallery.videoReview.stage"] video'
+        )!;
+        const blob = new Blob([Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))], {
+          type: 'video/webm',
+        });
+        const resultUrl = URL.createObjectURL(blob);
+        const decode = async (url: string) => {
+          const video = document.createElement('video');
+          try {
+            video.muted = true;
+            await new Promise<void>((resolve, reject) => {
+              video.onloadedmetadata = () => resolve();
+              video.onerror = () => reject(new Error('Decode failed'));
+              video.src = url;
+            });
+            await new Promise<void>((resolve) => {
+              video.onseeked = () => resolve();
+              video.currentTime = 1.05;
+            });
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(video, 0, 0);
+            return {
+              width: canvas.width,
+              height: canvas.height,
+              data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+            };
+          } finally {
+            video.removeAttribute('src');
+            video.load();
+          }
+        };
+        try {
+          const source = await decode(original.currentSrc),
+            result = await decode(resultUrl);
+          const error = (left: number, right: number, top: number, bottom: number) => {
+            let sum = 0,
+              count = 0;
+            for (let y = Math.ceil(source.height * top); y < source.height * bottom; y++)
+              for (let x = Math.ceil(source.width * left); x < source.width * right; x++)
+                for (let c = 0; c < 3; c++) {
+                  const i = (y * source.width + x) * 4 + c;
+                  sum += Math.abs(source.data[i]! - result.data[i]!);
+                  count++;
+                }
+            return sum / count;
+          };
+          return {
+            width: result.width,
+            height: result.height,
+            inside: error(0.32, 0.68, 0.52, 0.68),
+            outside: error(0.05, 0.2, 0.5, 0.8),
+          };
+        } finally {
+          URL.revokeObjectURL(resultUrl);
+        }
+      }, exported.toString('base64'));
+      expect(comparison).toMatchObject({ width: 160, height: 90 });
+      expect(comparison.inside).toBeLessThan(12);
+      expect(comparison.outside).toBeGreaterThan(8);
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
+      await page.setViewportSize({ width: 800, height: 600 });
+      await expect(button('gallery.videoReview.focusType')).toBeInViewport();
+      await page.screenshot({ path: testInfo.outputPath('spotlight-minimum.png') });
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first()
+        .click();
+      await expect(button('gallery.videoReview.focusType')).toContainText(
+        label('gallery.videoReview.focusSpotlight')
+      );
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await timelineGesture(page, 5);
+      await button('gallery.videoReview.zoomAdd').first().click();
+      const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
+      await expect(link).toHaveCount(0);
+      await button('gallery.videoReview.focusType').click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+        .click();
+      await expect(link).toHaveCount(1);
+      await link.click();
+      await expect(link).toHaveAttribute('data-connected', 'true');
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await lane.locator('[role="button"]').last().click();
+      await button('gallery.videoReview.focusType').click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.zoomRegionLabel'), exact: true })
+        .click();
+      await expect(link).toHaveCount(0);
+      await button('gallery.videoReview.undo').click();
+      await expect(link).toHaveAttribute('data-connected', 'true');
+      await lane.locator('[role="button"]').first().click();
+      await button('gallery.videoReview.focusOutside').click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.focusDim'), exact: true })
+        .click();
+      await button('gallery.videoReview.scene').click();
+      const background = await page.evaluate(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+        const context = canvas.getContext('2d')!;
+        context.fillStyle = '#4488bb';
+        context.fillRect(0, 0, 16, 16);
+        return canvas.toDataURL('image/png').split(',')[1]!;
+      });
+      await dialog.locator('input[accept="image/png,image/jpeg,image/webp"]').setInputFiles({
+        name: 'focus-background.png',
+        mimeType: 'image/png',
+        buffer: Buffer.from(background, 'base64'),
+      });
+      await expect(stage.locator('img')).toHaveCount(1);
+      await timelineGesture(page, 1);
+      const edge = await page.evaluate(
+        async (encoded) => {
+          const bitmap = await createImageBitmap(
+            new Blob([Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))], {
+              type: 'image/png',
+            })
+          );
+          const canvas = document.createElement('canvas');
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(bitmap, 0, 0);
+          bitmap.close();
+          return Array.from(ctx.getImageData(2, Math.floor(canvas.height / 2), 1, 1).data).slice(
+            0,
+            3
+          );
+        },
+        (
+          await stage.screenshot({ path: testInfo.outputPath('spotlight-background.png') })
+        ).toString('base64')
+      );
+      for (const [channel, expected] of [24, 48, 65].entries())
+        expect(Math.abs(edge[channel]! - expected)).toBeLessThanOrEqual(3);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

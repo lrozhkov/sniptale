@@ -1,3 +1,4 @@
+import { ReviewSpotlightPreview } from './spotlight-preview';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { useReviewBackgroundImage } from './use-review-background';
@@ -210,9 +211,9 @@ export function ReviewZoomPreview(props: {
         canvas: props.canvas,
         source: props.source,
         background: props.background,
-        camera: region.transform,
+        camera: region.spotlight ? { scale: 1, centerX: 0.5, centerY: 0.5 } : region.transform,
       }),
-    [output, props.source, props.canvas, props.background, region.transform]
+    [output, props.source, props.canvas, props.background, region.transform, region.spotlight]
   );
 
   const unavailable = sourceTime === null || !loadFrame;
@@ -227,18 +228,24 @@ export function ReviewZoomPreview(props: {
     >
       <div className="flex items-center justify-between gap-2">
         <h5 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {translate('gallery.videoReview.zoomPreview')}
+          {translate(
+            region.spotlight
+              ? 'gallery.videoReview.focusPreview'
+              : 'gallery.videoReview.zoomPreview'
+          )}
         </h5>
-        <SegmentedRow<'area' | 'result'>
-          ariaLabel={translate('gallery.videoReview.zoomPreview')}
-          columns={2}
-          value={view}
-          options={[
-            { value: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
-            { value: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
-          ]}
-          onChange={setView}
-        />
+        {!region.spotlight ? (
+          <SegmentedRow<'area' | 'result'>
+            ariaLabel={translate('gallery.videoReview.zoomPreview')}
+            columns={2}
+            value={view}
+            options={[
+              { value: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
+              { value: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
+            ]}
+            onChange={setView}
+          />
+        ) : null}
       </div>
       <div
         className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
@@ -252,22 +259,42 @@ export function ReviewZoomPreview(props: {
             style={{ objectFit: background.imageFit }}
           />
         ) : null}
-        <ZoomPreviewCanvas
-          key={region.id}
-          cornerRadius={
-            background.enabled
-              ? (background.layout.cornerRadius * output.width) /
-                Math.max(1, props.canvas?.width ?? props.source.width)
-              : 0
-          }
-          camera={region.transform}
-          disabled={props.disabled || status !== 'ready'}
-          frame={frame}
-          layout={layout}
-          output={output}
-          view={view}
-          onCenter={props.onChange}
-        />
+        {region.spotlight ? (
+          <ReviewSpotlightPreview
+            key={region.id}
+            region={region}
+            spotlight={region.spotlight}
+            frame={frame}
+            output={output}
+            layout={layout}
+            cornerRadius={
+              background.enabled
+                ? (background.layout.cornerRadius * output.width) /
+                  Math.max(1, props.canvas?.width ?? props.source.width)
+                : 0
+            }
+            scale={output.width / Math.max(1, props.canvas?.width ?? props.source.width)}
+            disabled={!!props.disabled || status !== 'ready'}
+            onChange={(spotlight) => props.onChange({ spotlight })}
+          />
+        ) : (
+          <ZoomPreviewCanvas
+            key={region.id}
+            cornerRadius={
+              background.enabled
+                ? (background.layout.cornerRadius * output.width) /
+                  Math.max(1, props.canvas?.width ?? props.source.width)
+                : 0
+            }
+            camera={region.transform}
+            disabled={props.disabled || status !== 'ready'}
+            frame={frame}
+            layout={layout}
+            output={output}
+            view={view}
+            onCenter={props.onChange}
+          />
+        )}
       </div>
       {unavailable ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">

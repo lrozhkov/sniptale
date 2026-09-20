@@ -340,3 +340,18 @@ it('keeps rendered translation and scale monotonic across a long slow camera tra
     previous = next;
   }
 });
+
+it('does not let an inactive transition shorten the opposite phase', () => {
+  const camera = evaluateQuickEditCameraAtTime(
+    [
+      region({
+        start: 0,
+        end: 2,
+        enter: { type: 'none', duration: 60 },
+        exit: { type: 'linear', duration: 2 },
+      }),
+    ],
+    1
+  );
+  expect(camera.scale).toBeCloseTo(1.5);
+});

@@ -44,6 +44,10 @@ export function ReviewInspector(props: {
         ? 'selected'
         : 'scene';
   const [section, setSection] = useState<Section>(contextSection);
+  const scroll = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scroll.current) scroll.current.scrollTop = 0;
+  }, [contextKey, section]);
   const previousSettings = useRef(props.settingsAvailable);
   useEffect(() => {
     const modeChanged = previousSettings.current !== props.settingsAvailable;
@@ -130,7 +134,7 @@ export function ReviewInspector(props: {
           />
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto">
+      <div ref={scroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto">
         {shown === 'scene' ? (
           props.scene
         ) : shown === 'selected' ? (

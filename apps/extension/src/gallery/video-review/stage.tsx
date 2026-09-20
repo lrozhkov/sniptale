@@ -1,3 +1,6 @@
+import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
+import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
+import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
 import { fitVideoRect, projectVideoRegion } from '../../features/video/review/geometry';
@@ -48,6 +51,7 @@ export function ReviewStage(props: {
     background: QuickEditBackgroundSettings;
     canvas?: { width: number; height: number } | undefined;
     camera: QuickEditCameraTransform;
+    focus?: { regions: readonly QuickEditZoomRegion[]; time: number };
   };
   /** Handle target for the selected zoom region, independent from the playhead camera. */
   zoom?: {
@@ -89,10 +93,8 @@ export function ReviewStage(props: {
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   });
-  const { size, sceneLayout, zoomLayout, backgroundPaint, content } = useReviewStageGeometry(
-    props,
-    host
-  );
+  const { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight } =
+    useReviewStageGeometry(props, host);
   const plane = useReviewDrawingPlane({
     drawing: props.drawing,
     content,
@@ -165,6 +167,7 @@ export function ReviewStage(props: {
           onPlaying={props.onPlaying}
           onError={props.onError}
         />
+        <ReviewSpotlightOverlay output={size} frame={spotlight} />
         {props.comments && props.comments.items.length ? (
           <ReviewStageComments comments={props.comments} output={size} source={props.source} />
         ) : null}
@@ -445,5 +448,14 @@ function useReviewStageGeometry(
         videoTransform: sceneLayout.videoTransform,
       });
   }, [size, sceneLayout, reportGeometry]);
-  return { size, sceneLayout, zoomLayout, backgroundPaint, content };
+  const spotlight =
+    sceneLayout && props.scene?.focus
+      ? evaluateQuickEditSpotlightAtTime({
+          ...props.scene.focus,
+          output: size,
+          video: sceneLayout.videoRect,
+          scale: size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width),
+        })
+      : null;
+  return { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight };
 }

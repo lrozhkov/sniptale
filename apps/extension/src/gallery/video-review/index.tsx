@@ -600,7 +600,9 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
           outputTime={timeline.sceneOutputTime}
           zoomOverlay={
             zoomRegion && !busy && editing.exporter.phase === 'idle'
-              ? zoom.focusOverlay(zoomRegion)
+              ? zoomRegion.spotlight
+                ? undefined
+                : zoom.focusOverlay(zoomRegion)
               : undefined
           }
           comments={snapshot.document.canvasComments}
@@ -745,7 +747,12 @@ function reviewInspectorContext(state: InspectorState): string {
 function reviewSelectionLabel(state: InspectorState): string | undefined {
   const selection = state.activeSelection;
   if (selection.kind === 'telemetry') return translate('gallery.videoReview.telemetry');
-  if (selection.kind === 'zoom') return translate('gallery.videoReview.zoomTrack');
+  if (selection.kind === 'zoom')
+    return translate(
+      state.advanced.zoom.regions.find((region) => region.id === selection.id)?.spotlight
+        ? 'gallery.videoReview.focusSpotlight'
+        : 'gallery.videoReview.zoomRegionLabel'
+    );
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
   if (selection.kind === 'audio')
     return translate(
