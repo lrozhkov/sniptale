@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type PlaneDragProps = {
@@ -22,6 +22,32 @@ interface PlaneDragState {
   selection: ReviewAnchor;
   time: number;
   pointerId: number;
+}
+
+type CapturedPointerDrag = {
+  node: HTMLElement;
+  pointerId: number;
+};
+
+/** Escape owns cancellation and pointer release for one active timeline-item drag. */
+export function useReviewDragEscape<T extends CapturedPointerDrag>(
+  drag: MutableRefObject<T | null>,
+  resetPreview: () => void
+) {
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      const current = drag.current;
+      if (event.key !== 'Escape' || !current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      drag.current = null;
+      resetPreview();
+      if (current.node.hasPointerCapture(current.pointerId))
+        current.node.releasePointerCapture(current.pointerId);
+    };
+    window.addEventListener('keydown', cancel, true);
+    return () => window.removeEventListener('keydown', cancel, true);
+  });
 }
 
 const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number, gutter: number) => {

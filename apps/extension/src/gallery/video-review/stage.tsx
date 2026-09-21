@@ -23,6 +23,30 @@ import type {
 import { ReviewCommentOverlay } from './comment-overlay';
 import { useReviewDrawingPlane } from './stage-drawing';
 
+type ReviewStageScene = {
+  background: QuickEditBackgroundSettings;
+  canvas?: { width: number; height: number } | undefined;
+  camera: QuickEditCameraTransform;
+  focus?: { regions: readonly QuickEditZoomRegion[]; time: number };
+};
+
+type ReviewStageCommentBinding = {
+  items: readonly CanvasComment[];
+  annotations: readonly ReviewAnnotation[];
+  time: number;
+  background: QuickEditBackgroundSettings;
+  camera: QuickEditCameraTransform | null;
+  selectedId: string | null;
+  busy: boolean;
+  onSelect(id: string): void;
+  onMove(id: string, position: { x: number; y: number }): void;
+  /** Reports the stage geometry for attachment switching; null hides overlays. */
+  onGeometry?(geometry: {
+    output: { width: number; height: number };
+    videoTransform: { x: number; y: number; width: number; height: number } | null;
+  }): void;
+};
+
 /** Stage pixels: the host box measured once and on every resize. */
 function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
   const [size, setSize] = useState({ width: 1, height: 1 });
@@ -48,30 +72,10 @@ export function ReviewStage(props: {
   drawing: boolean;
   region: ReviewRegion | undefined;
   /** One scene: applied background and the camera at the represented frame. */
-  scene?: {
-    background: QuickEditBackgroundSettings;
-    canvas?: { width: number; height: number } | undefined;
-    camera: QuickEditCameraTransform;
-    focus?: { regions: readonly QuickEditZoomRegion[]; time: number };
-  };
+  scene?: ReviewStageScene;
   /** Selected focus controls; disabled during playback and export by the binding. */
   zoom?: ReviewStageFocus;
-  comments?: {
-    items: readonly CanvasComment[];
-    annotations: readonly ReviewAnnotation[];
-    time: number;
-    background: QuickEditBackgroundSettings;
-    camera: QuickEditCameraTransform | null;
-    selectedId: string | null;
-    busy: boolean;
-    onSelect(id: string): void;
-    onMove(id: string, position: { x: number; y: number }): void;
-    /** Reports the stage geometry for attachment switching; null hides overlays. */
-    onGeometry?(geometry: {
-      output: { width: number; height: number };
-      videoTransform: { x: number; y: number; width: number; height: number } | null;
-    }): void;
-  };
+  comments?: ReviewStageCommentBinding;
   onRegion(value: ReviewRegion): void;
   onReady(): void;
   onTime(time: number): void;
@@ -162,18 +166,7 @@ export function ReviewStage(props: {
 
 /** Overlay comment stack using the shared scene geometry. */
 function ReviewStageComments(props: {
-  comments: {
-    items: readonly CanvasComment[];
-    /** Linked overlays resolve their text from the annotation owner. */
-    annotations: readonly ReviewAnnotation[];
-    time: number;
-    background: QuickEditBackgroundSettings;
-    camera: QuickEditCameraTransform | null;
-    selectedId: string | null;
-    busy: boolean;
-    onSelect(id: string): void;
-    onMove(id: string, position: { x: number; y: number }): void;
-  };
+  comments: ReviewStageCommentBinding;
   output: { width: number; height: number };
   source: ReviewSource;
 }) {

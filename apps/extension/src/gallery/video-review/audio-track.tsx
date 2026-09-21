@@ -70,11 +70,7 @@ const LANES: Array<{
   { key: 'music', label: 'gallery.videoReview.audioMusic' },
 ];
 
-/** One semantic clip lane: move drags the block, the edges trim inside the timeline. */
-function ReviewAudioClipLane(props: {
-  lane: ReviewAudioLane;
-  label: string;
-  clips: readonly QuickEditAudioClip[];
+type ReviewAudioTimelineProps = {
   duration: number;
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
@@ -82,7 +78,7 @@ function ReviewAudioClipLane(props: {
   assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
   selectedId: string | null;
   busy: boolean;
-  onSelect(id: string): void;
+  onSelect(id: string | null): void;
   onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
   onTrimClip(
     lane: ReviewAudioLane,
@@ -91,11 +87,44 @@ function ReviewAudioClipLane(props: {
     timelineTime: number,
     assetDuration?: number
   ): void;
+};
+
+type ReviewAudioClipLaneProps = ReviewAudioTimelineProps & {
+  lane: ReviewAudioLane;
+  label: string;
+  clips: readonly QuickEditAudioClip[];
   onDropFile?: (file: File, timelineTime: number) => void;
   trailing?: ReactNode;
   cutsProjection?: ReviewTrackProjection | undefined;
   voiceoverSegments?: QuickEditAudioState['voiceoverSegments'] | undefined;
-}) {
+};
+
+type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
+  originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
+  selectedEditId?: string | undefined;
+  edits?: readonly ReviewEdit[] | undefined;
+  onOriginalRange?: ((range: ReviewAnchor) => void) | undefined;
+  onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
+  audio: QuickEditAudioState;
+  hasOriginalAudio?: boolean;
+  showAddedAudio?: boolean;
+  onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
+  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
+  onRecordVoiceover(): void;
+  onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
+};
+
+type ReviewClipLanesProps = ReviewAudioTimelineProps & {
+  audio: QuickEditAudioState;
+  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
+  onRecordVoiceover(): void;
+  onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
+  pickerLane: RefObject<ReviewAudioLane | null>;
+  pickerInput: RefObject<HTMLInputElement | null>;
+};
+
+/** One semantic clip lane: move drags the block, the edges trim inside the timeline. */
+function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   const [preview, setPreview] = useState<{
     clip: QuickEditAudioClip;
     guide: number | null;
@@ -339,36 +368,7 @@ function ReviewAudioClipBlock(props: {
 }
 
 /** The three semantic audio lanes; the original stays bound to the video structure. */
-export function ReviewAudioTrack(props: {
-  originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
-  selectedEditId?: string | undefined;
-  edits?: readonly ReviewEdit[] | undefined;
-  onOriginalRange?: ((range: ReviewAnchor) => void) | undefined;
-  onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
-  audio: QuickEditAudioState;
-  hasOriginalAudio?: boolean;
-  showAddedAudio?: boolean;
-  duration: number;
-  projection?: ReviewTrackProjection | undefined;
-  snapTimes?: readonly number[] | undefined;
-  waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
-  assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
-  selectedId: string | null;
-  busy: boolean;
-  onSelect(id: string | null): void;
-  onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
-  onTrimClip(
-    lane: ReviewAudioLane,
-    id: string,
-    edge: 'start' | 'end',
-    timelineTime: number,
-    assetDuration?: number
-  ): void;
-  onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
-  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
-  onRecordVoiceover(): void;
-  onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
-}) {
+export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
   const input = useRef<HTMLInputElement>(null);
   const picker = useRef<ReviewAudioLane | null>(null);
   return (
@@ -424,30 +424,7 @@ export function ReviewAudioTrack(props: {
   );
 }
 
-function ReviewClipLanes(props: {
-  audio: QuickEditAudioState;
-  duration: number;
-  projection?: ReviewTrackProjection | undefined;
-  snapTimes?: readonly number[] | undefined;
-  waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
-  assets?: ReadonlyMap<string, ReviewAudioAsset> | undefined;
-  selectedId: string | null;
-  busy: boolean;
-  onSelect(id: string | null): void;
-  onMoveClip(lane: ReviewAudioLane, id: string, timelineStart: number): void;
-  onTrimClip(
-    lane: ReviewAudioLane,
-    id: string,
-    edge: 'start' | 'end',
-    timelineTime: number,
-    assetDuration?: number
-  ): void;
-  onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
-  onRecordVoiceover(): void;
-  onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
-  pickerLane: RefObject<ReviewAudioLane | null>;
-  pickerInput: RefObject<HTMLInputElement | null>;
-}) {
+function ReviewClipLanes(props: ReviewClipLanesProps) {
   return (
     <>
       {LANES.map((lane) => (

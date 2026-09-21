@@ -1,7 +1,7 @@
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ScanEye } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
@@ -23,6 +23,7 @@ import {
 } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
+import { useReviewDragEscape } from './timeline-drag';
 
 type ZoomTrackProps = {
   sourceSelection?: ReviewAnchor | undefined;
@@ -145,21 +146,10 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   const [guide, setGuide] = useState<number | null>(null);
   const [preview, setPreview] = useState<{ id: string; start: number; end: number } | null>(null);
   const drag = useRef<ZoomDragState | null>(null);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      const current = drag.current;
-      if (event.key !== 'Escape' || !current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      drag.current = null;
-      setPreview(null);
-      setGuide(null);
-      if (current.node.hasPointerCapture(current.pointerId))
-        current.node.releasePointerCapture(current.pointerId);
-    };
-    window.addEventListener('keydown', cancel, true);
-    return () => window.removeEventListener('keydown', cancel, true);
-  }, []);
+  useReviewDragEscape(drag, () => {
+    setPreview(null);
+    setGuide(null);
+  });
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : { start: region.start, end: region.end };
   const { edits, boundaries, time, toOutputTime } = props;
