@@ -30,6 +30,22 @@ function writeBaseline(root: string, findings: Array<Record<string, unknown>>) {
   return baselinePath;
 }
 
+it('keeps the checked-in naming baseline structurally valid', () => {
+  const baselinePath = 'tooling/configs/qa/naming-repository-baseline.json';
+  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  const findings = baseline.findings.map(
+    ({ noiseId: _noiseId, ...finding }: Record<string, unknown>) => finding
+  );
+
+  expect(
+    applyRepositoryFindingBaseline({
+      baselinePath,
+      controlId: 'qa.rule.naming',
+      findings,
+    })
+  ).toMatchObject({ matched: true, violations: [], advisories: [] });
+});
+
 it('keeps an exact repository baseline silent', () => {
   const root = createTempRoot('repository-baseline-match-');
   const findings = [{ rule: 'example', file: 'src/example.ts', line: 7, message: 'known' }];

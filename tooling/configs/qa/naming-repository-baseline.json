@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "controlId": "qa.rule.naming",
   "findingCount": 19,
-  "findingDigest": "sha256:0cbfe5260647626d7f50cca43ec2c8938c6c3e5d4fa4ef5a0d826e829415516e",
+  "findingDigest": "sha256:f10fc074af109e165d9e61e3ad02b5ddfb5fe6422497953c053c281b506194dc",
   "rationales": [
     {
       "id": "noise.naming.reviewed-owner-context",
