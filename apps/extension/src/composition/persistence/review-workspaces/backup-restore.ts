@@ -5,6 +5,11 @@ import {
 } from '../infrastructure/indexed-db/core.stores';
 import type { VideoWorkspace, VideoWorkspaceDraft, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
+import {
+  assertPortableReviewAssetRefs,
+  decodePortableReviewAssetRefs,
+  remapReviewAssetReferences,
+} from './asset-refs';
 
 /** Portable review includes all history and field recovery, but no local OPFS identity. */
 export interface PortableVideoReview {
@@ -14,10 +19,22 @@ export interface PortableVideoReview {
 
 /** Validates portable state and its association before archive publication. */
 export function parsePortableVideoReview(value: unknown, aggregateId: string): PortableVideoReview {
+  return parsePortableVideoReviewShape(value, aggregateId, false);
+}
+
+function parsePortableVideoReviewShape(
+  value: unknown,
+  aggregateId: string,
+  allowLocalAssetIds: boolean
+): PortableVideoReview {
   if (!isRecord(value) || !isRecord(value['workspace']) || 'sourceAssetId' in value['workspace']) {
     throw new Error('Portable video review is invalid.');
   }
-  const workspace = parseVideoWorkspace({ ...value['workspace'], sourceAssetId: 'portable' });
+  if (!allowLocalAssetIds) assertPortableReviewAssetRefs(value['workspace']);
+  const workspace = parseVideoWorkspace({
+    ...(decodePortableReviewAssetRefs(value['workspace']) as Record<string, unknown>),
+    sourceAssetId: 'portable',
+  });
   const draft =
     value['draft'] === null
       ? null
@@ -65,9 +82,10 @@ export async function readVideoReviewForBackup(args: {
     throw new Error('Video review source is missing or changed.');
   }
   const { sourceAssetId: _localId, ...portable } = workspace;
-  return parsePortableVideoReview(
+  return parsePortableVideoReviewShape(
     { workspace: portable, draft: rawDraft === undefined ? null : rawDraft },
-    args.aggregateId
+    args.aggregateId,
+    true
   );
 }
 
@@ -77,18 +95,21 @@ export function prepareVideoReviewRestore(args: {
   sourceAggregateId: string;
   targetAggregateId: string;
   sourceAssetId: string;
+  /** Restored project-asset id map for review audio and image references. */
+  assetIdMap?: ReadonlyMap<string, string>;
 }): VideoWorkspaceSnapshot {
-  const review = parsePortableVideoReview(args.review, args.sourceAggregateId);
+  const review = parsePortableVideoReviewShape(args.review, args.sourceAggregateId, true);
   const workspace = parseVideoWorkspace({
     ...review.workspace,
     aggregateId: args.targetAggregateId,
     sourceAssetId: args.sourceAssetId,
   });
   if (!workspace) throw new Error('Restored video review is invalid.');
-  return {
+  const snapshot: VideoWorkspaceSnapshot = {
     workspace,
     draft: review.draft ? { ...review.draft, aggregateId: args.targetAggregateId } : null,
   };
+  return remapReviewAssetReferences(snapshot, args.assetIdMap ?? new Map());
 }
 
 /** Must be called inside the original media publication transaction. */

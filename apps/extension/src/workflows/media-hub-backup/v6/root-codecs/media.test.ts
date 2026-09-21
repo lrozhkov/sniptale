@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { createQuickEditAdvancedState } from '../../../../features/video/review/advanced/defaults';
 import { parsePortableMediaMetadata } from './media';
 
 function metadata() {
@@ -50,10 +51,47 @@ function metadata() {
   };
 }
 
+function recordingMetadata() {
+  return {
+    entry: {
+      id: 'recording:recording-one',
+      kind: 'recording',
+      filename: 'recording.webm',
+      originalFilename: 'recording.webm',
+      source: { kind: 'recording', recordingId: 'recording-one' },
+      mimeType: 'video/webm',
+      createdAt: 1,
+      updatedAt: 1,
+      duration: 2,
+      size: 6,
+      width: 640,
+      height: 360,
+      sourceUrl: null,
+      sourceTitle: null,
+      sourceFavicon: null,
+      tags: [],
+    },
+    originalObjectId: 'recording-object',
+    recording: {
+      entry: {
+        createdAt: 1,
+        filename: 'recording.webm',
+        id: 'recording-one',
+        mimeType: 'video/webm',
+        size: 6,
+      },
+    },
+  };
+}
+
 it('parses a standalone project video review without changing the supplied metadata', () => {
   const input = metadata();
   const before = structuredClone(input);
-  expect(parsePortableMediaMetadata(input).videoReview).toEqual(input.videoReview);
+  // A legacy portable workspace parses as the v2 normalized record the restore writes.
+  expect(parsePortableMediaMetadata(input).videoReview).toEqual({
+    ...input.videoReview,
+    workspace: { ...input.videoReview.workspace, advanced: createQuickEditAdvancedState() },
+  });
   expect(input).toEqual(before);
 });
 
@@ -95,7 +133,28 @@ it('rejects invalid byte ownership, local identity, history and review source', 
 it('accepts historical WebM project exports without an explicit MIME type', () => {
   const input = metadata();
   const { mimeType: _mime, ...projectExport } = input.projectExport;
-  expect(parsePortableMediaMetadata({ ...input, projectExport }).videoReview).toEqual(
-    input.videoReview
+  expect(parsePortableMediaMetadata({ ...input, projectExport }).videoReview).toEqual({
+    ...input.videoReview,
+    workspace: { ...input.videoReview.workspace, advanced: createQuickEditAdvancedState() },
+  });
+});
+
+it('requires an exact recording source and sidecar identity association', () => {
+  const input = recordingMetadata();
+  expect(parsePortableMediaMetadata(input).recording?.entry.id).toBe('recording-one');
+  expect(() => parsePortableMediaMetadata({ ...input, recording: undefined })).toThrow(
+    'recording association'
   );
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      recording: { entry: { ...input.recording.entry, id: 'other-recording' } },
+    })
+  ).toThrow('recording association');
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      entry: { ...input.entry, id: 'recording:other-recording' },
+    })
+  ).toThrow('recording association');
 });

@@ -1,3 +1,4 @@
+import { normalizeRecordingSignals } from '../../../features/video/project/recording-actions';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { type SourceTimedProjectSpan } from '../../../features/video/project/timeline/source-time';
 import { mapSourceRangeToProjectSpans } from '../../../features/video/project/timeline/source-time';
@@ -48,7 +49,7 @@ function buildTelemetryLaneSpans(
       ];
     });
   const clips = collectRepresentativeRecordingSourceClips(project, recordingId);
-  const typingSignals = telemetry.signals.filter(
+  const typingSignals = normalizeRecordingSignals(telemetry.signals).filter(
     (signal) => signal.kind === RecordingTelemetrySignalKind.TYPING
   );
   const typingSpans = typingSignals.flatMap((signal) =>

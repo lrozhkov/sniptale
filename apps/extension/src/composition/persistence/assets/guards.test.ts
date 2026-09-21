@@ -95,6 +95,7 @@ describe('asset persistence guards', () => {
   it('narrows resumable archive restore sessions and rejects mutable identity drift', () => {
     const session = {
       archiveFingerprint: 'a'.repeat(64),
+      childIdMap: { 'scenario-asset:image': 'image-copy' },
       committedRoots: ['media:library-item:one'],
       conflictedRoots: [],
       createdAt: 1,
@@ -108,11 +109,17 @@ describe('asset persistence guards', () => {
       updatedAt: 2,
     };
     expect(parseArchiveRestoreSession(session)).toEqual(session);
+    const { childIdMap: _childIdMap, ...legacySession } = session;
+    expect(parseArchiveRestoreSession(legacySession)).toEqual({
+      ...legacySession,
+      childIdMap: {},
+    });
     expect(
       parseArchiveRestoreSession({ ...session, archiveFingerprint: 'filename.zip' })
     ).toBeNull();
     expect(parseArchiveRestoreSession({ ...session, strategy: 'merge' })).toBeNull();
     expect(parseArchiveRestoreSession({ ...session, currentRoot: '' })).toBeNull();
+    expect(parseArchiveRestoreSession({ ...session, childIdMap: { '': 'image-copy' } })).toBeNull();
     expect(parseArchiveRestoreSession({ ...session, rootIdMap: {} })).toBeNull();
     expect(
       parseArchiveRestoreSession({ ...session, conflictedRoots: ['unknown-root'] })

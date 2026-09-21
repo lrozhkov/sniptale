@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { applyReviewOperation, replayReviewHistory } from './document';
+import { createQuickEditAdvancedContent } from './advanced/defaults';
+import type { QuickEditAdvancedContent } from './advanced/types';
+import { createCanvasComment } from './comments';
 import type { ReviewAnnotation, ReviewOperation, ReviewSource } from './types';
 
 const source: ReviewSource = {
@@ -24,6 +27,21 @@ const added: ReviewOperation = {
 };
 
 describe('video review history', () => {
+  it('replays canvas comment operations like other targets at every cursor', () => {
+    const comment = createCanvasComment({ id: 'c1', at: 2 });
+    const edited = { ...comment, text: 'Now with text' };
+    const history: ReviewOperation[] = [
+      { id: 'op1', at: 1, target: 'canvasComment', before: null, after: comment },
+      { id: 'op2', at: 2, target: 'canvasComment', before: comment, after: edited },
+      { id: 'op3', at: 3, target: 'canvasComment', before: edited, after: null },
+    ];
+    expect(replayReviewHistory(history, 0, source).canvasComments).toEqual([]);
+    expect(replayReviewHistory(history, 1, source).canvasComments).toEqual([comment]);
+    expect(replayReviewHistory(history, 2, source).canvasComments).toEqual([edited]);
+    expect(replayReviewHistory(history, 3, source).canvasComments).toEqual([]);
+    expect(comment.text).toBe('');
+  });
+
   it('replays add, edit and delete at every undo cursor without mutating earlier values', () => {
     const edited = { ...annotation, text: 'Corrected text' };
     const history: ReviewOperation[] = [
@@ -112,4 +130,114 @@ describe('video review history', () => {
       )
     ).toThrow('entire');
   });
+});
+
+describe('advancedContent operations', () => {
+  it('replays content ops on the baseline and undo returns to it', () => {
+    const baseline = createQuickEditAdvancedContent();
+    const zoomed: QuickEditAdvancedContent = {
+      ...baseline,
+      zoom: {
+        enabled: true,
+        regions: [
+          {
+            id: 'z',
+            start: 1,
+            end: 3,
+            transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'none', duration: 0 },
+            exit: { type: 'none', duration: 0 },
+          },
+        ],
+      },
+    };
+    const operation: ReviewOperation = {
+      id: 'op-a',
+      at: 5,
+      target: 'advancedContent',
+      before: baseline,
+      after: zoomed,
+    };
+    const history = [operation];
+    expect(replayReviewHistory(history, 1, source, baseline).advancedContent).toEqual(zoomed);
+    expect(replayReviewHistory(history, 0, source, baseline).advancedContent).toEqual(baseline);
+  });
+
+  it('rejects stale content before-values and no-change commits', () => {
+    const baseline = createQuickEditAdvancedContent();
+    const changed: QuickEditAdvancedContent = {
+      ...baseline,
+      audio: { ...baseline.audio, original: { muted: true, volume: 1 } },
+    };
+    expect(() =>
+      applyReviewOperation(
+        replayReviewHistory([], 0, source, baseline),
+        { id: 'op-b', at: 1, target: 'advancedContent', before: baseline, after: changed },
+        source
+      )
+    ).not.toThrow();
+    expect(() =>
+      applyReviewOperation(
+        replayReviewHistory([], 0, source, baseline),
+        { id: 'op-c', at: 1, target: 'advancedContent', before: changed, after: baseline },
+        source
+      )
+    ).toThrow('does not match');
+    expect(() =>
+      applyReviewOperation(
+        replayReviewHistory([], 0, source, baseline),
+        { id: 'op-d', at: 1, target: 'advancedContent', before: baseline, after: baseline },
+        source
+      )
+    ).toThrow('no change');
+  });
+});
+
+it('keeps historical focus snapshots replayable while new edits atomically anchor focus', () => {
+  const baseline = createQuickEditAdvancedContent();
+  baseline.zoom.regions = [
+    {
+      id: 'focus',
+      start: 6,
+      end: 8,
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'linear', duration: 0.3 },
+      exit: { type: 'linear', duration: 0.3 },
+    },
+  ];
+  const cut: ReviewOperation = {
+    id: 'old-cut',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: { id: 'cut', kind: 'cut', start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
+  };
+  const changed = structuredClone(baseline);
+  changed.zoom.regions[0]!.transform.scale = 3;
+  const history: ReviewOperation[] = [
+    cut,
+    { id: 'snapshot', at: 2, target: 'advancedContent', before: baseline, after: changed },
+  ];
+  expect(replayReviewHistory(history, 2, source, baseline).advancedContent).toEqual(changed);
+  history.push({
+    id: 'remove-cut',
+    at: 3,
+    target: 'edit',
+    before: cut.after,
+    after: null,
+    preserveFocusAnchors: true,
+  });
+  const result = replayReviewHistory(history, 3, source, baseline);
+  expect(result.advancedContent.zoom.regions[0]).toMatchObject({ start: 8, end: 10 });
+  const next = structuredClone(result.advancedContent);
+  next.zoom.regions[0]!.transform.scale = 2;
+  history.push({
+    id: 'new-snapshot',
+    at: 4,
+    target: 'advancedContent',
+    before: result.advancedContent,
+    after: next,
+  });
+  expect(replayReviewHistory(history, 4, source, baseline).advancedContent).toEqual(next);
+  expect(replayReviewHistory(history, 2, source, baseline).advancedContent).toEqual(changed);
 });

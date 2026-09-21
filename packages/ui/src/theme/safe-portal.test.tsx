@@ -149,3 +149,23 @@ describe('useResolvedPortalTheme', () => {
     }
   });
 });
+
+it('keeps floating controls inside the nearest open native dialog and restores the normal target on close', () => {
+  const outer = document.createElement('dialog');
+  const inner = document.createElement('dialog');
+  const anchor = document.createElement('button');
+  outer.open = true;
+  inner.open = true;
+  inner.append(anchor);
+  outer.append(inner);
+  document.body.append(outer);
+  try {
+    expect(resolveThemeSafePortalTarget(anchor)).toBe(inner);
+    inner.open = false;
+    expect(resolveThemeSafePortalTarget(anchor)).toBe(outer);
+    outer.open = false;
+    expect(resolveThemeSafePortalTarget(anchor)).toBe(document.body);
+  } finally {
+    outer.remove();
+  }
+});

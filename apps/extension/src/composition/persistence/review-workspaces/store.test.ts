@@ -1,3 +1,5 @@
+import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import type { ReviewAnnotation, ReviewOperation } from '../../../features/video/review/types';
@@ -20,8 +22,14 @@ import {
   moveVideoWorkspaceHistory,
   openVideoWorkspace,
   readVideoWorkspace,
+  saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
 } from './store';
+import {
+  createQuickEditAdvancedContent,
+  createQuickEditAdvancedState,
+} from '../../../features/video/review/advanced/defaults';
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
 
 const id = 'recording:beta-v1-recording';
 const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
@@ -332,4 +340,388 @@ it('refuses to create a session for a replaced file loaded before opening the ed
     code: 'changed-source',
   });
   expect(await readVideoWorkspace(id)).toBeNull();
+});
+
+it('opens legacy workspaces with advanced defaults and persists explicit replacement', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  expect(opened.workspace.advanced).toEqual(createQuickEditAdvancedState());
+  expect(parseVideoWorkspace({ ...opened.workspace, advanced: undefined })).toEqual(
+    opened.workspace
+  );
+  const advanced = {
+    ...createQuickEditAdvancedState(),
+    ui: {
+      mode: 'advanced',
+      tracks: { actions: true, zoom: true, audio: true },
+      overlaysVisible: true,
+    },
+  };
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced,
+  });
+  expect(saved.workspace.advanced).toEqual(advanced);
+  const reopened = await openVideoWorkspace(id, source);
+  expect(reopened.workspace.advanced).toEqual(advanced);
+});
+
+it('commits advanced content as a fixed-point history payload and reopens its baseline', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const before = createQuickEditAdvancedContent();
+  const after = {
+    ...before,
+    zoom: {
+      enabled: true,
+      regions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'focus', at: 0 }),
+          spotlight: createQuickEditSpotlight(),
+        },
+      ],
+    },
+    canvas: { width: 1080, height: 1920 },
+    audio: {
+      ...before.audio,
+      original: { muted: true, volume: 0.5 },
+      laneVolumes: { voiceover: 0.8, music: 0.4 },
+    },
+  };
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    operation: {
+      id: 'advanced-1',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after,
+    },
+  });
+  expect(committed.workspace.history[0]).toMatchObject({
+    target: 'advancedContent',
+    before: { schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION },
+    after: { schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION },
+  });
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(committed.workspace);
+  expect(parseVideoWorkspace(committed.workspace)).toEqual(committed.workspace);
+  expect(committed.workspace.history[0]?.after).toEqual(after);
+});
+
+it('migrates a v1 advanced payload on load and keeps the workspace writable (R03)', async () => {
+  rows.get('video_workspaces')!.set(id, {
+    aggregateId: id,
+    sourceAssetId: 'beta-v1-recording-asset',
+    formatVersion: 1,
+    source,
+    revision: 1,
+    cursor: 2,
+    history: [
+      {
+        id: 'edit-cut-1',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut-1', start: 0, end: 2, requestedStart: 0, requestedEnd: 2, kind: 'cut' },
+      },
+      {
+        id: 'edit-speed-1',
+        at: 2,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'speed-1',
+          start: 2,
+          end: 6,
+          requestedStart: 2,
+          requestedEnd: 6,
+          kind: 'speed',
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+    ],
+    createdAt: 1,
+    updatedAt: 1,
+    advanced: {
+      schemaVersion: 1,
+      ui: {
+        mode: 'advanced',
+        tracks: { actions: true, zoom: true, audio: true },
+        overlaysVisible: true,
+      },
+      zoom: {
+        enabled: true,
+        regions: [
+          {
+            id: 'z2',
+            start: 0.5,
+            end: 1.5,
+            transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'none', duration: 0 },
+            exit: { type: 'none', duration: 0 },
+          },
+          {
+            id: 'z1',
+            start: 8,
+            end: 10,
+            transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'ease-in-out', duration: 0.3 },
+            exit: { type: 'ease-in-out', duration: 0.3 },
+          },
+        ],
+      },
+      background: { enabled: false },
+      audio: { original: { muted: false, volume: 1 }, voiceover: [], music: [] },
+    },
+  });
+  const opened = await openVideoWorkspace(id, source);
+  expect(opened.workspace.advanced.schemaVersion).toBe(2);
+  expect(opened.workspace.advanced.zoom.regions[0]).toMatchObject({
+    start: 0.5,
+    end: 1.5,
+    dormant: true,
+  });
+  expect(opened.workspace.advanced.zoom.regions[1]).toMatchObject({
+    start: 4,
+    end: 6,
+    dormant: false,
+  });
+  // Every write re-validates the migrated record: dormant source coords stay exempt.
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced: opened.workspace.advanced,
+  });
+  expect(saved.workspace.advanced.zoom.regions).toHaveLength(2);
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: saved.workspace.revision,
+    operation,
+  });
+  expect(committed.workspace.history).toHaveLength(3);
+});
+
+it('rejects stale or malformed advanced saves without touching the record', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: opened.workspace.revision + 1,
+      advanced: createQuickEditAdvancedState(),
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedSourceAssetId: 'wrong-asset',
+      expectedRevision: opened.workspace.revision,
+      advanced: createQuickEditAdvancedState(),
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: opened.workspace.revision,
+      advanced: { broken: true },
+    })
+  ).rejects.toMatchObject({ code: 'invalid' });
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(opened.workspace);
+});
+
+it('advances the revision for advanced saves so history writers detect the change', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced: createQuickEditAdvancedState(),
+  });
+  expect(saved.workspace.revision).toBe(opened.workspace.revision + 1);
+  expect(saved.workspace.history).toEqual([]);
+  expect(saved.workspace.cursor).toBe(0);
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: opened.workspace.revision,
+      operation,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+});
+
+it('keeps schema version constant in stored advanced state', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: opened.workspace.revision,
+    advanced: createQuickEditAdvancedState(),
+  });
+  expect(saved.workspace.advanced.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
+});
+
+it('commits cut focus cleanup atomically and restores source anchors through undo and reload', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const advanced = createQuickEditAdvancedState();
+  const first = {
+    ...createQuickEditZoomRegion({ id: 'first', at: 0, duration: 1 }),
+    linkTo: 'removed',
+  };
+  const removed = { ...createQuickEditZoomRegion({ id: 'removed', at: 3 }), linkTo: 'last' };
+  const last = createQuickEditZoomRegion({ id: 'last', at: 9 });
+  advanced.zoom.regions = [first, removed, last];
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    advanced,
+  });
+  const args = {
+    aggregateId: id,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    operation: {
+      id: 'cut-focus',
+      at: 10,
+      target: 'edit',
+      before: null,
+      after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    },
+  };
+  harness.failure = true;
+  await expect(commitVideoWorkspace(args)).rejects.toBeDefined();
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(saved.workspace);
+  harness.failure = false;
+  const committed = await commitVideoWorkspace(args);
+  const { replayReviewHistory, reviewAdvancedContentBaseline } =
+    await import('../../../features/video/review/document');
+  const derive = (workspace: typeof saved.workspace) =>
+    replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    ).advancedContent.zoom.regions;
+  expect(derive(committed.workspace)).toEqual([
+    createQuickEditZoomRegion({ id: 'first', at: 0, duration: 1 }),
+    { ...last, start: 7, end: 9 },
+  ]);
+  expect((await openVideoWorkspace(id, source)).workspace).toEqual(committed.workspace);
+  const undone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: committed.workspace.revision,
+    direction: 'undo',
+  });
+  expect(derive(undone.workspace)).toEqual([first, removed, last]);
+  const redone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(derive(redone.workspace)).toEqual(derive(committed.workspace));
+});
+
+it('preserves voiceover records and temporarily suppresses recordings intersected by cuts', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
+  const clip = {
+    id: 'voice',
+    assetId: 'voice-asset',
+    timelineStart: 1,
+    sourceOffset: 2,
+    duration: 8,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  };
+  advanced.audio.voiceover = [clip, { ...clip, id: 'later', timelineStart: 10, duration: 1 }];
+  advanced.audio.music = [{ ...clip, id: 'music' }];
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    advanced,
+  });
+  const args = {
+    aggregateId: id,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    operation: {
+      id: 'cut-voice',
+      at: 10,
+      target: 'edit',
+      before: null,
+      after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    },
+  };
+  const { replayReviewHistory, reviewAdvancedContentBaseline } =
+    await import('../../../features/video/review/document');
+  const { resolveQuickEditEffectiveState } =
+    await import('../../../features/video/review/advanced/effective');
+  const derive = (workspace: typeof saved.workspace) =>
+    replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    ).advancedContent;
+  harness.failure = true;
+  await expect(commitVideoWorkspace(args)).rejects.toBeDefined();
+  expect((await readVideoWorkspace(id))?.workspace).toEqual(saved.workspace);
+  harness.failure = false;
+  const committed = await commitVideoWorkspace(args);
+  const content = derive(committed.workspace);
+  expect(content.audio.voiceover).toHaveLength(2);
+  expect(content.audio.voiceover[0]).toMatchObject(clip);
+  expect(content.audio.music).toEqual(advanced.audio.music);
+  const applied = resolveQuickEditEffectiveState({ ...content, ui: advanced.ui });
+  expect(
+    applied.voiceover.map(({ timelineStart, sourceOffset, duration }) => ({
+      timelineStart,
+      sourceOffset,
+      duration,
+    }))
+  ).toEqual([{ timelineStart: 8, sourceOffset: 2, duration: 1 }]);
+  expect((await openVideoWorkspace(id, source)).workspace).toEqual(committed.workspace);
+  const undone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: committed.workspace.revision,
+    direction: 'undo',
+  });
+  expect(derive(undone.workspace).audio).toEqual(advanced.audio);
+  const redone = await moveVideoWorkspaceHistory({
+    ...args,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(derive(redone.workspace)).toEqual(content);
+  const restored = await commitVideoWorkspace({
+    ...args,
+    expectedRevision: redone.workspace.revision,
+    operation: {
+      ...args.operation,
+      id: 'restore-video',
+      before: args.operation.after,
+      after: null,
+    },
+  });
+  expect(
+    resolveQuickEditEffectiveState({
+      ...derive(restored.workspace),
+      ui: advanced.ui,
+    }).voiceover.map(({ timelineStart, duration }) => ({ timelineStart, duration }))
+  ).toEqual([
+    { timelineStart: 1, duration: 8 },
+    { timelineStart: 10, duration: 1 },
+  ]);
 });

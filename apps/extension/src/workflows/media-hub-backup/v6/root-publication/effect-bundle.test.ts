@@ -39,6 +39,7 @@ const journal = {
 } satisfies AssetReadyJournal;
 const session = {
   archiveFingerprint: 'a'.repeat(64),
+  childIdMap: {},
   committedRoots: [],
   conflictedRoots: [],
   createdAt: 1,
@@ -134,14 +135,12 @@ describe('effect bundle v6 root publication', () => {
       })
     ).resolves.toEqual({ conflicted: false, imported: true, retainedAssetIds: [] });
     expect(mocks.put).toHaveBeenCalledOnce();
-    expect(mocks.checkpoint).toHaveBeenCalledWith(
-      expect.anything(),
-      'restore-1',
-      'media:effect-bundle:bundle-one',
-      'bundle-one',
-      true,
-      false
-    );
+    expect(mocks.checkpoint).toHaveBeenCalledWith(expect.anything(), 'restore-1', {
+      conflicted: false,
+      imported: true,
+      rootKey: 'media:effect-bundle:bundle-one',
+      targetRootId: 'bundle-one',
+    });
     expect(tx.objectStore).toHaveBeenCalledWith('video_effect_bundles');
     expect(tx.objectStore).toHaveBeenCalledWith('asset_operations');
   });

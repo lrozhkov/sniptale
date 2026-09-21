@@ -8,10 +8,13 @@ import type {
   PhysicalDeleteAssetOperation,
   ArchiveRestoreSession,
 } from './contracts';
+import { parseArchiveRestoreChildIdMap } from './restore-child-ids';
 
 export function parseArchiveRestoreSession(value: unknown): ArchiveRestoreSession | null {
+  if (!isRecord(value)) return null;
+  const childIdMap = parseArchiveRestoreChildIdMap(value['childIdMap']);
   if (
-    !isRecord(value) ||
+    !childIdMap ||
     value['kind'] !== 'archive-restore-session' ||
     !isString(value['operationId']) ||
     !['pending', 'completed', 'aborted'].includes(String(value['status'])) ||
@@ -63,6 +66,7 @@ export function parseArchiveRestoreSession(value: unknown): ArchiveRestoreSessio
   }
   return {
     archiveFingerprint: value['archiveFingerprint'],
+    childIdMap,
     committedRoots,
     conflictedRoots,
     createdAt: value['createdAt'],

@@ -99,3 +99,21 @@ function createAudioBuffer(): PreviewEffectAudioBuffer {
     sampleRate: 48_000,
   };
 }
+
+it('prepares separate cached buffers when the tempo changes', async () => {
+  const graph = createGraph();
+  const state = createPreviewEffectAudioState();
+  state.audioGraph = graph.value;
+  const plan = createPlan();
+  await syncPreviewEffectAudio({ currentTime: 2.5, isPlaying: true, plans: [plan], state });
+  expect(graph.value.decode).toHaveBeenLastCalledWith(plan.assetBlob, plan.assetMimeType, 2);
+  await syncPreviewEffectAudio({
+    currentTime: 2.5,
+    isPlaying: true,
+    plans: [{ ...plan, playbackRate: 1.5 }],
+    state,
+  });
+  expect(graph.value.decode).toHaveBeenCalledTimes(2);
+  expect(graph.value.decode).toHaveBeenLastCalledWith(plan.assetBlob, plan.assetMimeType, 1.5);
+  await cleanupPreviewEffectAudio(state);
+});

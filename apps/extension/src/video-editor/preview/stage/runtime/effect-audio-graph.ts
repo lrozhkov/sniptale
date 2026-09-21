@@ -1,3 +1,4 @@
+import { renderTempoBuffer } from '../../../../features/video/audio/tempo-buffer';
 import type { EffectRuntimeAudioPlan } from '../../../../features/video/composition/effect-runtime/audio/plan';
 import { decodeEffectAudio } from '../../../../features/video/composition/effect-runtime/media/decode';
 
@@ -18,7 +19,7 @@ export interface PreviewEffectAudioNode {
 export interface PreviewEffectAudioGraph {
   readonly currentTime: number;
   close(): Promise<void>;
-  decode(blob: Blob, mimeType: string): Promise<PreviewEffectAudioBuffer>;
+  decode(blob: Blob, mimeType: string, rate?: number): Promise<PreviewEffectAudioBuffer>;
   resume(): Promise<void>;
   start(args: {
     buffer: PreviewEffectAudioBuffer;
@@ -31,7 +32,10 @@ export interface PreviewEffectAudioGraph {
 class BrowserEffectAudioBuffer implements PreviewEffectAudioBuffer {
   readonly kind = 'preview-effect-audio-buffer' as const;
 
-  constructor(readonly value: AudioBuffer) {}
+  constructor(
+    readonly value: AudioBuffer,
+    readonly rate = 1
+  ) {}
 
   get length(): number {
     return this.value.length;
@@ -69,6 +73,7 @@ class BrowserEffectAudioNode implements PreviewEffectAudioNode {
 }
 
 class BrowserEffectAudioGraph implements PreviewEffectAudioGraph {
+  private readonly preparation = new AbortController();
   private readonly context = new AudioContext({
     latencyHint: 'interactive',
     sampleRate: EFFECT_AUDIO_SAMPLE_RATE,
@@ -79,14 +84,24 @@ class BrowserEffectAudioGraph implements PreviewEffectAudioGraph {
   }
 
   async close(): Promise<void> {
+    this.preparation.abort();
     if (this.context.state !== 'closed') await this.context.close();
   }
 
-  async decode(blob: Blob, mimeType: string): Promise<PreviewEffectAudioBuffer> {
+  async decode(blob: Blob, mimeType: string, rate = 1): Promise<PreviewEffectAudioBuffer> {
     const buffer = await decodeEffectAudio(blob, mimeType, (bytes) =>
       this.context.decodeAudioData(bytes)
     );
-    return new BrowserEffectAudioBuffer(buffer);
+    const prepared =
+      rate === 1
+        ? buffer
+        : await renderTempoBuffer(
+            buffer,
+            { start: 0, duration: buffer.duration, rate },
+            this.preparation.signal
+          );
+    this.preparation.signal.throwIfAborted();
+    return new BrowserEffectAudioBuffer(prepared, rate);
   }
 
   async resume(): Promise<void> {
@@ -107,12 +122,16 @@ class BrowserEffectAudioGraph implements PreviewEffectAudioGraph {
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = args.buffer.value;
-    source.playbackRate.value = args.plan.playbackRate;
+    source.playbackRate.value = 1;
     gain.gain.value = args.plan.volume;
     source.connect(gain);
     gain.connect(this.context.destination);
     source.onended = args.onEnded;
-    source.start(0, timing.sourceOffset, timing.sourceDuration);
+    source.start(
+      0,
+      timing.sourceOffset / args.buffer.rate,
+      timing.sourceDuration / args.buffer.rate
+    );
     source.stop(this.context.currentTime + timing.projectDuration);
     return new BrowserEffectAudioNode(source, gain);
   }

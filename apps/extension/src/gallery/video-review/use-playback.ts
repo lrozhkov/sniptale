@@ -1,40 +1,54 @@
+import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewEdit } from '../../features/video/review/types';
+import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
 import { nearestReviewBoundary, reviewPlaybackSettings } from '../../features/video/review/cuts';
 
-/** Owns source-time playback and restores sound/rate when leaving an edited interval. */
+/** Owns source-time playback; the persisted original-audio gate and rate live here. */
 export function useReviewPlayback(props: {
   duration: number;
   edits: readonly ReviewEdit[];
   boundaries(): readonly number[] | undefined;
   onSeek(value: number): void;
   onFailure(): void;
+  original: QuickEditOriginalAudio;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [volume, setVolume] = useState(1);
   const latest = useRef(props);
   latest.current = props;
   const synchronize = (value: number, applyEdits: boolean) => {
     const node = video.current;
     const settings = reviewPlaybackSettings(value, latest.current.edits);
-    const next = applyEdits ? settings.time : value;
+    // Media clocks quantize seeks to microseconds. Round cut destinations forward
+    // so truncation cannot land inside the same cut and seek on every frame.
+    const next =
+      applyEdits && settings.time !== value
+        ? Math.min(latest.current.duration, cutSeekTarget(settings.time))
+        : value;
     if (node) {
       if (next !== value) node.currentTime = next;
-      node.playbackRate = settings.rate;
-      node.preservesPitch = false;
-      node.muted = settings.muted;
+      if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
+      if (node.preservesPitch !== true) node.preservesPitch = true;
+      const gain = originalAudioGainAt(latest.current.original, next, latest.current.edits);
+      const muted = settings.muted || gain === 0;
+      if (node.muted !== muted) node.muted = muted;
+      // The element caps at one; the preview audio graph amplifies beyond it.
+      const volume = Math.min(1, gain);
+      if (node.volume !== volume) node.volume = volume;
       if (next >= latest.current.duration) node.pause();
     }
     setTime(next);
     return next;
   };
+  const audioSettingsKey = JSON.stringify([props.original, props.edits]);
   const tick = useRef(synchronize);
   tick.current = synchronize;
   useEffect(() => {
-    if (video.current) video.current.volume = volume;
-  }, [volume]);
+    const node = video.current;
+    if (node) tick.current(node.currentTime, false);
+  }, [audioSettingsKey]);
   useEffect(() => {
     if (!playing) return;
     let frame = 0;
@@ -51,8 +65,6 @@ export function useReviewPlayback(props: {
     time,
     playing,
     setPlaying,
-    volume,
-    setVolume,
     onTime: (value: number) => synchronize(value, playing),
     seek: (value: number, snap = true) => {
       const clamped = Math.max(0, Math.min(props.duration, value));
@@ -73,4 +85,10 @@ export function useReviewPlayback(props: {
       } else node.pause();
     },
   };
+}
+
+/** Account for binary floating-point truncation when Chromium converts seconds to microseconds. */
+function cutSeekTarget(time: number): number {
+  const rounded = Math.ceil(time * 1e6) / 1e6;
+  return Math.floor(rounded * 1e6) / 1e6 < time ? rounded + 1e-6 : rounded;
 }

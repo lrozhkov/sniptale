@@ -37,6 +37,7 @@ import {
 
 const session = {
   archiveFingerprint: 'a'.repeat(64),
+  childIdMap: {},
   committedRoots: ['media:library-item:one'],
   conflictedRoots: [],
   createdAt: 1,

@@ -17,7 +17,10 @@ function root(bytes = 'media') {
   return {
     descriptor,
     load: vi.fn(async () => ({
-      metadata: { filename: 'capture.png', id: 'portable-media-000001' },
+      metadata: {
+        entry: { id: descriptor.rootId, source: { kind: 'screenshot' }, tags: [] },
+        originalObjectId: 'object-000001',
+      },
       objects: [
         {
           blob,
@@ -44,6 +47,7 @@ function root(bytes = 'media') {
 
 function effectBundleRoot() {
   const blob = new Blob(['image'], { type: 'image/png' });
+  const objectId = 'effect-bundle-000001-object-000001';
   return {
     descriptor: {
       mediaSubtype: 'effect-bundle' as const,
@@ -54,15 +58,31 @@ function effectBundleRoot() {
       totalBytes: blob.size,
     },
     load: vi.fn(async () => ({
-      metadata: { id: 'portable-effect-bundle' },
+      metadata: {
+        entry: {
+          assets: [
+            {
+              byteLength: blob.size,
+              kind: 'image',
+              mimeType: blob.type,
+              objectId,
+              sha256: 'a'.repeat(64),
+            },
+          ],
+          documents: [{}],
+          packId: 'demo-pack',
+          retainedByteLength: blob.size,
+          version: '1',
+        },
+      },
       objects: [
         {
           blob,
           ref: {
             filename: 'asset-000001',
             mimeType: 'image/png',
-            objectId: 'effect-bundle-000001-object-000001',
-            path: '_sniptale/assets/effect-bundle-000001-object-000001/asset-000001',
+            objectId,
+            path: `_sniptale/assets/${objectId}/asset-000001`,
             size: blob.size,
           },
         },
@@ -79,7 +99,28 @@ function effectBundleRoot() {
   };
 }
 
-describe('media backup v6 export', () => {
+function projectRoot(kind: 'scenario-project' | 'video-project', id: string) {
+  return {
+    descriptor: {
+      metadataPath: `_sniptale/metadata/${kind}/${id}.json`,
+      objectCount: 0,
+      rootId: id,
+      rootKind: kind,
+      totalBytes: 0,
+    },
+    load: vi.fn(async () => ({ metadata: {}, objects: [] })),
+    summary: {
+      draftCount: 0,
+      recordingCount: 0,
+      sourceMetadataCount: 0,
+      telemetryCount: 0,
+      thumbnailCount: 0,
+      webSnapshotCount: 0,
+    },
+  };
+}
+
+describe('media backup v6 archive writing', () => {
   it('round-trips bounded saved Gallery views through the manifest', async () => {
     const plan = buildMediaHubBackupExportPlanV6({
       archiveId: 'archive-views',
@@ -188,7 +229,9 @@ describe('media backup v6 export', () => {
       rootKeys: ['media:effect-bundle:demo-pack'],
     });
   });
+});
 
+describe('media backup v6 export planning', () => {
   it('rejects duplicate root identities before writing', () => {
     const item = root();
     expect(() =>
@@ -201,5 +244,25 @@ describe('media backup v6 export', () => {
         roots: [item, item],
       })
     ).toThrow('identity is duplicated');
+  });
+
+  it('orders scenario roots before dependent video roots', () => {
+    const plan = buildMediaHubBackupExportPlanV6({
+      privacy: {
+        includeSourceMetadata: false,
+        includeTelemetry: false,
+        includeWebSnapshots: false,
+      },
+      roots: [projectRoot('video-project', 'video'), projectRoot('scenario-project', 'scenario')],
+    });
+
+    expect(plan.roots.map((item) => item.descriptor.rootKind)).toEqual([
+      'scenario-project',
+      'video-project',
+    ]);
+    expect(plan.manifest.catalogs.map((catalog) => catalog.rootKind)).toEqual([
+      'scenario-project',
+      'video-project',
+    ]);
   });
 });

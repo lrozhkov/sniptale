@@ -2,9 +2,9 @@ import type {
   TourDocument,
   TourNavigationSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { List, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
 import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
@@ -63,8 +63,8 @@ export function TourNavigationSettings({
             })
           }
         />
-        <ContentToolbarButton
-          title={t('common.actions.delete')}
+        <ScenarioInspectorActionButton
+          tone="danger"
           disabled={disabled}
           onClick={() => {
             if (
@@ -76,8 +76,9 @@ export function TourNavigationSettings({
               onSelect(null);
           }}
         >
-          <Trash2 size={16} />
-        </ContentToolbarButton>
+          <Trash2 size={15} />
+          {t('common.actions.delete')}
+        </ScenarioInspectorActionButton>
       </GuideInspectorGroup>
     );
   return (
@@ -125,16 +126,15 @@ export function TourNavigationSettings({
             }
           />
           {slide.background.image && (
-            <ProductActionButton
-              compact
-              tone="secondary"
+            <ScenarioInspectorActionButton
+              tone="danger"
               disabled={disabled}
               onClick={() =>
                 onChange({ ...slide, background: { ...slide.background, image: null } })
               }
             >
               {t('scenario.editor.tourRemoveBackground')}
-            </ProductActionButton>
+            </ScenarioInspectorActionButton>
           )}
         </GuideInspectorGroup>
       )}
@@ -152,6 +152,43 @@ export function TourNavigationSettings({
         />
       )}
     </>
+  );
+}
+
+/** Adds one empty navigation button through a single slide update. */
+export function TourAddButtonControl({
+  slide,
+  disabled,
+  onChange,
+  onSelect,
+  t,
+}: {
+  slide: TourNavigationSlide;
+  disabled: boolean;
+  onChange: (slide: TourNavigationSlide) => boolean;
+  onSelect: (id: string | null) => void;
+  t: Translate;
+}) {
+  return (
+    <ContentToolbarButton
+      disabled={disabled || slide.buttons.length >= 120}
+      title={t('scenario.editor.tourAddButton')}
+      onClick={() => {
+        const id = crypto.randomUUID();
+        if (
+          onChange({
+            ...slide,
+            buttons: [
+              ...slide.buttons,
+              { id, label: t('scenario.editor.tourButton'), action: { kind: 'next' } },
+            ],
+          })
+        )
+          onSelect(id);
+      }}
+    >
+      <Plus size={16} />
+    </ContentToolbarButton>
   );
 }
 
@@ -191,30 +228,16 @@ function TourNavigationButtons({
       icon={List}
       title={t('scenario.editor.tourContentsLinks')}
       action={
-        <ContentToolbarButton
-          disabled={disabled || slide.buttons.length >= 120}
-          title={t('scenario.editor.tourAddButton')}
-          onClick={() => {
-            const id = crypto.randomUUID();
-            if (
-              onChange({
-                ...slide,
-                buttons: [
-                  ...slide.buttons,
-                  { id, label: t('scenario.editor.tourButton'), action: { kind: 'next' } },
-                ],
-              })
-            )
-              onSelect(id);
-          }}
-        >
-          <Plus size={16} />
-        </ContentToolbarButton>
+        <TourAddButtonControl
+          slide={slide}
+          disabled={disabled}
+          onChange={onChange}
+          onSelect={onSelect}
+          t={t}
+        />
       }
     >
-      <ProductActionButton
-        compact
-        tone="secondary"
+      <ScenarioInspectorActionButton
         disabled={
           disabled || !destinations.length || slide.buttons.length + destinations.length > 120
         }
@@ -234,7 +257,7 @@ function TourNavigationButtons({
       >
         {t('scenario.editor.tourBuildContents')}
         {destinations.length > 0 && ` (${destinations.length})`}
-      </ProductActionButton>
+      </ScenarioInspectorActionButton>
       <p className="guide-inspector-hint">
         {t(
           destinations.length

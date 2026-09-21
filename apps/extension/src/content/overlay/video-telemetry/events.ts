@@ -1,3 +1,4 @@
+import { isRepeatedRecordingClick } from '../../../features/video/project/recording-actions';
 import { describeTelemetryTarget } from './target';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
 import {
@@ -7,6 +8,7 @@ import {
 import type { TelemetryListeners, TelemetryState } from './types';
 import {
   finalizeTelemetrySignals,
+  finalizeTypingSignal,
   recordKeyboardShortcut,
   recordTypingActivity,
   tickCursorIdleTelemetry,
@@ -105,22 +107,43 @@ function resolveActionEvent(event: MouseEvent | null) {
   };
 }
 
-function recordActionEvent(state: TelemetryState, event: MouseEvent | null): void {
+function recordActionEvent(
+  state: TelemetryState,
+  event: MouseEvent,
+  targetId: string | null
+): void {
   state.viewportObserver?.();
   const resolvedEvent = resolveActionEvent(event);
-  state.actionEvents.push({
+  const action = {
     id: crypto.randomUUID(),
     kind: VideoProjectActionEventKind.CLICK,
     time: getElapsedSeconds(state, resolvedEvent.timeStamp),
     duration: 0.45,
     point: resolvedEvent.point,
     label: resolvedEvent.label,
-    data: resolvedEvent.data,
+    data: { ...resolvedEvent.data, ...(targetId ? { targetId } : {}), clickCount: event.detail },
     preset: VideoProjectActionPreset.CLICK_RIPPLE,
-  });
+  };
+  const previous = state.actionEvents.at(-1);
+  if (previous && isRepeatedRecordingClick(previous, action)) {
+    if (event.detail === 2) previous.data['clickCount'] = 2;
+    return;
+  }
+  state.actionEvents.push(action);
 }
 
 export function createTelemetryListeners(state: TelemetryState): TelemetryListeners {
+  const targets = new WeakMap<Element, string>();
+  const identity = (event: MouseEvent) => {
+    const target = describeTelemetryTarget(event).element;
+    if (!target) return null;
+    let id = targets.get(target);
+    if (!id) {
+      id = crypto.randomUUID();
+      targets.set(target, id);
+    }
+    return id;
+  };
   return {
     change: (event) => {
       recordTypingActivity(state, event);
@@ -128,9 +151,8 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
     click: (event) => {
       // Keyboard/accessibility activation has no pointer click count or pointer coordinates.
       if (event.detail === 0) return;
-      finalizeTelemetrySignals(state);
       recordCursorSample(state, event as PointerEvent, { force: true });
-      recordActionEvent(state, event);
+      recordActionEvent(state, event, identity(event));
     },
     input: (event) => {
       recordTypingActivity(state, event);
@@ -139,6 +161,7 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
       recordKeyboardShortcut(state, event);
     },
     pointerDown: (event) => {
+      finalizeTypingSignal(state, event.timeStamp);
       updatePointerIdleAnchor(state, event as PointerEvent, { reset: true });
       recordCursorSample(state, event as PointerEvent, { force: true });
     },

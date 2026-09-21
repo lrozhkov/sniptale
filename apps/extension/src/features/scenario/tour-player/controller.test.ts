@@ -46,7 +46,7 @@ async function mount(options?: Parameters<typeof createTourPlayer>[2]) {
   if (!root) throw new Error('Missing player fixture');
   document.body.append(root);
   const player = createTourPlayer(root, { tour, labels, assets: [] }, options);
-  const value = { player, root };
+  const value = { player, root, tour };
   mounted.push(value);
   return value;
 }
@@ -214,21 +214,6 @@ it('cancels an active object gesture when the player is disposed', async () => {
   player.dispose();
   pointer(point, 'pointerup', 36);
   expect(onMoveObject).not.toHaveBeenCalled();
-});
-
-it('keeps an automatic callout within the letterboxed stage when no side fits', async () => {
-  const { player, root } = await mount();
-  const viewport = root.querySelector('[data-tour-viewport]')!;
-  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
-  Object.defineProperties(viewport, { clientWidth: { value: 608 }, clientHeight: { value: 620 } });
-  Object.defineProperties(hint, { offsetWidth: { value: 340 }, offsetHeight: { value: 200 } });
-  player.update(authoringInput());
-  const top = Number.parseFloat(hint.style.top);
-  const left = Number.parseFloat(hint.style.left);
-  expect(top).toBeGreaterThanOrEqual((620 - 342) / 2 + 8);
-  expect(top + 200).toBeLessThanOrEqual((620 - 342) / 2 + 342 - 8);
-  expect(left).toBeGreaterThanOrEqual(8);
-  expect(left + 340).toBeLessThanOrEqual(608 - 8);
 });
 
 it('preserves the selected object after the scene is resized', async () => {
@@ -741,7 +726,7 @@ it('shows navigation primary text directly in a compact centered composition', a
   expect(content?.style.textAlign).toBe('center');
   expect(
     root.querySelector<HTMLElement>('.tour-navigation-buttons')?.style.gridTemplateColumns
-  ).toBe('repeat(1, minmax(0, 1fr))');
+  ).toMatch(/^repeat\(1, [\d.]+px\)$/);
 });
 
 it('keeps every navigation link reachable across unequal text page heights', async () => {

@@ -17,6 +17,7 @@ export function createReviewCut(args: {
   id: string;
   selection: ReviewAnchor;
   boundaries: readonly number[];
+  snapToKeyframes?: boolean;
   duration: number;
   edits: readonly ReviewEdit[];
 }): ReviewEdit | null {
@@ -49,8 +50,14 @@ function reviewRange(args: Parameters<typeof createReviewCut>[0]) {
     selection.start >= selection.end
   )
     return null;
-  const start = nearestReviewBoundary(selection.start, boundaries);
-  const end = nearestReviewBoundary(selection.end, boundaries);
+  const start =
+    args.snapToKeyframes === false
+      ? selection.start
+      : nearestReviewBoundary(selection.start, boundaries);
+  const end =
+    args.snapToKeyframes === false
+      ? selection.end
+      : nearestReviewBoundary(selection.end, boundaries);
   if (start < 0 || end > duration || start >= end) return null;
   if (edits.some((edit) => edit.start < end && edit.end > start)) return null;
   return {

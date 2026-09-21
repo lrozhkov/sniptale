@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoProjectActionEventKind } from '../../../features/video/project/types';
 import {
   finalizeTelemetrySignals,
+  finalizeTypingSignal,
   recordKeyboardShortcut,
   recordTypingActivity,
   tickCursorIdleTelemetry,
@@ -62,15 +63,7 @@ function registerTypingSignalTests() {
     recordTypingActivity(state, createTypingEvent('change', 1_600));
     recordTypingActivity(state, createTypingEvent('input', 2_801));
 
-    expect(state.signals).toEqual([
-      expect.objectContaining({
-        data: { eventCount: 2, eventType: 'input' },
-        endTime: 2.801,
-        kind: 'typing',
-        point: { x: 320, y: 180 },
-        startTime: 1,
-      }),
-    ]);
+    expect(state.signals).toEqual([]);
     expect(state.typingSignal).toEqual(
       expect.objectContaining({
         data: expect.objectContaining({ eventCount: 1, eventType: 'input' }),
@@ -81,21 +74,15 @@ function registerTypingSignalTests() {
     );
   });
 
-  it('flushes the active typing signal on finalization', () => {
+  it('flushes qualifying input at its last actual event, not the later stop', () => {
     const state = createSignalState();
-
-    recordTypingActivity(state, createTypingEvent('input', 900));
-    vi.spyOn(performance, 'now').mockReturnValue(1_400);
+    for (const time of [900, 1700, 2500, 3300, 3900])
+      recordTypingActivity(state, createTypingEvent('input', time));
+    vi.spyOn(performance, 'now').mockReturnValue(9000);
     finalizeTelemetrySignals(state);
-
     expect(state.typingSignal).toBeNull();
-    expect(state.signals).toEqual([
-      expect.objectContaining({
-        data: { eventCount: 1, eventType: 'input' },
-        endTime: 1.4,
-        kind: 'typing',
-        startTime: 0.9,
-      }),
+    expect(state.signals).toMatchObject([
+      { startTime: 0.9, endTime: 3.9, data: { eventCount: 5, captureSegment: 0 } },
     ]);
   });
 }
@@ -175,4 +162,80 @@ function registerSignalTests() {
 
 describe('content video telemetry signals', () => {
   registerSignalTests();
+});
+
+it('does not inflate short typing with the time of a later stop', () => {
+  const state = createSignalState();
+  recordTypingActivity(state, createTypingEvent('input', 1000));
+  recordTypingActivity(state, createTypingEvent('input', 1600));
+  vi.spyOn(performance, 'now').mockReturnValue(10000);
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toEqual([]);
+});
+
+it('combines input across form fields and records only actual input time', () => {
+  const state = createSignalState();
+  const fields = [document.createElement('input'), document.createElement('input')];
+  for (const [index, timeStamp] of [1000, 1600, 2200, 2800, 3400, 4000].entries()) {
+    const event = new Event('input');
+    Object.defineProperties(event, {
+      timeStamp: { value: timeStamp },
+      target: { value: fields[Math.floor(index / 2) % 2] },
+    });
+    recordTypingActivity(state, event);
+  }
+  vi.spyOn(performance, 'now').mockReturnValue(15000);
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toHaveLength(1);
+  expect(state.signals[0]).toMatchObject({ startTime: 1, endTime: 4, data: { eventCount: 6 } });
+});
+
+it('does not merge two qualifying typing intervals across recording pause boundaries', () => {
+  const state = createSignalState();
+  for (const time of [1000, 1800, 2600, 3400, 4000])
+    recordTypingActivity(state, createTypingEvent('input', time));
+  finalizeTelemetrySignals(state);
+  for (const time of [4100, 4900, 5700, 6500, 7100])
+    recordTypingActivity(state, createTypingEvent('input', time));
+  finalizeTelemetrySignals(state);
+  expect(state.signals.map((signal) => signal.data['captureSegment'])).toEqual([0, 1]);
+});
+
+it('does not count blur-time change as continued typing', () => {
+  const state = createSignalState();
+  for (const time of [1000, 1800, 2600, 3400, 3900])
+    recordTypingActivity(state, createTypingEvent('input', time));
+  recordTypingActivity(state, createTypingEvent('change', 4100));
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toEqual([]);
+});
+
+it('does not promote tiny field changes into a long typing action during capture', () => {
+  const state = createSignalState();
+  const fields = [document.createElement('input'), document.createElement('input')];
+  for (let index = 0; index < 8; index++) {
+    for (const offset of [0, 200]) {
+      const event = new Event('input');
+      Object.defineProperties(event, {
+        timeStamp: { value: 1000 + index * 600 + offset },
+        target: { value: fields[index % 2] },
+      });
+      recordTypingActivity(state, event);
+    }
+  }
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toEqual([]);
+});
+
+it('ends a raw typing burst at each pointer-down before short fragments can accumulate', () => {
+  const state = createSignalState();
+  for (let i = 0; i < 8; i++) {
+    const start = 1000 + i * 600;
+    recordTypingActivity(state, createTypingEvent('input', start));
+    recordTypingActivity(state, createTypingEvent('input', start + 200));
+    finalizeTypingSignal(state, start + 300);
+  }
+  finalizeTelemetrySignals(state);
+  expect(state.signals).toEqual([]);
+  expect(state.typingTarget).toBeNull();
 });

@@ -113,8 +113,9 @@ async function startMissingEffectAudioNode(
 ): Promise<void> {
   const generation = state.generation;
   try {
-    const buffer = await state.decodedBuffers.loadOrDecode(plan.assetCacheKey, () =>
-      graph.decode(plan.assetBlob, plan.assetMimeType)
+    const buffer = await state.decodedBuffers.loadOrDecode(
+      `${plan.assetCacheKey}:tempo:${plan.playbackRate}`,
+      () => graph.decode(plan.assetBlob, plan.assetMimeType, plan.playbackRate)
     );
     if (!canStartEffectAudioNode(state, plan, generation)) return;
     startEffectAudioNode(state, graph, plan, buffer, state.desiredTime);

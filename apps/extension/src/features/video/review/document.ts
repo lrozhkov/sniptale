@@ -1,4 +1,30 @@
+import { loadQuickEditAdvancedContentState } from './advanced/validation';
+import { anchorReviewVoiceover } from './voiceover-edits';
+import { buildReviewTimeMap } from './timeline';
+import { reconcileReviewFocus } from './focus-edits';
 import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
+import { createQuickEditAdvancedContent } from './advanced/defaults';
+import type { QuickEditAdvancedContent } from './advanced/types';
+
+/**
+ * The replay baseline for a persisted advanced record: pre-migration content
+ * stays frozen while `advancedContent` operations accumulate on top of it.
+ */
+export function reviewAdvancedContentBaseline(state: {
+  schemaVersion: QuickEditAdvancedContent['schemaVersion'];
+  zoom: QuickEditAdvancedContent['zoom'];
+  background: QuickEditAdvancedContent['background'];
+  audio: QuickEditAdvancedContent['audio'];
+  canvas?: QuickEditAdvancedContent['canvas'];
+}): QuickEditAdvancedContent {
+  return {
+    schemaVersion: state.schemaVersion,
+    zoom: state.zoom,
+    background: state.background,
+    audio: state.audio,
+    ...(state.canvas ? { canvas: state.canvas } : {}),
+  };
+}
 
 function replaceItem<T extends { id: string }>(items: T[], before: T | null, after: T | null): T[] {
   const id = before?.id ?? after?.id;
@@ -17,6 +43,20 @@ function replaceItem<T extends { id: string }>(items: T[], before: T | null, aft
   );
 }
 
+function replaceAdvancedContent(
+  current: QuickEditAdvancedContent,
+  before: QuickEditAdvancedContent,
+  after: QuickEditAdvancedContent
+): QuickEditAdvancedContent {
+  if (JSON.stringify(current) !== JSON.stringify(before)) {
+    throw new Error('Review operation does not match the current document.');
+  }
+  if (JSON.stringify(before) === JSON.stringify(after)) {
+    throw new Error('Review operation has no change.');
+  }
+  return after;
+}
+
 /** Applies a validated operation without changing its inputs or the original media. */
 export function applyReviewOperation(
   document: ReviewDocument,
@@ -29,6 +69,22 @@ export function applyReviewOperation(
       annotations: replaceItem(document.annotations, operation.before, operation.after),
     };
   }
+  if (operation.target === 'canvasComment') {
+    return {
+      ...document,
+      canvasComments: replaceItem(document.canvasComments, operation.before, operation.after),
+    };
+  }
+  if (operation.target === 'advancedContent') {
+    return {
+      ...document,
+      advancedContent: replaceAdvancedContent(
+        document.advancedContent,
+        operation.before,
+        operation.after
+      ),
+    };
+  }
   const edits = replaceItem(document.edits, operation.before, operation.after);
   const ordered = [...edits].sort((a, b) => a.start - b.start);
   let previousEnd = 0;
@@ -39,19 +95,55 @@ export function applyReviewOperation(
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
   if (removed >= source.duration) throw new Error('Review cuts remove the entire video.');
-  return { ...document, edits };
+  const advancedContent = operation.preserveFocusAnchors
+    ? {
+        ...document.advancedContent,
+        zoom: {
+          ...document.advancedContent.zoom,
+          regions: reconcileReviewFocus({
+            regions: document.advancedContent.zoom.regions,
+            duration: source.duration,
+            before: document.edits,
+            after: edits,
+            edit: operation.after,
+          }),
+        },
+      }
+    : document.advancedContent;
+  if (operation.preserveVoiceoverAnchors) {
+    const previous = buildReviewTimeMap(source.duration, document.edits);
+    const content = loadQuickEditAdvancedContentState({
+      ...advancedContent,
+      audio: {
+        ...advancedContent.audio,
+        voiceoverSegments: buildReviewTimeMap(source.duration, edits),
+        voiceover: advancedContent.audio.voiceover.map((clip) =>
+          anchorReviewVoiceover(clip, previous)
+        ),
+      },
+    });
+    if (!content) throw new Error('Voiceover placement is invalid.');
+    return { ...document, edits, advancedContent: content };
+  }
+  return { ...document, edits, advancedContent };
 }
 
 /** Reconstructs the selected history position. Redo entries remain in the stored history. */
 export function replayReviewHistory(
   history: readonly ReviewOperation[],
   cursor: number,
-  source: ReviewSource
+  source: ReviewSource,
+  advancedBaseline?: QuickEditAdvancedContent
 ): ReviewDocument {
   if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > history.length) {
     throw new Error('Review history cursor is invalid.');
   }
-  let document: ReviewDocument = { annotations: [], edits: [] };
+  let document: ReviewDocument = {
+    annotations: [],
+    edits: [],
+    canvasComments: [],
+    advancedContent: advancedBaseline ?? createQuickEditAdvancedContent(),
+  };
   for (const operation of history.slice(0, cursor)) {
     document = applyReviewOperation(document, operation, source);
   }

@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createArchiveWriter } from '../../../composition/archive-transfer';
 import { createArchiveMemorySink } from '../../../composition/archive-transfer/test-support';
 import { inspectMediaHubBackupV6 } from './inspect';
+import {
+  createIdentityMismatchArchive,
+  type IdentityRootProfile,
+} from './inspect.identity.test-support';
 
 function fixture() {
   const descriptor = {
@@ -71,7 +75,14 @@ async function archive(
     value.descriptor.metadataPath,
     JSON.stringify({
       descriptor: value.descriptor,
-      metadata: { id: 'portable-item' },
+      metadata: {
+        entry: {
+          id: value.descriptor.rootId,
+          source: { kind: 'screenshot' },
+          tags: [],
+        },
+        originalObjectId: value.object.objectId,
+      },
       objects: [value.object],
     })
   );
@@ -146,5 +157,16 @@ describe('media backup v6 inspection', () => {
         })
       )
     ).rejects.toThrow('metadata path does not match its profile');
+  });
+
+  it.each<IdentityRootProfile>([
+    'library-item',
+    'effect-bundle',
+    'video-project',
+    'scenario-project',
+  ])('rejects a %s descriptor whose parsed domain identity differs', async (profile) => {
+    await expect(
+      inspectMediaHubBackupV6(await createIdentityMismatchArchive(profile))
+    ).rejects.toThrow('metadata identity does not match its descriptor');
   });
 });

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
-import { ReviewButton } from '../../video-review/controls';
 import { translate } from '../../../platform/i18n';
 import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
 import {
@@ -141,15 +140,6 @@ function PreviewPanelSidebar(props: PreviewPanelProps & { onReview?: () => void 
         bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
     >
       <PreviewPanelHeader item={props.item} />
-      {props.onReview ? (
-        <div className="mt-4">
-          <ReviewButton
-            data-ui="gallery.videoReview.enter"
-            label={translate('gallery.videoReview.enter')}
-            onClick={props.onReview}
-          />
-        </div>
-      ) : null}
       <PreviewPromotionAction
         item={props.item}
         {...(props.onPromote ? { onPromote: props.onPromote } : {})}
@@ -209,11 +199,12 @@ function handlePreviewKeyDown(
 }
 
 export function PreviewPanel(props: PreviewPanelProps) {
-  const { item, previewUrl } = props;
-  const [review, setReview] = useState(false);
+  const { item, navigation, onClose } = props;
+  const [review, setReview] = useState(
+    () =>
+      props.initialMode === 'edit' && isGalleryMediaItem(item) && item.mimeType.startsWith('video/')
+  );
   const opener = useRef<HTMLElement | null>(null);
-  const navigation = props.navigation;
-  const onClose = props.onClose;
 
   useEffect(() => {
     if (review) return;
@@ -228,6 +219,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
     return (
       <VideoReview
         aggregateId={item.id}
+        onClose={onClose}
         onBack={() => {
           setReview(false);
           requestAnimationFrame(() => {
@@ -240,6 +232,22 @@ export function PreviewPanel(props: PreviewPanelProps) {
       />
     );
 
+  return (
+    <PreviewPanelSurface
+      {...props}
+      onReview={() => {
+        opener.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        setReview(true);
+      }}
+    />
+  );
+}
+
+/** Preview-only layout; the parent owns editor mode and keyboard/focus lifecycle. */
+function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
+  const { onReview, ...panel } = props;
+  const { item, previewUrl, onClose } = panel;
   return (
     <div
       role="dialog"
@@ -265,20 +273,14 @@ export function PreviewPanel(props: PreviewPanelProps) {
             inspectorCollapsed={props.inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
             onInspectorToggle={props.onInspectorToggle}
-            onClose={props.onClose}
+            onClose={onClose}
           />
           {props.inspectorCollapsed ? null : (
             <PreviewPanelSidebar
-              {...props}
+              {...panel}
               {...(isGalleryMediaItem(item) && item.mimeType.startsWith('video/') && previewUrl
                 ? {
-                    onReview: () => {
-                      opener.current =
-                        document.activeElement instanceof HTMLElement
-                          ? document.activeElement
-                          : null;
-                      setReview(true);
-                    },
+                    onReview,
                   }
                 : {})}
             />

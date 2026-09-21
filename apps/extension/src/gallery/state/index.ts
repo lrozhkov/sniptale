@@ -209,6 +209,7 @@ function useInitialRecordingPreview({
 }) {
   const initialRecordingIdRef = useRef(getInitialRecordingPreviewId());
   const appliedRef = useRef(false);
+  const quickEditRef = useRef(new URLSearchParams(window.location.search).get('mode') === 'edit');
 
   useEffect(() => {
     const recordingId = initialRecordingIdRef.current;
@@ -224,6 +225,7 @@ function useInitialRecordingPreview({
     appliedRef.current = true;
     clearGalleryRecordingPreviewUrlParams();
     setPreview({
+      ...(quickEditRef.current ? { initialMode: 'edit' as const } : {}),
       inspectorCollapsed: false,
       item,
       url: null,

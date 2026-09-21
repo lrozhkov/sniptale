@@ -86,7 +86,16 @@ class TestAudioBuffer {
 }
 
 function installAudioContext() {
-  const windows: { input?: TestAudioBuffer; frames: number; rate?: number }[] = [];
+  const windows: {
+    input?: TestAudioBuffer;
+    frames: number;
+    sources?: { buffer: AudioBuffer | null }[];
+    rate?: number;
+    gains?: Array<{
+      gain: { value: number; readonlyPoints: Array<[string, number, number]> };
+      destinations: unknown[];
+    }>;
+  }[] = [];
   let onRender = () => {};
   vi.stubGlobal('AudioBuffer', TestAudioBuffer);
   vi.stubGlobal(
@@ -108,8 +117,8 @@ function installAudioContext() {
       }
       createBufferSource() {
         const window = this.window;
-        return {
-          buffer: null,
+        const source = {
+          buffer: null as AudioBuffer | null,
           playbackRate: {
             set value(rate: number) {
               window.rate = rate;
@@ -117,6 +126,31 @@ function installAudioContext() {
           },
           connect() {},
           start() {},
+        };
+        window.sources ??= [];
+        window.sources.push(source);
+        return source;
+      }
+      createGain() {
+        const window = this.window;
+        const gain = {
+          value: 1,
+          readonlyPoints: [] as Array<[string, number, number]>,
+          setValueAtTime(value: number, time: number) {
+            gain.readonlyPoints.push(['set', value, time]);
+          },
+          linearRampToValueAtTime(value: number, time: number) {
+            gain.readonlyPoints.push(['ramp', value, time]);
+          },
+        };
+        window.gains ??= [];
+        window.gains!.push({ gain, destinations: [] });
+        return {
+          gain,
+          connect(destination: unknown) {
+            window.gains!.at(-1)!.destinations.push(destination);
+            return destination;
+          },
         };
       }
       async startRendering() {
@@ -232,11 +266,59 @@ it('bounds accelerated windows and emits a short final chunk without a whole-sou
       [1, 48_000],
       [2, 12_000],
     ]);
-    expect(fixture.windows.map((window) => window.rate)).toEqual([4, 4, 4]);
+    expect(fixture.windows.map((window) => window.rate)).toEqual([1, 1, 1]);
     expect(Math.max(...fixture.windows.map((window) => window.input!.length))).toBeLessThanOrEqual(
       199_681
     );
     expect(audioMock.samples).not.toHaveBeenCalled();
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+it('mixes applied external clips and original gain into each window', async () => {
+  const fixture = await audioFixture();
+  try {
+    const clipBuffer = new TestAudioBuffer({
+      numberOfChannels: 1,
+      length: 96_000,
+      sampleRate: 48_000,
+    });
+    const entry = {
+      lane: 'music' as const,
+      clipId: 'm',
+      assetId: 'project-asset:m',
+      timelineStart: 0.5,
+      duration: 1,
+      sourceOffset: 0,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+    };
+    const samples = [];
+    for await (const sample of renderReviewAudio(
+      fixture.track,
+      { sourceStart: 0, sourceEnd: 1, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
+      false,
+      new AbortController().signal,
+      {
+        entries: [entry],
+        buffers: new Map<string, AudioBuffer>([
+          ['project-asset:m', clipBuffer as unknown as AudioBuffer],
+        ]),
+        originalVolume: 2,
+        originalMuted: false,
+      }
+    ))
+      samples.push(sample);
+    const window = fixture.windows[0]!;
+    // The original chain gains by 2; the clip is placed at its output position
+    // with a full clip-local envelope, starting mid-clip at the matching gain.
+    expect(window.gains!).toHaveLength(2);
+    expect(window.gains![0]!.gain.value).toBe(2);
+    const clipGain = window.gains![1]!.gain;
+    expect(clipGain.readonlyPoints[0]).toEqual(['set', 1, 0.02 + 0.5]);
+    expect(clipGain.readonlyPoints.at(-1)).toEqual(['ramp', 1, 0.02 + 1]);
   } finally {
     fixture.cleanup();
   }
@@ -331,4 +413,108 @@ it('reads variable Opus packet durations and rejects empty or invalid frame coun
   expect(audioPacketDuration(packet([]), 'aac', 48_000)).toBe(1024 / 48_000);
   expect(() => audioPacketDuration(packet([]), 'opus', 48_000)).toThrow('Empty Opus');
   expect(() => audioPacketDuration(packet([3, 0]), 'opus', 48_000)).toThrow('Invalid Opus');
+});
+
+it.each([48000, 44100])(
+  'feeds pitch-preserved PCM with continuous resampler context at %s Hz',
+  async (sampleRate) => {
+    const fixture = await audioFixture();
+    vi.spyOn(fixture.track, 'getSampleRate').mockResolvedValue(sampleRate);
+    audioMock.packets = Array.from({ length: 160 }, (_, i) => ({
+      timestamp: i * 0.02,
+      duration: 0.02,
+      data: new Uint8Array([0xf8, 0]),
+    }));
+    audioMock.samples.mockImplementation((start: number, end: number) => {
+      const count = Math.round((end - start) * sampleRate);
+      const data = Float32Array.from(
+        { length: count },
+        (_, i) => 0.5 * Math.sin(2 * Math.PI * 200 * (start + i / sampleRate))
+      );
+      return [
+        new AudioSample({
+          format: 'f32-planar',
+          sampleRate,
+          numberOfChannels: 1,
+          timestamp: start,
+          numberOfFrames: count,
+          data,
+        }),
+      ];
+    });
+    try {
+      for await (const _sample of renderReviewAudio(
+        fixture.track,
+        {
+          sourceStart: 0.2,
+          sourceEnd: 3.2,
+          resultStart: 0,
+          resultEnd: 1.5,
+          rate: 2,
+          kind: 'speed',
+        },
+        false,
+        new AbortController().signal
+      )) {
+        /* consume */
+      }
+      const padded = fixture.windows.map((window) => window.sources![0]!.buffer!.getChannelData(0));
+      const padding = Math.round(sampleRate * 0.02);
+      expect(padded[0]!.slice(-2 * padding)).toEqual(padded[1]!.slice(0, 2 * padding));
+      const chunks = padded.map((chunk) => chunk.subarray(padding, chunk.length - padding));
+      expect(chunks.map((chunk) => chunk.length)).toEqual([sampleRate, sampleRate / 2]);
+      for (const chunk of chunks) {
+        let crosses = 0;
+        for (let i = 4801; i < chunk.length - 4800; i++)
+          if (chunk[i - 1]! < 0 && chunk[i]! >= 0) crosses++;
+        expect((crosses * sampleRate) / (chunk.length - 9600)).toBeCloseTo(200, -1);
+      }
+      expect(Math.abs(chunks[1]![0]! - chunks[0]!.at(-1)!)).toBeLessThan(0.03);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);
+
+it('applies source gain inside a fragment without scaling the added music buffer', async () => {
+  const fixture = await audioFixture();
+  audioMock.packets = Array.from({ length: 50 }, (_, i) => ({
+    timestamp: 2 + i * 0.02,
+    duration: 0.02,
+    data: new Uint8Array([0xf8, 0]),
+  }));
+  audioMock.samples.mockImplementation((start: number, end: number) => [
+    decodedSample(start, end - start),
+  ]);
+  const music = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
+  music.getChannelData(0).fill(0.75);
+  try {
+    for await (const _sample of renderReviewAudio(
+      fixture.track,
+      { sourceStart: 2, sourceEnd: 3, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
+      false,
+      new AbortController().signal,
+      {
+        entries: [],
+        buffers: new Map([['music', music]]),
+        originalVolume: 1,
+        originalMuted: false,
+        originalRanges: [
+          { id: 'mute', start: 2.2, end: 2.4, volume: 0 },
+          { id: 'boost', start: 2.4, end: 2.6, volume: 2 },
+        ],
+      }
+    )) {
+      /* drain */
+    }
+    const pcm = fixture.windows[0]!.sources![0]!.buffer!.getChannelData(0);
+    const at = (time: number) => pcm[Math.round((time + 0.02) * 48_000)];
+    expect(at(0.1)).toBeCloseTo(0.25);
+    expect(at(0.3)).toBe(0);
+    expect(at(0.5)).toBeCloseTo(0.5);
+    expect(at(0.7)).toBeCloseTo(0.25);
+    expect(music.getChannelData(0)[0]).toBe(0.75);
+  } finally {
+    fixture.cleanup();
+  }
 });

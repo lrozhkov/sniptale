@@ -112,6 +112,20 @@ afterEach(() => {
   container = null;
 });
 
+it('hides the hover scrub while typing and restores it after leaving the text field', () => {
+  renderNumericRow();
+  const row = container!.querySelector('[data-ui="shared.ui.compact-inspector.numeric-row"]')!;
+  const input = container!.querySelector<HTMLInputElement>('input[type="text"]')!;
+  act(() => row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true })));
+  expect(row.getAttribute('data-range-visible')).toBe('true');
+  act(() => input.focus());
+  act(() => row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true })));
+  expect(row.getAttribute('data-range-visible')).toBe('false');
+  expect(getRange().tabIndex).toBe(-1);
+  act(() => input.blur());
+  expect(row.getAttribute('data-range-visible')).toBe('true');
+});
+
 it('previews and commits range changes on the numeric row lower edge', () => {
   const { onCommitValue, onPreviewValue } = renderNumericRow();
   const range = getRange();
@@ -203,6 +217,27 @@ it('keeps the range slider on the lower edge of the whole numeric row', () => {
   );
   expect(getRange().style.getPropertyValue('--sniptale-range-track-offset-y')).toBe('');
   expect(getRange().className).not.toContain('group-focus-within/compact-numeric-row:opacity-100');
+});
+
+it('forgets slider focus after a pending save disables and restores the control', () => {
+  const props = {
+    label: 'Opacity',
+    value: 40,
+    scrub: { min: 0, max: 100 },
+    onPreviewValue: vi.fn(),
+    onCommitValue: vi.fn(),
+  };
+  renderNumericRow(props);
+  act(() => getRange().focus());
+  act(() => root?.render(<NumericRow {...props} disabled />));
+  expect(container?.querySelector('input[type="range"]')).toBeNull();
+  act(() => root?.render(<NumericRow {...props} />));
+  act(() => container?.querySelector<HTMLInputElement>('input[type="text"]')?.focus());
+  expect(
+    container
+      ?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+      ?.getAttribute('aria-hidden')
+  ).toBe('true');
 });
 
 it('reveals the row range across the label, spacing, and value area', () => {

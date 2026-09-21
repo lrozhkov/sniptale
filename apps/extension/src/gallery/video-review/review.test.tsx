@@ -2,9 +2,10 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewSourceLane } from './timeline-selection';
 import { ReviewTimeline } from './timeline';
+import { parseReviewOperation } from '../../features/video/review/validation';
 import type { ReviewAnchor } from '../../features/video/review/types';
+import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -17,6 +18,7 @@ const integration = vi.hoisted(() => ({
   commit: vi.fn(),
   history: vi.fn(),
   read: vi.fn(),
+  advanced: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
 }));
@@ -26,6 +28,9 @@ vi.mock('../../workflows/video-review/export-lifecycle', async (importOriginal) 
 }));
 vi.mock('../../workflows/video-review/media-index', () => ({
   inspectReviewMedia: integration.index,
+  supportedReviewVideoCodecs: vi.fn(async (format: string) =>
+    format === 'mp4' ? ['avc'] : ['vp9', 'vp8']
+  ),
 }));
 vi.mock('../../workflows/video-review/source', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/source')>()),
@@ -36,209 +41,58 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
     typeof import('../../composition/persistence/review-workspaces/store')
   >()),
   saveVideoWorkspaceDraft: integration.draft,
+  saveVideoWorkspaceAdvanced: integration.advanced,
   commitVideoWorkspace: integration.commit,
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
+}));
+vi.mock('../../workflows/video-review/audio-import', () => ({
+  importReviewAudio: vi.fn(
+    async (args: {
+      attach(assetId: string, duration: number): Promise<void>;
+      assertCurrentTarget(): void;
+      signal: AbortSignal;
+    }) => {
+      args.signal.throwIfAborted();
+      args.assertCurrentTarget();
+      await args.attach('project-asset:drop', 2);
+    }
+  ),
+  importedAudioClip: (
+    assetId: string,
+    duration: number,
+    atTime: number,
+    timelineDuration: number
+  ) => ({
+    id: `audio-${assetId}`,
+    assetId,
+    timelineStart: Math.max(0, Math.min(atTime, Math.max(0, timelineDuration - 0.2))),
+    sourceOffset: 0,
+    duration,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  }),
 }));
 vi.mock('../shared/download', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/download')>()),
   downloadGalleryBlob: integration.download,
 }));
-import {
-  parseReviewAnnotation,
-  parseReviewOperation,
-} from '../../features/video/review/validation';
 import { VideoReview } from './index';
-import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import type {
-  saveVideoWorkspaceDraft,
-  commitVideoWorkspace,
-  moveVideoWorkspaceHistory,
-} from '../../composition/persistence/review-workspaces/store';
+import { createEditorFixture } from './editor-fixture.test-support';
 
-function createEditorFixture() {
-  integration.index.mockRejectedValue(new Error('No safe index'));
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      disconnect() {}
-    }
+function advancedContentAt(snapshot: VideoWorkspaceSnapshot, index = -1) {
+  const operations = snapshot.workspace.history.filter(
+    (operation) => operation.target === 'advancedContent'
   );
-  for (const [target, key] of [
-    [HTMLDialogElement.prototype, 'showModal'],
-    [HTMLDialogElement.prototype, 'close'],
-    [URL, 'createObjectURL'],
-    [URL, 'revokeObjectURL'],
-  ] as const) {
-    if (!(key in target))
-      Object.defineProperty(target, key, {
-        configurable: true,
-        writable: true,
-        value: () => undefined,
-      });
-  }
-  const show = vi
-    .spyOn(HTMLDialogElement.prototype, 'showModal')
-    .mockImplementation(function (this: HTMLDialogElement) {
-      this.open = true;
-    });
-  const close = vi
-    .spyOn(HTMLDialogElement.prototype, 'close')
-    .mockImplementation(function (this: HTMLDialogElement) {
-      this.open = false;
-    });
-  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(
-    function (this: HTMLMediaElement) {
-      this.dispatchEvent(new Event('pause'));
-    }
-  );
-  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
-    async function (this: HTMLMediaElement) {
-      this.dispatchEvent(new Event('play'));
-    }
-  );
-  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640);
-  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(360);
-  const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:review');
-  const revokeUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-  const clipboard = vi.fn(async () => undefined);
-  Object.defineProperty(navigator, 'clipboard', {
-    configurable: true,
-    value: { writeText: clipboard },
-  });
-  let snapshot: VideoWorkspaceSnapshot = {
-    workspace: {
-      aggregateId: 'recording:r',
-      sourceAssetId: 'file',
-      formatVersion: 1,
-      source: { duration: 4, width: 320, height: 180, mimeType: 'video/webm', size: 5 },
-      revision: 1,
-      cursor: 0,
-      history: [],
-      createdAt: 1,
-      updatedAt: 1,
-    },
-    draft: null,
-  };
-  integration.load.mockImplementation(async () => ({
-    source: snapshot.workspace.source,
-    snapshot: structuredClone(snapshot),
-    file: new File(['video'], 'video.webm'),
-    filename: 'video.webm',
-    telemetry: {
-      captureMode: 'tab',
-      viewport: { width: 320, height: 180 },
-      actionEvents: [],
-      cursorTrack: null,
-      signals: [
-        { id: 'idle', kind: 'cursor-idle', startTime: 2, endTime: 3, point: null, data: {} },
-        {
-          id: 'warning',
-          kind: 'static-frame',
-          startTime: 0,
-          endTime: 0,
-          point: null,
-          data: { code: 'unavailable' },
-        },
-      ],
-    },
-  }));
-  integration.draft.mockImplementation(
-    async (args: Parameters<typeof saveVideoWorkspaceDraft>[0]) => {
-      snapshot = {
-        ...snapshot,
-        draft: args.annotation
-          ? {
-              aggregateId: 'recording:r',
-              annotation: parseReviewAnnotation(args.annotation, 4, true)!,
-              before: args.before ? parseReviewAnnotation(args.before, 4)! : null,
-              revision: (snapshot.draft?.revision ?? 0) + 1,
-              updatedAt: 2,
-            }
-          : null,
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  integration.commit.mockImplementation(
-    async (args: Parameters<typeof commitVideoWorkspace>[0]) => {
-      snapshot = {
-        ...snapshot,
-        workspace: {
-          ...snapshot.workspace,
-          revision: snapshot.workspace.revision + 1,
-          history: [
-            ...snapshot.workspace.history.slice(0, snapshot.workspace.cursor),
-            parseReviewOperation(args.operation, 4)!,
-          ],
-          cursor: snapshot.workspace.cursor + 1,
-        },
-        draft: args.consumeDraftRevision ? null : snapshot.draft,
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  integration.history.mockImplementation(
-    async (args: Parameters<typeof moveVideoWorkspaceHistory>[0]) => {
-      snapshot = {
-        ...snapshot,
-        workspace: {
-          ...snapshot.workspace,
-          cursor: snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1),
-          revision: snapshot.workspace.revision + 1,
-        },
-      };
-      return structuredClone(snapshot);
-    }
-  );
-  integration.read.mockImplementation(async () => structuredClone(snapshot));
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  const back = vi.fn();
-  const button = (key: string) => {
-    const node = host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`);
-    if (!node) throw new Error(`Missing ${key}`);
-    return node;
-  };
-  const click = async (key: string) => act(async () => button(key).click());
-  const fill = async (value: string) =>
-    act(async () => {
-      const field = host.querySelector('textarea')!;
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-        field,
-        value
-      );
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  return {
-    host,
-    root,
-    back,
-    button,
-    click,
-    fill,
-    show,
-    close,
-    createUrl,
-    revokeUrl,
-    clipboard,
-    get snapshot() {
-      return snapshot;
-    },
-    async cleanup() {
-      await act(async () => root.unmount());
-      host.remove();
-      vi.restoreAllMocks();
-      vi.unstubAllGlobals();
-    },
-  };
+  const operation = index < 0 ? operations.at(-1) : operations[index];
+  if (operation?.target !== 'advancedContent') throw new Error('Missing advanced content op');
+  return operation.after;
 }
 
 it('integrates selection, recoverable text, drawing, history and report actions in the modal', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { host, root, back, click, fill, show, close, createUrl, revokeUrl, clipboard } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -252,7 +106,10 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await act(async () => host.querySelector('video')!.dispatchEvent(new Event('pause')));
     await click('addComment');
     await fill('First note');
-    expect(fixture.button('addComment').disabled).toBe(true);
+    expect(
+      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.addComment"]')
+        ?.disabled
+    ).toBe(true);
     expect(host.querySelector('input[type="number"]')).toBeNull();
     const stage = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.stage"]')!;
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 360));
@@ -314,8 +171,8 @@ it('integrates selection, recoverable text, drawing, history and report actions 
         .querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventCursorIdle"]')!
         .click()
     );
-    expect(host.querySelector('textarea')).not.toBeNull();
-    await click('discard');
+    expect(host.querySelector('textarea')).toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.actionProperties"]')).not.toBeNull();
     await click('telemetry');
     await click('back');
     expect(back).toHaveBeenCalledOnce();
@@ -330,7 +187,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
 });
 
 it('keeps unsaved text in the editor when Back cannot persist recovery, then retries', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host, back, click, fill } = fixture;
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -350,7 +207,7 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
 });
 
 it('offers source-load retry and surfaces playback failure without exiting', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host, back, click } = fixture;
   integration.load.mockRejectedValueOnce(new Error('Missing source'));
   try {
@@ -373,7 +230,10 @@ it('offers source-load retry and surfaces playback failure without exiting', asy
 
 async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
-  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 80));
+  const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(-gutter, 0, gutter + 400, 80)
+  );
   Object.assign(plane, {
     setPointerCapture: vi.fn(),
     hasPointerCapture: () => true,
@@ -390,7 +250,7 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
 }
 
 it('selects a range by dragging anywhere on the time plane and clears it outside', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host } = fixture;
   let selected: ReviewAnchor = { kind: 'point', time: 0 };
   const seek = vi.fn();
@@ -448,7 +308,7 @@ it('selects a range by dragging anywhere on the time plane and clears it outside
 });
 
 it('commits safe cuts, skips excluded playback and preserves exact comment navigation', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   const { root, host, back, click } = fixture;
   integration.index.mockResolvedValue({
     duration: 4,
@@ -493,6 +353,8 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       anchor: { kind: 'point', time: 1.4 },
     });
     await click('undo');
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
+    await click('cutMode');
     await dragTimePlane(host, 0);
     await key('ArrowLeft');
     expect(video.currentTime).toBe(0);
@@ -539,105 +401,130 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
   }
 });
 
-it('moves and resizes edit blocks once per gesture, cancelling transient geometry safely', async () => {
-  const fixture = createEditorFixture();
-  const { host, root } = fixture;
-  const change = vi.fn(),
-    select = vi.fn();
-  const edit = {
-    id: 'cut',
-    kind: 'cut' as const,
-    start: 2,
-    end: 4,
-    requestedStart: 2,
-    requestedEnd: 4,
-  };
+it('creates a zoom region from the playhead, edits it in the inspector, and persists it', async () => {
+  const fixture = createEditorFixture(integration);
+  const { root, click } = fixture;
   try {
     await act(async () =>
-      root.render(
-        <ReviewSourceLane
-          duration={10}
-          time={0}
-          selection={{ kind: 'point', time: 0 }}
-          annotations={[]}
-          edits={[edit]}
-          boundaries={[0, 2, 4, 6, 8, 10]}
-          onEdit={select}
-          onChangeEdit={change}
-          onSeek={vi.fn()}
-          onSelect={vi.fn()}
-          onComment={vi.fn()}
-        />
-      )
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
-    const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
-    vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 48));
-    const button = lane.querySelector<HTMLButtonElement>('button')!;
-    const block = button.parentElement!;
-    Object.assign(block, {
-      setPointerCapture: vi.fn(),
-      hasPointerCapture: () => true,
-      releasePointerCapture: vi.fn(),
+    await click('advancedEditing');
+    expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions).toHaveLength(1);
+    expect(advancedContentAt(fixture.snapshot, 0).zoom.enabled).toBe(true);
+    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions[0]).toMatchObject({
+      start: 0,
+      end: 2,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
     });
-    const event = async (target: Element, kind: string, x: number, button = 0) =>
-      act(async () => {
-        target.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x, button }));
-      });
-    await event(button, 'pointerdown', 200);
-    await event(block, 'pointermove', 400);
-    expect(block.style.left).toBe('40%');
-    expect(change).not.toHaveBeenCalled();
-    await event(block, 'pointerup', 400);
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 4, end: 6 });
-    expect(change).toHaveBeenCalledOnce();
-    const start = block.querySelector('[data-edge="start"]')!,
-      end = block.querySelector('[data-edge="end"]')!;
-    await event(start, 'pointerdown', 200);
-    await event(block, 'pointermove', 0);
-    await event(block, 'pointerup', 0);
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 0, end: 4 });
-    await event(end, 'pointerdown', 400);
-    await event(block, 'pointermove', 700);
-    await event(block, 'pointerup', 700);
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6 });
-    change.mockClear();
-    await event(button, 'pointerdown', 200);
-    await event(block, 'pointermove', 600);
-    await event(block, 'pointercancel', 600);
-    await event(block, 'pointerup', 600);
-    expect(change).not.toHaveBeenCalled();
-    expect(block.style.left).toBe('20%');
-    for (const target of [button, start, end]) {
-      vi.mocked(block.releasePointerCapture).mockClear();
-      const destination = target === start ? 0 : 400;
-      await event(target, 'pointerdown', 200);
-      await event(block, 'pointermove', destination);
-      await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-      expect(block.style.left).toBe('20%');
-      expect(block.style.width).toBe('20%');
-      expect(block.releasePointerCapture).toHaveBeenCalled();
-      await event(block, 'pointerup', destination);
-      expect(change).not.toHaveBeenCalled();
-    }
-    await event(button, 'pointerdown', 200, 2);
-    await event(block, 'pointermove', 500);
-    await event(block, 'pointerup', 500);
-    expect(change).not.toHaveBeenCalled();
+    const inspector = document.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')!;
+    expect(inspector).not.toBeNull();
+    const scale = inspector.querySelector<HTMLInputElement>(
+      '[aria-label="gallery.videoReview.zoomScale"]'
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(scale, '2');
+      scale.dispatchEvent(new Event('input', { bubbles: true }));
+      scale.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2);
+    // Basic mode suppresses the lane and its effect while preserving the stored region.
+    await click('advancedEditing');
+    expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('places new zoom regions in result time after cuts and speed changes (R03)', async () => {
+  const history = [
+    parseReviewOperation(
+      {
+        id: 'edit-cut-1',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut-1', start: 0, end: 1, requestedStart: 0, requestedEnd: 1, kind: 'cut' },
+      },
+      4
+    )!,
+    parseReviewOperation(
+      {
+        id: 'edit-speed-1',
+        at: 2,
+        target: 'edit',
+        before: null,
+        after: {
+          id: 'speed-1',
+          start: 1,
+          end: 2,
+          requestedStart: 1,
+          requestedEnd: 2,
+          kind: 'speed',
+          rate: 2,
+          audio: 'speed',
+        },
+      },
+      4
+    )!,
+  ].filter((operation) => operation !== null);
+  const fixture = createEditorFixture(integration, { history });
+  const { root, host, click } = fixture;
+  try {
     await act(async () =>
-      end.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }))
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6 });
+    // Result of cut [0,1) + speed [1,2)x2 + keep [2,4): 2.5 s; source 3 sits at 1.5.
+    await dragTimePlane(host, 300);
+    await click('advancedEditing');
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
+      start: 1.5,
+      end: 2.5,
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('refuses a zoom placement while the playhead is on a removed part (R03)', async () => {
+  const history = [
+    parseReviewOperation(
+      {
+        id: 'edit-cut-1',
+        at: 1,
+        target: 'edit',
+        before: null,
+        after: { id: 'cut-1', start: 0, end: 1, requestedStart: 0, requestedEnd: 1, kind: 'cut' },
+      },
+      4
+    )!,
+  ].filter((operation) => operation !== null);
+  const fixture = createEditorFixture(integration, { history });
+  const { root, host, click } = fixture;
+  try {
     await act(async () =>
-      start.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }))
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
-    expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 0, end: 4 });
+    await dragTimePlane(host, 50);
+    await click('advancedEditing');
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(0);
+    expect(host.textContent).toContain('gallery.videoReview.placementOnCut');
   } finally {
     await fixture.cleanup();
   }
 });
 
 it('ignores the comment shortcut while report copying disables the comment control', async () => {
-  const fixture = createEditorFixture();
+  const fixture = createEditorFixture(integration);
   let finish!: () => void;
   fixture.clipboard.mockImplementation(
     () =>
@@ -662,48 +549,146 @@ it('ignores the comment shortcut while report copying disables the comment contr
   }
 });
 
-it('blocks history and destructive shortcuts while the export controls are disabled', async () => {
-  const fixture = createEditorFixture();
-  let fail!: (reason: Error) => void;
-  integration.export.mockImplementation(
-    () =>
-      new Promise((_, reject) => {
-        fail = reject;
-      })
-  );
+it('toggles the persisted advanced mode and restores it after reopening the editor', async () => {
+  const fixture = createEditorFixture(integration);
+  const { root, button, click } = fixture;
+  try {
+    await act(async () =>
+      root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
+    await click('advancedEditing');
+    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('true');
+    expect(button('zoomTrack').getAttribute('aria-pressed')).toBe('true');
+    expect(button('audioTrack').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.ui).toEqual({
+      mode: 'advanced',
+      tracks: { actions: true, zoom: true, audio: true },
+      overlaysVisible: true,
+    });
+    expect(integration.advanced).toHaveBeenCalled();
+    await click('advancedEditing');
+    expect(button('advancedEditing').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('[aria-label="gallery.videoReview.zoomTrack"]')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(fixture.snapshot.workspace.advanced.ui.mode).toBe('basic');
+    expect(fixture.snapshot.workspace.advanced.ui.tracks.zoom).toBe(true);
+    // Reopening reads the same durable workspace: the saved mode and track return.
+    await act(async () => root.unmount());
+    const reopenedHost = document.createElement('div');
+    document.body.appendChild(reopenedHost);
+    const reopenedRoot = createRoot(reopenedHost);
+    const reopenedButton = (key: string) =>
+      reopenedHost.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`)!;
+    try {
+      await act(async () =>
+        reopenedRoot.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      expect(reopenedButton('advancedEditing').getAttribute('aria-pressed')).toBe('false');
+      await act(async () => reopenedButton('advancedEditing').click());
+      expect(reopenedButton('zoomTrack').getAttribute('aria-pressed')).toBe('true');
+    } finally {
+      await act(async () => reopenedRoot.unmount());
+      reopenedHost.remove();
+    }
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('reveals the three audio lanes and persists the original audio gate', async () => {
+  const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
-    boundaries: [0, 1, 2, 3, 4],
+    boundaries: [0, 2, 4],
     videoCodec: 'vp8',
-    audioCodec: null,
+    audioCodec: 'opus',
     container: 'webm',
     rotation: 0,
   });
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
+    const lanes = host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]');
+    expect(lanes).toHaveLength(3);
+    expect(host.querySelector('[data-ui="gallery.videoReview.audioTrack"]')).not.toBeNull();
+    const mute = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.audioEnabled"]'
+    )!;
+    await act(async () => mute.click());
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    expect(advancedContentAt(fixture.snapshot).audio.original.muted).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('imports a file dropped on the music lane at the drop point', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
+    const music = host.querySelector('[data-audio-lane="music"]')!;
+    vi.spyOn(music, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 32));
+    const file = new File([new Uint8Array(4)], 'song.mp3', { type: 'audio/mpeg' });
+    const dragEvent = (type: string, files: File[]) => {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 250 });
+      Object.defineProperty(event, 'dataTransfer', {
+        value: { files, types: files.length ? ['Files'] : [] },
+      });
+      return event;
+    };
+    await act(async () => music.dispatchEvent(dragEvent('dragenter', [file])));
+    expect(music.getAttribute('data-drop-active')).toBe('true');
+    await act(async () => music.dispatchEvent(dragEvent('drop', [file])));
+    expect(music.getAttribute('data-drop-active')).toBeNull();
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
+    const musicClips = advancedContentAt(fixture.snapshot).audio.music;
+    expect(musicClips).toHaveLength(1);
+    expect(musicClips[0]!.timelineStart).toBeCloseTo(1.25, 5);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('opens the shared voiceover recorder from the audio lane', async () => {
+  const fixture = createEditorFixture(integration);
+  const { host, root, click, back } = fixture;
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    await click('advancedEditing');
+    await click('recordVoiceover');
+    const modal = host.querySelector('[role="dialog"]');
+    expect(modal).not.toBeNull();
+    expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
+    await act(async () =>
+      modal!
+        .querySelector<HTMLButtonElement>('sniptale-modal-close, [title="common.actions.close"]')!
+        .click()
+    );
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps original audio controls when the export index cannot inspect the source', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockRejectedValue(new Error('Unsupported packet audio codec'));
   try {
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
-    await fixture.click('cutMode');
-    await dragTimePlane(fixture.host, 0, 100);
-    await act(async () =>
-      fixture.host
-        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.cutLabel 0.0 – 1.0"]')!
-        .click()
+    await fixture.click('advancedEditing');
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')).toHaveLength(
+      3
     );
-    await fixture.click('exportVideo');
-    expect(fixture.button('undo').disabled).toBe(true);
-    integration.history.mockClear();
-    integration.commit.mockClear();
-    for (const key of ['z', 'y'])
-      await act(async () =>
-        window.dispatchEvent(new KeyboardEvent('keydown', { key, ctrlKey: true }))
-      );
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
-    expect(integration.history).not.toHaveBeenCalled();
-    await dragTimePlane(fixture.host, 200, 300);
-    expect(integration.commit).not.toHaveBeenCalled();
+    expect(fixture.host.textContent).toContain('gallery.videoReview.audioOriginal');
   } finally {
-    await act(async () => fail?.(new Error('Cancelled test export')));
     await fixture.cleanup();
   }
 });

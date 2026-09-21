@@ -186,6 +186,10 @@ function renderPreviewOverlayPanel(
 ) {
   return (
     <PreviewPanel
+      key={previewItem.id}
+      {...(props.state.preview.session.initialMode
+        ? { initialMode: props.state.preview.session.initialMode }
+        : {})}
       {...buildPreviewTagProps(props)}
       {...(props.state.preview.draft.hasChanges ? { hasChanges: true } : {})}
       {...buildPreviewNavigationProps(props, previewItem)}

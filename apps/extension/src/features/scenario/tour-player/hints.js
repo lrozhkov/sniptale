@@ -171,6 +171,7 @@ export function createTourHints(
 }
 
 /** Places callouts without covering their target when another side has enough room. */
+const CALLOUT_ANCHOR_GAP = 30;
 function positionHint({ hint, viewport, geometry, current, appearance }) {
   const { stageWidth: hintWidth, stageHeight: hintHeight, imageBox } = geometry;
   const offsetX = ((viewport.clientWidth || hintWidth) - hintWidth) / 2;
@@ -197,20 +198,21 @@ function positionHint({ hint, viewport, geometry, current, appearance }) {
     const y = point.y;
     if (placement === 'auto') {
       placement =
-        x + 22 + hint.offsetWidth <= hintWidth - 8
+        x + CALLOUT_ANCHOR_GAP + hint.offsetWidth <= hintWidth - 8
           ? 'right'
-          : x - 22 - hint.offsetWidth >= 8
+          : x - CALLOUT_ANCHOR_GAP - hint.offsetWidth >= 8
             ? 'left'
-            : y + 22 + hint.offsetHeight <= hintHeight - 8
+            : y + CALLOUT_ANCHOR_GAP + hint.offsetHeight <= hintHeight - 8
               ? 'bottom'
               : 'top';
     }
-    left = x + 22;
+    left = x + CALLOUT_ANCHOR_GAP;
     top = y - hint.offsetHeight / 2;
-    if (placement === 'left') left = x - hint.offsetWidth - 22;
+    if (placement === 'left') left = x - hint.offsetWidth - CALLOUT_ANCHOR_GAP;
     if (placement === 'top' || placement === 'bottom') {
       left = x - hint.offsetWidth / 2;
-      top = placement === 'top' ? y - hint.offsetHeight - 22 : y + 22;
+      top =
+        placement === 'top' ? y - hint.offsetHeight - CALLOUT_ANCHOR_GAP : y + CALLOUT_ANCHOR_GAP;
     }
   }
   return {

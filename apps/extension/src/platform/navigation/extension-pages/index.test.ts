@@ -252,3 +252,15 @@ it('builds a fixed local editor frame URL carrying only its embed session', asyn
   ]);
   expect(browserTabsCreateMock).not.toHaveBeenCalled();
 });
+
+it('scopes quick-edit intent to the requested recording route', async () => {
+  const { openGalleryPage } = await import('./index');
+  await openGalleryPage({ recordingId: 'rec&1', quickEdit: true });
+  const url = new URL(browserTabsCreateMock.mock.calls.at(-1)![0].url);
+  expect(url.searchParams.get('recordingId')).toBe('rec&1');
+  expect(url.searchParams.get('mode')).toBe('edit');
+  await openGalleryPage({ quickEdit: true });
+  expect(browserTabsCreateMock).toHaveBeenLastCalledWith({
+    url: `${EXTENSION_URL_ROOT}/gallery/index.html`,
+  });
+});

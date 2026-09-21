@@ -35,6 +35,10 @@ import { openArchiveReader } from '../../../../composition/archive-transfer';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from '../export';
 import { inspectMediaHubBackupV6 } from '../inspect';
 import { scenarioProjectRootPublisher } from './scenario-project';
+import {
+  SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECTS_STORE,
+} from '../../../../composition/persistence/infrastructure/indexed-db/core';
 beforeEach(() => {
   vi.clearAllMocks();
   io.put.mockResolvedValue({ imported: true, conflicted: false });
@@ -131,6 +135,7 @@ function input() {
     },
     session: {
       archiveFingerprint: 'a'.repeat(64),
+      childIdMap: {},
       committedRoots: [],
       conflictedRoots: [],
       createdAt: 1,
@@ -169,6 +174,88 @@ it('duplicates historical image/document identities and leaves consumed JSON for
   });
   expect(result.retainedAssetIds).toContain('physical-image');
   expect(result.retainedAssetIds).not.toContain('physical-history');
+  expect(io.checkpoint.mock.calls[0]?.[2]?.childIds).toEqual({
+    'scenario-asset:logical-image': root.assets[0]?.entry.id,
+  });
+});
+
+it('keeps stable child identities and checkpoints validated children when replacement is skipped', async () => {
+  const { args } = input();
+  args.session.strategy = 'replace';
+  const metadata = args.envelope.metadata as unknown as {
+    assets: Array<{ entry: Record<string, unknown> }>;
+  };
+  let restoredAsset: unknown;
+  io.put.mockImplementationOnce(async (input) => {
+    restoredAsset = input.root.assets[0]?.entry;
+    return { imported: false, conflicted: true };
+  });
+  io.mutate.mockImplementation(async (operation) =>
+    operation({
+      get: async () => ({ id: 'guide' }),
+      transaction: () => ({
+        objectStore: () => ({
+          get: async () => restoredAsset ?? metadata.assets[0]?.entry,
+          put: vi.fn(),
+        }),
+        done: Promise.resolve(),
+      }),
+    })
+  );
+
+  const result = await scenarioProjectRootPublisher.publish(args);
+
+  const call = io.put.mock.calls[0]?.[0] as Parameters<
+    typeof import('../../../../composition/persistence/scenario/backup-restore').putScenarioProjectBackupRestore
+  >[0];
+  expect(call.root.entry.id).toBe('guide');
+  expect(call.root.assets[0]?.entry.id).toBe('logical-image');
+  expect(result).toMatchObject({ conflicted: true, imported: false, retainedAssetIds: [] });
+  expect(io.checkpoint.mock.calls[0]?.[2]?.childIds).toEqual({
+    'scenario-asset:logical-image': 'logical-image',
+  });
+});
+
+it('checkpoints only locally validated scenario children when skipping an existing root', async () => {
+  const { args } = input();
+  const metadata = args.envelope.metadata as unknown as {
+    assets: Array<{ entry: Record<string, unknown> }>;
+    entry: Record<string, unknown>;
+  };
+  io.mutate.mockImplementation(async (operation) =>
+    operation({
+      transaction: () => ({
+        objectStore: (store: string) => ({
+          get: async (id: string) => {
+            if (store === SCENARIO_PROJECTS_STORE) return metadata.entry;
+            if (store === SCENARIO_ASSETS_STORE && id === 'logical-image') {
+              return {
+                ...metadata.assets[0]!.entry,
+                assetId: 'physical-existing',
+              };
+            }
+            return undefined;
+          },
+          put: vi.fn(),
+        }),
+        done: Promise.resolve(),
+      }),
+    })
+  );
+
+  await expect(
+    scenarioProjectRootPublisher.checkpointSkipIfExisting!({
+      envelope: args.envelope,
+      session: { ...args.session, strategy: 'skip' },
+    })
+  ).resolves.toBe(true);
+  expect(io.checkpoint).toHaveBeenCalledWith(expect.anything(), 'restore', {
+    childIds: { 'scenario-asset:logical-image': 'logical-image' },
+    conflicted: true,
+    imported: false,
+    rootKey: 'scenario-project:guide',
+    targetRootId: 'guide',
+  });
 });
 it('rejects foreign history before publishing any root', async () => {
   const { args, history } = input();

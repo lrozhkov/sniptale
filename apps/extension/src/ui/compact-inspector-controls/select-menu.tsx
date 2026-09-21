@@ -1,4 +1,5 @@
 import { Check } from 'lucide-react';
+import { useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   CSSProperties,
@@ -52,6 +53,17 @@ export function CompactSelectMenu<T extends string>({
   value,
 }: CompactSelectMenuProps<T>): ReactNode {
   const containedMenuRef = useFloatingSurfaceWheelContainment(menuRef);
+  const selectedIndex = options.findIndex((option) => option.value === value);
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    const selected = optionRefs.current[selectedIndex];
+    if (!menu || !selected) return;
+    // Keep pointer-open selection visible without scrolling its inspector or moving focus.
+    const top = selected.offsetTop;
+    const bottom = top + selected.offsetHeight;
+    if (top < menu.scrollTop || bottom > menu.scrollTop + menu.clientHeight)
+      menu.scrollTop = Math.max(0, top - (menu.clientHeight - selected.offsetHeight) / 2);
+  }, [menuRef, optionRefs, selectedIndex, style.maxHeight]);
   return createPortal(
     <div
       id={menuId}

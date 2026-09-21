@@ -119,7 +119,8 @@ it('renders an offline mix and returns buffer settings', async () => {
       startTime: 1,
       volume: 0.5,
     }),
-    decodedBuffer
+    decodedBuffer,
+    undefined
   );
 });
 

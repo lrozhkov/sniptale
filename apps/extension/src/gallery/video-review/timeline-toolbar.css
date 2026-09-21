@@ -1,0 +1,63 @@
+@layer utilities {
+  .review-timeline-toolbar {
+    --review-toolbar-size: 32px;
+    --review-toolbar-icon: 14px;
+    --review-toolbar-font: 12px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    min-width: 0;
+    border-bottom: 1px solid var(--sniptale-color-border-soft);
+  }
+  .review-timeline-toolbar [data-review-toolbar-button] {
+    position: relative;
+    flex-shrink: 0;
+    height: var(--review-toolbar-size) !important;
+    min-height: var(--review-toolbar-size) !important;
+    width: auto !important;
+    min-width: var(--review-toolbar-size);
+    padding-inline: 8px !important;
+    gap: 6px;
+    font-size: var(--review-toolbar-font);
+    white-space: nowrap;
+    /* Size transitions feed intermediate widths back into the responsive layout observer. */
+    transition-property: color, background-color, border-color, box-shadow, opacity;
+  }
+  .review-timeline-toolbar [data-review-toolbar-button] > svg {
+    flex-shrink: 0;
+    width: var(--review-toolbar-icon) !important;
+    height: var(--review-toolbar-icon) !important;
+  }
+  .review-timeline-toolbar [data-toolbar-transport] [data-review-toolbar-button] > svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .review-timeline-toolbar [data-caption-hidden] [data-review-toolbar-label] {
+    display: none;
+  }
+  .review-timeline-toolbar [data-review-toolbar-button][data-caption-hidden] {
+    width: var(--review-toolbar-size) !important;
+    padding-inline: 0 !important;
+  }
+  .review-timeline-toolbar[data-layout='compact'] {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+  .review-timeline-toolbar[data-layout='stacked'] {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='leading'] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    overflow-x: auto;
+  }
+  .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-transport] {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='trailing'] {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}

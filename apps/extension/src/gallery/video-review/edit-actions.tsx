@@ -1,4 +1,12 @@
-import { useMemo } from 'react';
+import {
+  type VideoQuality,
+  VideoResolutionPreset,
+} from '@sniptale/runtime-contracts/video/types/types';
+import { reviewOutputCodecs } from '../../workflows/video-review/render-settings';
+import { SelectField } from '../../ui/compact-inspector-controls';
+import { reviewSelectFieldClassName } from './controls';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { useMemo, useState, useId, type ReactNode } from 'react';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
@@ -7,17 +15,46 @@ import {
   isReviewSpeedRate,
   type ReviewSpeedRate,
 } from '../../features/video/review/speed';
-import { Scissors, Download, FileVideo, Gauge, MousePointer2, Trash2 } from 'lucide-react';
+import {
+  Scissors,
+  Download,
+  FileVideo,
+  Gauge,
+  MousePointer2,
+  Trash2,
+  Settings2,
+} from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ReviewButton, reviewTimeLabel } from './controls';
+import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
+import {
+  reviewIconButtonClassName,
+  ReviewButton,
+  reviewTextButtonClassName,
+  reviewTimeLabel,
+} from './controls';
 
-const plain =
-  '!border-0 !bg-transparent !shadow-none !h-8 !w-8 aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
+const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
+  canvas: 'gallery.videoReview.canvas',
+  'precise-edits': 'gallery.videoReview.exportPreciseEdits',
+  zoom: 'gallery.videoReview.exportBlockerZoom',
+  background: 'gallery.videoReview.exportBlockerBackground',
+  comments: 'gallery.videoReview.exportBlockerComments',
+  voiceover: 'gallery.videoReview.exportBlockerVoiceover',
+  music: 'gallery.videoReview.exportBlockerMusic',
+  'original-audio': 'gallery.videoReview.exportBlockerOriginalAudio',
+  'audio-encoder': 'gallery.videoReview.exportBlockerAudioEncoder',
+  'video-encoder': 'gallery.videoReview.exportBlockerVideoEncoder',
+  'asset-missing': 'gallery.videoReview.exportBlockerAssetMissing',
+};
+
+const plain = reviewIconButtonClassName;
 
 /** The timeline owns the editing tools; a drag applies the current tool directly. */
 export function ReviewTimelineTools(props: {
-  mode: 'cut' | 'speed' | null;
+  mode: 'cut' | 'speed' | 'audio' | 'focus' | null;
   available: boolean;
+  cutAvailable?: boolean;
+  speedAvailable?: boolean;
   busy: boolean;
   rate: number;
   audio: 'speed' | 'mute';
@@ -32,6 +69,7 @@ export function ReviewTimelineTools(props: {
     <>
       <ReviewButton
         label={translate('gallery.videoReview.pointerTool')}
+        toolbarLabel={translate('gallery.videoReview.toolbarPointer')}
         aria-pressed={props.mode === null}
         className={plain}
         onClick={props.onPointer}
@@ -40,59 +78,30 @@ export function ReviewTimelineTools(props: {
       </ReviewButton>
       <ReviewButton
         label={translate('gallery.videoReview.cutMode')}
+        toolbarLabel={translate('gallery.videoReview.toolbarCut')}
         title={translate('gallery.videoReview.cutGesture')}
         aria-pressed={props.mode === 'cut'}
         className={plain}
-        disabled={!props.available || props.busy}
+        disabled={!props.available || props.busy || props.cutAvailable === false}
         onClick={() => props.onToggle('cut')}
       >
         <Scissors size={16} />
       </ReviewButton>
       <ReviewButton
         label={translate('gallery.videoReview.speedMode')}
+        toolbarLabel={translate('gallery.videoReview.speedMode')}
         aria-pressed={props.mode === 'speed'}
         className={plain}
-        disabled={!props.available || props.busy}
+        disabled={!props.available || props.busy || props.speedAvailable === false}
         onClick={() => props.onToggle('speed')}
       >
         <Gauge size={16} />
       </ReviewButton>
-      {props.mode === 'speed' ? (
-        <>
-          <select
-            aria-label={translate('gallery.videoReview.speedRate')}
-            value={props.rate}
-            disabled={props.busy}
-            className="h-7 rounded bg-[var(--sniptale-color-surface-panel)] text-xs"
-            onChange={(event) => {
-              const value = Number(event.currentTarget.value);
-              if (isReviewSpeedRate(value)) props.onRate(value);
-            }}
-          >
-            {REVIEW_SPEED_RATES.map((rate) => (
-              <option key={rate} value={rate}>
-                {rate < 0.25 ? `1/${1 / rate}` : rate}×
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label={translate('gallery.videoReview.speedAudio')}
-            value={props.audio}
-            disabled={props.busy}
-            className="h-7 max-w-28 rounded bg-[var(--sniptale-color-surface-panel)] text-xs"
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (value === 'speed' || value === 'mute') props.onAudio(value);
-            }}
-          >
-            <option value="speed">{translate('gallery.videoReview.speedSound')}</option>
-            <option value="mute">{translate('gallery.videoReview.muteSound')}</option>
-          </select>
-        </>
-      ) : null}
+      {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
       {props.selected ? (
         <ReviewButton
           label={translate('gallery.videoReview.removeEdit')}
+          toolbarLabel={translate('gallery.videoReview.removeEdit')}
           className={plain}
           disabled={props.busy}
           onClick={props.onRemove}
@@ -100,6 +109,76 @@ export function ReviewTimelineTools(props: {
           <Trash2 size={15} />
         </ReviewButton>
       ) : null}
+    </>
+  );
+}
+
+/** Compact speed choices shared by the timeline tool and selected-edit inspector. */
+export function ReviewSpeedOptions(props: {
+  layout?: 'toolbar' | 'inspector';
+  rate: number;
+  audio: 'speed' | 'mute';
+  busy: boolean;
+  onRate(value: ReviewSpeedRate): void;
+  onAudio(value: 'speed' | 'mute'): void;
+}) {
+  const rateOptions = REVIEW_SPEED_RATES.map((rate) => ({
+    value: String(rate),
+    label: `${rate < 0.25 ? `1/${1 / rate}` : rate}×`,
+  }));
+  const audioOptions = [
+    { value: 'speed' as const, label: translate('gallery.videoReview.speedSound') },
+    { value: 'mute' as const, label: translate('gallery.videoReview.muteSound') },
+  ];
+  const changeRate = (value: string) => {
+    const rate = Number(value);
+    if (isReviewSpeedRate(rate)) props.onRate(rate);
+  };
+  if (props.layout === 'inspector')
+    return (
+      <>
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.speedRate')}
+          value={String(props.rate)}
+          disabled={props.busy}
+          options={rateOptions}
+          onChange={changeRate}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.speedAudio')}
+          value={props.audio}
+          disabled={props.busy}
+          options={audioOptions}
+          onChange={props.onAudio}
+        />
+      </>
+    );
+  return (
+    <>
+      <ProductSelect
+        aria-label={translate('gallery.videoReview.speedRate')}
+        controlSize="sm"
+        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        containerClassName="!w-auto !min-w-0 shrink-0"
+        menuWidth={112}
+        value={String(props.rate)}
+        disabled={props.busy}
+        options={rateOptions}
+        onChange={changeRate}
+      />
+      <ProductSelect<'speed' | 'mute'>
+        aria-label={translate('gallery.videoReview.speedAudio')}
+        controlSize="sm"
+        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        containerClassName="!w-auto !min-w-0 shrink-0"
+        menuWidth={180}
+        value={props.audio}
+        disabled={props.busy}
+        onChange={props.onAudio}
+        options={audioOptions}
+      />
     </>
   );
 }
@@ -113,37 +192,63 @@ export function ReviewEditActions(props: {
   progress: number;
   failed: boolean;
   hasResult: boolean;
+  settings?: ReactNode;
   audioUnavailable?: boolean;
+  advancedBlockers?: readonly QuickEditExportReason[] | null;
   onExport(): void;
   onCancel(): void;
   onDownload(): void;
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsId = useId();
   const running = props.phase !== 'idle';
+  const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1">
+      <div
+        className={
+          'sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 ' +
+          'bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]'
+        }
+      >
         <ReviewButton
           label={translate('gallery.videoReview.exportVideo')}
-          primary
-          className="flex-1"
-          disabled={!props.available || props.busy || running || props.audioUnavailable}
+          className={`${reviewTextButtonClassName}
+            !w-full min-w-0 justify-start !whitespace-normal !text-left !leading-tight`}
+          disabled={!props.available || props.busy || running || props.audioUnavailable || blocked}
           onClick={props.onExport}
         >
           <FileVideo size={15} />
           <span>{translate('gallery.videoReview.exportVideo')}</span>
         </ReviewButton>
+        {props.settings ? (
+          <ReviewButton
+            label={translate('gallery.videoReview.exportSettings')}
+            className={plain}
+            aria-expanded={settingsOpen}
+            aria-controls={settingsId}
+            aria-pressed={settingsOpen}
+            onClick={() => setSettingsOpen(!settingsOpen)}
+          >
+            <Settings2 size={16} />
+          </ReviewButton>
+        ) : null}
         <ReviewButton
           label={translate('gallery.videoReview.downloadVideo')}
+          className={`${reviewTextButtonClassName} col-span-2 !w-full justify-start`}
           disabled={
             running ||
             props.busy ||
+            blocked ||
             (props.hasEdits && (!props.available || props.audioUnavailable))
           }
           onClick={props.onDownload}
         >
           <Download size={16} />
+          <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
       </div>
+      {props.settings && settingsOpen ? <div id={settingsId}>{props.settings}</div> : null}
       {running ? (
         <div className="flex items-center justify-between gap-2 text-xs" role="status">
           <span>
@@ -154,6 +259,7 @@ export function ReviewEditActions(props: {
           {props.phase === 'exporting' ? (
             <ReviewButton
               label={translate('gallery.videoReview.cancelExport')}
+              className={reviewTextButtonClassName}
               onClick={props.onCancel}
             />
           ) : null}
@@ -169,6 +275,12 @@ export function ReviewEditActions(props: {
           {translate('gallery.videoReview.speedAudioUnavailable')}
         </p>
       ) : null}
+      {blocked ? (
+        <p role="status" className="text-xs">
+          {translate('gallery.videoReview.exportAdvancedUnavailable')}{' '}
+          {props.advancedBlockers!.map((blocker) => translate(REASON_LABEL[blocker])).join(' · ')}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -176,6 +288,7 @@ export function ReviewEditActions(props: {
 /** A range-only download affordance; unavailable or fully removed intervals cannot be exported. */
 export function ReviewFragmentAction(props: {
   selection: ReviewAnchor;
+  snapToKeyframes?: boolean;
   index: ReviewMediaIndex | null;
   edits: readonly ReviewEdit[];
   busy: boolean;
@@ -189,10 +302,11 @@ export function ReviewFragmentAction(props: {
             selection,
             duration: index.duration,
             boundaries: index.boundaries,
+            snapToKeyframes: props.snapToKeyframes !== false,
             edits,
           })
         : null,
-    [selection, index, edits]
+    [selection, index, edits, props.snapToKeyframes]
   );
   if (selection.kind !== 'range') return null;
   const audioUnavailable =
@@ -206,6 +320,7 @@ export function ReviewFragmentAction(props: {
   return (
     <ReviewButton
       label={translate('gallery.videoReview.downloadSelection')}
+      toolbarLabel={translate('gallery.videoReview.toolbarFragment')}
       title={rangeLabel + hint}
       disabled={!fragment || props.busy || audioUnavailable}
       className={plain}
@@ -213,5 +328,94 @@ export function ReviewFragmentAction(props: {
     >
       <Download size={16} />
     </ReviewButton>
+  );
+}
+
+/** Output choices remain reachable when a selected encoder is unavailable. */
+export function ReviewRenderOptions({
+  exporter,
+  busy,
+}: {
+  exporter: ReturnType<typeof import('./use-export').useReviewExport>;
+  busy: boolean;
+}) {
+  if (!exporter.index || !exporter.renderSettings) return null;
+  const settings = exporter.renderSettings;
+  const format = settings.format ?? exporter.index.container;
+  const codecs = reviewOutputCodecs(exporter.index, format);
+  return (
+    <div className="min-w-0 max-w-full pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
+      <fieldset disabled={busy} className="min-w-0 space-y-2 pb-2">
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('videoEditor.exportDialog.formatLabel')}
+          disabled={busy}
+          value={format}
+          options={(['mp4', 'webm'] as const).map((value) => ({
+            value,
+            label: value === 'mp4' ? 'MP4' : 'WebM',
+            disabled: reviewOutputCodecs(exporter.index!, value).length === 0,
+          }))}
+          onChange={(format) => {
+            const codec = reviewOutputCodecs(exporter.index!, format)[0];
+            if (codec) exporter.setRenderSettings({ ...settings, format, codec });
+          }}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.exportCodec')}
+          disabled={busy}
+          value={settings.codec ?? codecs[0] ?? ''}
+          options={codecs.map((codec) => ({
+            value: codec,
+            label:
+              codec === 'avc' ? 'H.264' : codec === 'hevc' ? 'H.265 / HEVC' : codec.toUpperCase(),
+          }))}
+          onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('videoEditor.exportDialog.resolutionLabel')}
+          disabled={busy}
+          value={settings.resolution ?? VideoResolutionPreset.SOURCE}
+          options={Object.values(VideoResolutionPreset).map((value) => ({
+            value,
+            label:
+              value === VideoResolutionPreset.SOURCE
+                ? translate('gallery.videoReview.exportSceneSize')
+                : value.toLowerCase(),
+          }))}
+          onChange={(resolution) => exporter.setRenderSettings({ ...settings, resolution })}
+        />
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.exportFrameRate')}
+          disabled={busy}
+          value={String(settings.frameRate)}
+          options={[
+            { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
+            ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
+          ]}
+          onChange={(value) => {
+            const frameRate = Number(value);
+            if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
+              exporter.setRenderSettings({ ...settings, frameRate });
+          }}
+        />
+        <SelectField<VideoQuality>
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.exportQuality')}
+          disabled={busy}
+          value={settings.quality}
+          options={[
+            { value: 'LOW', label: translate('videoEditor.exportDialog.qualityLow') },
+            { value: 'MEDIUM', label: translate('videoEditor.exportDialog.qualityMedium') },
+            { value: 'HIGH', label: translate('videoEditor.exportDialog.qualityHigh') },
+            { value: 'ULTRA', label: translate('videoEditor.exportDialog.qualityUltra') },
+          ]}
+          onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
+        />
+      </fieldset>
+    </div>
   );
 }

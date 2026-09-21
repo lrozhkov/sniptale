@@ -213,3 +213,8 @@ it('deletes single-source raw tracks without invoking project deletion', async (
   expect(mocks.deletePersistedVideoProject).not.toHaveBeenCalled();
   expect(mocks.deleteRecording).toHaveBeenCalledTimes(3);
 });
+
+it('passes explicit quick edit through the gallery navigation owner', async () => {
+  await openLatestRecordingInGallery('rec-1', true);
+  expect(mocks.openGalleryPage).toHaveBeenCalledWith({ recordingId: 'rec-1', quickEdit: true });
+});

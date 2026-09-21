@@ -3,6 +3,7 @@ import type {
   ReviewOperation,
   ReviewSource,
 } from '../../../features/video/review/types';
+import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
 
 /** Durable review history for one library media identity; the document is derived by replay. */
 export interface VideoWorkspace {
@@ -13,6 +14,7 @@ export interface VideoWorkspace {
   revision: number;
   history: ReviewOperation[];
   cursor: number;
+  advanced: QuickEditAdvancedState;
   createdAt: number;
   updatedAt: number;
 }

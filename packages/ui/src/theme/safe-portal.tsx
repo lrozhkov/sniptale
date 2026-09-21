@@ -42,6 +42,9 @@ function resolveThemeOwner(source: Node | null): HTMLElement | null {
 export function resolveThemeSafePortalTarget(
   anchorEl: HTMLElement | null
 ): ShadowRoot | DocumentFragment | HTMLElement {
+  // Native modal dialogs make body-level portals inert and paint above them.
+  const dialog = anchorEl?.closest<HTMLDialogElement>('dialog[open]');
+  if (dialog) return dialog;
   const portalTarget = anchorEl?.getRootNode();
   if (portalTarget instanceof ShadowRoot || portalTarget instanceof DocumentFragment) {
     return portalTarget;

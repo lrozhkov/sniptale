@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { parseReviewAnnotation, parseReviewOperation, parseReviewSource } from './validation';
+import { createCanvasComment } from './comments';
 
 const source = { duration: 10, width: 100, height: 50, mimeType: 'video/webm', size: 1000 };
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point', time: 1 } };
@@ -92,4 +93,132 @@ it('validates effective and requested edit intervals and admitted speed/audio ch
   ]) {
     expect(parseReviewOperation({ ...op, after: { ...edit, ...patch } }, 10)).toBeNull();
   }
+});
+
+it('parses canvas comment operations and rejects unbounded or malformed overlay values', () => {
+  const comment = createCanvasComment({ id: 'c1', at: 2 });
+  const op = { id: 'op9', at: 3, target: 'canvasComment', before: null, after: comment };
+  expect(parseReviewOperation(op, 10)).toEqual(op);
+  expect(
+    parseReviewOperation(
+      { id: 'op9', at: 3, target: 'canvasComment', before: comment, after: null },
+      10
+    )?.target
+  ).toBe('canvasComment');
+  for (const patch of [
+    { position: { x: 1.1, y: 0.5 } },
+    { position: { x: 0.5, y: -0.1 } },
+    { attachment: 'frame' },
+    { visible: 'yes' },
+    { start: 4, end: 2 },
+    { start: 11 },
+    { end: -1 },
+  ]) {
+    const value = typeof patch === 'object' ? { ...comment, ...patch } : comment;
+    expect(
+      parseReviewOperation(
+        { id: 'op9', at: 3, target: 'canvasComment', before: null, after: value },
+        10
+      )
+    ).toBeNull();
+  }
+  expect(
+    parseReviewOperation(
+      {
+        id: 'op9',
+        at: 3,
+        target: 'canvasComment',
+        before: null,
+        after: { ...comment, style: { ...comment.style, fillPaint: 'red' } },
+      },
+      10
+    )
+  ).toBeNull();
+  expect(
+    parseReviewOperation(
+      {
+        id: 'op9',
+        at: 3,
+        target: 'canvasComment',
+        before: null,
+        after: { ...comment, style: { ...comment.style, radius: 65 } },
+      },
+      10
+    )
+  ).toBeNull();
+});
+
+it('round-trips linked overlays: annotation link and placement survive parsing', () => {
+  const linked = {
+    ...createCanvasComment({ id: 'c1', at: 2, annotationId: 'a1', placement: 'below' as const }),
+    text: '',
+  };
+  const op = { id: 'op9', at: 3, target: 'canvasComment', before: null, after: linked };
+  expect(parseReviewOperation(op, 10)).toEqual(op);
+  const legacy = { ...createCanvasComment({ id: 'c2', at: 2 }) };
+  const legacyOp = { id: 'op10', at: 3, target: 'canvasComment', before: null, after: legacy };
+  expect(parseReviewOperation(legacyOp, 10)).toEqual(legacyOp);
+  const parsedLegacy = parseReviewOperation(legacyOp, 10);
+  expect('annotationId' in ((parsedLegacy?.after ?? {}) as Record<string, unknown>)).toBe(false);
+  for (const patch of [{ annotationId: 42 }, { placement: 'side' }]) {
+    expect(
+      parseReviewOperation(
+        { id: 'op9', at: 3, target: 'canvasComment', before: null, after: { ...linked, ...patch } },
+        10
+      )
+    ).toBeNull();
+  }
+});
+
+it('roundtrips custom comment typography and rejects malformed geometry before persistence', () => {
+  const comment = createCanvasComment({ id: 'styled', at: 1 });
+  comment.style = { ...comment.style, width: 320, fontSize: 18, padding: 12 };
+  const operation = { id: 'style', at: 1, target: 'canvasComment', before: null, after: comment };
+  expect(parseReviewOperation(JSON.parse(JSON.stringify(operation)), 10)).toEqual(operation);
+  for (const patch of [
+    { width: 79 },
+    { width: 641 },
+    { fontSize: 0 },
+    { fontSize: 49 },
+    { padding: -1 },
+    { padding: 33 },
+    { width: '320' },
+  ]) {
+    expect(
+      parseReviewOperation(
+        { ...operation, after: { ...comment, style: { ...comment.style, ...patch } } },
+        10
+      )
+    ).toBeNull();
+  }
+});
+
+it('round-trips the focus anchor policy and rejects malformed policy values', () => {
+  const operation = {
+    id: 'cut-focus',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    preserveFocusAnchors: true,
+  };
+  expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  for (const invalid of [false, 'true', 1, null])
+    expect(parseReviewOperation({ ...operation, preserveFocusAnchors: invalid }, 12)).toBeNull();
+});
+
+it('preserves the voiceover anchor policy and rejects invalid policy values', () => {
+  const operation = {
+    id: 'voice-cut',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    preserveVoiceoverAnchors: true,
+  };
+  expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  for (const invalid of [false, 'true', null])
+    expect(
+      parseReviewOperation({ ...operation, preserveVoiceoverAnchors: invalid }, 12)
+    ).toBeNull();
 });

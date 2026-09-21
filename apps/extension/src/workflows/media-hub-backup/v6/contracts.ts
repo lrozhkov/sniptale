@@ -10,6 +10,13 @@ export const MEDIA_HUB_BACKUP_VERSION = 6;
 export const MAX_CATALOG_SHARD_BYTES = 4 * 1024 * 1024;
 export const MAX_CATALOG_SHARD_ROOTS = 1_000;
 export const MAX_ROOT_METADATA_BYTES = 4 * 1024 * 1024;
+/** Dependency order shared by archive planning and restore, including older v6 manifests. */
+export const MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER = [
+  'media:library-item',
+  'media:effect-bundle',
+  'scenario-project',
+  'video-project',
+] as const;
 
 export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };

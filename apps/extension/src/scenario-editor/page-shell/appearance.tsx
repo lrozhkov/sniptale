@@ -11,6 +11,7 @@ import { RotateCcw, LayoutTemplate, ListOrdered, Palette } from 'lucide-react';
 import { resolveGuideStyle, applyGuideLayout } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideNumberingControls } from './numbering-controls';
+import { InspectorCategorizedContent } from './inspector';
 import { GuideStyleFields, GuideLayoutFields } from './style-controls';
 
 type AppearanceProps = {
@@ -59,7 +60,7 @@ export function GuideAppearance({
   const renderSection = (section: string) => (
     <>
       {item.kind === 'step' && section === 'layout' && (
-        <>
+        <InspectorCategorizedContent flatten={presentation === 'sections'}>
           <GuideLayoutFields
             layout={item.layout}
             disabled={disabled}
@@ -69,39 +70,52 @@ export function GuideAppearance({
           {item.blocks.length > 0 && (
             <p className="guide-inspector-hint">{t('scenario.editor.appearanceLayoutHelp')}</p>
           )}
-        </>
+          {onSaveTemplate && onApplyTemplate && (
+            <GuideTemplateControls
+              key={item.id}
+              step={item}
+              disabled={disabled}
+              t={t}
+              onSave={(name) => onSaveTemplate(item.id, name)}
+              onApply={(templateId, mode) => onApplyTemplate(item.id, templateId, mode)}
+            />
+          )}
+        </InspectorCategorizedContent>
       )}
-      {section === 'layout' && item.kind === 'step' && onSaveTemplate && onApplyTemplate && (
-        <GuideTemplateControls
-          key={item.id}
-          step={item}
-          disabled={disabled}
-          t={t}
-          onSave={(name) => onSaveTemplate(item.id, name)}
-          onApply={(templateId, mode) => onApplyTemplate(item.id, templateId, mode)}
-        />
-      )}
-      {section === 'numbering' && (
-        <GuideNumberingControls
-          project={project}
-          item={item}
-          disabled={disabled}
-          t={t}
-          onChange={change}
-        />
-      )}
+      {section === 'numbering' &&
+        (item.kind === 'step' ? (
+          <InspectorCategorizedContent flatten={presentation === 'sections'}>
+            <GuideNumberingControls
+              project={project}
+              item={item}
+              disabled={disabled}
+              t={t}
+              onChange={change}
+            />
+          </InspectorCategorizedContent>
+        ) : (
+          <GuideNumberingControls
+            project={project}
+            item={item}
+            disabled={disabled}
+            t={t}
+            onChange={change}
+          />
+        ))}
       {item.kind === 'step' && section === 'appearance' && (
         <>
-          <div className="guide-appearance-heading">
-            <h3>{t('scenario.editor.appearance')}</h3>
-            <ContentToolbarButton
-              title={t('scenario.editor.appearanceReset')}
-              disabled={disabled || Object.keys(item.styleOverrides).length === 0}
-              onClick={() => change({ ...item, styleOverrides: {} })}
-            >
-              <RotateCcw size={15} aria-hidden="true" />
-            </ContentToolbarButton>
-          </div>
+          {presentation !== 'sections' && (
+            <div className="guide-appearance-heading">
+              <h3>{t('scenario.editor.appearance')}</h3>
+              <ContentToolbarButton
+                title={t('scenario.editor.appearanceReset')}
+                disabled={disabled || Object.keys(item.styleOverrides).length === 0}
+                onClick={() => change({ ...item, styleOverrides: {} })}
+              >
+                <RotateCcw size={15} aria-hidden="true" />
+              </ContentToolbarButton>
+            </div>
+          )}
           <GuideStyleFields
             style={resolveGuideStyle(project.style, item.styleOverrides)}
             disabled={disabled}
@@ -112,6 +126,16 @@ export function GuideAppearance({
       )}
     </>
   );
+  const resetControl =
+    item.kind === 'step' ? (
+      <ContentToolbarButton
+        title={t('scenario.editor.appearanceReset')}
+        disabled={disabled || Object.keys(item.styleOverrides).length === 0}
+        onClick={() => change({ ...item, styleOverrides: {} })}
+      >
+        <RotateCcw size={15} aria-hidden="true" />
+      </ContentToolbarButton>
+    ) : null;
   return (
     <div className="guide-appearance">
       {item.kind !== 'step' ? (
@@ -124,6 +148,10 @@ export function GuideAppearance({
           initialSection={activeSection}
           onSectionChange={setActiveSection}
           sections={sections}
+          showSectionHeading
+          renderSectionHeadingControl={(section) =>
+            section === 'appearance' ? resetControl : null
+          }
           renderSection={renderSection}
         />
       )}

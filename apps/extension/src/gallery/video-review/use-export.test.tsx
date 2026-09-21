@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
+import { QuickEditExportUnavailable } from '../../workflows/video-review/export-lifecycle';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { ReviewRenderOptions } from './edit-actions';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';
-import { useReviewExport } from './use-export';
+import { prepareReviewExporter, useReviewExport } from './use-export';
 const mocks = vi.hoisted(() => ({ index: vi.fn(), export: vi.fn(), download: vi.fn() }));
 vi.mock('../../workflows/video-review/media-index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/media-index')>()),
   inspectReviewMedia: mocks.index,
+  supportedReviewVideoCodecs: vi.fn(async (format: string) =>
+    format === 'mp4' ? ['avc'] : ['vp9', 'vp8']
+  ),
 }));
 vi.mock('../../workflows/video-review/export-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/export-lifecycle')>()),
@@ -18,7 +25,10 @@ vi.mock('../shared/download', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../shared/download')>()),
   downloadGalleryBlob: mocks.download,
 }));
-function setup() {
+function setup(
+  apply?: (advanced: ReturnType<typeof createQuickEditAdvancedState>) => void,
+  showOptions = false
+) {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const source = { duration: 6, width: 160, height: 90, mimeType: 'video/webm', size: 5 };
@@ -31,11 +41,13 @@ function setup() {
       revision: 1,
       cursor: 0,
       history: [],
+      advanced: createQuickEditAdvancedState(),
       createdAt: 1,
       updatedAt: 1,
     },
     draft: null,
   };
+  apply?.(snapshot.workspace.advanced);
   const resource: LoadedReview = {
     source,
     snapshot,
@@ -52,16 +64,20 @@ function setup() {
     audioCodec: null,
     container: 'webm',
     rotation: 0,
+    processedVideoCodec: 'vp9',
   });
-  const root = createRoot(document.createElement('div'));
+  const host = document.createElement('div');
+  const root = createRoot(host);
   let hook!: ReturnType<typeof useReviewExport>;
   function Harness() {
     hook = useReviewExport(resource);
-    return null;
+    return showOptions ? <ReviewRenderOptions exporter={hook} busy={false} /> : null;
   }
   return {
+    host,
     root,
     Harness,
+    resource,
     get hook() {
       return hook;
     },
@@ -163,6 +179,141 @@ it('downloads a selection without replacing the full-result report receipt', asy
     );
     expect(fixture.hook.result).toBe(full);
     expect(fixture.hook.phase).toBe('idle');
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('downloads the rendered result when only visual effects are applied', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
+    advanced.zoom.enabled = true;
+    advanced.zoom.regions = [createQuickEditZoomRegion({ id: 'visual', at: 0, endMax: 4 })];
+  });
+  mocks.export.mockResolvedValue({
+    file: new File(['copy'], 'copy.webm'),
+    receipt: { filename: 'copy.webm' },
+  });
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () => fixture.hook.download());
+    expect(mocks.export).toHaveBeenCalledOnce();
+    expect(mocks.export.mock.calls[0]![0].destination).toBe('download');
+    expect(mocks.download).toHaveBeenCalledWith(
+      expect.anything(),
+      'copy.webm',
+      undefined,
+      expect.any(Function)
+    );
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('passes the selected render options through the real export hook', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+    advanced.background = {
+      enabled: true,
+      type: 'solid',
+      color: '#112233ff',
+      layout: { padding: 8, cornerRadius: 4 },
+    };
+  }, true);
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const selects = fixture.host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
+    expect(selects).toHaveLength(5);
+    for (const [index, option] of [
+      [1, 0],
+      [3, 1],
+      [4, 1],
+    ] as const) {
+      await act(async () => selects[index]!.click());
+      await act(async () =>
+        document.querySelectorAll<HTMLButtonElement>('[role="option"]')[option]!.click()
+      );
+    }
+    await act(async () => fixture.hook.start());
+    expect(mocks.export.mock.calls[0]![0].renderSettings).toEqual({
+      codec: 'vp9',
+      frameRate: 24,
+      quality: 'MEDIUM',
+    });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+it('flushes pending edits before the download entry point', async () => {
+  const fixture = setup();
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const order: string[] = [];
+    mocks.download.mockImplementation(() => {
+      order.push('download');
+    });
+    const exporter = prepareReviewExporter(
+      fixture.hook,
+      async (action) => {
+        await action();
+      },
+      async () => {
+        order.push('flush');
+      }
+    );
+    await act(async () => exporter.download());
+    expect(order).toEqual(['flush', 'download']);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('allows recovery from unavailable export settings after the profile changes', async () => {
+  const fixture = setup((advanced) => {
+    advanced.ui.mode = 'advanced';
+  });
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () =>
+      fixture.hook.setRenderSettings({
+        quality: 'HIGH',
+        frameRate: 30,
+        format: 'webm',
+        codec: 'avc',
+      })
+    );
+    await act(async () => fixture.hook.start());
+    expect(fixture.hook.blocked).toEqual(['video-encoder']);
+    await act(async () =>
+      fixture.hook.setRenderSettings({
+        quality: 'HIGH',
+        frameRate: 30,
+        format: 'webm',
+        codec: 'vp9',
+      })
+    );
+    expect(fixture.hook.blocked).toBeNull();
+    expect(fixture.hook.plan()).toMatchObject({ kind: 'ready', video: 'render' });
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps export failure visible when pending edits were flushed after the last render', async () => {
+  const fixture = setup();
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    const start = fixture.hook.start;
+    const state = fixture.resource.session.getSnapshot();
+    const snapshot = {
+      ...state.snapshot,
+      workspace: { ...state.snapshot.workspace, revision: state.snapshot.workspace.revision + 1 },
+    };
+    vi.spyOn(fixture.resource.session, 'getSnapshot').mockReturnValue({ ...state, snapshot });
+    mocks.export.mockRejectedValueOnce(new QuickEditExportUnavailable(['asset-missing']));
+    await act(async () => start());
+    expect(fixture.hook.blocked).toEqual(['asset-missing']);
   } finally {
     await fixture.cleanup();
   }

@@ -126,6 +126,25 @@ it('renders the mix loop and closes the decode context in the caller', async () 
   expect(decodeClipAudioBuffer).toHaveBeenCalledTimes(1);
   expect(scheduleOfflineAudioClipMix).toHaveBeenCalledTimes(1);
   expect(buildOfflineAudioMixResult).toHaveBeenCalledWith(renderedBuffer);
-  expect(throwIfAborted).toHaveBeenCalledTimes(1);
+  expect(throwIfAborted).toHaveBeenCalledTimes(2);
   expect(offlineContext.startRendering).toHaveBeenCalledTimes(1);
+});
+
+it('waits for tempo preparation before rendering and propagates preparation failure', async () => {
+  const { executeOfflineAudioMixRender } = await import('./execute');
+  const { args, scheduleOfflineAudioClipMix, offlineContext } =
+    createExecuteOfflineAudioMixRenderArgs();
+  let reject!: (error: Error) => void;
+  scheduleOfflineAudioClipMix.mockImplementation(
+    () =>
+      new Promise<void>((_resolve, fail) => {
+        reject = fail;
+      })
+  );
+  const pending = executeOfflineAudioMixRender(args);
+  await vi.waitFor(() => expect(reject).toBeTypeOf('function'));
+  expect(offlineContext.startRendering).not.toHaveBeenCalled();
+  reject(new Error('cancelled tempo preparation'));
+  await expect(pending).rejects.toThrow('cancelled tempo preparation');
+  expect(offlineContext.startRendering).not.toHaveBeenCalled();
 });

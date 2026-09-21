@@ -53,3 +53,9 @@ it('rejects points, empty snapped ranges, invalid bounds and entirely removed fr
   ).toBeNull();
   expect(createReviewFragment({ ...input, boundaries: [] })).toBeNull();
 });
+
+it('preserves advanced fragment endpoints between keyframes', () => {
+  const fragment = createReviewFragment({ ...input, snapToKeyframes: false });
+  expect(fragment).toMatchObject({ start: 1.8, end: 8.1 });
+  expect(buildReviewTimeMap(10, fragment!.edits).at(-1)?.resultEnd).toBeCloseTo(6.3);
+});

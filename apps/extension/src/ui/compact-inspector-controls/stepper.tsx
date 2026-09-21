@@ -10,7 +10,9 @@ interface NumericStepperProps {
 }
 
 export function NumericStepper({ disabled, label, onStep }: NumericStepperProps) {
-  const repeat = useStepperRepeat(onStep);
+  const repeat = useStepperRepeat((direction) => {
+    if (!disabled) onStep(direction);
+  });
 
   return (
     <span

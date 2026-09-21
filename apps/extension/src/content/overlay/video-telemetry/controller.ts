@@ -1,3 +1,7 @@
+import {
+  normalizeRecordingActions,
+  normalizeRecordingSignals,
+} from '../../../features/video/project/recording-actions';
 import type { RecordingTelemetrySnapshot } from '../../../contracts/messaging/contracts/response-types';
 import { clearLegacyControlledCursorArtifacts } from './artifacts';
 import { recordTelemetryPauseBoundary } from './events';
@@ -78,8 +82,8 @@ function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetry
     viewport: state.viewport,
     viewportObservation: state.viewportObservation ?? null,
     cursorTrack: state.cursorTrack,
-    actionEvents: [...state.actionEvents],
-    signals: state.signals.map((signal) => ({
+    actionEvents: normalizeRecordingActions(state.actionEvents),
+    signals: normalizeRecordingSignals(state.signals).map((signal) => ({
       ...signal,
       point: signal.point === null ? null : { ...signal.point },
       data: { ...signal.data },

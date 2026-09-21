@@ -121,6 +121,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     resize,
     motion,
     openContents: navigationController.openContents,
+    closeContents: navigationController.closeContents,
     show(slide, isEnd) {
       if (signal.aborted) return;
       const previous = motion?.capture() ?? null;

@@ -135,6 +135,7 @@ async function buildTourPlayerShell(args: {
 <main id="tour-player">
 <header class="tour-toolbar">
 <button class="tour-button tour-contents-trigger" data-tour-contents
+ aria-haspopup="dialog" aria-expanded="false"
  aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
 <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
@@ -166,11 +167,20 @@ ${escape(labels.previous)}</button>
 </aside>
 </div>
 <footer class="tour-transport">
-<button class="tour-button" data-tour-previous>
-${escape(labels.previous)}</button>
+<button class="tour-button tour-icon-button" data-tour-previous
+ aria-label="${escape(labels.previous)}" title="${escape(labels.previous)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m15 18-6-6 6-6"/>
+</svg>
+</button>
 <span class="tour-counter" data-tour-counter aria-live="polite">
 </span>
-<button class="tour-button" data-tour-next>${escape(labels.next)}</button>
+<button class="tour-button tour-icon-button" data-tour-next
+ aria-label="${escape(labels.next)}" title="${escape(labels.next)}">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="m9 18 6-6-6-6"/>
+</svg>
+</button>
 </footer>
 <dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
 </dialog>

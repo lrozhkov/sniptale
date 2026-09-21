@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 
 const { clampClipPlaybackRateMock } = vi.hoisted(() => ({
   clampClipPlaybackRateMock: vi.fn((value) => value),
@@ -61,7 +61,32 @@ function createAudioBuffer(channels: number, sampleRate: number, length: number)
   } as AudioBuffer;
 }
 
+beforeEach(() => {
+  vi.stubGlobal(
+    'AudioBuffer',
+    class {
+      length: number;
+      sampleRate: number;
+      numberOfChannels: number;
+      planes: Float32Array[];
+      constructor(options: { length: number; sampleRate: number; numberOfChannels: number }) {
+        Object.assign(this, options);
+        this.length = options.length;
+        this.sampleRate = options.sampleRate;
+        this.numberOfChannels = options.numberOfChannels;
+        this.planes = Array.from(
+          { length: options.numberOfChannels },
+          () => new Float32Array(options.length)
+        );
+      }
+      getChannelData(c: number) {
+        return this.planes[c]!;
+      }
+    }
+  );
+});
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.resetModules();
 });
@@ -84,10 +109,10 @@ it('schedules fades and playback bounds for an offline mix clip', async () => {
     volumeEnvelopeStart: 1,
   };
 
-  scheduleOfflineAudioClipMix(context, clip as never, createAudioBuffer(2, 48_000, 4_800));
+  await scheduleOfflineAudioClipMix(context, clip as never, createAudioBuffer(2, 48_000, 4_800));
 
-  expect(context.lastSource?.start).toHaveBeenCalledWith(1, 0.25, 1.5);
-  expect(context.lastSource?.playbackRate.value).toBe(1.25);
+  expect(context.lastSource?.start).toHaveBeenCalledWith(1, 0, 1.2);
+  expect(context.lastSource?.playbackRate.value).toBe(1);
   expect(clampClipPlaybackRateMock).toHaveBeenCalledWith(1.25);
   expect(context.lastSource?.stop).toHaveBeenCalledWith(3);
   expect(context.lastGain?.gain.setValueAtTime).toHaveBeenCalledWith(0, 1);
@@ -115,7 +140,7 @@ it('uses immediate gain changes for muted clips without fades', async () => {
     volumeEnvelopeStart: 1.5,
   };
 
-  scheduleOfflineAudioClipMix(context, clip as never, createAudioBuffer(2, 48_000, 4_800));
+  await scheduleOfflineAudioClipMix(context, clip as never, createAudioBuffer(2, 48_000, 4_800));
 
   expect(context.lastGain?.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
   expect(context.lastGain?.gain.setValueAtTime).toHaveBeenCalledWith(0, 0);
@@ -128,7 +153,7 @@ it('prefers absolute audio gain fields when envelope values are absent', async (
   const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
     OfflineAudioContext;
 
-  scheduleOfflineAudioClipMix(
+  await scheduleOfflineAudioClipMix(
     context,
     {
       audioGainEnd: 0.25,
@@ -157,7 +182,7 @@ it.each(['LINEAR', 'EASE_IN_OUT'] as const)(
       await import('../../../../features/video/project/transition/runtime');
     const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
       OfflineAudioContext;
-    scheduleOfflineAudioClipMix(
+    await scheduleOfflineAudioClipMix(
       context,
       {
         duration: 0.5,

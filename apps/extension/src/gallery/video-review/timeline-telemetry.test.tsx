@@ -1,0 +1,124 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ReviewTelemetryStrip } from './timeline-telemetry';
+import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
+
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
+  translate: (key: string) => key,
+}));
+
+let root: Root;
+let host: HTMLDivElement;
+
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+});
+
+afterEach(async () => {
+  await act(async () => root.unmount());
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+const marker = (
+  kind: 'action' | 'signal',
+  id: string,
+  start: number,
+  end = start
+): ReviewTelemetryMarker => ({
+  ref: { kind, id },
+  eventType: 'eventClick',
+  start,
+  end,
+});
+
+const render = (markers: ReviewTelemetryMarker[]) =>
+  act(() => {
+    root.render(
+      <ReviewTelemetryStrip
+        markers={markers}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={vi.fn()}
+      />
+    );
+  });
+
+it('separates colliding markers into disjoint lanes with a consistent pitch', () => {
+  render([
+    marker('action', 'a', 1, 2),
+    marker('action', 'b', 1.1, 2.1),
+    marker('action', 'c', 1.2, 2.2),
+  ]);
+  const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')];
+  expect(buttons).toHaveLength(3);
+  for (const button of buttons) expect(button.style.height).toBe('20px');
+  const tops = new Set(buttons.map((button) => button.style.top));
+  expect(tops.has('0px')).toBe(true);
+  expect(tops.has('24px')).toBe(true);
+  expect(buttons.some((button) => button.style.top === '7px')).toBe(false);
+  const laneTops = buttons.map((button) => Number(button.style.top.replace('px', '')));
+  expect(new Set(laneTops).size).toBe(laneTops.length);
+});
+
+it('keeps every dense marker clickable in a bounded scrollable strip', async () => {
+  const markers = [0, 1, 2, 3].map((value) => marker('action', `e${value}`, 1 + value / 50));
+  markers.push(marker('signal', 's1', 1.02));
+  const onMarker = vi.fn();
+  act(() => {
+    root.render(
+      <ReviewTelemetryStrip
+        markers={markers}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={onMarker}
+      />
+    );
+  });
+  // All five markers render; the lane stack height stays capped at three rows.
+  const strip = host.firstElementChild as HTMLDivElement;
+  expect(strip.style.height).toBe('68px');
+  expect(strip.className).toContain('overflow-y-auto');
+  const buttons = [...strip.querySelectorAll<HTMLButtonElement>('button')];
+  expect(buttons).toHaveLength(5);
+  expect(strip.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
+  await act(async () => {
+    for (const button of buttons) button.click();
+  });
+  expect(onMarker).toHaveBeenCalledTimes(5);
+  const seen = new Set(
+    onMarker.mock.calls.map(([clicked]) => `${(clicked as ReviewTelemetryMarker).ref.id}`)
+  );
+  for (const entry of markers) expect(seen.has(entry.ref.id)).toBe(true);
+});
+
+it('reserves no lane space for an empty history', () => {
+  render([]);
+  const strip = host.firstElementChild as HTMLDivElement;
+  expect(strip.style.height).toBe('0px');
+});
+
+it('exposes readable event text for a history interval with available space', () => {
+  render([{ ...marker('action', 'readable', 1, 3), eventType: 'SCROLL' }]);
+  expect(host.querySelector('button')?.textContent).toContain('gallery.videoReview.eventScroll');
+});
+
+it('describes the captured target and full interval in the action hint', () => {
+  render([{ ...marker('signal', 'typing', 1, 4), eventType: 'typing', target: 'Search projects' }]);
+  const button = host.querySelector('button')!;
+  expect(button.title).toContain('Search projects');
+  expect(button.title).toContain('1.0');
+  expect(button.title).toContain('4.0');
+  expect(button.getAttribute('aria-label')).toContain('Search projects');
+});

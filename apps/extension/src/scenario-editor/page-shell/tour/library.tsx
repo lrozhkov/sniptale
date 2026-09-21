@@ -200,45 +200,57 @@ function TourSlideList({
               command={state.command}
               onPointerStart={startReorder}
             />
-            <button
-              className="tour-slide-select"
-              aria-current={
+            <div
+              className="tour-slide-card"
+              data-current={
                 state.selection?.kind === 'slide' && state.selection.slideId === slide.id
-                  ? 'step'
-                  : undefined
               }
-              onClick={() => onSelect(slide.id)}
             >
-              <span className="tour-slide-number">{index + 1}</span>
-              {image && images[image.assetId] ? (
-                <img src={images[image.assetId]!} alt="" />
-              ) : (
-                <List size={18} />
-              )}
-              <span title={slide.title || t('scenario.editor.tourUntitled')}>
-                {slide.title || t('scenario.editor.tourUntitled')}
-              </span>
-            </button>
-            <ContentToolbarButton
-              className="tour-slide-action"
-              disabled={disabled}
-              title={t('scenario.editor.tourDuplicate')}
-              onClick={() => {
-                const newId = crypto.randomUUID();
-                if (state.command({ kind: 'duplicate-slide', slideId: slide.id, newId }))
-                  onSelect(newId);
-              }}
-            >
-              <Copy size={14} />
-            </ContentToolbarButton>
-            <ContentToolbarButton
-              className="tour-slide-action"
-              disabled={disabled}
-              title={t('common.actions.delete')}
-              onClick={() => remove(slide.id)}
-            >
-              <Trash2 size={14} />
-            </ContentToolbarButton>
+              <button
+                className="tour-slide-select"
+                aria-current={
+                  state.selection?.kind === 'slide' && state.selection.slideId === slide.id
+                    ? 'step'
+                    : undefined
+                }
+                onClick={() => onSelect(slide.id)}
+              >
+                <span className="tour-slide-number">{index + 1}</span>
+                {image && images[image.assetId] ? (
+                  <img src={images[image.assetId]!} alt="" />
+                ) : (
+                  <List size={18} />
+                )}
+                <span
+                  className="tour-slide-title"
+                  title={slide.title || t('scenario.editor.tourUntitled')}
+                >
+                  {slide.title || t('scenario.editor.tourUntitled')}
+                </span>
+              </button>
+              <div className="tour-slide-actions">
+                <ContentToolbarButton
+                  className="tour-slide-action"
+                  disabled={disabled}
+                  title={t('scenario.editor.tourDuplicate')}
+                  onClick={() => {
+                    const newId = crypto.randomUUID();
+                    if (state.command({ kind: 'duplicate-slide', slideId: slide.id, newId }))
+                      onSelect(newId);
+                  }}
+                >
+                  <Copy size={14} />
+                </ContentToolbarButton>
+                <ContentToolbarButton
+                  className="tour-slide-action"
+                  disabled={disabled}
+                  title={t('common.actions.delete')}
+                  onClick={() => remove(slide.id)}
+                >
+                  <Trash2 size={14} />
+                </ContentToolbarButton>
+              </div>
+            </div>
           </div>
         );
       })}

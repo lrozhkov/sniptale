@@ -1,3 +1,8 @@
+import {
+  RECORDING_TYPING_FRAGMENT_MIN_SECONDS,
+  normalizeRecordingSignals,
+  RECORDING_TYPING_GAP_SECONDS,
+} from '../../../features/video/project/recording-actions';
 import { describeTelemetryTarget } from './target';
 import {
   RecordingTelemetrySignalKind,
@@ -9,7 +14,7 @@ import type { CursorIdleTelemetrySignal, TelemetryState, TypingTelemetrySignal }
 
 const CURSOR_IDLE_DWELL_MS = 1200;
 const CURSOR_IDLE_TOLERANCE_PX = 12;
-const TYPING_MERGE_GAP_MS = 1200;
+const TYPING_MERGE_GAP_MS = RECORDING_TYPING_GAP_SECONDS * 1000;
 
 function getElapsedSeconds(state: TelemetryState, timestampMs: number): number {
   const runningDurationMs = state.isPaused ? 0 : timestampMs - state.segmentStartedAtTimestamp;
@@ -28,6 +33,7 @@ function pushCompletedSignal(
   const data =
     signal.kind === RecordingTelemetrySignalKind.TYPING
       ? {
+          captureSegment: signal.data.captureSegment,
           eventCount: signal.data.eventCount,
           eventType: signal.data.eventType,
           ...signal.data.targetDescription,
@@ -40,18 +46,26 @@ function pushCompletedSignal(
     ...signal,
     point: signal.point === null ? null : { ...signal.point },
     data,
-    endTime: Math.max(signal.startTime, getElapsedSeconds(state, timestampMs)),
+    endTime:
+      signal.kind === 'typing'
+        ? signal.endTime
+        : Math.max(signal.startTime, getElapsedSeconds(state, timestampMs)),
   });
 }
 
-function finalizeTypingSignal(state: TelemetryState, timestampMs: number): void {
+/** Ends one raw input burst before cross-field grouping. */
+export function finalizeTypingSignal(state: TelemetryState, timestampMs: number): void {
+  state.typingTarget = null;
   if (state.typingSignal === null) {
     return;
   }
 
-  pushCompletedSignal(state, state.typingSignal, timestampMs);
+  if (
+    state.typingSignal.endTime >=
+    state.typingSignal.startTime + RECORDING_TYPING_FRAGMENT_MIN_SECONDS
+  )
+    pushCompletedSignal(state, state.typingSignal, timestampMs);
   state.typingSignal = null;
-  state.typingTarget = null;
 }
 
 function finalizeCursorIdleSignal(state: TelemetryState, timestampMs: number): void {
@@ -123,16 +137,32 @@ export function recordKeyboardShortcut(state: TelemetryState, event: KeyboardEve
 }
 
 export function recordTypingActivity(state: TelemetryState, event: Event): void {
+  // A blur-time change commits an existing value; it is not a new input sample.
+  if (event.type !== 'input') return;
   const timestampMs = event.timeStamp || performance.now();
   const elapsedSeconds = getElapsedSeconds(state, timestampMs);
   const lastEventTimeMs = state.typingSignal?.data.lastEventTimeMs ?? null;
   const target = describeTelemetryTarget(event);
+  const element = target.element;
+  const inputTarget =
+    element?.closest('input,textarea,[contenteditable]:not([contenteditable="false"])') ?? element;
+  if (element) {
+    const textInput =
+      element instanceof HTMLInputElement &&
+      ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(element.type);
+    if (
+      !textInput &&
+      !(element instanceof HTMLTextAreaElement) &&
+      !element.closest('[contenteditable]:not([contenteditable="false"])')
+    )
+      return;
+  }
 
   if (
     state.typingSignal !== null &&
-    state.typingTarget === target.element &&
+    state.typingTarget === inputTarget &&
     lastEventTimeMs !== null &&
-    timestampMs - lastEventTimeMs <= TYPING_MERGE_GAP_MS
+    timestampMs - lastEventTimeMs < TYPING_MERGE_GAP_MS
   ) {
     state.typingSignal = {
       ...state.typingSignal,
@@ -147,7 +177,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   }
 
   finalizeTypingSignal(state, timestampMs);
-  state.typingTarget = target.element;
+  state.typingTarget = inputTarget;
   state.typingSignal = {
     id: crypto.randomUUID(),
     kind: RecordingTelemetrySignalKind.TYPING,
@@ -155,6 +185,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
     endTime: elapsedSeconds,
     point: resolveSignalPoint(state),
     data: {
+      captureSegment: state.captureSegment,
       eventCount: 1,
       eventType: event.type,
       targetDescription: target.data,
@@ -231,4 +262,6 @@ export function finalizeTelemetrySignals(state: TelemetryState): void {
   const timestampMs = performance.now();
   finalizeTypingSignal(state, timestampMs);
   finalizeCursorIdleSignal(state, timestampMs);
+  state.signals = normalizeRecordingSignals(state.signals);
+  state.captureSegment += 1;
 }

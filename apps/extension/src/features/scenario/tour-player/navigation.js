@@ -30,48 +30,69 @@ export function createTourNavigation({
 
   function openContents(slides, index, onSelect) {
     const navigation = root.querySelector('[data-tour-navigation]');
-    let page = Math.floor(index / 12);
-    const draw = () => {
-      navigation.replaceChildren();
-      const close = actionButton(labels.close, { kind: 'none' }, 'tour-button');
-      close.addEventListener('click', () => navigation.close());
-      navigation.append(close);
-      const list = element('div', 'tour-contents-list');
-      for (const [offset, slide] of slides.slice(page * 12, page * 12 + 12).entries()) {
-        const number = page * 12 + offset;
-        const button = actionButton(
-          `${number + 1}. ${slide.title}`,
-          { kind: 'none' },
-          'tour-button'
-        );
-        button.title = slide.title;
-        button.addEventListener('click', () => {
-          onSelect(number);
-          navigation.close();
-        });
-        list.append(button);
+    const trigger = root.querySelector('[data-tour-contents]');
+    if (navigation.open) {
+      closeContents(false);
+      return;
+    }
+    navigation.replaceChildren();
+    const list = element('div', 'tour-contents-list');
+    let current = null;
+    slides.forEach((slide, number) => {
+      const button = actionButton(`${number + 1}. ${slide.title}`, { kind: 'none' }, 'tour-button');
+      button.title = slide.title;
+      if (number === index) {
+        button.setAttribute('aria-current', 'step');
+        current = button;
       }
-      navigation.append(list);
-      const before = actionButton(labels.previous, { kind: 'none' }, 'tour-button');
-      const after = actionButton(labels.next, { kind: 'none' }, 'tour-button');
-      before.disabled = page === 0;
-      after.disabled = (page + 1) * 12 >= slides.length;
-      before.addEventListener('click', () => {
-        page -= 1;
-        draw();
+      button.addEventListener('click', () => {
+        onSelect(number);
+        closeContents(true);
       });
-      after.addEventListener('click', () => {
-        page += 1;
-        draw();
-      });
-      navigation.append(before, after);
-    };
-    draw();
-    navigation.showModal();
+      list.append(button);
+    });
+    navigation.append(list);
+    const player = root.getBoundingClientRect();
+    const bounds = trigger.getBoundingClientRect();
+    navigation.style.left = `${bounds.left - player.left}px`;
+    navigation.style.top = `${bounds.bottom - player.top + 6}px`;
+    navigation.setAttribute('open', '');
+    trigger.setAttribute('aria-expanded', 'true');
+    current?.scrollIntoView?.({ block: 'nearest' });
+    current?.focus({ preventScroll: true });
+    root.ownerDocument.addEventListener('keydown', onContentsKey, true);
+    root.ownerDocument.addEventListener('pointerdown', onContentsPointerDown, true);
   }
+
+  function closeContents(restoreFocus) {
+    const navigation = root.querySelector('[data-tour-navigation]');
+    if (!navigation.open) return;
+    const trigger = root.querySelector('[data-tour-contents]');
+    root.ownerDocument.removeEventListener('keydown', onContentsKey, true);
+    root.ownerDocument.removeEventListener('pointerdown', onContentsPointerDown, true);
+    navigation.removeAttribute('open');
+    trigger?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) trigger?.focus({ preventScroll: true });
+  }
+
+  function onContentsKey(event) {
+    const navigation = root.querySelector('[data-tour-navigation]');
+    if (event.key !== 'Escape' || !navigation.open || event.defaultPrevented) return;
+    event.preventDefault();
+    closeContents(true);
+  }
+
+  function onContentsPointerDown(event) {
+    const navigation = root.querySelector('[data-tour-navigation]');
+    if (!navigation.open || !(event.target instanceof globalThis.Element)) return;
+    if (navigation.contains(event.target) || event.target.closest('[data-tour-contents]')) return;
+    closeContents(false);
+  }
+
   return {
     render,
     openContents,
+    closeContents: () => closeContents(false),
     reset() {
       navigationPage = 0;
     },

@@ -459,6 +459,55 @@ it('creates a local explanation style override from inherited settings', async (
   expect(project.tour!.style.textAppearance.surface).toBeUndefined();
 });
 
+it('shows one section heading in sections mode and moves object actions into it', async () => {
+  presentation = 'sections';
+  draw();
+  const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
+  expect(heading).not.toBeNull();
+  expect(heading.textContent).toContain('Slide');
+  expect(host.querySelector('.guide-inspector-group-heading')).toBeNull();
+  await click('Slide objects');
+  const objectsHeading = host.querySelector(
+    '[data-ui="shared.categorized-inspector.section-heading"]'
+  )!;
+  expect(objectsHeading.textContent).toContain('Slide objects');
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  await click('Hotspot');
+  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  await click('Back to slide settings');
+  await click('Playback');
+  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  presentation = 'all';
+  draw();
+  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
+});
+
+it('renders tour numeric rows as plain quiet-focus rows with scrub', async () => {
+  presentation = 'sections';
+  draw();
+  await click('Slide objects');
+  await click('Hotspot');
+  await click('Back to slide settings');
+  await click('Camera');
+  const rows = [...host.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]')];
+  expect(rows.length).toBeGreaterThan(0);
+  for (const row of rows) {
+    expect(row.getAttribute('data-appearance')).toBe('plain');
+    const field = row.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')!;
+    expect(field.getAttribute('data-focus-appearance')).toBe('quiet');
+    expect(row.querySelector('input[type=range]')).not.toBeNull();
+  }
+  const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!;
+  expect(zoom.value).toBeTruthy();
+  const range = host.querySelector<HTMLInputElement>('input[type=range]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range, '250');
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!.value).toBeTruthy();
+});
+
 it('preserves image categories through All and object drill-down without editing the tour', async () => {
   presentation = 'sections';
   draw();
@@ -480,7 +529,7 @@ it('preserves image categories through All and object drill-down without editing
   await click('Slide objects');
   await click('Hotspot');
   expect(host.querySelector('nav')).toBeNull();
-  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
+  expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
   await click('Back to slide settings');
   expect(
     host.querySelector('button[aria-label="Slide objects"]')?.getAttribute('aria-pressed')

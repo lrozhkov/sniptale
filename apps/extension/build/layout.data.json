@@ -244,10 +244,10 @@
     "zustand"
   ],
   "appWorkspaceDependencies": {
-    "@sniptale/foundation": "0.4.1",
-    "@sniptale/platform": "0.4.1",
-    "@sniptale/runtime-contracts": "0.4.1",
-    "@sniptale/ui": "0.4.1"
+    "@sniptale/foundation": "0.4.2",
+    "@sniptale/platform": "0.4.2",
+    "@sniptale/runtime-contracts": "0.4.2",
+    "@sniptale/ui": "0.4.2"
   },
   "appDevDependencies": [
     "@crxjs/vite-plugin",

@@ -24,6 +24,14 @@
   padding-block: 12px;
   border-top: 1px solid var(--sniptale-color-border-soft);
 }
+.guide-inspector-categorized .guide-inspector-group {
+  padding-block: 0;
+  border-top: none;
+}
+.guide-inspector-categorized .guide-inspector-group + .guide-inspector-group {
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
 .guide-inspector-group-heading {
   display: flex;
   align-items: center;
@@ -47,6 +55,45 @@
   gap: 8px;
   min-width: 0;
 }
+.guide-inspector-panel .scenario-inspector-action {
+  width: 100%;
+  height: auto;
+  min-height: 2rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  text-align: start;
+  font-size: 0.75rem;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.guide-inspector-panel .scenario-inspector-action:hover:not(:disabled),
+.guide-inspector-panel .scenario-inspector-action:focus-visible {
+  border-color: var(--sniptale-color-border-soft);
+}
+.guide-inspector-panel .scenario-inspector-action:disabled {
+  opacity: 0.55;
+  border-color: transparent;
+}
+.guide-inspector-panel .scenario-inspector-action-icon {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  justify-content: center;
+}
+.guide-inspector-panel .scenario-inspector-action-danger {
+  color: var(--sniptale-color-text-secondary);
+  border-color: transparent;
+}
+.guide-inspector-panel .scenario-inspector-action-danger:hover:not(:disabled),
+.guide-inspector-panel .scenario-inspector-action-danger:focus-visible {
+  color: var(--sniptale-color-danger);
+  border-color: color-mix(in srgb, var(--sniptale-color-danger) 28%, transparent);
+}
+
 .guide-inspector-choice {
   display: grid;
   gap: 5px;

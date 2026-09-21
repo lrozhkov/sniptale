@@ -6,19 +6,27 @@ import {
   EncodedVideoPacketSource,
   EncodedAudioPacketSource,
   AudioSampleSource,
+  VideoSampleSource,
+  type VideoCodec,
   type StreamTargetChunk,
   type EncodedPacket,
 } from 'mediabunny';
 import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import type { ReviewMediaIndex } from './media-index';
 
-/** Builds codec tracks and a bounded positioned stream; caller owns cancellation and publication. */
+/**
+ * Builds codec tracks and a bounded positioned stream; caller owns cancellation and publication.
+ * A `sampleVideo` swaps packet copy for the frame renderer: frames are drawn pre-rotated,
+ * so the output track keeps identity rotation.
+ */
 export function createReviewMediaOutput(args: {
   index: ReviewMediaIndex;
+  container?: 'mp4' | 'webm';
   processedAudio: 'aac' | 'opus' | null;
   writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
   signal: AbortSignal;
   provenance?: string;
+  sampleVideo?: { codec: VideoCodec; fullCodecString: string; frameRate: number; bitrate: number };
   onAudioPacket(packet: EncodedPacket): void;
 }) {
   const { index, signal } = args;
@@ -34,13 +42,29 @@ export function createReviewMediaOutput(args: {
   const output = new Output({
     target,
     format:
-      index.container === 'mp4'
+      (args.container ?? index.container) === 'mp4'
         ? new Mp4OutputFormat({ fastStart: 'fragmented', minimumFragmentDuration: 1 })
         : new WebMOutputFormat({ minimumClusterDuration: 1 }),
   });
   if (args.provenance) output.setMetadataTags({ comment: args.provenance });
-  const video = new EncodedVideoPacketSource(index.videoCodec);
-  output.addVideoTrack(video, { rotation: index.rotation });
+  const video = args.sampleVideo
+    ? {
+        kind: 'sample' as const,
+        source: new VideoSampleSource({
+          codec: args.sampleVideo.codec,
+          fullCodecString: args.sampleVideo.fullCodecString,
+          bitrate: args.sampleVideo.bitrate,
+          bitrateMode: 'variable',
+          latencyMode: 'quality',
+          hardwareAcceleration: 'no-preference',
+          keyFrameInterval: 2,
+        }),
+      }
+    : { kind: 'copy' as const, source: new EncodedVideoPacketSource(index.videoCodec) };
+  output.addVideoTrack(
+    video.source,
+    args.sampleVideo ? { frameRate: args.sampleVideo.frameRate } : { rotation: index.rotation }
+  );
   const audio = args.processedAudio
     ? {
         kind: 'processed' as const,

@@ -1,333 +1,134 @@
 # Sniptale
 
-[![Release provenance](https://img.shields.io/github/actions/workflow/status/lrozhkov/sniptale/provenance.yml?branch=main&label=Release%20provenance)](https://github.com/lrozhkov/sniptale/actions/workflows/provenance.yml) [![Release deployment](https://img.shields.io/github/actions/workflow/status/lrozhkov/sniptale/release.yml?branch=main&event=workflow_dispatch&label=Release%20deployment)](https://github.com/lrozhkov/sniptale/actions/workflows/release.yml) [![Release provenance coverage](https://coveralls.io/repos/github/lrozhkov/sniptale/badge.svg?branch=main)](https://coveralls.io/github/lrozhkov/sniptale?branch=main) [![Release](https://img.shields.io/github/v/release/lrozhkov/sniptale?sort=semver&label=Release)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://img.shields.io/github/license/lrozhkov/sniptale?label=License)](https://github.com/lrozhkov/sniptale/blob/main/LICENSE)
+[![Release](https://img.shields.io/github/v/release/lrozhkov/sniptale?sort=semver&label=Release)](https://github.com/lrozhkov/sniptale/releases/latest) [![License](https://img.shields.io/github/license/lrozhkov/sniptale?label=License)](LICENSE)
 
 **Snip the web. Tell the story.**
 
-Sniptale is a local-first Chromium (MV3 Extension) workspace for capturing, understanding, annotating, recording, editing, and exporting the web — built as an AI-first software-engineering experiment.
+Sniptale is a local-first browser workspace for capturing web pages and turning them into annotated screenshots, videos, step-by-step guides, and interactive tours. It combines page tools, image and video editors, and a local media library in a Chromium Manifest V3 extension.
 
-> **Alpha preview.** The broad product surface and repository architecture are largely in place, but individual workflows still need product-level validation, polish, compatibility work, performance tuning, and real-world testing. Project, archive, preset, and effect formats may change without migration or backward compatibility. Do not rely on the current build as the only copy of important data.
+The core workspace runs in your browser without a Sniptale account or hosted backend. Capture a page, refine the result, organize your work, and export it as files you control.
 
-Sniptale is not intended to be only a screenshot tool or only a screen recorder. It is an attempt to cover the wider workflow around collecting information from web pages and turning it into something useful:
+[Features](#features) · [Installation](#installation) · [Build from source](#build-from-source) · [Documentation](docs/README.md)
 
-```text
-live page
-  → prepare, edit, redact, or annotate
-  → capture screenshots, video, diagnostics, or structured data
-  → refine the result in an editor, guide, presentation, or video project
-  → export it or keep it in a local media library
-```
+> **Alpha software.** Project and archive formats may change between versions. Keep separate backups of important work.
 
-The core application works locally in the browser. It does not require a Sniptale account, subscription, or hosted Sniptale backend. External AI and optional network-assisted snapshot features are opt-in and are described in [Local-first does not mean zero network](#local-first-does-not-mean-zero-network).
+## Features
 
-## Install the latest alpha
+### Screenshots and page preparation
 
-Download the extension ZIP from the [latest immutable GitHub Release](https://github.com/lrozhkov/sniptale/releases/latest), verify it against the published `SHA256SUMS`, unpack it, then open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the unpacked directory. The release also provides a CycloneDX SBOM, provenance, and one QA evidence ZIP containing the canonical security, coverage, and proof reports.
+Capture the visible area, a full page, or a selected region. You can also capture a window or screen through the browser's source picker. Start from the extension popup, page toolbar, context menu, keyboard shortcut, or a saved quick action.
 
-This remains an alpha distribution rather than a Chrome Web Store release. See [SECURITY.md](.github/SECURITY.md) to report vulnerabilities privately; do not disclose suspected security issues in a public issue.
+Prepare the page before capture: edit text, adjust element styles, apply viewport presets, and set a countdown. Choose whether to download the result, copy it to the clipboard, open it in the image editor, or retain it in the Library. Quick actions combine capture settings and destinations for repeatable workflows.
+
+### On-page annotation and design review
+
+Annotate the live page with element-aligned frames, highlights, numbered steps, callouts, drawing tools, and blur. Customize borders, fills, spacing, shadows, and annotation presets without manually aligning every mark to the page.
+
+Design review attaches feedback to specific page elements. Add comments, inspect and adjust typography, dimensions, spacing, backgrounds, and borders, then navigate feedback from a searchable list. Element paths and structured element data can be copied for handoff.
+
+### Image editing
+
+Open a capture or import an image from a file, the clipboard, or drag and drop. Crop and resize images, manage layers and groups, align objects with snapping, and add text, arrows, connectors, shapes, step labels, and blur.
+
+Style the composition with backgrounds, padding, browser-window frames, and image effects. Reuse tool presets, export the finished image, or keep an editable document for later changes.
+
+### Screen and camera recording
+
+Record a browser tab, a selected tab region, a window, a display, or the webcam. Configure microphone and camera inputs, recording quality, countdown, and camera presentation. Pause and resume a session before saving it to the Library, downloading it, or opening it in the video editor.
+
+Camera and microphone material can be retained separately for later composition where supported. System audio and available capture sources depend on the browser and operating system.
+
+### Video editing and review
+
+Build a video on a multitrack timeline with video, audio, images, text, shapes, and subtitles. Trim, split, arrange, and retime clips; add effects and transitions; adjust camera overlays and framing. Recordings with retained interaction data can also use cursor and action-aware editing tools.
+
+For lighter work, open **Annotate and quick edit** from the Library. Add comments to a timestamp or interval, mark a region of the frame, inspect recorded actions, cut sections, and change interval speed. Save or download an edited copy without replacing the source, download a selected fragment, or export a Markdown review report.
+
+The video editor exports an entire project, a selected range, or a selected clip as MP4 or WebM, with resolution, quality, and frame-rate controls. Codec availability depends on the browser and device.
+
+### Step-by-step guides
+
+Create illustrated instructions in the Scenario editor from captured steps, imported images, or video frames. Organize content into sections and numbered steps with headings, rich text, notes, captions, and images. Choose stacked, side-by-side, comparison, or text layouts, and reuse saved step templates.
+
+Edit images without leaving the guide workflow, customize document appearance, and configure page size and pagination. Export a self-contained HTML document or a Markdown archive with image assets, or use the browser's print dialog to print or save as PDF.
+
+### Interactive tours
+
+Create an interactive walkthrough alongside a guide. Combine screenshot slides and navigation screens with clickable hotspots, annotations, highlights, blur, redaction masks, zoom, and transitions. Configure next-step actions, jumps between slides, and navigation buttons for non-linear walkthroughs.
+
+Add narration to slides or individual interactive elements, adjust playback timing, and choose manual navigation or autoplay. Preview the result and export a self-contained HTML file with its images, audio, and player, ready to open without the extension.
+
+### Local media library
+
+The **Library** brings together captures, recordings, editable projects, guides, saved web snapshots, and exports. Search, sort, tag, and filter items by properties such as file type, source, size, resolution, duration, and date. Save frequently used views, preview media, and reopen it in the appropriate editor or viewer.
+
+Use multi-selection for batch actions and downloads. Export all or selected work to a ZIP backup and restore it later. Storage tools help manage retained data, while Library and Drafts views distinguish saved work from in-progress material.
+
+### Page export and web snapshots
+
+Extract page content as Markdown or structured JSON, or export selected open tabs in a batch. Combine text, tables, images, attachments, page metadata, and screenshots in a ZIP package for research, documentation, or handoff.
+
+Save a web snapshot to keep a full-page screenshot together with a sanitized reference document and source metadata. Open it in a dedicated read-only viewer, using the captured image for visual fidelity or the static document for inspecting page content. Snapshots do not preserve an active browser session.
+
+### Workspace customization
+
+Configure keyboard shortcuts, context-menu entries, quick actions, viewport and save presets, and editor presets. Command palettes provide access to common actions across the workspace. The interface supports English and Russian, with system, light, and dark themes.
+
+## Installation
+
+Use Chrome meeting the [minimum supported browser version](docs/engineering/project-facts.md). Capture, audio, and codec support may differ in other Chromium-based browsers.
+
+1. Download the extension archive, named `sniptale_<version>_<date>.zip`, from the [latest GitHub Release](https://github.com/lrozhkov/sniptale/releases/latest) and extract it.
+2. Open `chrome://extensions` and enable **Developer mode**.
+3. Choose **Load unpacked** and select the extracted directory containing `manifest.json`.
+
+Open Sniptale from the browser toolbar. Grant page, microphone, or camera access when needed for the workflow you choose. Keyboard shortcuts can be configured at `chrome://extensions/shortcuts`.
+
+This README describes the current `main` branch. Published releases may contain an earlier feature set; build from source to use the current implementation.
 
 ## Build from source
 
-### Requirements
-
-- The Node.js range declared in the root `package.json`
-- npm
-- The Chrome baseline listed in the [generated project facts](docs/engineering/project-facts.md)
-
-Install the exact dependency versions from `package-lock.json` and create a release-mode Vite build:
+Use the Node.js version pinned in [`.nvmrc`](.nvmrc) and the npm version specified by `packageManager` in [`package.json`](package.json).
 
 ```bash
+git clone https://github.com/lrozhkov/sniptale.git
+cd sniptale
 npm ci
 npm run build:release
 ```
 
-`npm ci` is the dependency-install command; there is no separate `npm run ci` script. The second command runs only the Vite build. Release mode removes console and debugger logging, omits source maps, and writes the unpacked extension to `dist/`.
+The unpacked extension is written to `dist/`. Load that directory through **Load unpacked** at `chrome://extensions`. After rebuilding, reload the extension from the same page.
 
-Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the generated `dist/` directory.
+For local development, start the Vite development server with `npm run dev`. Environment-specific setup is documented in the [WSL setup guide](docs/tooling/wsl-setup.md).
 
-This build can run natively on Windows. Linux, or WSL with the repository and `node_modules` stored inside the WSL Linux filesystem rather than under `/mnt/c`, is required only for the repository's supported full development and QA workflow. See [WSL setup](docs/tooling/wsl-setup.md), the [Release guide](docs/oss/release.md), and the [Operator handbook](docs/tooling/operator-handbook.md) for those workflows and all other commands.
+## Local data and privacy
 
-### Optional agent tooling
+Captures, projects, drafts, and settings are stored in your browser profile using local extension storage and IndexedDB. Use Library backups to keep an independent copy of your work before removing the extension or clearing browser data.
 
-Repository-local agent instructions and review skills are opt-in. Their reviewable distribution is `docs/agent-tooling/agent-tooling.zip`. Install ignored local copies of `AGENTS.md`, `DESIGN.md`, and `.agents/**` with `npm run agents:install`; remove them with `npm run agents:remove`. Maintainers rebuild the archive from the repository-local copies with `npm run agents:pack`. None of these commands runs during dependency installation, hooks, CI, or QA; install and remove refuse local conflicts unless `--force` is explicit.
+Local-first does not mean every optional feature is offline. Optional integrations and network-assisted snapshot capture have separate network behavior, described in [Data handling](docs/security/data-handling.md). See [Manifest permissions](docs/security/manifest-permissions.md) for browser access requirements.
 
-## Why this project exists
+## Project structure
 
-Sniptale began as my first pet project for testing a practical question: **can a person who is not a software developer build and continue maintaining a complex application through coding agents?**
-
-I do not have the skills to write this codebase by hand. My role has been to define the product direction, explain desired behavior, set acceptance criteria, inspect results, make architecture and security trade-offs, and decide what is ready to keep or release. The implementation itself has been produced through AI coding-agent sessions.
-
-I started by trying different extensions, agents, workflows, and models. Over time I settled on Codex because it became the most effective fit for this repository and the way I work. Most of the current application code, tests, refactors, documentation, and quality tooling were written or revised through Codex-driven sessions.
-
-The project was not built as one long generation prompt. Development repeatedly followed a constrained review loop:
+Sniptale uses TypeScript, React, Vite, and CRXJS, with Fabric.js for image editing and browser media APIs for recording and video processing.
 
 ```text
-product intent and acceptance criteria
-  → bounded implementation task
-  → deterministic checks and tests
-  → separate architecture or security review context when risk justified it
-  → consolidated refactor
-  → repeat
+apps/extension/              Extension pages, browser runtimes, and product workflows
+packages/foundation/         Shared domain primitives
+packages/runtime-contracts/  Cross-runtime data and message contracts
+packages/platform/           Browser, storage, and media adapters
+packages/ui/                 Shared interface components
+docs/                        Project documentation
+tooling/                     Development and release utilities
 ```
 
-At larger milestones, the repository was reviewed again as a whole to look for structural drift, unsafe boundaries, duplicated ownership, untested failure paths, and divergence from the intended architecture. These reviews are internal AI-assisted engineering controls, not a third-party certification, professional penetration test, or guarantee that the application is defect-free.
+## Documentation and contributing
 
-The experiment has already shown that coding agents can implement substantial vertical features. It has also shown that generating code is not the hardest part. The harder problem is keeping a growing system coherent, testable, secure, and reversible. Much of the repository therefore exists to make architectural rules executable rather than leaving them as informal advice.
+Start with the [documentation index](docs/README.md) for architecture, data handling, and development guides. The [repository overview](docs/architecture/repository-overview.md) maps the main source areas.
 
-## Current maturity
-
-The architecture and approximate target feature set have largely stabilized. The next phase is not to add every possible feature; it is to take each existing workflow through product-level validation, simplify rough interactions, harden recovery paths, test real sites and long-running media workloads, and decide which experimental ideas deserve a stable contract.
-
-| Area                                                                                  | Current status                                                                                              |
-| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Repository architecture and quality guardrails                                        | Established and actively enforced, but still open to simplification when a boundary does not pay for itself |
-| Screenshot capture, page preparation, structured export, Media Hub, and image editing | Alpha                                                                                                       |
-| Browser recording and video editing                                                   | Alpha; advanced automation, codec paths, and effect workflows remain experimental                           |
-| Scenario, step-guide, and presentation authoring                                      | Experimental                                                                                                |
-| Saved web snapshots                                                                  | Production-ready local save/viewer path; optional network-assisted asset capture remains policy-controlled  |
-| Diagnostic capture                                                                   | Experimental                                                                                                |
-| Native desktop companion                                                              | Separate project and experimental integration surface                                                       |
-| Backward compatibility and migrations                                                 | Not promised during the alpha-preview phase                                                                 |
-| Cloud sync, hosted collaboration, and team sharing                                    | Not implemented; the design and privacy trade-offs remain undecided                                         |
-
-The current source contains no account gate, paid tier, or artificial recording quota. Practical limits still exist: browser APIs, operating-system capture behavior, codec availability, available memory, local disk space, page complexity, and unfinished implementation paths can all limit a workflow.
-
-## What Sniptale can do
-
-### Capture and prepare a page
-
-Sniptale supports visible-area, full-page, and selected-region screenshots. Capture can start from the popup, browser context menu, in-page preparation toolbar, keyboard shortcut, or a configurable quick action.
-
-Quick actions can combine a capture mode with a viewport preset, delay, output format, quality, destination, and post-capture action. Bundled examples include opening a visible capture in the editor, downloading a full-page capture, copying a region to the clipboard, and taking a delayed screenshot. Outputs can be copied, downloaded, sent through a save preset, opened in the image editor, recorded as a scenario step, or retained in the local Gallery.
-
-Before capture, an in-page preparation mode can be used to make the source page presentation-ready. It includes:
-
-- direct text editing and element-level style inspection;
-- typography, spacing, sizing, background, border, shadow, gradient, image, and object-fit adjustments;
-- reusable page-style templates;
-- navigation locking while editing;
-- viewport presets and capture countdowns;
-- an optional pinned toolbar that can restore its working state after a page refresh.
-
-### Annotate using the page structure
-
-A central Sniptale idea is that annotation should understand the page instead of forcing every mark to be drawn manually.
-
-The element-aware highlighter can attach frames to real DOM elements, preserving page geometry while the capture is prepared. Frames can use configurable borders, fill, padding, corner radius, shadow, blur, focus effects, comments, callouts, and automatically numbered step badges. This makes it possible to create a clean annotated page screenshot in a few clicks rather than manually aligning every rectangle.
-
-Auto-Blur can scan visible text for selected categories of potentially sensitive information, including email addresses, phone numbers, URLs or logins, IP addresses, payment-card-like values, and document-number-like values. The user chooses which findings to apply; detection is a convenience feature, not a guarantee that all sensitive data will be found.
-
-### Edit page content with AI
-
-The page-preparation surface can optionally send a bounded, structured representation of selected editable page data to an AI provider. The user can preview the exact JSON payload, choose which fields or table rows are editable, apply a prompt template, validate the returned operations against a schema, and review the result before applying it back to the page.
-
-Sniptale can use Chrome's built-in on-device Prompt API where available or a user-configured OpenAI-compatible endpoint. External-provider use is optional and requires explicit disclosure of the provider, model, prompt inclusion, and data classes being sent.
-
-### Configure repeatable workspace actions
-
-Several product surfaces include a command palette for navigating or running common actions without searching through every panel. The browser context menu can also be configured around screenshot preparation and capture, recording, export, editors, the Gallery, settings, quick actions, and copying the current page link as rich text, Markdown, or plain text.
-
-The interface supports Russian and English, plus system, light, and dark appearance modes. Viewport presets, download-folder presets, capture defaults, quick-action hotkeys, page-style rules, and editor presets are intended to turn repeated documentation or QA routines into a small number of predictable actions.
-
-### Keep captures in a local Media Hub
-
-Screenshots, recordings, audio, exports, video projects, scenario projects and exports, and saved web snapshots can be retained in a local IndexedDB-backed media library.
-
-The future beta persistence contract starts from the clean `sniptale-db` baseline recorded in the [generated project facts](docs/engineering/project-facts.md), with independently versioned logical domains. Alpha database versions are intentionally not migration sources; once beta begins, every released beta fixture remains supported for forward migration without silent loss of durable data.
-
-The Gallery includes search, sorting, tags, multiple view densities, previews, rename and download actions, image copy, multi-selection, batch tag updates, ZIP download, and links into the relevant editor or viewer. A storage manager can identify old, large, and orphaned items and estimate reclaimable space.
-
-Backup and restore workflows can export the full Gallery or a selection to a ZIP archive. Depending on the chosen options, a backup can include source metadata, recording telemetry, editor drafts, web snapshots, and diagnostic support data. Import validates the archive, reports version and conflicts, and supports replace, skip, or duplicate strategies. Backups may contain sensitive URLs or diagnostic context; the export UI is expected to be treated as a data-disclosure boundary.
-
-Privacy controls can delete retained product data while preserving selected UI preferences and AI configuration, or perform a broader factory reset that removes local data, preferences, and stored provider secrets.
-
-### Extract structured information from web pages
-
-Sniptale can parse a page into an internal structured document and project it into several export forms. A user can quickly copy the current page as cleaned JSON or Markdown, or run a batch export across selected open tabs.
-
-Exportable data classes include structured page data, cleaned text and tables, attachments, images and previews, basic diagnostics, detailed sanitized page diagnostics such as DOM, virtual DOM, and Resource Timing data, page styling and element diagnostics, and a full-page screenshot. Selected outputs can be combined into a ZIP archive, with progress, cancellation, per-tab failures, and retry support.
-
-This is intended for documentation, research, support, QA, handoff, and AI-ready data extraction. The parser and projectors are still evolving, so output schemas are not yet stable public contracts.
-
-### Save a local, read-only web snapshot
-
-The web-snapshot workflow saves a local package containing an authoritative full-page screenshot, sanitized markup and styles, source metadata, warnings, and safe diagnostics. A save succeeds only when the screenshot and validated package are both retained. Saved snapshots appear in the Gallery with a derived thumbnail and full screenshot preview, and open in a dedicated read-only viewer.
-
-The viewer opens in **Visual** mode, which displays the retained capture raster at the captured CSS viewport width. This is the fidelity-preserving view for canvas state, generated content, loaded images, sticky layouts, and other pixels visible during capture. **Static document** mode is an explicit alternative for inspecting the sanitized document structure; it is not expected to reproduce every captured pixel.
-
-Scripts, event handlers, cookies, authentication state, browser storage, page IndexedDB, API bodies, and live JavaScript state are excluded. Additional asset capture is not performed by default. Authenticated same-origin assets or anonymous external public assets can be enabled through explicit disclosure and acknowledgement, with security and fidelity limitations.
-
-A snapshot is therefore a visually faithful capture of the page at save time plus a sanitized local reference document. It is not a live browser session and not a substitute for a standards-compliant archival crawler.
-
-### Edit screenshots and other images
-
-The image editor is a Fabric-based canvas workspace for lightweight design and annotation work. It supports paste, drop, file import, layers, hide and lock states, reorder, rename, duplicate and merge operations, undo and redo, crop, image and canvas resize, grouping, grid and magnetic snapping, and reusable tool presets.
-
-Drawing and annotation tools include text, freehand drawing, lines, arrows, connectors, step labels, blur, common shapes, flowchart elements, callouts, stars, banners, buttons, technical symbols, and RoughJS-style elements. Imported SVG, JSON, and Excalidraw content passes through validation and sanitization before entering the document.
-
-The scene can use a solid, gradient, or image background with configurable padding and presentation presets. Browser-window frames and technical metadata overlays can be generated around a screenshot. Raster effects cover common color, blur, noise, pixelation, sharpening, edge, vintage, and transform operations without trying to replace a full professional image suite.
-
-Editor documents can be exported as images or retained as editable session data. Portability and team reuse of presets are part of the direction, but hosted preset sharing is not implemented.
-
-### Build step guides and presentations
-
-The experimental scenario editor records a process as a sequence of screenshots rather than only as a video. A capture can retain page URL, title, viewport, scroll position, selected-element identity and bounds, cursor or interaction metadata, and other bounded context needed for later editing.
-
-A scenario can contain screenshot steps, sections, notes, dividers, focus and click overlays, cursor markers, arrows, rectangles, ellipses, text, and blur regions. Steps can be reordered, edited in sequence, exported as HTML, or exported as Markdown with packaged image assets. Scenario material can also seed a video-editing project.
-
-The same runtime contains an early presentation/deck mode with slides, layouts, layers, text, code, images, shapes, connectors, notes, themes, safe areas, grids, snapping, transitions, build animations, presenter and audience views, and importable layout packs. An optional AI operation layer can modify a bounded project snapshot through schema-validated commands rather than returning arbitrary executable code.
-
-This area began as a step-guide generator and later expanded toward presentation authoring. Its final product boundary is not settled, and the step-guide workflow is expected to receive renewed focus before it can be considered stable.
-
-### Record browser and display video
-
-The browser recording workflow supports active-tab capture, selected-area capture inside a tab, webcam-only capture, viewport-preset capture, and the system picker for a tab, window, or display. Multi-source sessions can prepare up to three selected display sources where the browser and operating system support the flow.
-
-Recording controls include countdown, pause, resume, stop, microphone and camera toggles, device selection, microphone level and test recording, echo cancellation, noise suppression, automatic gain control, camera preview, preferred camera resolution and frame rate, and several recording-quality presets. System-audio availability depends on the selected source and browser or operating-system capability.
-
-A session can retain separate camera and microphone material for later composition where supported. After recording, media can be kept in the Gallery, opened in the video editor, downloaded, or deleted.
-
-The browser extension does not currently promise unlimited duration or universal codec behavior. Long recordings, multi-source sessions, memory pressure, service-worker suspension, interrupted writes, and recovery after browser or operating-system failures remain important validation areas.
-
-### Edit short-form video
-
-The alpha video editor is intended primarily for lightweight and short-form editing rather than large professional post-production projects. It uses local projects and project-owned media copies.
-
-Current editing surfaces include multiple video, audio, annotation, and subtitle tracks; clip splitting, duplication, deletion, trim, close-gap operations, speed and volume changes, fades, linked or detached audio/video pairs, transitions and crossfades, direct voice recording, and a stage for text, subtitles, shapes, arrows, lines, and ellipses.
-
-Scene backgrounds can be solid, gradient, or image-based and can be animated. Cursor, click, camera, and action tooling includes experimental cursor-path extraction and correction, zoom or camera-follow behavior, click ripples, spotlight and dwell emphasis, scroll emphasis, motion paths, and automatic processing of selected stable or inactive stretches.
-
-Export supports whole-project or selected-clip output, MP4 or WebM containers, browser-dependent codec choices, quality, dimensions and frame rate controls, and burned-in or sidecar subtitle workflows. Actual encoder support varies by browser, operating system, and hardware and is probed at runtime.
-
-### Extend the video editor with EffectV1 bundles
-
-Sniptale includes an experimental declarative effect format called EffectV1. Bundles can describe reusable clip effects, transitions, overlays, animated titles, lower thirds, callouts, progress cards, and other compositions without importing arbitrary JavaScript into the extension runtime.
-
-Imported bundles are validated, assigned bounded resources, and evaluated in a manifest-declared sandbox that has no extension API authority, no network access, no browser persistence, and no permission to execute imported source code. Malformed output, identity mismatch, unsupported commands, timeouts, and resource-budget violations fail the render request.
-
-A separate authoring SDK is planned for publishing independently so custom compositions can be developed with a coding agent, validated, exported, imported into Sniptale, and reused. The SDK and a hosted team marketplace are not part of this repository today.
-
-### Capture diagnostic context for reproducing defects
-
-An experimental diagnostic mode can retain sanitized recording context such as session metadata, lifecycle state, selected user actions, safe key events, warnings, errors, and service meta-events. The goal is to let a developer replay a recording alongside enough bounded evidence to understand how a defect was reproduced.
-
-Typed text, credentials, authorization values, cookies, and unrestricted request bodies are not intended to be retained. Diagnostic data is stored locally and can be exported as JSON or a support ZIP after disclosure. This remains a sensitive feature and should be treated as experimental until its privacy, sanitization, compatibility, and failure behavior have received broader adversarial testing.
-
-### Connect an optional desktop companion
-
-A separately maintained native companion is intended to extend capture beyond the browser. Its contract covers Windows, macOS, and Linux screenshot and recording modes, global or tray-driven actions, screen, window, multi-display and region capture, cursor capture, microphone and system-audio options, and bounded interaction telemetry.
-
-The companion can operate independently or connect to the extension through Chrome native messaging. In the connected flow, captured media can be handed back to the browser workspace so it opens in an editor or enters the local Gallery instead of remaining only as a loose file on disk.
-
-The native companion is not included in this repository or extension artifact. Its distribution, maturity, platform coverage, and installation instructions may differ from the browser extension.
-
-The extension validates native messages, protocol compatibility, controller ownership, and capability limits. Install-health fields reported by the companion, including binary-signing and package-integrity status, are compatibility and repair signals from that companion rather than cryptographic attestation performed by the extension. Chrome's native-host registration, operating-system trust, and companion distribution remain outside the extension's verification boundary.
-
-## Local-first does not mean zero network
-
-The main Sniptale workflow is local-first:
-
-- no Sniptale account is required;
-- no Sniptale cloud backend is required;
-- captures, projects, settings, and media are stored in browser-controlled local storage and IndexedDB;
-- the core capture and editing workflows do not require an external AI provider;
-- Chrome's built-in AI path is on-device when the browser makes that capability available.
-
-There are explicit exceptions:
-
-1. When the user configures and invokes an external OpenAI-compatible provider, selected prompt and page data are sent to that endpoint. HTTPS remote endpoints and explicit localhost HTTP endpoints are supported.
-2. When optional web-snapshot asset capture is enabled, the extension may fetch disclosed same-origin authenticated assets or anonymous external public assets under the snapshot policy.
-3. Downloaded or imported files, links, and page content retain the privacy and security characteristics of their source.
-4. Browser extension permissions are broad because Sniptale spans capture, downloads, diagnostics, tab coordination, offscreen recording, and an optional native bridge. Persistent host access is optional rather than a mandatory `<all_urls>` grant.
-
-Provider API keys are stored as AES-GCM envelopes. The default transparent mode protects against accidental inspection but is not a defense against a compromised browser profile or extension runtime. Optional passphrase protection keeps passphrase-derived key material only in background memory; after a Manifest V3 worker restart it must be unlocked again. Forgotten passphrases cannot be recovered.
-
-AI request history is designed to retain metadata such as time, model, request type, counts, and status rather than prompts, page payloads, or raw responses. More detail is available in [Security data handling](docs/security/data-handling.md), [Manifest permissions](docs/security/manifest-permissions.md), and the [Threat model](docs/security/threat-model.md).
-
-## An AI-first repository, not an unbounded generator
-
-Sniptale is intentionally structured for agent-driven implementation. In this repository, an owner is meant to be a bounded unit of responsibility, state, reasoning, and verification rather than only a folder name.
-
-The architecture attempts to constrain the most common failure modes of large AI-generated changes:
-
-- sibling runtime implementations do not import each other directly;
-- cross-runtime messages are typed and parsed at the receiving boundary;
-- page DOM, imported archives, model output, native messages, and other external inputs remain untrusted until validated;
-- privileged routes use explicit sender classes, authorization policy, freshness, capabilities or leases, and replay protection where applicable;
-- persistent state has named authorities rather than incidental writers spread across UI components;
-- dependency direction is checked automatically;
-- sandboxed EffectV1 evaluation cannot acquire extension privileges;
-- security-sensitive storage, network, diagnostics, permissions, and runtime owners are recorded in machine-readable registries;
-- negative paths, cleanup, cancellation, stale state, and partial failure are expected to be demonstrated rather than assumed.
-
-The principal runtime contexts are the background service worker, content script, popup, settings, Gallery, image editor, video editor, scenario editor, web-snapshot viewer, camera recorder, offscreen document, and effect sandbox. Shared code is divided among `foundation`, `runtime-contracts`, `platform`, and `ui` packages, while product workflows and durable app state remain in named application owners.
-
-That structure also carries historical costs. Successive agent-driven iterations have left the codebase highly fragmented, and some areas are more elaborate than their current product value justifies. This is a known trade-off, but no repository-wide rewrite or global change to the engineering approach is currently planned; simplification will remain local and evidence-driven.
-
-See [Repository overview](docs/architecture/repository-overview.md), [Runtime contexts](docs/architecture/runtime-contexts.md), [Storage state authority](docs/architecture/storage-state-authority.md), [Parser architecture](docs/architecture/parser-architecture.md), and [Video editor layering](docs/architecture/video-editor-layering.md).
-
-## Quality guardrails
-
-AI implementation is controlled by a repository-local quality system rather than accepted only because a generated diff looks plausible.
-
-The normal workflow combines:
-
-- native TypeScript 7 type checking, Oxlint with retained Security and syntax-only SonarJS plugin rules, Oxfmt, unit and integration tests, and Playwright extension E2E suites;
-- dependency-boundary and runtime-topology checks;
-- coverage, dead-code, cycle, duplication, complexity, and ownership checks;
-- manifest-permission, message-boundary, storage-authority, network-egress, diagnostic-sanitization, and other security guards;
-- static-analysis and supply-chain tooling, including repository-controlled Semgrep and CodeQL paths where available;
-- deterministic build, release packaging, legal notices, SBOM generation, audit evidence, and rollback procedure;
-- dedicated agent skills for architecture review, repository audit, security review, and topology-plan review.
-
-The repository's working convention is to begin with acceptance criteria and non-goals, run a preflight, implement one coherent change, execute the relevant checkpoint, run every routed read-only architecture or security review, independently assess unrouted changes against both review triggers, consolidate findings, and close out only after the required proof is green.
-
-Repository-local commands remain the QA authority. GitHub Actions applies the same pushed-range proof to every pull request and update to `main`; it complements the local workflow rather than defining a second validation path.
-
-These guardrails reduce risk; they do not prove correctness. A green pipeline is not a substitute for real-user testing, browser and operating-system compatibility work, production observability, performance profiling, malicious-page testing, fuzzing, or an independent professional security assessment.
-
-The operating model is documented in the repository-local `AGENTS.md`, [Implementation rules](docs/engineering/implementation-rules.md), [Code quality](docs/tooling/code-quality.md), and the [Operator handbook](docs/tooling/operator-handbook.md).
-
-## Known gaps and next priorities
-
-The next stage is productization rather than architectural expansion. Priorities include:
-
-- validating every primary workflow on real and hostile pages;
-- simplifying interactions and removing abstractions that do not protect a real invariant;
-- hardening interrupted capture, service-worker restart, storage-quota, import, export, and recovery behavior;
-- profiling full-page capture, long recordings, multi-source media, large projects, and video export under memory pressure;
-- stabilizing persisted formats and introducing migrations only when the product is ready to promise compatibility;
-- returning the scenario editor to a focused step-guide and manual-authoring workflow;
-- completing live recording annotations and deciding which diagnostics are safe enough to expose broadly;
-- publishing and documenting the EffectV1 authoring SDK separately;
-- defining whether sharing should remain file-based, use user-selected infrastructure, or become a hosted capability without compromising the local-first model;
-- completing compatibility and release work for the native companion.
-
-Until those decisions are made, the alpha should be evaluated as a transparent engineering preview rather than a finished replacement for established capture, documentation, or video-production products.
-
-## Repository map
-
-- `apps/extension` — extension runtimes, product features, workflows, composition, and app persistence.
-- `packages/foundation` — dependency-minimal reusable domain primitives.
-- `packages/runtime-contracts` — cross-runtime wire and data contracts.
-- `packages/platform` — browser, storage, transport, observability, media, and security adapters.
-- `packages/ui` — reusable presentation primitives.
-- `tooling` — quality gates, inventories, security checks, test runners, release tooling, and audit evidence.
-- `docs/agent-tooling/agent-tooling.zip` — reviewable archive of optional repository-local agent instructions and skills.
-- `docs` — active architecture, engineering, security, tooling, provenance, and release documentation.
-
-## Documentation
-
-[docs/README.md](docs/README.md) is the sole documentation index. The documentation in this repository was written and revised entirely by AI coding agents under human direction. It may contain inaccuracies, omissions, or descriptions that no longer match the implementation; verify important claims against the code, machine-readable policy, and deterministic checks.
-
-## Contributing
-
-During the alpha phase, focused product and engineering improvement proposals are the most useful contributions. Bug reports have limited value at this stage because substantial stabilization work remains before beta. Structured bug feedback and acceptance testing will become a priority once the project reaches beta.
-
-Sniptale does not currently accept unsolicited external code contributions. Do not submit an implementation patch or pull request unless the repository owner has explicitly requested it. See [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+Bug reports and focused product proposals are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for participation and external code-contribution policy, and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately as described in [SECURITY.md](.github/SECURITY.md).
 
 ## License
 
 Copyright (C) 2026 Lev Rozhkov.
 
-Sniptale is licensed under the [GNU Affero General Public License v3 or later](LICENSE) (`AGPL-3.0-or-later`). Third-party material copied into release artifacts is listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Bundled Manrope font files remain under the [SIL Open Font License 1.1](LICENSES/OFL-1.1.txt).
+Sniptale is licensed under the [GNU Affero General Public License v3 or later](LICENSE) (`AGPL-3.0-or-later`). Third-party notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

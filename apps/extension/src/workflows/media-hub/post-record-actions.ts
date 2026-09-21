@@ -26,8 +26,14 @@ function downloadBlob(blob: Blob, filename: string): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export async function openLatestRecordingInGallery(primaryRecordingId: string): Promise<void> {
-  await openGalleryPage({ recordingId: primaryRecordingId });
+export async function openLatestRecordingInGallery(
+  primaryRecordingId: string,
+  quickEdit = false
+): Promise<void> {
+  await openGalleryPage({
+    recordingId: primaryRecordingId,
+    ...(quickEdit ? { quickEdit: true } : {}),
+  });
 }
 
 export async function openSavedRecordingInVideoEditor(

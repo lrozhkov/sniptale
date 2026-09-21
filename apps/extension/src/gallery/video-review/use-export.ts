@@ -1,21 +1,74 @@
+import { useReviewExportSettings } from './use-review-export-settings';
+import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
+import { createReviewFragment } from '../../features/video/review/fragment';
 import { useEffect, useRef, useState } from 'react';
 import {
   inspectReviewMedia,
   type ReviewMediaIndex,
+  type ReviewRenderSettings,
 } from '../../workflows/video-review/media-index';
-import { exportReviewedVideo } from '../../workflows/video-review/export-lifecycle';
+import {
+  exportReviewedVideo,
+  QuickEditExportUnavailable,
+} from '../../workflows/video-review/export-lifecycle';
+import {
+  type QuickEditExportPlan,
+  type QuickEditExportReason,
+} from '../../features/video/review/advanced/effective';
 import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type ExportResult = Awaited<ReturnType<typeof exportReviewedVideo>>;
+
+/** Export starts only after debounced editor content reaches the shared session. */
+export function prepareReviewExporter(
+  exporter: ReturnType<typeof useReviewExport>,
+  run: (action: () => Promise<unknown>) => Promise<unknown>,
+  flushPending: () => Promise<void>
+): ReturnType<typeof useReviewExport> {
+  const start = async (
+    destination: 'gallery' | 'download' = 'gallery',
+    selection?: Extract<ReviewAnchor, { kind: 'range' }>
+  ) => {
+    await run(async () => {
+      await flushPending();
+      await exporter.start(destination, selection);
+    });
+  };
+  return {
+    ...exporter,
+    start,
+    downloadSelection: (selection) => start('download', selection),
+    download: async () => {
+      await run(async () => {
+        await flushPending();
+        await exporter.download();
+      });
+    },
+  };
+}
+
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
-  const [index, setIndex] = useState<ReviewMediaIndex | null>(null);
+  const [sourceIndex, setIndex] = useState<ReviewMediaIndex | null>(null);
+  const state = resource.session.getSnapshot();
+  const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
+    sourceIndex,
+    {
+      ui: state.snapshot.workspace.advanced.ui,
+      ...state.document.advancedContent,
+    }
+  );
   const [indexing, setIndexing] = useState(true);
   const [phase, setPhase] = useState<'idle' | 'exporting' | 'publishing'>('idle');
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
+  const context = reviewExportContext(resource, renderSettings);
+  const [blocked, setBlocked] = useState<{
+    context: string;
+    reasons: readonly QuickEditExportReason[];
+  } | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const active = useRef<AbortController | null>(null);
   const publishing = useRef(false);
@@ -40,11 +93,24 @@ export function useReviewExport(resource: LoadedReview) {
       active.current?.abort();
     };
   }, [resource.file]);
+  /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
+  const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
+    reviewExportPlan(resource, index, renderSettings, selection);
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
-    if (active.current || !index) return;
+    if (active.current || !index || checkingCodecs) return;
+    const attemptContext = reviewExportContext(resource, renderSettings);
+    const currentPlan = plan(selection);
+    if (currentPlan.kind === 'unavailable') {
+      setBlocked({
+        context: reviewExportContext(resource, renderSettings),
+        reasons: currentPlan.reasons,
+      });
+      return;
+    }
+    setBlocked(null);
     const controller = new AbortController();
     active.current = controller;
     publishing.current = false;
@@ -53,6 +119,7 @@ export function useReviewExport(resource: LoadedReview) {
     setProgress(0);
     try {
       const value = await exportReviewedVideo({
+        renderSettings,
         snapshot: resource.session.getSnapshot().snapshot,
         index,
         signal: controller.signal,
@@ -74,8 +141,11 @@ export function useReviewExport(resource: LoadedReview) {
           });
         if (!selection) setResult(value);
       }
-    } catch {
-      if (mounted.current && !controller.signal.aborted) setFailed(true);
+    } catch (error) {
+      if (error instanceof QuickEditExportUnavailable) {
+        if (mounted.current && !controller.signal.aborted)
+          setBlocked({ context: attemptContext, reasons: error.reasons });
+      } else if (mounted.current && !controller.signal.aborted) setFailed(true);
     } finally {
       active.current = null;
       publishing.current = false;
@@ -88,17 +158,76 @@ export function useReviewExport(resource: LoadedReview) {
     phase,
     progress,
     failed,
+    blocked: blocked?.context === context ? blocked.reasons : null,
+    checkingCodecs,
     result,
+    plan,
+    renderSettings,
+    setRenderSettings,
     start,
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
       start('download', selection),
     cancel: () => {
       if (!publishing.current) active.current?.abort();
     },
-    download: () => {
-      if (!resource.session.getSnapshot().document.edits.length)
-        downloadGalleryBlob(resource.file, resource.filename);
-      else void start('download');
+    download: async () => {
+      const currentPlan = plan();
+      if (currentPlan.kind === 'unavailable') {
+        setBlocked({
+          context: reviewExportContext(resource, renderSettings),
+          reasons: currentPlan.reasons,
+        });
+        return;
+      }
+      const state = resource.session.getSnapshot();
+      const applied =
+        currentPlan.video === 'render' ||
+        currentPlan.audio === 'process' ||
+        state.document.edits.length > 0;
+      if (!applied) downloadGalleryBlob(resource.file, resource.filename);
+      else await start('download');
     },
   };
+}
+
+/** One applied-state capability plan for all export entry points. */
+function reviewExportPlan(
+  resource: LoadedReview,
+  index: ReviewMediaIndex | null,
+  renderSettings: ReviewRenderSettings,
+  selection?: Extract<ReviewAnchor, { kind: 'range' }>
+): QuickEditExportPlan {
+  const state = resource.session.getSnapshot();
+  const fragment =
+    selection && index
+      ? createReviewFragment({
+          selection,
+          duration: index.duration,
+          boundaries: index.boundaries,
+          snapToKeyframes: state.snapshot.workspace.advanced.ui.mode !== 'advanced',
+          edits: state.document.edits,
+        })
+      : null;
+  return configuredReviewExportPlan({
+    index,
+    renderSettings,
+    document: fragment ? { ...state.document, edits: fragment.edits } : state.document,
+    advanced: {
+      ui: state.snapshot.workspace.advanced.ui,
+      ...state.document.advancedContent,
+    },
+    ...(index ? { videoCopyBoundaries: index.boundaries } : {}),
+  });
+}
+
+/** Bind failures to the actual committed input after the export entry point has flushed edits. */
+function reviewExportContext(resource: LoadedReview, settings: ReviewRenderSettings): string {
+  const { workspace } = resource.session.getSnapshot().snapshot;
+  return JSON.stringify([
+    workspace.aggregateId,
+    workspace.sourceAssetId,
+    workspace.revision,
+    workspace.advanced.ui.mode,
+    settings,
+  ]);
 }

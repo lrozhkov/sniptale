@@ -47,22 +47,20 @@ export function openInEditor(item: GalleryItem) {
     return;
   }
 
-  if (!isGalleryMediaItem(item) || !isImageKind(item.kind)) {
-    if (isGalleryMediaItem(item) && item.recordingGroupView?.projectId) {
-      void openVideoEditorPage(item.recordingGroupView.projectId, null);
-      return;
-    }
-    if (isGalleryMediaItem(item) && item.kind === 'web-archive') {
-      void openWebSnapshotViewerPage(item.entityId ?? item.id);
-    }
-    return;
-  }
+  if (isGalleryMediaItem(item)) openMediaInEditor(item);
+}
 
-  void browserTabs.create({
-    url: buildEditorUrl({
-      assetId: item.entityId ?? item.id,
-    }),
-  });
+/** Media routes create recording projects or open the matching asset editor. */
+function openMediaInEditor(item: import('../items').GalleryMediaItem) {
+  if (item.source.kind === 'recording') {
+    void openVideoEditorPage(null, item.source.recordingId);
+  } else if (isImageKind(item.kind)) {
+    void browserTabs.create({ url: buildEditorUrl({ assetId: item.entityId ?? item.id }) });
+  } else if (item.recordingGroupView?.projectId) {
+    void openVideoEditorPage(item.recordingGroupView.projectId, null);
+  } else if (item.kind === 'web-archive') {
+    void openWebSnapshotViewerPage(item.entityId ?? item.id);
+  }
 }
 
 function resetPreview(controller: GalleryPreviewController) {

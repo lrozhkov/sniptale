@@ -6,9 +6,9 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Crosshair, MessageSquare, ScanLine } from 'lucide-react';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
 import { GuideInspectorGroup } from '../inspector';
 import { TourActionField, TourPointFields, TourTextField, TourTextPresentation } from './fields';
+import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
 type SettingsProps<T> = {
@@ -172,7 +172,7 @@ function TourRectFields({
       />
       <div className="tour-coordinate-fields">
         {(['width', 'height'] as const).map((axis) => (
-          <NumericRow
+          <TourInspectorNumericRow
             key={axis}
             label={t(`scenario.editor.${axis}`)}
             unit="%"
@@ -181,8 +181,7 @@ function TourRectFields({
             min={0.1}
             max={(1 - (axis === 'width' ? value.x : value.y)) * 100}
             disabled={disabled}
-            onPreviewValue={() => {}}
-            onCommitValue={(size) => onChange({ ...value, [axis]: size / 100 })}
+            onChange={(size) => onChange({ ...value, [axis]: size / 100 })}
           />
         ))}
       </div>

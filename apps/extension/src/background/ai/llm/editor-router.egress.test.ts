@@ -234,4 +234,5 @@ it('uses provided guide optional payload fields before provider egress', async (
   expect(text).toContain('"outline":true');
   expect(text).toContain('"slide":"one"');
   expect(text).toContain('"tools":["title"]');
+  expect(text.indexOf('Tool manifest JSON:')).toBeLessThan(text.indexOf('Project snapshot JSON:'));
 });

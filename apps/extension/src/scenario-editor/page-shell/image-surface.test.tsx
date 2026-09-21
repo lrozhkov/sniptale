@@ -1,5 +1,5 @@
-import { GuideLayoutAssistance } from './layout-assistance';
 // @vitest-environment jsdom
+import { GuideLayoutAssistance } from './layout-assistance';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

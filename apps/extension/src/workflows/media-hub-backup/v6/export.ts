@@ -8,6 +8,7 @@ import { encodeCatalogShards } from './catalog';
 import { parseArchiveRootDescriptor, parseRootEnvelope } from './codec';
 import {
   MEDIA_HUB_BACKUP_FORMAT,
+  MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER,
   MEDIA_HUB_BACKUP_VERSION,
   type JsonValue,
   type MediaHubBackupCatalogShard,
@@ -113,12 +114,7 @@ export function buildMediaHubBackupExportPlanV6(args: {
     grouped.set(profile, group);
   }
 
-  const profileOrder = [
-    'media:library-item',
-    'media:effect-bundle',
-    'video-project',
-    'scenario-project',
-  ];
+  const profileOrder = MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER;
   const roots = profileOrder.flatMap((profile) => grouped.get(profile) ?? []);
   const catalogs: PlannedCatalog[] = [];
   for (const profile of profileOrder) {

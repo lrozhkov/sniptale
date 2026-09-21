@@ -1,3 +1,4 @@
+import { renderTempoBuffer } from '../../../../features/video/audio/tempo-buffer';
 import { getTransitionProgress } from '../../../../features/video/project/transition/runtime';
 import { clampClipPlaybackRate } from '../../../../features/video/project/timeline';
 import type { OfflineAudioRenderableClip } from '../clip-audio/index';
@@ -24,14 +25,29 @@ function resolveEnvelopeGainAtTime(
   return startGain + (endGain - startGain) * progress;
 }
 
-export function scheduleOfflineAudioClipMix(
+export async function scheduleOfflineAudioClipMix(
   offlineContext: OfflineAudioContext,
   clip: OfflineAudioRenderableClip,
-  buffer: AudioBuffer
+  buffer: AudioBuffer,
+  signal?: AbortSignal
 ) {
+  const rate = clampClipPlaybackRate(clip.playbackRate ?? 1);
+  const prepared =
+    rate === 1
+      ? buffer
+      : await renderTempoBuffer(
+          buffer,
+          {
+            start: clip.sourceStart,
+            duration: clip.sourceDuration,
+            rate,
+          },
+          signal
+        );
+  signal?.throwIfAborted();
   const source = offlineContext.createBufferSource();
-  source.buffer = buffer;
-  source.playbackRate.value = clampClipPlaybackRate(clip.playbackRate ?? 1);
+  source.buffer = prepared;
+  source.playbackRate.value = 1;
   const gain = offlineContext.createGain();
   gain.gain.setValueAtTime(0, 0);
   source.connect(gain);
@@ -96,6 +112,6 @@ export function scheduleOfflineAudioClipMix(
   }
   gain.gain.setValueAtTime(0, clipEnd);
 
-  source.start(clipStart, clip.sourceStart, clip.sourceDuration);
+  source.start(clipStart, rate === 1 ? clip.sourceStart : 0, clip.sourceDuration / rate);
   source.stop(clipEnd);
 }

@@ -38,7 +38,14 @@ export function renderTourNavigationScene({
   const count = Math.max(textPages.length, Math.ceil(slide.buttons.length / pageSize));
   const current = Math.min(page, Math.max(0, count - 1));
   const buttons = element('div', 'tour-navigation-buttons');
-  buttons.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+  // Column choice changes count and block width, never the width of one button.
+  const referenceColumnWidth = Math.max(0, (contentWidth - gap * 2) / 3);
+  const gridWidth = referenceColumnWidth * columns + gap * (columns - 1);
+  buttons.style.gridTemplateColumns = `repeat(${columns}, ${referenceColumnWidth}px)`;
+  buttons.style.width = `${gridWidth}px`;
+  buttons.style.alignSelf = { start: 'flex-start', center: 'center', end: 'flex-end' }[
+    layout.align
+  ];
   buttons.style.gap = `${gap}px`;
   const buttonPage = Math.min(current, Math.max(0, Math.ceil(slide.buttons.length / pageSize) - 1));
   for (const button of slide.buttons.slice(buttonPage * pageSize, (buttonPage + 1) * pageSize)) {

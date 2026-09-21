@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Mic, Upload } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../../platform/i18n';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourNarrationRecording } from './narration-recording';
 
 type ImportInput = Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>;
@@ -49,24 +49,20 @@ export function TourNarrationAcquisition({
   return (
     <>
       <fieldset disabled={disabled || pending} className="tour-audio-acquisition">
-        <ProductActionButton
-          compact
-          tone="secondary"
+        <ScenarioInspectorActionButton
           disabled={disabled || pending}
           onClick={() => setRecording(structuredClone(destination))}
         >
           <Mic size={15} />
           {t('scenario.editor.tourRecord')}
-        </ProductActionButton>
-        <ProductActionButton
-          compact
-          tone="secondary"
+        </ScenarioInspectorActionButton>
+        <ScenarioInspectorActionButton
           disabled={disabled || pending}
           onClick={() => input.current?.click()}
         >
           <Upload size={15} />
           {t('scenario.editor.tourAudioUpload')}
-        </ProductActionButton>
+        </ScenarioInspectorActionButton>
         {children}
         <input
           ref={input}

@@ -8,11 +8,15 @@ import { TextWithOverflowHint } from './overflow-hint';
 export interface NumericValueFieldProps {
   className?: string | undefined;
   disabled?: boolean | undefined;
+  /** Focus presentation: 'accent-box' draws an accent border box, 'quiet' a thin accent line. */
+  focusAppearance?: 'accent-box' | 'quiet' | undefined;
   invalid?: boolean | undefined;
   label: string;
   max?: number | undefined;
   min?: number | undefined;
   normalizeValue?: ((value: number) => number) | undefined;
+  /** Optional domain step mapping, e.g. the next irregular media boundary. */
+  getStepValue?: ((value: number, direction: 1 | -1) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
   precision?: number | undefined;
@@ -29,6 +33,7 @@ export function NumericValueField(props: NumericValueFieldProps) {
     max: props.max,
     min: props.min,
     normalizeValue: props.normalizeValue,
+    getStepValue: props.getStepValue,
     onCommitValue: props.onCommitValue,
     onPreviewValue: props.onPreviewValue,
     precision: props.precision,
@@ -47,17 +52,23 @@ function NumericValueFieldView({
   props: NumericValueFieldProps;
   state: ReturnType<typeof useNumericValueFieldState>;
 }) {
+  const quietFocus = props.focusAppearance === 'quiet';
   return (
     <div
       data-ui="shared.ui.compact-inspector.numeric-value-field"
+      data-focus-appearance={props.focusAppearance ?? 'accent-box'}
       className={cx(
         'group/compact-numeric relative flex',
         'h-[var(--sniptale-compact-control-height,32px)] w-[6.25rem] shrink-0 items-center',
         'gap-0',
         'rounded-[7px] px-2 transition-[border-color,background-color]',
         'border border-transparent bg-transparent',
-        'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
-        'focus-within:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_70%,transparent)]',
+        ...(quietFocus
+          ? []
+          : [
+              'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
+              'focus-within:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_70%,transparent)]',
+            ]),
         props.invalid &&
           'border-[color:var(--sniptale-color-danger)] text-[color:var(--sniptale-color-danger)]',
         props.disabled && 'cursor-not-allowed opacity-55',
@@ -67,6 +78,16 @@ function NumericValueFieldView({
       <NumericValueInput props={props} state={state} />
       <NumericUnitLabel state={state} />
       <NumericStepper disabled={props.disabled} label={props.label} onStep={state.applyStep} />
+      {quietFocus && (
+        <span
+          aria-hidden="true"
+          className={[
+            'pointer-events-none absolute inset-x-1 bottom-0 h-px',
+            'bg-[color:var(--sniptale-color-accent)] opacity-0 transition-opacity',
+            'group-focus-within/compact-numeric:opacity-60',
+          ].join(' ')}
+        />
+      )}
     </div>
   );
 }
@@ -143,6 +164,14 @@ export function NumericRow({
       data-range-visible={range.visible ? 'true' : 'false'}
       onPointerMove={range.show}
       onPointerLeave={range.hide}
+      onFocusCapture={(event) => {
+        if (event.target instanceof HTMLInputElement && event.target.type === 'text')
+          range.setTextFocused(true);
+      }}
+      onBlurCapture={(event) => {
+        if (event.target instanceof HTMLInputElement && event.target.type === 'text')
+          range.setTextFocused(false);
+      }}
       className={cx(
         'group/compact-numeric-row relative min-h-10 items-center gap-2',
         appearance === 'surface' &&
@@ -187,6 +216,7 @@ function useNumericRowRangeState(
 ) {
   const [hot, setHot] = useState(false);
   const [active, setActive] = useState(false);
+  const [textFocused, setTextFocused] = useState(false);
   const show = () => {
     if (!scrub || disabled) {
       return;
@@ -197,7 +227,14 @@ function useNumericRowRangeState(
     setHot(false);
   };
 
-  return { active, hide, setActive, show, visible: hot || active };
+  return {
+    active,
+    hide,
+    setActive,
+    setTextFocused,
+    show,
+    visible: !textFocused && (hot || active),
+  };
 }
 
 function NumericRowLabel({

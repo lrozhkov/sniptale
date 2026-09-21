@@ -189,3 +189,21 @@ function configureGalleryOwnerMocks(
     },
   });
 }
+
+it('hands a one-shot quick-edit intent to the resolved recording and clears the route', () => {
+  window.history.replaceState(null, '', '/gallery.html?recordingId=rec-7&mode=edit');
+  const item = createItem({
+    id: 'recording:rec-7',
+    kind: 'video',
+    source: { kind: 'recording', recordingId: 'rec-7' },
+  });
+  configureGalleryOwnerMocks('library', [item]);
+  renderHook();
+  expect(galleryActionMocks.setPreview).toHaveBeenCalledWith({
+    initialMode: 'edit',
+    inspectorCollapsed: false,
+    item,
+    url: null,
+  });
+  expect(window.location.search).toBe('');
+});

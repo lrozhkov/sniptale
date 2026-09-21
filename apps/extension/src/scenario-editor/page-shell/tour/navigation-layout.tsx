@@ -12,7 +12,7 @@ import {
   TOUR_NAVIGATION_LAYOUT,
   type TourNavigationSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { TourInspectorNumericRow } from './numeric-row';
 import { GuideInspectorGroup } from '../inspector';
 import type { Translate } from '../../../platform/i18n';
 
@@ -87,13 +87,12 @@ export function TourNavigationLayoutSettings({
           { key: 'gap', label: t('scenario.editor.tourContentGap'), min: 0, max: 32, unit: 'px' },
         ] as const
       ).map(({ key, ...props }) => (
-        <NumericRow
+        <TourInspectorNumericRow
           key={key}
           {...props}
           value={layout[key]}
           disabled={disabled}
-          onPreviewValue={() => {}}
-          onCommitValue={(value) => onChange({ ...slide, layout: { ...layout, [key]: value } })}
+          onChange={(value) => onChange({ ...slide, layout: { ...layout, [key]: value } })}
         />
       ))}
       <div className="tour-layout-setting">

@@ -42,7 +42,11 @@ it('reads associated labels without storing password, text input or editable con
     input.value = 'entered-secret';
     label.append(input);
     document.body.append(label);
-    expect(describe(input).data).toEqual({ targetTag: 'input', targetName: 'Account' });
+    expect(describe(input).data).toEqual({
+      targetTag: 'input',
+      targetType: input.type,
+      targetName: 'Account',
+    });
   }
   const editable = document.createElement('div');
   editable.setAttribute('contenteditable', 'true');
@@ -75,23 +79,31 @@ it('bounds labels and does not copy ordinary page text or URLs', () => {
   expect(describe(link).data).toEqual({ targetTag: 'a', targetName: 'Open' });
 });
 
-it('keeps typing in different fields separate and publishes only scalar metadata', () => {
+it('merges fast form entry while publishing only scalar target metadata', () => {
   const state = createInitialState();
   const listeners = createTelemetryListeners(state);
-  for (const name of ['First field', 'Second field']) {
+  for (const [index, name] of [
+    'First field',
+    'Second field',
+    'First field',
+    'Second field',
+    'First field',
+  ].entries()) {
     const input = document.createElement('input');
     input.setAttribute('aria-label', name);
     input.value = 'never retained';
     document.body.append(input);
     input.addEventListener('input', listeners.input);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    for (const offset of [0, 500]) {
+      const event = new Event('input', { bubbles: true });
+      Object.defineProperty(event, 'timeStamp', { value: 1000 + index * 800 + offset });
+      input.dispatchEvent(event);
+    }
   }
   finalizeTelemetrySignals(state);
-  expect(state.signals).toHaveLength(2);
-  expect(state.signals.map((signal) => signal.data['targetName'])).toEqual([
-    'First field',
-    'Second field',
-  ]);
+  expect(state.signals).toHaveLength(1);
+  expect(state.signals.map((signal) => signal.data['targetName'])).toEqual(['First field']);
+  expect(state.typingSignal).toBeNull();
   expect(state.typingTarget).toBeNull();
   expect(JSON.stringify(state.signals)).not.toContain('never retained');
   expect(
@@ -113,4 +125,22 @@ it('retains a select description without retaining selected or unselected option
   label.append(select);
   document.body.append(label);
   expect(describe(select).data).toEqual({ targetTag: 'select', targetName: 'Account' });
+});
+
+it('does not label checkbox, range, or select changes as typing', () => {
+  const state = createInitialState();
+  const listeners = createTelemetryListeners(state);
+  for (const type of ['checkbox', 'radio', 'range', 'color', 'file', 'button']) {
+    const input = document.createElement('input');
+    input.type = type;
+    input.addEventListener('input', listeners.input);
+    input.addEventListener('change', listeners.change);
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('change'));
+  }
+  const select = document.createElement('select');
+  select.addEventListener('change', listeners.change);
+  select.dispatchEvent(new Event('change'));
+  finalizeTelemetrySignals(state);
+  expect(state.signals.filter((signal) => signal.kind === 'typing')).toEqual([]);
 });

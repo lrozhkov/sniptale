@@ -23,6 +23,14 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: formatBytesMock,
 }));
 
+vi.mock('../../video-review', () => ({
+  VideoReview: (props: { aggregateId: string; onBack(): void }) => (
+    <button data-test-review={props.aggregateId} onClick={props.onBack}>
+      Back
+    </button>
+  ),
+}));
+
 import { PreviewPanel } from './index';
 import { PreviewMedia } from './media';
 import { PreviewActions, PreviewMetadataCards, PreviewTagEditor } from './sidebar-sections';
@@ -552,4 +560,29 @@ it('offers gallery quick review only for a video media item with an available so
   expect(renderToStaticMarkup(<PreviewPanel {...createProps()} />)).not.toContain(
     'gallery.videoReview.enter'
   );
+});
+
+it('groups quick edit and full video editor inside inspector actions', () => {
+  const item = createItem({
+    kind: 'recording',
+    mimeType: 'video/webm',
+    source: { kind: 'recording', recordingId: 'rec-1' },
+  });
+  const markup = renderToStaticMarkup(<PreviewPanel {...createProps({ item })} />);
+  expect(markup.indexOf('preview-actions-heading')).toBeLessThan(
+    markup.indexOf('gallery.videoReview.enter')
+  );
+  expect(markup).toContain('gallery.videoReview.openVideoEditor');
+});
+
+it('starts a routed video in quick edit and stays in preview after returning', () => {
+  const item = createItem({ id: 'recording:rec-1', kind: 'recording', mimeType: 'video/webm' });
+  const props = createProps({ item, initialMode: 'edit', previewUrl: null });
+  renderNode(<PreviewPanel {...props} />);
+  const back = container!.querySelector<HTMLButtonElement>('[data-test-review="recording:rec-1"]')!;
+  expect(back).not.toBeNull();
+  act(() => back.click());
+  renderNode(<PreviewPanel {...props} previewUrl="blob:loaded" />);
+  expect(container!.querySelector('[data-test-review]')).toBeNull();
+  expect(container!.querySelector('[data-ui="gallery.videoReview.enter"]')).not.toBeNull();
 });

@@ -20,6 +20,7 @@ interface NumericValueStateParams {
   max?: number | undefined;
   min?: number | undefined;
   normalizeValue?: ((value: number) => number) | undefined;
+  getStepValue?: ((value: number, direction: 1 | -1) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
   precision?: number | undefined;
@@ -87,6 +88,7 @@ function useNumericFieldActions({
   max,
   min,
   normalizeValue,
+  getStepValue,
   onCommitValue,
   onPreviewValue,
   precision,
@@ -103,6 +105,7 @@ function useNumericFieldActions({
       max,
       min,
       normalizeValue,
+      getStepValue,
       onCommitValue,
       onPreviewValue,
       precision,
@@ -166,19 +169,29 @@ function applyNumericStep({
   max,
   min,
   normalizeValue,
+  getStepValue,
   onCommitValue,
   onPreviewValue,
   precision,
   step,
 }: Pick<
   NumericValueStateParams,
-  'max' | 'min' | 'normalizeValue' | 'onCommitValue' | 'onPreviewValue' | 'precision' | 'step'
+  | 'max'
+  | 'min'
+  | 'normalizeValue'
+  | 'getStepValue'
+  | 'onCommitValue'
+  | 'onPreviewValue'
+  | 'precision'
+  | 'step'
 > & {
   direction: 1 | -1;
   draftState: NumericDraftState;
 }) {
   draftState.dirtyRef.current = false;
-  const stepped = draftState.stepValueRef.current + step * direction;
+  const stepped = getStepValue
+    ? getStepValue(draftState.stepValueRef.current, direction)
+    : draftState.stepValueRef.current + step * direction;
   const next = clampNumber(normalizeValue?.(stepped) ?? stepped, min, max);
   draftState.stepValueRef.current = next;
   draftState.setEditing(draftState.editingRef.current);

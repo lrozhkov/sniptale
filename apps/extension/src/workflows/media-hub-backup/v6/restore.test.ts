@@ -65,6 +65,7 @@ const object = {
 const catalogPath = '_sniptale/catalog/media-000001.ndjson';
 let currentSession: {
   archiveFingerprint: string;
+  childIdMap: Record<string, string>;
   committedRoots: string[];
   conflictedRoots: string[];
   createdAt: number;
@@ -85,7 +86,14 @@ async function archive(): Promise<Blob> {
   await writer.addText(catalogPath, `${JSON.stringify(descriptor)}\n`);
   await writer.addText(
     descriptor.metadataPath,
-    JSON.stringify({ descriptor, metadata: {}, objects: [object] })
+    JSON.stringify({
+      descriptor,
+      metadata: {
+        entry: { id: descriptor.rootId, source: { kind: 'screenshot' }, tags: [] },
+        originalObjectId: object.objectId,
+      },
+      objects: [object],
+    })
   );
   await writer.addBlob(object.path, new Blob(['media']));
   await writer.close();
@@ -96,6 +104,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   currentSession = {
     archiveFingerprint: 'a'.repeat(64),
+    childIdMap: {},
     committedRoots: [],
     conflictedRoots: [],
     createdAt: 1,

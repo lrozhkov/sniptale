@@ -1,18 +1,108 @@
 import { translate } from '../../platform/i18n';
-import type { ButtonHTMLAttributes } from 'react';
+import { ChevronRight } from 'lucide-react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
+
 import {
   getControlPrimaryButtonClassName,
   getControlSecondaryButtonClassName,
 } from '@sniptale/ui/control-language';
 
+/** Timeline objects share a thin selection border, never an accent fill. */
+export function reviewTimelineItemTone(
+  selected: boolean,
+  kind: 'neutral' | 'cut' | 'speed' | 'focus' = 'neutral'
+): string {
+  const border = selected
+    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
+    : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
+  const surface = {
+    neutral: 'bg-[var(--sniptale-color-surface-hover)]',
+    cut: 'bg-[color-mix(in_srgb,var(--sniptale-color-danger)_12%,var(--sniptale-color-surface-hover))]',
+    speed:
+      'bg-[color-mix(in_srgb,var(--sniptale-color-info)_12%,var(--sniptale-color-surface-hover))]',
+    focus:
+      'bg-[color-mix(in_srgb,var(--sniptale-color-success)_10%,var(--sniptale-color-surface-hover))]',
+  };
+  return `${surface[kind]} ${border}`;
+}
+
+/** Consistent visible grips and hit areas across editable timeline lanes. */
+export const reviewTimelineResizeHandleClassName =
+  'absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center rounded ' +
+  'bg-[var(--sniptale-color-surface-hover)]';
+
+const iconButtonBase =
+  '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +
+  '!bg-transparent !text-[var(--sniptale-color-text-secondary)] ' +
+  'enabled:hover:!border-[var(--sniptale-color-border-strong)] ' +
+  'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
+  'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
+
+/** Selected tools use an accent icon; only hover draws a border. */
+export const reviewIconButtonClassName =
+  iconButtonBase +
+  ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
+  'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';
+
+/** Lane status highlights suppression; aria-pressed still reports whether the lane is enabled. */
+export const reviewTrackStatusButtonClassName =
+  iconButtonBase +
+  ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
+  'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
+
+/** Labelled commands share the transparent timeline-button states without a fixed icon width. */
+export const reviewTextButtonClassName =
+  reviewIconButtonClassName + ' !w-auto gap-2 !text-xs [&_svg]:shrink-0';
+
+/** Reversible delete actions keep the same geometry with a distinct danger tone. */
+export const reviewDeleteButtonClassName =
+  reviewTextButtonClassName +
+  ' !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
+
+/** Read-only timing uses the same label/value row as editable inspector parameters. */
+export function ReviewInterval({ start, end }: { start: number; end: number }) {
+  return (
+    <div
+      className="flex min-h-8 items-center justify-between gap-3 py-0.5"
+      data-ui="gallery.videoReview.interval"
+    >
+      <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate(
+          start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
+        )}
+      </span>
+      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
+        {start === end
+          ? reviewTimeLabel(start)
+          : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`}
+      </span>
+    </div>
+  );
+}
+
+/** Inline parameter selectors use the same geometry and typography as numeric rows. */
+export const reviewSelectFieldClassName =
+  '!min-h-8 !rounded-none !border-0 !bg-transparent !px-0 !py-0 ' +
+  '[&>span]:!whitespace-normal [&>span]:!overflow-visible [&>span]:!text-xs ' +
+  '[&>span]:!font-semibold [&>span]:!text-[var(--sniptale-color-text-secondary)] ' +
+  '[&>div]:!w-auto [&>div]:!max-w-[65%]';
+
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({
   label,
   primary = false,
+  toolbarLabel,
+  toolbarPriority = 6,
   children,
   className = '',
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; primary?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  primary?: boolean;
+  toolbarLabel?: string | undefined;
+  /** Lower priorities lose their caption first when the toolbar runs out of space. */
+  toolbarPriority?: number;
+}) {
   const tone = primary
     ? getControlPrimaryButtonClassName()
     : getControlSecondaryButtonClassName({ density: 'compact' });
@@ -21,12 +111,19 @@ export function ReviewButton({
       type="button"
       title={label}
       aria-label={label}
+      data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
+      data-toolbar-priority={toolbarLabel === undefined ? undefined : toolbarPriority}
       {...props}
       className={`${tone}
-      !min-h-8 !rounded-[var(--sniptale-radius-sm)]
+      !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]
       !px-2 outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)] ${className}`}
     >
       {children ?? label}
+      {toolbarLabel !== undefined ? (
+        <span data-review-toolbar-label aria-hidden="true">
+          {toolbarLabel}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -55,5 +152,22 @@ export function reviewEventLabel(kind: string): string {
   } as const;
   return translate(
     Object.hasOwn(keys, kind) ? keys[kind as keyof typeof keys] : 'gallery.videoReview.telemetry'
+  );
+}
+
+/** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
+export function ReviewDetails({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="group min-w-0">
+      <summary
+        className="flex cursor-pointer list-none items-center gap-2 py-2 text-xs font-semibold
+        text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]
+        focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)] [&::-webkit-details-marker]:hidden"
+      >
+        <ChevronRight size={14} aria-hidden="true" className="shrink-0 group-open:rotate-90" />
+        {label}
+      </summary>
+      <div className="space-y-3 pt-2">{children}</div>
+    </details>
   );
 }

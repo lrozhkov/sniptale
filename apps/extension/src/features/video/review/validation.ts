@@ -1,6 +1,10 @@
+import { parsePaint } from '@sniptale/foundation/paint';
 import { isReviewSpeedRate } from './speed';
+import { CANVAS_COMMENT_LIMITS } from './comments';
+import { loadQuickEditAdvancedContentState } from './advanced/validation';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
+  CanvasComment,
   ReviewAnchor,
   ReviewAnnotation,
   ReviewEdit,
@@ -148,6 +152,79 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
   return { ...range, kind: 'speed', rate, audio };
 }
 
+function parseCanvasComment(value: unknown, duration: number): CanvasComment | null {
+  if (
+    !isRecord(value) ||
+    !identity(value['id']) ||
+    typeof value['text'] !== 'string' ||
+    value['text'].length > CANVAS_COMMENT_LIMITS.maxTextLength ||
+    !isRecord(value['position']) ||
+    !finite(value['position']['x']) ||
+    !finite(value['position']['y']) ||
+    value['position']['x'] < 0 ||
+    value['position']['x'] > 1 ||
+    value['position']['y'] < 0 ||
+    value['position']['y'] > 1 ||
+    (value['attachment'] !== 'content' && value['attachment'] !== 'viewport')
+  )
+    return null;
+  const start = value['start'] === undefined ? undefined : value['start'];
+  const end = value['end'] === undefined ? undefined : value['end'];
+  if (start !== undefined && !time(start, duration)) return null;
+  if (end !== undefined && !time(end, duration)) return null;
+  if (start !== undefined && end !== undefined && start >= end) return null;
+  if (typeof value['visible'] !== 'boolean' || typeof value['renderToVideo'] !== 'boolean')
+    return null;
+  const annotationId =
+    value['annotationId'] === undefined || value['annotationId'] === null
+      ? undefined
+      : value['annotationId'];
+  if (annotationId !== undefined && !identity(annotationId)) return null;
+  const placement =
+    value['placement'] === undefined || value['placement'] === null
+      ? undefined
+      : value['placement'];
+  if (placement !== undefined && placement !== 'above' && placement !== 'below') return null;
+  const style = value['style'];
+  if (
+    !isRecord(style) ||
+    typeof style['textColor'] !== 'string' ||
+    style['textColor'].length === 0 ||
+    style['textColor'].length > 64 ||
+    !finite(style['radius']) ||
+    style['radius'] < 0 ||
+    style['radius'] > 64 ||
+    (style['width'] !== undefined &&
+      (!finite(style['width']) || style['width'] < 80 || style['width'] > 640)) ||
+    (style['fontSize'] !== undefined &&
+      (!finite(style['fontSize']) || style['fontSize'] < 10 || style['fontSize'] > 48)) ||
+    (style['padding'] !== undefined &&
+      (!finite(style['padding']) || style['padding'] < 0 || style['padding'] > 32)) ||
+    parsePaint(style['fillPaint']) === null
+  )
+    return null;
+  return {
+    id: value['id'],
+    ...(annotationId === undefined ? {} : { annotationId }),
+    text: value['text'],
+    ...(start === undefined ? {} : { start }),
+    ...(end === undefined ? {} : { end }),
+    visible: value['visible'],
+    renderToVideo: value['renderToVideo'],
+    attachment: value['attachment'],
+    position: { x: value['position']['x'], y: value['position']['y'] },
+    ...(placement === undefined ? {} : { placement }),
+    style: {
+      fillPaint: parsePaint(style['fillPaint'])!,
+      textColor: style['textColor'],
+      radius: style['radius'],
+      ...(style['width'] === undefined ? {} : { width: style['width'] }),
+      ...(style['fontSize'] === undefined ? {} : { fontSize: style['fontSize'] }),
+      ...(style['padding'] === undefined ? {} : { padding: style['padding'] }),
+    },
+  };
+}
+
 /** Parses both undo values, preserving no unvalidated extension properties. */
 export function parseReviewOperation(value: unknown, duration: number): ReviewOperation | null {
   if (!isRecord(value) || !identity(value['id']) || !finite(value['at']) || value['at'] < 0)
@@ -174,7 +251,40 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       (!before && !after)
     )
       return null;
-    return { ...metadata, target: 'edit', before, after };
+    if (value['preserveFocusAnchors'] !== undefined && value['preserveFocusAnchors'] !== true)
+      return null;
+    if (
+      value['preserveVoiceoverAnchors'] !== undefined &&
+      value['preserveVoiceoverAnchors'] !== true
+    )
+      return null;
+    return {
+      ...metadata,
+      target: 'edit',
+      before,
+      after,
+      ...(value['preserveFocusAnchors'] === true ? { preserveFocusAnchors: true as const } : {}),
+      ...(value['preserveVoiceoverAnchors'] === true
+        ? { preserveVoiceoverAnchors: true as const }
+        : {}),
+    };
+  }
+  if (value['target'] === 'canvasComment') {
+    const before = value['before'] === null ? null : parseCanvasComment(value['before'], duration);
+    const after = value['after'] === null ? null : parseCanvasComment(value['after'], duration);
+    if (
+      (!before && value['before'] !== null) ||
+      (!after && value['after'] !== null) ||
+      (!before && !after)
+    )
+      return null;
+    return { ...metadata, target: 'canvasComment', before, after };
+  }
+  if (value['target'] === 'advancedContent') {
+    const before = loadQuickEditAdvancedContentState(value['before']);
+    const after = loadQuickEditAdvancedContentState(value['after']);
+    if (!before || !after) return null;
+    return { ...metadata, target: 'advancedContent', before, after };
   }
   return null;
 }

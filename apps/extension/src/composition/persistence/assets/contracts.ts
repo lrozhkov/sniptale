@@ -60,6 +60,8 @@ export interface ArchiveRestoreSession {
   committedRoots: string[];
   /** Durable portable-root to local-root identity mapping for cross-root references. */
   rootIdMap: Record<string, string>;
+  /** Durable portable-child to local-child identity mapping published with its owning root. */
+  childIdMap: Record<string, string>;
   /** Roots whose portable identity collided with an existing local graph. */
   conflictedRoots: string[];
   skippedRoots: string[];

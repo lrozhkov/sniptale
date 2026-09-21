@@ -13,8 +13,13 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { applyReviewOperation, replayReviewHistory } from '../../../features/video/review/document';
+import {
+  applyReviewOperation,
+  replayReviewHistory,
+  reviewAdvancedContentBaseline,
+} from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
+import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type { ReviewSource } from '../../../features/video/review/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
@@ -203,8 +208,16 @@ export async function commitVideoWorkspace(args: {
       args.expectedRevision,
       args.expectedSourceAssetId
     );
-    const operation = parseReviewOperation(args.operation, workspace.source.duration);
-    if (!operation) throw new VideoWorkspaceError('invalid');
+    const parsed = parseReviewOperation(args.operation, workspace.source.duration);
+    if (!parsed) throw new VideoWorkspaceError('invalid');
+    const operation =
+      parsed.target === 'edit'
+        ? {
+            ...parsed,
+            preserveFocusAnchors: true as const,
+            preserveVoiceoverAnchors: true as const,
+          }
+        : parsed;
     if (
       args.consumeDraftRevision !== undefined &&
       (!draft ||
@@ -214,7 +227,12 @@ export async function commitVideoWorkspace(args: {
         JSON.stringify(operation.before) !== JSON.stringify(draft.before))
     )
       throw new VideoWorkspaceError('conflict');
-    const document = replayReviewHistory(workspace.history, workspace.cursor, workspace.source);
+    const document = replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    );
     applyReviewOperation(document, operation, workspace.source);
     const next = await putWorkspace(tx, {
       ...workspace,
@@ -244,6 +262,29 @@ export async function moveVideoWorkspaceHistory(args: {
     const cursor = snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
     if (cursor < 0 || cursor > snapshot.workspace.history.length) return snapshot;
     return { ...snapshot, workspace: await putWorkspace(tx, { ...snapshot.workspace, cursor }) };
+  });
+}
+
+/** Replaces the whole advanced state; deletion happens only through explicit replacement. */
+export async function saveVideoWorkspaceAdvanced(args: {
+  aggregateId: string;
+  expectedRevision: number;
+  expectedSourceAssetId: string;
+  advanced: unknown;
+}): Promise<VideoWorkspaceSnapshot> {
+  return mutate(args.aggregateId, async (tx) => {
+    const snapshot = await requireSnapshot(
+      tx,
+      args.aggregateId,
+      args.expectedRevision,
+      args.expectedSourceAssetId
+    );
+    const advanced = loadQuickEditAdvancedState(args.advanced);
+    if (!advanced) throw new VideoWorkspaceError('invalid');
+    return {
+      ...snapshot,
+      workspace: await putWorkspace(tx, { ...snapshot.workspace, advanced }),
+    };
   });
 }
 

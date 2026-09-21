@@ -316,3 +316,22 @@ describe('gallery preview shared actions', () => {
     verifyBusyActionRunnerFlow
   );
 });
+
+it('opens a recording in a new video project even when it belongs to a saved group', () => {
+  openInEditor(
+    createMediaItem({
+      kind: 'recording',
+      source: { kind: 'recording', recordingId: 'rec-new' },
+      recordingGroupView: {
+        groupId: 'group',
+        memberCount: 2,
+        order: 0,
+        projectId: 'old-project',
+        role: 'display',
+        sourceLabel: null,
+      },
+    })
+  );
+  expect(openVideoEditorPageMock).toHaveBeenCalledWith(null, 'rec-new');
+  expect(openVideoEditorPageMock).not.toHaveBeenCalledWith('old-project', null);
+});
