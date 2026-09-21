@@ -12,7 +12,10 @@ import type {
   ReviewRegion,
   ReviewSource,
 } from '../../features/video/review/types';
-import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
+import {
+  computeQuickEditSceneLayout,
+  computeQuickEditVideoTransform,
+} from '../../features/video/review/advanced/scene';
 import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
@@ -248,6 +251,8 @@ function ReviewSceneVideo(props: {
                 transformOrigin: '0 0',
                 transform: videoTransform,
                 maxWidth: 'none',
+                // Scene geometry already fits the source; native contain can leave a raster seam.
+                objectFit: 'fill',
                 pointerEvents: 'none',
               }
             : {
@@ -331,16 +336,38 @@ function backgroundPaintOf(background: {
   return '#000000';
 }
 
+/** Align the stationary raster bounds; fractional video boxes expose the black stage edge. */
+function snapPreviewRect(rect: ReviewRegion): ReviewRegion {
+  return {
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.max(1, Math.round(rect.width)),
+    height: Math.max(1, Math.round(rect.height)),
+  };
+}
+
+function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout>[0]) {
+  const layout = computeQuickEditSceneLayout(input);
+  const videoRect = snapPreviewRect(layout.videoRect);
+  // Camera motion stays subpixel-smooth and overlays use the same displayed frame bounds.
+  return {
+    ...layout,
+    videoRect,
+    videoTransform: computeQuickEditVideoTransform({ videoRect, camera: input.camera }),
+  };
+}
+
 /** Measures and projects the preview through the same scene model as export. */
 function useReviewStageGeometry(
   props: Parameters<typeof ReviewStage>[0],
   host: RefObject<HTMLDivElement | null>
 ) {
   const viewport = useStageMeasure(host);
-  const size = fitVideoRect(viewport, props.scene?.canvas ?? props.source);
+  const fitted = fitVideoRect(viewport, props.scene?.canvas ?? props.source);
+  const size = snapPreviewRect(fitted);
   const sceneLayout = props.scene
-    ? computeQuickEditSceneLayout({
-        output: size,
+    ? previewSceneLayout({
+        output: fitted,
         canvas: props.scene?.canvas,
         source: props.source,
         background: props.scene.background,
@@ -348,8 +375,8 @@ function useReviewStageGeometry(
       })
     : null;
   const zoomLayout = props.zoom
-    ? computeQuickEditSceneLayout({
-        output: size,
+    ? previewSceneLayout({
+        output: fitted,
         canvas: props.scene?.canvas,
         source: props.source,
         background: props.scene?.background ?? { enabled: false },

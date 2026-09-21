@@ -79,105 +79,54 @@ vi.mock('../shared/download', async (importOriginal) => ({
   downloadGalleryBlob: integration.download,
 }));
 
-it('creates and edits a visible overlay through the current inspector selection owner', async () => {
-  const fixture = createEditorFixture(integration);
-  integration.index.mockResolvedValue({
-    duration: 4,
-    boundaries: [0, 1, 2, 3, 4],
-    videoCodec: 'vp8',
-    processedVideoCodec: 'vp8',
-    audioCodec: null,
-    container: 'webm',
-    rotation: 0,
-  });
-  try {
-    await act(async () =>
-      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
-    );
-    expect(
-      fixture.button('advancedEditing').closest('[data-ui="gallery.videoReview.timeline"]')
-    ).not.toBeNull();
-    expect(fixture.host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
-    await fixture.click('advancedEditing');
-    await act(async () =>
-      [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
-        .find((button) => button.textContent === 'gallery.videoReview.comments')!
-        .click()
-    );
-    await fixture.click('addOverlayComment');
-    expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')
-    ).not.toBeNull();
-    expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')
-    ).not.toBeNull();
-    const text = fixture.host.querySelector<HTMLTextAreaElement>(
-      '[data-ui="gallery.videoReview.overlayTextInput"]'
-    )!;
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-        text,
-        'Frame note'
+it.each([false, true])(
+  'keeps canvas comments unavailable in Notes (advanced=%s)',
+  async (advanced) => {
+    const annotation = {
+      id: 'note-a',
+      text: 'Saved note',
+      anchor: { kind: 'point' as const, time: 1 },
+    };
+    const fixture = createEditorFixture(integration, {
+      history: [{ id: 'note-op', at: 1, target: 'annotation', before: null, after: annotation }],
+    });
+    try {
+      await act(async () =>
+        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
       );
-      text.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 350)));
-    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
-      target: 'canvasComment',
-      after: { text: 'Frame note', visible: true, renderToVideo: true },
-    });
-    expect(
-      fixture.host.querySelector('aside [aria-label="gallery.videoReview.advancedEditing"]')
-    ).toBeNull();
-  } finally {
-    await fixture.cleanup();
-  }
-});
-
-it('bridges a saved annotation into the selected video overlay editor', async () => {
-  const annotation = {
-    id: 'note-a',
-    text: 'Saved note',
-    anchor: { kind: 'point' as const, time: 1 },
-  };
-  const fixture = createEditorFixture(integration, {
-    history: [
-      {
-        id: 'note-op',
-        at: 1,
+      if (advanced) {
+        await fixture.click('advancedEditing');
+        await act(async () =>
+          [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
+            .find((button) => button.textContent === 'gallery.videoReview.comments')!
+            .click()
+        );
+      }
+      expect(fixture.host.textContent).toContain('Saved note');
+      expect(
+        fixture.host.querySelector('[aria-label="gallery.videoReview.showOnVideo"]')
+      ).toBeNull();
+      expect(
+        fixture.host.querySelector('[aria-label="gallery.videoReview.addOverlayComment"]')
+      ).toBeNull();
+      expect(
+        fixture.host.querySelector('[data-ui="gallery.videoReview.canvasComments"]')
+      ).toBeNull();
+      expect(
+        fixture.host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')
+      ).toBeNull();
+      await fixture.click('editComment');
+      await fixture.fill('Edited note');
+      await fixture.click('save');
+      expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
         target: 'annotation',
-        before: null,
-        after: annotation,
-      },
-    ],
-  });
-  try {
-    await act(async () =>
-      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
-    );
-    await fixture.click('advancedEditing');
-    await act(async () =>
-      [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
-        .find((button) => button.textContent === 'gallery.videoReview.comments')!
-        .click()
-    );
-    await fixture.click('showOnVideo');
-    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
-      target: 'canvasComment',
-      after: { annotationId: annotation.id, renderToVideo: true, visible: true },
-    });
-    expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')
-    ).not.toBeNull();
-    expect(
-      fixture.host.querySelector<HTMLTextAreaElement>(
-        '[data-ui="gallery.videoReview.overlayTextInput"]'
-      )?.disabled
-    ).toBe(true);
-  } finally {
-    await fixture.cleanup();
+        after: { text: 'Edited note' },
+      });
+    } finally {
+      await fixture.cleanup();
+    }
   }
-});
+);
 
 it('keeps conflict recovery accessible while a Basic comment is being edited', async () => {
   const fixture = createEditorFixture(integration);

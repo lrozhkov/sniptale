@@ -2777,3 +2777,83 @@ for (const variant of [
     }
   });
 }
+
+test('quick editor preview has no black raster seam after resizing and changing modes', async ({
+  page,
+}, testInfo) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'ru' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-avc-padded-color.mp4', {
+      width: 1904,
+      height: 984,
+      duration: 2,
+    });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('dialog');
+    const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+    await expect
+      .poll(() => stage.locator('video').evaluate((v) => v.readyState))
+      .toBeGreaterThan(1);
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: translate(key, 'ru'), exact: true });
+    for (const [width, height] of [
+      [1920, 1080],
+      [1280, 720],
+      [900, 900],
+      [2560, 720],
+    ]) {
+      await page.setViewportSize({ width: width!, height: height! });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('gallery.videoReview.backgroundSolid').click();
+      const padding = dialog.getByRole('textbox', {
+        name: translate('gallery.videoReview.backgroundPadding', 'ru'),
+        exact: true,
+      });
+      await padding.fill('48');
+      await padding.press('Enter');
+      await button('gallery.videoReview.advancedEditing').click();
+      const screenshot = await page.screenshot({
+        path: testInfo.outputPath(`preview-${width}.png`),
+      });
+      const bounds = await stage.boundingBox();
+      expect(bounds).not.toBeNull();
+      const edges = await page.evaluate(
+        async ({ encoded, box }) => {
+          const image = new Image();
+          const loaded = new Promise<void>((resolve, reject) => {
+            image.onload = () => resolve();
+            image.onerror = reject;
+          });
+          image.src = `data:image/png;base64,${encoded}`;
+          await loaded;
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(image, 0, 0);
+          const x = Math.floor(box.x + box.width / 2),
+            y = Math.floor(box.y + box.height / 2);
+          return [
+            [x, Math.ceil(box.y + box.height) - 1],
+            [Math.ceil(box.x + box.width) - 1, y],
+          ].map(([px, py]) => Array.from(context.getImageData(px!, py!, 1, 1).data).slice(0, 3));
+        },
+        { encoded: screenshot.toString('base64'), box: bounds! }
+      );
+      // The synthetic fixture has bright bottom/right edges; a black pixel belongs to the stage.
+      for (const edge of edges) expect(Math.max(...edge)).toBeGreaterThan(64);
+    }
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

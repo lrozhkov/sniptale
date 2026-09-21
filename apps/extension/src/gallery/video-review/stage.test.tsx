@@ -44,22 +44,23 @@ const source = { duration: 4, width: 320, height: 180, mimeType: 'video/webm', s
 const identity: QuickEditCameraTransform = { scale: 1, centerX: 0.5, centerY: 0.5 };
 const disabled: QuickEditBackgroundSettings = { enabled: false };
 
-const renderStage = (props: {
-  scene?: {
-    background: QuickEditBackgroundSettings;
-    camera: QuickEditCameraTransform;
-    canvas?: { width: number; height: number };
-  };
-  zoom?: ReviewStageFocus;
-}) => {
+const renderStage = (
+  props: Partial<
+    Pick<
+      Parameters<typeof ReviewStage>[0],
+      'scene' | 'zoom' | 'backgroundImageUrl' | 'drawing' | 'region'
+    >
+  >
+) => {
   act(() => {
     root.render(
       <ReviewStage
         url="blob:review"
         source={source}
         video={{ current: null }}
-        drawing={false}
-        region={undefined}
+        drawing={props.drawing ?? false}
+        region={props.region}
+        backgroundImageUrl={props.backgroundImageUrl}
         {...(props.scene ? { scene: props.scene } : {})}
         {...(props.zoom ? { zoom: props.zoom } : {})}
         onRegion={vi.fn()}
@@ -109,9 +110,9 @@ it('paints the scene background and crops the video to the content rect', async 
   const stageNode = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
   expect(stageNode.style.background).toBe('rgb(17, 34, 51)');
   const clip = stage.video.parentElement!;
-  expect(Number.parseFloat(clip.style.left)).toBeCloseTo(177.7778);
+  expect(Number.parseFloat(clip.style.left)).toBe(178);
   expect(clip.style.top).toBe('100px');
-  expect(Number.parseFloat(clip.style.width)).toBeCloseTo(444.4444);
+  expect(Number.parseFloat(clip.style.width)).toBe(444);
   expect(clip.style.height).toBe('250px');
   expect(clip.style.overflow).toBe('hidden');
   // Fitted video inside the padded content rect (letterboxed horizontally).
@@ -119,7 +120,7 @@ it('paints the scene background and crops the video to the content rect', async 
   const width = Number(stage.video.style.width.replace('px', ''));
   expect(left).toBe(0);
   expect(Number(stage.video.style.top.replace('px', ''))).toBeCloseTo(0, 6);
-  expect(width).toBeCloseTo(444.44, 1);
+  expect(width).toBe(444);
   expect(Number(stage.video.style.height.replace('px', ''))).toBeCloseTo(250, 6);
 });
 
@@ -277,7 +278,11 @@ it('moves and resizes spotlight on the stage with live preview and one durable c
     onChange,
     onInteract,
   };
-  const stage = renderStage({ scene: { background: disabled, camera: identity }, zoom });
+  const stage = renderStage({
+    scene: { background: disabled, camera: identity, focus: { regions: [zoom.region], time: 2 } },
+    zoom,
+  });
+  expect(host.querySelector('[data-ui="gallery.videoReview.spotlight"]')).not.toBeNull();
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.focusArea"]')!;
   const area = plane.querySelector<HTMLElement>('[role="group"]')!;
   vi.spyOn(plane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 450));
@@ -308,4 +313,97 @@ it('moves and resizes spotlight on the stage with live preview and one durable c
     },
   });
   expect(onInteract).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  [1550, 892],
+  [910, 524],
+  [530, 708],
+])('fills the basic preview raster at %ix%i without a second contain fit', (width, height) => {
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(height);
+  const result = renderStage({ scene: { background: disabled, camera: identity } });
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  const clip = result.video.parentElement!;
+  expect(clip.style.left).toBe('0px');
+  expect(clip.style.top).toBe('0px');
+  for (const dimension of ['width', 'height'] as const) {
+    expect(result.video.style.objectFit).toBe('fill');
+    expect(result.video.style[dimension]).toBe(stage.style[dimension]);
+    expect(clip.style[dimension]).toBe(stage.style[dimension]);
+  }
+});
+
+it('restores the source raster after gradient and image scene backgrounds', () => {
+  const layout = { padding: 23.7, cornerRadius: 12 };
+  renderStage({
+    scene: {
+      camera: identity,
+      background: {
+        enabled: true,
+        type: 'gradient',
+        layout,
+        gradient: {
+          type: 'linear',
+          angle: 90,
+          stops: [
+            { id: 'a', color: '#111318ff', position: 0, midpoint: 0.5 },
+            { id: 'b', color: '#2b2f3aff', position: 1, midpoint: 0.5 },
+          ],
+          interpolation: 'srgb',
+          repeat: { enabled: false, span: 1 },
+        },
+      },
+    },
+  });
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  expect(stage.style.background).toContain('linear-gradient');
+  const imageScene = {
+    camera: identity,
+    background: {
+      enabled: true as const,
+      type: 'image' as const,
+      layout,
+      assetId: 'background',
+      imageFit: 'cover' as const,
+    },
+  };
+  renderStage({ scene: imageScene, backgroundImageUrl: 'blob:background' });
+  expect(host.querySelector('img')?.style.objectFit).toBe('cover');
+  expect(stage.style.background).toBe('rgb(0, 0, 0)');
+  const result = renderStage({ scene: { camera: identity, background: disabled } });
+  expect(host.querySelector('img')).toBeNull();
+  expect(result.video.parentElement!.style.borderRadius).toBe('');
+  expect(result.video.style.width).toBe(stage.style.width);
+  expect(result.video.style.height).toBe(stage.style.height);
+  expect(result.video.style.objectFit).toBe('fill');
+});
+
+it('keeps note-region bounds aligned to the fitted raster when drawing and leaving the scene', async () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  const scene = { camera: identity, background: disabled };
+  const view = renderStage({ scene, drawing: true });
+  const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
+  Object.assign(stage, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await view.event(stage, 'pointerdown', 80, 45);
+  await view.event(stage, 'pointermove', 400, 225);
+  const overlay = host.querySelector<HTMLElement>(
+    '[aria-label="gallery.videoReview.selectedRegion"]'
+  )!;
+  expect(overlay.style.left).toBe('80px');
+  expect(overlay.style.top).toBe('45px');
+  expect(overlay.style.width).toBe('320px');
+  expect(overlay.querySelectorAll('[data-region-corner]')).toHaveLength(4);
+  await view.event(stage, 'pointerup', 400, 225);
+  renderStage({ scene, region: { x: 0.1, y: 0.1, width: 0.4, height: 0.4 } });
+  expect(host.querySelector('[data-region-corner]')).toBeNull();
+  expect(
+    host.querySelector<HTMLElement>('[aria-label="gallery.videoReview.selectedRegion"]')!.style.left
+  ).toBe('80px');
+  renderStage({ scene });
+  expect(host.querySelector('[aria-label="gallery.videoReview.selectedRegion"]')).toBeNull();
 });

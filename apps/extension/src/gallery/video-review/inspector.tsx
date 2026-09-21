@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   Plus,
   FileDown,
-  Video,
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -43,12 +42,9 @@ export function ReviewInspector(props: {
   onHover(value: ReviewAnnotation | null): void;
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
-  /** Shows a saved annotation on the video without duplicating its text. */
-  onShowOnVideo(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
   children: ReactNode;
   actions?: ReactNode;
-  canvas?: ReactNode;
   composer?: ReactNode;
   editingId?: string | undefined;
   contextKey?: string;
@@ -179,7 +175,6 @@ function ReviewAnnotationList(props: {
   onHover(value: ReviewAnnotation | null): void;
   onEdit(value: ReviewAnnotation): void;
   onDelete(value: ReviewAnnotation): void;
-  onShowOnVideo(value: ReviewAnnotation): void;
 }) {
   return (
     <ol className="space-y-2">
@@ -214,14 +209,6 @@ function ReviewAnnotationList(props: {
                 </span>
               </button>
               <div className="mt-2 flex justify-end gap-1">
-                <ReviewButton
-                  label={translate('gallery.videoReview.showOnVideo')}
-                  disabled={props.busy}
-                  className={reviewIconButtonClassName}
-                  onClick={() => props.onShowOnVideo(annotation)}
-                >
-                  <Video size={16} />
-                </ReviewButton>
                 <ReviewButton
                   label={translate('gallery.videoReview.editComment')}
                   disabled={props.busy}
@@ -331,9 +318,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
         onHover={props.onHover}
         onEdit={props.onEdit}
         onDelete={props.onDelete}
-        onShowOnVideo={props.onShowOnVideo}
       />
-      {props.canvas}
     </>
   );
 }
