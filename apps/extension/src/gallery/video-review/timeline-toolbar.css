@@ -1,7 +1,7 @@
 @layer utilities {
   .review-timeline-toolbar {
     --review-toolbar-size: 32px;
-    --review-toolbar-icon: 16px;
+    --review-toolbar-icon: 14px;
     --review-toolbar-font: 12px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
@@ -29,6 +29,10 @@
     flex-shrink: 0;
     width: var(--review-toolbar-icon) !important;
     height: var(--review-toolbar-icon) !important;
+  }
+  .review-timeline-toolbar [data-toolbar-transport] [data-review-toolbar-button] > svg {
+    width: 16px !important;
+    height: 16px !important;
   }
   .review-timeline-toolbar[data-labels='hidden'] [data-review-toolbar-label] {
     display: none;
@@ -59,13 +63,11 @@
   @container (max-width: 1000px) {
     .review-timeline-toolbar {
       --review-toolbar-size: 28px;
-      --review-toolbar-icon: 15px;
     }
   }
   @container (min-width: 1400px) {
     .review-timeline-toolbar {
       --review-toolbar-size: 36px;
-      --review-toolbar-icon: 18px;
       --review-toolbar-font: 13px;
     }
   }

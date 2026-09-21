@@ -104,7 +104,7 @@ export function ReviewOriginalAudioTrack(props: {
                 props.editor?.selectOriginal(range.id);
               }}
             >
-              <span className="pointer-events-none mx-3 min-w-0 flex-1 text-xs">
+              <span className="pointer-events-none mx-3 min-w-0 flex-1 text-[10px]">
                 <ReviewTimelineLabel
                   icon={range.volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
                   value={range.volume > 0 ? `${Math.round(range.volume * 100)}%` : undefined}
@@ -134,7 +134,7 @@ export function ReviewOriginalAudioTrack(props: {
               aria-label={translate('gallery.videoReview.audioMutedBySpeed')}
               data-ui="gallery.videoReview.speedAudioMute"
               aria-pressed={props.selectedEditId === edit.id}
-              className={`absolute inset-y-0 z-20 flex items-center justify-center gap-1 rounded border
+              className={`absolute inset-y-0 z-20 flex items-center justify-center gap-1 rounded border text-[10px]
                 ${reviewTimelineItemTone(props.selectedEditId === edit.id)}`}
               style={rectStyle(edit.start, edit.end)}
               onPointerDown={(event) => event.stopPropagation()}

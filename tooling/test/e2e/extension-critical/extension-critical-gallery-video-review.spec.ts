@@ -2366,6 +2366,18 @@ for (const variant of [
       await drag(focusBox, 0.1, 0.3);
       await expect(dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]')).toBeVisible();
       await expectTimelineSelection(focus.locator('[role="button"][aria-pressed="true"]'));
+      const focusLabel = focus.locator(
+        '[role="button"][aria-pressed="true"] [data-ui="gallery.videoReview.timelineLabel"]'
+      );
+      await expect(focusLabel).toHaveCSS('font-size', '10px');
+      await expect(
+        dialog
+          .locator(
+            '[data-ui="gallery.videoReview.originalAudioRange"] [data-ui="gallery.videoReview.timelineLabel"]'
+          )
+          .first()
+      ).toHaveCSS('font-size', '10px');
+
       await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCSS(
         'background-color',
         'rgba(0, 0, 0, 0)'
@@ -2464,6 +2476,17 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       const toolbar = dialog.locator('[data-ui="gallery.videoReview.toolbar"]');
       const pointer = button('gallery.videoReview.pointerTool');
+      const cutTool = button('gallery.videoReview.cutMode');
+      await page.mouse.move(0, 0);
+      const stroke = await cutTool
+        .locator('svg')
+        .evaluate((node) => getComputedStyle(node).strokeWidth);
+      const iconColor = await cutTool.evaluate((node) => getComputedStyle(node).color);
+      await cutTool.hover();
+      await expect(cutTool.locator('svg')).toHaveCSS('stroke-width', stroke);
+      await expect(cutTool).not.toHaveCSS('color', iconColor);
+      await page.mouse.move(0, 0);
+
       await button('gallery.videoReview.advancedEditing').click();
       for (const [width, height, size] of [
         [1280, 720, 32],
@@ -2474,7 +2497,9 @@ for (const variant of [
       ] as const) {
         await page.setViewportSize({ width, height });
         await expect(pointer).toHaveCSS('height', `${size}px`);
-        await expect(toolbar).toHaveAttribute('data-labels', width >= 1920 ? 'shown' : 'hidden');
+        await expect(pointer.locator('svg')).toHaveCSS('width', '14px');
+        if (width >= 1920) await expect(toolbar).toHaveAttribute('data-labels', 'shown');
+        if (width <= 1000) await expect(toolbar).toHaveAttribute('data-labels', 'hidden');
         const geometry = await toolbar.evaluate((node) => ({
           width: node.clientWidth,
           content: node.scrollWidth,

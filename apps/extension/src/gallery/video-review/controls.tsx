@@ -35,7 +35,7 @@ const iconButtonBase =
   '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +
   '!bg-transparent !text-[var(--sniptale-color-text-secondary)] ' +
   'enabled:hover:!border-[var(--sniptale-color-border-strong)] ' +
-  'enabled:hover:!text-[var(--sniptale-color-text-primary)] enabled:hover:[&_svg]:stroke-[2.5] ' +
+  'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
   'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
 
 /** Selected tools use an accent icon; only hover draws a border. */
