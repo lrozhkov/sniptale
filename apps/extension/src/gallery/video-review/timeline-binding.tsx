@@ -228,6 +228,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       trackControls={
         <ReviewTrackControls
           advanced={props.advanced}
+          setMode={props.setMode}
           telemetryAvailable={props.telemetryAvailable}
           setTrackVisibility={props.setTrackVisibility}
           busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}

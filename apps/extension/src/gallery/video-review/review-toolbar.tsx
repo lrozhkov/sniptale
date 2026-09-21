@@ -49,13 +49,15 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
   const advanced = props.advanced;
   return (
     <>
-      <div
-        className="flex shrink-0 items-center gap-0.5"
-        data-ui="gallery.videoReview.workspaceTools"
-      >
-        <ReviewModeControl advanced={advanced} busy={busy} setMode={props.setMode} />
-        {advanced.ui.mode === 'basic' ? <ReviewHistoryTrackControl {...props} busy={busy} /> : null}
-      </div>
+      {advanced.ui.mode === 'basic' ? (
+        <div
+          className="flex shrink-0 items-center gap-0.5"
+          data-ui="gallery.videoReview.workspaceTools"
+        >
+          <ReviewModeControl advanced={advanced} busy={busy} setMode={props.setMode} />
+          <ReviewHistoryTrackControl {...props} busy={busy} />
+        </div>
+      ) : null}
       <div
         className="flex min-w-max flex-1 flex-nowrap items-center justify-center gap-0.5 px-2"
         data-ui="gallery.videoReview.editingTools"
@@ -145,6 +147,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
 function ReviewModeControl(props: {
   advanced: QuickEditAdvancedState;
   busy: boolean;
+  compact?: boolean;
   setMode(mode: 'basic' | 'advanced'): void;
 }) {
   const advanced = props.advanced.ui.mode === 'advanced';
@@ -152,7 +155,7 @@ function ReviewModeControl(props: {
     <ReviewButton
       label={translate('gallery.videoReview.advancedEditing')}
       toolbarPriority={5}
-      toolbarLabel={translate('gallery.videoReview.advancedEditing')}
+      toolbarLabel={props.compact ? undefined : translate('gallery.videoReview.advancedEditing')}
       title={translate(
         !advanced && hasSuppressedAdvancedFeatures(props.advanced)
           ? 'gallery.videoReview.advancedSuppressedHint'
@@ -160,10 +163,10 @@ function ReviewModeControl(props: {
       )}
       aria-pressed={advanced}
       disabled={props.busy}
-      className={`${plain} !w-auto gap-2`}
+      className={`${plain} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : '!w-auto gap-2'}`}
       onClick={() => props.setMode(advanced ? 'basic' : 'advanced')}
     >
-      <PanelsTopLeft size={16} className="shrink-0" aria-hidden="true" />
+      <PanelsTopLeft size={props.compact ? 14 : 16} className="shrink-0" aria-hidden="true" />
     </ReviewButton>
   );
 }
@@ -173,6 +176,7 @@ export function ReviewTrackControls(props: {
   advanced: QuickEditAdvancedState;
   telemetryAvailable: boolean;
   busy: boolean;
+  setMode(mode: 'basic' | 'advanced'): void;
   setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
 }) {
   const advanced = props.advanced;
@@ -184,6 +188,7 @@ export function ReviewTrackControls(props: {
       data-ui="gallery.videoReview.trackControls"
       className="flex items-center gap-1"
     >
+      <ReviewModeControl advanced={advanced} busy={props.busy} setMode={props.setMode} compact />
       <ReviewHistoryTrackControl {...props} compact />
       {features.mode === 'advanced' ? (
         <>
