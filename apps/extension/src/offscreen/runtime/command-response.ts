@@ -136,6 +136,9 @@ function isPositiveSafeInteger(value: unknown): value is number {
 
 function buildDesktopFrameResponse(result: unknown): OffscreenCommandSuccessResponse {
   const type = MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME;
+  if (isRecordWithExactKeys(result, ['result']) && result['result'] === 'cancelled') {
+    return { success: true, result: 'cancelled' };
+  }
   if (
     !isRecordWithExactKeys(result, ['dataUrl', 'height', 'result', 'width']) ||
     result['result'] !== 'captured' ||

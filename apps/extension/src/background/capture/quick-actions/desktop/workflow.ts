@@ -10,7 +10,6 @@ import { transitionCaptureJob } from '../../jobs/state-machine';
 import type { QuickActionRuntimeContext } from '../flow/shared';
 import { acquireMediaMutationPermit } from '../../../mutation-exclusion/media-activity';
 import { assertQuickActionPolicy } from '../../../../features/quick-actions-presets/policy';
-import { chooseDesktopScreenshotSource } from '../../../../platform/media-utils/desktop-capture-source-picker';
 import {
   ensureOffscreenDocument,
   waitForOffscreenReady,
@@ -66,7 +65,6 @@ function captureOffscreenFrame(args: {
   imageQuality: number;
   delaySeconds: number;
   requestId: string;
-  streamId: string;
 }) {
   return getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
@@ -142,26 +140,25 @@ export async function reserveDesktopQuickAction(args: {
 export async function selectAndCaptureDesktopQuickAction(args: {
   context: QuickActionRuntimeContext;
   tabId: number;
-  targetTab?: chrome.tabs.Tab;
 }): Promise<DesktopScreenshotSelection> {
   const preparation = await reserveDesktopQuickAction({
     context: args.context,
     tabId: args.tabId,
   });
   try {
-    const source = await chooseDesktopScreenshotSource(args.targetTab);
-    if (source.status === 'failed') throw new Error(source.error);
-    if (source.status === 'cancelled') {
-      return { status: 'cancelled', ...preparation };
-    }
-
+    // The offscreen command now owns the picker and live capture, not a popup continuation.
+    const pending = pendingPreparations.get(preparation.reservationToken);
+    if (!pending) throw new Error('Desktop screenshot preparation is missing or expired');
+    clearTimeout(pending.timeout);
     const response = await captureOffscreenFrame({
       imageFormat: args.context.imageFormat,
       imageQuality: args.context.imageQuality,
       delaySeconds: args.context.delaySeconds,
       requestId: preparation.requestId,
-      streamId: source.selection.streamId,
     });
+    if (response?.success && response.result === 'cancelled') {
+      return { status: 'cancelled', ...preparation };
+    }
     if (!response?.success || response.result !== 'captured') {
       throw new Error(response?.error || 'Desktop screenshot capture failed');
     }
@@ -239,15 +236,15 @@ export async function runDesktopQuickAction(args: {
   tabId: number;
 }): Promise<DesktopQuickActionResult> {
   assertQuickActionPolicy(args.context.action);
-  if (!args.desktopSelection) throw new Error('Desktop screenshot selection is required');
+  const selection = args.desktopSelection ?? (await selectAndCaptureDesktopQuickAction(args));
   const preparation = takePreparation({
     context: args.context,
-    selection: args.desktopSelection,
+    selection,
     tabId: args.tabId,
   });
   let jobId: string | null = null;
   try {
-    if (args.desktopSelection.status === 'cancelled') {
+    if (selection.status === 'cancelled') {
       await cancelOffscreenFrame(preparation.requestId);
       return { result: 'cancelled' };
     }
@@ -256,7 +253,7 @@ export async function runDesktopQuickAction(args: {
     jobId = createdJobId;
     const filename = generateFilename('desktop', args.context.imageFormat);
     const assetId = await saveScreenshotToMediaHubFromDataUrl(
-      args.desktopSelection.dataUrl,
+      selection.dataUrl,
       filename,
       undefined,
       args.context.afterCapture === 'save_to_library' ? 'library' : 'temporary'
@@ -264,7 +261,7 @@ export async function runDesktopQuickAction(args: {
     await deliverDesktopCapture({
       assetId,
       context: args.context,
-      dataUrl: args.desktopSelection.dataUrl,
+      dataUrl: selection.dataUrl,
       filename,
       jobId: createdJobId,
     });

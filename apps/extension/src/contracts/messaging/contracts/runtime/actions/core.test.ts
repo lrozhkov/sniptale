@@ -238,6 +238,21 @@ it('parses exact offscreen desktop frame responses and rejects malformed dimensi
     delaySeconds: 3,
   } as const;
   expect(offscreenDesktopCaptureContract.parseRequest(captureRequest)).toEqual(captureRequest);
+  const { streamId: _streamId, ...offscreenOwnedRequest } = captureRequest;
+  expect(offscreenDesktopCaptureContract.parseRequest(offscreenOwnedRequest)).toEqual(
+    offscreenOwnedRequest
+  );
+  expect(
+    offscreenDesktopCaptureContract.parseResponse({ success: true, result: 'cancelled' })
+  ).toEqual({ success: true, result: 'cancelled' });
+  expect(() =>
+    offscreenDesktopCaptureContract.parseResponse({
+      success: true,
+      result: 'cancelled',
+      dataUrl: 'data:image/png;base64,AA==',
+    })
+  ).toThrow();
+
   for (const delaySeconds of [-1, 2, 11, Number.NaN, '3', undefined]) {
     expect(() =>
       offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, delaySeconds })

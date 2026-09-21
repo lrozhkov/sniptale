@@ -13,7 +13,7 @@ export type RuntimeDesktopFrameRequestByType = {
     type: typeof MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME;
     capabilityToken: string;
     requestId: string;
-    streamId: string;
+    streamId?: string;
     imageFormat: DesktopFrameImageFormat;
     imageQuality: number;
     delaySeconds: number;
@@ -33,12 +33,15 @@ export type RuntimeDesktopFrameRequestByType = {
 
 export type RuntimeDesktopFrameResponseByType = {
   [MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME]: RuntimeMessageResponse<{ result: 'accepted' }>;
-  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: RuntimeMessageResponse<{
-    result: 'captured';
-    dataUrl: string;
-    width: number;
-    height: number;
-  }>;
+  [MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME]: RuntimeMessageResponse<
+    | { result: 'cancelled' }
+    | {
+        result: 'captured';
+        dataUrl: string;
+        width: number;
+        height: number;
+      }
+  >;
   [MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME]: RuntimeMessageResponse<{ result: 'accepted' }>;
   [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: RuntimeMessageResponse<{
     result: 'copied';

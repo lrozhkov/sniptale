@@ -293,3 +293,16 @@ it('surfaces a rejected page-tool operation through the menu alert', async () =>
   expect(alertText).toContain('Sniptale');
   expect(alertText).not.toContain('Toolbar unavailable');
 });
+
+it('starts Screen or Window with a three-second delay', async () => {
+  const { MenuRoute } = await import('./route');
+  act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
+  await act(async () => {
+    container
+      .querySelector<HTMLButtonElement>('[title="popup.home.quickDesktopEditHint"]')
+      ?.click();
+  });
+  expect(mocks.triggerScreenshotCapture).toHaveBeenCalledWith(
+    expect.objectContaining({ screenshotMode: 'desktop', delay: 3 })
+  );
+});

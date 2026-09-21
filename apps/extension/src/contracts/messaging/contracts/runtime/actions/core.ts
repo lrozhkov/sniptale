@@ -277,30 +277,40 @@ function isDesktopFrameAckResponse(
 }
 
 const isDesktopFrameCaptureResponseEnvelope = createRuntimeResponseGuard<
-  RuntimeMessageResponse<{
-    result: 'captured';
-    dataUrl: string;
-    width: number;
-    height: number;
-  }>
+  RuntimeMessageResponse<
+    | { result: 'cancelled' }
+    | {
+        result: 'captured';
+        dataUrl: string;
+        width: number;
+        height: number;
+      }
+  >
 >({
   optional: {
-    result: (value) => value === 'captured',
+    result: (value) => value === 'captured' || value === 'cancelled',
     dataUrl: isImageDataUrl,
     width: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
     height: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
   },
 });
-function isDesktopFrameCaptureResponse(value: unknown): value is RuntimeMessageResponse<{
-  result: 'captured';
-  dataUrl: string;
-  width: number;
-  height: number;
-}> {
+function isDesktopFrameCaptureResponse(value: unknown): value is RuntimeMessageResponse<
+  | { result: 'cancelled' }
+  | {
+      result: 'captured';
+      dataUrl: string;
+      width: number;
+      height: number;
+    }
+> {
   return (
     isDesktopFrameCaptureResponseEnvelope(value) &&
     isRecord(value) &&
     (value['success'] !== true ||
+      (value['result'] === 'cancelled' &&
+        !('dataUrl' in value) &&
+        !('width' in value) &&
+        !('height' in value)) ||
       (value['result'] === 'captured' &&
         isImageDataUrl(value['dataUrl']) &&
         isNumber(value['width']) &&
@@ -414,11 +424,13 @@ export const runtimeActionCoreMessageContracts = {
         required: {
           capabilityToken: isString,
           requestId: isDesktopCaptureCorrelationId,
-          streamId: (value) => isString(value) && value.length > 0 && value.length <= 4096,
           delaySeconds: (value) => value === 0 || value === 3 || value === 5 || value === 10,
           imageFormat: isScreenshotImageFormat,
           imageQuality: (value) =>
             isNumber(value) && Number.isFinite(value) && value >= 1 && value <= 100,
+        },
+        optional: {
+          streamId: (value) => isString(value) && value.length > 0 && value.length <= 4096,
         },
       })
     ),

@@ -51,7 +51,7 @@ function buildCaptureConfig(
   return {
     screenshotMode: mode,
     viewportPresetId: null,
-    delay: null,
+    delay: mode === 'desktop' ? 3 : null,
     afterCapture,
     imageFormat: afterCapture === 'copy' ? 'png' : null,
     imageQuality: null,

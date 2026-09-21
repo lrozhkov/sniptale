@@ -108,6 +108,11 @@ const validCompletions = [
     { error: 'encoder failed', result: 'terminal-failure' },
     { error: 'encoder failed', result: 'terminal-failure', success: true },
   ],
+  [
+    MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
+    { result: 'cancelled' },
+    { success: true, result: 'cancelled' },
+  ],
   [MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME, 'accepted', { result: 'accepted', success: true }],
   [MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME, 'accepted', { result: 'accepted', success: true }],
   [
