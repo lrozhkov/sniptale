@@ -35,6 +35,10 @@ import {
   isVideoRecordingSurfaceSnapshot,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
+function isLibraryDestinationRequestedMarker(value: unknown): value is true {
+  return value === true;
+}
+
 function isDesktopScreenshotPreparationRequest(value: unknown): value is {
   type: typeof MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE;
   actionId?: string;
@@ -203,6 +207,7 @@ export const contentActionRuntimeContracts = {
           requestId: isString,
           source: isContentPrivilegedActionRequestSource,
         },
+        optional: { libraryDestinationRequested: isLibraryDestinationRequestedMarker },
       })
     ),
     parseResponse: createGuardParser(
