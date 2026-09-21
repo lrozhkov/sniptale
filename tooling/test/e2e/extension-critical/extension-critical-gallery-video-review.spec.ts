@@ -746,6 +746,21 @@ for (const variant of [
       await expect(button('gallery.videoReview.telemetry')).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({ path: testInfo.outputPath('basic.png') });
       await button('gallery.videoReview.advancedEditing').click();
+      const inspectorTabs = dialog.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
+      const sceneTab = inspectorTabs.getByRole('button', {
+        name: label('gallery.videoReview.scene'),
+        exact: true,
+      });
+      const sceneText = sceneTab.locator('span');
+      const sceneTextX = (await sceneText.boundingBox())!.x;
+      await inspectorTabs
+        .getByRole('button', { name: label('gallery.videoReview.comments'), exact: true })
+        .click();
+      expect((await sceneText.boundingBox())!.x).toBeCloseTo(sceneTextX, 1);
+      await sceneTab.click();
+      expect((await sceneText.boundingBox())!.x).toBeCloseTo(sceneTextX, 1);
+      await expect(sceneTab).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(sceneTab).toHaveCSS('height', '32px');
       const laneControls = dialog.locator('[data-ui="gallery.videoReview.trackControls"]');
       await expect(laneControls).toBeInViewport();
       await expect(laneControls.getByRole('button')).toHaveCount(3);
@@ -1012,7 +1027,7 @@ for (const variant of [
       const stage = await dialog.locator('[data-ui="gallery.videoReview.stage"]').boundingBox();
       expect(stage!.height).toBeGreaterThan(140);
       const navigation = dialog.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
-      expect((await navigation.boundingBox())!.height).toBeGreaterThan(32);
+      expect((await navigation.boundingBox())!.height).toBe(33);
       await expect(dialog.locator('ol').getByText('Explicit note', { exact: true })).toBeInViewport(
         { ratio: 1 }
       );
@@ -2386,6 +2401,27 @@ for (const variant of [
       const edit = source.getByRole('button', { name: editLabel!, exact: true }).locator('..');
       await edit.click();
       await expect(edit.locator('button[aria-pressed="true"]')).toHaveCount(1);
+      const originalWidth = await edit.evaluate((node) => node.style.width);
+      const fitted = edit.locator('[data-ui="gallery.videoReview.timelineLabel"]');
+      await expect(edit).toHaveAttribute('title', /2×/);
+      for (const [width, mode] of [
+        [250, 'full'],
+        [80, 'compact'],
+        [50, 'value'],
+        [38, 'ellipsis'],
+      ] as const) {
+        await edit.evaluate((node, width) => {
+          node.style.width = `${width}px`;
+        }, width);
+        await expect(fitted).toHaveAttribute('data-mode', mode);
+        if (mode === 'value')
+          await expect.poll(() => edit.locator('button[aria-pressed]').innerText()).toBe('2×');
+        if (mode === 'ellipsis')
+          await expect.poll(() => edit.locator('button[aria-pressed]').innerText()).toBe('…');
+      }
+      await edit.evaluate((node, width) => {
+        node.style.width = width;
+      }, originalWidth);
       await expect(edit).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(edit).toHaveCSS('border-top-width', '1px');
       const selectedBorder = await edit.evaluate((node) => getComputedStyle(node).borderTopColor);

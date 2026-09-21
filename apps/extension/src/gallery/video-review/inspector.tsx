@@ -1,3 +1,4 @@
+import './inspector-navigation.css';
 import {
   ChevronsDownUp,
   ChevronsUpDown,
@@ -124,7 +125,10 @@ export function ReviewInspector(props: {
       ) : null}
       {props.recovery}
       {props.settingsAvailable ? (
-        <div className="shrink-0" data-ui="gallery.videoReview.inspectorNavigation">
+        <div
+          className="review-inspector-navigation shrink-0"
+          data-ui="gallery.videoReview.inspectorNavigation"
+        >
           <SegmentedSwitch<Section>
             wrap
             density="compact"

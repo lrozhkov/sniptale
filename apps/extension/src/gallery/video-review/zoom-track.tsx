@@ -1,3 +1,4 @@
+import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ScanEye } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -292,14 +293,16 @@ function ReviewZoomGapLink(props: {
   const right = props.projection?.position(next.start) ?? next.start / props.duration;
   if (!(right - left > 0)) return null;
   const connected = region.linkTo === next.id;
+  const label = translate(
+    connected ? 'gallery.videoReview.zoomLinkSettings' : 'gallery.videoReview.zoomConnect'
+  );
   return (
     <button
       type="button"
       data-ui="gallery.videoReview.zoomLink"
+      title={label}
       data-connected={connected ? 'true' : 'false'}
-      aria-label={translate(
-        connected ? 'gallery.videoReview.zoomLinkSettings' : 'gallery.videoReview.zoomConnect'
-      )}
+      aria-label={label}
       aria-pressed={props.linkSelectedId === region.id}
       className={`group absolute inset-y-1 z-[6] flex items-center justify-center rounded border
         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]
@@ -380,6 +383,7 @@ function ReviewZoomRegionBlock(
       role="button"
       tabIndex={0}
       aria-label={label}
+      title={`${label}${region.spotlight ? '' : ` · ${region.transform.scale}×`}`}
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
@@ -434,19 +438,16 @@ function ReviewZoomRegionBlock(
         props.onSelect(region.id);
       }}
     >
-      <span
-        className="pointer-events-none absolute inset-x-2 top-1/2 -translate-y-1/2
-          flex items-center justify-center gap-1 truncate text-center text-[10px]"
-      >
-        {region.spotlight ? (
-          <>
-            <ScanEye size={13} /> {translate('gallery.videoReview.focusSpotlight')}
-          </>
-        ) : (
-          <>
-            <Focus size={13} /> {region.transform.scale}×
-          </>
-        )}
+      <span className="pointer-events-none absolute inset-y-0 inset-x-3 text-[10px]">
+        <ReviewTimelineLabel
+          icon={region.spotlight ? <ScanEye size={13} /> : <Focus size={13} />}
+          name={translate(
+            region.spotlight
+              ? 'gallery.videoReview.focusSpotlight'
+              : 'gallery.videoReview.zoomRegionLabel'
+          )}
+          value={region.spotlight ? undefined : `${region.transform.scale}×`}
+        />
       </span>
       {(['start', 'end'] as const).map((edge) => (
         <span

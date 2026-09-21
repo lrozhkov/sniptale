@@ -1,3 +1,4 @@
+import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone } from './controls';
 import { useMemo } from 'react';
 import {
@@ -92,10 +93,10 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               height: ACTION_MARKER_HEIGHT_PX,
             }}
           >
-            <ReviewEventIcon kind={marker.eventType} />
-            {item.width >= 64 ? (
-              <span className="truncate">{reviewEventLabel(marker.eventType)}</span>
-            ) : null}
+            <ReviewTimelineLabel
+              icon={<ReviewEventIcon kind={marker.eventType} />}
+              name={reviewEventLabel(marker.eventType)}
+            />
           </button>
         );
       })}

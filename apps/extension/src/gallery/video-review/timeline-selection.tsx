@@ -1,3 +1,4 @@
+import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useEffect, useRef, useState } from 'react';
 import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
@@ -98,14 +99,12 @@ function ReviewEditBlock(
   }, [onSnap]);
   const committing = useRef(false);
   const range = preview ?? edit;
-  const label =
-    edit.kind === 'cut'
-      ? translate('gallery.videoReview.cutLabel')
-      : `${translate('gallery.videoReview.speedMode')} ${edit.rate < 0.25 ? `1/${1 / edit.rate}` : edit.rate}×`;
+  const { name, value, label } = reviewEditCaption(edit);
   const selected = props.selectedEditId === edit.id;
   return (
     <div
       data-ui="gallery.videoReview.editBlock"
+      title={`${label} · ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`}
       className={`absolute inset-y-1 z-[5] rounded border text-xs ${reviewTimelineItemTone(selected, edit.kind)}`}
       style={{
         left: percent(range.start, duration),
@@ -197,8 +196,11 @@ function ReviewEditBlock(
           if (event.detail === 0) props.onEdit?.(edit);
         }}
       >
-        {edit.kind === 'cut' ? <Scissors size={12} /> : <Gauge size={12} />}
-        <span className="truncate">{label}</span>
+        <ReviewTimelineLabel
+          icon={edit.kind === 'cut' ? <Scissors size={12} /> : <Gauge size={12} />}
+          name={name}
+          value={value}
+        />
       </button>
       {(['start', 'end'] as const).map((edge) => (
         <ReviewEditEdge
@@ -212,6 +214,16 @@ function ReviewEditBlock(
       ))}
     </div>
   );
+}
+
+/** One complete caption feeds the tooltip, accessible label and responsive visible parts. */
+function reviewEditCaption(edit: ReviewEdit) {
+  const name = translate(
+    edit.kind === 'cut' ? 'gallery.videoReview.cutLabel' : 'gallery.videoReview.speedMode'
+  );
+  const value =
+    edit.kind === 'speed' ? `${edit.rate < 0.25 ? `1/${1 / edit.rate}` : edit.rate}×` : undefined;
+  return { name, value, label: value ? `${name} ${value}` : name };
 }
 
 /** Pointer and keyboard resizing of one edit edge; keyboard steps follow the media boundaries. */
@@ -349,11 +361,18 @@ function ReviewCommentMarkers(
         bg-[var(--sniptale-color-surface-canvas)] px-1 text-[10px] font-medium
         text-[var(--sniptale-color-accent-emphasis)] ${range ? '' : '-translate-x-1/2'}`}
       >
-        <MessageSquare size={11} className="shrink-0" />
         {range ? (
-          <span className="truncate">{translate('gallery.videoReview.commentText')}</span>
-        ) : null}
-        {group.length > 1 ? <span>{group.length}</span> : null}
+          <ReviewTimelineLabel
+            icon={<MessageSquare size={11} />}
+            name={translate('gallery.videoReview.commentText')}
+            value={group.length > 1 ? String(group.length) : undefined}
+          />
+        ) : (
+          <>
+            <MessageSquare size={11} className="shrink-0" />
+            {group.length > 1 ? <span>{group.length}</span> : null}
+          </>
+        )}
       </button>
     );
   });

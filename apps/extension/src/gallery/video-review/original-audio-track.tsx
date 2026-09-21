@@ -1,3 +1,4 @@
+import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Volume2, VolumeX, Link2 } from 'lucide-react';
@@ -103,15 +104,11 @@ export function ReviewOriginalAudioTrack(props: {
                 props.editor?.selectOriginal(range.id);
               }}
             >
-              <span className="pointer-events-none mx-3 flex min-w-0 items-center gap-1 overflow-hidden text-xs">
-                {range.volume === 0 ? (
-                  <VolumeX size={14} className="shrink-0" aria-hidden="true" />
-                ) : (
-                  <>
-                    <Volume2 size={14} className="shrink-0" aria-hidden="true" />
-                    <span className="truncate tabular-nums">{Math.round(range.volume * 100)}%</span>
-                  </>
-                )}
+              <span className="pointer-events-none mx-3 min-w-0 flex-1 text-xs">
+                <ReviewTimelineLabel
+                  icon={range.volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                  value={range.volume > 0 ? `${Math.round(range.volume * 100)}%` : undefined}
+                />
               </span>
               {(['start', 'end'] as const).map((edge) => (
                 <span
@@ -146,8 +143,15 @@ export function ReviewOriginalAudioTrack(props: {
                 props.onSelectSpeed?.(edit);
               }}
             >
-              <VolumeX size={14} />
-              <Link2 size={12} />
+              <ReviewTimelineLabel
+                icon={
+                  <>
+                    <VolumeX size={14} />
+                    <Link2 size={12} />
+                  </>
+                }
+                name={translate('gallery.videoReview.audioMutedBySpeed')}
+              />
             </button>
           ))}
         {preview && !preview.id ? (
