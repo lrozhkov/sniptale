@@ -170,7 +170,7 @@ async function segmentVideoPackets(
   const start =
     segment.sourceStart === 0
       ? await videoSink.getFirstPacket()
-      : await videoSink.getKeyPacket(segment.sourceStart);
+      : await exactBoundaryPacket(videoSink, segment.sourceStart, signal);
   if (
     !start ||
     (segment.sourceStart !== 0 && start.timestamp !== segment.sourceStart) ||
@@ -183,9 +183,26 @@ async function segmentVideoPackets(
   )
     throw new Error('Export entry point is not independently decodable.');
   const end =
-    segment.sourceEnd === index.duration ? null : await videoSink.getKeyPacket(segment.sourceEnd);
-  if (end && end.timestamp !== segment.sourceEnd) throw new Error('Export boundary changed.');
+    segment.sourceEnd === index.duration
+      ? null
+      : await exactBoundaryPacket(videoSink, segment.sourceEnd, signal);
   return retainedVideo(videoSink, start, end, segment, signal);
+}
+
+/** Timestamp seeks may land before a known WebM keyframe; advance without moving the edit edge. */
+async function exactBoundaryPacket(
+  sink: EncodedPacketSink,
+  time: number,
+  signal: AbortSignal
+): Promise<EncodedPacket> {
+  let packet = (await sink.getKeyPacket(time)) ?? (await sink.getFirstKeyPacket());
+  while (packet && packet.timestamp < time) {
+    signal.throwIfAborted();
+    packet = await sink.getNextKeyPacket(packet);
+  }
+  signal.throwIfAborted();
+  if (!packet || packet.timestamp !== time) throw new Error('Export boundary changed.');
+  return packet;
 }
 
 /** Merge one pending packet per track so muxer buffering stays bounded. */
