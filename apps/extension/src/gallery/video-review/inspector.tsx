@@ -54,12 +54,13 @@ export function ReviewInspector(props: {
 }) {
   const contextKey = props.contextKey ?? 'comments';
   type Section = 'scene' | 'selected' | 'comments';
-  const contextSection: Section =
-    !props.settingsAvailable || contextKey.startsWith('comments')
-      ? 'comments'
-      : props.selectionLabel
-        ? 'selected'
-        : 'scene';
+  const contextSection: Section = contextKey.startsWith('comments')
+    ? 'comments'
+    : props.selectionLabel
+      ? 'selected'
+      : props.settingsAvailable
+        ? 'scene'
+        : 'comments';
   const [section, setSection] = useState<Section>(contextSection);
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -75,11 +76,14 @@ export function ReviewInspector(props: {
         : contextSection
     );
   }, [contextKey, contextSection, props.settingsAvailable]);
-  const shown = !props.settingsAvailable
-    ? 'comments'
-    : section === 'selected' && !props.selectionLabel
-      ? 'scene'
-      : section;
+  const shown =
+    section === 'selected' && !props.selectionLabel
+      ? props.settingsAvailable
+        ? 'scene'
+        : 'comments'
+      : section === 'scene' && !props.settingsAvailable
+        ? 'comments'
+        : section;
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
@@ -120,7 +124,7 @@ export function ReviewInspector(props: {
         </p>
       ) : null}
       {props.recovery}
-      {props.settingsAvailable ? (
+      {props.settingsAvailable || props.selectionLabel ? (
         <div
           className="review-inspector-navigation shrink-0"
           data-ui="gallery.videoReview.inspectorNavigation"
@@ -132,7 +136,9 @@ export function ReviewInspector(props: {
             ariaLabel={translate('gallery.videoReview.inspector')}
             options={[
               { id: 'comments', label: translate('gallery.videoReview.comments') },
-              { id: 'scene', label: translate('gallery.videoReview.scene') },
+              ...(props.settingsAvailable
+                ? [{ id: 'scene' as const, label: translate('gallery.videoReview.scene') }]
+                : []),
               ...(props.selectionLabel
                 ? [{ id: 'selected' as const, label: props.selectionLabel }]
                 : []),
@@ -147,16 +153,7 @@ export function ReviewInspector(props: {
         ) : shown === 'selected' ? (
           props.children
         ) : (
-          <>
-            {!props.settingsAvailable &&
-            (contextKey.startsWith('action:') || contextKey.startsWith('edit:')) ? (
-              <section className="space-y-2 border-b border-[var(--sniptale-color-border-soft)] pb-3">
-                <h3 className="text-sm font-semibold">{props.selectionLabel}</h3>
-                {props.children}
-              </section>
-            ) : null}
-            <ReviewNotes {...props} />
-          </>
+          <ReviewNotes {...props} />
         )}
       </div>
       <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
@@ -279,7 +276,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
       {!props.annotations.some((note) => note.id === props.editingId) ? props.composer : null}
       {!props.composer ? (
         <div className="space-y-2">
-          {!props.settingsAvailable ? (
+          {!props.settingsAvailable && !props.selectionLabel ? (
             <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>
           ) : null}
           <ReviewButton

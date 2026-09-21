@@ -141,7 +141,7 @@ it('rejects duplicate and failed interval commands without losing selection, and
   try {
     act(() => root.render(<Harness />));
     expect(hook.canApply('cut', { kind: 'range', start: 0, end: 2 })).toBe(false);
-    let pending!: Promise<void>;
+    let pending!: Promise<boolean | void>;
     act(() => {
       pending = hook.toggle('cut');
     });

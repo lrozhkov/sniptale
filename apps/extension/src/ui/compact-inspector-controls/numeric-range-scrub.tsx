@@ -39,11 +39,11 @@ interface NumericRangeScrubProps {
 }
 
 export function NumericRangeScrub(props: NumericRangeScrubProps) {
-  const [focused, setFocused] = useState(false);
-  if (props.disabled) {
-    return null;
-  }
+  return props.disabled ? null : <EnabledNumericRangeScrub {...props} />;
+}
 
+function EnabledNumericRangeScrub(props: NumericRangeScrubProps) {
+  const [focused, setFocused] = useState(false);
   const state = getNumericRangeScrubState(props);
   const visible = props.visible || props.active || focused;
 

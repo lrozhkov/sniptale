@@ -102,6 +102,27 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     expect(host.textContent).not.toContain('gallery.videoReview.committed');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).not.toBeNull();
+    await act(async () => render(false, 'edit:cut-1', 'Cut'));
+    expect(host.textContent).toContain('Selected controls');
+    expect(host.textContent).not.toContain('gallery.videoReview.commentsEmpty');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
+    const basicTabs = () =>
+      Array.from(
+        host.querySelectorAll<HTMLButtonElement>(
+          '[aria-label="gallery.videoReview.inspector"] button'
+        )
+      );
+    expect(basicTabs().map((button) => button.textContent)).toEqual([
+      'gallery.videoReview.comments',
+      'Cut',
+    ]);
+    await act(async () => basicTabs()[0]!.click());
+    expect(host.textContent).not.toContain('Selected controls');
+    expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).not.toBeNull();
+    await act(async () => basicTabs()[1]!.click());
+    expect(host.textContent).toContain('Selected controls');
+    await act(async () => render(false, 'comments'));
+    expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     await act(async () => render(true, 'settings:none:'));
     expect(host.querySelectorAll('[data-ui="gallery.videoReview.exportFooter"]')).toHaveLength(1);
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')?.className).toContain(

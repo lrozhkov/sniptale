@@ -219,6 +219,27 @@ it('keeps the range slider on the lower edge of the whole numeric row', () => {
   expect(getRange().className).not.toContain('group-focus-within/compact-numeric-row:opacity-100');
 });
 
+it('forgets slider focus after a pending save disables and restores the control', () => {
+  const props = {
+    label: 'Opacity',
+    value: 40,
+    scrub: { min: 0, max: 100 },
+    onPreviewValue: vi.fn(),
+    onCommitValue: vi.fn(),
+  };
+  renderNumericRow(props);
+  act(() => getRange().focus());
+  act(() => root?.render(<NumericRow {...props} disabled />));
+  expect(container?.querySelector('input[type="range"]')).toBeNull();
+  act(() => root?.render(<NumericRow {...props} />));
+  act(() => container?.querySelector<HTMLInputElement>('input[type="text"]')?.focus());
+  expect(
+    container
+      ?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+      ?.getAttribute('aria-hidden')
+  ).toBe('true');
+});
+
 it('reveals the row range across the label, spacing, and value area', () => {
   renderNumericRow();
 

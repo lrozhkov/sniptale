@@ -63,14 +63,14 @@ export function useReviewEdits(props: {
     requestedKind?: 'cut' | 'speed'
   ) => {
     const kind = before?.kind ?? requestedKind ?? mode;
-    if (!kind || pending.current) return;
+    if (!kind || pending.current) return false;
     const planned = candidate(kind, selection, before);
     const after = planned && { ...planned, id: before?.id ?? crypto.randomUUID() };
     if (!after) {
       props.onInvalid?.();
-      return;
+      return false;
     }
-    if (before && after.start === before.start && after.end === before.end) return;
+    if (before && after.start === before.start && after.end === before.end) return true;
     props.pause();
     pending.current = true;
     try {
@@ -79,7 +79,9 @@ export function useReviewEdits(props: {
         setSelectedEditId(after.id);
         props.setSelection({ kind: 'point', time: after.start });
         if (!before) props.seek(after.start);
+        return true;
       }
+      return false;
     } finally {
       pending.current = false;
     }

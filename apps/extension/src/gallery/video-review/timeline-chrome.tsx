@@ -48,6 +48,10 @@ export function ReviewRuler({ duration, width }: { duration: number; width: numb
 
 const plain = reviewIconButtonClassName;
 
+function playbackTime(value: number): string {
+  return formatPreciseTime(Math.round(value * 100) / 100).slice(0, -1);
+}
+
 /** Editing tools, centered transport and viewport controls share one quiet toolbar. */
 export function ReviewToolbar(props: {
   duration: number;
@@ -90,7 +94,7 @@ export function ReviewToolbar(props: {
           )}
         </ReviewButton>
         <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
-          {formatPreciseTime(props.time)} / {formatPreciseTime(props.duration)}
+          {playbackTime(props.time)} / {playbackTime(props.duration)}
         </span>
         {props.resultDuration !== undefined &&
         Math.abs(props.resultDuration - props.duration) > 0.05 ? (

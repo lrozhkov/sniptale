@@ -301,7 +301,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onRangeCommit={(range) => {
         if (props.editing.mode) void props.editing.commitRange(range);
       }}
-      onChangeEdit={(edit, range) => props.editing.commitRange(range, edit)}
+      onChangeEdit={async (edit, range) => {
+        await props.editing.commitRange(range, edit);
+      }}
       time={props.time}
       playing={props.playing}
       selection={

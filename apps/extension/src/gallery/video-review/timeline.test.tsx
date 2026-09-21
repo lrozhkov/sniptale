@@ -54,6 +54,13 @@ function renderTimeline(overrides: Partial<Parameters<typeof ReviewTimeline>[0]>
 
 type PlaneEvent = { type: string; x: number; button?: number };
 
+it('shows hundredths in playback time with correct minute rollover', () => {
+  const { host } = renderTimeline({ time: 59.999, duration: 72.345 });
+  expect(host.querySelector('[data-toolbar-transport]')?.textContent).toContain(
+    '1:00.00 / 1:12.35'
+  );
+});
+
 function planeWithMetrics(host: HTMLDivElement) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));

@@ -118,7 +118,11 @@ it.each([false, true])(
       await fixture.click('editComment');
       await fixture.fill('Edited note');
       await fixture.click('save');
-      expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      expect(
+        fixture.snapshot.workspace.history.findLast(
+          (operation) => operation.target === 'annotation'
+        )
+      ).toMatchObject({
         target: 'annotation',
         after: { text: 'Edited note' },
       });
