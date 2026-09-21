@@ -207,19 +207,17 @@ function TourSettingsPanel({
         state.selection?.kind === 'slide' &&
         !state.selection.objectId && (
           <footer className="guide-resource-footer">
-            {selectedImage && onEditImage && (
-              <ProductActionButton
-                compact
-                tone="secondary"
-                data-tour-edit-image={state.slide?.id}
-                disabled={disabled || !images[selectedImage.assetId]}
-                onClick={() => {
-                  if (state.slide) onEditImage(state.slide.id);
-                }}
-              >
-                {t('scenario.editor.guideEditImage')}
-              </ProductActionButton>
-            )}
+            <ProductActionButton
+              compact
+              tone="secondary"
+              data-tour-edit-image={state.slide?.id}
+              disabled={disabled || !images[selectedImage.assetId]}
+              onClick={() => {
+                if (state.slide) onEditImage(state.slide.id);
+              }}
+            >
+              {t('scenario.editor.guideEditImage')}
+            </ProductActionButton>
           </footer>
         )}
     </FloatingChromePanel>

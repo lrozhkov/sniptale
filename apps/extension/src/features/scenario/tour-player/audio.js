@@ -19,7 +19,7 @@ export function createTourAudio(root, signal, failed) {
   function pause() {
     generation++;
     pending = false;
-    if (current || pending) audio.pause();
+    if (current) audio.pause();
     globalThis.cancelAnimationFrame(frame);
   }
   function stop() {

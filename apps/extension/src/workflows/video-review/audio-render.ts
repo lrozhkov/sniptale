@@ -32,11 +32,10 @@ export async function chooseReviewAudioCodec(
 ) {
   if (typeof OfflineAudioContext === 'undefined') return null;
   let numberOfChannels = 2;
-  let sampleRate = outputRate;
   if (track) {
     if (!(await track.canDecode())) return null;
     numberOfChannels = await track.getNumberOfChannels();
-    sampleRate = await track.getSampleRate();
+    const sampleRate = await track.getSampleRate();
     if (numberOfChannels < 1 || numberOfChannels > 8 || sampleRate < 8000 || sampleRate > 192_000)
       return null;
   }
