@@ -58,7 +58,7 @@ export function ReviewTimelineLabel(props: {
       data-ui="gallery.videoReview.timelineLabel"
       data-mode={mode}
       className="pointer-events-none relative flex h-full w-full min-w-0
-        items-center justify-center gap-1 overflow-hidden"
+        items-center justify-center gap-1 overflow-hidden text-[var(--sniptale-color-text-secondary)]"
     >
       <span
         ref={icon}
