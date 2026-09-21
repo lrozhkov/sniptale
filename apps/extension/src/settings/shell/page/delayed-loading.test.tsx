@@ -77,6 +77,14 @@ vi.mock('../../sections/styles/annotations', () => {
   settingsPageDelayMocks.loadedSectionModules.push('annotations');
   return { AnnotationsSection: markerComponent('highlighter-section') };
 });
+vi.mock('../../sections/styles/scenario-layouts', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('scenario-layouts');
+  return { ScenarioLayoutsSection: markerComponent('scenario-layouts-section') };
+});
+vi.mock('../../sections/styles/video-effects', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('video-effects');
+  return { VideoEffectsSection: markerComponent('video-effects-section') };
+});
 vi.mock('../../sections/styles/editor-resources', () => {
   settingsPageDelayMocks.loadedSectionModules.push('editor-resources');
   return { EditorResourcesSection: markerComponent('editor-section') };
@@ -129,6 +137,7 @@ vi.mock('../command-palette', () => ({
 }));
 
 import { SettingsPage } from '.';
+import { preloadDeferredSettingsSections } from './sections';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -195,7 +204,9 @@ describe('SettingsPage delayed loading', () => {
     expect(settingsPageDelayMocks.loadedSectionModules).toEqual([]);
 
     await advanceTimersBy(1);
-    await flushDeferredSection();
+    await act(async () => {
+      await preloadDeferredSettingsSections();
+    });
 
     expect(new Set(settingsPageDelayMocks.loadedSectionModules)).toEqual(
       new Set([
@@ -203,6 +214,8 @@ describe('SettingsPage delayed loading', () => {
         'screen-sizes',
         'saving',
         'annotations',
+        'scenario-layouts',
+        'video-effects',
         'editor-resources',
         'media-quality',
         'ai-prompts',
