@@ -6,7 +6,35 @@ import { GuideProjectActions } from './project-actions';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Undo2, Redo2, Download } from 'lucide-react';
+import { Undo2, Redo2, Download, Palette } from 'lucide-react';
+
+type GuidePageHeaderProps = {
+  project: GuideProject | null;
+  images?: Record<string, string | null>;
+  panelControls?: ReactNode;
+  aiSelection?: { stepId: string | null; blockId: string | null };
+  onAiOpen?: () => void;
+  onAppearance: () => void;
+  leftControls?: ReactNode;
+  representationControls?: ReactNode;
+  showSnap?: boolean;
+  status: ComponentProps<typeof GuideProjectActions>['status'];
+  commandsDisabled: boolean;
+  onDuplicate: (name: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onReload: () => Promise<void>;
+  onPreview: () => void;
+  previewRef: Ref<HTMLButtonElement>;
+  previewDisabled: boolean;
+  disabled: boolean;
+  feedback?: ReactNode;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onChange: (project: GuideProject, group?: string | null) => void;
+  t: Translate;
+};
 
 export function GuidePageHeader({
   project,
@@ -34,33 +62,7 @@ export function GuidePageHeader({
   onRedo,
   onChange,
   t,
-}: {
-  project: GuideProject | null;
-  images?: Record<string, string | null>;
-  panelControls?: ReactNode;
-  aiSelection?: { stepId: string | null; blockId: string | null };
-  onAiOpen?: () => void;
-  onAppearance: () => void;
-  leftControls?: ReactNode;
-  representationControls?: ReactNode;
-  showSnap?: boolean;
-  status: ComponentProps<typeof GuideProjectActions>['status'];
-  commandsDisabled: boolean;
-  onDuplicate: (name: string) => Promise<void>;
-  onDelete: () => Promise<void>;
-  onReload: () => Promise<void>;
-  onPreview: () => void;
-  previewRef: Ref<HTMLButtonElement>;
-  previewDisabled: boolean;
-  disabled: boolean;
-  feedback?: ReactNode;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  onChange: (project: GuideProject, group?: string | null) => void;
-  t: Translate;
-}) {
+}: GuidePageHeaderProps) {
   return (
     <>
       <header className="guide-page-header">
@@ -106,6 +108,14 @@ export function GuidePageHeader({
               {showSnap && <GuideSnapButton t={t} disabled={disabled} />}
               <ContentToolbarButton
                 className="guide-labeled-action"
+                title={t('scenario.editor.appearance')}
+                onClick={onAppearance}
+              >
+                <Palette size={16} aria-hidden="true" />
+                <span>{t('scenario.editor.appearance')}</span>
+              </ContentToolbarButton>
+              <ContentToolbarButton
+                className="guide-labeled-action"
                 ref={previewRef}
                 title={t('scenario.editor.guideReaderOpen')}
                 disabled={previewDisabled}
@@ -145,7 +155,6 @@ export function GuidePageHeader({
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 onReload={onReload}
-                onAppearance={onAppearance}
                 t={t}
               />
             </>

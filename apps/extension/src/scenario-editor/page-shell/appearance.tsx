@@ -116,12 +116,14 @@ export function GuideAppearance({
               </ContentToolbarButton>
             </div>
           )}
-          <GuideStyleFields
-            style={resolveGuideStyle(project.style, item.styleOverrides)}
-            disabled={disabled}
-            t={t}
-            onChange={customize}
-          />
+          <InspectorCategorizedContent flatten={false}>
+            <GuideStyleFields
+              style={resolveGuideStyle(project.style, item.styleOverrides)}
+              disabled={disabled}
+              t={t}
+              onChange={customize}
+            />
+          </InspectorCategorizedContent>
         </>
       )}
     </>

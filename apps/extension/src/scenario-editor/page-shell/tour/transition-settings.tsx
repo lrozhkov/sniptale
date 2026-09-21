@@ -24,17 +24,20 @@ export function TourTransitionSettings({
     onChange({ ...tour, transition: { ...transition, hotspotTravelMs } });
   return (
     <GuideInspectorGroup icon={Layers} title={t('scenario.editor.tourTransitions')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourTransitionKind')}
-        value={transition.kind}
-        disabled={disabled}
-        options={[
-          { value: 'none', label: t('scenario.editor.tourTransitionNone') },
-          { value: 'fade', label: t('scenario.editor.tourTransitionFade') },
-          { value: 'slide', label: t('scenario.editor.tourTransitionSlide') },
-        ]}
-        onChange={(kind) => onChange({ ...tour, transition: { ...transition, kind } })}
-      />
+      <div className="tour-text-field">
+        <span>{t('scenario.editor.tourTransitionKind')}</span>
+        <CompactSelect
+          aria-label={t('scenario.editor.tourTransitionKind')}
+          value={transition.kind}
+          disabled={disabled}
+          options={[
+            { value: 'none', label: t('scenario.editor.tourTransitionNone') },
+            { value: 'fade', label: t('scenario.editor.tourTransitionFade') },
+            { value: 'slide', label: t('scenario.editor.tourTransitionSlide') },
+          ]}
+          onChange={(kind) => onChange({ ...tour, transition: { ...transition, kind } })}
+        />
+      </div>
       {transition.kind !== 'none' && (
         <TourInspectorNumericRow
           label={t('scenario.editor.tourSwitchMs')}

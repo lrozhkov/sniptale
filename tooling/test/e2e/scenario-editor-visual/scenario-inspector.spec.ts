@@ -65,9 +65,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toHaveAttribute('aria-pressed', 'true');
     await page
       .locator('.guide-page-header')
-      .getByRole('button', { name: 'Сценарий', exact: true })
+      .getByRole('button', { name: 'Оформление', exact: true })
       .click();
-    await page.getByRole('button', { name: 'Оформление сценария', exact: true }).click();
     await expect(panel.locator('h2')).toHaveText('Весь сценарий');
     await expect(
       panel.getByRole('button', { name: 'Показать все настройки', exact: true })

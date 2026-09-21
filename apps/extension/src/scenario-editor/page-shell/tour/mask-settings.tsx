@@ -28,20 +28,23 @@ export function TourMaskSettings({
       : controls.amount?.value;
   return (
     <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.tourMask')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourMask')}
-        disabled={disabled}
-        value={value.kind}
-        options={[
-          { value: 'highlight', label: t('scenario.editor.tourHighlight') },
-          { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
-          { value: 'blur', label: t('scenario.editor.tourBlur') },
-          ...(value.kind === 'redact'
-            ? [{ value: 'redact' as const, label: t('scenario.editor.tourRedact') }]
-            : []),
-        ]}
-        onChange={(kind) => onChange({ ...value, kind })}
-      />
+      <div className="tour-text-field">
+        <span>{t('scenario.editor.tourMask')}</span>
+        <CompactSelect
+          aria-label={t('scenario.editor.tourMask')}
+          disabled={disabled}
+          value={value.kind}
+          options={[
+            { value: 'highlight', label: t('scenario.editor.tourHighlight') },
+            { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
+            { value: 'blur', label: t('scenario.editor.tourBlur') },
+            ...(value.kind === 'redact'
+              ? [{ value: 'redact' as const, label: t('scenario.editor.tourRedact') }]
+              : []),
+          ]}
+          onChange={(kind) => onChange({ ...value, kind })}
+        />
+      </div>
       <p className="text-xs leading-relaxed text-[color:var(--sniptale-color-text-secondary)]">
         {t('scenario.editor.tourAreaCanvasHint')}
       </p>

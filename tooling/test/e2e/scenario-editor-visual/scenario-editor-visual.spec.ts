@@ -1191,8 +1191,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await rightDivider.focus();
     for (let i = 0; i < 15; i++) await page.keyboard.press('ArrowRight');
     await expect(rightDivider).toHaveAttribute('aria-valuenow', '260');
-    await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
-    await page.getByRole('button', { name: 'Оформление сценария', exact: true }).click();
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: 'Оформление', exact: true })
+      .click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(
       inspector.getByRole('heading', { name: 'Весь сценарий', exact: true })

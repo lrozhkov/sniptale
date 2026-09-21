@@ -15,9 +15,12 @@ export function TourCameraTools(props: ComponentProps<typeof TourStage>) {
     view === 'frame' && slide?.kind === 'image' && slide.camera.mode !== 'manual' ? 'edit' : view;
   return (
     <div className="tour-camera-editor">
-      <TourStage {...props} view={effectiveView} previewKey={replay} />
       {image && (
-        <div className="tour-camera-tools" aria-label={props.t('scenario.editor.tourCamera')}>
+        <div
+          className="tour-camera-tools"
+          role="group"
+          aria-label={props.t('scenario.editor.tourCamera')}
+        >
           <ProductActionButton
             compact
             tone="secondary"
@@ -60,6 +63,7 @@ export function TourCameraTools(props: ComponentProps<typeof TourStage>) {
           )}
         </div>
       )}
+      <TourStage {...props} view={effectiveView} previewKey={replay} />
     </div>
   );
 }

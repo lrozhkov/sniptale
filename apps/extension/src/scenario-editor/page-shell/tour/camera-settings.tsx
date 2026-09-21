@@ -36,18 +36,21 @@ export function TourCameraSettings({
     )?.zoom ?? 1;
   return (
     <GuideInspectorGroup icon={ScanSearch} title={t('scenario.editor.tourCamera')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourCameraMode')}
-        value={camera.mode}
-        disabled={locked}
-        options={[
-          { value: 'inherit', label: t('scenario.editor.tourInherited') },
-          { value: 'off', label: t('scenario.editor.tourCameraOff') },
-          { value: 'auto', label: t('scenario.editor.tourCameraAuto') },
-          { value: 'manual', label: t('scenario.editor.tourCameraManual') },
-        ]}
-        onChange={(mode) => onChange({ ...slide, camera: { ...camera, mode } })}
-      />
+      <div className="tour-text-field">
+        <span>{t('scenario.editor.tourCameraMode')}</span>
+        <CompactSelect
+          aria-label={t('scenario.editor.tourCameraMode')}
+          value={camera.mode}
+          disabled={locked}
+          options={[
+            { value: 'inherit', label: t('scenario.editor.tourInherited') },
+            { value: 'off', label: t('scenario.editor.tourCameraOff') },
+            { value: 'auto', label: t('scenario.editor.tourCameraAuto') },
+            { value: 'manual', label: t('scenario.editor.tourCameraManual') },
+          ]}
+          onChange={(mode) => onChange({ ...slide, camera: { ...camera, mode } })}
+        />
+      </div>
       {automatic && !enabled && (
         <p className="guide-inspector-hint">{t('scenario.editor.tourCameraOneTarget')}</p>
       )}

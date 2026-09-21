@@ -557,3 +557,45 @@ it('separates document defaults from slide settings and exposes every category',
   draw();
   expect(host.querySelector('nav')).toBeNull();
 });
+
+it('renders exactly one heading per section in both presentations and keeps nested subgroups', async () => {
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  for (const label of ['Appearance', 'Explanations', 'Playback', 'Transitions']) {
+    await click(label);
+    const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
+    expect(heading.textContent).toContain(label);
+    expect(
+      host.querySelectorAll('.guide-inspector-group-heading'),
+      `${label} must not repeat the section heading inside its content`
+    ).toHaveLength(0);
+  }
+  presentation = 'all';
+  draw();
+  const groups = [...host.querySelectorAll('.guide-inspector-group')];
+  expect(groups).toHaveLength(4);
+  for (const group of groups)
+    expect(group.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(1);
+  scope = 'selection';
+  selected = { kind: 'slide', slideId: 'nav', objectId: null };
+  presentation = 'sections';
+  draw();
+  for (const label of ['Navigation slide', 'Composition', 'Contents links']) {
+    await click(label);
+    const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
+    expect(heading.textContent).toContain(label);
+    expect(host.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(0);
+  }
+  const linksHeading = host.querySelector(
+    '[data-ui="shared.categorized-inspector.section-heading"]'
+  )!;
+  expect(linksHeading.querySelector('button[title="Add button"]')).not.toBeNull();
+  selected = { kind: 'slide', slideId: 'image', objectId: null };
+  draw();
+  await click('Playback');
+  const subgroupHeadings = [...host.querySelectorAll('.guide-inspector-group-heading')].map(
+    (node) => node.textContent?.trim()
+  );
+  expect(subgroupHeadings).toEqual([expect.stringContaining('Timing and autoplay')]);
+});

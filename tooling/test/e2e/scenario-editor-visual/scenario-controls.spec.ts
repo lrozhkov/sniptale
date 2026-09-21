@@ -1,6 +1,230 @@
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
-import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
+import {
+  openVisualHarness,
+  createPageIssueCollector,
+  SCENARIO_VISUAL_LOCALES,
+} from './scenario-editor-visual.helpers';
+
+const HEADER_LABELS = {
+  ru: {
+    appearance: 'Оформление',
+    document: 'Весь сценарий',
+    menu: 'Сценарий',
+    menuAppearance: 'Оформление сценария',
+    tour: 'Интерактивный тур',
+    tourDocument: 'Оформление тура',
+  },
+  en: {
+    appearance: 'Appearance',
+    document: 'Entire guide',
+    menu: 'Scenario',
+    menuAppearance: 'Guide appearance',
+    tour: 'Interactive tour',
+    tourDocument: 'Tour appearance',
+  },
+} as const;
+
+for (const locale of SCENARIO_VISUAL_LOCALES) {
+  test(`scenario header exposes a persistent labeled appearance action in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const labels = HEADER_LABELS[locale];
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, 'light', locale, { width: 1280, height: 900 });
+    const header = page.locator('.guide-page-header');
+    const appearance = header.getByRole('button', { name: labels.appearance, exact: true });
+    await expect(appearance).toBeVisible();
+    await expect(appearance.locator('span')).toHaveText(labels.appearance);
+    await appearance.click();
+    const panel = page.locator('#guide-inspector-panel');
+    await expect(panel.locator('h2')).toHaveText(labels.document);
+    await header.getByRole('button', { name: labels.menu, exact: true }).click();
+    const menu = page.locator('.guide-action-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu).not.toContainText(labels.menuAppearance);
+    await page.keyboard.press('Escape');
+    await header.getByRole('button', { name: labels.tour, exact: true }).click();
+    await appearance.click();
+    await expect(panel.locator('h2')).toHaveText(labels.tourDocument);
+    issues.assertClean();
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`numeric inspector input keeps quiet focus without a squared outline in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 900 });
+    const block = page.locator('.guide-block[data-kind="text"]').first();
+    await block.locator('textarea').focus();
+    const field = page
+      .locator('#guide-inspector-panel')
+      .locator('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
+      .first();
+    const input = field.locator('input').first();
+    await input.focus();
+    const outline = await input.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { style: style.outlineStyle, width: style.outlineWidth };
+    });
+    expect(
+      outline,
+      'nested numeric input must not render the squared accent outline'
+    ).toMatchObject({ style: 'none' });
+    const underline = await field
+      .locator('span[aria-hidden="true"]')
+      .first()
+      .evaluate((node) => Number(getComputedStyle(node).opacity));
+    expect(underline, 'quiet underline must keep keyboard focus visible').toBeGreaterThan(0);
+    issues.assertClean();
+  });
+}
+
+test('document voice fields keep dictation controls clear of editable text', async ({
+  page,
+  hostOrigin,
+}) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'ru', { width: 1280, height: 900 });
+  const metrics = await page.evaluate(() => {
+    const results: Record<string, Record<string, number>> = {};
+    let index = 0;
+    for (const field of document.querySelectorAll<HTMLElement>(
+      '.guide-document .guide-voice-field'
+    )) {
+      const input = field.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')!;
+      input.focus();
+      const control = field.querySelector<HTMLElement>('.guide-voice-control')!;
+      const fieldRect = input.getBoundingClientRect();
+      const controlRect = control.getBoundingClientRect();
+      results[`${input.getAttribute('aria-label') ?? input.tagName}#${index++}`] = {
+        rightInset: fieldRect.right - controlRect.right,
+        paddingRight: parseFloat(getComputedStyle(input).paddingRight),
+        controlWidth: controlRect.width,
+        inside:
+          controlRect.top >= fieldRect.top - 1 && controlRect.bottom <= fieldRect.bottom + 1
+            ? 1
+            : 0,
+      };
+      input.blur();
+    }
+    return results;
+  });
+  expect(Object.keys(metrics).length, 'document exposes voice fields').toBeGreaterThan(0);
+  for (const [label, metric] of Object.entries(metrics)) {
+    expect.soft(metric.inside, `${label}: controls stay inside the field`).toBe(1);
+    expect
+      .soft(metric.paddingRight, `${label}: field padding reserves the control strip`)
+      .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
+  }
+  issues.assertClean();
+});
+
+test('tour inspector and canvas controls keep contextual geometry', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'ru', { width: 1280, height: 900 });
+  const header = page.locator('.guide-page-header');
+  await header.getByRole('button', { name: 'Интерактивный тур', exact: true }).click();
+  await page.getByRole('button', { name: 'Из руководства', exact: true }).first().click();
+  const review = page.locator('.tour-generation');
+  const accept = review.getByRole('button', { name: 'Из руководства', exact: true });
+  await expect(accept).toBeEnabled({ timeout: 30_000 });
+  await accept.click();
+  const slide = page.locator('.tour-slide-select:has(img)').first();
+  await expect(slide).toBeVisible({ timeout: 10_000 });
+  await slide.click();
+  const panel = page.locator('#guide-inspector-panel');
+  await expect(panel.locator('h2')).toBeVisible();
+
+  // Camera tools live above the slide canvas instead of overlaying it.
+  const tools = page.locator('.tour-camera-tools');
+  await expect(tools).toBeVisible();
+  const camera = await page.evaluate(() => {
+    const bar = document.querySelector('.tour-camera-tools')!;
+    const stage = document.querySelector('.tour-stage-host')!;
+    const barRect = bar.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    return {
+      position: getComputedStyle(bar).position,
+      barBottom: barRect.bottom,
+      stageTop: stageRect.top,
+    };
+  });
+  expect.soft(camera.position).not.toBe('absolute');
+  expect
+    .soft(camera.barBottom <= camera.stageTop + 1, 'camera tools must not overlap the slide canvas')
+    .toBe(true);
+
+  // Clear and dictation controls hug the field edge without covering text.
+  const voiceMetrics = await panel.evaluate((node) => {
+    const metrics: Record<string, Record<string, number>> = {};
+    let index = 0;
+    for (const field of node.querySelectorAll<HTMLElement>('.guide-voice-field')) {
+      const input = field.querySelector<HTMLInputElement | HTMLTextAreaElement>('input, textarea')!;
+      input.focus();
+      const control = field.querySelector<HTMLElement>('.guide-voice-control')!;
+      const fieldRect = input.getBoundingClientRect();
+      const controlRect = control.getBoundingClientRect();
+      metrics[`${input.getAttribute('aria-label') ?? input.tagName}#${index++}`] = {
+        rightInset: fieldRect.right - controlRect.right,
+        paddingRight: parseFloat(getComputedStyle(input).paddingRight),
+        controlWidth: controlRect.width,
+        inside:
+          controlRect.top >= fieldRect.top - 1 && controlRect.bottom <= fieldRect.bottom + 1
+            ? 1
+            : 0,
+      };
+      input.blur();
+    }
+    return metrics;
+  });
+  for (const [label, metric] of Object.entries(voiceMetrics)) {
+    expect.soft(metric.inside, `${label}: controls stay inside the field`).toBe(1);
+    expect.soft(metric.rightInset, `${label}: controls hug the field edge`).toBeLessThanOrEqual(12);
+    expect
+      .soft(metric.paddingRight, `${label}: field padding reserves the control strip`)
+      .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
+  }
+
+  // Image editing is a top-context inspector action, not a footer control.
+  await expect
+    .soft(
+      panel.locator('.guide-panel-heading [data-tour-edit-image]'),
+      'edit image belongs to the inspector header'
+    )
+    .toHaveCount(1);
+  await expect.soft(panel.locator('footer [data-tour-edit-image]')).toHaveCount(0);
+
+  // Object add actions carry recognizable text labels.
+  await panel.getByRole('button', { name: 'Объекты слайда', exact: true }).click();
+  const objectActions = panel.locator('.tour-object-actions > button');
+  await expect.soft(objectActions).toHaveCount(3);
+  for (const label of ['Точка действия', 'Пояснение', 'Выделение']) {
+    await expect
+      .soft(objectActions.filter({ hasText: label }), `object action ${label}`)
+      .toHaveCount(1);
+  }
+
+  // Nested numeric inputs keep the quiet focus treatment in the tour inspector too.
+  await panel.getByRole('button', { name: 'Камера', exact: true }).click();
+  await panel.getByRole('button', { name: 'Приближение', exact: true }).click();
+  await page.getByRole('option', { name: 'Вручную', exact: true }).click();
+  const zoom = panel.locator('input[aria-label="Масштаб"]');
+  await zoom.focus();
+  expect(await zoom.evaluate((node) => getComputedStyle(node).outlineStyle)).toBe('none');
+  await testInfo.attach('tour-inspector-controls', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  issues.assertClean();
+});
 
 for (const theme of ['light', 'dark'] as const) {
   for (const width of [1280, 1024]) {

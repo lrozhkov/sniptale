@@ -40,7 +40,7 @@
   background: var(--sniptale-color-surface-canvas);
 }
 .tour-stage-host {
-  height: 100%;
+  flex: 1;
   min-height: 0;
 }
 .tour-empty,
@@ -85,13 +85,6 @@
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-.tour-object-actions > button {
-  width: 2rem;
-  height: 2rem;
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0;
 }
 .tour-generation li {
   padding-block: 0.25rem;
@@ -500,20 +493,26 @@ html[data-tour-reordering] * {
 
 .tour-camera-editor {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100%;
   min-height: 0;
 }
 .tour-camera-tools {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
   display: flex;
+  flex: none;
   justify-content: center;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 8px;
+  padding: 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-md);
+  background: var(--sniptale-color-surface-panel);
 }
 .tour-camera-tools button[aria-pressed='true'] {
   color: var(--sniptale-color-accent);

@@ -20,6 +20,29 @@
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 3px;
 }
+.guide-page
+  :is(
+    [data-ui='shared.ui.compact-inspector.numeric-value-field'],
+    [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
+  )
+  input:focus-visible {
+  outline: none;
+}
+.guide-page
+  [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
+  input:focus-visible::-webkit-slider-thumb {
+  border-color: var(--sniptale-color-accent);
+}
+.guide-page
+  [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
+  input:focus-visible::-moz-range-thumb {
+  border-color: var(--sniptale-color-accent);
+}
+.guide-page
+  [data-ui='shared.ui.compact-inspector.numeric-value-field'][data-focus-appearance='quiet']
+  > span[aria-hidden='true'] {
+  transition: none;
+}
 .guide-page [hidden] {
   display: none !important;
 }
@@ -27,8 +50,9 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  height: 3.25rem;
-  flex: 0 0 3.25rem;
+  min-height: 3.25rem;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
   min-width: 0;
   padding: 0 0.75rem;
   border-bottom: 1px solid var(--sniptale-color-border-soft);
@@ -75,7 +99,8 @@
 .guide-header-actions {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 0.25rem;
   margin-left: auto;
 }
@@ -1494,18 +1519,23 @@ html[data-guide-reordering] .guide-block-grip {
   min-width: 0;
 }
 .guide-page .guide-document .guide-voice-field > textarea,
-.guide-page .guide-voice-field > input {
+.guide-page .guide-voice-field > input,
+.guide-page .guide-inspector-panel .guide-voice-field > textarea {
   padding-right: 4.25rem;
   min-height: 2rem;
 }
 .guide-voice-control {
   position: absolute;
   display: flex;
+  gap: 0.125rem;
   top: min(0.5rem, calc((100% - 1.5rem) / 2));
-  right: 2.125rem;
+  right: 0.375rem;
   z-index: 5;
   opacity: 0;
   pointer-events: none;
+}
+.guide-document .guide-voice-control {
+  right: 2.125rem;
 }
 .guide-voice-field:hover > .guide-voice-control,
 .guide-voice-field:focus-within > .guide-voice-control,

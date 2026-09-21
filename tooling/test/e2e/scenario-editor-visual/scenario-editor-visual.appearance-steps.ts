@@ -18,8 +18,10 @@ async function chooseAppearance(scope: Page | Locator, field: string, option: st
 
 async function openDefaults(page: Page) {
   await expect(page.getByRole('status').first()).toHaveText('Saved');
-  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
-  await page.getByRole('button', { name: 'Guide appearance', exact: true }).click();
+  await page
+    .locator('.guide-page-header')
+    .getByRole('button', { name: 'Appearance', exact: true })
+    .click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   return page.locator('#guide-inspector-panel');
 }

@@ -1,4 +1,4 @@
-import { Copy, FolderOpen, MoreHorizontal, Trash2, Palette } from 'lucide-react';
+import { Copy, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
@@ -13,7 +13,6 @@ export function GuideProjectActions({
   onDuplicate,
   onDelete,
   onReload,
-  onAppearance,
   t,
 }: {
   project: GuideProject;
@@ -22,7 +21,6 @@ export function GuideProjectActions({
   onDuplicate: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onReload: () => Promise<void>;
-  onAppearance: () => void;
   t: Translate;
 }) {
   const [confirmation, setConfirmation] = useState<'delete' | 'reload' | null>(null);
@@ -48,11 +46,6 @@ export function GuideProjectActions({
             disabled,
             icon: <Copy size={15} aria-hidden="true" />,
             onSelect: copy,
-          },
-          {
-            label: t('scenario.editor.guideDefaultAppearance'),
-            icon: <Palette size={15} aria-hidden="true" />,
-            onSelect: onAppearance,
           },
           ...(status === 'conflict' || status === 'failed'
             ? [

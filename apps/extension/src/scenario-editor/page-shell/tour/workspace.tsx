@@ -11,7 +11,7 @@ import type {
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { X, Settings2, Image, List, PanelLeft } from 'lucide-react';
+import { X, Settings2, Image, List, PanelLeft, Pencil } from 'lucide-react';
 import { ScenarioWorkspaceFrame } from '../workspace';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideResourceDrawer } from '../resource-drawer';
@@ -145,6 +145,22 @@ function TourSettingsPanel({
       <div className="guide-panel-heading">
         <Settings2 size={16} />
         <h2 title={inspectorTitle}>{inspectorTitle}</h2>
+        {selectedImage &&
+          onEditImage &&
+          panels.rightScope === 'selection' &&
+          state.selection?.kind === 'slide' &&
+          !state.selection.objectId && (
+            <ContentToolbarButton
+              title={t('scenario.editor.guideEditImage')}
+              data-tour-edit-image={state.slide?.id}
+              disabled={disabled || !images[selectedImage.assetId]}
+              onClick={() => {
+                if (state.slide) onEditImage(state.slide.id);
+              }}
+            >
+              <Pencil size={16} aria-hidden="true" />
+            </ContentToolbarButton>
+          )}
         {grouped && (
           <ContentToolbarButton
             title={t(
@@ -201,25 +217,6 @@ function TourSettingsPanel({
           />
         )}
       </div>
-      {selectedImage &&
-        onEditImage &&
-        panels.rightScope === 'selection' &&
-        state.selection?.kind === 'slide' &&
-        !state.selection.objectId && (
-          <footer className="guide-resource-footer">
-            <ProductActionButton
-              compact
-              tone="secondary"
-              data-tour-edit-image={state.slide?.id}
-              disabled={disabled || !images[selectedImage.assetId]}
-              onClick={() => {
-                if (state.slide) onEditImage(state.slide.id);
-              }}
-            >
-              {t('scenario.editor.guideEditImage')}
-            </ProductActionButton>
-          </footer>
-        )}
     </FloatingChromePanel>
   );
 }

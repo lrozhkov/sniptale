@@ -18,7 +18,11 @@ export function useTourInspectorSections(presentation: 'all' | 'sections', t: Tr
   const [active, setActive] = useState<Record<string, string>>({});
   return (context: string, sections: SettingsSection[]) => {
     if (presentation === 'all')
-      return sections.map(({ id, content }) => <div key={id}>{content}</div>);
+      return sections.map(({ id, content }) => (
+        <div key={id} className="guide-inspector-section">
+          {content}
+        </div>
+      ));
     return (
       <CategorizedInspector
         key={context}

@@ -25,9 +25,8 @@ import {
 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { GuideInspectorGroup } from '../inspector';
+import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourTextField, TourTextPresentation } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
@@ -126,29 +125,37 @@ export function TourInspector(props: InspectorProps) {
         id: 'appearance',
         icon: Palette,
         label: t('scenario.editor.appearance'),
+        categorized: true,
         content: <TourDocumentSettings {...documentSettings} section="appearance" />,
       },
       {
         id: 'explanations',
         icon: MessageSquare,
         label: t('scenario.editor.tourTextPresentation'),
+        categorized: true,
         content: <TourDocumentSettings {...documentSettings} section="explanations" />,
       },
       {
         id: 'playback',
         icon: Play,
         label: t('scenario.editor.tourPlayback'),
+        categorized: true,
         content: <TourPlaybackSettings {...documentSettings} />,
       },
       {
         id: 'transitions',
         icon: Layers,
         label: t('scenario.editor.tourTransitions'),
+        categorized: true,
         content: <TourTransitionSettings {...documentSettings} />,
       },
     ]);
   if (selection?.kind === 'end')
-    return <TourEndSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />;
+    return (
+      <InspectorCategorizedContent>
+        <TourEndSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />
+      </InspectorCategorizedContent>
+    );
   if (!slide)
     return <p className="guide-inspector-hint">{t('scenario.editor.guideSelectForSettings')}</p>;
   const objectId = selection?.kind === 'slide' ? selection.objectId : null;
@@ -242,16 +249,19 @@ function TourImageSettings(props: ImageSettingsProps) {
             disabled={disabled}
             onChange={(title) => onChange({ ...slide, title })}
           />
-          <CompactSelect
-            aria-label={t('scenario.editor.tourFit')}
-            value={slide.fit}
-            disabled={disabled}
-            options={[
-              { value: 'contain', label: t('scenario.editor.tourContain') },
-              { value: 'cover', label: t('scenario.editor.tourCover') },
-            ]}
-            onChange={(fit) => onChange({ ...slide, fit })}
-          />
+          <div className="tour-text-field">
+            <span>{t('scenario.editor.tourFit')}</span>
+            <CompactSelect
+              aria-label={t('scenario.editor.tourFit')}
+              value={slide.fit}
+              disabled={disabled}
+              options={[
+                { value: 'contain', label: t('scenario.editor.tourContain') },
+                { value: 'cover', label: t('scenario.editor.tourCover') },
+              ]}
+              onChange={(fit) => onChange({ ...slide, fit })}
+            />
+          </div>
           {slide.image && (
             <TourTextField
               label={t('scenario.editor.tourAlt')}
@@ -488,27 +498,30 @@ function TourImageObjectActions({
 }) {
   return (
     <div className="tour-object-actions">
-      <ContentToolbarButton
+      <ScenarioInspectorActionButton
         disabled={disabled || !slide.image || slide.hotspots.length >= 20}
         title={t('scenario.editor.tourHotspot')}
         onClick={() => onAdd('hotspot')}
       >
-        <Crosshair size={16} />
-      </ContentToolbarButton>
-      <ContentToolbarButton
+        <Crosshair size={15} aria-hidden="true" />
+        {t('scenario.editor.tourHotspot')}
+      </ScenarioInspectorActionButton>
+      <ScenarioInspectorActionButton
         disabled={disabled || !slide.image || slide.annotations.length >= 20}
         title={t('scenario.editor.tourAnnotation')}
         onClick={() => onAdd('annotation')}
       >
-        <MessageSquare size={16} />
-      </ContentToolbarButton>
-      <ContentToolbarButton
+        <MessageSquare size={15} aria-hidden="true" />
+        {t('scenario.editor.tourAnnotation')}
+      </ScenarioInspectorActionButton>
+      <ScenarioInspectorActionButton
         disabled={disabled || !slide.image || slide.masks.length >= 20}
         title={t('scenario.editor.tourMask')}
         onClick={() => onAdd('mask')}
       >
-        <ScanLine size={16} />
-      </ContentToolbarButton>
+        <ScanLine size={15} aria-hidden="true" />
+        {t('scenario.editor.tourMask')}
+      </ScenarioInspectorActionButton>
     </div>
   );
 }
@@ -537,17 +550,20 @@ function TourDocumentSettings({
     >
       {section === 'appearance' && (
         <>
-          <CompactSelect
-            aria-label={t('scenario.editor.tourAspect')}
-            value={tour.stage.aspect}
-            disabled={disabled}
-            options={[
-              { value: '16:9', label: '16:9' },
-              { value: '4:3', label: '4:3' },
-              { value: '9:16', label: '9:16' },
-            ]}
-            onChange={(aspect) => onChange({ ...tour, stage: { ...tour.stage, aspect } })}
-          />
+          <div className="tour-text-field">
+            <span>{t('scenario.editor.tourAspect')}</span>
+            <CompactSelect
+              aria-label={t('scenario.editor.tourAspect')}
+              value={tour.stage.aspect}
+              disabled={disabled}
+              options={[
+                { value: '16:9', label: '16:9' },
+                { value: '4:3', label: '4:3' },
+                { value: '9:16', label: '9:16' },
+              ]}
+              onChange={(aspect) => onChange({ ...tour, stage: { ...tour.stage, aspect } })}
+            />
+          </div>
           <ColorField
             label={t('scenario.editor.tourBackground')}
             title={t('scenario.editor.tourBackground')}
