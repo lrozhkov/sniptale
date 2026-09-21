@@ -1,6 +1,6 @@
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
@@ -11,6 +11,7 @@ import {
 } from '../../features/video/review/snap';
 import { reviewTimeLabel } from './controls';
 import { ReviewTrackRow } from './track-row';
+import { useReviewDragEscape } from './timeline-drag';
 
 type SelectionProps = {
   duration: number;
@@ -82,21 +83,10 @@ function ReviewEditBlock(
     node: HTMLDivElement;
     pointerId: number;
   } | null>(null);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      const current = drag.current;
-      if (event.key !== 'Escape' || !current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      drag.current = null;
-      setPreview(null);
-      onSnap(null);
-      if (current.node.hasPointerCapture(current.pointerId))
-        current.node.releasePointerCapture(current.pointerId);
-    };
-    window.addEventListener('keydown', cancel, true);
-    return () => window.removeEventListener('keydown', cancel, true);
-  }, [onSnap]);
+  useReviewDragEscape(drag, () => {
+    setPreview(null);
+    onSnap(null);
+  });
   const committing = useRef(false);
   const range = preview ?? edit;
   const { name, value, label } = reviewEditCaption(edit);

@@ -2656,9 +2656,11 @@ for (const advanced of [false, true]) {
     { locale: 'ru' as const, theme: 'light' as const },
     { locale: 'en' as const, theme: 'dark' as const },
   ]) {
-    test(`quick editor automatic ranges and export fit (${variant.locale}, ${variant.theme}, advanced=${advanced})`, async ({
-      page,
-    }, testInfo) => {
+    const testTitle = [
+      'quick editor automatic ranges and export fit',
+      `(${variant.locale}, ${variant.theme}, advanced=${advanced})`,
+    ].join(' ');
+    test(testTitle, async ({ page }, testInfo) => {
       const host = await startHostServer();
       try {
         await page.setViewportSize({ width: 1920, height: 1080 });
