@@ -82,6 +82,16 @@ export function projectReviewVoiceover(
   });
 }
 
+/** Rebuilds one audible recording's source geometry from its unchanged playback duration. */
+export function reanchorReviewVoiceover(
+  clip: QuickEditAudioClip,
+  map?: readonly ReviewTimeSegment[]
+): QuickEditAudioClip {
+  if (!clip.sourceAnchor || !map || clip.dormant || isReviewVoiceoverCut(clip, map)) return clip;
+  const projected = projectReviewVoiceover([clip], map)[0];
+  return projected ? anchorReviewVoiceover(projected, map) : clip;
+}
+
 /** Moving a retained recording shifts its complete placement, including currently cut portions. */
 export function moveReviewVoiceover(
   clip: QuickEditAudioClip,

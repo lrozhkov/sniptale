@@ -275,8 +275,8 @@ it('marks the selected source edit while preserving neutral surfaces', () => {
   expect(blocks[0]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
   expect(blocks[1]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('true');
   expect(blocks[1]!.className).toContain('border-[var(--sniptale-color-accent)]');
-  expect(blocks[0]!.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
-  expect(blocks[1]!.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(blocks[0]!.className).toContain('var(--sniptale-color-danger)_12%');
+  expect(blocks[1]!.className).toContain('var(--sniptale-color-info)_12%');
   expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
 });
 

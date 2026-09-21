@@ -76,7 +76,7 @@ export function ReviewAudioWaveform(props: {
   fadeIn?: number;
   fadeOut?: number;
 }) {
-  const viewport = useWaveformViewport();
+  const viewport = useWaveformViewport(props.timelineStart);
   const wave = props.waveform;
   const { sampleTime, projection, duration, timelineStart, gainAt } = props;
   const localAt = useCallback(

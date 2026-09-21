@@ -931,6 +931,57 @@ for (const variant of [
         node.scrollLeft = 0;
       });
       await button('gallery.videoReview.fit').click();
+      const [voiceFile] = await Promise.all([
+        page.waitForEvent('filechooser'),
+        button('gallery.videoReview.audioImport').first().click(),
+      ]);
+      await voiceFile.setFiles({ name: 'voice.wav', mimeType: 'audio/wav', buffer: wav });
+      const voice = dialog.locator('[data-audio-lane="voiceover"] [role="button"]');
+      await expect(voice).toHaveCount(1);
+      const voiceBefore = (await voice.boundingBox())!;
+      await button('gallery.videoReview.speedMode').click();
+      const sourceBox = (await dialog
+        .locator('[data-ui="gallery.videoReview.sourceLane"]')
+        .boundingBox())!;
+      await page.mouse.move(sourceBox.x + 1, sourceBox.y + sourceBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(
+        sourceBox.x + sourceBox.width * 0.6,
+        sourceBox.y + sourceBox.height / 2,
+        { steps: 4 }
+      );
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await voice.boundingBox())!.width)
+        .toBeGreaterThan(voiceBefore.width * 1.9);
+      await button('gallery.videoReview.pointerTool').click();
+      const voiceBox = (await voice.boundingBox())!;
+      await expect
+        .poll(async () => (await voice.locator('path').getAttribute('d'))?.length ?? 0)
+        .toBeGreaterThan(100);
+      const loudStart = async () =>
+        voice.locator('path').evaluate((node) => {
+          const bars = [...(node.getAttribute('d') ?? '').matchAll(/M([\d.]+) ([\d.]+)V/g)];
+          return Number(bars.find((bar) => Number(bar[2]) < 40)?.[1] ?? -1);
+        });
+      const voicePeakStart = await loudStart();
+      expect(voicePeakStart).toBeGreaterThan(45);
+      expect(voicePeakStart).toBeLessThan(55);
+      await page.mouse.move(voiceBox.x + voiceBox.width / 2, voiceBox.y + voiceBox.height / 2);
+      await page.keyboard.down('Shift');
+      await page.mouse.down();
+      await page.mouse.move(
+        voiceBox.x + voiceBox.width / 2 + 25,
+        voiceBox.y + voiceBox.height / 2,
+        { steps: 3 }
+      );
+      expect((await voice.boundingBox())!.x).toBeGreaterThan(voiceBox.x + 20);
+      expect(Math.abs((await loudStart()) - voicePeakStart)).toBeLessThan(1);
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      await page.keyboard.up('Shift');
+      expect((await voice.boundingBox())!.x).toBeCloseTo(voiceBox.x, 0);
+      await page.screenshot({ path: testInfo.outputPath('voiceover-speed-preview.png') });
       const playhead = dialog.locator('[data-ui="gallery.videoReview.playhead"]');
       expect((await playhead.boundingBox())!.height).toBeGreaterThan(150);
       const timePlane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');

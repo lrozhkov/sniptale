@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAudioTrack } from './audio-track';
 import { createTrackProjection } from './track-projection';
+import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
 import type {
   QuickEditAudioClip,
@@ -58,6 +60,7 @@ afterEach(async () => {
 
 const renderTrack = (
   audio?: {
+    voiceoverSegments?: ReturnType<typeof buildReviewTimeMap>;
     original: QuickEditOriginalAudio;
     voiceover: QuickEditAudioClip[];
     music: QuickEditAudioClip[];
@@ -66,12 +69,14 @@ const renderTrack = (
   snapTimes: readonly number[] = [],
   hasOriginalAudio = true,
   assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
-  projection?: Parameters<typeof ReviewAudioTrack>[0]['projection']
+  projection?: Parameters<typeof ReviewAudioTrack>[0]['projection'],
+  waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms']
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
         projection={projection}
+        waveforms={waveforms}
         assets={assets}
         hasOriginalAudio={hasOriginalAudio}
         audio={audio ?? { original: { muted: false, volume: 1 }, voiceover: [], music: [] }}
@@ -354,4 +359,95 @@ it('marks removed source spans consistently across original, voiceover and music
     expect(mask!.style.left).toBe('20%');
     expect(mask!.style.width).toBe('20%');
   }
+});
+
+it('shows an anchored recording until playback ends and snaps its audible end while moving', async () => {
+  const recording = anchorReviewVoiceover(clip('a1', 2, 2), buildReviewTimeMap(10, []));
+  const edits = [
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+  ];
+  const lanes = renderTrack(
+    {
+      original: { muted: false, volume: 1 },
+      voiceover: [recording],
+      music: [],
+      voiceoverSegments: buildReviewTimeMap(10, edits),
+    },
+    false,
+    [4.75],
+    true,
+    undefined,
+    createTrackProjection(10, edits)
+  );
+  const block = lanes[1]!.querySelector<HTMLElement>('[role="button"]')!;
+  expect(block.style.left).toBe('20%');
+  expect(parseFloat(block.style.width)).toBeCloseTo(40);
+  vi.spyOn(lanes[1]!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200 }))
+  );
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 340 }))
+  );
+  expect(parseFloat(block.style.left)).toBeCloseTo(35);
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 340 }))
+  );
+  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 3.5);
+});
+
+it('moves anchored waveform samples with the clip before release and restores on Escape', async () => {
+  const map = buildReviewTimeMap(10, []);
+  const recording = anchorReviewVoiceover(clip('a1', 2, 2), map);
+  const lanes = renderTrack(
+    {
+      original: { muted: false, volume: 1 },
+      voiceover: [recording],
+      music: [],
+      voiceoverSegments: map,
+    },
+    false,
+    [],
+    true,
+    undefined,
+    createTrackProjection(10, []),
+    new Map([
+      [
+        'asset:1',
+        {
+          duration: 4,
+          peaks: new Float32Array([0.1, 0.9, 0.2, 0.8, 0.3, 0.7, 0.4, 0.6]),
+        },
+      ],
+    ])
+  );
+  const lane = lanes[1]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn(), hasPointerCapture: () => false });
+  const peaks = () => block.querySelector('path')!.getAttribute('d');
+  const before = peaks();
+  expect(before).not.toBe('');
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200 }))
+  );
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 300 }))
+  );
+  expect(block.style.left).toBe('30%');
+  expect(peaks()).toBe(before);
+  expect(onMoveClip).not.toHaveBeenCalled();
+  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(block.style.left).toBe('20%');
+  expect(peaks()).toBe(before);
 });

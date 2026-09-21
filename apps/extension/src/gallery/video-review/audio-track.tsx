@@ -4,6 +4,7 @@ import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types
 import type { useReviewAudio } from './use-review-audio';
 import {
   isReviewVoiceoverCut,
+  reanchorReviewVoiceover,
   reviewVoiceoverRange,
   reviewVoiceoverOffset,
 } from '../../features/video/review/voiceover-edits';
@@ -93,11 +94,10 @@ function ReviewAudioClipLane(props: {
   onDropFile?: (file: File, timelineTime: number) => void;
   trailing?: ReactNode;
   cutsProjection?: ReviewTrackProjection | undefined;
+  voiceoverSegments?: QuickEditAudioState['voiceoverSegments'] | undefined;
 }) {
   const [preview, setPreview] = useState<{
-    id: string;
-    timelineStart: number;
-    duration: number;
+    clip: QuickEditAudioClip;
     guide: number | null;
   } | null>(null);
   const dropTarget = useAudioLaneDrop(props);
@@ -129,17 +129,12 @@ function ReviewAudioClipLane(props: {
     const assetId = props.clips.find((clip) => clip.id === current.id)?.assetId ?? '';
     const assetDuration =
       props.assets?.get(assetId)?.duration ?? props.waveforms?.get(assetId)?.duration;
+    const range = reviewVoiceoverRange(shown.clip);
     if (current.edge === 'start')
-      props.onTrimClip(current.lane, current.id, 'start', shown.timelineStart, assetDuration);
+      props.onTrimClip(current.lane, current.id, 'start', range.start, assetDuration);
     else if (current.edge === 'end')
-      props.onTrimClip(
-        current.lane,
-        current.id,
-        'end',
-        shown.timelineStart + shown.duration,
-        assetDuration
-      );
-    else props.onMoveClip(current.lane, current.id, shown.timelineStart);
+      props.onTrimClip(current.lane, current.id, 'end', range.end, assetDuration);
+    else props.onMoveClip(current.lane, current.id, range.start);
   };
   return (
     <ReviewTrackRow
@@ -149,13 +144,7 @@ function ReviewAudioClipLane(props: {
     >
       <div data-ui="gallery.videoReview.audioLane" data-audio-lane={props.lane} {...dropTarget}>
         {props.clips.map((clip) => {
-          const shown =
-            preview?.id === clip.id
-              ? preview
-              : {
-                  timelineStart: reviewVoiceoverRange(clip).start,
-                  duration: reviewVoiceoverRange(clip).end - reviewVoiceoverRange(clip).start,
-                };
+          const shown = preview?.clip.id === clip.id ? preview.clip : clip;
           return (
             <ReviewAudioClipBlock
               key={clip.id}
@@ -163,18 +152,26 @@ function ReviewAudioClipLane(props: {
               shown={shown}
               selected={props.selectedId === clip.id}
               busy={props.busy}
-              cutSuppressed={isReviewVoiceoverCut(clip, props.cutsProjection?.cuts)}
+              cutSuppressed={isReviewVoiceoverCut(shown, props.cutsProjection?.cuts)}
               label={props.label}
               assets={props.assets}
               waveforms={props.waveforms}
               projection={props.projection}
+              sourceProjection={props.cutsProjection}
               snapTimes={props.snapTimes}
               duration={props.duration}
               drag={drag}
               lane={props.lane}
               clips={props.clips}
               onSelect={props.onSelect}
-              onPreview={(value) => setPreview(value && { id: clip.id, ...value })}
+              onPreview={(value) =>
+                setPreview(
+                  value && {
+                    ...value,
+                    clip: reanchorReviewVoiceover(value.clip, props.voiceoverSegments),
+                  }
+                )
+              }
               onCommit={commit}
               onCancel={cancelDrag}
             />
@@ -199,7 +196,8 @@ function ReviewAudioClipLane(props: {
 function ReviewAudioClipBlock(props: {
   clip: QuickEditAudioClip;
   cutSuppressed: boolean;
-  shown: { timelineStart: number; duration: number };
+  shown: QuickEditAudioClip;
+  sourceProjection?: ReviewTrackProjection | undefined;
   selected: boolean;
   busy: boolean;
   label: string;
@@ -212,7 +210,7 @@ function ReviewAudioClipBlock(props: {
   lane: ReviewAudioLane;
   clips: readonly QuickEditAudioClip[];
   onSelect(id: string): void;
-  onPreview(value: { timelineStart: number; duration: number; guide: number | null } | null): void;
+  onPreview(value: { clip: QuickEditAudioClip; guide: number | null } | null): void;
   onCommit(): void;
   onCancel(): void;
 }) {
@@ -220,10 +218,9 @@ function ReviewAudioClipBlock(props: {
   const asset = props.assets?.get(clip.assetId);
   const assetDuration = asset?.duration ?? props.waveforms?.get(clip.assetId)?.duration;
   const filename = asset?.filename || props.label;
-  const start =
-    props.projection?.position(props.shown.timelineStart) ??
-    props.shown.timelineStart / props.duration;
-  const endTime = props.shown.timelineStart + props.shown.duration;
+  const shownRange = reviewVoiceoverRange(props.shown);
+  const start = props.projection?.position(shownRange.start) ?? shownRange.start / props.duration;
+  const endTime = shownRange.end;
   const end = props.projection?.position(endTime, 'end') ?? endTime / props.duration;
   return (
     <div
@@ -289,17 +286,20 @@ function ReviewAudioClipBlock(props: {
             .flatMap((clip) => [reviewVoiceoverRange(clip).start, reviewVoiceoverRange(clip).end]),
         ];
         const start = snapTimelineTime(base.timelineStart + delta, candidates, threshold);
-        const end = snapTimelineTime(
-          base.timelineStart + base.duration + delta,
-          candidates,
-          threshold
-        );
+        const mapped =
+          original.sourceAnchor && !props.cutSuppressed ? props.sourceProjection : undefined;
+        const movedEnd = mapped
+          ? mapped.source(mapped.output(base.timelineStart + delta) + original.duration, 'end')
+          : base.timelineStart + base.duration + delta;
+        const requestedEnd =
+          current.edge === 'move' ? movedEnd : base.timelineStart + base.duration + delta;
+        const end = snapTimelineTime(requestedEnd, candidates, threshold);
         const useEnd =
           current.edge === 'end' ||
           (current.edge === 'move' &&
             end.candidate !== null &&
             (start.candidate === null ||
-              Math.abs(end.time - base.timelineStart - base.duration - delta) <
+              Math.abs(end.time - requestedEnd) <
                 Math.abs(start.time - base.timelineStart - delta)));
         const snapped = useEnd ? end : start;
         const next =
@@ -309,12 +309,15 @@ function ReviewAudioClipBlock(props: {
               ? trimQuickEditAudioClip(base, 'end', end.time, props.duration, assetDuration)
               : moveQuickEditAudioClip(
                   base,
-                  useEnd ? end.time - base.duration : start.time,
+                  useEnd
+                    ? mapped
+                      ? mapped.source(mapped.output(end.time) - original.duration)
+                      : end.time - base.duration
+                    : start.time,
                   props.duration
                 );
         props.onPreview({
-          timelineStart: reviewVoiceoverRange(next).start,
-          duration: reviewVoiceoverRange(next).end - reviewVoiceoverRange(next).start,
+          clip: next,
           guide: snapped.candidate,
         });
       }}
@@ -452,7 +455,12 @@ function ReviewClipLanes(props: {
           key={lane.key}
           lane={lane.key}
           label={translate(lane.label)}
-          clips={props.audio[lane.key]}
+          clips={props.audio[lane.key].map((clip) =>
+            lane.key === 'voiceover'
+              ? reanchorReviewVoiceover(clip, props.audio.voiceoverSegments)
+              : clip
+          )}
+          voiceoverSegments={lane.key === 'voiceover' ? props.audio.voiceoverSegments : undefined}
           assets={props.assets}
           waveforms={props.waveforms}
           projection={
@@ -627,29 +635,20 @@ function ReviewClipWaveform(
     'clip' | 'shown' | 'projection' | 'waveforms' | 'cutSuppressed'
   >
 ) {
-  const clip = props.clip;
+  const clip = props.shown;
+  const range = reviewVoiceoverRange(clip);
   const sampleTime = useCallback(
     (fraction: number) =>
-      clip.sourceAnchor
-        ? reviewVoiceoverOffset(clip, props.shown.timelineStart + fraction * props.shown.duration) -
-          reviewVoiceoverOffset(clip, props.shown.timelineStart)
-        : fraction * props.shown.duration,
-    [clip, props.shown.timelineStart, props.shown.duration]
+      reviewVoiceoverOffset(clip, range.start + fraction * (range.end - range.start)),
+    [clip, range.start, range.end]
   );
   return (
     <ReviewAudioWaveform
       waveform={props.waveforms?.get(clip.assetId)}
       projection={props.projection}
-      timelineStart={props.shown.timelineStart}
-      offset={
-        clip.sourceAnchor
-          ? clip.sourceOffset + reviewVoiceoverOffset(clip, props.shown.timelineStart)
-          : clip.sourceOffset +
-            (props.shown.duration !== clip.duration
-              ? props.shown.timelineStart - clip.timelineStart
-              : 0)
-      }
-      duration={clip.sourceAnchor ? clip.duration : props.shown.duration}
+      timelineStart={range.start}
+      offset={clip.sourceOffset}
+      duration={clip.duration}
       sampleTime={clip.sourceAnchor ? sampleTime : undefined}
       volume={clip.volume}
       muted={clip.muted || props.cutSuppressed}

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   anchorReviewVoiceover,
+  reanchorReviewVoiceover,
   projectReviewVoiceover,
   moveReviewVoiceover,
   trimReviewVoiceover,
@@ -113,4 +114,33 @@ it('validates anchor coverage and mapping continuity without dropping malformed 
     [{ start: 3, end: 7, offset: 0, duration: 2 }],
   ])
     expect(parseVoiceoverAnchors(invalid, 3, 4)).toBeNull();
+});
+
+it.each([2, 0.5] as const)(
+  'matches playback geometry at %sx without changing the recording',
+  (rate) => {
+    const recording = anchorReviewVoiceover({ ...clip, timelineStart: 2, duration: 2 }, original);
+    const map = buildReviewTimeMap(12, [{ ...cut(2, 8), kind: 'speed', rate, audio: 'speed' }]);
+    const shown = reanchorReviewVoiceover(recording, map);
+    expect(reviewVoiceoverRange(shown)).toEqual({ start: 2, end: 2 + 2 * rate });
+    expect(projectReviewVoiceover([shown], map)).toEqual(projectReviewVoiceover([recording], map));
+    expect(shown).toMatchObject({ duration: 2, sourceOffset: clip.sourceOffset });
+    expect(reviewVoiceoverRange(recording)).toEqual({ start: 2, end: 4 });
+    expect(reviewVoiceoverRange(reanchorReviewVoiceover(recording, original))).toEqual({
+      start: 2,
+      end: 4,
+    });
+  }
+);
+
+it('stretches only the elapsed part under speed and keeps other or cut recordings unchanged', () => {
+  const recording = anchorReviewVoiceover({ ...clip, timelineStart: 1, duration: 3 }, original);
+  const map = buildReviewTimeMap(12, [{ ...cut(2, 4), kind: 'speed', rate: 2, audio: 'speed' }]);
+  expect(reviewVoiceoverRange(reanchorReviewVoiceover(recording, map))).toEqual({
+    start: 1,
+    end: 5,
+  });
+  const later = anchorReviewVoiceover({ ...clip, timelineStart: 8, duration: 2 }, original);
+  expect(reanchorReviewVoiceover(later, map)).toEqual(later);
+  expect(reanchorReviewVoiceover(recording, buildReviewTimeMap(12, [cut(2, 3)]))).toBe(recording);
 });

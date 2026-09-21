@@ -305,9 +305,9 @@ function ReviewZoomGapLink(props: {
         focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]
         ${
           props.linkSelectedId === region.id
-            ? reviewTimelineItemTone(true)
+            ? reviewTimelineItemTone(true, 'focus')
             : connected
-              ? reviewTimelineItemTone(false)
+              ? reviewTimelineItemTone(false, 'focus')
               : `border-dashed border-transparent hover:border-[var(--sniptale-color-border-soft)]
                   focus-visible:border-[var(--sniptale-color-border-soft)]
                   text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-hover)]`
@@ -348,7 +348,7 @@ function ReviewZoomRegionBlock(
   const label =
     `${translate(region.spotlight ? 'gallery.videoReview.focusSpotlight' : 'gallery.videoReview.zoomRegionLabel')} ` +
     `${reviewTimeLabel(region.start)} – ${reviewTimeLabel(region.end)}`;
-  const tone = reviewTimelineItemTone(props.selected);
+  const tone = reviewTimelineItemTone(props.selected, 'focus');
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();

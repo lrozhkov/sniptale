@@ -8,11 +8,22 @@ import {
 } from '@sniptale/ui/control-language';
 
 /** Timeline objects share a thin selection border, never an accent fill. */
-export function reviewTimelineItemTone(selected: boolean): string {
+export function reviewTimelineItemTone(
+  selected: boolean,
+  kind: 'neutral' | 'cut' | 'speed' | 'focus' = 'neutral'
+): string {
   const border = selected
     ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
     : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
-  return `bg-[var(--sniptale-color-surface-hover)] ${border}`;
+  const surface = {
+    neutral: 'bg-[var(--sniptale-color-surface-hover)]',
+    cut: 'bg-[color-mix(in_srgb,var(--sniptale-color-danger)_12%,var(--sniptale-color-surface-hover))]',
+    speed:
+      'bg-[color-mix(in_srgb,var(--sniptale-color-info)_12%,var(--sniptale-color-surface-hover))]',
+    focus:
+      'bg-[color-mix(in_srgb,var(--sniptale-color-success)_10%,var(--sniptale-color-surface-hover))]',
+  };
+  return `${surface[kind]} ${border}`;
 }
 
 /** Consistent visible grips and hit areas across editable timeline lanes. */

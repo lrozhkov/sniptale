@@ -106,7 +106,7 @@ function ReviewEditBlock(
   return (
     <div
       data-ui="gallery.videoReview.editBlock"
-      className={`absolute inset-y-1 z-[5] rounded border text-xs ${reviewTimelineItemTone(selected)}`}
+      className={`absolute inset-y-1 z-[5] rounded border text-xs ${reviewTimelineItemTone(selected, edit.kind)}`}
       style={{
         left: percent(range.start, duration),
         width: percent(range.end - range.start, duration),

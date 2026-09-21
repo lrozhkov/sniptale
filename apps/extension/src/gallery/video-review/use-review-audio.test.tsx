@@ -3,6 +3,11 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { useReviewAudio } from './use-review-audio';
+import {
+  anchorReviewVoiceover,
+  reviewVoiceoverRange,
+} from '../../features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 vi.mock('../../composition/persistence/media-library', () => ({
   listMediaLibrary: vi.fn(async () => []),
@@ -210,6 +215,72 @@ it('keeps cut-suppressed recordings editable without trimming them to the shorte
     expect(audio.voiceover[1]).toMatchObject({ timelineStart: 9, duration: 2 });
   } finally {
     await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('commits trim samples from the displayed speed geometry without changing neighbouring recordings', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const recording = anchorReviewVoiceover(
+    createQuickEditAudioClip({
+      id: 'voice',
+      assetId: 'asset',
+      timelineStart: 2,
+      duration: 2,
+      endMax: 10,
+    }),
+    buildReviewTimeMap(10, [])
+  );
+  const neighbour = { ...recording, id: 'other' };
+  let audioState: QuickEditAudioState = {
+    original: { volume: 1, muted: false },
+    music: [],
+    voiceover: [recording, neighbour],
+    voiceoverSegments: buildReviewTimeMap(10, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 2,
+        end: 6,
+        requestedStart: 2,
+        requestedEnd: 6,
+        rate: 2,
+        audio: 'speed',
+      },
+    ]),
+  };
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewAudio>;
+  function Harness() {
+    hook = useReviewAudio({
+      audio: audioState,
+      timelineDuration: 8,
+      setAudio: (update) => {
+        audioState = update(audioState);
+      },
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.trimClip('voiceover', 'voice', 'start', 3, 2));
+    expect(audioState.voiceover[0]).toMatchObject({
+      timelineStart: 3,
+      duration: 1.5,
+      sourceOffset: 0.5,
+    });
+    expect(reviewVoiceoverRange(audioState.voiceover[0]!)).toEqual({ start: 3, end: 6 });
+    expect(audioState.voiceover[1]).toBe(neighbour);
+    act(() => root.render(<Harness />));
+    act(() => hook.moveClip('voiceover', 'voice', 6));
+    expect(audioState.voiceover[0]).toMatchObject({
+      timelineStart: 6,
+      duration: 1.5,
+      sourceOffset: 0.5,
+    });
+    expect(reviewVoiceoverRange(audioState.voiceover[0]!)).toEqual({ start: 6, end: 7.5 });
+  } finally {
+    act(() => root.unmount());
     vi.unstubAllGlobals();
   }
 });
