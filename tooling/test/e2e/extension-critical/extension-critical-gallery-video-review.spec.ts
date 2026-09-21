@@ -2069,7 +2069,7 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
       const downloading = page.waitForEvent('download');
       await button('gallery.videoReview.downloadVideo').click();
       const download = await downloading;
-      expect(download.suggestedFilename()).toMatch(new RegExp(`\\.${format}$`));
+      expect(download.suggestedFilename().endsWith(`.${format}`)).toBe(true);
       await download.saveAs(testInfo.outputPath(`color-export.${format}`));
       const bytes = await readFile(await download.path());
       const input = new Input({ source: new BlobSource(new Blob([bytes])), formats: ALL_FORMATS });
@@ -2599,7 +2599,11 @@ for (const variant of [
               const nodes = [
                 node,
                 ...node.querySelectorAll(
-                  '[data-ui="gallery.videoReview.exportFooter"], [data-ui="gallery.videoReview.exportSettings"], fieldset'
+                  [
+                    '[data-ui="gallery.videoReview.exportFooter"]',
+                    '[data-ui="gallery.videoReview.exportSettings"]',
+                    'fieldset',
+                  ].join(', ')
                 ),
               ];
               return Math.max(...nodes.map((item) => item.scrollWidth - item.clientWidth));

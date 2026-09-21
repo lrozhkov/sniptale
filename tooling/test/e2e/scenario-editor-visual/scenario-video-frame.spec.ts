@@ -10,10 +10,11 @@ import {
 const fixture = fileURLToPath(new URL('../fixtures/cache-source.webm', import.meta.url));
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`imports local videos through the library and retains captured frames after source deletion in ${theme}`, async ({
-    page,
-    hostOrigin,
-  }, testInfo) => {
+  const title = [
+    'imports local videos through the library and retains captured frames after source deletion in',
+    theme,
+  ].join(' ');
+  test(title, async ({ page, hostOrigin }, testInfo) => {
     await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
     await page.setViewportSize({ width: 1024, height: 640 });
     const id = crypto.randomUUID();

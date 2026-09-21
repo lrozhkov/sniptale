@@ -377,21 +377,10 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await expect(apply).toBeEnabled();
   await expect(page.locator('.guide-image-editor > header')).toHaveCount(0);
   await expect(page.locator('.guide-image-editor iframe')).toHaveJSProperty('clientHeight', 900);
-  const previousDownloads = await page.evaluate(async () =>
-    (await chrome.downloads.search({})).map((entry) => entry.id)
-  );
+  const downloadStarted = page.waitForEvent('download');
   await child.locator('[data-ui="editor.floating.document-bar.save-button"]').click();
-  await expect
-    .poll(() =>
-      page.evaluate(
-        async (previous) =>
-          (await chrome.downloads.search({})).some(
-            (entry) => !previous.includes(entry.id) && entry.state === 'complete'
-          ),
-        previousDownloads
-      )
-    )
-    .toBe(true);
+  const download = await downloadStarted;
+  await download.path();
   await expect(apply).toBeEnabled();
   await expect(page.locator('.guide-image-editor')).toHaveCount(1);
   await page.setViewportSize({ width: 1024, height: 640 });
@@ -496,23 +485,43 @@ async function readImageEditProof(page: Page) {
         annotations: Math.max(
           0,
           ...documents.map((entry) => {
-            const canvas = JSON.parse(entry.document.canvasJson) as {
-              objects?: Array<{ type?: string }>;
-            };
-            return (
-              canvas.objects?.filter((object) => object.type?.toLowerCase() === 'path').length ?? 0
-            );
+            const canvas: unknown = JSON.parse(entry.document.canvasJson);
+            if (
+              typeof canvas !== 'object' ||
+              canvas === null ||
+              !('objects' in canvas) ||
+              !Array.isArray(canvas.objects)
+            )
+              return 0;
+            return canvas.objects.filter(
+              (object) =>
+                typeof object === 'object' &&
+                object !== null &&
+                'type' in object &&
+                typeof object.type === 'string' &&
+                object.type.toLowerCase() === 'path'
+            ).length;
           })
         ),
         frameAnnotations: Math.max(
           0,
           ...documents.map((entry) => {
-            const canvas = JSON.parse(entry.document.canvasJson) as {
-              objects?: Array<{ sniptaleFrameAnnotationJson?: string }>;
-            };
-            return (
-              canvas.objects?.filter((object) => object.sniptaleFrameAnnotationJson).length ?? 0
-            );
+            const canvas: unknown = JSON.parse(entry.document.canvasJson);
+            if (
+              typeof canvas !== 'object' ||
+              canvas === null ||
+              !('objects' in canvas) ||
+              !Array.isArray(canvas.objects)
+            )
+              return 0;
+            return canvas.objects.filter(
+              (object) =>
+                typeof object === 'object' &&
+                object !== null &&
+                'sniptaleFrameAnnotationJson' in object &&
+                typeof object.sniptaleFrameAnnotationJson === 'string' &&
+                object.sniptaleFrameAnnotationJson.length > 0
+            ).length;
           })
         ),
         standaloneWorkspaces,

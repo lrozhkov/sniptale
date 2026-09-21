@@ -3062,6 +3062,672 @@
         "start": 269,
         "end": 295
       }
+    },
+    {
+      "id": "0cb869fe63ae7b3ee9a22eed32379da636a3672d845b05b88b81632a198d5ca5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/library-preview <-> apps/extension/src/video-editor/preview/stage/canvas",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
+        "start": 19,
+        "end": 25
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
+        "start": 193,
+        "end": 199
+      }
+    },
+    {
+      "id": "0d9ba417decac5dfa064f3b1b1b743c9dc1603b155e6178f9cd9bd50f8d5c956",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/stage.tsx",
+        "start": 162,
+        "end": 172
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/stage.tsx",
+        "start": 56,
+        "end": 65
+      }
+    },
+    {
+      "id": "1703d602edfb5e5226e687265ed971d3e2db8f6fab395f99adba7f681db66e77",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/library-preview <-> apps/extension/src/workflows/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/composition/library-preview/audio-peaks-stream.ts",
+        "start": 25,
+        "end": 36
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/video-review/waveform.ts",
+        "start": 82,
+        "end": 94
+      }
+    },
+    {
+      "id": "2e9008a62ec7b3970d1ea83ef422644c8b8ac32f64d095653b6d29939618cbdb",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/review/advanced",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
+        "start": 308,
+        "end": 313
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
+        "start": 348,
+        "end": 353
+      }
+    },
+    {
+      "id": "2f285214f686900719dd89e7834521ed2524717accb1fefbd15681e566d5ab6e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1738,
+        "end": 1749
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1769,
+        "end": 1780
+      }
+    },
+    {
+      "id": "3d699aa844579d1ae35911577d834ad1b974cbf00e4b26cbd55b23466cb3126a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/audio-track.tsx",
+        "start": 349,
+        "end": 365
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/audio-track.tsx",
+        "start": 427,
+        "end": 443
+      }
+    },
+    {
+      "id": "51812e64b9818ab827e9ddf6c76882b281e8a132fa329369c1fb017beaf66994",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/projects/backup-restore.ts",
+        "start": 94,
+        "end": 101
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/backup-restore.ts",
+        "start": 62,
+        "end": 69
+      }
+    },
+    {
+      "id": "5277b9d4038b8e2aaf31395e3dcdba6a0deace53b12748e209976e3062f7542a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/background/frame-annotation-raster/route.ts",
+        "start": 235,
+        "end": 243
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-raster-client/orchestrator.ts",
+        "start": 118,
+        "end": 126
+      }
+    },
+    {
+      "id": "54c17975cbd7cdb5889df8de766bb1420feb97e200d96f596d291027c1fba3a1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/print.tsx",
+        "start": 161,
+        "end": 174
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/reader.tsx",
+        "start": 139,
+        "end": 152
+      }
+    },
+    {
+      "id": "60ce376043e2ed4c008ec182390a5030c64e50ee28f84565360616251ea72768",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/review/advanced",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
+        "start": 178,
+        "end": 185
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
+        "start": 201,
+        "end": 207
+      }
+    },
+    {
+      "id": "63c6b4b9838606987cab4a71b82bef4b94524ec07af4c05c7c079a15a721d7f2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/review/cuts.ts",
+        "start": 49,
+        "end": 61
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/fragment.ts",
+        "start": 25,
+        "end": 37
+      }
+    },
+    {
+      "id": "6f9188d76ad721da72642a53784a52cd91abf2eaa4e53565136e0d54caef0a61",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/audio-track.tsx",
+        "start": 348,
+        "end": 356
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/audio-track.tsx",
+        "start": 76,
+        "end": 84
+      }
+    },
+    {
+      "id": "7745c8967ced82ddb8fb54726d97ba53f5cd0c4ec2a976d24ba57ecbdd542b00",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/scenario-capture-edit",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/scenario-capture-edit/edits.ts",
+        "start": 74,
+        "end": 92
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/scenario-capture-edit/tour-edits.ts",
+        "start": 101,
+        "end": 119
+      }
+    },
+    {
+      "id": "77626ae5609579307b72c9d6db35edc969dbf7c9a70325c780ab4837e0bfb05c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
+        "start": 187,
+        "end": 202
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 285,
+        "end": 300
+      }
+    },
+    {
+      "id": "7837080af26c4a3bb8eb790bcfc767a1fc2f03408451b24b45af37c307f12db5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1810,
+        "end": 1817
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 906,
+        "end": 913
+      }
+    },
+    {
+      "id": "82cfe31f1f0c8bbf8d3c450f5f40bb552615733672714b2253bc1996742c7029",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 104,
+        "end": 114
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 153,
+        "end": 163
+      }
+    },
+    {
+      "id": "8f0edd3e01e6e76d65f16f568b360ef96b8bcdf127b15f68c9b8901871c2415d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/tour",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
+        "start": 158,
+        "end": 168
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
+        "start": 170,
+        "end": 180
+      }
+    },
+    {
+      "id": "94c313163283966484eb0877218696a74edee38e563b35573065f582c44808cc",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review <-> apps/extension/src/video-editor/workspace/sidebar/selection/scene-background",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/background-inspector.tsx",
+        "start": 109,
+        "end": 121
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/colors.tsx",
+        "start": 43,
+        "end": 55
+      }
+    },
+    {
+      "id": "9ae278a5f12d11abf47a2952e3c8dfcbac3dd47f8421d850885b67d612f2fa64",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1738,
+        "end": 1749
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1782,
+        "end": 1793
+      }
+    },
+    {
+      "id": "9fadf35247382b2ab7b025dfea3f8e19fe77170cd17ac688d830704985c6edda",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/library-preview <-> apps/extension/src/video-editor/preview/stage/canvas",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
+        "start": 87,
+        "end": 105
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
+        "start": 209,
+        "end": 227
+      }
+    },
+    {
+      "id": "a4801b008c8afdc8f2ee0f72107f4a9261938513cf7697a984ff66e4f097fc98",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-advanced-content.ts",
+        "start": 112,
+        "end": 125
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/use-advanced.ts",
+        "start": 79,
+        "end": 92
+      }
+    },
+    {
+      "id": "a50d841d0dffa7739a50ca33c203d8ca9f3521e4b1c5967a0942f1b519f1bcec",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell <-> apps/extension/src/settings/sections/styles/scenario-layouts",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/template-catalog.ts",
+        "start": 21,
+        "end": 36
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/scenario-layouts/controller.ts",
+        "start": 35,
+        "end": 50
+      }
+    },
+    {
+      "id": "a5d0985b400da2757a3ca7bdefd74a18cc7c39ffc31c74c07105e686c43af9c9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/block-actions.tsx",
+        "start": 29,
+        "end": 37
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/step-actions.tsx",
+        "start": 27,
+        "end": 35
+      }
+    },
+    {
+      "id": "b3d9a3bac21e7e4630befbbfd305704c5bde4321e7aff3c97c5d0feb3ca0ccb4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-advanced-content.ts",
+        "start": 74,
+        "end": 94
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/use-advanced.ts",
+        "start": 44,
+        "end": 64
+      }
+    },
+    {
+      "id": "bb82b72b964a82b844abfc47d40b1f46cc24682d8297f1672700d9b6a8e722db",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/workflows/media-hub-backup/v6/root-publication",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/projects/backup-restore.ts",
+        "start": 94,
+        "end": 101
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/media-review-assets.ts",
+        "start": 109,
+        "end": 116
+      }
+    },
+    {
+      "id": "bcf501a4754f1d88238b1b0a9f763089babecfe7cf2d8a9b73dd40294decdaaf",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell <-> apps/extension/src/settings/sections/styles/scenario-layouts",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/template-catalog.ts",
+        "start": 9,
+        "end": 16
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/scenario-layouts/controller.ts",
+        "start": 19,
+        "end": 26
+      }
+    },
+    {
+      "id": "ceba95ecbb9cf83c0eefa8b2e06b394dae0d6337802f01e498b815b42c68c2ce",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/use-advanced-content.ts",
+        "start": 114,
+        "end": 125
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/use-session.ts",
+        "start": 191,
+        "end": 202
+      }
+    },
+    {
+      "id": "d15d1d97960e534f1957204bf3aa60457aaf43580bfc5443588842538ceceea2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 307,
+        "end": 315
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 45,
+        "end": 53
+      }
+    },
+    {
+      "id": "dbfb9034aef4273718bda6bb9d96bde1bab0bde1265f73a38ea162e80ad1977a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 154,
+        "end": 165
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 251,
+        "end": 262
+      }
+    },
+    {
+      "id": "e0bf69c0488cd820874b9a0aac1a79c33cc95757c49930f28652e937ca631ab4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
+        "start": 230,
+        "end": 236
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 321,
+        "end": 327
+      }
+    },
+    {
+      "id": "e3e24f108f7f61abf721161be596a367cb42c30b5a101df1ab517db206586938",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 466,
+        "end": 472
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/note-block.tsx",
+        "start": 60,
+        "end": 66
+      }
+    },
+    {
+      "id": "e6ccf6f3a4d54344d3748fd0e9eb6716d7d719db1fc3c9c554076e664c0746f5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1738,
+        "end": 1749
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1752,
+        "end": 1763
+      }
+    },
+    {
+      "id": "e9e82d1b5558b027649582ed1176cd8dee8da57039286537ca8b34212df11d37",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell <-> apps/extension/src/scenario-editor/page-shell/tour",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/html-workbench.tsx",
+        "start": 55,
+        "end": 69
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/export.tsx",
+        "start": 33,
+        "end": 47
+      }
+    },
+    {
+      "id": "ee819f2440f1d5f3b3c5ffb9d015d491d56f0b9ec46f8ecfe7628d6cd28d7f76",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 270,
+        "end": 275
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 746,
+        "end": 750
+      }
+    },
+    {
+      "id": "f095d57aa3f1603bcd9c0092f8e40f1a35b155c3886c423919d261b89bf944e1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/scenario/tour-player",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/features/scenario/tour-player/authoring-rect.js",
+        "start": 92,
+        "end": 102
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/scenario/tour-player/authoring.js",
+        "start": 59,
+        "end": 69
+      }
+    },
+    {
+      "id": "ff123f4c2da89af993920e73489d770ffa86600d977cfa51a41c9d0759b1b65d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/timeline-selection.tsx",
+        "start": 83,
+        "end": 91
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/zoom-track.tsx",
+        "start": 146,
+        "end": 154
+      }
+    },
+    {
+      "id": "ffea1bcc52722a940ed0b84c5e93500052235a5d607114b4b25fdcd81271d844",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review",
+      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
+      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-21",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/audio-track.tsx",
+        "start": 426,
+        "end": 442
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/audio-track.tsx",
+        "start": 76,
+        "end": 93
+      }
     }
   ]
 }

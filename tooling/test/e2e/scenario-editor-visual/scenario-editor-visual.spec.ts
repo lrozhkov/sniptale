@@ -354,7 +354,11 @@ test('workspace has three aligned surface headers and restores panels by section
   await expect(page.locator('.guide-library-link')).toHaveCount(0);
   await expect(page.locator('.guide-center-panel > .guide-page-header')).toBeVisible();
   const headers = page.locator(
-    '.guide-workspace > .guide-library-panel > .guide-panel-heading, .guide-center-panel > .guide-page-header, .guide-workspace > .guide-inspector-panel > .guide-panel-heading'
+    [
+      '.guide-workspace > .guide-library-panel > .guide-panel-heading',
+      '.guide-center-panel > .guide-page-header',
+      '.guide-workspace > .guide-inspector-panel > .guide-panel-heading',
+    ].join(', ')
   );
   await expect(headers).toHaveCount(3);
   const boxes = await headers.evaluateAll((elements) =>

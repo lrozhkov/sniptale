@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "controlId": "qa.rule.naming",
   "findingCount": 19,
-  "findingDigest": "sha256:f10fc074af109e165d9e61e3ad02b5ddfb5fe6422497953c053c281b506194dc",
+  "findingDigest": "sha256:a6e91a16e7e2c87b8396ed057d6cb9417e8b75e6262f6147dca6999623d684df",
   "rationales": [
     {
       "id": "noise.naming.reviewed-owner-context",
@@ -84,7 +84,7 @@
       "noiseId": "noise.naming.reviewed-owner-context"
     },
     {
-      "file": "packages/runtime-contracts/src/scenario/types/base.ts",
+      "file": "packages/runtime-contracts/src/scenario/guide-capture-schema.ts",
       "rule": "repeated-child-prefix-topology",
       "noiseId": "noise.naming.reviewed-owner-context"
     },

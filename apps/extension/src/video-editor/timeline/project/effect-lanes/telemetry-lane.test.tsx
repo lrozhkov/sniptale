@@ -381,7 +381,7 @@ function overlappingTypingFixture() {
     cursorTrack: null,
     actionEvents: [],
     signals: [
-      { id: 'typing', kind: 'typing', startTime: 1, endTime: 3, point: null, data: {} },
+      { id: 'typing', kind: 'typing', startTime: 1, endTime: 4, point: null, data: {} },
       { id: 'idle', kind: 'cursor-idle', startTime: 0, endTime: 5, point: null, data: {} },
       { id: 'static', kind: 'static-frame', startTime: 0, endTime: 5, point: null, data: {} },
     ],
