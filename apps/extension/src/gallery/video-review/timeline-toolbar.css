@@ -69,17 +69,4 @@
       --review-toolbar-font: 13px;
     }
   }
-  @container (min-width: 2400px) {
-    .review-timeline-toolbar {
-      --review-toolbar-size: 40px;
-      --review-toolbar-icon: 20px;
-      --review-toolbar-font: 14px;
-    }
-  }
-  @container (min-width: 3400px) {
-    .review-timeline-toolbar {
-      --review-toolbar-size: 44px;
-      --review-toolbar-icon: 22px;
-    }
-  }
 }

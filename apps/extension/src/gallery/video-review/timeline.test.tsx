@@ -218,7 +218,8 @@ it('highlights only the explicitly selected action, independently of playback', 
   expect(selected?.getAttribute('aria-pressed')).toBe('true');
   expect(selected?.className).toContain('border-[var(--sniptale-color-accent)]');
   expect(selected?.className).not.toContain('bg-[var(--sniptale-color-accent');
-  expect(selected?.className).toContain('bg-transparent');
+  expect(selected?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(scrolled?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   expect(scrolled?.getAttribute('aria-pressed')).toBe('false');
   expect(scrolled?.className).not.toContain('accent');
   expect(scrolled?.className).not.toContain('ring-');
@@ -251,7 +252,7 @@ it('exposes transport, continuous zoom and fit without a volume control', () => 
   ).toBe('0');
 });
 
-it('marks the selected source edit without filling its range or other edits', () => {
+it('marks the selected source edit while preserving neutral surfaces', () => {
   const edits = [
     { id: 'cut', kind: 'cut' as const, start: 1, end: 2, requestedStart: 1, requestedEnd: 2 },
     {
@@ -274,10 +275,8 @@ it('marks the selected source edit without filling its range or other edits', ()
   expect(blocks[0]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('false');
   expect(blocks[1]!.querySelector('button')!.getAttribute('aria-pressed')).toBe('true');
   expect(blocks[1]!.className).toContain('border-[var(--sniptale-color-accent)]');
-  for (const block of blocks) {
-    expect(block.className).toContain('bg-transparent');
-    expect(block.style.backgroundColor).toBe('');
-  }
+  expect(blocks[0]!.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(blocks[1]!.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   expect(host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
 });
 

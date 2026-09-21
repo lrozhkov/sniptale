@@ -1,4 +1,4 @@
-import { reviewTimelineItemTone } from './controls';
+import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ScanEye } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
@@ -452,9 +452,11 @@ function ReviewZoomRegionBlock(
         <span
           key={edge}
           data-zoom-edge={edge}
-          className={`absolute inset-y-0 w-2 cursor-ew-resize bg-black/10
+          className={`${reviewTimelineResizeHandleClassName}
               ${edge === 'start' ? 'left-0' : 'right-0'}`}
-        />
+        >
+          <span aria-hidden="true" className="h-4 w-px bg-current opacity-60" />
+        </span>
       ))}
     </div>
   );

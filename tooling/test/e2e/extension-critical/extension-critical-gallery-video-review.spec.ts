@@ -20,7 +20,7 @@ import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critic
 
 async function expectTimelineSelection(item: Locator) {
   await expect(item).toHaveAttribute('aria-pressed', 'true');
-  await expect(item).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(item).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(item).toHaveCSS('border-top-width', '1px');
   await expect
     .poll(() =>
@@ -1036,6 +1036,16 @@ for (const variant of [
       const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(1);
       await expect(link).toHaveAttribute('data-connected', 'false');
+      const selectedRegion = lane.locator('[role="button"][aria-pressed="true"]');
+      await expect(selectedRegion.locator('[data-zoom-edge="start"]')).toHaveCSS('width', '12px');
+      await expect(selectedRegion).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const restingRegion = lane.locator('[role="button"][aria-pressed="false"]').first();
+      await expect(restingRegion).toHaveCSS(
+        'background-color',
+        await selectedRegion.evaluate((node) => getComputedStyle(node).backgroundColor)
+      );
+
+      await lane.screenshot({ path: testInfo.outputPath('focus-lane.png') });
       // The selected region shows the framing preview with a real source frame.
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       await expect(inspector).toBeVisible();
@@ -2325,7 +2335,7 @@ for (const variant of [
       const edit = source.getByRole('button', { name: editLabel!, exact: true }).locator('..');
       await edit.click();
       await expect(edit.locator('button[aria-pressed="true"]')).toHaveCount(1);
-      await expect(edit).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(edit).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(edit).toHaveCSS('border-top-width', '1px');
       const selectedBorder = await edit.evaluate((node) => getComputedStyle(node).borderTopColor);
       await button('gallery.videoReview.pointerTool').click();
@@ -2371,8 +2381,8 @@ for (const variant of [
       for (const [width, height, size] of [
         [1280, 720, 32],
         [1920, 1080, 36],
-        [2560, 1440, 40],
-        [3840, 2160, 44],
+        [2560, 1440, 36],
+        [3840, 2160, 36],
         [900, 720, 28],
       ] as const) {
         await page.setViewportSize({ width, height });
@@ -2385,7 +2395,7 @@ for (const variant of [
         expect(geometry.content).toBeLessThanOrEqual(geometry.width + 1);
         if (width >= 1280) await expect(toolbar).not.toHaveAttribute('data-layout', 'stacked');
         await expect(pointer).toBeInViewport();
-        if ([1280, 1920, 3840].includes(width))
+        if ([1280, 1920, 2560, 3840].includes(width))
           await page.screenshot({ path: testInfo.outputPath(`toolbar-${width}.png`) });
         await button('gallery.videoReview.speedMode').click();
         if (width !== 1920)

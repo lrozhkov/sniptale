@@ -1,4 +1,4 @@
-import { reviewTimelineItemTone } from './controls';
+import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { useReviewAudio } from './use-review-audio';
@@ -326,8 +326,7 @@ function ReviewAudioClipBlock(props: {
         <span
           key={edge}
           data-audio-edge={edge}
-          className={`absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center
-            bg-black/10 ${edge === 'start' ? 'left-0' : 'right-0'}`}
+          className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
         >
           <span className="h-4 w-px bg-current opacity-60" />
         </span>

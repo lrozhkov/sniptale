@@ -9,10 +9,16 @@ import {
 
 /** Timeline objects share a thin selection border, never an accent fill. */
 export function reviewTimelineItemTone(selected: boolean): string {
-  return selected
-    ? 'bg-transparent border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
-    : 'bg-transparent border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
+  const border = selected
+    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
+    : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
+  return `bg-[var(--sniptale-color-surface-hover)] ${border}`;
 }
+
+/** Consistent visible grips and hit areas across editable timeline lanes. */
+export const reviewTimelineResizeHandleClassName =
+  'absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center rounded ' +
+  'bg-[var(--sniptale-color-surface-hover)]';
 
 const iconButtonBase =
   '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +

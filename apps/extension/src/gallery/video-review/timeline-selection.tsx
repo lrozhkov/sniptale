@@ -1,4 +1,4 @@
-import { reviewTimelineItemTone } from './controls';
+import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useEffect, useRef, useState } from 'react';
 import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -229,7 +229,7 @@ function ReviewEditEdge(props: {
       aria-label={translate(
         props.edge === 'start' ? 'gallery.videoReview.resizeStart' : 'gallery.videoReview.resizeEnd'
       )}
-      className={`absolute inset-y-0 w-3 cursor-ew-resize rounded bg-black/10
+      className={`${reviewTimelineResizeHandleClassName}
           ${props.edge === 'start' ? 'left-0' : 'right-0'}`}
       onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -260,7 +260,7 @@ function ReviewEditEdge(props: {
           });
       }}
     >
-      <span aria-hidden="true" className="mx-auto block h-4 w-px bg-current opacity-50" />
+      <span aria-hidden="true" className="h-4 w-px bg-current opacity-60" />
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import { reviewTimelineItemTone } from './controls';
+import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Volume2, VolumeX, Link2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
@@ -93,7 +93,7 @@ export function ReviewOriginalAudioTrack(props: {
               data-ui="gallery.videoReview.originalAudioRange"
               data-audio-id={range.id}
               className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
-                rounded border bg-transparent ${reviewTimelineItemTone(selected)}`}
+                rounded border ${reviewTimelineItemTone(selected)}`}
               style={rectStyle(
                 preview?.id === range.id ? preview.from : range.start,
                 preview?.id === range.id ? preview.to : range.end
@@ -109,8 +109,7 @@ export function ReviewOriginalAudioTrack(props: {
                   key={edge}
                   data-audio-edge={edge}
                   data-audio-id={range.id}
-                  className={`absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center
-                    bg-black/10 ${edge === 'start' ? 'left-0' : 'right-0'}`}
+                  className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
                 >
                   <span className="h-4 w-px bg-current opacity-60" />
                 </span>
