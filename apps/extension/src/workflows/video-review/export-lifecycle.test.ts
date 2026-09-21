@@ -294,7 +294,7 @@ it('blocks visual changes without a video encoder and never stages bytes', async
   expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
 });
 
-it('keeps stored in-frame comments out of rendered exports while the feature is unavailable', async () => {
+it('routes stored in-frame comments into rendered exports', async () => {
   const { args, deps, writer } = fixture();
   const advanced = args.snapshot.workspace.advanced;
   advanced.ui.mode = 'advanced';
@@ -333,7 +333,14 @@ it('keeps stored in-frame comments out of rendered exports while the feature is 
   expect(deps.writeReviewFrames).toHaveBeenCalledWith(
     expect.objectContaining({
       fragmentOffset: 0,
-      comments: [],
+      comments: [
+        expect.objectContaining({
+          id: 'c',
+          annotationId: 'a1',
+          resolvedText: 'Look at this',
+          renderToVideo: true,
+        }),
+      ],
     })
   );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();

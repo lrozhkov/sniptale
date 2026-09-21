@@ -32,6 +32,7 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
     actionsTrackVisible: true,
     zoomTrackVisible: true,
     audioTrackVisible: true,
+    overlaysVisible: true,
     zoomApplied: true,
     backgroundApplied: true,
     originalAudioApplied: true,
@@ -51,6 +52,7 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
     actionsTrackVisible: true,
     zoomTrackVisible: false,
     audioTrackVisible: false,
+    overlaysVisible: false,
     zoomApplied: false,
     backgroundApplied: false,
     originalAudioApplied: false,
@@ -124,24 +126,11 @@ function musicStub() {
 }
 
 it('plans render requirements and audio-only processing from applied changes', () => {
-  const document = (renderToVideo: boolean) => ({
-    edits: [],
-    canvasComments: [{ ...createCanvasComment({ id: 'c', at: 0 }), renderToVideo }],
-  });
+  const document = { edits: [], canvasComments: [] };
   const state = advancedWithContent();
   state.zoom = { enabled: true, regions: [regionStub()] };
-  const blocked = resolveQuickEditExportPlan({
-    document: document(true),
-    advanced: state,
-  });
-  expect(blocked).toMatchObject({
-    kind: 'ready',
-    video: 'render',
-    audio: 'copy',
-    reasons: ['zoom', 'background'],
-  });
   const visual = resolveQuickEditExportPlan({
-    document: document(false),
+    document,
     advanced: state,
   });
   expect(visual).toMatchObject({
@@ -152,26 +141,7 @@ it('plans render requirements and audio-only processing from applied changes', (
   });
   expect(
     resolveQuickEditExportPlan({
-      document: document(true),
-      advanced: {
-        ...createQuickEditAdvancedState(),
-        ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
-      },
-      videoRenderAvailable: false,
-    })
-  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
-  expect(
-    resolveQuickEditExportPlan({
-      document: document(true),
-      advanced: {
-        ...createQuickEditAdvancedState(),
-        ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
-      },
-    })
-  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
-  expect(
-    resolveQuickEditExportPlan({
-      document: document(false),
+      document,
       advanced: state,
       videoRenderAvailable: false,
     })
@@ -181,7 +151,7 @@ it('plans render requirements and audio-only processing from applied changes', (
   visualWithAudio.audio.music = [musicStub()];
   expect(
     resolveQuickEditExportPlan({
-      document: document(false),
+      document,
       advanced: visualWithAudio,
     })
   ).toMatchObject({
@@ -192,7 +162,7 @@ it('plans render requirements and audio-only processing from applied changes', (
   });
   expect(
     resolveQuickEditExportPlan({
-      document: document(false),
+      document,
       advanced: visualWithAudio,
       videoRenderAvailable: false,
     })
@@ -205,7 +175,7 @@ it('plans render requirements and audio-only processing from applied changes', (
   voice.background = { enabled: false };
   voice.zoom = { enabled: false, regions: [] };
   voice.audio.voiceover = [voiceClipStub()];
-  expect(resolveQuickEditExportPlan({ document: document(false), advanced: voice })).toMatchObject({
+  expect(resolveQuickEditExportPlan({ document, advanced: voice })).toMatchObject({
     kind: 'ready',
     video: 'copy',
     audio: 'process',
@@ -213,7 +183,7 @@ it('plans render requirements and audio-only processing from applied changes', (
   });
   expect(
     resolveQuickEditExportPlan({
-      document: document(false),
+      document,
       advanced: voice,
       audioProcessingAvailable: false,
     })
@@ -223,9 +193,7 @@ it('plans render requirements and audio-only processing from applied changes', (
   original.zoom = { enabled: false, regions: [] };
   original.background = { enabled: false };
   original.audio.original = { muted: false, volume: 1.5 };
-  expect(
-    resolveQuickEditExportPlan({ document: document(false), advanced: original })
-  ).toMatchObject({
+  expect(resolveQuickEditExportPlan({ document, advanced: original })).toMatchObject({
     kind: 'ready',
     audio: 'process',
     reasons: ['original-audio'],
@@ -234,12 +202,48 @@ it('plans render requirements and audio-only processing from applied changes', (
   const none = advancedWithContent();
   none.zoom = { enabled: false, regions: [] };
   none.background = { enabled: false };
-  expect(resolveQuickEditExportPlan({ document: document(false), advanced: none })).toMatchObject({
+  expect(resolveQuickEditExportPlan({ document, advanced: none })).toMatchObject({
     kind: 'ready',
     video: 'copy',
     audio: 'copy',
     reasons: [],
   });
+});
+
+it('routes only effectively visible burn-in comments through frame rendering', () => {
+  const document = (renderToVideo: boolean, visible = true) => ({
+    edits: [],
+    canvasComments: [{ ...createCanvasComment({ id: 'c', at: 0 }), renderToVideo, visible }],
+  });
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  expect(resolveQuickEditExportPlan({ document: document(true), advanced })).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: ['comments'],
+  });
+  expect(
+    resolveQuickEditExportPlan({
+      document: document(true),
+      advanced,
+      videoRenderAvailable: false,
+    })
+  ).toMatchObject({ kind: 'unavailable', reasons: ['video-encoder'] });
+  for (const candidate of [document(false), document(true, false)])
+    expect(resolveQuickEditExportPlan({ document: candidate, advanced })).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+      reasons: [],
+    });
+  const overlaysHidden = {
+    ...advanced,
+    ui: { ...advanced.ui, overlaysVisible: false },
+  };
+  expect(
+    resolveQuickEditExportPlan({ document: document(true), advanced: overlaysHidden })
+  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
 });
 
 it('lets the basic path export basic changes even with stored advanced settings', () => {

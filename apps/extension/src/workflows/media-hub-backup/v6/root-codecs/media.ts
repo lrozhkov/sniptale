@@ -23,6 +23,16 @@ import {
   parsePortableVideoReview,
   type PortableVideoReview,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
+import { collectReviewAssetReferences } from '../../../../composition/persistence/review-workspaces/asset-refs';
+import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
+import { parseRecordingTelemetryEntry } from '../../../../composition/persistence/recordings/telemetry.guards';
+import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
+
+interface PortableMediaReviewAsset {
+  entry: Omit<StoredProjectAssetEntry, 'assetId'>;
+  filename: string;
+  objectId: string;
+}
 
 export interface PortableMediaThumbnail {
   objectId: string;
@@ -44,6 +54,7 @@ export interface PortableMediaMetadata {
   projectAsset?: Omit<StoredProjectAssetEntry, 'assetId'>;
   projectExport?: Omit<StoredProjectExportEntry, 'assetId'>;
   videoReview?: PortableVideoReview;
+  reviewAssets?: PortableMediaReviewAsset[];
   thumbnail?: PortableMediaThumbnail;
   recording?: {
     entry: Omit<StoredRecordingEntry, 'assetId'>;
@@ -138,6 +149,7 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
   ) {
     throw new Error('Portable web snapshot role association is invalid.');
   }
+  validateRecordingMedia(metadata);
   validateProjectMedia(metadata);
   if (metadata.videoReview !== undefined) {
     if (!metadata.entry || !metadata.entry.mimeType.startsWith('video/'))
@@ -146,7 +158,94 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
     if (metadata.videoReview.workspace.source.size !== metadata.entry.size)
       throw new Error('Video review source size is inconsistent.');
   }
+  const reviewAssets = parseReviewAssets(metadata.reviewAssets, metadata.videoReview);
+  if (reviewAssets) metadata.reviewAssets = reviewAssets;
+  else delete metadata.reviewAssets;
   return metadata as PortableMediaMetadata;
+}
+
+function parseReviewAssets(
+  value: unknown,
+  review: PortableVideoReview | undefined
+): PortableMediaReviewAsset[] | undefined {
+  if (value === undefined && !review) return undefined;
+  if (value !== undefined && !Array.isArray(value)) {
+    throw new Error('Portable media review assets are invalid.');
+  }
+  const assets = (value ?? []).map((raw) => {
+    if (
+      !isRecord(raw) ||
+      !isRecord(raw['entry']) ||
+      'assetId' in raw['entry'] ||
+      typeof raw['filename'] !== 'string' ||
+      typeof raw['objectId'] !== 'string' ||
+      !raw['objectId']
+    )
+      throw new Error('Portable media review asset is invalid.');
+    const entry = parseProjectAssetEntry({ ...raw['entry'], assetId: 'portable' });
+    if (!entry) throw new Error('Portable media review asset is invalid.');
+    const { assetId: _assetId, ...portable } = entry;
+    return { entry: portable, filename: raw['filename'], objectId: raw['objectId'] };
+  });
+  const ids = assets.map((asset) => asset.entry.id);
+  const objectIds = assets.map((asset) => asset.objectId);
+  if (new Set(ids).size !== ids.length || new Set(objectIds).size !== objectIds.length) {
+    throw new Error('Portable media review assets contain duplicate identities.');
+  }
+  const referenced = review
+    ? [...collectReviewAssetReferences(review.workspace)].map((reference) =>
+        reference.slice('project-asset:'.length)
+      )
+    : [];
+  if (
+    referenced.length !== ids.length ||
+    referenced.some((id) => !ids.includes(id)) ||
+    ids.some((id) => !referenced.includes(id))
+  ) {
+    throw new Error('Portable media review assets do not match the review references.');
+  }
+  return assets.length ? assets : undefined;
+}
+
+function validateRecordingMedia(metadata: Partial<PortableMediaMetadata>): void {
+  const entry = metadata.entry;
+  const source = entry?.source;
+  if (metadata.recording === undefined && source?.kind !== 'recording') return;
+  const recording = parsePortableRecording(metadata.recording);
+  if (!recording || !entry || !hasMatchingRecordingIdentity(entry, recording.entry)) {
+    throw new Error('Portable recording association is invalid.');
+  }
+  metadata.recording = recording;
+}
+
+function parsePortableRecording(value: unknown): PortableMediaMetadata['recording'] | null {
+  if (!isRecord(value) || !isRecord(value['entry']) || 'assetId' in value['entry']) return null;
+  const recording = parseRecordingEntry({ ...value['entry'], assetId: 'portable' });
+  if (!recording) return null;
+  const rawTelemetry = value['telemetry'];
+  const telemetry =
+    rawTelemetry === undefined ? undefined : parseRecordingTelemetryEntry(rawTelemetry);
+  if (rawTelemetry !== undefined && (!telemetry || telemetry.recordingId !== recording.id)) {
+    return null;
+  }
+  const { assetId: _localId, ...portable } = recording;
+  return {
+    entry: portable,
+    ...(telemetry ? { telemetry } : {}),
+  };
+}
+
+function hasMatchingRecordingIdentity(
+  entry: PortableMediaMetadata['entry'],
+  recording: NonNullable<PortableMediaMetadata['recording']>['entry']
+): boolean {
+  return (
+    entry.source.kind === 'recording' &&
+    entry.source.recordingId === recording.id &&
+    entry.id === createRecordingMediaId(recording.id) &&
+    entry.mimeType === recording.mimeType &&
+    entry.size === recording.size
+  );
 }
 
 function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {

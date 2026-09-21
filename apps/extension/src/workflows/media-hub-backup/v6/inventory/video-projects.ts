@@ -224,7 +224,7 @@ async function buildReviewReferencedAssets(
     if (collectedIds.has(id)) continue;
     const raw = await db.get(PROJECT_ASSETS_STORE, id);
     const asset = raw === undefined ? null : parseProjectAssetEntry(raw);
-    if (!asset) continue;
+    if (!asset) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
     const media = parseMediaLibraryEntry(
       await db.get(MEDIA_LIBRARY_STORE, createProjectAssetMediaId(asset.id))
     );

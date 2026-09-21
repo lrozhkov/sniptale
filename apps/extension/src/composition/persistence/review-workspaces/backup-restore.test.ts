@@ -213,3 +213,73 @@ it('backs up disabled image history and restores it with newly allocated asset r
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
   expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
 });
+
+it('rejects local asset ids hidden in portable current, history, and recovery state', () => {
+  const content = createQuickEditAdvancedContent();
+  const rawImage = {
+    enabled: true as const,
+    type: 'image' as const,
+    imageFit: 'cover' as const,
+    assetId: 'project-asset:local-secret',
+    layout: { padding: 0, cornerRadius: 0 },
+  };
+  const cases = [
+    { advanced: { ...workspace.advanced, background: rawImage } },
+    {
+      history: [
+        {
+          id: 'raw-history',
+          at: 1,
+          target: 'advancedContent' as const,
+          before: content,
+          after: { ...content, background: rawImage },
+        },
+      ],
+    },
+    {
+      advanced: {
+        ...workspace.advanced,
+        recoveryV1: JSON.stringify({ ...content, background: rawImage }),
+      },
+    },
+  ];
+  const { sourceAssetId: _local, ...portableWorkspace } = workspace;
+  for (const patch of cases) {
+    expect(() =>
+      parsePortableVideoReview(
+        { workspace: { ...portableWorkspace, ...patch }, draft: null },
+        workspace.aggregateId
+      )
+    ).toThrow('Portable video review contains a local asset id.');
+  }
+});
+
+it('rejects every portable asset reference that was not restored', () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.music = [
+    {
+      id: 'music',
+      assetId: 'project-asset:known-local-id',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  const stored = { ...workspace, advanced };
+  const { sourceAssetId: _local, ...portableWorkspace } = stored;
+  const portable = encodePortableReviewAssetRefs({ workspace: portableWorkspace, draft: null });
+  const parsed = parsePortableVideoReview(portable, stored.aggregateId);
+  expect(() =>
+    prepareVideoReviewRestore({
+      review: parsed,
+      sourceAggregateId: stored.aggregateId,
+      targetAggregateId: 'recording:restored',
+      sourceAssetId: 'new-source',
+      assetIdMap: new Map([['unrelated', 'restored-unrelated']]),
+    })
+  ).toThrow('Portable video review asset reference is unresolved.');
+});

@@ -23,10 +23,13 @@ import { parseBoundedJson, parseRootEnvelope } from './codec';
 import {
   MAX_CATALOG_SHARD_BYTES,
   MAX_ROOT_METADATA_BYTES,
+  MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER,
+  type MediaHubBackupCatalogShard,
   type MediaHubBackupRootEnvelope,
 } from './contracts';
 import { verifyMediaHubRestoreResume } from './restore-session';
 import { stageArchiveRootObjects, type StagedArchiveObject } from './staging';
+import { assertArchiveRootMetadataIdentity } from './root-codecs/root-identity';
 
 export interface ArchiveRootPublicationResult {
   conflicted: boolean;
@@ -60,6 +63,28 @@ function rootKey(descriptor: ArchiveRootDescriptor): string {
   return `${profile(descriptor)}:${descriptor.rootId}`;
 }
 
+function catalogRestorePriority(catalog: MediaHubBackupCatalogShard): number {
+  const catalogProfile =
+    catalog.rootKind === 'media' ? `media:${catalog.mediaSubtype}` : catalog.rootKind;
+  const priority = (MEDIA_HUB_BACKUP_ROOT_PROFILE_ORDER as readonly string[]).indexOf(
+    catalogProfile
+  );
+  return priority === -1 ? Number.MAX_SAFE_INTEGER : priority;
+}
+
+function orderedRestoreCatalogs(
+  catalogs: readonly MediaHubBackupCatalogShard[]
+): MediaHubBackupCatalogShard[] {
+  return catalogs
+    .map((catalog, index) => ({ catalog, index }))
+    .sort(
+      (left, right) =>
+        catalogRestorePriority(left.catalog) - catalogRestorePriority(right.catalog) ||
+        left.index - right.index
+    )
+    .map(({ catalog }) => catalog);
+}
+
 async function cleanupStaged(staged: readonly StagedArchiveObject[]): Promise<void> {
   const results = await Promise.allSettled(
     staged.map((object) => discardPreparedAsset(object.ref.assetId))
@@ -82,6 +107,7 @@ async function loadEnvelope(
   if (JSON.stringify(envelope.descriptor) !== JSON.stringify(descriptor)) {
     throw new Error('Media backup root descriptor changed after preflight.');
   }
+  assertArchiveRootMetadataIdentity(descriptor, envelope.metadata);
   return envelope;
 }
 
@@ -197,7 +223,7 @@ export async function restoreMediaHubBackupV6(args: {
       };
       const report = () => args.onProgress?.({ ...progress });
       let session = verifiedSession;
-      for (const catalog of inspection.manifest.catalogs) {
+      for (const catalog of orderedRestoreCatalogs(inspection.manifest.catalogs)) {
         const entry = reader.entry(catalog.path);
         if (!entry) throw new Error(`Media backup catalog is missing: ${catalog.path}.`);
         const descriptors = parseCatalog(await entry.text(MAX_CATALOG_SHARD_BYTES));

@@ -130,13 +130,12 @@ describe('remapReviewAssetReferences', () => {
       },
       draft: null,
     } as VideoWorkspaceSnapshot;
-    // Nothing matches: the same reference object is returned unchanged.
-    expect(
+    expect(() =>
       remapReviewAssetReferences(
         snapshot,
         new Map([['project-asset:unrelated', 'project-asset:x']])
       )
-    ).toBe(snapshot);
+    ).toThrow('Portable video review asset reference is unresolved.');
     const result = remapReviewAssetReferences(
       snapshot,
       new Map([
@@ -182,6 +181,42 @@ describe('remapReviewAssetReferences', () => {
     const result = remapReviewAssetReferences(snapshot, new Map([['music', 'restored-music']]));
     expect(result.workspace.advanced.audio.music[0]!.assetId).toBe('project-asset:restored-music');
   });
+
+  it.each(['image', 'audio'] as const)(
+    'rejects an unresolved %s reference retained by recovery JSON',
+    (kind) => {
+      const recovery =
+        kind === 'image'
+          ? {
+              background: {
+                enabled: true,
+                type: 'image',
+                assetId: 'project-asset:missing-image',
+                imageFit: 'cover',
+                layout: { padding: 0, cornerRadius: 0 },
+              },
+            }
+          : {
+              audio: {
+                original: { muted: false, volume: 1 },
+                voiceover: [],
+                music: [{ assetId: 'project-asset:missing-audio' }],
+              },
+            };
+      const snapshot = {
+        workspace: {
+          aggregateId: 'recording:a',
+          sourceAssetId: 'asset:1',
+          advanced: advanced({ recoveryV1: JSON.stringify(recovery) }),
+        },
+        draft: null,
+      } as VideoWorkspaceSnapshot;
+
+      expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow(
+        'Portable video review asset reference is unresolved.'
+      );
+    }
+  );
 });
 
 it('collects, remaps, and portably encodes audio refs inside advancedContent history ops', () => {

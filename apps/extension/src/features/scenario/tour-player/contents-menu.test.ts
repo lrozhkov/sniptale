@@ -75,8 +75,10 @@ it('opens the contents menu as a non-modal list anchored to its trigger', async 
   document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   expect(navigation.open).toBe(false);
   trigger.click();
+  items[1]!.focus();
   items[1]!.click();
   expect(root.dataset['slideId']).toBe('second');
   expect(navigation.open).toBe(false);
+  expect(document.activeElement).toBe(trigger);
   void player;
 });

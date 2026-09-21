@@ -1,13 +1,7 @@
 import type { ReviewAnchor, ReviewEdit } from './types';
+import type { ReviewTimeSegment } from './time-segment';
 
-export interface ReviewTimeSegment {
-  sourceStart: number;
-  sourceEnd: number;
-  resultStart: number;
-  resultEnd: number;
-  kind: 'keep' | 'cut' | 'speed';
-  rate: number;
-}
+export type { ReviewTimeSegment } from './time-segment';
 
 /**
  * One conversion authority for playhead, action markers, snapping, preview, and export.

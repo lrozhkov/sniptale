@@ -335,6 +335,7 @@ it('finishes journals and obsolete objects for a committed restore', async () =>
 it('keeps a crashed archive session resumable while removing only its uncommitted root', async () => {
   const session: ArchiveRestoreSession = {
     archiveFingerprint: 'a'.repeat(64),
+    childIdMap: {},
     committedRoots: [],
     conflictedRoots: [],
     createdAt: 1,
@@ -374,6 +375,7 @@ it('never deletes a referenced object while cleaning a committed multi-object ar
   const rootKey = 'media:library-item:one';
   const session: ArchiveRestoreSession = {
     archiveFingerprint: 'b'.repeat(64),
+    childIdMap: {},
     committedRoots: [rootKey],
     conflictedRoots: [],
     createdAt: 1,

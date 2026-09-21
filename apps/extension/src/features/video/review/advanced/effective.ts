@@ -15,7 +15,7 @@ interface QuickEditEffectiveFeatures {
   actionsTrackVisible: boolean;
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
-  /** In-frame comments are unavailable; stored comment data remains intact. */
+  /** In-frame comments follow the advanced-mode overlay visibility control. */
   overlaysVisible: boolean;
   /** Advanced effects are suppressed while the editor is in basic mode. */
   zoomApplied: boolean;
@@ -38,7 +38,7 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
-    overlaysVisible: false,
+    overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
     originalAudioApplied: advanced,
@@ -154,6 +154,11 @@ export function resolveQuickEditExportPlan(args: {
   if (features.zoomApplied && args.advanced.zoom.regions.some((region) => !region.dormant))
     visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
+  if (
+    features.overlaysVisible &&
+    args.document.canvasComments.some((comment) => comment.visible && comment.renderToVideo)
+  )
+    visual.push('comments');
   if (visual.length) {
     if (args.videoRenderAvailable === false)
       return { kind: 'unavailable', reasons: ['video-encoder', ...audio] };

@@ -10,6 +10,7 @@ import type {
   ArchiveRestoreSession,
   ArchiveRestoreStrategy,
 } from './contracts';
+import { mergeArchiveRestoreChildIdMap } from './restore-child-ids';
 
 interface ArchiveRestoreSessionStore {
   get(operationId: string): Promise<unknown>;
@@ -114,6 +115,7 @@ export async function createArchiveRestoreSession(args: {
   const now = Date.now();
   const session: ArchiveRestoreSession = {
     archiveFingerprint: args.archiveFingerprint,
+    childIdMap: {},
     committedRoots: [],
     conflictedRoots: [],
     createdAt: now,
@@ -178,14 +180,20 @@ export async function beginArchiveRestoreRoot(
   });
 }
 
+interface ArchiveRestoreRootCheckpoint {
+  rootKey: string;
+  targetRootId: string;
+  imported?: boolean;
+  conflicted?: boolean;
+  childIds?: Readonly<Record<string, string>>;
+}
+
 export async function appendCommittedArchiveRootInTransaction(
   store: ArchiveRestoreSessionStore,
   operationId: string,
-  rootKey: string,
-  targetRootId: string,
-  imported = true,
-  conflicted = false
+  checkpoint: ArchiveRestoreRootCheckpoint
 ): Promise<ArchiveRestoreSession> {
+  const { rootKey, targetRootId } = checkpoint;
   if (targetRootId.length === 0) throw new Error('Archive restore target root ID is invalid.');
   const session = parseArchiveRestoreSession(await store.get(operationId));
   if (!session || session.status !== 'pending' || session.currentRoot !== rootKey) {
@@ -194,13 +202,18 @@ export async function appendCommittedArchiveRootInTransaction(
   if (session.committedRoots.includes(rootKey)) {
     throw new Error('Archive restore root is already committed.');
   }
+  const childIdMap = mergeArchiveRestoreChildIdMap(session.childIdMap, checkpoint.childIds ?? {});
   const next: ArchiveRestoreSession = {
     ...session,
+    childIdMap,
     committedRoots: [...session.committedRoots, rootKey],
-    conflictedRoots: conflicted ? [...session.conflictedRoots, rootKey] : session.conflictedRoots,
+    conflictedRoots: checkpoint.conflicted
+      ? [...session.conflictedRoots, rootKey]
+      : session.conflictedRoots,
     currentRoot: null,
     rootIdMap: { ...session.rootIdMap, [rootKey]: targetRootId },
-    skippedRoots: imported ? session.skippedRoots : [...session.skippedRoots, rootKey],
+    skippedRoots:
+      checkpoint.imported === false ? [...session.skippedRoots, rootKey] : session.skippedRoots,
     updatedAt: Date.now(),
   };
   await store.put(next);

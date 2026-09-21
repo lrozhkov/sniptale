@@ -30,16 +30,14 @@ import type {
 import {
   computeQuickEditSceneLayout,
   evaluateQuickEditCameraAtTime,
-  quickEditContentPointToCanvas,
 } from '../../features/video/review/advanced/scene';
 import {
-  canvasCommentBubble,
   isCanvasCommentVisibleAt,
-  overlayPulsePhase,
   type CanvasCommentExport,
 } from '../../features/video/review/comments';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
+import { drawReviewComments } from './render-comments';
 import { supportedReviewVideoCodecs, type ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
@@ -108,8 +106,9 @@ export async function writeReviewFrames(args: {
   const dispose = () => input.dispose();
   args.signal.addEventListener('abort', dispose, { once: true });
   let output: Output | null = null;
+  let source: ReviewRenderSource | null = null;
   try {
-    const source = await openReviewRenderSource(args, input, preparation);
+    source = await openReviewRenderSource(args, input, preparation);
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -204,6 +203,7 @@ export async function writeReviewFrames(args: {
     await output?.cancel().catch(() => undefined);
     throw error;
   } finally {
+    source?.image?.close();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }
@@ -372,19 +372,24 @@ async function openReviewRenderSource(
           signal
         )
       : null;
-  return {
-    video,
-    audio: audio ?? null,
-    audioSink: audio ? new EncodedPacketSink(audio) : null,
-    audioConfig,
-    processedAudio,
-    sampleRate: audio ? await audio.getSampleRate() : 0,
-    canvas,
-    sourceSize,
-    sceneScale: scale,
-    context,
-    image: backgroundImage,
-  };
+  try {
+    return {
+      video,
+      audio: audio ?? null,
+      audioSink: audio ? new EncodedPacketSink(audio) : null,
+      audioConfig,
+      processedAudio,
+      sampleRate: audio ? await audio.getSampleRate() : 0,
+      canvas,
+      sourceSize,
+      sceneScale: scale,
+      context,
+      image: backgroundImage,
+    };
+  } catch (error) {
+    backgroundImage?.close();
+    throw error;
+  }
 }
 
 /** One window's audio: processed samples or retained packets, advancing the shared clock. */
@@ -599,11 +604,6 @@ export function drawReviewSceneFrame(
       drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
     }
   }
-  const visible = (comments ?? []).filter(
-    (comment) =>
-      comment.renderToVideo &&
-      (sourceTime === undefined || isCanvasCommentVisibleAt(comment, sourceTime))
-  );
   context.save();
   context.beginPath();
   const clip = background.enabled ? background.layout : null;
@@ -632,138 +632,21 @@ export function drawReviewSceneFrame(
     layout.videoTransform.height
   );
   const cameraScale = args.cameraScale ?? 1;
-  for (const comment of visible) {
-    if (comment.attachment === 'content')
-      drawReviewComment(context, comment, {
-        canvas,
-        videoTransform: layout.videoTransform,
-        scale: cameraScale,
-        sourceTime,
-      });
-  }
-  context.restore();
-  for (const comment of visible) {
-    if (comment.attachment !== 'content')
-      drawReviewComment(context, comment, {
-        canvas,
-        videoTransform: null,
-        scale: 1,
-        sourceTime,
-      });
-  }
-}
-
-/** The design token value the preview paints with `--sniptale-color-accent`. */
-const CANVAS_COMMENT_ACCENT = '#f97316';
-
-/** One burned overlay: pulsing point plus the wrapped bubble, in output pixels. */
-function drawReviewComment(
-  context: CanvasRenderingContext2D,
-  comment: CanvasCommentExport,
-  args: {
-    canvas: { width: number; height: number };
-    videoTransform: { x: number; y: number; width: number; height: number } | null;
-    scale: number;
-    sourceTime: number | undefined;
-  }
-) {
-  const point = args.videoTransform
-    ? quickEditContentPointToCanvas(comment.position, args.videoTransform)
-    : { x: comment.position.x * args.canvas.width, y: comment.position.y * args.canvas.height };
-  const bubble = canvasCommentBubble(comment.style, {
-    width: args.canvas.width / args.scale,
-    height: args.canvas.height / args.scale,
+  drawReviewComments(context, comments ?? [], {
+    attachment: 'content',
+    canvas,
+    videoTransform: layout.videoTransform,
+    scale: cameraScale,
+    sourceTime,
   });
-  const pointRadius = bubble.pointRadius * args.scale;
-  const phase = overlayPulsePhase(args.sourceTime ?? 0, comment.start);
-  context.save();
-  if (phase > 0 && phase < 1) {
-    const ringRadius = pointRadius * (1 + 1.4 * phase);
-    context.globalAlpha = 0.35 * (1 - phase);
-    context.fillStyle = CANVAS_COMMENT_ACCENT;
-    context.beginPath();
-    context.arc(point.x, point.y, ringRadius, 0, Math.PI * 2);
-    context.fill();
-    context.globalAlpha = 1;
-  }
-  context.fillStyle = CANVAS_COMMENT_ACCENT;
-  context.strokeStyle = '#ffffff';
-  context.lineWidth = 2 * args.scale;
-  context.beginPath();
-  context.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
-  context.fill();
-  context.stroke();
-  const text = comment.resolvedText;
-  if (text.trim()) {
-    const fontSize = bubble.fontSize * args.scale;
-    const lineHeight = bubble.lineHeight * args.scale;
-    const maxWidth = bubble.maxWidth * args.scale;
-    const paddingX = bubble.paddingX * args.scale;
-    const paddingY = bubble.paddingY * args.scale;
-    const radius = comment.style.radius * args.scale;
-    context.font = `${fontSize}px ui-sans-serif, system-ui, sans-serif`;
-    const maxHeight = bubble.maxHeight * args.scale;
-    const maxLines = Math.max(1, Math.floor((maxHeight - paddingY * 2) / lineHeight));
-    const lines = wrapCanvasText(context, text, Math.max(1, maxWidth - paddingX * 2), maxLines);
-    const textWidth = Math.max(...lines.map((line) => context.measureText(line).width));
-    const boxWidth = Math.min(maxWidth, textWidth + paddingX * 2);
-    const boxHeight = Math.min(maxHeight, lines.length * lineHeight + paddingY * 2);
-    const below = comment.placement === 'below';
-    const boxX = point.x - boxWidth / 2;
-    const boxY = below
-      ? point.y + pointRadius + bubble.gap * args.scale
-      : point.y - pointRadius - bubble.gap * args.scale - boxHeight;
-    context.save();
-    context.beginPath();
-    context.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
-    context.clip();
-    const paint = comment.style.fillPaint;
-    if (paint.kind === 'solid') {
-      context.fillStyle = paint.color;
-      context.fillRect(boxX, boxY, boxWidth, boxHeight);
-    } else {
-      context.translate(boxX, boxY);
-      drawSceneGradient(context, paint.gradient, boxWidth, boxHeight);
-    }
-    context.restore();
-    context.save();
-    context.beginPath();
-    context.rect(boxX, boxY, boxWidth, boxHeight);
-    context.clip();
-    context.fillStyle = comment.style.textColor;
-    context.textBaseline = 'top';
-    lines.forEach((line, index) => {
-      context.fillText(line, boxX + paddingX, boxY + paddingY + index * lineHeight);
-    });
-    context.restore();
-  }
   context.restore();
-}
-
-/** Word-wraps explicit paragraphs into lines that fit the measured width. */
-function wrapCanvasText(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maxWidth: number,
-  maxLines: number
-): string[] {
-  const lines: string[] = [];
-  for (const paragraph of text.split('\n')) {
-    let current = '';
-    for (const word of paragraph.split(/\s+/).filter(Boolean)) {
-      const candidate = current ? `${current} ${word}` : word;
-      if (current && context.measureText(candidate).width > maxWidth) {
-        lines.push(current);
-        if (lines.length >= maxLines) return lines;
-        current = word;
-      } else {
-        current = candidate;
-      }
-    }
-    lines.push(current);
-    if (lines.length >= maxLines) return lines;
-  }
-  return lines;
+  drawReviewComments(context, comments ?? [], {
+    attachment: 'viewport',
+    canvas,
+    videoTransform: null,
+    scale: 1,
+    sourceTime,
+  });
 }
 
 function drawFittedImage(

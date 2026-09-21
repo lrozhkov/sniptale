@@ -51,6 +51,39 @@ function metadata() {
   };
 }
 
+function recordingMetadata() {
+  return {
+    entry: {
+      id: 'recording:recording-one',
+      kind: 'recording',
+      filename: 'recording.webm',
+      originalFilename: 'recording.webm',
+      source: { kind: 'recording', recordingId: 'recording-one' },
+      mimeType: 'video/webm',
+      createdAt: 1,
+      updatedAt: 1,
+      duration: 2,
+      size: 6,
+      width: 640,
+      height: 360,
+      sourceUrl: null,
+      sourceTitle: null,
+      sourceFavicon: null,
+      tags: [],
+    },
+    originalObjectId: 'recording-object',
+    recording: {
+      entry: {
+        createdAt: 1,
+        filename: 'recording.webm',
+        id: 'recording-one',
+        mimeType: 'video/webm',
+        size: 6,
+      },
+    },
+  };
+}
+
 it('parses a standalone project video review without changing the supplied metadata', () => {
   const input = metadata();
   const before = structuredClone(input);
@@ -104,4 +137,24 @@ it('accepts historical WebM project exports without an explicit MIME type', () =
     ...input.videoReview,
     workspace: { ...input.videoReview.workspace, advanced: createQuickEditAdvancedState() },
   });
+});
+
+it('requires an exact recording source and sidecar identity association', () => {
+  const input = recordingMetadata();
+  expect(parsePortableMediaMetadata(input).recording?.entry.id).toBe('recording-one');
+  expect(() => parsePortableMediaMetadata({ ...input, recording: undefined })).toThrow(
+    'recording association'
+  );
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      recording: { entry: { ...input.recording.entry, id: 'other-recording' } },
+    })
+  ).toThrow('recording association');
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      entry: { ...input.entry, id: 'recording:other-recording' },
+    })
+  ).toThrow('recording association');
 });

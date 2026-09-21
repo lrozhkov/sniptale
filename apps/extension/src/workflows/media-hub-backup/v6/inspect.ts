@@ -13,6 +13,7 @@ import {
   type MediaHubBackupManifestV6,
 } from './contracts';
 import { assertV6MetadataPath, MANIFEST_PATH } from './layout';
+import { assertArchiveRootMetadataIdentity } from './root-codecs/root-identity';
 
 export interface InspectedMediaHubBackupV6 {
   descriptors: ArchiveRootDescriptor[];
@@ -145,6 +146,7 @@ async function inspectRoot(args: {
   if (!sameDescriptor(envelope.descriptor, args.descriptor)) {
     throw new Error('Media backup catalog and root metadata descriptors do not match.');
   }
+  assertArchiveRootMetadataIdentity(args.descriptor, envelope.metadata);
   for (const object of envelope.objects) {
     if (args.state.declaredPaths.has(object.path)) {
       throw new Error('Media backup object path is duplicated.');

@@ -1,5 +1,5 @@
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
-import { useEffect, useRef, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import {
   buildQuickEditAudioPlan,
@@ -27,6 +27,8 @@ export interface ReviewAudioEngine {
   /** Graph-side amplification for original-audio volume beyond the element range. */
   setOriginalGain(volume: number): void;
   stopAll(): void;
+  /** Permanently releases this element's graph and its AudioContext. */
+  dispose(): void;
 }
 
 /** Seek-scale discontinuity before external clips are stopped and rescheduled. */
@@ -79,13 +81,20 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
     return null;
   }
   let originalGain: GainNode | null = null;
+  let originalSource: MediaElementAudioSourceNode | null = null;
   if (element) {
     const source = context.createMediaElementSource(element);
+    originalSource = source;
     originalGain = context.createGain();
     source.connect(originalGain);
     originalGain.connect(context.destination);
   }
   const handles = new Set<ReviewAudioHandle>();
+  let disposed = false;
+  const stopAll = () => {
+    for (const handle of handles) handle.stop();
+    handles.clear();
+  };
   return {
     now: () => context.currentTime,
     resume: () => context.resume(),
@@ -94,15 +103,71 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
     setOriginalGain: (volume) => {
       if (originalGain) originalGain.gain.value = volume > 1 ? volume : 1;
     },
-    stopAll: () => {
-      for (const handle of handles) handle.stop();
-      handles.clear();
+    stopAll,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      stopAll();
+      originalSource?.disconnect();
+      originalGain?.disconnect();
+      void context.close().catch(() => undefined);
     },
   };
 }
 
 interface ReviewAudioRuntime {
   buffers: Map<string, Promise<ReviewAudioClipBuffer | null>>;
+}
+
+interface ReviewAudioRuntimeProps {
+  video: RefObject<HTMLVideoElement | null>;
+  playing: boolean;
+  outputTime: number;
+  original: QuickEditOriginalAudio;
+  voiceover: readonly QuickEditAudioClip[];
+  music: readonly QuickEditAudioClip[];
+  resolveAsset(assetId: string): Promise<Blob | null>;
+  sessionKey: string;
+  onFailure(): void;
+  createEngine?: (element: HTMLMediaElement | null) => ReviewAudioEngine | null;
+}
+
+function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
+  const engineRef = useRef<ReviewAudioEngine | null>(null);
+  const elementRef = useRef<HTMLMediaElement | null>(null);
+  const dispose = useCallback(() => {
+    const engine = engineRef.current;
+    const element = elementRef.current;
+    engineRef.current = null;
+    elementRef.current = null;
+    if (!engine) return;
+    if (element && elementEngines.get(element) === engine) elementEngines.delete(element);
+    engine.dispose();
+  }, []);
+  const peek = useCallback((): ReviewAudioEngine | null => {
+    const element = latest.current.video.current;
+    if (engineRef.current && elementRef.current === element) return engineRef.current;
+    if (engineRef.current) dispose();
+    return (element && elementEngines.get(element)) ?? null;
+  }, [dispose, latest]);
+  const get = useCallback((): ReviewAudioEngine | null => {
+    const shared = peek();
+    if (shared) {
+      engineRef.current = shared;
+      elementRef.current = latest.current.video.current;
+      return shared;
+    }
+    const element = latest.current.video.current;
+    if (!element) return null;
+    const created = (latest.current.createEngine ?? createDefaultEngine)(element);
+    if (!created) return null;
+    elementEngines.set(element, created);
+    engineRef.current = created;
+    elementRef.current = element;
+    return created;
+  }, [latest, peek]);
+  useEffect(() => () => dispose(), [dispose]);
+  return { peek, get };
 }
 
 /**
@@ -132,66 +197,36 @@ export function useReviewEditorAudioRuntime(args: {
     onFailure: args.onFailure,
   });
 }
-export function useReviewAudioRuntime(props: {
-  video: RefObject<HTMLVideoElement | null>;
-  playing: boolean;
-  outputTime: number;
-  original: QuickEditOriginalAudio;
-  voiceover: readonly QuickEditAudioClip[];
-  music: readonly QuickEditAudioClip[];
-  resolveAsset(assetId: string): Promise<Blob | null>;
-  sessionKey: string;
-  onFailure(): void;
-  createEngine?: (element: HTMLMediaElement | null) => ReviewAudioEngine | null;
-}) {
+export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   // Applied values, not transient React object identities, define a playback plan.
   const planKey = JSON.stringify([props.voiceover, props.music]);
   const runtime = useRef<ReviewAudioRuntime | null>(null);
   const generation = useRef(0);
   const scheduledAt = useRef<{ outputTime: number; audioNow: number } | null>(null);
-  const engineRef = useRef<ReviewAudioEngine | null>(null);
   const latest = useRef(props);
   latest.current = props;
-  /** Only a previously created engine; never constructs Web Audio on demand. */
-  const peekEngine = (): ReviewAudioEngine | null => {
-    if (engineRef.current) return engineRef.current;
-    const element = latest.current.video.current;
-    return (element && elementEngines.get(element)) ?? null;
-  };
-  const getEngine = (): ReviewAudioEngine | null => {
-    const shared = peekEngine();
-    if (shared) {
-      engineRef.current = shared;
-      return shared;
-    }
-    const element = latest.current.video.current;
-    if (!element) return null;
-    const created = (latest.current.createEngine ?? createDefaultEngine)(element);
-    if (!created) return null;
-    elementEngines.set(element, created);
-    engineRef.current = created;
-    return created;
-  };
-  const resolveBuffer = async (
-    entry: QuickEditAudioPlanEntry
-  ): Promise<ReviewAudioClipBuffer | null> => {
-    const current = runtime.current;
-    if (!current) return null;
-    const cached = current.buffers.get(entry.assetId);
-    if (cached) return cached;
-    const pending = (async () => {
-      try {
-        const asset = await latest.current.resolveAsset(entry.assetId);
-        if (!asset) return null;
-        return (await getEngine()?.decode(await asset.arrayBuffer())) ?? null;
-      } catch {
-        return null;
-      }
-    })();
-    current.buffers.set(entry.assetId, pending);
-    return pending;
-  };
-  const schedule = () => {
+  const { peek: peekEngine, get: getEngine } = useElementAudioEngine(latest);
+  const resolveBuffer = useCallback(
+    async (entry: QuickEditAudioPlanEntry): Promise<ReviewAudioClipBuffer | null> => {
+      const current = runtime.current;
+      if (!current) return null;
+      const cached = current.buffers.get(entry.assetId);
+      if (cached) return cached;
+      const pending = (async () => {
+        try {
+          const asset = await latest.current.resolveAsset(entry.assetId);
+          if (!asset) return null;
+          return (await getEngine()?.decode(await asset.arrayBuffer())) ?? null;
+        } catch {
+          return null;
+        }
+      })();
+      current.buffers.set(entry.assetId, pending);
+      return pending;
+    },
+    [getEngine, latest]
+  );
+  const schedule = useCallback(() => {
     const current = latest.current;
     const engine = getEngine();
     if (!engine) {
@@ -235,7 +270,7 @@ export function useReviewAudioRuntime(props: {
         if (clipSchedule) engine.scheduleClip(clipSchedule, buffer);
       }
     })();
-  };
+  }, [getEngine, latest, resolveBuffer]);
   useEffect(() => {
     runtime.current = { buffers: new Map() };
     return () => {
@@ -244,7 +279,7 @@ export function useReviewAudioRuntime(props: {
       peekEngine()?.stopAll();
       runtime.current = null;
     };
-  }, [props.sessionKey]);
+  }, [peekEngine, props.sessionKey]);
   useEffect(() => {
     if (props.playing) schedule();
     else {
@@ -253,7 +288,7 @@ export function useReviewAudioRuntime(props: {
       peekEngine()?.stopAll();
     }
     // The plan identity changes with every applied edit; reschedule then.
-  }, [props.playing, planKey, props.sessionKey]);
+  }, [peekEngine, planKey, props.playing, props.sessionKey, schedule]);
   useEffect(() => {
     const scheduled = scheduledAt.current;
     if (!latest.current.playing || scheduled === null) return;
@@ -262,7 +297,7 @@ export function useReviewAudioRuntime(props: {
     const expected = scheduled.outputTime + (getEngine()!.now() - scheduled.audioNow);
     if (Math.abs(props.outputTime - expected) <= SEEK_RESCHEDULE_SECONDS) return;
     schedule();
-  }, [props.outputTime]);
+  }, [getEngine, props.outputTime, schedule]);
   useEffect(() => {
     peekEngine()?.setOriginalGain(
       Math.max(
@@ -270,5 +305,5 @@ export function useReviewAudioRuntime(props: {
         originalAudioGainAt(latest.current.original, latest.current.video.current?.currentTime ?? 0)
       )
     );
-  }, [props.original, props.outputTime]);
+  }, [peekEngine, props.original, props.outputTime]);
 }

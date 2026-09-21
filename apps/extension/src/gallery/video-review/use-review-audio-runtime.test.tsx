@@ -64,6 +64,7 @@ class FakeContext {
   readonly sources: FakeNode[] = [];
   readonly gains: FakeNode[] = [];
   resumed = false;
+  close = vi.fn(async () => undefined);
   createGain() {
     const node = new FakeNode();
     this.gains.push(node);
@@ -93,6 +94,7 @@ class FakeEngine implements ReviewAudioEngine {
   gains: number[] = [];
   currentTime = 100;
   failResume = false;
+  dispose = vi.fn(() => this.stopAll());
   readonly decoded = { duration: 10 } satisfies ReviewAudioClipBuffer;
   async resume() {
     if (this.failResume) throw new Error('autoplay failed');
@@ -298,8 +300,7 @@ it('cannot connect a stale decode after the session changes', async () => {
     root.render(<Harness sessionKey="session-2" outputTime={3} />);
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
-  // The new session schedules through its own deferred; the stale decode may
-  // resolve later but must never connect.
+  // The stale decode may resolve after the new session but must never connect.
   gates[1]!(new Blob());
   await act(async () => new Promise((resolve) => setTimeout(resolve, 0)));
   expect(engine.scheduled).toHaveLength(1);
@@ -384,7 +385,9 @@ it('builds the default Web Audio engine graph', async () => {
   expect(context.sources[0]!.stopped).toBe(true);
   expect(context.sources[0]!.destinations).toHaveLength(0);
   context.sources[0]!.onended?.();
-  engine!.stopAll();
+  engine!.dispose();
+  engine!.dispose();
+  expect(context.close).toHaveBeenCalledTimes(1);
   vi.unstubAllGlobals();
 });
 
@@ -476,6 +479,7 @@ it('stops the captured engine on unmount after the video ref detaches', async ()
   const stopsBefore = engine.stops;
   await act(async () => root.unmount());
   expect(engine.stops).toBe(stopsBefore + 1);
+  expect(engine.dispose).toHaveBeenCalledTimes(1);
   root = createRoot(host);
 });
 

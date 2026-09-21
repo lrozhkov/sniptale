@@ -36,37 +36,12 @@ import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import { preparePortableAggregatePresentation } from './presentation';
+import { transformPortableVideoProjectReferences } from './video-project-references';
 
 function newId() {
   if (typeof crypto.randomUUID !== 'function')
     throw new Error('Secure restore IDs are unavailable.');
   return crypto.randomUUID();
-}
-
-function transformReferences(
-  value: unknown,
-  assetIds: ReadonlyMap<string, string>,
-  rootIds: Readonly<Record<string, string>>
-): unknown {
-  if (Array.isArray(value))
-    return value.map((item) => transformReferences(item, assetIds, rootIds));
-  if (typeof value !== 'object' || value === null) return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => {
-      if (key === 'projectAssetId' && typeof child === 'string')
-        return [key, assetIds.get(child) ?? child];
-      if (key === 'projectAssetRef' && typeof child === 'string')
-        return [key, assetIds.get(child) ?? child];
-      if (key === 'recordingId' && typeof child === 'string') {
-        const mediaId = rootIds[`media:library-item:recording:${child}`];
-        return [
-          key,
-          mediaId?.startsWith('recording:') ? mediaId.slice('recording:'.length) : child,
-        ];
-      }
-      return [key, transformReferences(child, assetIds, rootIds)];
-    })
-  );
 }
 
 function stagedMap(staged: readonly StagedArchiveObject[]) {
@@ -92,10 +67,12 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         session.operationId,
-        `video-project:${envelope.descriptor.rootId}`,
-        metadata.entry.id,
-        false,
-        true
+        {
+          rootKey: `video-project:${envelope.descriptor.rootId}`,
+          targetRootId: metadata.entry.id,
+          imported: false,
+          conflicted: true,
+        }
       );
       await tx.done;
       return true;
@@ -103,12 +80,6 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
   },
   async publish({ envelope, session, staged }) {
     const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
-    const sourceExists = await runWithIndexedDbMutation(async (db) =>
-      Boolean(await db.get(VIDEO_PROJECTS_STORE, metadata.entry.id))
-    );
-    const targetProjectId =
-      session.strategy === 'duplicate' && sourceExists ? newId() : metadata.entry.id;
-    const rootKey = `video-project:${envelope.descriptor.rootId}`;
     const objects = stagedMap(staged);
     const assetIdMap = new Map(
       metadata.projectAssets.map((asset) => [
@@ -133,15 +104,30 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
         ),
       }))
     );
-    const transformedProject = transformReferences(
-      { ...metadata.entry.project, id: targetProjectId, effectSnapshots: snapshots },
+    const portableEntry = parseVideoProjectEntry({
+      ...metadata.entry,
+      project: decodePortableVideoProjectAssetRefs({
+        ...metadata.entry.project,
+        effectSnapshots: snapshots,
+      }),
+    });
+    if (!portableEntry) throw new Error('Restored video project metadata is invalid.');
+    const transformedProject = transformPortableVideoProjectReferences(
+      portableEntry.project,
       assetIdMap,
-      session.rootIdMap
+      session.rootIdMap,
+      session.childIdMap
     );
+    const sourceExists = await runWithIndexedDbMutation(async (db) =>
+      Boolean(await db.get(VIDEO_PROJECTS_STORE, metadata.entry.id))
+    );
+    const targetProjectId =
+      session.strategy === 'duplicate' && sourceExists ? newId() : metadata.entry.id;
+    const rootKey = `video-project:${envelope.descriptor.rootId}`;
     const entry = parseVideoProjectEntry({
       ...rebaseTemporaryLifecycle(metadata.entry),
       id: targetProjectId,
-      project: decodePortableVideoProjectAssetRefs(transformedProject),
+      project: { ...transformedProject, id: targetProjectId },
     });
     if (!entry) throw new Error('Restored video project metadata is invalid.');
     const assets = metadata.projectAssets.map((asset) => {
@@ -283,10 +269,12 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         session.operationId,
-        rootKey,
-        targetProjectId,
-        restored.imported,
-        restored.conflicted
+        {
+          rootKey,
+          targetRootId: targetProjectId,
+          imported: restored.imported,
+          conflicted: restored.conflicted,
+        }
       );
       await tx.done;
       imported = restored.imported;

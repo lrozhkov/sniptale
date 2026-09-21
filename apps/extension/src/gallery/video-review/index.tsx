@@ -25,6 +25,10 @@ import { ReviewRenderOptions, ReviewEditActions } from './edit-actions';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
 import { ReviewSceneProperties } from './advanced-panels';
+import {
+  ReviewCanvasCommentListBinding,
+  showReviewAnnotationOnVideo,
+} from './canvas-comment-inspector-binding';
 import type { useCanvasComments } from './use-canvas-comments';
 import { useReviewSelection } from './use-review-selection';
 import type { useReviewAudio } from './use-review-audio';
@@ -388,6 +392,13 @@ function ReviewInspectorBinding({
           <ReviewCommentComposer state={state} annotation={composer.annotation} />
         ) : null
       }
+      canvas={
+        <ReviewCanvasCommentListBinding
+          state={state}
+          canvasComments={canvasComments}
+          duration={resource.source.duration}
+        />
+      }
       selectionLabel={reviewSelectionLabel(state)}
       scene={
         <ReviewSceneProperties
@@ -440,6 +451,7 @@ function ReviewInspectorBinding({
             })
           );
       }}
+      onShowOnVideo={(annotation) => showReviewAnnotationOnVideo(state, canvasComments, annotation)}
       onReport={(action) => {
         if (busy) return;
         state.setBusy(true);
@@ -464,6 +476,7 @@ function ReviewInspectorBinding({
         toSourceTime={state.timeline.timeMap.timelineToSource}
         resource={resource}
         audio={audio}
+        canvasComments={canvasComments}
       />
     </ReviewInspector>
   );
@@ -732,6 +745,7 @@ function reviewSelectionLabel(state: InspectorState): string | undefined {
         : 'gallery.videoReview.zoomRegionLabel'
     );
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
+  if (selection.kind === 'canvas-comment') return translate('gallery.videoReview.overlayComments');
   if (selection.kind === 'original-audio')
     return translate('gallery.videoReview.originalAudioRange');
   if (selection.kind === 'audio')

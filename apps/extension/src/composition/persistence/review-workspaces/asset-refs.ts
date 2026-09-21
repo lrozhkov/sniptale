@@ -6,6 +6,55 @@ const ASSET_PREFIX = 'project-asset:';
 const LANES = ['voiceover', 'music'] as const;
 /** Portable metadata forbids local asset keys; review lane refs travel renamed. */
 const PORTABLE_REF_KEY = 'assetRef';
+const LOCAL_ASSET_ERROR = 'Portable video review contains a local asset id.';
+const UNRESOLVED_ASSET_ERROR = 'Portable video review asset reference is unresolved.';
+
+function assertNoLocalImageRef(background: unknown): void {
+  if (isRecord(background) && background['type'] === 'image' && 'assetId' in background) {
+    throw new Error(LOCAL_ASSET_ERROR);
+  }
+}
+
+function assertNoLocalAudioRefs(audio: unknown): void {
+  if (!isRecord(audio)) return;
+  for (const lane of LANES) {
+    const clips = audio[lane];
+    if (!Array.isArray(clips)) continue;
+    for (const clip of clips) {
+      if (isRecord(clip) && 'assetId' in clip) throw new Error(LOCAL_ASSET_ERROR);
+    }
+  }
+}
+
+function parseRecoveryContent(value: unknown): unknown {
+  if (typeof value !== 'string') return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function assertPortableContentRefs(content: unknown, inspectRecovery = true): void {
+  if (!isRecord(content)) return;
+  assertNoLocalImageRef(content['background']);
+  assertNoLocalAudioRefs(content['audio']);
+  if (inspectRecovery)
+    assertPortableContentRefs(parseRecoveryContent(content['recoveryV1']), false);
+}
+
+/** Rejects runtime-only asset keys anywhere portable review content can retain them. */
+export function assertPortableReviewAssetRefs(workspace: unknown): void {
+  if (!isRecord(workspace)) return;
+  assertPortableContentRefs(workspace['advanced']);
+  const history = workspace['history'];
+  if (!Array.isArray(history)) return;
+  for (const operation of history) {
+    if (!isRecord(operation) || operation['target'] !== 'advancedContent') continue;
+    assertPortableContentRefs(operation['before']);
+    assertPortableContentRefs(operation['after']);
+  }
+}
 
 /** Walks every history `advancedContent` operation payload once per transform. */
 function mapHistoryContent(
@@ -129,6 +178,12 @@ function lookupAssetId(
   return mapped.startsWith(ASSET_PREFIX) ? mapped : ASSET_PREFIX + mapped;
 }
 
+function requireMappedAssetId(assetIdMap: ReadonlyMap<string, string>, reference: string): string {
+  const mapped = lookupAssetId(assetIdMap, reference);
+  if (!mapped) throw new Error(UNRESOLVED_ASSET_ERROR);
+  return mapped;
+}
+
 /** Collects every project-asset reference the review keeps, including history ops. */
 export function collectReviewAssetReferences(
   workspace: Pick<VideoWorkspace, 'advanced' | 'history'>
@@ -174,8 +229,8 @@ function remapImageReference<T>(background: T, assetIdMap: ReadonlyMap<string, s
     typeof background['assetId'] !== 'string'
   )
     return background;
-  const assetId = lookupAssetId(assetIdMap, background['assetId']);
-  return assetId ? { ...background, assetId } : background;
+  const assetId = requireMappedAssetId(assetIdMap, background['assetId']);
+  return { ...background, assetId };
 }
 
 function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void {
@@ -211,8 +266,7 @@ function remapContentReferences(
   let changed = false;
   for (const lane of LANES) {
     audio[lane] = content.audio[lane].map((clip) => {
-      const remapped = lookupAssetId(assetIdMap, clip.assetId);
-      if (!remapped) return clip;
+      const remapped = requireMappedAssetId(assetIdMap, clip.assetId);
       changed = true;
       return { ...clip, assetId: remapped };
     });
@@ -225,32 +279,30 @@ function remapRecoveryReferences(
   recoveryV1: string,
   assetIdMap: ReadonlyMap<string, string>
 ): string | null {
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(recoveryV1);
-    if (!isRecord(parsed)) return null;
-    const background = remapImageReference(parsed['background'], assetIdMap);
-    let changed = background !== parsed['background'];
-    if (changed) parsed['background'] = background;
-    const recoveryAudio = isRecord(parsed['audio']) ? parsed['audio'] : {};
-    for (const lane of LANES) {
-      const clips = recoveryAudio[lane];
-      if (!Array.isArray(clips)) continue;
-      recoveryAudio[lane] = clips.map((clip: unknown) => {
-        if (!isRecord(clip)) return clip;
-        const assetId = clip['assetId'];
-        const remapped =
-          typeof assetId === 'string' ? lookupAssetId(assetIdMap, assetId) : undefined;
-        if (remapped) {
-          changed = true;
-          return { ...clip, assetId: remapped };
-        }
-        return clip;
-      });
-    }
-    return changed ? JSON.stringify(parsed) : null;
+    parsed = JSON.parse(recoveryV1);
   } catch {
     return null;
   }
+  if (!isRecord(parsed)) return null;
+  const background = remapImageReference(parsed['background'], assetIdMap);
+  let changed = background !== parsed['background'];
+  if (changed) parsed['background'] = background;
+  const recoveryAudio = isRecord(parsed['audio']) ? parsed['audio'] : {};
+  for (const lane of LANES) {
+    const clips = recoveryAudio[lane];
+    if (!Array.isArray(clips)) continue;
+    recoveryAudio[lane] = clips.map((clip: unknown) => {
+      if (!isRecord(clip)) return clip;
+      const assetId = clip['assetId'];
+      if (typeof assetId !== 'string') return clip;
+      const remapped = requireMappedAssetId(assetIdMap, assetId);
+      changed = true;
+      return { ...clip, assetId: remapped };
+    });
+  }
+  return changed ? JSON.stringify(parsed) : null;
 }
 
 /**
@@ -261,7 +313,6 @@ export function remapReviewAssetReferences(
   snapshot: VideoWorkspaceSnapshot,
   assetIdMap: ReadonlyMap<string, string>
 ): VideoWorkspaceSnapshot {
-  if (!assetIdMap.size) return snapshot;
   const remappedSnapshot = remapSnapshot(snapshot, assetIdMap);
   const history = (snapshot.workspace.history ?? []).map((operation) => {
     if (operation.target !== 'advancedContent') return operation;

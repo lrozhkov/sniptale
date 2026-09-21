@@ -152,7 +152,7 @@ describe('video project backup inventory', () => {
     expect(roots[0]!.descriptor.objectCount).toBe(2);
   });
 
-  it('skips stale review references instead of failing the backup', async () => {
+  it('rejects a project backup when a review-referenced asset is missing', async () => {
     const entry = createVideoProjectEntryWithMediaClip();
     // The review references project-asset:music but that store row is gone.
     const db = database(
@@ -163,12 +163,12 @@ describe('video project backup inventory', () => {
       [entry],
       [workspaceRow]
     );
-    const roots = await buildVideoProjectRootInventory({
-      db,
-      options: createMediaHubBackupExportOptions({ includeDrafts: true, scope: 'all' }),
-      paths,
-    });
-    const metadata = parsePortableVideoProjectMetadata((await roots[0]!.load()).metadata);
-    expect(metadata.projectAssets.map((asset) => asset.entry.id)).toEqual(['project-asset-1']);
+    await expect(
+      buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions({ includeDrafts: true, scope: 'all' }),
+        paths,
+      })
+    ).rejects.toThrow('Review-referenced project asset is missing: project-asset:music.');
   });
 });

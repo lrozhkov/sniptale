@@ -2,7 +2,10 @@ import {
   readVideoReviewForBackup,
   type VideoReviewBackupDatabase,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
-import { encodePortableReviewAssetRefs } from '../../../../composition/persistence/review-workspaces/asset-refs';
+import {
+  collectReviewAssetReferences,
+  encodePortableReviewAssetRefs,
+} from '../../../../composition/persistence/review-workspaces/asset-refs';
 import {
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
@@ -263,7 +266,12 @@ async function buildMediaSource(args: {
   Partial<
     Pick<
       PortableMediaMetadata,
-      'recording' | 'webSnapshot' | 'projectAsset' | 'projectExport' | 'videoReview'
+      | 'recording'
+      | 'webSnapshot'
+      | 'projectAsset'
+      | 'projectExport'
+      | 'videoReview'
+      | 'reviewAssets'
     >
   > & {
     originalObjectId: string;
@@ -284,16 +292,18 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'recording') {
     const recording = parseRecordingEntry(await args.db.get(STORE_NAME, entry.source.recordingId));
     if (!recording) throw new Error('Recording source is missing.');
-    const videoReview = encodePortableReviewAssetRefs(
-      await readVideoReviewForBackup({
-        db: args.db,
-        aggregateId: entry.id,
-        sourceAssetId: recording.assetId,
-      })
-    );
+    const storedReview = await readVideoReviewForBackup({
+      db: args.db,
+      aggregateId: entry.id,
+      sourceAssetId: recording.assetId,
+    });
+    const videoReview = encodePortableReviewAssetRefs(storedReview);
     return {
       ...(await buildRecordingSource({ ...args, entry, recordingId: entry.source.recordingId })),
       ...(videoReview ? { videoReview } : {}),
+      ...(storedReview
+        ? { reviewAssets: await buildReviewAssets(args.db, args.collector, storedReview.workspace) }
+        : {}),
     };
   }
   if (entry.source.kind === 'web-snapshot') {
@@ -306,13 +316,15 @@ async function buildMediaSource(args: {
   if (!child || !entry.mimeType.startsWith('video/'))
     throw new Error('Project video source is missing.');
   const file = await readRefFile(args.db, child.assetId, entry.filename);
-  const videoReview = encodePortableReviewAssetRefs(
-    await readVideoReviewForBackup({
-      db: args.db,
-      aggregateId: entry.id,
-      sourceAssetId: child.assetId,
-    })
-  );
+  const storedReview = await readVideoReviewForBackup({
+    db: args.db,
+    aggregateId: entry.id,
+    sourceAssetId: child.assetId,
+  });
+  const videoReview = encodePortableReviewAssetRefs(storedReview);
+  const reviewAssets = storedReview
+    ? await buildReviewAssets(args.db, args.collector, storedReview.workspace)
+    : [];
   const originalObjectId = args.collector.add(
     file,
     entry.filename,
@@ -323,12 +335,39 @@ async function buildMediaSource(args: {
     const asset = parseProjectAssetEntry(child);
     if (!asset) throw new Error('Project video asset is invalid.');
     const { assetId: _localId, ...projectAsset } = asset;
-    return { originalObjectId, projectAsset, ...(videoReview ? { videoReview } : {}) };
+    return {
+      originalObjectId,
+      projectAsset,
+      ...(videoReview ? { videoReview, reviewAssets } : {}),
+    };
   }
   const exportEntry = parseProjectExportEntry(child);
   if (!exportEntry) throw new Error('Project video export is invalid.');
   const { assetId: _exportLocalId, ...projectExport } = exportEntry;
-  return { originalObjectId, projectExport, ...(videoReview ? { videoReview } : {}) };
+  return { originalObjectId, projectExport, ...(videoReview ? { videoReview, reviewAssets } : {}) };
+}
+
+async function buildReviewAssets(
+  db: MediaInventoryDatabase,
+  collector: MediaObjectCollector,
+  workspace: Parameters<typeof collectReviewAssetReferences>[0]
+): Promise<NonNullable<PortableMediaMetadata['reviewAssets']>> {
+  const assets: NonNullable<PortableMediaMetadata['reviewAssets']> = [];
+  for (const reference of [...collectReviewAssetReferences(workspace)].sort()) {
+    const id = reference.slice('project-asset:'.length);
+    const entry = parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, id));
+    if (!entry) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
+    const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, reference));
+    const filename = media?.filename ?? id;
+    const file = await readRefFile(db, entry.assetId, filename);
+    const { assetId: _assetId, ...portable } = entry;
+    assets.push({
+      entry: portable,
+      filename,
+      objectId: collector.add(file, filename, entry.mimeType),
+    });
+  }
+  return assets;
 }
 
 async function buildThumbnail(args: {
@@ -445,6 +484,7 @@ async function buildMediaRoot(args: {
     ...(source.projectAsset ? { projectAsset: source.projectAsset } : {}),
     ...(source.projectExport ? { projectExport: source.projectExport } : {}),
     ...(source.videoReview ? { videoReview: source.videoReview } : {}),
+    ...(source.reviewAssets?.length ? { reviewAssets: source.reviewAssets } : {}),
     ...(thumbnail ? { thumbnail } : {}),
     ...(source.webSnapshot ? { webSnapshot: source.webSnapshot } : {}),
     ...(workspace ? { workspace } : {}),

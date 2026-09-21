@@ -1,9 +1,7 @@
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
-import { createGradientPaint } from '@sniptale/foundation/paint';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { parseReviewOperation } from '../../features/video/review/validation';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
@@ -22,6 +20,11 @@ const state = vi.hoisted(() => ({
   encoded: [] as { timestamp: number; close: unknown; width: number; height: number }[],
   composited: [] as unknown[][],
   drawn: [] as { draw: unknown; close: unknown }[],
+  audioTrack: null as null | {
+    codec: 'opus';
+    getDecoderConfig(): Promise<AudioDecoderConfig>;
+    getSampleRate(): Promise<number>;
+  },
 }));
 
 vi.mock('mediabunny', () => {
@@ -56,14 +59,14 @@ vi.mock('mediabunny', () => {
       };
     }
     async getPrimaryAudioTrack() {
-      return null;
+      return state.audioTrack;
     }
     dispose(): void {}
   }
   class Output {
     start = vi.fn();
     finalize = vi.fn();
-    cancel = vi.fn();
+    cancel = vi.fn(async () => undefined);
     addVideoTrack = vi.fn();
     addAudioTrack = vi.fn();
     setMetadataTags = vi.fn();
@@ -151,6 +154,7 @@ function writerFixture() {
 function argsFixture(overrides?: {
   advanced?: ReturnType<typeof createQuickEditAdvancedState>;
   processedVideoCodec?: 'avc' | 'vp8' | 'vp9' | null;
+  audioCodec?: 'aac' | 'opus' | null;
   frameRate?: number;
 }) {
   const advanced = overrides?.advanced ?? createQuickEditAdvancedState();
@@ -161,7 +165,7 @@ function argsFixture(overrides?: {
       duration: 2,
       boundaries: [0, 2],
       videoCodec: 'vp9' as const,
-      audioCodec: null,
+      audioCodec: overrides?.audioCodec ?? null,
       container: 'webm' as const,
       rotation: 0 as const,
       processedVideoCodec:
@@ -175,7 +179,7 @@ function argsFixture(overrides?: {
     fragmentOffset: 0,
     writer: writerFixture(),
     signal: new AbortController().signal,
-    readProjectAsset: vi.fn(async () => null),
+    readProjectAsset: vi.fn(async (): Promise<Blob | null> => null),
   };
 }
 
@@ -423,6 +427,7 @@ describe('writeReviewFrames', () => {
   afterEach(() => {
     state.encoded.length = 0;
     state.drawn.length = 0;
+    state.audioTrack = null;
   });
 
   it('blocks the render without a probed video encoder', async () => {
@@ -484,6 +489,89 @@ describe('writeReviewFrames', () => {
   });
 });
 
+describe('writeReviewFrames background lifecycle', () => {
+  afterEach(() => {
+    state.encoded.length = 0;
+    state.drawn.length = 0;
+    state.audioTrack = null;
+  });
+
+  it('closes a decoded background image after a successful render', async () => {
+    const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => bitmap)
+    );
+    const args = argsFixture();
+    args.advanced.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'project-asset:pic',
+      imageFit: 'cover',
+      layout: { padding: 0, cornerRadius: 0 },
+    };
+    args.readProjectAsset.mockResolvedValue(new Blob(['image']));
+    await writeReviewFrames(args);
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes a decoded background image when rendering throws', async () => {
+    const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => bitmap)
+    );
+    const args = argsFixture();
+    args.advanced.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'project-asset:pic',
+      imageFit: 'cover',
+      layout: { padding: 0, cornerRadius: 0 },
+    };
+    args.readProjectAsset.mockResolvedValue(new Blob(['image']));
+    await expect(
+      writeReviewFrames({
+        ...args,
+        onProgress: () => {
+          throw new Error('progress failed');
+        },
+      })
+    ).rejects.toThrow('progress failed');
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes a decoded background image when source acquisition later fails', async () => {
+    const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => bitmap)
+    );
+    state.audioTrack = {
+      codec: 'opus',
+      getDecoderConfig: async () => ({
+        codec: 'opus',
+        sampleRate: 48_000,
+        numberOfChannels: 2,
+      }),
+      getSampleRate: async () => {
+        throw new Error('sample rate failed');
+      },
+    };
+    const args = argsFixture({ audioCodec: 'opus' });
+    args.advanced.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'project-asset:pic',
+      imageFit: 'cover',
+      layout: { padding: 0, cornerRadius: 0 },
+    };
+    args.readProjectAsset.mockResolvedValue(new Blob(['image']));
+    await expect(writeReviewFrames(args)).rejects.toThrow('sample rate failed');
+    expect(bitmap.close).toHaveBeenCalledTimes(1);
+  });
+});
+
 it('burns visible comments inside the clip and viewport comments after restore', async () => {
   const calls: string[] = [];
   const context = {
@@ -531,28 +619,6 @@ it('burns visible comments inside the clip and viewport comments after restore',
   expect(calls.indexOf('clip')).toBeLessThan(calls.indexOf('point'));
 });
 
-it('draws below-placed bubbles under the anchor point', () => {
-  const context = contextFixture();
-  drawReviewSceneFrame(context, {
-    canvas: { width: 176, height: 104 },
-    layout: {
-      contentRect: { x: 8, y: 8, width: 160, height: 88 },
-      videoRect: { x: 8, y: 8, width: 160, height: 88 },
-      videoTransform: { x: 4, y: 2, width: 168, height: 104 },
-    },
-    background: { enabled: false },
-    image: null,
-    sample: { draw: vi.fn() } as never,
-    comments: [
-      { ...createCanvasComment({ id: 'c', at: 0 }), placement: 'below', resolvedText: 'Hi' },
-    ],
-    sourceTime: 0,
-    cameraScale: 1,
-  });
-  const boxY = vi.mocked(context.roundRect).mock.calls[0]![1] as number;
-  expect(boxY).toBeGreaterThan(60);
-});
-
 it('uses the selected render frame rate and rejects an unprobed codec', async () => {
   const args = argsFixture();
   state.encoded.length = 0;
@@ -562,97 +628,6 @@ it('uses the selected render frame rate and rejects an unprobed codec', async ()
   await expect(
     writeReviewFrames({ ...args, renderSettings: { quality: 'HIGH', frameRate: 30, codec: 'avc' } })
   ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable' });
-});
-
-it('renders custom comment geometry and a real Canvas gradient', () => {
-  const context = contextFixture();
-  const stops = vi.fn();
-  const gradient = { addColorStop: stops } as unknown as CanvasGradient;
-  context.createLinearGradient = vi.fn(() => gradient);
-  context.translate = vi.fn();
-  const comment = createCanvasComment({ id: 'style', at: 0 });
-  let id = 0;
-  comment.style = {
-    ...comment.style,
-    fillPaint: createGradientPaint('#ff0000', () => `stop-${id++}`),
-    width: 320,
-    fontSize: 18,
-    padding: 12,
-    radius: 8,
-  };
-  drawReviewSceneFrame(context, {
-    canvas: { width: 160, height: 90 },
-    layout: {
-      contentRect: { x: 0, y: 0, width: 160, height: 90 },
-      videoRect: { x: 0, y: 0, width: 160, height: 90 },
-      videoTransform: { x: 0, y: 0, width: 160, height: 90 },
-    },
-    background: { enabled: false },
-    image: null,
-    sample: { draw: vi.fn() } as never,
-    comments: [{ ...comment, resolvedText: 'Hi' }],
-    sourceTime: 0,
-    cameraScale: 1,
-  });
-  expect(context.font).toBe('18px ui-sans-serif, system-ui, sans-serif');
-  expect(context.createLinearGradient).toHaveBeenCalledOnce();
-  expect(stops).toHaveBeenCalled();
-  expect(context.roundRect).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), 36, 48, 8);
-});
-
-it('bounds accepted long comment dense-gradient raster work to the output frame', () => {
-  const context = contextFixture();
-  context.translate = vi.fn();
-  const allocations: number[][] = [];
-  vi.stubGlobal(
-    'OffscreenCanvas',
-    class {
-      constructor(width: number, height: number) {
-        allocations.push([width, height]);
-        if (width > 160 || height > 90) throw new Error('Unbounded comment raster');
-      }
-      getContext() {
-        return {
-          createImageData: (width: number, height: number) => ({
-            data: new Uint8ClampedArray(width * height * 4),
-          }),
-          putImageData: vi.fn(),
-        };
-      }
-    }
-  );
-  try {
-    const comment = createCanvasComment({ id: 'long', at: 0 });
-    const paint = createGradientPaint('#ff0000', () => crypto.randomUUID());
-    if (paint.kind !== 'gradient') throw new Error('Expected gradient fixture');
-    paint.gradient.repeat = { enabled: true, span: 0.01 };
-    paint.gradient.stops[1]!.position = 0.01;
-    comment.style = { ...comment.style, fillPaint: paint, fontSize: 48 };
-    comment.text = 'x\n'.repeat(40_000);
-    const parsed = parseReviewOperation(
-      { id: 'add', at: 0, target: 'canvasComment', before: null, after: comment },
-      4
-    );
-    expect(parsed).not.toBeNull();
-    drawReviewSceneFrame(context, {
-      canvas: { width: 160, height: 90 },
-      layout: {
-        contentRect: { x: 0, y: 0, width: 160, height: 90 },
-        videoRect: { x: 0, y: 0, width: 160, height: 90 },
-        videoTransform: { x: 0, y: 0, width: 160, height: 90 },
-      },
-      background: { enabled: false },
-      image: null,
-      sample: { draw: vi.fn() } as never,
-      comments: [{ ...comment, resolvedText: comment.text }],
-      sourceTime: 0,
-      cameraScale: 2,
-    });
-    expect(allocations).toHaveLength(1);
-    expect(context.fillText).toHaveBeenCalledTimes(1);
-  } finally {
-    vi.unstubAllGlobals();
-  }
 });
 
 it('encodes the selected portrait canvas while fitting the native landscape source', async () => {

@@ -19,6 +19,8 @@ import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewAdvancedPanels } from './advanced-panels';
 import { ReviewZoomPreview } from './zoom-preview';
 import { useZoomPreviewSource } from './use-zoom-preview-source';
+import { ReviewCanvasCommentsSection } from './comment-editor';
+import type { useCanvasComments } from './use-canvas-comments';
 
 /** Selected-object properties share the selection owner, separately from session actions. */
 export function ReviewSelectedProperties(props: {
@@ -33,6 +35,7 @@ export function ReviewSelectedProperties(props: {
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
   audio: ReturnType<typeof useReviewAudio>;
+  canvasComments: ReturnType<typeof useCanvasComments>;
 }) {
   const { advanced, zoom, busy, editing, resource, audio, selection } = props;
   const marker =
@@ -55,7 +58,16 @@ export function ReviewSelectedProperties(props: {
   return (
     <>
       <fieldset disabled={busy || editing.exporter.phase !== 'idle'} className="min-w-0 space-y-3">
-        {selection.kind === 'telemetry' ? (
+        {selection.kind === 'canvas-comment' && advanced.ui.mode === 'advanced' ? (
+          <ReviewCanvasCommentsSection
+            view="selected"
+            {...props.canvasComments}
+            comments={resource.session.getSnapshot().document.canvasComments}
+            annotations={resource.session.getSnapshot().document.annotations}
+            duration={resource.source.duration}
+            busy={busy}
+          />
+        ) : selection.kind === 'telemetry' ? (
           <ReviewActionProperties
             marker={marker}
             plan={plan}

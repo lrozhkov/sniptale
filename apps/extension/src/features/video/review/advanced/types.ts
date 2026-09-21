@@ -1,4 +1,5 @@
 import type { Gradient } from '@sniptale/foundation/paint';
+import type { ReviewTimeSegment } from '../time-segment';
 
 export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 2;
 
@@ -142,7 +143,7 @@ export interface QuickEditCanvasSize {
 
 export interface QuickEditAudioState {
   /** Current video mapping used only to project anchored voiceover into playback slices. */
-  voiceoverSegments?: import('../timeline').ReviewTimeSegment[];
+  voiceoverSegments?: ReviewTimeSegment[];
   /** Master gains multiply individual clip gains; omitted means unity. */
   laneVolumes?: { voiceover: number; music: number };
   original: QuickEditOriginalAudio;

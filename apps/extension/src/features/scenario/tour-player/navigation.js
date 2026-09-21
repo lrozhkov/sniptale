@@ -47,7 +47,7 @@ export function createTourNavigation({
       }
       button.addEventListener('click', () => {
         onSelect(number);
-        closeContents(false);
+        closeContents(true);
       });
       list.append(button);
     });

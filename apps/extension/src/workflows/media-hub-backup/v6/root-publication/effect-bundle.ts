@@ -24,10 +24,12 @@ export const effectBundleRootPublisher: ArchiveRootPublisher = {
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         session.operationId,
-        `media:effect-bundle:${envelope.descriptor.rootId}`,
-        metadata.entry.packId,
-        false,
-        true
+        {
+          rootKey: `media:effect-bundle:${envelope.descriptor.rootId}`,
+          targetRootId: metadata.entry.packId,
+          imported: false,
+          conflicted: true,
+        }
       );
       await tx.done;
       return true;
@@ -68,10 +70,12 @@ export const effectBundleRootPublisher: ArchiveRootPublisher = {
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         session.operationId,
-        rootKey,
-        targetPackId,
-        imported,
-        restored.conflicted
+        {
+          rootKey,
+          targetRootId: targetPackId,
+          imported,
+          conflicted: restored.conflicted,
+        }
       );
       await tx.done;
     });

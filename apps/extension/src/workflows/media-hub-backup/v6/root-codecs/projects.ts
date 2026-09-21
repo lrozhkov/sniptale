@@ -25,6 +25,8 @@ import {
   parsePortableVideoReview,
   type PortableVideoReview,
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
+import { assertExactPortableVideoProjectAssetInventory } from './video-project-asset-inventory';
+import { assertUniquePortableScenarioChildIdentities } from './scenario-project-identities';
 
 /** Portable image keys add eight bytes per image; array separators add one per version. */
 export const MAX_PORTABLE_SCENARIO_HISTORY_BYTES =
@@ -366,6 +368,11 @@ export function parsePortableVideoProjectMetadata(value: unknown): PortableVideo
       throw new Error('Video review source size is inconsistent.');
     return { ...item, videoReview };
   });
+  assertExactPortableVideoProjectAssetInventory({
+    project: value.entry.project,
+    projectAssets,
+    projectExports,
+  });
   return { ...value, projectAssets, projectExports };
 }
 
@@ -376,5 +383,6 @@ export function parsePortableScenarioProjectMetadata(
   if (!isPortableScenarioProjectMetadata(value)) {
     throw new Error('Portable scenario project children are invalid.');
   }
+  assertUniquePortableScenarioChildIdentities(value);
   return value;
 }

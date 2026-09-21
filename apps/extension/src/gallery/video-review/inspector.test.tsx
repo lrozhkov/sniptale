@@ -22,6 +22,7 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
   const onSelect = vi.fn();
   const onEdit = vi.fn();
   const onHover = vi.fn();
+  const onShowOnVideo = vi.fn();
   const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 2 } };
   try {
     act(() =>
@@ -40,6 +41,7 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
           onEdit={onEdit}
           onHover={onHover}
           onDelete={vi.fn()}
+          onShowOnVideo={onShowOnVideo}
           onReport={vi.fn()}
         >
           {null}
@@ -54,6 +56,12 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
     act(() => host.querySelector<HTMLButtonElement>('li button')!.click());
     expect(onSelect).toHaveBeenCalledWith(annotation);
     expect(onEdit).not.toHaveBeenCalled();
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.showOnVideo"]')!
+        .click()
+    );
+    expect(onShowOnVideo).toHaveBeenCalledWith(annotation);
     act(() =>
       host
         .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.editComment"]')!
@@ -86,6 +94,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         onHover={vi.fn()}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
+        onShowOnVideo={vi.fn()}
         onReport={vi.fn()}
         settingsAvailable={advanced}
         contextKey={contextKey}

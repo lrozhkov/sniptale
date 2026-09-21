@@ -65,6 +65,7 @@ const journal = {
 } satisfies AssetReadyJournal;
 const session = {
   archiveFingerprint: 'a'.repeat(64),
+  childIdMap: {},
   committedRoots: [],
   conflictedRoots: [],
   createdAt: 1,
@@ -81,168 +82,6 @@ const session = {
 beforeEach(() => {
   vi.clearAllMocks();
 });
-
-it.each(
-  (['skip', 'replace', 'duplicate'] as const).flatMap((strategy) =>
-    [true, false].map((explicitMime) => ({ strategy, explicitMime }))
-  )
-)(
-  'restores standalone video with $strategy and explicit MIME=$explicitMime',
-  async ({ strategy, explicitMime }) => {
-    const entry = {
-      id: 'export:e',
-      kind: 'export',
-      source: { kind: 'project-export', exportId: 'e', projectId: 'p' },
-      filename: 'result.webm',
-      originalFilename: 'result.webm',
-      createdAt: 1,
-      updatedAt: 1,
-      size: 6,
-      mimeType: 'video/webm',
-      duration: 2,
-      width: 640,
-      height: 360,
-      tags: [],
-      sourceUrl: null,
-      sourceTitle: null,
-      sourceFavicon: null,
-    };
-    const projectExport = {
-      id: 'e',
-      projectId: 'p',
-      filename: 'result.webm',
-      createdAt: 1,
-      size: 6,
-      ...(explicitMime ? { mimeType: 'video/webm' } : {}),
-      duration: 2,
-      width: 640,
-      height: 360,
-      fps: 30,
-    };
-    const workspace = {
-      aggregateId: entry.id,
-      formatVersion: 1,
-      source: { duration: 2, width: 640, height: 360, size: 6, mimeType: 'video/webm' },
-      revision: 3,
-      history: [
-        {
-          id: 'op',
-          at: 1,
-          target: 'annotation',
-          before: null,
-          after: { id: 'a', text: 'Saved comment', anchor: { kind: 'point', time: 1 } },
-        },
-      ],
-      cursor: 0,
-      createdAt: 1,
-      updatedAt: 2,
-    };
-    const draft = {
-      aggregateId: entry.id,
-      revision: 2,
-      annotation: { id: 'draft', text: 'Recovered text', anchor: { kind: 'point', time: 1 } },
-      before: null,
-      updatedAt: 2,
-    };
-    const tables = new Map<string, Map<string, unknown>>([
-      ['media_library', new Map([[entry.id, entry]])],
-      ['project_exports', new Map([['e', { ...projectExport, assetId: 'old-local' }]])],
-      ['video_workspaces', new Map([[entry.id, { ...workspace, sourceAssetId: 'old-local' }]])],
-      ['video_workspace_drafts', new Map([[entry.id, draft]])],
-    ]);
-    const storeFor = (name: string) => {
-      const table = tables.get(name) ?? new Map<string, unknown>();
-      tables.set(name, table);
-      return {
-        get: async (key: IDBValidKey) => table.get(String(key)),
-        delete: async (key: IDBValidKey) => {
-          table.delete(String(key));
-        },
-        put: async (value: unknown) => {
-          if (typeof value !== 'object' || !value) throw new Error('Invalid test row');
-          const key =
-            'aggregateId' in value
-              ? value.aggregateId
-              : 'id' in value
-                ? value.id
-                : 'assetId' in value
-                  ? value.assetId
-                  : 'other';
-          table.set(String(key), structuredClone(value));
-        },
-        index: () => ({ count: async () => 0 }),
-      };
-    };
-    mocks.runMutation.mockImplementation(async (callback) =>
-      callback({
-        get: async (name: string, key: IDBValidKey) => storeFor(name).get(key),
-        transaction: () => ({ objectStore: storeFor, done: Promise.resolve() }),
-      })
-    );
-    const result = await mediaLibraryRootPublisher.publish({
-      envelope: {
-        descriptor: {
-          mediaSubtype: 'library-item',
-          metadataPath: '_sniptale/metadata/media/export-e.json',
-          objectCount: 1,
-          rootId: entry.id,
-          rootKind: 'media',
-          totalBytes: 6,
-        },
-        metadata: portableJson({
-          entry,
-          projectExport,
-          originalObjectId: 'o',
-          videoReview: { workspace, draft },
-        }),
-        objects: [],
-      },
-      journal,
-      session: { ...session, strategy },
-      staged: [
-        {
-          objectId: 'o',
-          ref: {
-            assetId: 'new-local',
-            createdAt: 1,
-            location: { kind: 'opfs', objectKey: 'objects/new-local' },
-            mimeType: 'video/webm',
-            sha256: null,
-            size: 6,
-          },
-        },
-      ],
-    });
-    expect(result.imported).toBe(strategy !== 'skip');
-    if (strategy === 'skip') {
-      expect(tables.get('video_workspaces')?.get(entry.id)).toMatchObject({
-        sourceAssetId: 'old-local',
-      });
-      return;
-    }
-    const restoredId = [...tables.get('video_workspaces')!.keys()].find((id) =>
-      strategy === 'replace' ? id === entry.id : id !== entry.id
-    )!;
-    expect(tables.get('video_workspaces')?.get(restoredId)).toMatchObject({
-      aggregateId: restoredId,
-      sourceAssetId: 'new-local',
-      history: workspace.history,
-      cursor: 0,
-    });
-    expect(tables.get('video_workspace_drafts')?.get(restoredId)).toMatchObject({
-      aggregateId: restoredId,
-      annotation: draft.annotation,
-    });
-    expect(tables.get('project_exports')?.get(restoredId.slice('export:'.length))).toMatchObject({
-      assetId: 'new-local',
-    });
-    expect(result.retainedAssetIds).toContain('new-local');
-    if (strategy === 'duplicate')
-      expect(tables.get('video_workspaces')?.get(entry.id)).toMatchObject({
-        sourceAssetId: 'old-local',
-      });
-  }
-);
 
 describe('media v6 root publication', () => {
   it('publishes screenshot metadata and the restore checkpoint atomically', async () => {
@@ -316,14 +155,83 @@ describe('media v6 root publication', () => {
     expect(storeFor('media_library').put).toHaveBeenCalledWith(
       expect.objectContaining({ blob: expect.any(File), id: 'media-one' })
     );
-    expect(mocks.checkpoint).toHaveBeenCalledWith(
-      expect.anything(),
-      'restore-1',
-      'media:library-item:media-one',
-      'media-one',
-      true,
-      false
-    );
+    expect(mocks.checkpoint).toHaveBeenCalledWith(expect.anything(), 'restore-1', {
+      conflicted: false,
+      imported: true,
+      rootKey: 'media:library-item:media-one',
+      targetRootId: 'media-one',
+    });
+  });
+
+  it.each([
+    {
+      label: 'missing sidecar on skip',
+      metadata: {
+        entry: {
+          id: 'recording:recording-one',
+          source: { kind: 'recording', recordingId: 'recording-one' },
+          tags: [],
+        },
+        originalObjectId: 'object-one',
+      },
+      operation: 'skip',
+    },
+    {
+      label: 'mismatched sidecar on replace',
+      metadata: {
+        entry: {
+          id: 'recording:recording-one',
+          mimeType: 'video/webm',
+          size: 5,
+          source: { kind: 'recording', recordingId: 'recording-one' },
+          tags: [],
+        },
+        originalObjectId: 'object-one',
+        recording: {
+          entry: {
+            createdAt: 1,
+            filename: 'recording.webm',
+            id: 'other-recording',
+            mimeType: 'video/webm',
+            size: 5,
+          },
+        },
+      },
+      operation: 'replace',
+    },
+  ] as const)('rejects $label before opening a mutation', async ({ metadata, operation }) => {
+    const envelope = {
+      descriptor: {
+        mediaSubtype: 'library-item' as const,
+        metadataPath: '_sniptale/metadata/media/recording%3Arecording-one.json',
+        objectCount: 1,
+        rootId: 'recording:recording-one',
+        rootKind: 'media' as const,
+        totalBytes: 5,
+      },
+      metadata: portableJson(metadata),
+      objects: [],
+    };
+
+    if (operation === 'skip') {
+      await expect(
+        mediaLibraryRootPublisher.checkpointSkipIfExisting!({
+          envelope,
+          session: { ...session, strategy: 'skip' },
+        })
+      ).rejects.toThrow('recording association');
+    } else {
+      await expect(
+        mediaLibraryRootPublisher.publish({
+          envelope,
+          journal,
+          session,
+          staged: [],
+        })
+      ).rejects.toThrow('recording association');
+    }
+
+    expect(mocks.runMutation).not.toHaveBeenCalled();
   });
 });
 

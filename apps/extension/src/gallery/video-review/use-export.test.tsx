@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { QuickEditExportUnavailable } from '../../workflows/video-review/export-lifecycle';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-// @vitest-environment jsdom
 import { ReviewRenderOptions } from './edit-actions';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

@@ -1,4 +1,4 @@
-import { resolveReviewVideoEncoderConfig } from './render-settings';
+import { resolveReviewVideoEncoderConfig, type ReviewOutputCodec } from './render-codec';
 import type {
   VideoQuality,
   VideoResolutionPreset,
@@ -7,7 +7,7 @@ import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input, type Rotation } from
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import { chooseReviewAudioCodec } from './audio-render';
 
-export type ReviewOutputCodec = 'avc' | 'hevc' | 'vp8' | 'vp9';
+export type { ReviewOutputCodec } from './render-codec';
 
 /** Session-local export choices; basic mode keeps the source encoding. */
 export interface ReviewRenderSettings {

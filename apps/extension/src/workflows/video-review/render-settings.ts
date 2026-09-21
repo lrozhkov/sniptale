@@ -1,20 +1,13 @@
-import { resolveVideoCodecLevel } from '../../features/video/project/export/codec-level';
 import {
-  resolveVideoTargetBitrate,
   resolveVideoOutputDimensions,
   VideoQuality,
   VideoResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
-import type { ReviewMediaIndex, ReviewOutputCodec, ReviewRenderSettings } from './media-index';
+import type { ReviewMediaIndex, ReviewRenderSettings } from './media-index';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import { resolveReviewRenderBitrate, type ReviewOutputCodec } from './render-codec';
 
-/** Uses the calibrated recording/editor ladder; compressed source size is not a fidelity budget. */
-export function resolveReviewRenderBitrate(
-  output: { width: number; height: number; fps: number },
-  quality: VideoQuality = VideoQuality.HIGH
-): number {
-  return resolveVideoTargetBitrate({ ...output, quality });
-}
+export { resolveReviewRenderBitrate, resolveReviewVideoEncoderConfig } from './render-codec';
 
 /** The output profile is independent of the source container and preserves the scene aspect ratio. */
 export function resolveReviewOutputProfile(
@@ -67,31 +60,4 @@ export function reviewOutputCodecs(
         (index.processedVideoCodec ? [index.processedVideoCodec] : []))
       : []);
   return allowed.filter((codec) => probed.includes(codec));
-}
-
-/** Codec family plus exact frame-rate level, shared with the primary editor. */
-export function resolveReviewVideoEncoderConfig(
-  codec: ReviewOutputCodec,
-  output: {
-    width: number;
-    height: number;
-    fps?: number;
-    bitrate?: number;
-  }
-): VideoEncoderConfig {
-  const fps = output.fps ?? 30;
-  const base = { avc: 'avc1.640028', hevc: 'hvc1.1.6.L123.B0', vp9: 'vp09.00.10.08', vp8: 'vp8' }[
-    codec
-  ];
-  return {
-    codec: resolveVideoCodecLevel(base, { ...output, fps }),
-    width: output.width,
-    height: output.height,
-    framerate: fps,
-    bitrate: output.bitrate ?? resolveReviewRenderBitrate({ ...output, fps }),
-    bitrateMode: 'variable',
-    latencyMode: 'quality',
-    hardwareAcceleration: 'no-preference',
-    ...(codec === 'avc' ? { avc: { format: 'avc' } } : {}),
-  };
 }

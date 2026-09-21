@@ -79,8 +79,17 @@ vi.mock('../shared/download', async (importOriginal) => ({
   downloadGalleryBlob: integration.download,
 }));
 
-it('keeps advanced mode in the unified timeline toolbar and hides unavailable overlay controls', async () => {
+it('creates and edits a visible overlay through the current inspector selection owner', async () => {
   const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    processedVideoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
   try {
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
@@ -90,26 +99,81 @@ it('keeps advanced mode in the unified timeline toolbar and hides unavailable ov
     ).not.toBeNull();
     expect(fixture.host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     await fixture.click('advancedEditing');
-    for (const key of [
-      'addOverlayComment',
-      'showOnVideo',
-      'hideOverlays',
-      'showOverlays',
-      'trackControlsWidth',
-      'volume',
-    ])
-      expect(fixture.host.querySelector(`[aria-label="gallery.videoReview.${key}"]`)).toBeNull();
+    await act(async () =>
+      [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
+        .find((button) => button.textContent === 'gallery.videoReview.comments')!
+        .click()
+    );
+    await fixture.click('addOverlayComment');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')
+    ).not.toBeNull();
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.canvasComment"]')
+    ).not.toBeNull();
+    const text = fixture.host.querySelector<HTMLTextAreaElement>(
+      '[data-ui="gallery.videoReview.overlayTextInput"]'
+    )!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        text,
+        'Frame note'
+      );
+      text.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 350)));
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'canvasComment',
+      after: { text: 'Frame note', visible: true, renderToVideo: true },
+    });
     expect(
       fixture.host.querySelector('aside [aria-label="gallery.videoReview.advancedEditing"]')
     ).toBeNull();
-    expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')
-    ).not.toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('bridges a saved annotation into the selected video overlay editor', async () => {
+  const annotation = {
+    id: 'note-a',
+    text: 'Saved note',
+    anchor: { kind: 'point' as const, time: 1 },
+  };
+  const fixture = createEditorFixture(integration, {
+    history: [
+      {
+        id: 'note-op',
+        at: 1,
+        target: 'annotation',
+        before: null,
+        after: annotation,
+      },
+    ],
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
     await fixture.click('advancedEditing');
-    expect(fixture.host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
+    await act(async () =>
+      [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
+        .find((button) => button.textContent === 'gallery.videoReview.comments')!
+        .click()
+    );
+    await fixture.click('showOnVideo');
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'canvasComment',
+      after: { annotationId: annotation.id, renderToVideo: true, visible: true },
+    });
     expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')
-    ).toBeNull();
+      fixture.host.querySelector('[data-ui="gallery.videoReview.canvasCommentEditor"]')
+    ).not.toBeNull();
+    expect(
+      fixture.host.querySelector<HTMLTextAreaElement>(
+        '[data-ui="gallery.videoReview.overlayTextInput"]'
+      )?.disabled
+    ).toBe(true);
   } finally {
     await fixture.cleanup();
   }

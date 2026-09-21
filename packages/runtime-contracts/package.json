@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/runtime-contracts",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -73,7 +73,7 @@
     "./scenario/tour-parser": "./src/scenario/tour-parser.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.4.1",
+    "@sniptale/foundation": "0.4.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

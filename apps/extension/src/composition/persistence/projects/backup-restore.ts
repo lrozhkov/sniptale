@@ -32,6 +32,10 @@ import {
   PROJECT_EXPORT_OWNER_KIND,
   PROJECT_MEDIA_ASSET_ROLE,
 } from './asset-publication';
+import {
+  collectProjectAssetOwnership,
+  type ProjectAssetOwnership,
+} from './backup-restore-asset-ownership';
 
 interface Store<T = unknown> {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -80,14 +84,6 @@ export interface VideoProjectBackupRestoreStores {
   thumbnails: Store<MediaThumbnailEntry>;
 }
 
-function projectAssetIds(entry: VideoProjectEntry): Set<string> {
-  return new Set(
-    entry.project.assets.flatMap((asset) =>
-      asset.source.kind === 'project-asset' ? [asset.source.projectAssetId] : []
-    )
-  );
-}
-
 async function unlink(args: {
   assetId: string;
   entityId: string;
@@ -103,20 +99,15 @@ async function unlink(args: {
 }
 
 async function deleteExisting(args: {
+  assetOwnership: ProjectAssetOwnership;
   operation: PhysicalDeleteAssetOperation;
   projectId: string;
   stores: VideoProjectBackupRestoreStores;
 }) {
   const existing = parseVideoProjectEntry(await args.stores.projects.get(args.projectId));
   if (!existing) return;
-  const protectedAssets = new Set<string>();
-  for (const raw of await args.stores.projects.getAll()) {
-    const other = parseVideoProjectEntry(raw);
-    if (!other || other.id === args.projectId) continue;
-    for (const id of projectAssetIds(other)) protectedAssets.add(id);
-  }
-  for (const id of projectAssetIds(existing)) {
-    if (protectedAssets.has(id)) continue;
+  for (const id of args.assetOwnership.owned) {
+    if (args.assetOwnership.protected.has(id)) continue;
     const asset = parseProjectAssetEntry(await args.stores.assets.get(id));
     await args.stores.assets.delete(id);
     await args.stores.media.delete(`project-asset:${id}`);
@@ -153,19 +144,6 @@ async function deleteExisting(args: {
     createAggregatePresentationKey({ id: args.projectId, kind: 'video-project' })
   );
   await args.stores.projects.delete(args.projectId);
-}
-
-async function collectOtherProjectAssetIds(
-  projectId: string,
-  stores: VideoProjectBackupRestoreStores
-): Promise<Set<string>> {
-  const assetIds = new Set<string>();
-  for (const raw of await stores.projects.getAll()) {
-    const project = parseVideoProjectEntry(raw);
-    if (!project || project.id === projectId) continue;
-    for (const id of projectAssetIds(project)) assetIds.add(id);
-  }
-  return assetIds;
 }
 
 async function hasAssetConflict(args: {
@@ -271,11 +249,14 @@ export async function putVideoProjectBackupRestore(args: {
   stores: VideoProjectBackupRestoreStores;
 }): Promise<{ conflicted: boolean; imported: boolean }> {
   const existing = parseVideoProjectEntry(await args.stores.projects.get(args.root.entry.id));
-  const existingAssetIds = existing ? projectAssetIds(existing) : new Set<string>();
-  const otherAssetIds = await collectOtherProjectAssetIds(args.root.entry.id, args.stores);
+  const assetOwnership = await collectProjectAssetOwnership({
+    existing,
+    projectId: args.root.entry.id,
+    stores: args.stores,
+  });
   const assetConflict = await hasAssetConflict({
-    existingAssetIds,
-    otherAssetIds,
+    existingAssetIds: assetOwnership.owned,
+    otherAssetIds: assetOwnership.protected,
     root: args.root,
     stores: args.stores,
     strategy: args.strategy,
@@ -289,6 +270,7 @@ export async function putVideoProjectBackupRestore(args: {
   }
   if (existing && args.strategy === 'replace')
     await deleteExisting({
+      assetOwnership,
       operation: args.operation,
       projectId: args.root.entry.id,
       stores: args.stores,

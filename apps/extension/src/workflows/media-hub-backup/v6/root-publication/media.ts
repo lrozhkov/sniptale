@@ -4,15 +4,13 @@ import {
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
+  VIDEO_PROJECTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import {
   parseProjectAssetEntry,
   parseProjectExportEntry,
 } from '../../../../composition/persistence/projects/read-guards';
-import {
-  prepareVideoReviewRestore,
-  putVideoReviewRestore,
-} from '../../../../composition/persistence/review-workspaces/backup-restore';
+import { putVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
 import {
   appendCommittedArchiveRootInTransaction,
   buildPhysicalDeleteOperation,
@@ -62,10 +60,18 @@ import { parsePortableMediaMetadata } from '../root-codecs/media';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
+import {
+  deleteExclusiveMediaReviewAssets,
+  hasMediaReviewAssetConflict,
+  prepareMediaReviewAssets,
+  prepareStandaloneMediaVideoReview,
+  publishMediaReviewAssets,
+} from './media-review-assets';
 
 type MutableStore = {
   delete(key: IDBValidKey): Promise<unknown>;
   get(key: IDBValidKey): Promise<unknown>;
+  getAll(): Promise<unknown[]>;
   put(value: unknown): Promise<unknown>;
 };
 
@@ -81,6 +87,7 @@ interface MediaRestoreStores {
   workspaces: MutableStore;
   videoWorkspaces: MutableStore;
   videoDrafts: MutableStore;
+  videoProjects: MutableStore;
   projectAssets: MutableStore;
   projectExports: MutableStore;
 }
@@ -129,6 +136,13 @@ async function deleteExistingMediaRoot(args: {
 }) {
   const current = parseMediaLibraryEntry(await args.stores.media.get(args.mediaId));
   if (!current) return;
+  await deleteExclusiveMediaReviewAssets({
+    mediaId: args.mediaId,
+    operation: args.operation,
+    primaryProjectAssetId:
+      current.source.kind === 'project-asset' ? current.source.projectAssetId : null,
+    stores: args.stores,
+  });
   const workspace = parseImageWorkspaceEntry(await args.stores.workspaces.get(args.mediaId));
   if (workspace) {
     await removeEditorDocumentOwnership({
@@ -388,6 +402,38 @@ function prepareWorkspace(args: {
   return { refs, workspace };
 }
 
+function prepareProjectVideo(
+  metadata: PortableMedia,
+  media: ReturnType<typeof parseMediaLibraryEntry>,
+  original: StagedArchiveObject
+) {
+  if (!media) throw new Error('Restored media metadata is invalid.');
+  const projectAsset =
+    metadata.projectAsset && media.source.kind === 'project-asset'
+      ? parseProjectAssetEntry({
+          ...metadata.projectAsset,
+          id: media.source.projectAssetId,
+          assetId: original.ref.assetId,
+          size: original.ref.size,
+          mimeType: original.ref.mimeType,
+        })
+      : null;
+  const projectExport =
+    metadata.projectExport && media.source.kind === 'project-export'
+      ? parseProjectExportEntry({
+          ...metadata.projectExport,
+          id: media.source.exportId,
+          assetId: original.ref.assetId,
+          size: original.ref.size,
+          mimeType: original.ref.mimeType,
+        })
+      : null;
+  if ((metadata.projectAsset && !projectAsset) || (metadata.projectExport && !projectExport)) {
+    throw new Error('Restored project video is invalid.');
+  }
+  return { projectAsset, projectExport };
+}
+
 async function prepareMediaRoot(args: {
   metadata: PortableMedia;
   objects: StagedObjectMap;
@@ -432,52 +478,26 @@ async function prepareMediaRoot(args: {
     metadata: args.metadata,
     objects: args.objects,
   });
-  const projectAsset =
-    args.metadata.projectAsset && media.source.kind === 'project-asset'
-      ? parseProjectAssetEntry({
-          ...args.metadata.projectAsset,
-          id: media.source.projectAssetId,
-          assetId: original.ref.assetId,
-          size: original.ref.size,
-          mimeType: original.ref.mimeType,
-        })
-      : null;
-  const projectExport =
-    args.metadata.projectExport && media.source.kind === 'project-export'
-      ? parseProjectExportEntry({
-          ...args.metadata.projectExport,
-          id: media.source.exportId,
-          assetId: original.ref.assetId,
-          size: original.ref.size,
-          mimeType: original.ref.mimeType,
-        })
-      : null;
-  if (
-    (args.metadata.projectAsset && !projectAsset) ||
-    (args.metadata.projectExport && !projectExport)
-  )
-    throw new Error('Restored project video is invalid.');
-  if (
-    args.metadata.videoReview &&
-    args.metadata.videoReview.workspace.source.size !== original.ref.size
-  )
-    throw new Error('Restored video review bytes are inconsistent.');
-  const videoReview = args.metadata.videoReview
-    ? prepareVideoReviewRestore({
-        review: args.metadata.videoReview,
-        sourceAggregateId: args.metadata.entry.id,
-        targetAggregateId: media.id,
-        sourceAssetId: original.ref.assetId,
-      })
-    : null;
+  const reviewAssets = prepareMediaReviewAssets({
+    createId: newId,
+    metadata: args.metadata,
+    objects: args.objects,
+  });
+  const projectVideo = prepareProjectVideo(args.metadata, media, original);
+  const videoReview = prepareStandaloneMediaVideoReview({
+    mediaId: media.id,
+    metadata: args.metadata,
+    original,
+    reviewAssets,
+  });
   return {
     media,
     original,
     presentation,
     snapshot,
     thumbnail,
-    projectAsset,
-    projectExport,
+    ...projectVideo,
+    reviewAssets,
     videoReview,
     ...recording,
     ...workspace,
@@ -486,17 +506,19 @@ async function prepareMediaRoot(args: {
 
 type PreparedMediaRoot = Awaited<ReturnType<typeof prepareMediaRoot>>;
 
+async function hasRelatedMediaConflict(stores: MediaRestoreStores, prepared: PreparedMediaRoot) {
+  if (prepared.projectAsset)
+    return Boolean(await stores.projectAssets.get(prepared.projectAsset.id));
+  if (prepared.projectExport)
+    return Boolean(await stores.projectExports.get(prepared.projectExport.id));
+  if (prepared.recording) return Boolean(await stores.recordings.get(prepared.recording.id));
+  if (prepared.snapshot) return Boolean(await stores.snapshots.get(prepared.snapshot.id));
+  return false;
+}
+
 async function detectMediaConflicts(stores: MediaRestoreStores, prepared: PreparedMediaRoot) {
   const current = parseMediaLibraryEntry(await stores.media.get(prepared.media.id));
-  const relatedConflict = prepared.projectAsset
-    ? Boolean(await stores.projectAssets.get(prepared.projectAsset.id))
-    : prepared.projectExport
-      ? Boolean(await stores.projectExports.get(prepared.projectExport.id))
-      : prepared.recording
-        ? Boolean(await stores.recordings.get(prepared.recording.id))
-        : prepared.snapshot
-          ? Boolean(await stores.snapshots.get(prepared.snapshot.id))
-          : false;
+  const relatedConflict = await hasRelatedMediaConflict(stores, prepared);
   const sidecarConflict = Boolean(
     (await stores.workspaces.get(prepared.media.id)) ||
     (await stores.videoWorkspaces.get(prepared.media.id)) ||
@@ -505,12 +527,28 @@ async function detectMediaConflicts(stores: MediaRestoreStores, prepared: Prepar
       createAggregatePresentationKey({ id: prepared.media.id, kind: 'image' })
     ))
   );
+  if (await hasMediaReviewAssetConflict(stores.projectAssets, prepared.reviewAssets)) {
+    throw new Error('Restored media review asset identity is already in use.');
+  }
   return {
     conflict: Boolean(current || relatedConflict || sidecarConflict),
     current,
     relatedConflict,
     sidecarConflict,
   };
+}
+
+async function publishProjectVideo(prepared: PreparedMediaRoot, stores: MediaRestoreStores) {
+  const child = prepared.projectAsset ?? prepared.projectExport;
+  if (!child) return;
+  await stores.refs.put(prepared.original.ref);
+  await stores.owners.put({
+    assetId: child.assetId,
+    ownerId: child.id,
+    ownerKind: prepared.projectAsset ? 'project-asset' : 'project-export',
+    role: 'body',
+  });
+  await (prepared.projectAsset ? stores.projectAssets : stores.projectExports).put(child);
 }
 
 async function publishPreparedMedia(args: {
@@ -521,19 +559,8 @@ async function publishPreparedMedia(args: {
 }) {
   await args.stores.media.put(args.prepared.media);
   if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
-  const child = args.prepared.projectAsset ?? args.prepared.projectExport;
-  if (child) {
-    await args.stores.refs.put(args.prepared.original.ref);
-    await args.stores.owners.put({
-      assetId: child.assetId,
-      ownerId: child.id,
-      ownerKind: args.prepared.projectAsset ? 'project-asset' : 'project-export',
-      role: 'body',
-    });
-    await (args.prepared.projectAsset ? args.stores.projectAssets : args.stores.projectExports).put(
-      child
-    );
-  }
+  await publishProjectVideo(args.prepared, args.stores);
+  await publishMediaReviewAssets(args.prepared.reviewAssets, args.stores);
   if (args.prepared.videoReview)
     await putVideoReviewRestore({
       review: args.prepared.videoReview,
@@ -594,6 +621,7 @@ async function commitPreparedMediaRoot(args: {
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
+        VIDEO_PROJECTS_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
@@ -618,6 +646,7 @@ async function commitPreparedMediaRoot(args: {
       workspaces: tx.objectStore(IMAGE_WORKSPACES_STORE),
       videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
       videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
+      videoProjects: tx.objectStore(VIDEO_PROJECTS_STORE),
       projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
       projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
     };
@@ -626,10 +655,12 @@ async function commitPreparedMediaRoot(args: {
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         args.session.operationId,
-        args.rootKey,
-        args.prepared.media.id,
-        false,
-        true
+        {
+          rootKey: args.rootKey,
+          targetRootId: args.prepared.media.id,
+          imported: false,
+          conflicted: true,
+        }
       );
       await tx.done;
       return { conflicted: true, imported: false };
@@ -658,10 +689,12 @@ async function commitPreparedMediaRoot(args: {
     await appendCommittedArchiveRootInTransaction(
       tx.objectStore(ASSET_OPERATIONS_STORE),
       args.session.operationId,
-      args.rootKey,
-      args.prepared.media.id,
-      true,
-      conflict.conflict
+      {
+        rootKey: args.rootKey,
+        targetRootId: args.prepared.media.id,
+        imported: true,
+        conflicted: conflict.conflict,
+      }
     );
     await tx.done;
     return { conflicted: conflict.conflict, imported: true };
@@ -686,6 +719,7 @@ function retainedMediaAssetIds(args: {
         ]
       : []),
     ...args.prepared.refs.map((ref) => ref.assetId),
+    ...args.prepared.reviewAssets.map((asset) => asset.ref.assetId),
   ];
 }
 
@@ -703,10 +737,12 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         session.operationId,
-        `media:library-item:${envelope.descriptor.rootId}`,
-        metadata.entry.id,
-        false,
-        true
+        {
+          rootKey: `media:library-item:${envelope.descriptor.rootId}`,
+          targetRootId: metadata.entry.id,
+          imported: false,
+          conflicted: true,
+        }
       );
       await tx.done;
       return true;

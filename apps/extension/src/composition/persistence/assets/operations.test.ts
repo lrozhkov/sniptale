@@ -137,15 +137,15 @@ describe('durable asset operations', () => {
       get: vi.fn().mockResolvedValue(session),
       put: vi.fn().mockResolvedValue(undefined),
     };
-    await appendCommittedArchiveRootInTransaction(
-      store,
-      session.operationId,
-      'media:library-item:one',
-      'media-copy'
-    );
+    await appendCommittedArchiveRootInTransaction(store, session.operationId, {
+      rootKey: 'media:library-item:one',
+      targetRootId: 'media-copy',
+      childIds: { 'scenario-asset:image': 'image-copy' },
+    });
     expect(store.put).toHaveBeenCalledWith(
       expect.objectContaining({
         committedRoots: ['media:library-item:one'],
+        childIdMap: { 'scenario-asset:image': 'image-copy' },
         conflictedRoots: [],
         currentRoot: null,
         rootIdMap: { 'media:library-item:one': 'media-copy' },
@@ -154,15 +154,26 @@ describe('durable asset operations', () => {
       })
     );
 
+    store.get = vi.fn().mockResolvedValue({
+      ...session,
+      childIdMap: { 'scenario-asset:image': 'first-image-copy' },
+      currentRoot: 'scenario-project:two',
+    });
+    await expect(
+      appendCommittedArchiveRootInTransaction(store, session.operationId, {
+        rootKey: 'scenario-project:two',
+        targetRootId: 'scenario-copy',
+        childIds: { 'scenario-asset:image': 'second-image-copy' },
+      })
+    ).rejects.toThrow('already mapped');
+
     store.get = vi.fn().mockResolvedValue(session);
-    await appendCommittedArchiveRootInTransaction(
-      store,
-      session.operationId,
-      'media:library-item:one',
-      'media-existing',
-      false,
-      true
-    );
+    await appendCommittedArchiveRootInTransaction(store, session.operationId, {
+      rootKey: 'media:library-item:one',
+      targetRootId: 'media-existing',
+      imported: false,
+      conflicted: true,
+    });
     expect(store.put).toHaveBeenLastCalledWith(
       expect.objectContaining({
         conflictedRoots: ['media:library-item:one'],
@@ -174,6 +185,7 @@ describe('durable asset operations', () => {
   it('enforces archive root and terminal session transitions', async () => {
     const session = {
       archiveFingerprint: 'b'.repeat(64),
+      childIdMap: {},
       committedRoots: [],
       conflictedRoots: [],
       createdAt: 1,

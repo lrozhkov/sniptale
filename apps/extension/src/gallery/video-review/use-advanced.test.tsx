@@ -1,5 +1,5 @@
-import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 // @vitest-environment jsdom
+import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import {
   createQuickEditZoomRegion,
   updateQuickEditZoomRegion,

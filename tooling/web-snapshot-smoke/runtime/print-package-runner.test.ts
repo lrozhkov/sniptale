@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 // @vitest-environment jsdom
+import { describe, expect, it } from 'vitest';
 
 import { installPrintSmokeLifecycleHook, verifyPrintCoverage } from './print-package-runner.mjs';
 
