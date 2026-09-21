@@ -75,18 +75,30 @@ afterEach(cleanupRenderedNode);
 
 it('hides tab-only fields for desktop and keeps the capture action available', async () => {
   const onCapture = vi.fn();
+  const onChange = vi.fn();
   await renderNode(
     <ScreenshotSetupPanel
       config={DEFAULT_SCREENSHOT_SETUP_STATE.desktop}
       viewportPresets={[]}
       pending={false}
       disabledReason={null}
-      onChange={vi.fn()}
+      onChange={onChange}
       onCapture={onCapture}
     />
   );
   expect(getContainer()?.textContent).not.toContain('popup.home.captureAreaLabel');
-  expect(getContainer()?.textContent).not.toContain('popup.home.captureCountdownLabel');
+  expect(getContainer()?.textContent).toContain('popup.home.captureCountdownLabel');
+  const countdown = Array.from(getContainer()?.querySelectorAll('select') ?? []).find((select) =>
+    Array.from(select.options).some((option) => option.value === '10')
+  );
+  expect(countdown).toBeDefined();
+  await act(async () => {
+    countdown!.value = '3';
+    countdown!.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({ screenshotMode: 'desktop', delay: 3 })
+  );
   const afterCaptureValues = Array.from(getContainer()?.querySelectorAll('option') ?? []).map(
     (option) => option.value
   );

@@ -104,6 +104,7 @@ async function verifiesPopupOwnedDesktopSelection() {
           result: 'ready',
           imageFormat: 'webp',
           imageQuality: 72,
+          delaySeconds: 3,
           requestId: 'desktop-request',
           reservationToken: 'desktop-reservation',
         }
@@ -168,6 +169,7 @@ async function verifiesPopupOwnedDesktopSelection() {
     streamId: 'popup-desktop-stream',
     imageFormat: 'webp',
     imageQuality: 72,
+    delaySeconds: 3,
   });
 }
 
@@ -178,6 +180,7 @@ async function verifiesDesktopSelectionCancellationAndFailure() {
     result: 'ready',
     imageFormat: 'png',
     imageQuality: 90,
+    delaySeconds: 3,
     requestId: 'cancel-request',
     reservationToken: 'cancel-reservation',
   });
@@ -216,6 +219,7 @@ async function verifiesDesktopFrameFailureCancelsPreparation() {
           result: 'ready',
           imageFormat: 'png',
           imageQuality: 90,
+          delaySeconds: 3,
           requestId: 'failed-frame-request',
           reservationToken: 'failed-frame-reservation',
         }

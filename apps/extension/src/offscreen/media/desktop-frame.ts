@@ -7,7 +7,8 @@ import {
 import { acquireDesktopStream } from './desktop-stream';
 import { captureDesktopStreamFrame } from '../../platform/media-utils/desktop-frame';
 
-const RESERVATION_TIMEOUT_MS = 30_000;
+// Cover the background picker budget plus the longest supported screenshot countdown.
+const RESERVATION_TIMEOUT_MS = 40_000;
 
 export type DesktopFrameResult = {
   result: 'captured';
@@ -69,6 +70,7 @@ export async function captureDesktopFrame(args: {
   streamId: string;
   imageFormat: DesktopFrameImageFormat;
   imageQuality: number;
+  delaySeconds?: number;
 }): Promise<DesktopFrameResult> {
   const reservation = takeReservation(args.requestId);
   try {
@@ -80,6 +82,7 @@ export async function captureDesktopFrame(args: {
         }),
       imageFormat: args.imageFormat,
       imageQuality: args.imageQuality,
+      delaySeconds: args.delaySeconds ?? 0,
     });
     return { result: 'captured', ...frame };
   } finally {

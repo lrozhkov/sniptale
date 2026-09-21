@@ -16,6 +16,7 @@ export type RuntimeDesktopFrameRequestByType = {
     streamId: string;
     imageFormat: DesktopFrameImageFormat;
     imageQuality: number;
+    delaySeconds: number;
   };
   [MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME]: {
     type: typeof MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME;

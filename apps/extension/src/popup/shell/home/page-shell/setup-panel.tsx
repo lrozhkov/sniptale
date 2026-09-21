@@ -40,7 +40,7 @@ export function ScreenshotSetupPanel(props: {
             />
           )}
           <ImageQualityField config={props.config} patch={patch} />
-          {desktop ? null : <TabCaptureCountdownField config={props.config} patch={patch} />}
+          <TabCaptureCountdownField config={props.config} patch={patch} />
         </div>
       </div>
       <div className={`mt-3 ${actionFooterSurfaceClassName}`}>

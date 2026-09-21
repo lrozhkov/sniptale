@@ -30,6 +30,7 @@ export function routeQuickActionMessage(args: CaptureRouteCommandContext): boole
           result: 'ready',
           imageFormat: runtimeContext.imageFormat,
           imageQuality: runtimeContext.imageQuality,
+          delaySeconds: runtimeContext.delaySeconds,
           ...preparation,
         });
       })

@@ -41,6 +41,7 @@ it('replaces a persisted desktop clipboard action on read without writing', asyn
   const state = await loadScreenshotSetupState();
   expect(state.desktop).toEqual({
     ...DEFAULT_SCREENSHOT_SETUP_STATE.desktop,
+    delay: 10,
     imageFormat: 'webp',
     imageQuality: 80,
   });

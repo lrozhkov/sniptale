@@ -94,7 +94,9 @@ it('reserves the shared media lease before the picker and releases it on cancell
 it('expires an abandoned picker reservation', () => {
   vi.useFakeTimers();
   reserveDesktopFrame('desktop-request');
-  vi.advanceTimersByTime(30_000);
+  vi.advanceTimersByTime(39_999);
+  expect(inspectOffscreenMediaActivityOwner()).toBe('desktop-screenshot');
+  vi.advanceTimersByTime(1);
   expect(inspectOffscreenMediaActivityOwner()).toBeNull();
 });
 

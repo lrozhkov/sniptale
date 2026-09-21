@@ -5,6 +5,7 @@ import { captureDesktopScreenshotFrame } from './desktop-screenshot-frame';
 import { createPopupPreviewStream } from '../../popup/recording/video/setup/options/webcam-preview.test-support';
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -106,4 +107,47 @@ it('keeps capture available when Chrome omits cursor confirmation and still chec
   ).rejects.toThrow('raster budget');
   expect(sizeSurface.stop).toHaveBeenCalledOnce();
   sizeSurface.createElement.mockRestore();
+});
+
+it.each([3, 5, 10])(
+  'captures the current frame only after %s seconds of active sharing',
+  async (delaySeconds) => {
+    vi.useFakeTimers();
+    const surface = installCaptureSurface();
+    const capture = captureDesktopScreenshotFrame({
+      streamId: 'stream',
+      imageFormat: 'png',
+      imageQuality: 90,
+      delaySeconds,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(surface.getUserMedia).toHaveBeenCalledOnce();
+    expect(surface.video.play).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(delaySeconds * 1000 - 1);
+    expect(surface.canvas.toDataURL).not.toHaveBeenCalled();
+    expect(surface.stop).not.toHaveBeenCalled();
+    Object.defineProperty(surface.video, 'videoWidth', { configurable: true, value: 1440 });
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(capture).resolves.toMatchObject({ width: 1440 });
+    expect(surface.stop).toHaveBeenCalledOnce();
+  }
+);
+
+it('does not save a stale frame when sharing ends during countdown', async () => {
+  vi.useFakeTimers();
+  const surface = installCaptureSurface();
+  const capture = captureDesktopScreenshotFrame({
+    streamId: 'stream',
+    imageFormat: 'png',
+    imageQuality: 90,
+    delaySeconds: 3,
+  });
+  const rejected = expect(capture).rejects.toThrow('ended before capture');
+  await vi.advanceTimersByTimeAsync(0);
+  Object.defineProperty(surface.track, 'readyState', { value: 'ended' });
+  await vi.advanceTimersByTimeAsync(3000);
+  await rejected;
+  expect(surface.canvas.toDataURL).not.toHaveBeenCalled();
+  expect(surface.stop).toHaveBeenCalledOnce();
+  expect(surface.video.srcObject).toBeNull();
 });

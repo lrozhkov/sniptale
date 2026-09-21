@@ -35,7 +35,7 @@ it('replaces unavailable desktop clipboard delivery for popup capture configs', 
   ).toEqual({
     screenshotMode: 'desktop',
     viewportPresetId: null,
-    delay: null,
+    delay: 10,
     afterCapture: 'download_default',
     imageFormat: 'webp',
     imageQuality: 80,
@@ -60,7 +60,7 @@ it('applies quick-action field and sink policy for tab and desktop modes', () =>
   expect(normalizeQuickActionPolicy(desktop)).toMatchObject({
     afterCapture: 'download_default',
     viewportPresetId: null,
-    delay: null,
+    delay: 10,
     imageFormat: 'webp',
     imageQuality: 80,
     exitAfterCapture: false,

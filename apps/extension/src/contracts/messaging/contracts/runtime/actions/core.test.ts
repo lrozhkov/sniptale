@@ -198,6 +198,7 @@ it('resolves desktop encoding policy before the popup opens the picker', () => {
       result: 'ready',
       imageFormat: 'webp',
       imageQuality: 72,
+      delaySeconds: 3,
       requestId: 'request-1',
       reservationToken: 'reservation-1',
     })
@@ -234,8 +235,14 @@ it('parses exact offscreen desktop frame responses and rejects malformed dimensi
     streamId: 'desktop-stream-1',
     imageFormat: 'png',
     imageQuality: 80,
+    delaySeconds: 3,
   } as const;
   expect(offscreenDesktopCaptureContract.parseRequest(captureRequest)).toEqual(captureRequest);
+  for (const delaySeconds of [-1, 2, 11, Number.NaN, '3', undefined]) {
+    expect(() =>
+      offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, delaySeconds })
+    ).toThrow();
+  }
   expect(() =>
     offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, requestId: '' })
   ).toThrow();

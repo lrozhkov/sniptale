@@ -52,6 +52,7 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
   result: 'ready';
   imageFormat: ScreenshotImageFormat;
   imageQuality: number;
+  delaySeconds: number;
   requestId: string;
   reservationToken: string;
 }> {
@@ -60,6 +61,7 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
       result: isString,
       imageFormat: isString,
       imageQuality: isNumber,
+      delaySeconds: isNumber,
       requestId: isString,
       reservationToken: isString,
     },
@@ -69,6 +71,10 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
   if (response['success'] !== true) return true;
   return (
     response['result'] === 'ready' &&
+    (response['delaySeconds'] === 0 ||
+      response['delaySeconds'] === 3 ||
+      response['delaySeconds'] === 5 ||
+      response['delaySeconds'] === 10) &&
     isScreenshotImageFormat(response['imageFormat']) &&
     isNumber(response['imageQuality']) &&
     Number.isFinite(response['imageQuality']) &&

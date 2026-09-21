@@ -60,7 +60,7 @@ export function normalizeScreenshotCaptureConfig(
   return {
     ...config,
     ...(config.screenshotMode === 'desktop'
-      ? { viewportPresetId: null, delay: null, exitAfterCapture: false }
+      ? { viewportPresetId: null, exitAfterCapture: false }
       : {}),
     ...(copyToClipboard ? { imageFormat: 'png', imageQuality: null } : {}),
   };

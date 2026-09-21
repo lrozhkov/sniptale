@@ -189,7 +189,7 @@ it('releases the mutation permit when offscreen reservation fails', async () => 
 });
 
 it('selects a desktop source and captures its frame through the reserved offscreen owner', async () => {
-  const context = createContext('edit');
+  const context = { ...createContext('edit'), delaySeconds: 5 };
 
   await expect(
     selectAndCaptureDesktopQuickAction({
@@ -212,6 +212,7 @@ it('selects a desktop source and captures its frame through the reserved offscre
       imageFormat: 'webp',
       imageQuality: 80,
       streamId: 'stream-1',
+      delaySeconds: 5,
       type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
     })
   );
@@ -318,4 +319,42 @@ it('marks the created capture job failed when a downstream sink rejects', async 
   expect(mocks.transitionJob).toHaveBeenCalledWith('job-1', 'failed', {
     error: 'download failed',
   });
+});
+
+it.each([3, 5, 10])(
+  'keeps a late picker selection deliverable through a %s-second countdown',
+  async (delaySeconds) => {
+    vi.useFakeTimers();
+    const context = { ...createContext(), delaySeconds };
+    const preparation = await reserveDesktopQuickAction({ context, tabId: 94 });
+    await vi.advanceTimersByTimeAsync(29_000);
+    await vi.advanceTimersByTimeAsync(delaySeconds * 1000);
+    expect(mocks.releasePermit).not.toHaveBeenCalled();
+    await expect(
+      runDesktopQuickAction({
+        context,
+        tabId: 94,
+        desktopSelection: {
+          ...preparation,
+          status: 'selected',
+          dataUrl: createDataUrl(),
+          width: 1200,
+          height: 800,
+        },
+      })
+    ).resolves.toEqual({ result: 'accepted' });
+    expect(mocks.releasePermit).toHaveBeenCalledOnce();
+  }
+);
+
+it('expires an abandoned preparation after its bounded countdown allowance', async () => {
+  vi.useFakeTimers();
+  await reserveDesktopQuickAction({ context: { ...createContext(), delaySeconds: 10 }, tabId: 95 });
+  await vi.advanceTimersByTimeAsync(39_999);
+  expect(mocks.releasePermit).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.releasePermit).toHaveBeenCalledOnce();
+  expect(mocks.sendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME })
+  );
 });

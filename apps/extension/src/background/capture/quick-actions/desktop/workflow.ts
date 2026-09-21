@@ -39,6 +39,7 @@ function contextKey(context: QuickActionRuntimeContext): string {
     context.afterCapture,
     context.imageFormat,
     context.imageQuality,
+    context.delaySeconds,
   ]);
 }
 
@@ -63,6 +64,7 @@ function cancelOffscreenFrame(requestId: string) {
 function captureOffscreenFrame(args: {
   imageFormat: QuickActionRuntimeContext['imageFormat'];
   imageQuality: number;
+  delaySeconds: number;
   requestId: string;
   streamId: string;
 }) {
@@ -119,10 +121,13 @@ export async function reserveDesktopQuickAction(args: {
       requestId,
       reservationToken,
       tabId: args.tabId,
-      timeout: setTimeout(() => {
-        const current = pendingPreparations.get(reservationToken);
-        if (current) void cancelPreparation(current);
-      }, PREPARATION_TIMEOUT_MS),
+      timeout: setTimeout(
+        () => {
+          const current = pendingPreparations.get(reservationToken);
+          if (current) void cancelPreparation(current);
+        },
+        PREPARATION_TIMEOUT_MS + args.context.delaySeconds * 1000
+      ),
     };
     pendingPreparations.set(reservationToken, preparation);
     return { requestId, reservationToken };
@@ -153,6 +158,7 @@ export async function selectAndCaptureDesktopQuickAction(args: {
     const response = await captureOffscreenFrame({
       imageFormat: args.context.imageFormat,
       imageQuality: args.context.imageQuality,
+      delaySeconds: args.context.delaySeconds,
       requestId: preparation.requestId,
       streamId: source.selection.streamId,
     });

@@ -115,6 +115,7 @@ export type RuntimeContentActionResponseByType = {
     result: 'ready';
     imageFormat: ScreenshotImageFormat;
     imageQuality: number;
+    delaySeconds: number;
     requestId: string;
     reservationToken: string;
   }>;

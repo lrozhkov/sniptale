@@ -415,6 +415,7 @@ export const runtimeActionCoreMessageContracts = {
           capabilityToken: isString,
           requestId: isDesktopCaptureCorrelationId,
           streamId: (value) => isString(value) && value.length > 0 && value.length <= 4096,
+          delaySeconds: (value) => value === 0 || value === 3 || value === 5 || value === 10,
           imageFormat: isScreenshotImageFormat,
           imageQuality: (value) =>
             isNumber(value) && Number.isFinite(value) && value >= 1 && value <= 100,

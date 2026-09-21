@@ -59,6 +59,7 @@ export async function captureDesktopStreamFrame(args: {
   acquireStream: () => Promise<MediaStream>;
   imageFormat: DesktopFrameImageFormat;
   imageQuality: number;
+  delaySeconds?: number;
 }): Promise<CapturedDesktopFrame> {
   let stream: MediaStream | null = null;
   const video = document.createElement('video');
@@ -74,6 +75,13 @@ export async function captureDesktopStreamFrame(args: {
     video.playsInline = true;
     video.srcObject = stream;
     await waitForVideoFrame(video);
+    const delayMs = (args.delaySeconds ?? 0) * 1000;
+    if (delayMs > 0) {
+      await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+    }
+    if (stream.getVideoTracks()[0]?.readyState === 'ended') {
+      throw new Error('Desktop stream ended before capture');
+    }
     assertFrameDimensions(video.videoWidth, video.videoHeight);
 
     canvas.width = video.videoWidth;

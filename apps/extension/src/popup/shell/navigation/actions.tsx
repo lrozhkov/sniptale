@@ -148,6 +148,7 @@ async function choosePopupDesktopSource(
       streamId: selection.selection.streamId,
       imageFormat: prepareResponse.imageFormat,
       imageQuality: prepareResponse.imageQuality,
+      delaySeconds: prepareResponse.delaySeconds,
     });
   } catch (error) {
     await cancelPreparedDesktopCapture({

@@ -99,7 +99,7 @@ const bundledQuickActionConfigs: readonly BundledQuickActionConfig[] = [
     nameKey: 'shared.defaults.quickActionDesktopDownload',
     screenshotMode: 'desktop',
     afterCapture: 'download_default',
-    delay: null,
+    delay: 3,
     imageFormat: null,
     exitAfterCapture: false,
   },
