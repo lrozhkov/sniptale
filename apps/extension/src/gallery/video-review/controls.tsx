@@ -92,6 +92,7 @@ export function ReviewButton({
   label,
   primary = false,
   toolbarLabel,
+  toolbarPriority = 6,
   children,
   className = '',
   ...props
@@ -99,6 +100,8 @@ export function ReviewButton({
   label: string;
   primary?: boolean;
   toolbarLabel?: string | undefined;
+  /** Lower priorities lose their caption first when the toolbar runs out of space. */
+  toolbarPriority?: number;
 }) {
   const tone = primary
     ? getControlPrimaryButtonClassName()
@@ -109,6 +112,7 @@ export function ReviewButton({
       title={label}
       aria-label={label}
       data-review-toolbar-button={toolbarLabel === undefined ? undefined : ''}
+      data-toolbar-priority={toolbarLabel === undefined ? undefined : toolbarPriority}
       {...props}
       className={`${tone}
       !h-8 !min-h-8 !rounded-[var(--sniptale-radius-sm)]

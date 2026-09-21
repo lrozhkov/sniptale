@@ -2490,16 +2490,16 @@ for (const variant of [
       await button('gallery.videoReview.advancedEditing').click();
       for (const [width, height, size] of [
         [1280, 720, 32],
-        [1920, 1080, 36],
-        [2560, 1440, 36],
-        [3840, 2160, 36],
-        [900, 720, 28],
+        [1920, 1080, 32],
+        [2560, 1440, 32],
+        [3840, 2160, 32],
+        [900, 720, 32],
       ] as const) {
         await page.setViewportSize({ width, height });
         await expect(pointer).toHaveCSS('height', `${size}px`);
         await expect(pointer.locator('svg')).toHaveCSS('width', '14px');
         if (width >= 1920) await expect(toolbar).toHaveAttribute('data-labels', 'shown');
-        if (width <= 1000) await expect(toolbar).toHaveAttribute('data-labels', 'hidden');
+        if (width <= 1000) await expect(toolbar).not.toHaveAttribute('data-labels', 'shown');
         const geometry = await toolbar.evaluate((node) => ({
           width: node.clientWidth,
           content: node.scrollWidth,
@@ -2510,8 +2510,46 @@ for (const variant of [
         if ([1280, 1920, 2560, 3840].includes(width))
           await page.screenshot({ path: testInfo.outputPath(`toolbar-${width}.png`) });
         await button('gallery.videoReview.speedMode').click();
-        if (width !== 1920)
-          await expect(toolbar).toHaveAttribute('data-labels', width < 1920 ? 'hidden' : 'shown');
+        const rate = button('gallery.videoReview.speedRate');
+        await expect(rate).toHaveCSS('height', '32px');
+        await expect(rate).toHaveCSS('font-size', '12px');
+        await expect(rate).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        if (width >= 1920) await expect(toolbar).toHaveAttribute('data-labels', 'shown');
+        if (width === 1280) {
+          await expect(toolbar).toHaveAttribute(
+            'data-labels',
+            variant.locale === 'ru' ? 'partial' : 'shown'
+          );
+          const border = await rate.evaluate((node) => getComputedStyle(node).borderTopColor);
+          await rate.hover();
+          await expect(rate).not.toHaveCSS('border-top-color', border);
+          await page.mouse.move(0, 0);
+          const widths = await toolbar.evaluate(async (node) => {
+            const values: number[] = [];
+            for (let frame = 0; frame < 12; frame++) {
+              await new Promise(requestAnimationFrame);
+              values.push(
+                node.querySelector('[data-toolbar-side="leading"]')!.getBoundingClientRect().width
+              );
+            }
+            return values;
+          });
+          expect(Math.max(...widths) - Math.min(...widths)).toBeLessThan(0.5);
+          await page.screenshot({ path: testInfo.outputPath('toolbar-speed-1280.png') });
+        }
+        const captions = await toolbar.locator('[data-toolbar-priority]').evaluateAll((buttons) =>
+          buttons.map((button) => ({
+            priority: Number(button.getAttribute('data-toolbar-priority')),
+            hidden: button.hasAttribute('data-caption-hidden'),
+          }))
+        );
+        for (const caption of captions.filter((caption) => caption.hidden)) {
+          expect(
+            captions
+              .filter((other) => other.priority < caption.priority)
+              .every((other) => other.hidden)
+          ).toBe(true);
+        }
         const speedGeometry = await toolbar.evaluate((node) => {
           const leading = node.querySelector('[data-toolbar-side="leading"]')!;
           const transport = node.querySelector('[data-toolbar-transport]')!;

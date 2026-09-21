@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
 
-/** One layout owner hides captions before relaxing centering or moving tools to another row. */
+/** Keeps captions in priority order, sharing spare side space before hiding the next group. */
 export function useReviewToolbarLayout() {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -8,16 +8,48 @@ export function useReviewToolbarLayout() {
     if (!toolbar) return;
     let mounted = true;
     const sides = Array.from(toolbar.querySelectorAll<HTMLElement>('[data-toolbar-side]'));
-    const fits = () => sides.every((side) => side.scrollWidth <= side.clientWidth + 1);
+    const fits = () =>
+      toolbar.scrollWidth <= toolbar.clientWidth + 1 &&
+      sides.every((side) => {
+        const bounds = side.getBoundingClientRect();
+        return (
+          side.scrollWidth <= side.clientWidth + 1 &&
+          Array.from(side.querySelectorAll('button, input')).every((child) => {
+            const rect = child.getBoundingClientRect();
+            return (
+              rect.width === 0 || (rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1)
+            );
+          })
+        );
+      });
     const measure = () => {
       if (!mounted) return;
-      // These attributes are presentation-only and belong exclusively to this layout observer.
-      toolbar.dataset['layout'] = 'balanced';
-      toolbar.dataset['labels'] = 'shown';
-      if (!fits()) toolbar.dataset['labels'] = 'hidden';
-      if (!fits()) toolbar.dataset['layout'] = 'compact';
-      if (toolbar.scrollWidth > toolbar.clientWidth + 1 || !fits())
-        toolbar.dataset['layout'] = 'stacked';
+      // This observer exclusively owns presentation attributes; no React state or size animation.
+      const buttons = Array.from(toolbar.querySelectorAll<HTMLElement>('[data-toolbar-priority]'));
+      buttons.forEach((button) => delete button.dataset['captionHidden']);
+      const priorities = [
+        ...new Set(buttons.map((button) => Number(button.dataset['toolbarPriority']))),
+      ].sort((a, b) => a - b);
+      const arrange = () => {
+        toolbar.dataset['layout'] = 'balanced';
+        if (fits()) return true;
+        toolbar.dataset['layout'] = 'compact';
+        return fits();
+      };
+      for (const priority of priorities) {
+        if (arrange()) break;
+        buttons
+          .filter((button) => Number(button.dataset['toolbarPriority']) === priority)
+          .forEach((button) => {
+            button.dataset['captionHidden'] = '';
+          });
+      }
+      if (!arrange()) toolbar.dataset['layout'] = 'stacked';
+      const hidden = buttons.filter(
+        (button) => button.dataset['captionHidden'] !== undefined
+      ).length;
+      toolbar.dataset['labels'] =
+        hidden === 0 ? 'shown' : hidden === buttons.length ? 'hidden' : 'partial';
     };
     measure();
     const resize = new ResizeObserver(measure);
@@ -28,7 +60,10 @@ export function useReviewToolbarLayout() {
         changes.some((change) => {
           const target =
             change.target instanceof Element ? change.target : change.target.parentElement;
-          return !target?.closest('[data-toolbar-transport]');
+          return (
+            !target?.closest('[data-toolbar-transport]') ||
+            !!target?.closest('[data-review-toolbar-label]')
+          );
         })
       )
         measure();

@@ -72,6 +72,7 @@ export function ReviewToolbar(props: {
           label={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
+          toolbarPriority={3}
           toolbarLabel={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
@@ -127,6 +128,7 @@ export function ReviewToolbar(props: {
         />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}
+          toolbarPriority={0}
           toolbarLabel={translate('gallery.videoReview.fit')}
           className={plain}
           onClick={() => props.onZoom(1)}
@@ -151,6 +153,7 @@ export function ReviewHistoryControls(props: {
       {props.onAddNote ? (
         <ReviewButton
           label={translate('gallery.videoReview.addComment')}
+          toolbarPriority={2}
           toolbarLabel={translate('gallery.videoReview.toolbarNote')}
           className={plain}
           disabled={props.busy}
@@ -163,6 +166,7 @@ export function ReviewHistoryControls(props: {
         <ReviewButton
           key={direction}
           label={translate(`gallery.videoReview.${direction}`)}
+          toolbarPriority={1}
           toolbarLabel={translate(
             direction === 'undo'
               ? 'gallery.videoReview.toolbarUndo'

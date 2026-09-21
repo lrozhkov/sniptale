@@ -160,7 +160,7 @@ export function ReviewSpeedOptions(props: {
       <ProductSelect
         aria-label={translate('gallery.videoReview.speedRate')}
         controlSize="sm"
-        className="!h-8 !min-h-8 !w-auto !min-w-0 !py-0"
+        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
         containerClassName="!w-auto !min-w-0 shrink-0"
         menuWidth={112}
         value={String(props.rate)}
@@ -171,7 +171,7 @@ export function ReviewSpeedOptions(props: {
       <ProductSelect<'speed' | 'mute'>
         aria-label={translate('gallery.videoReview.speedAudio')}
         controlSize="sm"
-        className="!h-8 !min-h-8 !w-auto !min-w-0 !py-0"
+        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
         containerClassName="!w-auto !min-w-0 shrink-0"
         menuWidth={180}
         value={props.audio}

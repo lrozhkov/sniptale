@@ -151,6 +151,7 @@ function ReviewModeControl(props: {
   return (
     <ReviewButton
       label={translate('gallery.videoReview.advancedEditing')}
+      toolbarPriority={5}
       toolbarLabel={translate('gallery.videoReview.advancedEditing')}
       title={translate(
         !advanced && hasSuppressedAdvancedFeatures(props.advanced)
@@ -218,6 +219,7 @@ function ReviewHistoryTrackControl(
   return (
     <ReviewButton
       label={translate('gallery.videoReview.telemetry')}
+      toolbarPriority={4}
       toolbarLabel={props.compact ? undefined : translate('gallery.videoReview.telemetry')}
       aria-pressed={props.advanced.ui.tracks.actions}
       disabled={props.busy}

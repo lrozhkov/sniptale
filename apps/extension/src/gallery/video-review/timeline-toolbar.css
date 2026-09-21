@@ -34,10 +34,10 @@
     width: 16px !important;
     height: 16px !important;
   }
-  .review-timeline-toolbar[data-labels='hidden'] [data-review-toolbar-label] {
+  .review-timeline-toolbar [data-caption-hidden] [data-review-toolbar-label] {
     display: none;
   }
-  .review-timeline-toolbar[data-labels='hidden'] [data-review-toolbar-button] {
+  .review-timeline-toolbar [data-review-toolbar-button][data-caption-hidden] {
     width: var(--review-toolbar-size) !important;
     padding-inline: 0 !important;
   }
@@ -59,16 +59,5 @@
   .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='trailing'] {
     grid-column: 2;
     grid-row: 1;
-  }
-  @container (max-width: 1000px) {
-    .review-timeline-toolbar {
-      --review-toolbar-size: 28px;
-    }
-  }
-  @container (min-width: 1400px) {
-    .review-timeline-toolbar {
-      --review-toolbar-size: 36px;
-      --review-toolbar-font: 13px;
-    }
   }
 }
