@@ -93,7 +93,7 @@ export function ReviewOriginalAudioTrack(props: {
               data-ui="gallery.videoReview.originalAudioRange"
               data-audio-id={range.id}
               className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
-                rounded border ${reviewTimelineItemTone(selected)}`}
+                rounded border ${reviewTimelineItemTone(selected, range.volume === 0 ? 'cut' : 'neutral')}`}
               style={rectStyle(
                 preview?.id === range.id ? preview.from : range.start,
                 preview?.id === range.id ? preview.to : range.end
@@ -103,7 +103,16 @@ export function ReviewOriginalAudioTrack(props: {
                 props.editor?.selectOriginal(range.id);
               }}
             >
-              {range.volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              <span className="pointer-events-none mx-3 flex min-w-0 items-center gap-1 overflow-hidden text-xs">
+                {range.volume === 0 ? (
+                  <VolumeX size={14} className="shrink-0" aria-hidden="true" />
+                ) : (
+                  <>
+                    <Volume2 size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="truncate tabular-nums">{Math.round(range.volume * 100)}%</span>
+                  </>
+                )}
+              </span>
               {(['start', 'end'] as const).map((edge) => (
                 <span
                   key={edge}

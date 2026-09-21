@@ -183,6 +183,11 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
     };
     change(translate('gallery.videoReview.volume'), '150');
     expect(f.editor.selectedOriginal!.volume).toBe(1.5);
+    const block = f.host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.originalAudioRange"]'
+    )!;
+    expect(block.textContent).toBe('150%');
+    expect(block.className).not.toContain('sniptale-color-danger');
     change(translate('gallery.videoReview.rangeStart'), '1');
     change(translate('gallery.videoReview.rangeEnd'), '6');
     expect(f.editor.selectedOriginal).toMatchObject({ start: 1, end: 6 });
@@ -194,6 +199,9 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
         .click()
     );
     expect(f.editor.selectedOriginal!.volume).toBe(0);
+    expect(block.textContent).toBe('');
+    expect(block.className).toContain('var(--sniptale-color-danger)_12%');
+    expect(block.className).toContain('border-[var(--sniptale-color-accent)]');
     act(() =>
       f.host
         .querySelector<HTMLButtonElement>(
