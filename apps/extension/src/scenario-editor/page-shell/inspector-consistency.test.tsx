@@ -139,3 +139,41 @@ it('disables the shared color picker and reset while edits are locked', async ()
   }
   expect(change).not.toHaveBeenCalled();
 });
+
+it.each(['ru', 'en'] as const)(
+  'collapses groups without losing drafts or activating their actions in %s',
+  async (locale) => {
+    const translate = createTranslator(locale);
+    const { GuideInspectorGroup } = await import('./inspector');
+    const { Type } = await import('lucide-react');
+    const action = vi.fn();
+    const label = translate('scenario.editor.guideStyleGroup');
+    await act(async () =>
+      root.render(
+        <GuideInspectorGroup
+          title={label}
+          icon={Type}
+          action={<button onClick={action}>Reset</button>}
+        >
+          <input aria-label="Draft" defaultValue="Unsaved text" />
+        </GuideInspectorGroup>
+      )
+    );
+    const draft = host.querySelector('input')!;
+    draft.value = 'Edited draft';
+    const toggle = host.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+    const body = host.querySelector<HTMLElement>('.guide-inspector-group-body')!;
+    expect(toggle.textContent).toBe(label);
+    expect(toggle.getAttribute('aria-controls')).toBe(body.id);
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(body.hidden).toBe(true);
+    expect(host.querySelector('input')).toBe(draft);
+    await click('Reset');
+    expect(action).toHaveBeenCalledOnce();
+    expect(body.hidden).toBe(true);
+    await act(async () => toggle.click());
+    expect(body.hidden).toBe(false);
+    expect(draft.value).toBe('Edited draft');
+  }
+);

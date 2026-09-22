@@ -184,7 +184,11 @@ export function GuideLayoutFields({
 }) {
   return (
     <fieldset className="guide-style-fields" disabled={disabled}>
-      <GuideInspectorGroup icon={LayoutTemplate} title={t('scenario.editor.appearanceLayout')}>
+      <GuideInspectorGroup
+        collapsible={false}
+        icon={LayoutTemplate}
+        title={t('scenario.editor.appearanceLayout')}
+      >
         <CompactSelect
           aria-label={t('scenario.editor.appearanceLayout')}
           value={layout}

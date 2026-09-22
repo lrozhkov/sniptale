@@ -2,7 +2,7 @@ import { TourMaskSettings } from './mask-settings';
 import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
 import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTourInspectorSections } from './settings-sections';
 import type {
   TourDocument,
@@ -12,12 +12,13 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourSlideObjects, TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
+  ChevronRight,
   Crosshair,
   MessageSquare,
   ScanLine,
   Palette,
   Image,
-  ArrowLeft,
+  ChevronDown,
   ArrowDown,
   ArrowUp,
   Trash2,
@@ -33,7 +34,7 @@ import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
-import { ScenarioInspectorActionButton } from '../inspector-actions';
+import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from '../inspector-actions';
 import { GuideActionMenu } from '../action-menu';
 import { TourTextField, TourTextPresentation } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
@@ -136,6 +137,18 @@ function TourSlideCategories({
 export function TourInspector(props: InspectorProps) {
   const { tour, slide, selection, disabled, t, onSelectObject } = props;
   const renderSections = useTourInspectorSections(props.presentation ?? 'all', t);
+  const list = useRef<HTMLDivElement>(null);
+  const previousObject = useRef<string | null>(null);
+  const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
+  useEffect(() => {
+    if (props.scope === 'selection' && !selectedObject && previousObject.current) {
+      const buttons = list.current?.querySelectorAll<HTMLButtonElement>('[data-inspector-object]');
+      Array.from(buttons ?? [])
+        .find((button) => button.dataset['inspectorObject'] === previousObject.current)
+        ?.focus();
+    }
+    previousObject.current = selectedObject;
+  }, [selectedObject, props.scope]);
   const documentSettings = { tour, disabled, onChange: props.onChangeTour, t };
   if (props.scope === 'document')
     return renderSections('document', [
@@ -206,39 +219,43 @@ export function TourInspector(props: InspectorProps) {
   if (objectId)
     return (
       <>
-        <ScenarioInspectorActionButton onClick={() => onSelectObject(null)}>
-          <ArrowLeft size={15} />
-          {t('scenario.editor.tourBackToSlide')}
-        </ScenarioInspectorActionButton>
+        <ScenarioInspectorBackButton
+          label={t('scenario.editor.tourBackToSlide')}
+          onBack={() => onSelectObject(null)}
+        />
         {settings('object')}
       </>
     );
-  return renderSections(slide.kind, [
-    ...TourSlideCategories({
-      slide,
-      disabled,
-      t,
-      onChangeSlide: props.onChangeSlide,
-      onSelectObject,
-    }).map((section) => ({ ...section, content: settings(section.id) })),
-    {
-      id: 'playback',
-      icon: Play,
-      label: t('scenario.editor.tourPlayback'),
-      content: (
-        <>
-          <TourTimingSettings
-            tour={tour}
-            slide={slide}
-            disabled={disabled}
-            onChange={props.onChangeSlide}
-            t={t}
-          />
-          {props.narration}
-        </>
-      ),
-    },
-  ]);
+  return (
+    <div ref={list}>
+      {renderSections(slide.kind, [
+        ...TourSlideCategories({
+          slide,
+          disabled,
+          t,
+          onChangeSlide: props.onChangeSlide,
+          onSelectObject,
+        }).map((section) => ({ ...section, content: settings(section.id) })),
+        {
+          id: 'playback',
+          icon: Play,
+          label: t('scenario.editor.tourPlayback'),
+          content: (
+            <>
+              <TourTimingSettings
+                tour={tour}
+                slide={slide}
+                disabled={disabled}
+                onChange={props.onChangeSlide}
+                t={t}
+              />
+              {props.narration}
+            </>
+          ),
+        },
+      ])}
+    </div>
+  );
 }
 
 type ImageSettingsProps = {
@@ -453,11 +470,13 @@ function TourImageObjects({
           <div className="tour-object-item" key={entry.object.id}>
             <button
               className="tour-object-row"
+              data-inspector-object={entry.object.id}
               onClick={() => onSelect(entry.object.id)}
               title={label}
             >
               <Icon size={15} />
               <span>{label}</span>
+              <ChevronRight size={15} aria-hidden="true" />
             </button>
             <div className="tour-object-item-actions">
               <ContentToolbarButton
@@ -618,7 +637,12 @@ function TourAddObjectMenu({
     <div className="tour-object-add">
       <GuideActionMenu
         label={t('scenario.editor.tourAddObject')}
-        icon={<Plus size={16} aria-hidden="true" />}
+        icon={
+          <>
+            <Plus size={16} aria-hidden="true" />
+            <ChevronDown size={10} aria-hidden="true" />
+          </>
+        }
         disabled={disabled || !slide.image}
         items={tourAddObjectOptions(slide, t).map((option) => ({
           label: option.label,

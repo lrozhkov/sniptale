@@ -2,7 +2,7 @@ import type {
   TourDocument,
   TourNavigationSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { List, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { List, Plus, Trash2, ArrowUp, ArrowDown, ChevronRight } from 'lucide-react';
 import { GuideInspectorGroup } from '../inspector';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -271,10 +271,14 @@ function TourNavigationButtons({
         <div key={entry.id} className="tour-slide-row">
           <button
             className="tour-slide-select"
+            data-inspector-object={entry.id}
             onClick={() => onSelect(entry.id)}
             title={entry.label}
           >
-            {index + 1}. {entry.label || t('scenario.editor.tourButton')}
+            <span>
+              {index + 1}. {entry.label || t('scenario.editor.tourButton')}
+            </span>
+            <ChevronRight size={15} aria-hidden="true" />
           </button>
           <ContentToolbarButton
             title={t('scenario.editor.tourMoveButtonUp')}

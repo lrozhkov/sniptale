@@ -1,9 +1,10 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 
 /**
- * One visual language for scenario inspector inline actions: quiet neutral
- * buttons, soft border on hover/focus and a hover-only danger presentation.
+ * One visual language for scenario inspector inline actions: neutral commands, explicit
+ * navigation rows and separated destructive actions.
  */
 export function ScenarioInspectorActionButton({
   tone = 'default',
@@ -22,6 +23,7 @@ export function ScenarioInspectorActionButton({
       tone={tone}
       className={cx(
         'scenario-inspector-action',
+        tone === 'danger' && 'scenario-inspector-action-danger',
         layout === 'icon' && 'scenario-inspector-action-icon',
         className
       )}
@@ -34,4 +36,24 @@ export function ScenarioInspectorActionButton({
 
 function cx(...classNames: Array<string | false | null | undefined>): string {
   return classNames.filter(Boolean).join(' ');
+}
+
+/** Returns from a nested inspector to its parent with one consistent label and direction. */
+export function ScenarioInspectorBackButton({
+  label,
+  onBack,
+}: {
+  label: string;
+  onBack: () => void;
+}) {
+  return (
+    <ScenarioInspectorActionButton
+      className="scenario-inspector-navigation"
+      title={label}
+      onClick={onBack}
+    >
+      <ArrowLeft size={16} aria-hidden="true" />
+      {label}
+    </ScenarioInspectorActionButton>
+  );
 }

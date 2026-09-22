@@ -1,8 +1,9 @@
+import { ScenarioInspectorBackButton } from './inspector-actions';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Check, MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
+import { MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useImageDimensions } from './image-dimensions';
@@ -54,12 +55,7 @@ export function GuideImageControls({
         }
       }}
     >
-      <div className="guide-image-inspector-heading">
-        <h3>{t('scenario.editor.guideEditImageFrame')}</h3>
-        <ContentToolbarButton title={t('scenario.editor.guideImageDone')} onClick={onClose}>
-          <Check size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      </div>
+      <ScenarioInspectorBackButton label={t('scenario.editor.guideImageDone')} onBack={onClose} />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
         <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.guideFramingGroup')}>

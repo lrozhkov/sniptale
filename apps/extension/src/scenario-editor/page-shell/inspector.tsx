@@ -1,5 +1,5 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { createContext, useContext, useId, useState, type ReactNode } from 'react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { NumericValueField } from '../../ui/compact-inspector-controls/numeric';
 import './inspector.css';
 
@@ -30,24 +30,52 @@ export function GuideInspectorGroup({
   title,
   icon: Icon,
   action,
+  collapsible = true,
   children,
 }: {
   title: string;
   icon: LucideIcon;
   action?: ReactNode;
+  collapsible?: boolean;
   children: ReactNode;
 }) {
   const categorized = useContext(InspectorCategorizedContentContext);
+  const [expanded, setExpanded] = useState(true);
+  const bodyId = useId();
   return (
     <section className="guide-inspector-group" aria-label={title}>
       {!categorized && (
         <div className="guide-inspector-group-heading">
-          <Icon size={15} aria-hidden="true" />
-          <h3>{title}</h3>
+          <h3>
+            {collapsible ? (
+              <button
+                type="button"
+                className="guide-inspector-disclosure"
+                aria-expanded={expanded}
+                aria-controls={bodyId}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                <Icon size={15} aria-hidden="true" />
+                <span>{title}</span>
+                <ChevronDown size={15} aria-hidden="true" />
+              </button>
+            ) : (
+              <span className="guide-inspector-static-heading">
+                <Icon size={15} aria-hidden="true" />
+                {title}
+              </span>
+            )}
+          </h3>
           {action}
         </div>
       )}
-      <div className="guide-inspector-group-body">{children}</div>
+      <div
+        id={bodyId}
+        className="guide-inspector-group-body"
+        hidden={collapsible && !categorized && !expanded}
+      >
+        {children}
+      </div>
     </section>
   );
 }

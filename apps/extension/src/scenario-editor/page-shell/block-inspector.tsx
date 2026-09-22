@@ -7,9 +7,8 @@ import type {
   GuideTextStyle,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ScenarioInspectorBackButton } from './inspector-actions';
 import {
-  ArrowLeft,
   RotateCcw,
   Type,
   Columns2,
@@ -81,22 +80,10 @@ export function GuideBlockInspector({
   const selected = presets.find((preset) => preset.percent === width)?.value ?? 'custom';
   return (
     <div className="guide-block-inspector">
-      <div className="guide-appearance-heading">
-        <h3>
-          {t(
-            block.kind === 'note'
-              ? 'scenario.editor.guideAddNote'
-              : block.kind === 'heading'
-                ? 'scenario.editor.guideHeading'
-                : block.kind === 'text'
-                  ? 'scenario.editor.guideAddText'
-                  : 'scenario.editor.guideBlockSettings'
-          )}
-        </h3>
-        <ContentToolbarButton title={t('scenario.editor.guideStepSettings')} onClick={onClose}>
-          <ArrowLeft size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      </div>
+      <ScenarioInspectorBackButton
+        label={t('scenario.editor.guideStepSettings')}
+        onBack={onClose}
+      />
       <fieldset className="guide-style-fields" disabled={disabled}>
         <GuideInspectorGroup
           icon={Columns2}
@@ -145,7 +132,11 @@ export function GuideBlockInspector({
           )}
         </GuideInspectorGroup>
         {block.kind === 'note' && (
-          <GuideInspectorGroup icon={MessageSquare} title={t('scenario.editor.guideNoteType')}>
+          <GuideInspectorGroup
+            collapsible={false}
+            icon={MessageSquare}
+            title={t('scenario.editor.guideNoteType')}
+          >
             <CompactSelect
               aria-label={t('scenario.editor.guideNoteType')}
               value={block.tone}

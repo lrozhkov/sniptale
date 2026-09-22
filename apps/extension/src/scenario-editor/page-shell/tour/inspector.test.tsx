@@ -160,6 +160,7 @@ it('edits an image slide and hotspots through canonical commands without changin
   expect(current().hotspots[0]?.point).toEqual({ x: 0.3, y: 0.4 });
   expect(current().image!.source).toEqual(source);
   await click('Back to slide settings');
+  expect(document.activeElement?.textContent).toBe('Open settings');
   await click('Open settings');
   await click('Delete');
   expect(current().hotspots).toHaveLength(0);
