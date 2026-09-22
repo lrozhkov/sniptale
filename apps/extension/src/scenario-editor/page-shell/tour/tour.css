@@ -550,8 +550,3 @@ html[data-tour-reordering] * {
 .tour-header-controls button[aria-pressed='true'] {
   color: var(--sniptale-color-accent);
 }
-.tour-preview-status {
-  font-size: 0.75rem;
-  color: var(--sniptale-color-text-secondary);
-  padding: 0 0.375rem;
-}

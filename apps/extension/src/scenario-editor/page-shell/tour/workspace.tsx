@@ -102,11 +102,6 @@ export function TourWorkspace(props: TourWorkspaceProps) {
                   <span>{t('scenario.editor.guideEditImage')}</span>
                 </ContentToolbarButton>
               )}
-              {view.view === 'preview' && (
-                <span className="tour-preview-status" role="status">
-                  {t('scenario.editor.tourPreviewStatus')}
-                </span>
-              )}
             </div>
           )}
           t={t}

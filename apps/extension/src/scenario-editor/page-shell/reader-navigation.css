@@ -95,8 +95,3 @@
 .guide-reading-options {
   flex-shrink: 0;
 }
-.guide-reader .guide-reading-options button {
-  width: auto;
-  min-height: 2rem;
-  padding-inline: 0.625rem;
-}

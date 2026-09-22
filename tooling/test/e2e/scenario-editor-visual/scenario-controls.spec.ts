@@ -367,6 +367,113 @@ for (const theme of ['light', 'dark'] as const) {
   }
 }
 
+for (const locale of SCENARIO_VISUAL_LOCALES) {
+  test(`scenario top-bar controls share the selected representation metrics in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const labels = HEADER_LABELS[locale];
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, 'light', locale, { width: 1280, height: 900 });
+    const readMetrics = () =>
+      page.evaluate(() => {
+        const header = document.querySelector('.guide-page-header');
+        const reference = header?.querySelector<HTMLElement>(
+          '.tour-representation-switch .guide-section-tab[aria-pressed="true"]'
+        );
+        if (!header || !reference) return { missing: true } as const;
+        const measure = (node: HTMLElement) => {
+          const style = getComputedStyle(node);
+          const rect = node.getBoundingClientRect();
+          const icon = node.querySelector('svg')?.getBoundingClientRect();
+          return {
+            height: rect.height,
+            fontSize: style.fontSize,
+            fontWeight: style.fontWeight,
+            lineHeight: style.lineHeight,
+            borderRadius: style.borderTopLeftRadius,
+            borderWidth: style.borderTopWidth,
+            iconWidth: icon?.width ?? 0,
+            iconHeight: icon?.height ?? 0,
+          };
+        };
+        const name = (node: HTMLElement) =>
+          (node.getAttribute('aria-label') ?? node.textContent ?? '').trim();
+        const controls = [...header.querySelectorAll<HTMLElement>('button')]
+          .filter((button) => !button.closest('.guide-project-name'))
+          .filter((button) => {
+            const rect = button.getBoundingClientRect();
+            const style = getComputedStyle(button);
+            return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden';
+          })
+          .map((button) => ({
+            label: name(button),
+            iconOnly: ![...button.childNodes].some(
+              (child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim()
+            ),
+            text: button.textContent?.trim() ?? '',
+            metrics: measure(button),
+          }));
+        return {
+          missing: false as const,
+          reference: measure(reference),
+          referenceLabel: name(reference),
+          referenceHasText: Boolean(
+            [...reference.querySelectorAll('span')].some(
+              (span) => span.getBoundingClientRect().width > 0
+            )
+          ),
+          controls,
+        };
+      });
+    const assertUniform = async (phase: string) => {
+      const report = await readMetrics();
+      expect(report.missing, `${phase}: header and selected tab mount`).toBe(false);
+      if (report.missing) return;
+      expect(report.referenceHasText, `${phase}: selected tab keeps a text label`).toBe(true);
+      expect(report.controls.length, `${phase}: top bar exposes controls`).toBeGreaterThan(4);
+      for (const control of report.controls) {
+        for (const key of [
+          'height',
+          'fontSize',
+          'borderRadius',
+          'borderWidth',
+          'iconWidth',
+          'iconHeight',
+        ] as const) {
+          expect
+            .soft(
+              control.metrics[key],
+              `${phase}: ${control.label || control.text} ${key} matches ${report.referenceLabel}`
+            )
+            .toBe(report.reference[key]);
+        }
+      }
+      return report;
+    };
+    await assertUniform('guide');
+    await page.getByRole('button', { name: labels.tour, exact: true }).click();
+    await assertUniform('tour');
+    issues.assertClean();
+  });
+}
+
+test('scenario header undo and redo stay icon-only and accessible', async ({
+  page,
+  hostOrigin,
+}) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
+  const header = page.locator('.guide-page-header');
+  for (const name of ['Undo', 'Redo']) {
+    const button = header.getByRole('button', { name, exact: true });
+    await expect(button).toBeVisible();
+    await expect(button.locator('span')).toHaveCount(0);
+    await expect(button.locator('svg')).toBeVisible();
+  }
+  issues.assertClean();
+});
+
 for (const theme of ['light', 'dark'] as const) {
   test(`third and quarter presets wrap blocks into columns in ${theme}`, async ({
     page,

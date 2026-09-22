@@ -177,10 +177,6 @@ export const scenarioTourMessages = {
   tourPreviewSlide: { ru: 'Просмотр', en: 'Preview' },
   tourReturnToEditing: { ru: 'К редактированию', en: 'Return to editing' },
   tourReplayPreview: { ru: 'Повторить', en: 'Replay' },
-  tourPreviewStatus: {
-    ru: 'Просмотр: ссылки не открываются',
-    en: 'Preview: links do not open',
-  },
   tourRemoveBackground: { ru: 'Убрать фоновое изображение', en: 'Remove background image' },
   tourAutomaticTransition: { ru: 'Автоматический переход', en: 'Automatic transition' },
   tourExpandCaption: { ru: 'Развернуть пояснение', en: 'Expand explanation' },
