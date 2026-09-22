@@ -410,6 +410,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .soft(row.getByRole('button', { name: ru ? 'Удалить' : 'Delete', exact: true }))
         .toHaveCount(1);
       if (await row.getByRole('button', { name: ru ? 'Удалить' : 'Delete', exact: true }).count()) {
+        await row.hover();
         await row.getByRole('button', { name: ru ? 'Удалить' : 'Delete', exact: true }).click();
         await expect(row).toHaveCount(0);
         await page

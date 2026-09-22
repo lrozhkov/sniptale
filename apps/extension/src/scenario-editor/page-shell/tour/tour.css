@@ -563,3 +563,64 @@ html[data-tour-reordering] * {
 .tour-header-controls button[aria-pressed='true'] {
   color: var(--sniptale-color-accent);
 }
+
+.guide-library-panel .tour-resource-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 28px;
+  gap: 6px;
+  padding-block: 8px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-library-panel .tour-resource-row > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.guide-library-panel .tour-resource-thumbnail {
+  width: 40px;
+  height: 32px;
+}
+.guide-library-panel .tour-resource-row > button:last-child {
+  grid-column: 2 / -1;
+  justify-self: start;
+}
+.guide-library-panel .tour-resource-row > button:not(.tour-resource-thumbnail),
+.guide-library-panel .tour-audio-resource-actions > button {
+  width: auto;
+  min-width: 28px;
+  min-height: 28px;
+  height: auto;
+  padding: 4px;
+  gap: 4px;
+  font: 400 11px / 1.5 var(--sniptale-font-sans);
+  text-align: start;
+  white-space: normal;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.guide-library-panel .tour-audio-resource {
+  padding: 8px 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+  background: transparent;
+}
+.guide-library-panel .tour-audio-resource-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+}
+.guide-library-panel .tour-audio-resource-actions > button {
+  justify-content: flex-start;
+}
+.guide-library-panel .tour-audio-resource-actions > button:first-child {
+  grid-column: 1 / -1;
+}
+.guide-library-panel .tour-audio-resource-actions > button:last-child {
+  justify-content: center;
+}
+.guide-library-panel .tour-audio-name > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.guide-library-panel .tour-resource-row:last-child,
+.guide-library-panel .tour-audio-resource:last-child {
+  border-bottom: none;
+}

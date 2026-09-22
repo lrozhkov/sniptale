@@ -76,7 +76,7 @@ export function TourLibraryPanel(
               onClick={() => panels.openLeft(id)}
             >
               <Icon size={16} />
-              {panels.leftSection === id && <span>{label}</span>}
+              <span>{label}</span>
             </ContentToolbarButton>
           ))}
         </div>
@@ -89,7 +89,23 @@ export function TourLibraryPanel(
           <TourSlideList {...props} />
         ) : (
           <>
-            <TourResources {...props} />
+            <section
+              className="guide-image-resources"
+              aria-label={t('scenario.editor.guideLibraryImages')}
+            >
+              <h3>
+                <Image size={15} aria-hidden="true" />
+                {t('scenario.editor.guideLibraryImages')}
+              </h3>
+              <GuideImageUpload
+                compact
+                placement={{ kind: 'tour-slides' }}
+                disabled={importDisabled}
+                onUpload={props.onUpload}
+                t={t}
+              />
+              <TourResources {...props} />
+            </section>
             {panels.leftOpen && project.tour && (
               <TourAudioResources
                 tour={project.tour}
@@ -101,62 +117,51 @@ export function TourLibraryPanel(
                   state.select(selection);
                   panels.openRight('selection');
                 }}
-              />
+              >
+                {props.onImportNarration && (
+                  <TourNarrationAcquisition
+                    key={`${project.id}:resources`}
+                    destination={{ slideId: null, objectId: null, expectedNarration: null }}
+                    disabled={importDisabled}
+                    onImport={props.onImportNarration}
+                    t={t}
+                  />
+                )}
+              </TourAudioResources>
             )}
           </>
         )}
       </div>
-      <footer className="guide-resource-footer">
-        {panels.leftSection === 'resources' ? (
-          <>
-            <GuideImageUpload
-              compact
-              placement={{ kind: 'tour-slides' }}
-              disabled={importDisabled}
-              onUpload={props.onUpload}
-              t={t}
-            />
-            {panels.leftOpen && props.onImportNarration && project.tour && (
-              <TourNarrationAcquisition
-                key={`${project.id}:resources`}
-                destination={{ slideId: null, objectId: null, expectedNarration: null }}
-                disabled={importDisabled}
-                onImport={props.onImportNarration}
-                t={t}
-              />
-            )}
-          </>
-        ) : (
-          <>
-            <div className="tour-list-actions">
-              <ContentToolbarButton
-                disabled={disabled}
-                title={t('scenario.editor.tourAddImageSlide')}
-                onClick={() => state.add('image')}
-              >
-                <Plus size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.tourAddImageSlide')}</span>
-              </ContentToolbarButton>
-              <ContentToolbarButton
-                disabled={disabled}
-                title={t('scenario.editor.tourAddNavigation')}
-                onClick={() => state.add('navigation')}
-              >
-                <ListPlus size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.tourAddNavigation')}</span>
-              </ContentToolbarButton>
-              <ContentToolbarButton
-                disabled={disabled || !project.items.length}
-                title={t('scenario.editor.tourGenerate')}
-                onClick={props.onGenerate}
-              >
-                <BookOpen size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.tourGenerate')}</span>
-              </ContentToolbarButton>
-            </div>
-          </>
-        )}
-      </footer>
+      {panels.leftSection === 'structure' && (
+        <footer className="guide-resource-footer">
+          <div className="tour-list-actions">
+            <ContentToolbarButton
+              disabled={disabled}
+              title={t('scenario.editor.tourAddImageSlide')}
+              onClick={() => state.add('image')}
+            >
+              <Plus size={16} aria-hidden="true" />
+              <span>{t('scenario.editor.tourAddImageSlide')}</span>
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              disabled={disabled}
+              title={t('scenario.editor.tourAddNavigation')}
+              onClick={() => state.add('navigation')}
+            >
+              <ListPlus size={16} aria-hidden="true" />
+              <span>{t('scenario.editor.tourAddNavigation')}</span>
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              disabled={disabled || !project.items.length}
+              title={t('scenario.editor.tourGenerate')}
+              onClick={props.onGenerate}
+            >
+              <BookOpen size={16} aria-hidden="true" />
+              <span>{t('scenario.editor.tourGenerate')}</span>
+            </ContentToolbarButton>
+          </div>
+        </footer>
+      )}
     </FloatingChromePanel>
   );
 }

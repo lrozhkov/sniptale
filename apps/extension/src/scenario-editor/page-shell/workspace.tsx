@@ -102,7 +102,7 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
               onClick={() => props.panels.openLeft(id)}
             >
               <Icon size={16} aria-hidden="true" />
-              {props.panels.leftSection === id && <span>{label}</span>}
+              <span>{label}</span>
             </ContentToolbarButton>
           ))}
         </div>
@@ -119,20 +119,25 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
         {props.panels.leftSection === 'structure' ? (
           <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
         ) : (
-          <GuideResources {...props} />
+          <section
+            className="guide-image-resources"
+            aria-label={t('scenario.editor.guideLibraryImages')}
+          >
+            <h3>
+              <Image size={15} aria-hidden="true" />
+              {t('scenario.editor.guideLibraryImages')}
+            </h3>
+            <GuideImageUpload
+              compact
+              placement={{ kind: 'steps' }}
+              disabled={props.disabled}
+              onUpload={props.onUploadFile}
+              t={t}
+            />
+            <GuideResources {...props} />
+          </section>
         )}
       </div>
-      {props.panels.leftSection === 'resources' && (
-        <footer className="guide-resource-footer">
-          <GuideImageUpload
-            compact
-            placement={{ kind: 'steps' }}
-            disabled={props.disabled}
-            onUpload={props.onUploadFile}
-            t={t}
-          />
-        </footer>
-      )}
     </FloatingChromePanel>
   );
 }

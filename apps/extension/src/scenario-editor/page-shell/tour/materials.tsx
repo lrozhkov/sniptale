@@ -74,7 +74,9 @@ export function TourResources({
               }}
             >
               <ArrowRight size={12} />
-              <span>{ids.length}</span>
+              <span>
+                {t('scenario.editor.tourUsed')}: {ids.length}
+              </span>
             </ContentToolbarButton>
           </div>
         ))}

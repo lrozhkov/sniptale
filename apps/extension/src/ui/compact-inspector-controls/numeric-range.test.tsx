@@ -301,3 +301,28 @@ it('reveals the row range across the label, spacing, and value area', () => {
   });
   expect(row.dataset['rangeVisible']).toBe('false');
 });
+
+it('hides after a pointer commit and leave, while keyboard editing can retain visibility', () => {
+  renderNumericRow();
+  const row = getRow();
+  const range = getRange();
+  const shell = range.parentElement!;
+  act(() => row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true })));
+  act(() => {
+    range.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
+    range.focus();
+    range.dispatchEvent(createPointerEvent('pointerup', { bubbles: true }));
+  });
+  act(() =>
+    row.dispatchEvent(
+      createPointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  expect(shell.getAttribute('aria-hidden')).toBe('true');
+  act(() =>
+    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(shell.getAttribute('aria-hidden')).toBeNull();
+  act(() => range.blur());
+  expect(shell.getAttribute('aria-hidden')).toBe('true');
+});

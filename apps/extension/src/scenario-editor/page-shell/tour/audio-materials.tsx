@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Music2, Plus, ArrowRight, Trash2, Headphones } from 'lucide-react';
 import type {
   TourAudioResource,
@@ -83,6 +83,7 @@ export function TourAudioPicker({
 
 /** Audio resources outlive attachments; usage navigation resolves the exact object, not just its slide. */
 export function TourAudioResources({
+  children,
   tour,
   selection,
   disabled,
@@ -90,6 +91,7 @@ export function TourAudioResources({
   command,
   t,
 }: {
+  children?: ReactNode;
   tour: TourDocument;
   selection: TourSelection | null;
   disabled: boolean;
@@ -111,6 +113,7 @@ export function TourAudioResources({
         <Music2 size={15} />
         {t('scenario.editor.tourAudioResources')}
       </h3>
+      {children}
       {!resources.length && (
         <p className="guide-inspector-hint">{t('scenario.editor.tourAudioEmpty')}</p>
       )}
@@ -132,7 +135,7 @@ export function TourAudioResources({
           >
             <button
               className="tour-audio-name"
-              title={resource.name}
+              title={t('scenario.editor.tourAudioPreview')}
               aria-expanded={preview === resource.assetId}
               onClick={() => setPreview(preview === resource.assetId ? null : resource.assetId)}
             >
@@ -141,13 +144,6 @@ export function TourAudioResources({
               <small>{formatDurationLabel(resource.duration)}</small>
             </button>
             <div className="tour-audio-resource-actions">
-              <ContentToolbarButton
-                title={t('scenario.editor.tourAudioPreview')}
-                aria-expanded={preview === resource.assetId}
-                onClick={() => setPreview(preview === resource.assetId ? null : resource.assetId)}
-              >
-                <Headphones size={15} />
-              </ContentToolbarButton>
               <ContentToolbarButton
                 title={`${t('scenario.editor.tourAudioUsed')}: ${usages.length}`}
                 disabled={!usages.length}
@@ -161,7 +157,9 @@ export function TourAudioResources({
                 }}
               >
                 <ArrowRight size={14} />
-                <span>{usages.length}</span>
+                <span>
+                  {t('scenario.editor.tourAudioUsed')}: {usages.length}
+                </span>
               </ContentToolbarButton>
               <ContentToolbarButton
                 title={t('scenario.editor.tourAudioAttach')}
@@ -188,8 +186,10 @@ export function TourAudioResources({
                 }}
               >
                 <Plus size={15} />
+                <span>{t('scenario.editor.tourAudioAttach')}</span>
               </ContentToolbarButton>
               <ContentToolbarButton
+                tone="danger"
                 title={t('scenario.editor.tourAudioDelete')}
                 disabled={disabled}
                 onClick={() =>

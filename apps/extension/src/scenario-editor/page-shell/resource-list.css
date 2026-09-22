@@ -82,3 +82,57 @@
   margin: 0;
   font-size: 12px;
 }
+
+/* Resource acquisition lives with its media list, not in an unrelated footer. */
+.guide-library-panel .guide-image-resources,
+.guide-library-panel .tour-audio-resources {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+.guide-library-panel .tour-audio-resources {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font: 600 13px / 1.5 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+}
+.guide-library-panel :is(.guide-image-upload-compact, .tour-audio-acquisition) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.guide-library-panel :is(.guide-image-upload-compact, .tour-audio-acquisition) > button {
+  width: 100%;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 8px;
+  justify-content: flex-start;
+  gap: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  white-space: normal;
+  text-align: start;
+}
+.guide-library-panel
+  :is(.guide-image-upload-compact, .tour-audio-acquisition)
+  > button:hover:not(:disabled) {
+  border-color: var(--sniptale-color-border-soft);
+}
+.guide-library-panel .guide-inspector-hint {
+  margin: 0;
+  font: 400 12px / 1.5 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+}

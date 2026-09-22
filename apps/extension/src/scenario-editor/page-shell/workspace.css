@@ -1928,3 +1928,48 @@ html[data-guide-height-resizing] * {
   box-shadow: none;
   cursor: not-allowed;
 }
+
+/* Stable tab widths let the underline travel without shifting labels. */
+.guide-left-navigation {
+  position: relative;
+  gap: 0;
+}
+.guide-left-navigation::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  bottom: 0;
+  width: calc(50% - 16px);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--sniptale-color-accent);
+  pointer-events: none;
+  transition: left 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.guide-left-navigation:has(> button:nth-child(2)[aria-pressed='true'])::after {
+  left: calc(50% + 8px);
+}
+.guide-page .guide-left-navigation .guide-section-tab {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.guide-page .guide-left-navigation .guide-section-tab svg {
+  color: inherit;
+}
+.guide-left-navigation .guide-section-tab span {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-left-navigation::after {
+    transition: none;
+  }
+}
+@container guide-nav (max-width: 180px) {
+  .guide-left-navigation .guide-section-tab span {
+    display: none;
+  }
+}

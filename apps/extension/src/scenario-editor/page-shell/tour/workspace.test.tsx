@@ -565,3 +565,36 @@ function playbackFrames() {
     await Promise.resolve();
   };
 }
+
+it('returns from end selection to the exact audio usage and retains grouped resource controls', async () => {
+  const project = fixture();
+  project.tour!.audioResources = [{ assetId: 'voice', duration: 2, name: 'Voice.wav' }];
+  project.tour!.slides[0]!.narration = {
+    assetId: 'voice',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+  };
+  await render(project);
+  await click('End of tour');
+  await click('Resources');
+  const library = host.querySelector('#guide-library-panel')!;
+  expect(library.querySelector('.guide-resource-footer')).toBeNull();
+  expect(library.querySelector<HTMLButtonElement>('[title="Attach to selection"]')?.disabled).toBe(
+    true
+  );
+  await click('Bindings: 1', library);
+  expect(panelState.rightScope).toBe('selection');
+  expect(panelState.rightOpen).toBe(true);
+  expect(host.querySelector('#guide-inspector-panel h2')?.textContent).toBe('First');
+  expect(library.querySelector<HTMLButtonElement>('[title="Attach to selection"]')?.disabled).toBe(
+    false
+  );
+  expect(
+    library.querySelector('.guide-image-resources .guide-image-upload-compact')
+  ).not.toBeNull();
+  expect(library.querySelector('.tour-audio-resources .tour-audio-acquisition')).not.toBeNull();
+  expect(changed).not.toHaveBeenCalled();
+});

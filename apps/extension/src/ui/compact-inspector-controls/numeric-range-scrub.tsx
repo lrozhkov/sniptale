@@ -1,5 +1,6 @@
 import {
   useState,
+  useRef,
   type ReactNode,
   type ChangeEvent,
   type CSSProperties,
@@ -140,6 +141,7 @@ function NumericRangeInput(props: {
   readValue: (event: RangeCommitEvent | ChangeEvent<HTMLInputElement>) => number;
   visible: boolean;
 }) {
+  const pointerFocus = useRef(false);
   const handleRangeCommit = (event: RangeCommitEvent) => {
     props.onCommitValue(props.readValue(event));
   };
@@ -152,15 +154,21 @@ function NumericRangeInput(props: {
       max={props.rangeMax}
       step={props.rangeStep}
       value={props.rangeValue}
-      onFocus={() => props.onFocusChange(true)}
+      onFocus={() => props.onFocusChange(!pointerFocus.current)}
+      onKeyDown={() => props.onFocusChange(true)}
       onChange={(event) => props.onPreviewValue(props.readValue(event))}
-      onPointerDown={(event) => handlePointerActiveChange(event, props.onActiveChange, true)}
+      onPointerDown={(event) => {
+        pointerFocus.current = true;
+        props.onFocusChange(false);
+        handlePointerActiveChange(event, props.onActiveChange, true);
+      }}
       onPointerUp={(event) => {
         handlePointerActiveChange(event, props.onActiveChange, false);
         handleRangeCommit(event);
       }}
       onKeyUp={handleRangeCommit}
       onBlur={(event) => {
+        pointerFocus.current = false;
         props.onFocusChange(false);
         handleRangeCommit(event);
         props.onActiveChange(false);
