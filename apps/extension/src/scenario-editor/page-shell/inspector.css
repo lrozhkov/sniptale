@@ -382,8 +382,7 @@
   border-color: transparent;
   margin-bottom: 0;
 }
-.guide-inspector-panel .tour-object-item,
-.guide-inspector-panel .tour-slide-row {
+.guide-inspector-panel .tour-object-item {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
@@ -391,8 +390,7 @@
   padding-block: 4px;
   border-bottom: 1px solid var(--sniptale-color-border-soft);
 }
-.guide-inspector-panel .tour-object-row > span,
-.guide-inspector-panel .tour-slide-select > span {
+.guide-inspector-panel .tour-object-row > span {
   flex: 1;
   min-width: 0;
   overflow: visible;
@@ -403,23 +401,18 @@
   width: auto;
   margin-inline-start: auto;
 }
-.guide-inspector-panel .tour-object-item-actions > button,
-.guide-inspector-panel .tour-slide-row > button:not(.tour-slide-select) {
+.guide-inspector-panel .tour-object-item-actions > button {
   width: 1.5rem;
   height: 1.5rem;
   min-width: 1.5rem;
   min-height: 1.5rem;
 }
-.guide-inspector-panel .tour-object-row,
-.guide-inspector-panel .tour-slide-select {
+.guide-inspector-panel .tour-object-row {
   flex: 1;
   width: auto;
   min-width: 0;
   min-height: 36px;
   font-size: 12px;
-}
-.guide-inspector-panel .tour-slide-select + button {
-  margin-inline-start: auto;
 }
 .guide-inspector-panel .tour-object-add button {
   width: 32px;
@@ -553,7 +546,6 @@
   gap: 0;
 }
 
-.guide-inspector-panel .tour-slide-row:last-child,
 .guide-inspector-panel .tour-object-item:last-child {
   border-bottom: none;
 }
@@ -724,28 +716,24 @@
   transition: color 120ms ease;
 }
 /* Reserve action space: revealing controls never moves the row title. */
-.guide-inspector-panel .tour-object-item-actions,
-.guide-inspector-panel .tour-slide-row > button:not(.tour-slide-select) {
+.guide-inspector-panel .tour-object-item-actions {
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
 }
-.guide-inspector-panel .tour-object-item:is(:hover, :focus-within) .tour-object-item-actions,
-.guide-inspector-panel .tour-slide-row:is(:hover, :focus-within) > button:not(.tour-slide-select) {
+.guide-inspector-panel .tour-object-item:is(:hover, :focus-within) .tour-object-item-actions {
   opacity: 1;
   pointer-events: auto;
 }
 @media (hover: none), (pointer: coarse) {
-  .guide-inspector-panel .tour-object-item-actions,
-  .guide-inspector-panel .tour-slide-row > button:not(.tour-slide-select) {
+  .guide-inspector-panel .tour-object-item-actions {
     opacity: 1;
     pointer-events: auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] > nav button,
-  .guide-inspector-panel .tour-object-item-actions,
-  .guide-inspector-panel .tour-slide-row > button:not(.tour-slide-select) {
+  .guide-inspector-panel .tour-object-item-actions {
     transition: none;
   }
 }
@@ -756,4 +744,88 @@
   [role='group']
   button:hover:not(:disabled) {
   color: var(--sniptale-color-text-primary-strong);
+}
+
+/* Contents are one numbered list, independent of library slide-card geometry. */
+.tour-contents-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tour-contents-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 4px;
+  border-radius: var(--sniptale-radius-sm);
+}
+.tour-contents-row:is(:hover, :focus-within) {
+  background: var(--sniptale-color-surface-hover);
+}
+.tour-contents-select {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  font: 500 12px / 18px var(--sniptale-font-sans);
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+.tour-contents-select > span:last-child {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.tour-contents-number {
+  color: var(--sniptale-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.tour-contents-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.guide-inspector-panel .tour-contents-actions > button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+}
+.tour-contents-row:is(:hover, :focus-within) .tour-contents-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.tour-contents-build > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+.tour-contents-build > .tour-contents-count {
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
+}
+@media (hover: none), (pointer: coarse) {
+  .tour-contents-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-contents-actions {
+    transition: none;
+  }
 }

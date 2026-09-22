@@ -332,7 +332,7 @@ it('edits navigation and end screen in independent scopes', async () => {
   const nav = project.tour!.slides[1]!;
   expect(nav.kind === 'navigation' && nav.buttons[0]?.action.kind).toBe('restart');
   await click('Back to slide settings');
-  await click('1. Start');
+  await click('Start');
   await click('Delete');
   selected = { kind: 'end' };
   draw();
@@ -444,7 +444,11 @@ it('builds contents without duplicate destinations and reorders buttons atomical
   };
   expect(navigation().buttons).toHaveLength(1);
   expect(navigation().buttons[0]?.action).toEqual({ kind: 'slide', slideId: 'image' });
-  await click('Add slide links');
+  expect(
+    [...host.querySelectorAll('button')].some((button) =>
+      button.textContent?.includes('Add slide links')
+    )
+  ).toBe(false);
   expect(navigation().buttons).toHaveLength(1);
   await click('Add button');
   await click('Back to slide settings');

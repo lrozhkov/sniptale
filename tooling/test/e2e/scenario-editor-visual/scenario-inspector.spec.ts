@@ -374,7 +374,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
           exact: true,
         })
         .click();
-      const row = panel.locator('.tour-slide-row');
+      const row = panel.locator('.tour-contents-row');
       const rowCenters = await row.locator('button').evaluateAll((buttons) =>
         buttons.map((button) => {
           const box = button.getBoundingClientRect();
