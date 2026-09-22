@@ -45,11 +45,11 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Settings apply to every appearance of this action in this source instance.',
     ru: 'Настройки действуют на все появления этого действия в данном экземпляре источника.',
   },
-  sourceIn: { ru: 'In исходника', en: 'Source In' },
-  sourceOut: { ru: 'Out исходника', en: 'Source Out' },
+  sourceIn: { ru: 'Начало в исходнике', en: 'Start in source' },
+  sourceOut: { ru: 'Конец в исходнике', en: 'End in source' },
   sourceRangeHint: {
-    ru: 'Время в исходнике. Out — граница окончания фрагмента.',
-    en: 'Source time. Out is the boundary after the selected range.',
+    ru: 'Время относительно исходного файла. Конец — граница выбранного фрагмента.',
+    en: 'Times are relative to the source. End is the boundary after the selected range.',
   },
   nothingSelected: {
     ru: 'Ничего не выбрано',

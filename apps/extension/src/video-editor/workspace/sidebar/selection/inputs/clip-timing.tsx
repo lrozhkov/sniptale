@@ -76,7 +76,7 @@ export function ClipFadeFields(props: {
   onUpdateClipFades: WorkspaceSidebarSelectionPanelProps['onUpdateClipFades'];
 }) {
   return (
-    <div className="mt-3 space-y-3">
+    <div className="space-y-3">
       <SliderField
         label={translate(
           props.audio

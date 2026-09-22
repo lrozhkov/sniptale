@@ -1,3 +1,4 @@
+import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
@@ -12,6 +13,8 @@ for (const locale of ['ru', 'en'] as const) {
       const project = createEmptyVideoProject('Inspector');
       const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 0);
       project.clips.push(clip);
+      const motion = createVideoProjectMotionRegion(project, 0);
+      project.motionRegions = [motion];
       await applyHarnessBootstrap(page, {
         apiBehavior: { runtimeFallback: 'typed-success' },
         videoProjects: [project],
@@ -85,6 +88,15 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(palette).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(palette).toHaveCount(0);
+      const animation = panel.locator('[data-section="animation"]');
+      const animationHeading = animation.locator(':scope > details > summary');
+      const animationField = animation
+        .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+        .first();
+      await animationField.scrollIntoViewIfNeeded();
+      const headingBox = (await animationHeading.boundingBox())!;
+      const fieldBox = (await animationField.boundingBox())!;
+      expect(fieldBox.y - headingBox.y - headingBox.height).toBeLessThanOrEqual(9);
       for (const width of [420, 280]) {
         await page
           .locator('[data-ui="video-editor.floating.context-inspector"]')
@@ -99,6 +111,28 @@ for (const locale of ['ru', 'en'] as const) {
           contentType: 'image/png',
         });
       }
+      await page.locator('[data-ui="video-editor.viewer.scene"]').click();
+      const paint = panel.locator('[data-ui="shared.ui.paint-selector"]').first();
+      await expect(paint).toHaveAttribute('data-trigger-variant', 'swatch');
+      const paintButton = paint.locator('[data-ui="shared.ui.paint-selector.trigger"]');
+      await expect(paintButton).toContainText('#');
+      await expect(paintButton.locator('.lucide-palette')).toHaveCount(1);
+      await expect(paintButton).toHaveCSS('border-top-width', '0px');
+      await paintButton.click();
+      await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
+      await paintButton.click();
+      await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
+      await page.locator(`[data-timeline-effect-segment="${motion.id}"]`).click();
+      const remove = panel.locator('[data-inspector-tone="danger"]').last();
+      await page.mouse.move(0, 0);
+      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).toHaveCSS('justify-content', 'flex-start');
+      await remove.hover();
+      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await info.attach('motion-inspector', {
+        body: await panel.screenshot(),
+        contentType: 'image/png',
+      });
     });
   }
 }
@@ -157,10 +191,12 @@ for (const locale of ['ru', 'en'] as const) {
       const nested = panel.locator('[data-ui="video-editor.inspector.disclosure"]').first();
       const nestedHeading = nested.locator(':scope > summary');
       await expect(nested).not.toHaveAttribute('open', '');
-      await expect(nestedHeading).toHaveCSS('font-weight', '600');
+      await expect(nestedHeading).toHaveCSS('font-weight', '500');
+      await expect(nestedHeading).toHaveCSS('font-size', '12px');
+      await expect(nested).toHaveCSS('border-top-width', '0px');
       await nestedHeading.hover();
       await expect(nestedHeading).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      const textBox = (await nestedHeading.locator('h3').boundingBox())!;
+      const textBox = (await nestedHeading.locator('h4').boundingBox())!;
       const iconBox = (await nestedHeading.locator('svg').last().boundingBox())!;
       expect(
         Math.abs(textBox.y + textBox.height / 2 - iconBox.y - iconBox.height / 2)

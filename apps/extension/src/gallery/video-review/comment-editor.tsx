@@ -338,6 +338,7 @@ function ReviewCommentStyleFields(props: {
   return (
     <fieldset disabled={props.busy} className="space-y-2">
       <CompactPaintSelector
+        triggerVariant="swatch"
         label={translate('gallery.videoReview.overlayFill')}
         title={translate('gallery.videoReview.overlayFill')}
         value={props.style.fillPaint}

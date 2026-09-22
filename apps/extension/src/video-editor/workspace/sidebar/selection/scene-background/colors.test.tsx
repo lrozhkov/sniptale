@@ -69,6 +69,11 @@ describe('workspace-sidebar/selection/scene-background-colors', () => {
 
     expect(container?.textContent).toContain('videoEditor.sidebar.sceneBackgroundColorLabel');
     expect(container?.textContent).toContain('#123456'.toUpperCase());
+    expect(
+      container
+        ?.querySelector('[data-ui="shared.ui.paint-selector"]')
+        ?.getAttribute('data-trigger-variant')
+    ).toBe('swatch');
 
     await act(async () => {
       getButton('videoEditor.sidebar.sceneBackgroundColorLabel')?.click();

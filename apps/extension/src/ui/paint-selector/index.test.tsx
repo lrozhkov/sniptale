@@ -57,100 +57,115 @@ function changeInput(input: HTMLInputElement, value: string) {
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
-it('renders the shared selector trigger with a labeled value and transparency preview', () => {
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  act(() =>
-    root.render(
-      <CompactPaintSelector
-        label="Fill"
-        title="Fill"
-        value={createSolidPaint('#00000000')}
-        onChange={vi.fn()}
-      />
-    )
-  );
-  const trigger = host.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.paint-selector.trigger"]'
-  )!;
-  const preview = trigger.querySelector<HTMLElement>(
-    '[data-ui="shared.ui.paint-selector.preview"]'
-  )!;
-  expect(trigger.textContent).toContain('Fill');
-  expect(trigger.textContent).toContain('#00000000');
-  expect(preview.style.backgroundSize).toBe('100% 100%, 8px 8px');
-  expect(trigger.getAttribute('aria-expanded')).toBe('false');
-  act(() => trigger.click());
-  expect(trigger.getAttribute('aria-expanded')).toBe('true');
-  act(() => trigger.click());
-  expect(trigger.getAttribute('aria-expanded')).toBe('false');
-  expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBeNull();
-  act(() => root.unmount());
-  host.remove();
-});
+it.each(['default', 'swatch'] as const)(
+  'renders %s trigger with a labeled value and transparency preview',
+  (variant) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <CompactPaintSelector
+          triggerVariant={variant}
+          label="Fill"
+          title="Fill"
+          value={createSolidPaint('#00000000')}
+          onChange={vi.fn()}
+        />
+      )
+    );
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.paint-selector.trigger"]'
+    )!;
+    const preview = trigger.querySelector<HTMLElement>(
+      '[data-ui="shared.ui.paint-selector.preview"]'
+    )!;
+    expect(host.textContent).toContain('Fill');
+    expect(trigger.getAttribute('aria-label')).toBe('Fill');
+    if (variant === 'swatch') {
+      expect(trigger.textContent).not.toContain('Fill');
+      expect(trigger.querySelector('.lucide-palette')).not.toBeNull();
+    }
+    expect(trigger.textContent).toContain('#00000000');
+    expect(preview.style.backgroundSize).toBe('100% 100%, 8px 8px');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    act(() => trigger.click());
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    act(() => trigger.click());
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBeNull();
+    act(() => root.unmount());
+    host.remove();
+  }
+);
 
-it('uses one popup owner, switches modes, applies, and never nests a color popup', () => {
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  const onChange = vi.fn();
-  act(() =>
-    root.render(
-      <CompactPaintSelector
-        label="Fill"
-        title="Fill"
-        value={createSolidPaint('#f00')}
-        onChange={onChange}
-      />
-    )
-  );
-  act(() =>
-    host.querySelector<HTMLButtonElement>('[data-ui="shared.ui.paint-selector"] > button')!.click()
-  );
-  const popup = document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')!;
-  expect(popup).not.toBeNull();
-  expect(popup.querySelectorAll('[data-ui="shared.ui.color-selector.editor-panel"]')).toHaveLength(
-    1
-  );
-  expect(popup.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
-  expect(
-    popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
-      ?.textContent
-  ).toBe('');
-  expect(popup.firstElementChild?.firstElementChild?.tagName).toBe('STRONG');
-  expect(popup.firstElementChild?.lastElementChild?.getAttribute('role')).toBe('toolbar');
-  expect(
-    popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
-      ?.className
-  ).toContain('sniptale-glass-icon-button');
-  expect(
-    Array.from(popup.querySelectorAll<HTMLElement>('[role="toolbar"] > button')).map((button) =>
-      button.getAttribute('aria-label')
-    )
-  ).toEqual([
-    'highlighter.paintPicker.solid',
-    'highlighter.paintPicker.presets',
-    'highlighter.paintPicker.linear',
-    'highlighter.paintPicker.radial',
-    'highlighter.paintPicker.conic',
-  ]);
-  act(() => selectPaintMode(popup, 'linear'));
-  expect(popup.querySelector('strong')?.textContent).toBe('highlighter.paintPicker.linear');
-  expect(
-    popup.querySelectorAll('[aria-label^="highlighter.paintPicker.gradientStop"]')
-  ).toHaveLength(2);
-  const buttons = Array.from(popup.querySelectorAll<HTMLButtonElement>('button'));
-  act(() =>
-    buttons.find((button) => button.textContent?.includes('shared.ui.colorSelectorApply'))?.click()
-  );
-  expect(onChange.mock.calls[0]?.[0]).toMatchObject({
-    kind: 'gradient',
-    gradient: { type: 'linear' },
-  });
-  act(() => root.unmount());
-  host.remove();
-});
+it.each(['default', 'swatch'] as const)(
+  '%s uses one popup owner, switches modes, applies, and never nests a color popup',
+  (variant) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const onChange = vi.fn();
+    act(() =>
+      root.render(
+        <CompactPaintSelector
+          triggerVariant={variant}
+          label="Fill"
+          title="Fill"
+          value={createSolidPaint('#f00')}
+          onChange={onChange}
+        />
+      )
+    );
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[data-ui="shared.ui.paint-selector.trigger"]')!.click()
+    );
+    const popup = document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')!;
+    expect(popup).not.toBeNull();
+    expect(
+      popup.querySelectorAll('[data-ui="shared.ui.color-selector.editor-panel"]')
+    ).toHaveLength(1);
+    expect(popup.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
+    expect(
+      popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
+        ?.textContent
+    ).toBe('');
+    expect(popup.firstElementChild?.firstElementChild?.tagName).toBe('STRONG');
+    expect(popup.firstElementChild?.lastElementChild?.getAttribute('role')).toBe('toolbar');
+    expect(
+      popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.solid"]')
+        ?.className
+    ).toContain('sniptale-glass-icon-button');
+    expect(
+      Array.from(popup.querySelectorAll<HTMLElement>('[role="toolbar"] > button')).map((button) =>
+        button.getAttribute('aria-label')
+      )
+    ).toEqual([
+      'highlighter.paintPicker.solid',
+      'highlighter.paintPicker.presets',
+      'highlighter.paintPicker.linear',
+      'highlighter.paintPicker.radial',
+      'highlighter.paintPicker.conic',
+    ]);
+    act(() => selectPaintMode(popup, 'linear'));
+    expect(popup.querySelector('strong')?.textContent).toBe('highlighter.paintPicker.linear');
+    expect(
+      popup.querySelectorAll('[aria-label^="highlighter.paintPicker.gradientStop"]')
+    ).toHaveLength(2);
+    const buttons = Array.from(popup.querySelectorAll<HTMLButtonElement>('button'));
+    act(() =>
+      buttons
+        .find((button) => button.textContent?.includes('shared.ui.colorSelectorApply'))
+        ?.click()
+    );
+    expect(onChange.mock.calls[0]?.[0]).toMatchObject({
+      kind: 'gradient',
+      gradient: { type: 'linear' },
+    });
+    act(() => root.unmount());
+    host.remove();
+  }
+);
 
 it('copies a gradient template into the matching editable mode', () => {
   const host = document.createElement('div');

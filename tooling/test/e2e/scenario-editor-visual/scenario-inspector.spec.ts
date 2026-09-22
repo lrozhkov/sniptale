@@ -594,3 +594,90 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     });
   }
 }
+
+for (const locale of ['ru', 'en'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`semantic inspector rows ${locale} ${theme}`, async ({ page, hostOrigin }, info) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await openVisualHarness(
+        page,
+        hostOrigin,
+        theme,
+        locale,
+        { width: 1600, height: 1000 },
+        'compare',
+        { tourFixture: '1' }
+      );
+      const panel = page.locator('#guide-inspector-panel');
+      await panel
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Показать все настройки' : 'Show all settings',
+          exact: true,
+        })
+        .click();
+      const row = panel
+        .locator('.guide-inspector-choice:has(> span + [data-ui="shared.ui.compact-select"])')
+        .first();
+      await expect(row).toBeVisible();
+      for (const width of [420, 260]) {
+        await panel.evaluate((node, size) => {
+          (node as HTMLElement).style.width = `${size}px`;
+        }, width);
+        const layout = panel
+          .locator(
+            '.guide-inspector-group:has(> .guide-inspector-group-heading .guide-inspector-static-heading):has(> .guide-inspector-group-body > [data-ui="shared.ui.compact-select"]:only-child)'
+          )
+          .first();
+        await layout.scrollIntoViewIfNeeded();
+        const heading = (await layout.locator('.guide-inspector-group-heading').boundingBox())!;
+        const field = (await layout.locator('[data-ui="shared.ui.compact-select"]').boundingBox())!;
+        if (width === 420)
+          expect(
+            Math.abs(heading.y + heading.height / 2 - field.y - field.height / 2)
+          ).toBeLessThanOrEqual(1);
+        else expect(field.y).toBeGreaterThanOrEqual(heading.y + heading.height);
+        await row.scrollIntoViewIfNeeded();
+        const label = (await row.locator(':scope > span').first().boundingBox())!;
+        const select = (await row
+          .locator(':scope > [data-ui="shared.ui.compact-select"]')
+          .first()
+          .boundingBox())!;
+        if (width === 420)
+          expect(
+            Math.abs(label.y + label.height / 2 - select.y - select.height / 2)
+          ).toBeLessThanOrEqual(1);
+        else expect(select.y).toBeGreaterThanOrEqual(label.y + label.height);
+        expect(select.x + select.width).toBeLessThanOrEqual(
+          (await panel.boundingBox())!.x + width + 1
+        );
+      }
+      await page
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Интерактивный тур' : 'Interactive tour',
+          exact: true,
+        })
+        .click();
+      await page
+        .locator('#guide-library-panel')
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Навигационный слайд' : 'Navigation slide',
+          exact: true,
+        })
+        .click();
+      const paint = panel.locator('[data-ui="shared.ui.paint-selector"]').first();
+      await expect(paint).toHaveAttribute('data-trigger-variant', 'swatch');
+      const trigger = paint.locator('[data-ui="shared.ui.paint-selector.trigger"]');
+      await expect(trigger.locator('.lucide-palette')).toHaveCount(1);
+      await expect(trigger).toContainText('#');
+      await expect(trigger).toHaveCSS('border-top-width', '0px');
+      await trigger.click();
+      await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
+      await trigger.click();
+      await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
+      await info.attach('scenario-semantic-inspector', {
+        body: await panel.screenshot(),
+        contentType: 'image/png',
+      });
+    });
+  }
+}

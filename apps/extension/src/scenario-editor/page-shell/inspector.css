@@ -915,3 +915,74 @@
   > button:not(:hover):not(:focus-visible):not([aria-expanded='true']) {
   border-color: transparent;
 }
+
+/* Label/select pairs share the video inspector's value column; other content spans the row. */
+.guide-inspector-panel
+  :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field):has(
+    > span + [data-ui='shared.ui.compact-select']
+  ) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  align-items: center;
+  gap: 8px;
+}
+.guide-inspector-panel
+  :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field):has(
+    > span + [data-ui='shared.ui.compact-select']
+  )
+  > * {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.guide-inspector-panel
+  :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field)
+  > span:has(+ [data-ui='shared.ui.compact-select']) {
+  grid-column: 1;
+}
+.guide-inspector-panel
+  :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field)
+  > span
+  + [data-ui='shared.ui.compact-select'] {
+  grid-column: 2;
+  width: 100%;
+}
+@container (max-width: 280px) {
+  .guide-inspector-panel
+    :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field):has(
+      > span + [data-ui='shared.ui.compact-select']
+    ) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .guide-inspector-panel
+    :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field)
+    > span
+    + [data-ui='shared.ui.compact-select'] {
+    grid-column: 1;
+  }
+}
+
+/* A static title with one selector is a field row, not a separate disclosure. */
+.guide-inspector-panel
+  .guide-inspector-group:has(> .guide-inspector-group-heading .guide-inspector-static-heading):has(
+    > .guide-inspector-group-body > [data-ui='shared.ui.compact-select']:only-child
+  ) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  align-items: center;
+  gap: 8px;
+}
+.guide-inspector-panel
+  .guide-inspector-group:has(
+    > .guide-inspector-group-body > [data-ui='shared.ui.compact-select']:only-child
+  )
+  > .guide-inspector-group-heading:has(.guide-inspector-static-heading) {
+  margin-bottom: 0;
+}
+@container (max-width: 280px) {
+  .guide-inspector-panel
+    .guide-inspector-group:has(
+      > .guide-inspector-group-heading .guide-inspector-static-heading
+    ):has(> .guide-inspector-group-body > [data-ui='shared.ui.compact-select']:only-child) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

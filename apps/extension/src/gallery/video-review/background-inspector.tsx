@@ -140,6 +140,7 @@ export function ReviewBackgroundInspector(props: {
       ) : null}
       {background.enabled && background.type !== 'image' ? (
         <CompactPaintSelector
+          triggerVariant="swatch"
           className="relative w-full min-w-0 [&>button>span>span]:text-xs
             [&>button>span>span]:font-semibold"
           label={translate('gallery.videoReview.background')}

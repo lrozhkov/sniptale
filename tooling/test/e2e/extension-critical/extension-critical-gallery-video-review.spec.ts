@@ -2803,6 +2803,17 @@ for (const advanced of [false, true]) {
         await expect(
           dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button')
         ).toHaveCount(10);
+        const paint = dialog.locator(
+          '[data-ui="gallery.videoReview.backgroundInspector"] [data-ui="shared.ui.paint-selector"]'
+        );
+        await expect(paint).toHaveAttribute('data-trigger-variant', 'swatch');
+        const paintButton = paint.locator('[data-ui="shared.ui.paint-selector.trigger"]');
+        await expect(paintButton.locator('.lucide-palette')).toHaveCount(1);
+        await expect(paintButton).toHaveCSS('border-top-width', '0px');
+        await paintButton.click();
+        await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toBeVisible();
+        await paintButton.click();
+        await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
         const backgroundChoice = button('gallery.videoReview.backgroundGradient');
         await backgroundChoice.hover();
         await expect(backgroundChoice).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');

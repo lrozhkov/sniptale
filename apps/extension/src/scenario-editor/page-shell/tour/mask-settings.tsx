@@ -50,6 +50,7 @@ export function TourMaskSettings({
       </p>
       {controls.paint && (
         <CompactPaintSelector
+          triggerVariant="swatch"
           label={t('scenario.editor.color')}
           title={t('scenario.editor.color')}
           value={controls.paint.value}

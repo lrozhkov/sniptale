@@ -7,14 +7,20 @@ export function InspectorDetails(props: {
   children: ReactNode;
   icon?: LucideIcon;
   initiallyOpen?: boolean;
+  level?: 'section' | 'group';
 }) {
   const Icon = props.icon;
+  const Heading = props.level === 'section' ? 'h3' : 'h4';
   return (
-    <details data-ui="video-editor.inspector.disclosure" open={props.initiallyOpen}>
+    <details
+      data-ui="video-editor.inspector.disclosure"
+      data-level={props.level ?? 'group'}
+      open={props.initiallyOpen}
+    >
       <summary>
         {Icon ? <Icon size={16} aria-hidden="true" /> : null}
-        <h3>{props.label}</h3>
-        <ChevronDown size={16} aria-hidden="true" />
+        <Heading>{props.label}</Heading>
+        <ChevronDown size={props.level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>
       <div className="space-y-2 pt-2">{props.children}</div>
     </details>

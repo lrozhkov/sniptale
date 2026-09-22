@@ -110,8 +110,8 @@
 /* Top-level groups and nested disclosures share a heading and interaction language. */
 [data-ui='video-editor.inspector.disclosure'] {
   min-width: 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--sniptale-color-border-soft);
+  padding-top: 0;
+  border-top: 0;
 }
 [data-ui='video-editor.inspector.disclosure'] > summary {
   display: flex;
@@ -129,7 +129,7 @@
 [data-ui='video-editor.inspector.disclosure'] > summary::-webkit-details-marker {
   display: none;
 }
-[data-ui='video-editor.inspector.disclosure'] > summary > h3 {
+[data-ui='video-editor.inspector.disclosure'] > summary > :is(h3, h4) {
   margin: 0;
   font: inherit;
   flex: 1;
@@ -164,4 +164,21 @@
   [data-ui='video-editor.inspector.disclosure'] > summary > svg:last-child {
     transition: none;
   }
+}
+
+[data-ui='video-editor.inspector.disclosure'][data-level='group'] > summary {
+  min-height: 28px;
+  font: 500 12px / 18px var(--sniptale-font-sans);
+}
+[data-ui='video-editor.inspector.content'] [data-inspector-tone='danger'] {
+  width: 100%;
+  background: transparent;
+  color: var(--sniptale-color-text-secondary);
+  justify-content: flex-start;
+}
+[data-ui='video-editor.inspector.content']
+  [data-inspector-tone='danger']:is(:hover, :focus-visible):not(:disabled) {
+  background: transparent;
+  color: var(--sniptale-color-danger);
+  border-color: color-mix(in srgb, var(--sniptale-color-danger) 28%, transparent);
 }

@@ -121,7 +121,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
               aria-label={group.label}
               className="py-3 first:pt-0 last:pb-0 focus:outline-none"
             >
-              <InspectorDetails label={group.label} icon={Icon} initiallyOpen>
+              <InspectorDetails level="section" label={group.label} icon={Icon} initiallyOpen>
                 <InspectorGroupSection meta={group.meta}>{group.content}</InspectorGroupSection>
               </InspectorDetails>
             </section>

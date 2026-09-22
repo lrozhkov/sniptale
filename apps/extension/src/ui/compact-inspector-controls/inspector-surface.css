@@ -162,7 +162,9 @@
 .sniptale-inspector-surface .sniptale-glass-switch:disabled {
   opacity: 0.4;
 }
-.sniptale-inspector-surface [data-ui='shared.ui.paint-selector.trigger'] {
+.sniptale-inspector-surface
+  [data-ui='shared.ui.paint-selector'][data-trigger-variant='default']
+  [data-ui='shared.ui.paint-selector.trigger'] {
   min-height: 36px;
   height: auto;
   padding: 4px 0;
@@ -170,13 +172,19 @@
   background: transparent;
   box-shadow: none;
 }
-.sniptale-inspector-surface [data-ui='shared.ui.paint-selector.trigger'] > span:first-child {
+.sniptale-inspector-surface
+  [data-ui='shared.ui.paint-selector'][data-trigger-variant='default']
+  [data-ui='shared.ui.paint-selector.trigger']
+  > span:first-child {
   flex: none;
   padding: 0;
   background: transparent;
   box-shadow: none;
 }
-.sniptale-inspector-surface [data-ui='shared.ui.paint-selector.trigger'] .truncate {
+.sniptale-inspector-surface
+  [data-ui='shared.ui.paint-selector'][data-trigger-variant='default']
+  [data-ui='shared.ui.paint-selector.trigger']
+  .truncate {
   white-space: normal;
   overflow-wrap: anywhere;
   font-size: 12px;

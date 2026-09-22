@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { serializePaintToCss, type GradientType, type Paint } from '@sniptale/foundation/paint';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Palette } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import {
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
@@ -23,6 +23,7 @@ function gradientTypeLabel(type: GradientType): string {
 }
 
 export function PaintSelectorTrigger(props: {
+  variant?: 'default' | 'swatch' | undefined;
   buttonRef: RefObject<HTMLButtonElement | null>;
   disabled: boolean | undefined;
   draft: Paint;
@@ -39,6 +40,39 @@ export function PaintSelectorTrigger(props: {
     props.draft.kind === 'solid'
       ? `linear-gradient(${props.draft.color}, ${props.draft.color})`
       : serializePaintToCss(props.draft);
+  const previewStyle = {
+    backgroundColor: '#fff',
+    backgroundImage: [
+      previewImage,
+      'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
+    ].join(', '),
+    backgroundSize: '100% 100%, 8px 8px',
+  };
+  if (props.variant === 'swatch') {
+    return (
+      <div className="paint-inspector-field">
+        <span className="paint-inspector-label">{props.label}</span>
+        <button
+          ref={props.buttonRef}
+          type="button"
+          disabled={props.disabled}
+          aria-label={props.label}
+          aria-expanded={props.open}
+          onClick={props.onClick}
+          data-ui="shared.ui.paint-selector.trigger"
+        >
+          <span
+            aria-hidden="true"
+            className="paint-inspector-swatch"
+            data-ui="shared.ui.paint-selector.preview"
+            style={previewStyle}
+          />
+          <span className="paint-inspector-value">{summary}</span>
+          <Palette size={16} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
   return (
     <button
       ref={props.buttonRef}
@@ -64,14 +98,7 @@ export function PaintSelectorTrigger(props: {
           aria-hidden="true"
           className="block h-6 w-8 rounded-[5px]"
           data-ui="shared.ui.paint-selector.preview"
-          style={{
-            backgroundColor: '#fff',
-            backgroundImage: [
-              previewImage,
-              'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
-            ].join(', '),
-            backgroundSize: '100% 100%, 8px 8px',
-          }}
+          style={previewStyle}
         />
       </span>
       <span className="min-w-0 flex-1 leading-tight">

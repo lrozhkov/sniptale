@@ -99,6 +99,7 @@ export function TourNavigationSettings({
             onChange={(description) => onChange({ ...slide, description })}
           />
           <CompactPaintSelector
+            triggerVariant="swatch"
             label={t('scenario.editor.tourBackground')}
             title={t('scenario.editor.tourBackground')}
             value={slide.background.paint ?? createSolidPaint(slide.background.color)}
