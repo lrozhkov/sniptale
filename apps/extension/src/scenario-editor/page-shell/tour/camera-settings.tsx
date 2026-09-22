@@ -35,7 +35,7 @@ export function TourCameraSettings({
       tour.playback.autoZoom
     )?.zoom ?? 1;
   return (
-    <GuideInspectorGroup icon={ScanSearch} title={t('scenario.editor.tourCamera')}>
+    <GuideInspectorGroup id="camera" icon={ScanSearch} title={t('scenario.editor.tourCamera')}>
       <div className="tour-text-field">
         <span>{t('scenario.editor.tourCameraMode')}</span>
         <CompactSelect

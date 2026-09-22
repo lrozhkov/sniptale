@@ -40,6 +40,7 @@ export function ReviewInspector(props: {
   scene?: ReactNode;
   selectionLabel?: string | undefined;
   selectionHasSections?: boolean;
+  selectionPreferenceScope?: string;
   onBack(): void;
   onClose?(): void;
   rangeSelected?: boolean;
@@ -117,27 +118,7 @@ export function ReviewInspector(props: {
           {props.filename}
         </p>
       </div>
-      {props.saveStatus === 'failed' ? (
-        <div
-          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-muted)]"
-          role="status"
-        >
-          <span>{translate('gallery.videoReview.saveFailed')}</span>
-          {props.saveStatus === 'failed' ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.retry')}
-              disabled={props.busy}
-              onClick={props.onRetry}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      {props.message ? (
-        <p role="status" className="text-sm">
-          {props.message}
-        </p>
-      ) : null}
-      {props.recovery}
+      <ReviewInspectorStatus {...props} />
       {props.settingsAvailable || props.selectionLabel ? (
         <div
           className="review-inspector-navigation shrink-0"
@@ -164,7 +145,11 @@ export function ReviewInspector(props: {
         ref={scroll}
         className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
       >
-        <ReviewInspectorPresentation value={presentation}>
+        <ReviewInspectorPresentation
+          value={presentation}
+          section={shown}
+          selectionScope={props.selectionPreferenceScope}
+        >
           {shown === 'scene' ? (
             props.scene
           ) : shown === 'selected' ? (
@@ -402,5 +387,37 @@ function ReviewInspectorHeader(
         <X size={16} aria-hidden="true" />
       </ReviewButton>
     </header>
+  );
+}
+
+/** Save recovery and feedback stay visible above the inspector's scrollable settings. */
+function ReviewInspectorStatus(
+  props: Pick<
+    Parameters<typeof ReviewInspector>[0],
+    'saveStatus' | 'busy' | 'onRetry' | 'message' | 'recovery'
+  >
+) {
+  return (
+    <>
+      {props.saveStatus === 'failed' ? (
+        <div
+          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-muted)]"
+          role="status"
+        >
+          <span>{translate('gallery.videoReview.saveFailed')}</span>
+          <ReviewButton
+            label={translate('gallery.videoReview.retry')}
+            disabled={props.busy}
+            onClick={props.onRetry}
+          />
+        </div>
+      ) : null}
+      {props.message ? (
+        <p role="status" className="text-sm">
+          {props.message}
+        </p>
+      ) : null}
+      {props.recovery}
+    </>
   );
 }

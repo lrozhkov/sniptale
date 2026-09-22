@@ -60,7 +60,7 @@ export function TourNarrationSettings({
     objectId ? 'scenario.editor.tourObjectNarration' : 'scenario.editor.tourSlideNarration'
   );
   return (
-    <GuideInspectorGroup icon={Mic} title={title}>
+    <GuideInspectorGroup id="narration" icon={Mic} title={title}>
       {narration && (
         <>
           <div className="tour-audio-binding">

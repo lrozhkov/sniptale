@@ -1,3 +1,9 @@
+import { InspectorDisclosurePreferences } from '../../../composition/inspector-disclosures/state';
+import {
+  getTourSlideObjects,
+  type TourSlide,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
+import type { TourSelection } from './selection';
 import { useState, type ReactNode } from 'react';
 import {
   CategorizedInspector,
@@ -47,4 +53,31 @@ export function useTourInspectorSections(presentation: 'all' | 'sections', t: Tr
       />
     );
   };
+}
+
+/** Selection families own disclosure choices, independently of object and project identity. */
+export function TourInspectorPreferences(props: {
+  scope: 'selection' | 'document';
+  slide: TourSlide | null;
+  selection: TourSelection | null;
+  children: ReactNode;
+}) {
+  const objectId = props.selection?.kind === 'slide' ? props.selection.objectId : null;
+  const objectKind =
+    props.slide?.kind === 'image'
+      ? getTourSlideObjects(props.slide).find((entry) => entry.object.id === objectId)?.type
+      : objectId
+        ? 'navigation-button'
+        : undefined;
+  const family =
+    props.scope === 'document'
+      ? 'document'
+      : props.selection?.kind === 'end'
+        ? 'end'
+        : (objectKind ?? props.slide?.kind ?? props.selection?.kind ?? 'none');
+  return (
+    <InspectorDisclosurePreferences scope={`tour:${family}`}>
+      {props.children}
+    </InspectorDisclosurePreferences>
+  );
 }

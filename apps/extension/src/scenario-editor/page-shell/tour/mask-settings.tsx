@@ -27,7 +27,7 @@ export function TourMaskSettings({
       ? preview.amount
       : controls.amount?.value;
   return (
-    <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.tourMask')}>
+    <GuideInspectorGroup id="mask" icon={ScanLine} title={t('scenario.editor.tourMask')}>
       <div className="tour-text-field">
         <span>{t('scenario.editor.tourMask')}</span>
         <CompactSelect

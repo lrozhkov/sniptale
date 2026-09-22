@@ -71,7 +71,10 @@ export function ManualAreaFields(props: {
         motionRegionId={props.motionRegionId}
         panel={props.panel}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
+      <InspectorDetails
+        preferenceId="area:videoEditor.sidebar.inspectorExactPlacement"
+        label={translate('videoEditor.sidebar.inspectorExactPlacement')}
+      >
         <div className="pt-2">
           <MotionAreaCoordinateSection
             focusArea={focusArea}

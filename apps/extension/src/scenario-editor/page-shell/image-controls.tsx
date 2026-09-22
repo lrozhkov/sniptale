@@ -58,7 +58,11 @@ export function GuideImageControls({
       <ScenarioInspectorBackButton label={t('scenario.editor.guideImageDone')} onBack={onClose} />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
-        <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.guideFramingGroup')}>
+        <GuideInspectorGroup
+          id="framing"
+          icon={ScanLine}
+          title={t('scenario.editor.guideFramingGroup')}
+        >
           <p>{t('scenario.editor.guideImageGestureHint')}</p>
           <SegmentedSwitch
             activeId={block.fit}
@@ -101,29 +105,28 @@ export function GuideImageControls({
             />
           ))}
         </GuideInspectorGroup>
-        <GuideInspectorGroup icon={Text} title={t('scenario.editor.guideDescriptionGroup')}>
-          <label className="guide-image-description">
-            {t('scenario.editor.guideImageCaption')}
-            <ProductInput
-              value={block.caption}
-              maxLength={GUIDE_LIMITS.maxTextLength}
-              disabled={disabled}
-              onChange={(event) =>
-                onChange({ ...block, caption: event.target.value }, `image-caption:${block.id}`)
-              }
-            />
-          </label>
-          <label className="guide-image-description">
-            {t('scenario.editor.guideImageAlt')}
-            <ProductInput
-              value={block.alt}
-              maxLength={GUIDE_LIMITS.maxTextLength}
-              disabled={disabled}
-              onChange={(event) =>
-                onChange({ ...block, alt: event.target.value }, `image-alt:${block.id}`)
-              }
-            />
-          </label>
+        <GuideInspectorGroup
+          id="description"
+          icon={Text}
+          title={t('scenario.editor.guideDescriptionGroup')}
+        >
+          {(['caption', 'alt'] as const).map((field) => (
+            <label key={field} className="guide-image-description">
+              {t(
+                field === 'caption'
+                  ? 'scenario.editor.guideImageCaption'
+                  : 'scenario.editor.guideImageAlt'
+              )}
+              <ProductInput
+                value={block[field]}
+                maxLength={GUIDE_LIMITS.maxTextLength}
+                disabled={disabled}
+                onChange={(event) =>
+                  onChange({ ...block, [field]: event.target.value }, `image-${field}:${block.id}`)
+                }
+              />
+            </label>
+          ))}
         </GuideInspectorGroup>
         <div className="guide-image-reset-actions">
           <ContentToolbarButton
@@ -174,7 +177,7 @@ function ImageHtmlSettings({
   'block' | 'htmlDefaults' | 'disabled' | 'onChange' | 't'
 >) {
   return (
-    <GuideInspectorGroup icon={Maximize2} title={t('scenario.editor.htmlImages')}>
+    <GuideInspectorGroup id="htmlImages" icon={Maximize2} title={t('scenario.editor.htmlImages')}>
       <label className="guide-html-switch">
         <span>{t('scenario.editor.htmlInherit')}</span>
         <ProductToggle
@@ -221,7 +224,11 @@ function ImageActionContext({ source, t }: { source: GuideImageBlock['source']; 
   if (source.kind !== 'video-frame' || !source.action) return null;
   const action = source.action;
   return (
-    <GuideInspectorGroup icon={MousePointer2} title={t('scenario.editor.guideVideoActionContext')}>
+    <GuideInspectorGroup
+      id="videoActionContext"
+      icon={MousePointer2}
+      title={t('scenario.editor.guideVideoActionContext')}
+    >
       <p>
         {t(
           action.kind === 'KEY'

@@ -284,7 +284,11 @@ function EffectInstanceControls(
         )
         .map((section, index) =>
           section.advanced && props.parameterSection === undefined ? (
-            <InspectorDetails key={index} label={section.label}>
+            <InspectorDetails
+              preferenceId={`effect-section:${section.id}`}
+              key={index}
+              label={section.label}
+            >
               {section.controls.map(renderControl)}
             </InspectorDetails>
           ) : (
@@ -303,7 +307,11 @@ function EffectInstanceControls(
           const point = props.instance.sceneAnchors?.[handle.id];
           if (!point) return null;
           return (
-            <InspectorDetails key={handle.id} label={readLocaleText(handle.label)}>
+            <InspectorDetails
+              preferenceId={`effect-handle:${handle.id}`}
+              key={handle.id}
+              label={readLocaleText(handle.label)}
+            >
               {(['x', 'y'] as const).map((axis) => (
                 <NumberInput
                   key={axis}

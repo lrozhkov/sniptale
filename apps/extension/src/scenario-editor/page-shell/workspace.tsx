@@ -1,3 +1,4 @@
+import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { useGuideHoverIntent } from './hover-intent';
 import { GuideImageUpload } from './image-upload';
 import { resolveGuideNumbering } from '../../features/scenario/project/public';
@@ -244,6 +245,12 @@ function inspectorTitle(props: WorkspaceProps): string {
 
 /** Selected-item details and project tools use one scrollable app panel. */
 function GuideInspector(props: WorkspaceProps & { open: boolean }) {
+  const family =
+    props.panels.rightScope === 'document'
+      ? 'document'
+      : (props.inspectedBlockKind ??
+        props.project.items.find((item) => item.id === props.selectedId)?.kind ??
+        'none');
   const { t } = props;
   const grouped =
     props.panels.rightScope === 'selection' &&
@@ -285,7 +292,9 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
           <X size={16} aria-hidden="true" />
         </ContentToolbarButton>
       </div>
-      <div className="guide-panel-scroll">{props.itemActions}</div>
+      <InspectorDisclosurePreferences scope={`guide:${family}`}>
+        <div className="guide-panel-scroll">{props.itemActions}</div>
+      </InspectorDisclosurePreferences>
     </FloatingChromePanel>
   );
 }

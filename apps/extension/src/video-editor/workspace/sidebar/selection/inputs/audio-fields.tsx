@@ -32,7 +32,10 @@ function renderSharedAudioFields(params: {
         value={sharedVolumeValue}
         onChange={(value) => params.onUpdateClipVolume(params.clip.id, value)}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorEnvelope')}>
+      <InspectorDetails
+        preferenceId="audio-fields:videoEditor.sidebar.inspectorEnvelope"
+        label={translate('videoEditor.sidebar.inspectorEnvelope')}
+      >
         <AudioEnvelopeFields
           disabled={params.disabled}
           endValue={gainRange.end}

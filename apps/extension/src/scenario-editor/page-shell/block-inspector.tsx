@@ -86,6 +86,7 @@ export function GuideBlockInspector({
       />
       <fieldset className="guide-style-fields" disabled={disabled}>
         <GuideInspectorGroup
+          id="placement"
           icon={Columns2}
           title={`${t('scenario.editor.guidePlacementGroup')} · ${width}%`}
         >
@@ -133,6 +134,7 @@ export function GuideBlockInspector({
         </GuideInspectorGroup>
         {block.kind === 'note' && (
           <GuideInspectorGroup
+            id="noteType"
             collapsible={false}
             icon={MessageSquare}
             title={t('scenario.editor.guideNoteType')}
@@ -168,7 +170,7 @@ function GuideTextSettings({
   const change = (patch: Partial<GuideTextStyle>) =>
     onChange({ ...block, textStyle: { ...style, ...patch } }, null);
   return (
-    <GuideInspectorGroup icon={Type} title={t('scenario.editor.guideAddText')}>
+    <GuideInspectorGroup id="addText" icon={Type} title={t('scenario.editor.guideAddText')}>
       <span>{t('scenario.editor.guideTextSize')}</span>
       <CompactSegmentedSelector
         columns={3}

@@ -30,6 +30,7 @@ export function TourHtmlExport({
   const busy = job.status === 'preparing' || job.status === 'saving';
   return (
     <GuideExportWorkspace
+      preferenceScope="tour-html"
       className="tour-export"
       title={t('scenario.editor.tourHtmlTitle')}
       backLabel={t('scenario.editor.guideReaderBack')}
@@ -68,6 +69,7 @@ export function TourHtmlExport({
       inspector={
         <>
           <GuideInspectorGroup
+            id="htmlPreview"
             icon={MonitorSmartphone}
             title={t('scenario.editor.tourHtmlPreview')}
           >
@@ -90,7 +92,7 @@ export function TourHtmlExport({
               <span>{t('scenario.editor.tourCameraReplay')}</span>
             </ContentToolbarButton>
           </GuideInspectorGroup>
-          <GuideInspectorGroup icon={Image} title={t('scenario.editor.htmlImages')}>
+          <GuideInspectorGroup id="htmlImages" icon={Image} title={t('scenario.editor.htmlImages')}>
             <TourImageSettings t={t} options={options} busy={busy} onChange={setOptions} />
           </GuideInspectorGroup>
           <div className="tour-export-notes">

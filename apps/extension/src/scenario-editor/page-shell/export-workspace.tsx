@@ -1,3 +1,4 @@
+import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -10,6 +11,7 @@ import './export-workspace.css';
  */
 export function GuideExportWorkspace({
   className,
+  preferenceScope = 'export',
   title,
   backLabel,
   headingMeta,
@@ -21,6 +23,7 @@ export function GuideExportWorkspace({
   onClose,
 }: {
   className?: string;
+  preferenceScope?: string;
   title: string;
   backLabel: string;
   headingMeta?: ReactNode;
@@ -64,7 +67,9 @@ export function GuideExportWorkspace({
           <h1>{title}</h1>
           {headingMeta}
         </header>
-        <div className="guide-export-inspector-body">{inspector}</div>
+        <InspectorDisclosurePreferences scope={`scenario:${preferenceScope}`}>
+          <div className="guide-export-inspector-body">{inspector}</div>
+        </InspectorDisclosurePreferences>
         <footer className="guide-export-actions">
           {status}
           {actions}

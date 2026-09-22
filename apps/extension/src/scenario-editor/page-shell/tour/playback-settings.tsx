@@ -21,7 +21,7 @@ export function TourPlaybackSettings({
   const changeMinimum = (minimumHoldSeconds: number) =>
     onChange({ ...tour, playback: { ...tour.playback, minimumHoldSeconds } });
   return (
-    <GuideInspectorGroup icon={Play} title={t('scenario.editor.tourPlayback')}>
+    <GuideInspectorGroup id="playback" icon={Play} title={t('scenario.editor.tourPlayback')}>
       {(
         [
           ['autoplay', t('scenario.editor.tourAutoplay')],
@@ -76,7 +76,7 @@ export function TourTimingSettings({
   const changeHold = (holdSeconds: number) =>
     onChange({ ...slide, timing: { ...timing, holdSeconds } });
   return (
-    <GuideInspectorGroup icon={Timer} title={t('scenario.editor.tourTiming')}>
+    <GuideInspectorGroup id="timing" icon={Timer} title={t('scenario.editor.tourTiming')}>
       <div className="tour-text-field">
         <span>{t('scenario.editor.tourDurationMode')}</span>
         <CompactSelect

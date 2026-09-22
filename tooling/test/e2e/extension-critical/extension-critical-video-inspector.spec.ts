@@ -12,7 +12,8 @@ for (const locale of ['ru', 'en'] as const) {
       await page.emulateMedia({ colorScheme: theme });
       const project = createEmptyVideoProject('Inspector');
       const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 0);
-      project.clips.push(clip);
+      const secondClip = createTextClip(project.tracks[0]!.id, project.width, project.height, 6);
+      project.clips.push(clip, secondClip);
       const motion = createVideoProjectMotionRegion(project, 0);
       project.motionRegions = [motion];
       await applyHarnessBootstrap(page, {
@@ -145,6 +146,20 @@ for (const locale of ['ru', 'en'] as const) {
         body: await panel.screenshot(),
         contentType: 'image/png',
       });
+      await page.locator(`[data-project-timeline-clip="${clip.id}"]`).click();
+      await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
+      const remembered = panel.locator('[data-presentation="all"] > section > details').first();
+      await remembered.locator(':scope > summary').click();
+      await expect(remembered).not.toHaveAttribute('open', '');
+      await page.locator('[data-ui="video-editor.viewer.scene"]').click();
+      await expect(
+        panel.locator('[data-presentation="all"] > section > details').first()
+      ).toHaveAttribute('open', '');
+      await page.locator(`[data-project-timeline-clip="${secondClip.id}"]`).click();
+      await expect(remembered).not.toHaveAttribute('open', '');
+      await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
+      await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
+      await expect(remembered).not.toHaveAttribute('open', '');
     });
   }
 }

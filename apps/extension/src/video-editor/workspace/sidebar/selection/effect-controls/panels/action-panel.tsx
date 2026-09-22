@@ -216,7 +216,10 @@ function ActionPlacementFields({
         canvasDisabled={!canPlace}
         onChange={updatePoint}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
+      <InspectorDetails
+        preferenceId="action-panel:videoEditor.sidebar.inspectorExactPlacement"
+        label={translate('videoEditor.sidebar.inspectorExactPlacement')}
+      >
         <ActionPointFields
           point={normalized ? { x: point.x * 100, y: point.y * 100 } : point}
           projectHeight={normalized ? 100 : props.project.height}

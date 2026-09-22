@@ -76,7 +76,10 @@ export function CameraAppearanceControls(props: {
           onChange={(roundness) => change({ ...value, roundness })}
         />
       ) : null}
-      <InspectorDetails label={translate('videoEditor.sidebar.cameraCropSection')}>
+      <InspectorDetails
+        preferenceId="camera-appearance:videoEditor.sidebar.cameraCropSection"
+        label={translate('videoEditor.sidebar.cameraCropSection')}
+      >
         <CameraCropPreview
           key={props.clip.id}
           url={runtime?.assetUrls[props.clip.assetId]}

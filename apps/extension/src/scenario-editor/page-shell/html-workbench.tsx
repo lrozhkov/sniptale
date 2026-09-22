@@ -59,6 +59,7 @@ export function GuideHtmlWorkbench({
   const busy = job.status === 'pending';
   return (
     <GuideExportWorkspace
+      preferenceScope="guide-html"
       className="guide-html-workbench"
       title={t('scenario.editor.htmlImages')}
       backLabel={t('scenario.editor.htmlBack')}
@@ -86,10 +87,18 @@ export function GuideHtmlWorkbench({
       }
       inspector={
         <>
-          <GuideInspectorGroup icon={BookOpen} title={t('scenario.editor.guideReaderMode')}>
+          <GuideInspectorGroup
+            id="readerMode"
+            icon={BookOpen}
+            title={t('scenario.editor.guideReaderMode')}
+          >
             <GuideReadingControls value={reading} onChange={setReading} disabled={busy} t={t} />
           </GuideInspectorGroup>
-          <GuideInspectorGroup icon={Images} title={t('scenario.editor.htmlImages')}>
+          <GuideInspectorGroup
+            id="htmlImages"
+            icon={Images}
+            title={t('scenario.editor.htmlImages')}
+          >
             <GuideHtmlImageList
               project={project}
               images={images}
@@ -104,23 +113,7 @@ export function GuideHtmlWorkbench({
               t={t}
             />
           </GuideInspectorGroup>
-          <GuideInspectorGroup icon={ZoomIn} title={t('scenario.editor.htmlPreview')}>
-            <SegmentedSwitch
-              density="compact"
-              ariaLabel={t('scenario.editor.htmlPreview')}
-              activeId={zoom}
-              options={[
-                { id: 'fit', label: t('scenario.editor.htmlFit') },
-                { id: 'full', label: '100%' },
-              ]}
-              onChange={setZoom}
-            />
-            {preview && (
-              <p className="guide-html-preview-meta">
-                {`${preview.width} × ${preview.height} · ${formatBytes(preview.size)}`}
-              </p>
-            )}
-          </GuideInspectorGroup>
+          <GuideHtmlPreviewSettings zoom={zoom} onZoom={setZoom} preview={preview} t={t} />
           <GuideHtmlSettings
             project={project}
             selected={selected}
@@ -303,7 +296,7 @@ function GuideHtmlSettings({
   const resetTitle = t(common ? 'scenario.editor.htmlResetAll' : 'scenario.editor.htmlReset');
   const unavailable = busy || (!common && !chosen.length);
   return (
-    <GuideInspectorGroup icon={SlidersHorizontal} title={title}>
+    <GuideInspectorGroup id="html-workbench" icon={SlidersHorizontal} title={title}>
       <SegmentedSwitch
         density="compact"
         ariaLabel={t('scenario.editor.htmlImages')}
@@ -354,3 +347,36 @@ const exportStatusMessages = {
   'history-failed': 'scenario.editor.guideHtmlHistoryFailed',
   failed: 'scenario.editor.guideHtmlFailed',
 } as const;
+
+/** Preview controls affect inspection scale, independently of export preparation. */
+function GuideHtmlPreviewSettings({
+  zoom,
+  onZoom,
+  preview,
+  t,
+}: {
+  zoom: 'fit' | 'full';
+  onZoom(value: 'fit' | 'full'): void;
+  preview: ReturnType<typeof useHtmlImagePreview>['preview'];
+  t: Translate;
+}) {
+  return (
+    <GuideInspectorGroup id="htmlPreview" icon={ZoomIn} title={t('scenario.editor.htmlPreview')}>
+      <SegmentedSwitch
+        density="compact"
+        ariaLabel={t('scenario.editor.htmlPreview')}
+        activeId={zoom}
+        options={[
+          { id: 'fit', label: t('scenario.editor.htmlFit') },
+          { id: 'full', label: '100%' },
+        ]}
+        onChange={onZoom}
+      />
+      {preview && (
+        <p className="guide-html-preview-meta">
+          {`${preview.width} × ${preview.height} · ${formatBytes(preview.size)}`}
+        </p>
+      )}
+    </GuideInspectorGroup>
+  );
+}

@@ -23,7 +23,11 @@ export function TourTransitionSettings({
   const changeTravel = (hotspotTravelMs: number) =>
     onChange({ ...tour, transition: { ...transition, hotspotTravelMs } });
   return (
-    <GuideInspectorGroup icon={Layers} title={t('scenario.editor.tourTransitions')}>
+    <GuideInspectorGroup
+      id="transitions"
+      icon={Layers}
+      title={t('scenario.editor.tourTransitions')}
+    >
       <div className="tour-text-field">
         <span>{t('scenario.editor.tourTransitionKind')}</span>
         <CompactSelect

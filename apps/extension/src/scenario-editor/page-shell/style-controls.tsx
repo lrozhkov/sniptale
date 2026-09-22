@@ -102,6 +102,7 @@ export function GuideStyleFields({
   return (
     <fieldset className="guide-style-fields" disabled={disabled}>
       <GuideInspectorGroup
+        id="style"
         level={nested ? 'group' : 'section'}
         icon={Palette}
         title={t('scenario.editor.guideStyleGroup')}
@@ -146,6 +147,7 @@ export function GuideStyleFields({
         </div>
       </GuideInspectorGroup>
       <GuideInspectorGroup
+        id="layout"
         level={nested ? 'group' : 'section'}
         icon={LayoutTemplate}
         title={t('scenario.editor.guideLayoutGroup')}
@@ -166,6 +168,7 @@ export function GuideStyleFields({
         />
       </GuideInspectorGroup>
       <GuideInspectorGroup
+        id="details"
         level={nested ? 'group' : 'section'}
         icon={ScanLine}
         title={t('scenario.editor.guideDetailsGroup')}
@@ -204,6 +207,7 @@ export function GuideLayoutFields({
   return (
     <fieldset className="guide-style-fields" disabled={disabled}>
       <GuideInspectorGroup
+        id="appearanceLayout"
         collapsible={false}
         icon={LayoutTemplate}
         title={t('scenario.editor.appearanceLayout')}

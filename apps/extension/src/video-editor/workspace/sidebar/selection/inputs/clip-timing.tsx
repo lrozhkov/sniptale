@@ -37,7 +37,10 @@ export function ClipTimingControls(props: ClipTimingControlsProps) {
       {(isVideoClip(props.clip) || isAudioClip(props.clip)) &&
       props.onTrimClipStart &&
       props.onTrimClipEnd ? (
-        <InspectorDetails label={translate('videoEditor.sidebar.inspectorSourceBounds')}>
+        <InspectorDetails
+          preferenceId="clip-timing:videoEditor.sidebar.inspectorSourceBounds"
+          label={translate('videoEditor.sidebar.inspectorSourceBounds')}
+        >
           <ClipSourceRangeControls
             key={props.clip.id}
             project={props.project}

@@ -1,4 +1,5 @@
-import { createContext, useContext, useId, useState, type ReactNode } from 'react';
+import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
+import { createContext, useContext, useId, type ReactNode } from 'react';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { NumericValueField } from '../../ui/compact-inspector-controls/numeric';
 import './inspector.css';
@@ -28,6 +29,7 @@ export function InspectorCategorizedContent({
 /** Consistent section hierarchy for document, step and block properties. */
 export function GuideInspectorGroup({
   title,
+  id,
   icon: Icon,
   action,
   collapsible = true,
@@ -35,6 +37,7 @@ export function GuideInspectorGroup({
   children,
 }: {
   title: string;
+  id: string;
   icon: LucideIcon;
   action?: ReactNode;
   collapsible?: boolean;
@@ -43,7 +46,7 @@ export function GuideInspectorGroup({
 }) {
   const categorized = useContext(InspectorCategorizedContentContext);
   const Heading = level === 'group' ? 'h4' : 'h3';
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useInspectorDisclosure(id, true);
   const bodyId = useId();
   return (
     <section className="guide-inspector-group" data-level={level} aria-label={title}>
@@ -56,7 +59,7 @@ export function GuideInspectorGroup({
                 className="guide-inspector-disclosure"
                 aria-expanded={expanded}
                 aria-controls={bodyId}
-                onClick={() => setExpanded((value) => !value)}
+                onClick={() => setExpanded(!expanded)}
               >
                 <Icon size={16} aria-hidden="true" />
                 <span>{title}</span>

@@ -1,3 +1,4 @@
+import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate } from '../../platform/i18n';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
@@ -154,20 +155,30 @@ export function reviewEventLabel(kind: string): string {
 /** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
 export function ReviewDetails({
   label,
+  preferenceId,
   children,
   icon: Icon,
   level = 'group',
   initiallyOpen,
 }: {
   label: string;
+  preferenceId: string;
   children: ReactNode;
   icon?: LucideIcon;
   level?: 'section' | 'group';
   initiallyOpen?: boolean;
 }) {
+  const [open, setOpen] = useInspectorDisclosure(preferenceId, initiallyOpen ?? false);
   const Heading = level === 'section' ? 'h3' : 'h4';
   return (
-    <details data-ui="gallery.videoReview.disclosure" data-level={level} open={initiallyOpen}>
+    <details
+      data-ui="gallery.videoReview.disclosure"
+      data-level={level}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
+      }}
+    >
       <summary>
         {Icon ? <Icon size={16} aria-hidden="true" /> : null}
         <Heading>{label}</Heading>

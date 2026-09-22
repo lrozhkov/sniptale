@@ -1,3 +1,6 @@
+import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
+import { ReviewDetails } from './controls';
+import { createInspectorDisclosureStore } from '../../composition/persistence/inspector-disclosures/store';
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -117,4 +120,37 @@ it('edits the background paint and the selected zoom region through the panel ca
 
   await act(async () => button('toggleMode').click());
   expect(host.querySelector('[data-ui="gallery.videoReview.backgroundInspector"]')).toBeNull();
+});
+
+it('restores nested disclosure choices after another object and a fresh editor mount', async () => {
+  const values: Record<string, unknown> = {};
+  const storage = {
+    get: async () => values,
+    set: async (next: Record<string, unknown>) => {
+      Object.assign(values, next);
+    },
+  };
+  let store = createInspectorDisclosureStore(storage);
+  const render = (scope: string, instance: string) =>
+    root.render(
+      <InspectorDisclosurePreferences scope={scope} store={store}>
+        <ReviewDetails key={instance} preferenceId="precise-position" label="Precise position">
+          <input defaultValue="draft" />
+        </ReviewDetails>
+      </InspectorDisclosurePreferences>
+    );
+  await act(async () => render('gallery:zoom', 'first'));
+  const details = host.querySelector('details')!;
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new Event('toggle'));
+  });
+  await act(async () => render('gallery:scene', 'scene'));
+  expect(host.querySelector('details')!.open).toBe(false);
+  await act(async () => render('gallery:zoom', 'second'));
+  expect(host.querySelector('details')!.open).toBe(true);
+  await act(async () => root.render(null));
+  store = createInspectorDisclosureStore(storage);
+  await act(async () => render('gallery:zoom', 'another-project'));
+  expect(host.querySelector('details')!.open).toBe(true);
 });

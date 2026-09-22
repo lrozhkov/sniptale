@@ -22,7 +22,7 @@ export function TourEndSettings({
   const change = (patch: Partial<TourDocument['endScreen']>) =>
     onChange({ ...tour, endScreen: { ...value, ...patch } });
   return (
-    <GuideInspectorGroup icon={Flag} title={t('scenario.editor.tourEnd')}>
+    <GuideInspectorGroup id="end" icon={Flag} title={t('scenario.editor.tourEnd')}>
       <TourEndToggle tour={tour} disabled={disabled} onChange={onChange} t={t} />
       <TourTextField
         label={t('scenario.editor.guideStepTitle')}

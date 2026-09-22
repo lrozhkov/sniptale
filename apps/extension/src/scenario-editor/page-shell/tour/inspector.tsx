@@ -4,7 +4,7 @@ import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
 import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { useTourInspectorSections } from './settings-sections';
+import { useTourInspectorSections, TourInspectorPreferences } from './settings-sections';
 import type {
   TourDocument,
   TourImageSlide,
@@ -134,6 +134,14 @@ function TourSlideCategories({
 
 /** The inspector edits exactly one scope: whole tour, end screen, slide or selected object. */
 export function TourInspector(props: InspectorProps) {
+  return (
+    <TourInspectorPreferences scope={props.scope} slide={props.slide} selection={props.selection}>
+      <TourInspectorContent {...props} />
+    </TourInspectorPreferences>
+  );
+}
+
+function TourInspectorContent(props: InspectorProps) {
   const { tour, slide, selection, disabled, t, onSelectObject } = props;
   const renderSections = useTourInspectorSections(props.presentation ?? 'all', t);
   const list = useRef<HTMLDivElement>(null);
@@ -276,7 +284,7 @@ function TourImageSettings(props: ImageSettingsProps) {
   return (
     <>
       {section === 'content' && (
-        <GuideInspectorGroup icon={Image} title={t('scenario.editor.tourSlide')}>
+        <GuideInspectorGroup id="slide" icon={Image} title={t('scenario.editor.tourSlide')}>
           <TourTextField
             label={t('scenario.editor.guideStepTitle')}
             singleLine
@@ -453,6 +461,7 @@ function TourImageObjects({
   };
   return (
     <GuideInspectorGroup
+      id="objects"
       icon={Crosshair}
       title={t('scenario.editor.tourObjects')}
       action={
@@ -700,6 +709,7 @@ function TourDocumentSettings({
 }) {
   return (
     <GuideInspectorGroup
+      id={`document:${section}`}
       icon={section === 'appearance' ? Palette : MessageSquare}
       title={t(
         section === 'appearance'

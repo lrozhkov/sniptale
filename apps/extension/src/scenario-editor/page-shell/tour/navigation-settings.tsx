@@ -32,36 +32,34 @@ export function TourNavigationSettings({
   t: Translate;
 }) {
   const button = slide.buttons.find((entry) => entry.id === objectId);
+  const changeButton = (patch: Partial<TourNavigationSlide['buttons'][number]>) =>
+    onChange({
+      ...slide,
+      buttons: slide.buttons.map((entry) =>
+        entry.id === objectId ? { ...entry, ...patch } : entry
+      ),
+    });
   if (button)
     return (
-      <GuideInspectorGroup collapsible={false} icon={List} title={t('scenario.editor.tourButton')}>
+      <GuideInspectorGroup
+        id="button"
+        collapsible={false}
+        icon={List}
+        title={t('scenario.editor.tourButton')}
+      >
         <TourTextField
           label={t('scenario.editor.textLabel')}
           singleLine
           value={button.label}
           disabled={disabled}
-          onChange={(label) =>
-            onChange({
-              ...slide,
-              buttons: slide.buttons.map((entry) =>
-                entry.id === button.id ? { ...entry, label } : entry
-              ),
-            })
-          }
+          onChange={(label) => changeButton({ label })}
         />
         <TourActionField
           value={button.action}
           tour={tour}
           disabled={disabled}
           t={t}
-          onChange={(action) =>
-            onChange({
-              ...slide,
-              buttons: slide.buttons.map((entry) =>
-                entry.id === button.id ? { ...entry, action } : entry
-              ),
-            })
-          }
+          onChange={(action) => changeButton({ action })}
         />
         <ScenarioInspectorActionButton
           tone="danger"
@@ -84,7 +82,11 @@ export function TourNavigationSettings({
   return (
     <>
       {section === 'content' && (
-        <GuideInspectorGroup icon={List} title={t('scenario.editor.tourAddNavigation')}>
+        <GuideInspectorGroup
+          id="addNavigation"
+          icon={List}
+          title={t('scenario.editor.tourAddNavigation')}
+        >
           <TourTextField
             label={t('scenario.editor.tourNavigationTitle')}
             singleLine
@@ -226,6 +228,7 @@ function TourNavigationButtons({
   };
   return (
     <GuideInspectorGroup
+      id="contentsLinks"
       icon={List}
       title={t('scenario.editor.tourContentsLinks')}
       action={

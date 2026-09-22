@@ -28,7 +28,7 @@ export function TourHotspotSettings({
 }: SettingsProps<TourHotspot>) {
   return (
     <>
-      <GuideInspectorGroup icon={Crosshair} title={t('scenario.editor.tourHotspot')}>
+      <GuideInspectorGroup id="hotspot" icon={Crosshair} title={t('scenario.editor.tourHotspot')}>
         <TourTextField
           label={t('scenario.editor.tourObjectLabel')}
           singleLine
@@ -72,7 +72,11 @@ export function TourHotspotSettings({
           t={t}
         />
       </GuideInspectorGroup>
-      <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.tourTargetArea')}>
+      <GuideInspectorGroup
+        id="targetArea"
+        icon={ScanLine}
+        title={t('scenario.editor.tourTargetArea')}
+      >
         <label className="guide-number-toggle">
           <ProductToggle
             size="sm"
@@ -116,7 +120,11 @@ export function TourAnnotationSettings({
   t,
 }: SettingsProps<TourAnnotation>) {
   return (
-    <GuideInspectorGroup icon={MessageSquare} title={t('scenario.editor.tourAnnotation')}>
+    <GuideInspectorGroup
+      id="annotation"
+      icon={MessageSquare}
+      title={t('scenario.editor.tourAnnotation')}
+    >
       <TourTextField
         label={t('scenario.editor.textLabel')}
         value={value.text}

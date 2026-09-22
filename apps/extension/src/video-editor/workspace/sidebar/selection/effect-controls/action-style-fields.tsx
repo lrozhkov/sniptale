@@ -51,7 +51,10 @@ export function ActionClickStyleFields(
         formatValue={(v) => `${Math.round(v * 100)}%`}
         onChange={(opacity) => change({ opacity })}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+      <InspectorDetails
+        preferenceId="action-click:more"
+        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+      >
         <SliderField
           label={translate('videoEditor.sidebar.actionStroke')}
           value={props.value.strokeWidth}
@@ -139,7 +142,10 @@ export function ActionKeyStyleFields(
           { value: 'none', label: translate('videoEditor.sidebar.keyInstant') },
         ]}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+      <InspectorDetails
+        preferenceId="action-key:more"
+        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+      >
         <SliderField
           label={translate('videoEditor.sidebar.actionOpacity')}
           value={props.value.opacity}

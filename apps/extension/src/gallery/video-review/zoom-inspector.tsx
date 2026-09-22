@@ -120,7 +120,10 @@ export function ReviewZoomInspector(props: {
                       value={region.transform.scale}
                       onChange={(scale) => onChange({ scale })}
                     />
-                    <ReviewDetails label={translate('gallery.videoReview.precisePosition')}>
+                    <ReviewDetails
+                      preferenceId="gallery.videoReview.precisePosition"
+                      label={translate('gallery.videoReview.precisePosition')}
+                    >
                       <ReviewNumberRow
                         label={translate('gallery.videoReview.zoomFocusX')}
                         unit="%"

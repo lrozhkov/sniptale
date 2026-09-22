@@ -3167,6 +3167,21 @@ for (const locale of ['ru', 'en'] as const) {
           body: await panel.screenshot(),
           contentType: 'image/png',
         });
+        await background.locator(':scope > summary').click();
+        await expect(background).not.toHaveAttribute('open', '');
+        await dialog.locator('video').evaluate(async (video) => {
+          await new Promise<void>((resolve) => {
+            video.addEventListener('seeked', () => resolve(), { once: true });
+            video.currentTime = 5;
+          });
+        });
+        await button('gallery.videoReview.zoomAdd').click();
+        await expect(zoom.locator('details[data-level="group"]')).toHaveAttribute('open', '');
+        await panel
+          .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
+          .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+          .click();
+        await expect(background).not.toHaveAttribute('open', '');
       } finally {
         await new Promise<void>((resolve) => host.server.close(() => resolve()));
       }

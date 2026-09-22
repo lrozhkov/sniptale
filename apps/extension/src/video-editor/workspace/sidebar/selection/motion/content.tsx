@@ -97,7 +97,10 @@ export function MotionBehaviorFields(props: {
         panel={props.panel}
         value={props.motionRegion.easing}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+      <InspectorDetails
+        preferenceId="content:videoEditor.sidebar.inspectorMoreDetails"
+        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+      >
         <MotionOverlayZoomField
           motionRegionId={props.motionRegion.id}
           panel={props.panel}

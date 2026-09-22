@@ -29,7 +29,11 @@ export function GuideNumberingControls({
     );
   return (
     <fieldset className="guide-numbering-fields" disabled={disabled}>
-      <GuideInspectorGroup title={t('scenario.editor.guideNumbering')} icon={ListOrdered}>
+      <GuideInspectorGroup
+        id="numbering"
+        title={t('scenario.editor.guideNumbering')}
+        icon={ListOrdered}
+      >
         {item.kind === 'step' && (
           <label className="guide-number-toggle">
             <ProductToggle

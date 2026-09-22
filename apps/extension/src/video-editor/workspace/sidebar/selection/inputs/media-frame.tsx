@@ -57,7 +57,10 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   return (
     <div className="space-y-1">
       <MediaFramingPresets {...props} />
-      <InspectorDetails label={translate('videoEditor.sidebar.framingFineTune')}>
+      <InspectorDetails
+        preferenceId="media-frame:videoEditor.sidebar.framingFineTune"
+        label={translate('videoEditor.sidebar.framingFineTune')}
+      >
         <MediaFitModeSelect
           clipId={props.clip.id}
           disabled={props.locked}
@@ -71,7 +74,10 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
           onUpdateMediaClipFitScalePercent={props.onUpdateMediaClipFitScalePercent}
         />
       </InspectorDetails>
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorGroupAppearance')}>
+      <InspectorDetails
+        preferenceId="media-frame:videoEditor.sidebar.inspectorGroupAppearance"
+        label={translate('videoEditor.sidebar.inspectorGroupAppearance')}
+      >
         <MediaShadowControls
           clipId={props.clip.id}
           disabled={props.locked}

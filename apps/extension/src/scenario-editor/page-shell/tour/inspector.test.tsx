@@ -738,3 +738,23 @@ it('renders exactly one heading per section in both presentations and keeps nest
   );
   expect(subgroupHeadings).toEqual([expect.stringContaining('Timing and autoplay')]);
 });
+
+it('remembers document disclosure groups independently after leaving document settings', async () => {
+  scope = 'document';
+  draw();
+  const disclosure = (label: string) =>
+    host.querySelector<HTMLButtonElement>(
+      `section[aria-label="${label}"] .guide-inspector-disclosure`
+    )!;
+  await act(async () => disclosure('Appearance').click());
+  expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('false');
+  expect(disclosure('Explanations').getAttribute('aria-expanded')).toBe('true');
+  await act(async () => disclosure('Explanations').click());
+  await act(async () => disclosure('Appearance').click());
+  scope = 'selection';
+  draw();
+  scope = 'document';
+  draw();
+  expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('true');
+  expect(disclosure('Explanations').getAttribute('aria-expanded')).toBe('false');
+});

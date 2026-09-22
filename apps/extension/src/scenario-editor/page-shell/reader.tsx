@@ -64,6 +64,7 @@ export function GuideReader({
     return <GuidePrint project={project} images={images} onClose={print.close} t={t} />;
   return (
     <GuideExportWorkspace
+      preferenceScope="guide-reader"
       className="guide-reader"
       title={project.name}
       backLabel={t('scenario.editor.guideReaderBack')}
@@ -99,7 +100,11 @@ export function GuideReader({
       }
       inspector={
         <>
-          <GuideInspectorGroup icon={BookOpen} title={t('scenario.editor.guideReaderMode')}>
+          <GuideInspectorGroup
+            id="readerMode"
+            icon={BookOpen}
+            title={t('scenario.editor.guideReaderMode')}
+          >
             <GuideReadingControls value={options} onChange={setOptions} t={t} />
             {mode === 'steps' && (
               <div className="guide-reader-pagination">

@@ -389,6 +389,7 @@ function ReviewInspectorBinding({
         ) : null
       }
       selectionLabel={reviewSelectionLabel(state)}
+      selectionPreferenceScope={state.activeSelection.kind}
       selectionHasSections={
         state.advanced.ui.mode === 'advanced' &&
         (state.activeSelection.kind === 'zoom' ||

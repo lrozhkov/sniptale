@@ -1,17 +1,35 @@
+import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { translate } from '../../platform/i18n';
 import { ReviewDetails } from './controls';
 
-/** Transient presentation belongs to the quick editor, never to the video document. */
-export const ReviewInspectorPresentation = createContext<'all' | 'sections'>('all');
+const PresentationContext = createContext<'all' | 'sections'>('all');
+
+/** Presentation stays outside the video document; disclosure choices survive editor sessions. */
+export function ReviewInspectorPresentation(props: {
+  value: 'all' | 'sections';
+  section?: 'scene' | 'selected' | 'comments';
+  selectionScope?: string | undefined;
+  children: ReactNode;
+}) {
+  const family =
+    props.section === 'selected'
+      ? (props.selectionScope ?? 'selection')
+      : (props.section ?? 'selection');
+  return (
+    <InspectorDisclosurePreferences scope={`gallery:${family}`}>
+      <PresentationContext value={props.value}>{props.children}</PresentationContext>
+    </InspectorDisclosurePreferences>
+  );
+}
 
 type ReviewSection = { id: string; label: string; icon: LucideIcon; content: ReactNode };
 
 /** One section definition drives both the vertical navigation and the collapsible list. */
 export function ReviewInspectorSections({ sections }: { sections: readonly ReviewSection[] }) {
-  const presentation = useContext(ReviewInspectorPresentation);
+  const presentation = useContext(PresentationContext);
   const [remembered, remember] = useState<string>();
   const initial = sections.find((section) => section.id === remembered)?.id ?? sections[0]?.id;
   if (!initial) return null;
@@ -34,7 +52,13 @@ export function ReviewInspectorSections({ sections }: { sections: readonly Revie
       ) : (
         sections.map(({ id, label, icon, content }) => (
           <section key={id} data-section={id} className="review-inspector-section">
-            <ReviewDetails label={label} icon={icon} level="section" initiallyOpen>
+            <ReviewDetails
+              preferenceId={`section:${id}`}
+              label={label}
+              icon={icon}
+              level="section"
+              initiallyOpen
+            >
               {content}
             </ReviewDetails>
           </section>

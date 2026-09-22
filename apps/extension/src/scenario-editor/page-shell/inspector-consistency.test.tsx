@@ -59,7 +59,15 @@ function Workspace() {
       disabled={false}
       onSelect={() => {}}
       onAddStep={() => {}}
-      itemActions={null}
+      itemActions={
+        <GuideStyleFields
+          key={block ? 'block' : 'step'}
+          style={project.style}
+          disabled={false}
+          onChange={() => {}}
+          t={t}
+        />
+      }
       t={t}
       inspectedBlockKind={block ? 'text' : undefined}
     >
@@ -151,6 +159,7 @@ it.each(['ru', 'en'] as const)(
     await act(async () =>
       root.render(
         <GuideInspectorGroup
+          id="inspector-consistency"
           title={label}
           icon={Type}
           action={<button onClick={action}>Reset</button>}
@@ -177,3 +186,15 @@ it.each(['ru', 'en'] as const)(
     expect(draft.value).toBe('Edited draft');
   }
 );
+
+it('remembers disclosure choices by element type after another selection', async () => {
+  await act(async () => root.render(<Workspace />));
+  await click('Select step');
+  const toggle = () => host.querySelector<HTMLButtonElement>('.guide-inspector-disclosure')!;
+  await act(async () => toggle().click());
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
+  await click('Select block');
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  await click('Select step');
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
+});
