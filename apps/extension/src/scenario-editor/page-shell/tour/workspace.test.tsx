@@ -364,15 +364,16 @@ it('lists each affected navigation source before clearing links to a removed sli
   expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
 });
 
-it('keeps slide narration out of the selected-object drill-down', async () => {
+it('shows object narration without slide narration in the selected-object drill-down', async () => {
   await render();
   await click('2Second');
   await click('Slide objects', host.querySelector('#guide-inspector-panel')!);
   await click('Go first');
   const inspector = host.querySelector('#guide-inspector-panel')!;
-  expect(inspector.textContent).not.toContain('Object narration');
+  expect(inspector.textContent).toContain('Object narration');
+  expect(inspector.textContent).not.toContain('Slide narration');
   expect([...inspector.querySelectorAll('button')].some((b) => b.textContent === 'Record')).toBe(
-    false
+    true
   );
 });
 
@@ -390,7 +391,8 @@ it('uses the header presentation switch and keeps narration in playback, objects
   await click('Hotspot', panel());
   expect(panel().querySelector('nav')).toBeNull();
   expect(panel().querySelector('[title="Show all settings"]')).toBeNull();
-  expect(panel().textContent).not.toContain('Object narration');
+  expect(panel().textContent).toContain('Object narration');
+  expect(panel().textContent).not.toContain('Slide narration');
   await click('Back to slide settings', panel());
   expect(panel().querySelector('[aria-label="Slide objects"]')?.getAttribute('aria-pressed')).toBe(
     'true'

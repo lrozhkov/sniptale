@@ -89,6 +89,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
         onDelete={vi.fn()}
         onReport={vi.fn()}
         settingsAvailable={advanced}
+        selectionHasSections={advanced && contextKey.startsWith('settings:zoom:')}
         contextKey={contextKey}
         {...(selectionLabel ? { selectionLabel } : {})}
         scene={<p>Scene controls</p>}
@@ -103,6 +104,7 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).not.toContain('gallery.videoReview.committed');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).not.toBeNull();
     await act(async () => render(false, 'edit:cut-1', 'Cut'));
+    expect(host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')).toBeNull();
     expect(host.textContent).toContain('Selected controls');
     expect(host.textContent).not.toContain('gallery.videoReview.commentsEmpty');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
@@ -131,6 +133,9 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
+    ).not.toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')?.className).toContain(
       'border-t'
     );

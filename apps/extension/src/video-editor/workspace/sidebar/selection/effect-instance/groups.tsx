@@ -283,7 +283,7 @@ function EffectInstanceControls(
           (section) => props.parameterSection === undefined || section.id === props.parameterSection
         )
         .map((section, index) =>
-          section.advanced ? (
+          section.advanced && props.parameterSection === undefined ? (
             <InspectorDetails key={index} label={section.label}>
               {section.controls.map(renderControl)}
             </InspectorDetails>

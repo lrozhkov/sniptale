@@ -50,7 +50,7 @@
 .guide-inspector-group-heading > svg {
   flex: none;
 }
-.guide-inspector-group-heading h3 {
+.guide-inspector-group-heading :is(h3, h4) {
   flex: 1;
   margin: 0;
   min-width: 0;
@@ -985,4 +985,23 @@
     ):has(> .guide-inspector-group-body > [data-ui='shared.ui.compact-select']:only-child) {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Appearance subgroups stay subordinate to their parent in both presentation modes. */
+.guide-inspector-panel .guide-inspector-group[data-level='group'] {
+  border: 0;
+  padding-block: 0;
+}
+.guide-inspector-panel .guide-inspector-group[data-level='group'] + .guide-inspector-group {
+  margin-top: 12px;
+  padding-top: 0;
+}
+.guide-inspector-group[data-level='group'] > .guide-inspector-group-heading {
+  font: 500 12px / 18px var(--sniptale-font-sans);
+}
+.guide-inspector-group[data-level='group'] > .guide-inspector-group-heading h4 {
+  font: inherit;
+}
+.guide-inspector-group[data-level='group'] .guide-inspector-disclosure {
+  min-height: 28px;
 }

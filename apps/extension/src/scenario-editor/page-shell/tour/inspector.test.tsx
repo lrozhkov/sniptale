@@ -668,7 +668,7 @@ it('preserves image categories through All and object drill-down without editing
   await click('Slide objects');
   await click('Hotspot');
   expect(host.querySelector('nav')).toBeNull();
-  expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
+  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
   await click('Back to slide settings');
   expect(
     host.querySelector('button[aria-label="Slide objects"]')?.getAttribute('aria-pressed')

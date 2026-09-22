@@ -118,6 +118,7 @@ export function GuideAppearance({
           )}
           <InspectorCategorizedContent flatten={false}>
             <GuideStyleFields
+              nested
               style={resolveGuideStyle(project.style, item.styleOverrides)}
               disabled={disabled}
               t={t}

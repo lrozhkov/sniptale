@@ -32,6 +32,12 @@ for (const theme of ['light', 'dark'] as const) {
         .getByRole('navigation')
         .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
         .click();
+      const nestedStyle = panel.locator('.guide-style-fields > .guide-inspector-group');
+      for (const group of await nestedStyle.all()) {
+        await check(group).toHaveCSS('border-top-width', '0px');
+        await check(group.locator('.guide-inspector-group-heading')).toHaveCSS('font-size', '12px');
+        await check(group.locator('button[aria-expanded]').first()).toHaveCSS('min-height', '28px');
+      }
       const accent = panel.locator('.guide-style-accent');
       check((await accent.boundingBox())!.height).toBeLessThanOrEqual(40);
       const resetEdge = await accent.evaluate(

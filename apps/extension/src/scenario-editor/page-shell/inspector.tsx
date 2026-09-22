@@ -31,22 +31,25 @@ export function GuideInspectorGroup({
   icon: Icon,
   action,
   collapsible = true,
+  level = 'section',
   children,
 }: {
   title: string;
   icon: LucideIcon;
   action?: ReactNode;
   collapsible?: boolean;
+  level?: 'section' | 'group';
   children: ReactNode;
 }) {
   const categorized = useContext(InspectorCategorizedContentContext);
+  const Heading = level === 'group' ? 'h4' : 'h3';
   const [expanded, setExpanded] = useState(true);
   const bodyId = useId();
   return (
-    <section className="guide-inspector-group" aria-label={title}>
+    <section className="guide-inspector-group" data-level={level} aria-label={title}>
       {!categorized && (
         <div className="guide-inspector-group-heading">
-          <h3>
+          <Heading>
             {collapsible ? (
               <button
                 type="button"
@@ -65,7 +68,7 @@ export function GuideInspectorGroup({
                 <span>{title}</span>
               </span>
             )}
-          </h3>
+          </Heading>
           {action}
         </div>
       )}

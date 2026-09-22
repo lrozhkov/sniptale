@@ -133,6 +133,18 @@ for (const locale of ['ru', 'en'] as const) {
         body: await panel.screenshot(),
         contentType: 'image/png',
       });
+      await page.locator('[data-ui="video-editor.timeline.track-select"]').first().click();
+      await expect(panel.locator('[data-section="general"]')).toBeVisible();
+      await expect(panel.locator('[data-section="display"]')).toBeVisible();
+      await expect(panel.locator('[data-section="display"] details details')).toHaveCount(0);
+      await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
+      await expect(panel.locator('nav button')).toHaveCount(2);
+      await panel.locator('nav button').nth(1).click();
+      await expect(panel.locator('[data-ui="video-editor.inspector.track-layout"]')).toBeVisible();
+      await info.attach('track-inspector', {
+        body: await panel.screenshot(),
+        contentType: 'image/png',
+      });
     });
   }
 }

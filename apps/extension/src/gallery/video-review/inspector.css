@@ -250,3 +250,17 @@
   padding-inline: 12px;
   overflow-x: hidden;
 }
+
+.review-overlay-number {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.25rem;
+  align-items: center;
+  min-height: 36px;
+  gap: 8px;
+}
+.review-overlay-number > span {
+  overflow-wrap: anywhere;
+}
+[data-ui='gallery.videoReview.inspector'] .review-overlay-number > input {
+  background: transparent;
+}

@@ -88,18 +88,24 @@ function StyleChoice<T extends string>({
 /** Compact fields emit only the edited key, so unmodified values keep inheriting. */
 export function GuideStyleFields({
   style,
+  nested = false,
   disabled,
   onChange,
   t,
 }: {
   style: GuideStyle;
+  nested?: boolean;
   disabled: boolean;
   onChange: (patch: Partial<GuideStyle>) => void;
   t: Translate;
 }) {
   return (
     <fieldset className="guide-style-fields" disabled={disabled}>
-      <GuideInspectorGroup icon={Palette} title={t('scenario.editor.guideStyleGroup')}>
+      <GuideInspectorGroup
+        level={nested ? 'group' : 'section'}
+        icon={Palette}
+        title={t('scenario.editor.guideStyleGroup')}
+      >
         <StyleChoice
           label={t('scenario.editor.appearanceTheme')}
           value={style.theme}
@@ -139,7 +145,11 @@ export function GuideStyleFields({
           </ContentToolbarButton>
         </div>
       </GuideInspectorGroup>
-      <GuideInspectorGroup icon={LayoutTemplate} title={t('scenario.editor.guideLayoutGroup')}>
+      <GuideInspectorGroup
+        level={nested ? 'group' : 'section'}
+        icon={LayoutTemplate}
+        title={t('scenario.editor.guideLayoutGroup')}
+      >
         <StyleChoice
           label={t('scenario.editor.appearanceDensity')}
           value={style.density}
@@ -155,7 +165,11 @@ export function GuideStyleFields({
           t={t}
         />
       </GuideInspectorGroup>
-      <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.guideDetailsGroup')}>
+      <GuideInspectorGroup
+        level={nested ? 'group' : 'section'}
+        icon={ScanLine}
+        title={t('scenario.editor.guideDetailsGroup')}
+      >
         <StyleChoice
           label={t('scenario.editor.appearanceBorder')}
           value={style.imageBorder}

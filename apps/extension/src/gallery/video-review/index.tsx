@@ -389,6 +389,13 @@ function ReviewInspectorBinding({
         ) : null
       }
       selectionLabel={reviewSelectionLabel(state)}
+      selectionHasSections={
+        state.advanced.ui.mode === 'advanced' &&
+        (state.activeSelection.kind === 'zoom' ||
+          state.activeSelection.kind === 'canvas-comment' ||
+          state.activeSelection.kind === 'audio' ||
+          state.activeSelection.kind === 'original-audio')
+      }
       scene={
         <ReviewSceneProperties
           background={state.advanced.background}

@@ -245,3 +245,67 @@ it('preserves an off-scene handle coordinate when committing its existing value'
     sceneAnchors: { [handle.id]: { x: -150, y: 900 } },
   });
 });
+
+it('renders promoted advanced controls without a duplicate disclosure', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
+  const fixtureSource = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+    'utf8'
+  );
+  const document = JSON.parse(fixtureSource);
+  document.controls.at(-1).group = 'advanced';
+  const source = JSON.stringify(document);
+  const parsed = parseEffectV1Source(source);
+  if (!parsed.document) throw new Error('Expected callout fixture');
+  const handle = parsed.document.objectLayout!.handles![0]!;
+  const project = createEmptyVideoProject('Handle');
+  project.effectSnapshots = [
+    {
+      id: 'snapshot',
+      documentId: parsed.document.id,
+      kind: 'standalone',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(source).length,
+      schemaVersion: 'sniptale.effect.v1',
+      sha256: '0'.repeat(64),
+      source,
+    },
+  ];
+  project.effectInstances = [
+    {
+      id: 'callout',
+      kind: 'standalone',
+      snapshotId: 'snapshot',
+      enabled: true,
+      controls: {},
+      duration: 3,
+      playbackRate: 1,
+      startTime: 0,
+      target: { kind: 'scene' },
+      sceneAnchors: { [handle.id]: { x: -120, y: 900 } },
+    },
+  ];
+  const update = vi.fn();
+  act(() =>
+    root.render(
+      createEffectInstanceGroups({
+        project,
+        instanceId: 'callout',
+        target: { kind: 'scene' },
+        onUpdateEffectInstance: update,
+        onDeleteEffectInstance: vi.fn(),
+        onDuplicateEffectInstance: vi.fn(() => null),
+        onMoveEffectInstance: vi.fn(),
+      }).map((group) => (
+        <div key={group.id} data-semantic={group.semantic}>
+          {group.content}
+        </div>
+      ))
+    )
+  );
+  const advanced = container.querySelector('[data-semantic="advanced"]')!;
+  expect(advanced).not.toBeNull();
+  expect(advanced.querySelector('details')).toBeNull();
+  expect(advanced.querySelector('input,button')).not.toBeNull();
+});

@@ -104,7 +104,7 @@ describe('workspace-sidebar/selection/inspect-track', () => {
     );
 
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupInfo');
-    expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupGeneral');
+    expect(markup).toContain('videoEditor.sidebar.inspectorGroupGeneral');
     expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
     expect(markup).toContain('hover:text-[var(--sniptale-color-danger)]');
     expect(markup).toContain('rounded-[12px]');

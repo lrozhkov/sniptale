@@ -39,6 +39,7 @@ export function ReviewInspector(props: {
   recovery?: ReactNode;
   scene?: ReactNode;
   selectionLabel?: string | undefined;
+  selectionHasSections?: boolean;
   onBack(): void;
   onClose?(): void;
   rangeSelected?: boolean;
@@ -103,7 +104,7 @@ export function ReviewInspector(props: {
       <ReviewInspectorHeader
         {...props}
         presentation={presentation}
-        showPresentation={shown !== 'comments'}
+        section={shown}
         onTogglePresentation={() =>
           setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
         }
@@ -344,7 +345,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    showPresentation: boolean;
+    section: 'scene' | 'selected' | 'comments';
     onTogglePresentation(): void;
   }
 ) {
@@ -361,7 +362,8 @@ function ReviewInspectorHeader(
       <h2 className="min-w-0 flex-1 text-sm font-semibold">
         {translate('gallery.videoReview.editorTitle')}
       </h2>
-      {props.showPresentation ? (
+      {props.section === 'scene' ||
+      (props.section === 'selected' && props.selectionHasSections === true) ? (
         <ReviewButton
           label={translate(
             props.presentation === 'all'

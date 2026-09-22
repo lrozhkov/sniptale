@@ -223,6 +223,7 @@ export function TourInspector(props: InspectorProps) {
           onBack={() => onSelectObject(null)}
         />
         {settings('object')}
+        {props.narration}
       </>
     );
   return (
