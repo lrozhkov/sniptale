@@ -1,5 +1,5 @@
 import { translate } from '../../platform/i18n';
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import {
@@ -57,7 +57,7 @@ export const reviewTextButtonClassName =
 /** Reversible delete actions keep the same geometry with a distinct danger tone. */
 export const reviewDeleteButtonClassName =
   reviewTextButtonClassName +
-  ' !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
+  ' review-inspector-danger !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
 
 /** Read-only timing uses the same label/value row as editable inspector parameters. */
 export function ReviewInterval({ start, end }: { start: number; end: number }) {
@@ -152,18 +152,28 @@ export function reviewEventLabel(kind: string): string {
 }
 
 /** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
-export function ReviewDetails({ label, children }: { label: string; children: ReactNode }) {
+export function ReviewDetails({
+  label,
+  children,
+  icon: Icon,
+  level = 'group',
+  initiallyOpen,
+}: {
+  label: string;
+  children: ReactNode;
+  icon?: LucideIcon;
+  level?: 'section' | 'group';
+  initiallyOpen?: boolean;
+}) {
+  const Heading = level === 'section' ? 'h3' : 'h4';
   return (
-    <details className="group min-w-0">
-      <summary
-        className="flex cursor-pointer list-none items-center gap-2 py-2 text-xs font-semibold
-        text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]
-        focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)] [&::-webkit-details-marker]:hidden"
-      >
-        <ChevronRight size={14} aria-hidden="true" className="shrink-0 group-open:rotate-90" />
-        {label}
+    <details data-ui="gallery.videoReview.disclosure" data-level={level} open={initiallyOpen}>
+      <summary>
+        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
+        <Heading>{label}</Heading>
+        <ChevronDown size={level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>
-      <div className="space-y-3 pt-2">{children}</div>
+      <div className="review-inspector-section-body">{children}</div>
     </details>
   );
 }

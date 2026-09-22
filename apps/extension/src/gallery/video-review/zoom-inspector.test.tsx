@@ -262,7 +262,7 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
         .click()
     );
   };
-  expect(host.querySelector('details')?.open).toBe(false);
+  expect(host.querySelector<HTMLDetailsElement>('details[data-level="group"]')?.open).toBe(false);
   await choose('focusReveal', 'focusContract', 'zoomTransitionIn');
   expect(spotlight.exitReveal).toBe('fade');
   await choose('focusReveal', 'focusExpand', 'zoomTransitionOut');
@@ -282,4 +282,16 @@ it('uses a precise transition slider while preserving longer typed durations', a
   await type(duration, '12');
   await commit(duration);
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 12 } });
+});
+
+it('distinguishes compact nested position from collapsible top-level sections', () => {
+  renderInspector(vi.fn());
+  const nested = host.querySelector('details[data-level="group"]');
+  expect(nested).not.toBeNull();
+  expect(nested?.querySelector('summary h4')?.textContent).toBe(
+    'gallery.videoReview.precisePosition'
+  );
+  const parents = host.querySelectorAll('details[data-level="section"]');
+  expect(parents.length).toBeGreaterThanOrEqual(2);
+  expect([...parents].every((node) => node.hasAttribute('open'))).toBe(true);
 });

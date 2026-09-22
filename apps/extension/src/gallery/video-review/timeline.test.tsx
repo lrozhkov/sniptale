@@ -334,7 +334,11 @@ it('keeps the whole playhead inside the plane at the final frame', () => {
   const { host } = renderTimeline({ time: 4 });
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const playhead = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
-  expect(Number.parseFloat(playhead.style.left)).toBeLessThan(Number.parseFloat(plane.style.width));
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  expect(plane.style.width).toBe('100%');
+  expect(Number.parseFloat(playhead.style.left)).toBeLessThan(viewport.clientWidth);
   expect(playhead.style.clipPath).toBeTruthy();
 });
 
@@ -414,4 +418,14 @@ it('routes focus drawing to its own tool and cancels without committing', () => 
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   dispatchPlane(plane, [{ type: 'pointerup', x: 100 }]);
   expect(onFocusRangeCommit).toHaveBeenCalledTimes(1);
+});
+
+it('fits the time plane to live CSS width without a resize-observer frame of overflow', () => {
+  const { host } = renderTimeline();
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  expect(plane.style.width).toBe('100%');
+  expect(viewport.style.overflowX).toBe('hidden');
 });

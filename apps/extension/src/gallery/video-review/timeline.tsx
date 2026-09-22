@@ -91,6 +91,7 @@ export function ReviewTimeline(props: TimelineProps) {
       <div
         ref={viewport}
         data-ui="gallery.videoReview.timelineViewport"
+        style={{ overflowX: zoom === 1 ? 'hidden' : 'auto' }}
         className="w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain"
       >
         <div
@@ -106,7 +107,8 @@ export function ReviewTimeline(props: TimelineProps) {
           className="group/plane relative cursor-crosshair overflow-clip pb-2 outline-none"
           style={
             {
-              width: gutter + Math.max(1, width * zoom),
+              // CSS follows the resized viewport before ResizeObserver can update ruler measurements.
+              width: zoom === 1 ? '100%' : `calc(${zoom * 100}% - ${gutter * (zoom - 1)}px)`,
               '--review-track-gutter': `${gutter}px`,
             } as CSSProperties
           }

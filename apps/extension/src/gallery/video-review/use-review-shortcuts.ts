@@ -49,6 +49,12 @@ function useReviewKeys({
       }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key === ' ') {
+        if (
+          target instanceof HTMLElement &&
+          target.closest('[data-ui="gallery.videoReview.inspector"]') &&
+          target.closest('button,summary')
+        )
+          return;
         event.preventDefault();
         if (!event.repeat) play();
         return;

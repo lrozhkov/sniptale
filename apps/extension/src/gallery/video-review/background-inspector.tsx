@@ -51,8 +51,7 @@ export function ReviewBackgroundInspector(props: {
     />
   );
   return (
-    <div data-ui="gallery.videoReview.backgroundInspector" className="min-w-0 space-y-3">
-      <h4 className="text-sm font-semibold">{translate('gallery.videoReview.background')}</h4>
+    <div data-ui="gallery.videoReview.backgroundInspector" className="min-w-0 space-y-2">
       <div
         className="grid grid-cols-2 gap-1"
         role="group"

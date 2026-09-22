@@ -152,6 +152,7 @@ export function ReviewZoomPreview(props: {
         </h5>
         {!region.spotlight ? (
           <SegmentedSwitch<'area' | 'result'>
+            dataAttribute={{ 'data-ui': 'gallery.videoReview.previewMode' }}
             ariaLabel={translate('gallery.videoReview.zoomPreview')}
             density="compact"
             activeId={view}

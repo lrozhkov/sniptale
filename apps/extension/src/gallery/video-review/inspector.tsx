@@ -1,7 +1,10 @@
+import { ReviewInspectorPresentation } from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import './inspector-navigation.css';
 import {
+  List,
+  PanelsTopLeft,
   ChevronsDownUp,
   ChevronsUpDown,
   Pencil,
@@ -54,6 +57,7 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
+  const [presentation, setPresentation] = useState<'all' | 'sections'>('all');
   const contextKey = props.contextKey ?? 'comments';
   type Section = 'scene' | 'selected' | 'comments';
   const contextSection: Section = contextKey.startsWith('comments')
@@ -67,7 +71,7 @@ export function ReviewInspector(props: {
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = 0;
-  }, [contextKey, section]);
+  }, [contextKey, section, presentation]);
   const previousSettings = useRef(props.settingsAvailable);
   useEffect(() => {
     const modeChanged = previousSettings.current !== props.settingsAvailable;
@@ -96,7 +100,14 @@ export function ReviewInspector(props: {
             : ''
         }`}
     >
-      <ReviewInspectorHeader {...props} />
+      <ReviewInspectorHeader
+        {...props}
+        presentation={presentation}
+        showPresentation={shown !== 'comments'}
+        onTogglePresentation={() =>
+          setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
+        }
+      />
       <div className="shrink-0">
         <p
           className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
@@ -148,14 +159,19 @@ export function ReviewInspector(props: {
           />
         </div>
       ) : null}
-      <div ref={scroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-        {shown === 'scene' ? (
-          props.scene
-        ) : shown === 'selected' ? (
-          props.children
-        ) : (
-          <ReviewNotes {...props} />
-        )}
+      <div
+        ref={scroll}
+        className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
+      >
+        <ReviewInspectorPresentation value={presentation}>
+          {shown === 'scene' ? (
+            props.scene
+          ) : shown === 'selected' ? (
+            props.children
+          ) : (
+            <ReviewNotes {...props} />
+          )}
+        </ReviewInspectorPresentation>
       </div>
       <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
     </aside>
@@ -325,7 +341,13 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 }
 
 /** Header exits share the flush owner; Back restores the viewer, Close dismisses it. */
-function ReviewInspectorHeader(props: Parameters<typeof ReviewInspector>[0]) {
+function ReviewInspectorHeader(
+  props: Parameters<typeof ReviewInspector>[0] & {
+    presentation: 'all' | 'sections';
+    showPresentation: boolean;
+    onTogglePresentation(): void;
+  }
+) {
   return (
     <header className="flex shrink-0 items-center gap-1">
       <ReviewButton
@@ -339,6 +361,24 @@ function ReviewInspectorHeader(props: Parameters<typeof ReviewInspector>[0]) {
       <h2 className="min-w-0 flex-1 text-sm font-semibold">
         {translate('gallery.videoReview.editorTitle')}
       </h2>
+      {props.showPresentation ? (
+        <ReviewButton
+          label={translate(
+            props.presentation === 'all'
+              ? 'scenario.editor.inspectorShowSections'
+              : 'scenario.editor.inspectorShowAll'
+          )}
+          className={reviewIconButtonClassName}
+          data-ui="gallery.videoReview.inspectorPresentation"
+          onClick={props.onTogglePresentation}
+        >
+          {props.presentation === 'all' ? (
+            <PanelsTopLeft size={16} aria-hidden="true" />
+          ) : (
+            <List size={16} aria-hidden="true" />
+          )}
+        </ReviewButton>
+      ) : null}
       <ReviewButton
         label={translate(
           props.fullHeight

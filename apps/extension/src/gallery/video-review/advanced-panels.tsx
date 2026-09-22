@@ -1,3 +1,5 @@
+import { Scan, Paintbrush, AudioLines } from 'lucide-react';
+import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type {
@@ -86,31 +88,59 @@ export function ReviewSceneProperties(props: {
   ): void;
 }) {
   return (
-    <fieldset
-      disabled={props.busy}
-      className="min-w-0 space-y-4 [&>section+*]:border-t [&>section+*]:pt-4
-        [&>div+section]:border-t [&>div+section]:pt-4
-        [&>*]:border-[var(--sniptale-color-border-soft)]"
-    >
-      <ReviewCanvasSettings source={props.source} canvas={props.canvas} onChange={props.onCanvas} />
+    <fieldset disabled={props.busy} className="min-w-0">
       {props.pending ? (
         <p role="status">{translate('gallery.videoReview.backgroundImporting')}</p>
       ) : null}
       {props.failed ? (
         <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
       ) : null}
-      <ReviewBackgroundInspector
-        background={props.background}
-        onImportImage={props.onImportImage}
-        onChange={(patch) =>
-          props.setBackground((current) => updateQuickEditBackground(current, patch))
-        }
-      />
-      <ReviewSceneAudio
-        audio={props.audio}
-        hasOriginalAudio={props.hasOriginalAudio}
-        onOriginal={props.onOriginalVolume}
-        onLaneVolume={props.onLaneVolume}
+      <ReviewInspectorSections
+        sections={[
+          {
+            id: 'canvas',
+            label: translate('gallery.videoReview.canvas'),
+            icon: Scan,
+            content: (
+              <ReviewCanvasSettings
+                source={props.source}
+                canvas={props.canvas}
+                onChange={props.onCanvas}
+              />
+            ),
+          },
+          {
+            id: 'background',
+            label: translate('gallery.videoReview.background'),
+            icon: Paintbrush,
+            content: (
+              <ReviewBackgroundInspector
+                background={props.background}
+                onImportImage={props.onImportImage}
+                onChange={(patch) =>
+                  props.setBackground((current) => updateQuickEditBackground(current, patch))
+                }
+              />
+            ),
+          },
+          ...(props.hasOriginalAudio || props.audio.voiceover.length || props.audio.music.length
+            ? [
+                {
+                  id: 'audio',
+                  label: translate('gallery.videoReview.volume'),
+                  icon: AudioLines,
+                  content: (
+                    <ReviewSceneAudio
+                      audio={props.audio}
+                      hasOriginalAudio={props.hasOriginalAudio}
+                      onOriginal={props.onOriginalVolume}
+                      onLaneVolume={props.onLaneVolume}
+                    />
+                  ),
+                },
+              ]
+            : []),
+        ]}
       />
     </fieldset>
   );
