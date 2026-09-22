@@ -812,7 +812,7 @@
   opacity: 0;
   cursor: ew-resize;
   touch-action: none;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
 }
@@ -952,7 +952,7 @@
   padding: 0;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   color: var(--sniptale-color-text-primary);
 }
 .guide-insertion {
@@ -1278,7 +1278,7 @@
   opacity: 0;
   cursor: grab;
   touch-action: none;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
 }
@@ -1530,7 +1530,7 @@ html[data-guide-reordering] .guide-block-grip {
   padding: 0;
   border-radius: 50%;
   border: 1px solid var(--sniptale-color-border-soft);
-  background: var(--sniptale-color-surface-canvas);
+  background: var(--sniptale-color-surface-panel);
 }
 .guide-project-name > .guide-voice-field {
   grid-area: 1 / 1;
@@ -1698,7 +1698,7 @@ html[data-guide-width-resizing] * {
   --guide-tool-hover-surface: color-mix(
     in srgb,
     var(--sniptale-color-accent) 8%,
-    var(--sniptale-color-surface-canvas)
+    var(--sniptale-color-surface-panel)
   );
 }
 .guide-center-panel
@@ -1823,7 +1823,7 @@ html[data-guide-width-resizing] * {
   padding: 0;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   cursor: ns-resize;
   touch-action: none;
   opacity: 0;

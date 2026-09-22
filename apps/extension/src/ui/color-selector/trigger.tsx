@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Palette } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import {
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
@@ -61,6 +61,7 @@ function PickerTriggerButton(props: {
   formatMode: ColorSelectorFormatMode;
   value: string;
   onOpenPicker: () => void;
+  variant?: 'value' | 'swatch';
 }) {
   const isTransparent = props.value.trim().toLowerCase() === COLOR_SELECTOR_TRANSPARENT;
   const previewColor = resolvePickerColor(props.value);
@@ -78,8 +79,12 @@ function PickerTriggerButton(props: {
       type="button"
       disabled={props.disabled}
       aria-label={translate('shared.ui.colorSelectorChooseColor')}
+      title={displayValue}
       onClick={props.onOpenPicker}
-      className={PICKER_ACTION_CLASS_NAME}
+      className={cx(
+        PICKER_ACTION_CLASS_NAME,
+        props.variant === 'swatch' && '!w-7 !flex-none !justify-center'
+      )}
       data-ui="shared.ui.color-selector.picker-trigger"
     >
       <span
@@ -99,7 +104,9 @@ function PickerTriggerButton(props: {
           backgroundSize: '100% 100%, 8px 8px',
         }}
       />
-      <span className={valueClassName}>{displayValue}</span>
+      <span className={props.variant === 'swatch' ? 'sr-only' : valueClassName}>
+        {displayValue}
+      </span>
     </button>
   );
 }
@@ -109,31 +116,42 @@ function PaletteButton(props: {
   expanded: boolean;
   title: string;
   onClick: () => void;
+  variant?: 'value' | 'swatch';
 }) {
   return (
     <button
       type="button"
       disabled={props.disabled}
       aria-label={props.title}
+      title={props.title}
       aria-expanded={props.expanded}
       onClick={props.onClick}
       className={PALETTE_BUTTON_CLASS_NAME}
       data-ui="shared.ui.color-selector.palette-trigger"
     >
-      <ChevronDown
-        size={15}
-        strokeWidth={2.2}
-        className={[
-          'shrink-0 text-[var(--sniptale-color-text-muted-strong)] opacity-75 transition-transform',
-          props.expanded ? 'rotate-180' : '',
-        ].join(' ')}
-      />
+      {props.variant === 'swatch' ? (
+        <Palette
+          size={16}
+          aria-hidden="true"
+          className="text-[var(--sniptale-color-text-secondary)]"
+        />
+      ) : (
+        <ChevronDown
+          size={15}
+          strokeWidth={2.2}
+          className={[
+            'shrink-0 text-[var(--sniptale-color-text-muted-strong)] opacity-75 transition-transform',
+            props.expanded ? 'rotate-180' : '',
+          ].join(' ')}
+        />
+      )}
     </button>
   );
 }
 
 export function ColorSelectorTrigger(props: {
   active?: boolean;
+  variant?: 'value' | 'swatch';
   disabled?: boolean;
   expanded: boolean;
   formatMode: ColorSelectorFormatMode;
@@ -148,14 +166,17 @@ export function ColorSelectorTrigger(props: {
     <div
       className={cx(
         ROOT_CLASS_NAME,
+        props.variant === 'swatch' && '!gap-1 !px-0',
         props.active && COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME,
         props.disabled && 'cursor-not-allowed opacity-55'
       )}
       aria-disabled={props.disabled || undefined}
       data-ui="shared.ui.color-selector.trigger"
+      data-variant={props.variant ?? 'value'}
       style={resolveCompactInspectorInteractiveControlStyle(undefined)}
     >
       <PickerTriggerButton
+        variant={props.variant ?? 'value'}
         disabled={props.disabled === true}
         formatMode={props.formatMode}
         value={props.value}
@@ -163,9 +184,12 @@ export function ColorSelectorTrigger(props: {
       />
       {props.showPaletteButton === false ? null : (
         <PaletteButton
+          variant={props.variant ?? 'value'}
           disabled={props.disabled === true}
           expanded={props.expanded}
-          title={props.title}
+          title={
+            props.variant === 'swatch' ? translate('shared.ui.colorSelectorPalette') : props.title
+          }
           onClick={props.onToggleExpanded}
         />
       )}

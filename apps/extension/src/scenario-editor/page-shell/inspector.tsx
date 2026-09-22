@@ -55,14 +55,14 @@ export function GuideInspectorGroup({
                 aria-controls={bodyId}
                 onClick={() => setExpanded((value) => !value)}
               >
-                <Icon size={15} aria-hidden="true" />
+                <Icon size={16} aria-hidden="true" />
                 <span>{title}</span>
-                <ChevronDown size={15} aria-hidden="true" />
+                <ChevronDown size={16} aria-hidden="true" />
               </button>
             ) : (
               <span className="guide-inspector-static-heading">
-                <Icon size={15} aria-hidden="true" />
-                {title}
+                <Icon size={16} aria-hidden="true" />
+                <span>{title}</span>
               </span>
             )}
           </h3>

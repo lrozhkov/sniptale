@@ -163,3 +163,28 @@ it('keeps the dedicated chevron trigger clickable', async () => {
 
   expect(onToggleExpanded).toHaveBeenCalledOnce();
 });
+
+it('uses a swatch and explicit palette icon without losing the value or separate actions', async () => {
+  const onOpenPicker = vi.fn();
+  const onToggleExpanded = vi.fn();
+  renderTrigger({ variant: 'swatch', onOpenPicker, onToggleExpanded });
+  const picker = getButton('shared.ui.colorSelectorChooseColor')!;
+  const palette = getButton('shared.ui.colorSelectorPalette')!;
+  expect(picker.title).toBe('#123456');
+  expect(picker.querySelector('.sr-only')?.textContent).toBe('#123456');
+  expect(palette.querySelector('.lucide-palette')).not.toBeNull();
+  expect(palette.querySelector('.lucide-chevron-down')).toBeNull();
+  await act(async () => {
+    picker.click();
+    palette.click();
+  });
+  expect(onOpenPicker).toHaveBeenCalledOnce();
+  expect(onToggleExpanded).toHaveBeenCalledOnce();
+  renderTrigger({ variant: 'swatch', disabled: true, onOpenPicker, onToggleExpanded });
+  await act(async () => {
+    picker.click();
+    palette.click();
+  });
+  expect(onOpenPicker).toHaveBeenCalledOnce();
+  expect(onToggleExpanded).toHaveBeenCalledOnce();
+});

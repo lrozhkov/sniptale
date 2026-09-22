@@ -27,5 +27,7 @@ export interface CompactColorSelectorProps {
   pickerOnly?: boolean;
   recentColors?: readonly string[];
   title: string;
+  /** Swatch presentation keeps the current value in a tooltip and separates palette access. */
+  triggerVariant?: 'value' | 'swatch';
   value: string;
 }

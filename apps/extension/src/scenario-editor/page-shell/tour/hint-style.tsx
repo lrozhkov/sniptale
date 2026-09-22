@@ -35,6 +35,8 @@ export function TourHintStyle({
         value={{ fillPaint: surface.fillPaint, surfaceCss: surface.surfaceCss }}
       />
       <ColorField
+        triggerVariant="swatch"
+        floatingPlacement="side"
         layout="stacked"
         label={t('scenario.editor.tourTextColor')}
         title={t('scenario.editor.tourTextColor')}

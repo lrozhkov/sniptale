@@ -56,7 +56,7 @@
   min-width: 0;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 20px;
 }
 .guide-inspector-group-body {
   display: grid;
@@ -174,7 +174,13 @@
   border-top: 1px solid var(--sniptale-color-border-soft);
 }
 .guide-inspector-panel .guide-appearance-heading {
-  margin-top: 8px;
+  min-height: 32px;
+  margin-block: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-inspector-panel .guide-appearance-heading h3 {
+  font: 600 13px / 20px var(--sniptale-font-sans);
 }
 .guide-inspector-panel .guide-block-inspector {
   gap: 0;
@@ -231,21 +237,6 @@
 }
 .guide-style-accent {
   min-width: 0;
-}
-.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-}
-.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] > span {
-  white-space: normal;
-  overflow: visible;
-  flex: none;
-}
-.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] > div {
-  width: 100% !important;
-  max-width: 100%;
-  margin-left: 0;
 }
 .guide-inspector-choice [role='group'] button {
   padding-inline: 4px;
@@ -414,9 +405,11 @@
 }
 
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
 }
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] > span {
   overflow: visible;
@@ -425,9 +418,22 @@
   color: var(--sniptale-color-text-primary);
 }
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] > div {
-  width: 100% !important;
+  width: 56px !important;
   max-width: 100%;
   margin-inline-start: 0;
+}
+.guide-inspector-panel [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch'] {
+  height: 32px;
+  border-radius: var(--sniptale-radius-sm);
+}
+.guide-inspector-panel [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch'] button {
+  min-height: 28px;
+}
+.guide-inspector-panel .guide-style-accent > button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
 }
 
 .guide-inspector-panel [data-ui='shared.ui.surface-style-selector'] > div:first-child {
@@ -821,4 +827,15 @@
     > button {
     transition: none;
   }
+}
+
+/* Action values use the same row rhythm as the numeric parameters immediately above. */
+.guide-inspector-panel .tour-action-field {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+}
+.guide-inspector-panel .tour-action-field > :nth-child(n + 3) {
+  grid-column: 1 / -1;
 }

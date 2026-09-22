@@ -118,6 +118,8 @@ export function GuideStyleFields({
         />
         <div className="guide-style-accent">
           <ColorField
+            triggerVariant="swatch"
+            floatingPlacement="side"
             layout="stacked"
             label={t('scenario.editor.appearanceAccent')}
             title={t('scenario.editor.appearanceAccent')}

@@ -201,7 +201,7 @@ export function TourActionField({
     if (kind === 'url') setInvalid(!onChange({ kind: 'url', url }));
   };
   return (
-    <div className="tour-text-field">
+    <div className="tour-text-field tour-action-field">
       <span>{t('scenario.editor.tourAction')}</span>
       <CompactSelect
         aria-label={t('scenario.editor.tourAction')}

@@ -25,6 +25,7 @@ function ColorSelectorHeader(props: {
   formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
   label: string;
   pickerOnly: boolean;
+  triggerVariant: NonNullable<CompactColorSelectorProps['triggerVariant']>;
   title: string;
   value: string;
   onOpenPicker: () => void;
@@ -32,6 +33,7 @@ function ColorSelectorHeader(props: {
 }) {
   return (
     <ColorSelectorTrigger
+      variant={props.triggerVariant}
       active={props.active}
       disabled={props.disabled}
       expanded={props.expanded}
@@ -170,6 +172,7 @@ function ColorSelectorBody(props: {
   floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
   label: string;
   pickerOnly: boolean;
+  triggerVariant: NonNullable<CompactColorSelectorProps['triggerVariant']>;
   state: ReturnType<typeof useColorSelectorState>;
   title: string;
 }) {
@@ -192,6 +195,7 @@ function ColorSelectorBody(props: {
         formatMode={props.state.formatMode}
         label={props.label}
         pickerOnly={props.pickerOnly}
+        triggerVariant={props.triggerVariant}
         title={props.title}
         value={props.state.draftColor}
         onToggleExpanded={props.state.handleToggleExpanded}
@@ -239,6 +243,7 @@ export function CompactColorSelector({
   onPreviewReset,
   palette = [],
   pickerOnly = false,
+  triggerVariant = 'value',
   recentColors = [],
   title,
   value,
@@ -279,6 +284,7 @@ export function CompactColorSelector({
       floatingPlacement={floatingPlacement}
       label={label}
       pickerOnly={pickerOnly}
+      triggerVariant={triggerVariant}
       state={state}
       title={title}
     />

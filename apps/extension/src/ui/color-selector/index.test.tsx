@@ -369,3 +369,32 @@ it('closes the picker on escape and rolls back the draft without committing it',
   expect(onChange).not.toHaveBeenCalled();
   expect(onPreviewReset).toHaveBeenCalledWith('#123456');
 });
+
+it('keeps palette commit and picker cancellation on the existing owner in swatch mode', async () => {
+  const onChange = vi.fn();
+  renderSelector({ triggerVariant: 'swatch', floatingPlacement: 'side', onChange });
+  const palette = getButton('shared.ui.colorSelectorPalette')!;
+  await act(async () => palette.click());
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>('button[title="Grid color: #abcdef"]')!.click();
+  });
+  expect(onChange).toHaveBeenCalledWith('#abcdef');
+  expect(
+    document.querySelector('[data-ui="shared.ui.color-selector.expanded-layer"]')
+  ).not.toBeNull();
+  await act(async () => palette.click());
+  expect(document.querySelector('[data-ui="shared.ui.color-selector.expanded-layer"]')).toBeNull();
+  onChange.mockClear();
+  const picker = getButton('shared.ui.colorSelectorChooseColor')!;
+  await act(async () => {
+    picker.focus();
+    picker.click();
+  });
+  expect(document.querySelector('[data-ui="shared.ui.color-selector.picker"]')).not.toBeNull();
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(picker);
+});

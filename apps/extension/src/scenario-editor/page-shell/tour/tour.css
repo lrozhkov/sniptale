@@ -26,6 +26,16 @@
 }
 .tour-representation-switch .guide-section-tab span {
   display: block;
+  font: 500 13px / 20px var(--sniptale-font-sans);
+}
+.guide-page .guide-page-header .tour-representation-switch .guide-section-tab[aria-pressed='true'],
+.guide-page
+  .guide-page-header
+  .tour-representation-switch
+  .guide-section-tab[aria-pressed='true']:hover:not(:disabled) {
+  border-color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-accent-soft);
+  color: var(--sniptale-color-text-primary);
 }
 .tour-drop-zone {
   position: relative;

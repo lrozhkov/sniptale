@@ -723,6 +723,8 @@ function TourDocumentSettings({
             />
           </div>
           <ColorField
+            triggerVariant="swatch"
+            floatingPlacement="side"
             layout="stacked"
             palette={DEFAULT_DRAWING_COLORS}
             label={t('scenario.editor.tourBackground')}
@@ -740,6 +742,8 @@ function TourDocumentSettings({
             ] as const
           ).map(({ key, label }) => (
             <ColorField
+              triggerVariant="swatch"
+              floatingPlacement="side"
               layout="stacked"
               palette={DEFAULT_DRAWING_COLORS}
               key={key}
