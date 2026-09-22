@@ -91,7 +91,6 @@ export function TourStage({
     <div
       className="tour-stage-host"
       data-view={view}
-      inert={view === 'preview'}
       onDragStart={(event) => event.preventDefault()}
       ref={(node) => {
         if (node && !node.shadowRoot) setShadow(node.attachShadow({ mode: 'open' }));
@@ -195,7 +194,7 @@ function cameraPreviewTour(tour: TourDocument, selection: TourSelection | null):
   return {
     ...tour,
     slides: slide ? [slide] : [],
-    playback: { ...tour.playback, autoplay: false, loop: false },
+    playback: { ...tour.playback, autoplay: true, loop: false },
     endScreen: { ...tour.endScreen, enabled: false },
   };
 }

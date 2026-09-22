@@ -20,7 +20,7 @@ export function createTourPlayer(root, input, options = {}) {
   let index = 0;
   let ended = false;
   const history = [];
-  const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
+  const view = createTourScene(root, input, act, lifetime.signal, options);
   const chrome = options.authoring ? null : createTourChrome(root, lifetime.signal);
   const playback = options.authoring
     ? null
@@ -31,7 +31,6 @@ export function createTourPlayer(root, input, options = {}) {
           if (restart) history.length = 0;
           go(target, !restart);
         },
-        silent: options.preview,
         chrome,
       });
   function manualGo(target, recordHistory = true) {
@@ -39,7 +38,9 @@ export function createTourPlayer(root, input, options = {}) {
     go(target, recordHistory);
   }
   function act(action) {
-    if (options.authoring || options.preview) return;
+    if (options.authoring) return;
+    // Editor preview stays inside its document: URL actions never navigate or open tabs.
+    if (options.preview && action.kind === 'url') return;
     if (action.kind !== 'none') playback?.interact();
     if (action.kind === 'next') go(index + 1);
     else if (action.kind === 'previous') go(index - 1);

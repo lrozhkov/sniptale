@@ -1125,7 +1125,7 @@
   flex-shrink: 0;
 }
 .guide-project-name {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
 }
 @media (max-width: 720px) {
   .guide-workspace {

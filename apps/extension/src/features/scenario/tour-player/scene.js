@@ -11,8 +11,43 @@ function slideExplanations(slide) {
     .map((entry) => entry.object);
 }
 
+/** Mount policy decides interaction affordances once; rendering stays policy-free. */
+function scenePolicy(root, options) {
+  const authoring = options.authoring ?? null;
+  const preview = Boolean(options.preview);
+  return {
+    authoring,
+    // Editor preview never creates an executable link; denied actions stay plain buttons.
+    linkedUrls: !authoring && !preview,
+    keyboardScope: authoring || preview ? root : null,
+    hideVoice: Boolean(authoring),
+  };
+}
+
+/** Hint interaction wiring follows the mount policy; explanation order stays scene-owned. */
+function createSceneHints(root, input, policy, signal, getHints) {
+  const scene = root.querySelector('[data-tour-scene]');
+  return createTourHints(root, input.tour.style.textAppearance, {
+    signal,
+    keyboardScope: policy.keyboardScope,
+    hideVoice: policy.hideVoice,
+    onClose: () => {},
+    labels: input.labels,
+    focusTrigger: (activeIndex) => {
+      const object = getHints()[activeIndex];
+      const trigger =
+        (object ? scene.querySelector(`[data-tour-object-id="${object.id}"]`) : null) ??
+        scene.querySelector('.tour-details') ??
+        root.querySelector('[data-tour-contents]');
+      trigger.focus();
+    },
+  });
+}
+
 /** Owns current scene geometry and explanation state, independent from playback history. */
-export function createTourScene(root, input, onAction, signal, authoring) {
+export function createTourScene(root, input, onAction, signal, options = {}) {
+  const policy = scenePolicy(root, options);
+  const { authoring } = policy;
   let { tour } = input;
   const { assets, labels } = input;
   const media = new Map(assets.map((asset) => [asset.id, asset.src]));
@@ -30,21 +65,8 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   let stageWidth = 640;
   let stageHeight = 360;
   let hints = [];
-  const { element, actionButton } = sceneElements(root.ownerDocument, onAction, authoring);
-  const hintController = createTourHints(root, tour.style.textAppearance, {
-    signal,
-    keyboardScope: authoring ? root : null,
-    onClose: () => {},
-    labels,
-    focusTrigger: (activeIndex) => {
-      const object = hints[activeIndex];
-      const trigger =
-        (object ? scene.querySelector(`[data-tour-object-id="${object.id}"]`) : null) ??
-        scene.querySelector('.tour-details') ??
-        query('contents');
-      trigger.focus();
-    },
-  });
+  const { element, actionButton } = sceneElements(root.ownerDocument, onAction, policy);
+  const hintController = createSceneHints(root, input, policy, signal, () => hints);
   const navigationController = createTourNavigation({
     root,
     labels,
@@ -167,7 +189,7 @@ function endSlide(tour, labels) {
   };
 }
 
-function sceneElements(document, onAction, authoring) {
+function sceneElements(document, onAction, policy) {
   function element(tag, className, text) {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -175,15 +197,16 @@ function sceneElements(document, onAction, authoring) {
     return node;
   }
   function actionButton(label, action, className, objectId = null) {
-    const node = element(!authoring && action.kind === 'url' ? 'a' : 'button', className, label);
-    if (!authoring && action.kind === 'url') {
+    const linked = policy.linkedUrls && action.kind === 'url';
+    const node = element(linked ? 'a' : 'button', className, label);
+    if (linked) {
       node.href = action.url;
       node.target = '_blank';
       node.rel = 'noopener noreferrer';
     } else {
       node.type = 'button';
       node.addEventListener('click', () =>
-        authoring ? authoring.onSelectObject(objectId) : onAction(action)
+        policy.authoring ? policy.authoring.onSelectObject(objectId) : onAction(action)
       );
     }
     if (objectId) node.dataset.tourObjectId = objectId;

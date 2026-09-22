@@ -143,24 +143,36 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   const panel = page.locator('#guide-inspector-panel');
   await expect(panel.locator('h2')).toBeVisible();
 
-  // Camera tools live above the slide canvas instead of overlaying it.
-  const tools = page.locator('.tour-camera-tools');
-  await expect(tools).toBeVisible();
-  const camera = await page.evaluate(() => {
-    const bar = document.querySelector('.tour-camera-tools')!;
+  // Contextual tour controls live in the central header between the title and the
+  // representation switch instead of overlaying the slide canvas.
+  const controls = header.locator('.tour-header-controls');
+  await expect(controls).toBeVisible();
+  await expect(controls.getByRole('button', { name: 'Просмотр', exact: true })).toBeVisible();
+  const geometry = await page.evaluate(() => {
+    const controls = document.querySelector('.tour-header-controls')!;
+    const representation = document.querySelector('.tour-representation-switch')!;
+    const title = document.querySelector('.guide-project-name')!;
     const stage = document.querySelector('.tour-stage-host')!;
-    const barRect = bar.getBoundingClientRect();
-    const stageRect = stage.getBoundingClientRect();
     return {
-      position: getComputedStyle(bar).position,
-      barBottom: barRect.bottom,
-      stageTop: stageRect.top,
+      afterTitle: Boolean(
+        title.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      beforeSwitch: Boolean(
+        controls.compareDocumentPosition(representation) & Node.DOCUMENT_POSITION_FOLLOWING
+      ),
+      controlsBottom: controls.getBoundingClientRect().bottom,
+      stageTop: stage.getBoundingClientRect().top,
     };
   });
-  expect.soft(camera.position).not.toBe('absolute');
+  expect.soft(geometry.afterTitle, 'tour controls follow the project title').toBe(true);
+  expect.soft(geometry.beforeSwitch, 'tour controls precede the representation switch').toBe(true);
   expect
-    .soft(camera.barBottom <= camera.stageTop + 1, 'camera tools must not overlap the slide canvas')
+    .soft(
+      geometry.controlsBottom <= geometry.stageTop + 1,
+      'header controls must not overlap the slide canvas'
+    )
     .toBe(true);
+  await expect(page.locator('.tour-camera-tools')).toHaveCount(0);
 
   // Clear and dictation controls hug the field edge without covering text.
   const voiceMetrics = await panel.evaluate((node) => {
@@ -193,24 +205,28 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
       .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
   }
 
-  // Image editing is a top-context inspector action, not a footer control.
+  // Image editing is a header action, not an inspector or footer control.
   await expect
-    .soft(
-      panel.locator('.guide-panel-heading [data-tour-edit-image]'),
-      'edit image belongs to the inspector header'
-    )
+    .soft(controls.locator('[data-tour-edit-image]'), 'edit image belongs to the header controls')
     .toHaveCount(1);
-  await expect.soft(panel.locator('footer [data-tour-edit-image]')).toHaveCount(0);
+  await expect.soft(panel.locator('[data-tour-edit-image]')).toHaveCount(0);
 
-  // Object add actions carry recognizable text labels.
+  // Object creation uses the heading-level Add menu once objects exist.
   await panel.getByRole('button', { name: 'Объекты слайда', exact: true }).click();
-  const objectActions = panel.locator('.tour-object-actions > button');
-  await expect.soft(objectActions).toHaveCount(3);
+  const emptyActions = panel.locator('.tour-object-actions > button');
+  if (await emptyActions.count()) {
+    await emptyActions.filter({ hasText: 'Точка действия' }).click();
+    await expect(emptyActions).toHaveCount(0);
+  }
+  const add = panel.getByRole('button', { name: 'Добавить', exact: true });
+  await expect(add).toBeVisible();
+  await add.click();
   for (const label of ['Точка действия', 'Пояснение', 'Выделение']) {
     await expect
-      .soft(objectActions.filter({ hasText: label }), `object action ${label}`)
-      .toHaveCount(1);
+      .soft(page.getByRole('option', { name: label, exact: true }), `object option ${label}`)
+      .toBeVisible();
   }
+  await page.keyboard.press('Escape');
 
   // Nested numeric inputs keep the quiet focus treatment in the tour inspector too.
   await panel.getByRole('button', { name: 'Камера', exact: true }).click();
@@ -219,6 +235,14 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   const zoom = panel.locator('input[aria-label="Масштаб"]');
   await zoom.focus();
   expect(await zoom.evaluate((node) => getComputedStyle(node).outlineStyle)).toBe('none');
+
+  // Camera framing stays reachable from the header controls once a manual camera exists.
+  const frame = controls.getByRole('button', { name: 'Область камеры', exact: true });
+  await expect(frame).toBeVisible();
+  await frame.click();
+  const stage = page.locator('.tour-stage-host');
+  await expect(stage).toHaveAttribute('data-view', 'frame');
+  await expect(stage.locator('.tour-camera-frame')).toBeVisible();
   await testInfo.attach('tour-inspector-controls', {
     body: await page.screenshot(),
     contentType: 'image/png',

@@ -38,7 +38,7 @@ export function measureHintPages(hintText, fullText) {
 export function createTourHints(
   root,
   defaultAppearance,
-  { onClose, focusTrigger, signal, keyboardScope, labels }
+  { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels }
 ) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
@@ -69,7 +69,7 @@ export function createTourHints(
       hint.hidden = true;
       return;
     }
-    voice.hidden = Boolean(keyboardScope) || current.narration?.trigger !== 'activation';
+    voice.hidden = Boolean(hideVoice) || current.narration?.trigger !== 'activation';
     voice.dataset.tourNarration = current.id;
     activeHintId = current.id;
     hint.hidden = false;

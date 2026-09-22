@@ -16,6 +16,7 @@ type GuidePageHeaderProps = {
   onAiOpen?: () => void;
   onAppearance: () => void;
   leftControls?: ReactNode;
+  contextControls?: ReactNode;
   representationControls?: ReactNode;
   showSnap?: boolean;
   status: ComponentProps<typeof GuideProjectActions>['status'];
@@ -44,6 +45,7 @@ export function GuidePageHeader({
   onAiOpen,
   onAppearance,
   leftControls,
+  contextControls,
   representationControls,
   showSnap = true,
   status,
@@ -88,6 +90,7 @@ export function GuidePageHeader({
         )}
         {feedback}
         <div className="guide-header-actions">
+          {contextControls}
           {representationControls}
           {aiSelection && onAiOpen && (
             <GuideAiEntry

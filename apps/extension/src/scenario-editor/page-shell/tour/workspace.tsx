@@ -11,12 +11,13 @@ import type {
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { X, Settings2, Image, List, PanelLeft, Pencil } from 'lucide-react';
+import { X, Settings2, Image, List, PanelLeft, SquarePen } from 'lucide-react';
 import { ScenarioWorkspaceFrame } from '../workspace';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideResourceDrawer } from '../resource-drawer';
 import { GuideImageUpload } from '../image-upload';
-import { TourCameraTools } from './camera-tools';
+import { TourStage } from './stage';
+import { TourViewControls, useTourViewMode, type TourView } from './view-controls';
 import { TourInspector } from './inspector';
 import { TourGeneration } from './generation';
 import { TourImageDropZone } from './image-drop';
@@ -33,7 +34,7 @@ type TourWorkspaceProps = {
   project: GuideProject;
   images: Record<string, string | null>;
   panels: ReturnType<typeof useGuidePanels>;
-  header: ReactNode;
+  header: (contextControls: ReactNode) => ReactNode;
   disabled: boolean;
   importDisabled?: boolean;
   t: Translate;
@@ -47,7 +48,14 @@ type TourWorkspaceProps = {
 export function TourWorkspace(props: TourWorkspaceProps) {
   const { project, panels, disabled, importDisabled = disabled, t, onChange, onImport } = props;
   const state = useTourSelection(project, disabled, onChange, props.initialSlideId);
+  const view = useTourViewMode(state.selection, state.slide);
   const [generating, setGenerating] = useState(false);
+  const selectedImage =
+    state.slide?.kind === 'image' ? state.slide.image : state.slide?.background.image;
+  const editImage =
+    state.slide && selectedImage && props.onEditImage
+      ? { slideId: state.slide.id, disabled: disabled || !props.images[selectedImage.assetId] }
+      : null;
   const selectSlide = (slideId: string) => {
     state.select({ kind: 'slide', slideId, objectId: null });
     panels.selectRightScope('selection');
@@ -70,7 +78,37 @@ export function TourWorkspace(props: TourWorkspaceProps) {
       >
         <ScenarioWorkspaceFrame
           panels={panels}
-          header={props.header}
+          header={props.header(
+            <div
+              className="tour-header-controls"
+              role="group"
+              aria-label={t('scenario.editor.tourSlideControls')}
+            >
+              <TourViewControls
+                mode={view}
+                previewDisabled={!state.slide}
+                disabled={disabled}
+                t={t}
+              />
+              {editImage && (
+                <ContentToolbarButton
+                  className="guide-labeled-action"
+                  title={t('scenario.editor.guideEditImage')}
+                  data-tour-edit-image={editImage.slideId}
+                  disabled={editImage.disabled}
+                  onClick={() => props.onEditImage?.(editImage.slideId)}
+                >
+                  <SquarePen size={16} aria-hidden="true" />
+                  <span>{t('scenario.editor.guideEditImage')}</span>
+                </ContentToolbarButton>
+              )}
+              {view.view === 'preview' && (
+                <span className="tour-preview-status" role="status">
+                  {t('scenario.editor.tourPreviewStatus')}
+                </span>
+              )}
+            </div>
+          )}
           t={t}
           left={
             <TourLibraryPanel
@@ -86,6 +124,8 @@ export function TourWorkspace(props: TourWorkspaceProps) {
           <TourCanvas
             {...props}
             state={state}
+            view={view.view}
+            previewKey={view.replay}
             onSelectObject={selectObject}
             generating={generating}
             onGenerationChange={setGenerating}
@@ -113,14 +153,10 @@ function TourSettingsPanel({
   disabled,
   importDisabled = disabled,
   t,
-  onEditImage,
   onImportNarration,
-  images,
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
-  const selectedImage =
-    state.slide?.kind === 'image' ? state.slide.image : state.slide?.background.image;
   const inspectorTitle =
     panels.rightScope === 'document'
       ? t('scenario.editor.tourSettings')
@@ -145,22 +181,6 @@ function TourSettingsPanel({
       <div className="guide-panel-heading">
         <Settings2 size={16} />
         <h2 title={inspectorTitle}>{inspectorTitle}</h2>
-        {selectedImage &&
-          onEditImage &&
-          panels.rightScope === 'selection' &&
-          state.selection?.kind === 'slide' &&
-          !state.selection.objectId && (
-            <ContentToolbarButton
-              title={t('scenario.editor.guideEditImage')}
-              data-tour-edit-image={state.slide?.id}
-              disabled={disabled || !images[selectedImage.assetId]}
-              onClick={() => {
-                if (state.slide) onEditImage(state.slide.id);
-              }}
-            >
-              <Pencil size={16} aria-hidden="true" />
-            </ContentToolbarButton>
-          )}
         {grouped && (
           <ContentToolbarButton
             title={t(
@@ -231,10 +251,14 @@ function TourCanvas({
   onImport,
   state,
   onSelectObject: selectObject,
+  view,
+  previewKey,
   generating,
   onGenerationChange: setGenerating,
   onUpload: upload,
 }: SelectedTourProps & {
+  view: TourView;
+  previewKey: number;
   generating: boolean;
   onGenerationChange: (value: boolean) => void;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
@@ -256,35 +280,39 @@ function TourCanvas({
         />
       ) : project.tour && state.selection ? (
         <>
-          <TourCameraTools
-            disabled={disabled}
-            key={`${state.slide?.id}:${t('scenario.editor.tourMode')}`}
-            tour={project.tour}
-            images={images}
-            selection={state.selection}
-            t={t}
-            onSelectObject={selectObject}
-            onFrameCamera={(camera) => {
-              if (state.slide?.kind === 'image')
-                state.changeSlide({
-                  ...state.slide,
-                  camera: { ...state.slide.camera, ...camera, mode: 'manual' },
-                });
-            }}
-            onResizeObject={(id, rect) => {
-              if (state.slide?.kind === 'image')
-                state.changeSlide({
-                  ...state.slide,
-                  masks: state.slide.masks.map((mask) =>
-                    mask.id === id ? { ...mask, rect } : mask
-                  ),
-                });
-            }}
-            onMoveObject={(id, point) => {
-              if (state.slide?.kind === 'image')
-                state.changeSlide(moveObject(state.slide, id, point));
-            }}
-          />
+          <div className="tour-camera-editor">
+            <TourStage
+              disabled={disabled}
+              key={`${state.slide?.id}:${t('scenario.editor.tourMode')}`}
+              tour={project.tour}
+              images={images}
+              selection={state.selection}
+              t={t}
+              view={view}
+              previewKey={previewKey}
+              onSelectObject={selectObject}
+              onFrameCamera={(camera) => {
+                if (state.slide?.kind === 'image')
+                  state.changeSlide({
+                    ...state.slide,
+                    camera: { ...state.slide.camera, ...camera, mode: 'manual' },
+                  });
+              }}
+              onResizeObject={(id, rect) => {
+                if (state.slide?.kind === 'image')
+                  state.changeSlide({
+                    ...state.slide,
+                    masks: state.slide.masks.map((mask) =>
+                      mask.id === id ? { ...mask, rect } : mask
+                    ),
+                  });
+              }}
+              onMoveObject={(id, point) => {
+                if (state.slide?.kind === 'image')
+                  state.changeSlide(moveObject(state.slide, id, point));
+              }}
+            />
+          </div>
           {state.slide?.kind === 'image' && !state.slide.image && (
             <div className="tour-empty-image">
               <GuideImageUpload

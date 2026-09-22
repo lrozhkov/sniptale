@@ -398,6 +398,48 @@ it('switches representations directly from the header and keeps only the active 
   expect(container.querySelector('.guide-document-scroll')).not.toBeNull();
 });
 
+it('places tour controls between the title and the representation switch only in tour mode', async () => {
+  const project = createGuideProject('Tour header', 'guide', 100);
+  const slide = createTourImageSlide('first');
+  slide.image = {
+    assetId: 'image',
+    width: 100,
+    height: 100,
+    alt: '',
+    galleryAssetId: null,
+    editDocumentId: null,
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  project.tour = { ...createTourDocument(), slides: [slide] };
+  io.load.mockResolvedValue(project);
+  io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:guide-image');
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  await render();
+  expect(container.querySelector('.tour-header-controls')).toBeNull();
+  await click('Interactive tour');
+  const header = container.querySelector('.guide-page-header')!;
+  const title = header.querySelector('.guide-project-name')!;
+  const controls = header.querySelector('.tour-header-controls')!;
+  const representation = header.querySelector('.tour-representation-switch')!;
+  expect(controls).not.toBeNull();
+  expect(title.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(
+    controls.compareDocumentPosition(representation) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  const actions = [...controls.querySelectorAll('button')].map((button) => button.title);
+  expect(actions).toContain('Preview');
+  expect(actions).toContain('Edit image');
+  expect(actions).not.toContain('Editing');
+  await click('Guide');
+  expect(container.querySelector('.tour-header-controls')).toBeNull();
+});
+
 it('opens standalone tour export and returns to the selected slide', async () => {
   const project = createGuideProject('Export tour', 'guide', 100);
   const slide = createTourImageSlide('export-slide');

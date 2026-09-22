@@ -87,7 +87,7 @@ export function ScenarioEditorPage() {
         onClose={reader.close}
       />
     );
-  const header = (
+  const renderHeader = (contextControls?: ReactNode) => (
     <ScenarioHeader
       state={state}
       panels={panels}
@@ -97,6 +97,7 @@ export function ScenarioEditorPage() {
       tourMode={tourMode}
       representation={representation}
       onRepresentation={setRepresentation}
+      contextControls={contextControls}
       feedback={feedback}
       t={t}
     />
@@ -107,7 +108,7 @@ export function ScenarioEditorPage() {
       onBlurCapture={state.sealEdit}
       onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
     >
-      {!project && header}
+      {!project && renderHeader()}
       <GuideProjectRecovery state={state} t={t} />
       {project && tourMode && (
         <TourWorkspace
@@ -115,7 +116,7 @@ export function ScenarioEditorPage() {
           project={project}
           images={state.images}
           panels={panels}
-          header={header}
+          header={renderHeader}
           disabled={disabled || status === 'conflict'}
           importDisabled={importDisabled}
           onChange={state.update}
@@ -134,7 +135,7 @@ export function ScenarioEditorPage() {
           state={state}
           project={project}
           panels={panels}
-          header={header}
+          header={renderHeader()}
           imports={imports}
           importDisabled={importDisabled}
           disabled={disabled}
@@ -262,6 +263,7 @@ function ScenarioHeader({
   tourMode,
   representation,
   onRepresentation,
+  contextControls,
   feedback,
   t,
 }: {
@@ -273,6 +275,7 @@ function ScenarioHeader({
   tourMode: boolean;
   representation: 'guide' | 'tour';
   onRepresentation: (value: 'guide' | 'tour') => void;
+  contextControls?: ReactNode;
   feedback: ReactNode;
   t: Translate;
 }) {
@@ -327,6 +330,7 @@ function ScenarioHeader({
       }
       status={status}
       commandsDisabled={commandsDisabled}
+      contextControls={contextControls}
       onDuplicate={state.duplicate}
       onDelete={state.remove}
       onReload={state.reload}

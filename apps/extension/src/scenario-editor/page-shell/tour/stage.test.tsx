@@ -47,12 +47,13 @@ function fixture() {
     },
   ];
   tour.slides = [slide, createTourImageSlide('second')];
+  const images: Record<string, string> = {
+    image:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=',
+  };
   return {
     tour,
-    images: {
-      image:
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=',
-    },
+    images,
     selection: { kind: 'slide' as const, slideId: 'first', objectId: null },
     onSelectObject: vi.fn(),
     onMoveObject: vi.fn(),

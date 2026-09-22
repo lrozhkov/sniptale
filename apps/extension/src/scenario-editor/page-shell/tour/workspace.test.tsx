@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, useState } from 'react';
+import { act, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -22,6 +22,7 @@ let current: GuideProject;
 let panelState: ReturnType<typeof useGuidePanels>;
 const imported = vi.fn();
 const changed = vi.fn();
+const edited = vi.fn();
 function Probe({ initial, locked = false }: { initial: GuideProject; locked?: boolean }) {
   const [project, setProject] = useState(initial);
   current = project;
@@ -32,7 +33,7 @@ function Probe({ initial, locked = false }: { initial: GuideProject; locked?: bo
       project={project}
       images={{ image: 'data:image/png;base64,aA==' }}
       panels={panels}
-      header={<header>Project header</header>}
+      header={(controls: ReactNode) => <header>Project header {controls}</header>}
       disabled={locked}
       t={createTranslator('en')}
       onChange={(next) => {
@@ -41,6 +42,7 @@ function Probe({ initial, locked = false }: { initial: GuideProject; locked?: bo
       }}
       onImport={imported}
       onImportNarration={imported}
+      onEditImage={edited}
     />
   );
 }
@@ -48,6 +50,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', 1280);
   changed.mockReset();
+  edited.mockReset();
   imported.mockReset();
   imported.mockResolvedValue(true);
   prepare.mockReset();
@@ -426,24 +429,139 @@ it('offers visual blur without overwriting highlight opacity or numeric canvas g
   expect(resized.masks[0]!.rect.width).toBeGreaterThan(0.3);
 });
 
-it('separates camera framing and replay from project edits and returns to base view', async () => {
+it('places contextual tour controls inside the page header', async () => {
+  await render();
+  const header = host.querySelector('header')!;
+  const controls = header.querySelector('.tour-header-controls');
+  expect(controls).not.toBeNull();
+  const labels = [...controls!.querySelectorAll('button')].map((button) => button.title);
+  expect(labels).toContain('Preview');
+  expect(labels).toContain('Edit image');
+  expect(labels).not.toContain('Editing');
+});
+
+it('keeps Edit image stable for image and navigation slides and degrades cleanly', async () => {
+  const project = fixture();
+  project.tour!.slides.push({
+    kind: 'navigation',
+    id: 'nav',
+    title: 'Nav',
+    description: '',
+    background: { color: '#111827', image: null },
+    narration: null,
+    timing: createTourImageSlide().timing,
+    buttons: [],
+  });
+  await render(project);
+  const editImage = () => host.querySelector<HTMLButtonElement>('[data-tour-edit-image]');
+  expect(editImage()?.dataset['tourEditImage']).toBe('first');
+  await act(async () => editImage()!.click());
+  expect(edited).toHaveBeenCalledWith('first');
+  await click('3Nav');
+  expect(editImage()).toBeNull();
+  await click('End of tour');
+  expect(editImage()).toBeNull();
+  expect(
+    [...host.querySelectorAll<HTMLButtonElement>('.tour-header-controls button')].find(
+      (button) => button.title === 'Preview'
+    )?.disabled
+  ).toBe(true);
+  await click('1First');
+  act(() => root.render(null));
+  const missing = fixture();
+  const slide = missing.tour!.slides[0]!;
+  if (slide.kind !== 'image' || !slide.image) throw new Error('Expected image');
+  slide.image = { ...slide.image, assetId: 'missing' };
+  await render(missing);
+  expect(editImage()?.disabled).toBe(true);
+  act(() => root.render(null));
+  await render(fixture(), true);
+  expect(editImage()?.disabled).toBe(true);
+});
+
+it('moves preview, replay and camera framing through one disposable header mode', async () => {
+  instantImages();
+  const tick = playbackFrames();
   const project = fixture();
   const slide = project.tour!.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
   slide.camera = { mode: 'manual', center: { x: 0.5, y: 0.5 }, zoom: 2 };
   await render(project);
   const stage = () => host.querySelector<HTMLElement>('.tour-stage-host')!;
+  const motion = () =>
+    stage().shadowRoot!.querySelector<HTMLElement>('[data-tour-stage]')!.dataset['motion'];
   const width = () => stage().shadowRoot!.querySelector<HTMLElement>('.tour-image')!.style.width;
   const base = width();
   await click('Camera area');
   expect(stage().dataset['view']).toBe('frame');
   expect(stage().shadowRoot!.querySelector('.tour-camera-frame')).not.toBeNull();
-  await click('Play animation');
+  await click('Preview');
   expect(stage().dataset['view']).toBe('preview');
-  expect(stage().hasAttribute('inert')).toBe(true);
-  await click('Replay animation');
-  await click('Editing');
-  expect(width()).toBe(base);
   expect(stage().hasAttribute('inert')).toBe(false);
+  await act(async () => {
+    await tick(1400);
+  });
+  expect(motion()).toBe('settled');
+  await click('Replay');
+  expect(stage().dataset['view']).toBe('preview');
+  expect(motion()).not.toBe('settled');
+  await act(async () => {
+    await tick(1400);
+  });
+  expect(motion()).toBe('settled');
+  await click('Return to editing');
+  expect(stage().dataset['view']).toBe('edit');
+  expect(width()).toBe(base);
   expect(changed).not.toHaveBeenCalled();
 });
+
+it('returns to editing when another slide is selected and disposes the preview player', async () => {
+  instantImages();
+  const tick = playbackFrames();
+  await render();
+  await click('Preview');
+  const stage = () => host.querySelector<HTMLElement>('.tour-stage-host')!;
+  expect(stage().dataset['view']).toBe('preview');
+  const scene = () => stage().shadowRoot!.querySelector('[data-tour-scene]')!;
+  await act(async () => {
+    await tick(1400);
+  });
+  expect(scene().children.length).toBeGreaterThan(0);
+  await click('2Second');
+  expect(stage().dataset['view']).toBe('edit');
+  expect(changed).not.toHaveBeenCalled();
+});
+
+function instantImages() {
+  vi.stubGlobal(
+    'Image',
+    class {
+      onload: (() => void) | null = null;
+      onerror: ((error?: unknown) => void) | null = null;
+      decode = () => Promise.resolve();
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+  );
+}
+
+function playbackFrames() {
+  let time = 0;
+  let id = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.spyOn(performance, 'now').mockImplementation(() => time);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callbacks.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (token: number) => callbacks.delete(token));
+  return async (delta: number) => {
+    time += delta;
+    const queued = [...callbacks.values()];
+    callbacks.clear();
+    queued.forEach((callback) => callback(time));
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+}

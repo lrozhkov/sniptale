@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, createRef } from 'react';
+import { act, createRef, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
@@ -22,7 +22,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function draw(options: { commandsDisabled?: boolean } = {}) {
+async function draw(
+  options: {
+    commandsDisabled?: boolean;
+    contextControls?: ReactNode;
+    representationControls?: ReactNode;
+  } = {}
+) {
   const appearance = vi.fn();
   const duplicate = vi.fn();
   const remove = vi.fn();
@@ -35,6 +41,8 @@ async function draw(options: { commandsDisabled?: boolean } = {}) {
         project={project}
         status="failed"
         commandsDisabled={options.commandsDisabled ?? false}
+        contextControls={options.contextControls}
+        representationControls={options.representationControls}
         disabled={false}
         onAppearance={appearance}
         onDuplicate={duplicate}
@@ -80,6 +88,26 @@ it('shows Appearance as a persistent labeled header action outside the overflow 
   expect(labels).toContain('Delete project');
   expect(labels).not.toContain('Guide appearance');
   expect(labels).not.toContain('Appearance');
+});
+
+it('renders contextual controls between the project title and the representation switch', async () => {
+  await draw({
+    contextControls: <div className="context-slot">context</div>,
+    representationControls: <div className="representation-slot">switch</div>,
+  });
+  const header = host.querySelector('.guide-page-header')!;
+  const title = header.querySelector('.guide-project-name')!;
+  const context = header.querySelector('.context-slot')!;
+  const representation = header.querySelector('.representation-slot')!;
+  expect(context.closest('.guide-header-actions')).not.toBeNull();
+  expect(title.compareDocumentPosition(context) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(
+    context.compareDocumentPosition(representation) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(
+    representation.compareDocumentPosition(headerButton('Appearance')!) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
 });
 
 it('keeps Appearance enabled across an autosave lock while project mutations stay disabled', async () => {

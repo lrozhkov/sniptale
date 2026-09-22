@@ -18,11 +18,7 @@ function syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, stat
 }
 
 /** Projects transport and route policy; the session owns media readiness and the single clock. */
-export function createTourPlayback(
-  root,
-  input,
-  { signal, motion, navigate, silent = false, chrome }
-) {
+export function createTourPlayback(root, input, { signal, motion, navigate, chrome }) {
   let tour = input.tour;
   let index = 0;
   let ended = false;
@@ -113,7 +109,7 @@ export function createTourPlayback(
     choice = false;
     const slide = tour.slides[index];
     audioState = null;
-    audio.show(ended || silent ? null : slide, assets);
+    audio.show(ended ? null : slide, assets);
     timeline = tourLinearTimeline(tour, reduced());
     entrance = tourEntranceTiming(tour, ended ? null : slide, reduced()).total;
     duration = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
