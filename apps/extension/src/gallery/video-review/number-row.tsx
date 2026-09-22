@@ -36,6 +36,7 @@ export function ReviewNumberRow(props: {
   return (
     <NumericRow
       appearance="plain"
+      focusAppearance="accent-box"
       className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
       label={props.label}
       min={props.min}

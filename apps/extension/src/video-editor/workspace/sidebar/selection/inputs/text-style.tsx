@@ -132,7 +132,11 @@ function TextStyleSlider(
       min={props.min}
       max={props.max}
       step={props.step ?? 1}
-      formatValue={props.formatValue ?? ((value) => `${Math.round(value)} px`)}
+      formatValue={
+        props.formatValue ??
+        ((value) =>
+          props.field === 'fontWeight' ? String(Math.round(value)) : `${Math.round(value)} px`)
+      }
       onChange={(value) => props.onUpdateTextStyle(props.clipId, { [props.field]: value })}
     />
   );

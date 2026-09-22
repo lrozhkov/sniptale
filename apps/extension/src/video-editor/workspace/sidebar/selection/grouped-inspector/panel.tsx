@@ -137,6 +137,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
   return (
     <div ref={surface} className="-mx-3" data-ui="video-editor.inspector.sections">
       <CategorizedInspector
+        dataUi="video-editor.inspector.categories"
         key={memory.family}
         onSectionChange={memory.remember}
         ariaLabel={translate('videoEditor.sidebar.projectInspector')}

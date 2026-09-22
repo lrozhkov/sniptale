@@ -92,6 +92,10 @@ function registerTextFieldTests() {
     const { onUpdateTextStyle } = await renderFields();
 
     expect(container?.textContent).toContain('videoEditor.sidebar.textWeightLabel');
+    const weightInput = container?.querySelector(
+      'input[aria-label="videoEditor.sidebar.textWeightLabel"]'
+    );
+    expect(weightInput?.parentElement?.textContent).not.toContain('px');
     expect(container?.textContent).toContain('videoEditor.sidebar.textLineHeightLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.textColorLabel');
     expect(

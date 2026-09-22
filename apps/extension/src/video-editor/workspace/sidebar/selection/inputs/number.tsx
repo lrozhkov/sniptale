@@ -31,6 +31,7 @@ export function NumberInput({
   return (
     <NumericRow
       appearance="plain"
+      focusAppearance="accent-box"
       className="py-0! grid-cols-[minmax(0,1fr)_auto]!"
       label={label}
       value={numericValue}

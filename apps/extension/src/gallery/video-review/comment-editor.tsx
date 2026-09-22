@@ -90,7 +90,7 @@ function ReviewOverlayPlacementFields(props: {
       <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
         {translate('gallery.videoReview.overlayPlacement')}
       </legend>
-      <div className="flex flex-wrap gap-1">
+      <div data-inspector-choices className="flex flex-wrap gap-1">
         <ReviewButton
           label={translate('gallery.videoReview.overlayAbove')}
           aria-pressed={props.placement !== 'below'}
@@ -289,7 +289,7 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
         <legend className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.behaviorAtZoom')}
         </legend>
-        <div className="flex flex-wrap gap-1">
+        <div data-inspector-choices className="flex flex-wrap gap-1">
           <ReviewButton
             label={translate('gallery.videoReview.followVideo')}
             aria-pressed={props.comment.attachment === 'content'}
@@ -345,6 +345,8 @@ function ReviewCommentStyleFields(props: {
         onChange={(fillPaint) => patch({ fillPaint })}
       />
       <ColorField
+        triggerVariant="swatch"
+        floatingPlacement="side"
         label={translate('gallery.videoReview.overlayTextColor')}
         title={translate('gallery.videoReview.overlayTextColor')}
         value={props.style.textColor}
@@ -431,7 +433,7 @@ function ReviewOverlayFlagRow(props: {
 }) {
   const toggleButton = 'aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
   return (
-    <div className="flex flex-wrap gap-2">
+    <div data-inspector-choices className="flex flex-wrap gap-2">
       <ReviewButton
         label={translate('gallery.videoReview.overlayVisible')}
         aria-pressed={props.comment.visible}

@@ -2654,6 +2654,8 @@ for (const variant of [
 for (const advanced of [false, true]) {
   for (const variant of [
     { locale: 'ru' as const, theme: 'light' as const },
+    { locale: 'ru' as const, theme: 'dark' as const },
+    { locale: 'en' as const, theme: 'light' as const },
     { locale: 'en' as const, theme: 'dark' as const },
   ]) {
     const testTitle = [
@@ -2661,6 +2663,7 @@ for (const advanced of [false, true]) {
       `(${variant.locale}, ${variant.theme}, advanced=${advanced})`,
     ].join(' ');
     test(testTitle, async ({ page }, testInfo) => {
+      await page.emulateMedia({ colorScheme: variant.theme });
       const host = await startHostServer();
       try {
         await page.setViewportSize({ width: 1920, height: 1080 });
@@ -2673,6 +2676,7 @@ for (const advanced of [false, true]) {
         });
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await expect(page.locator('html')).toHaveAttribute('data-theme', variant.theme);
         await seedReviewVideo(page, 'review-vp8-opus.webm', {
           width: 160,
           height: 90,
@@ -2799,6 +2803,28 @@ for (const advanced of [false, true]) {
         await expect(
           dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button')
         ).toHaveCount(10);
+        const backgroundChoice = button('gallery.videoReview.backgroundGradient');
+        await backgroundChoice.hover();
+        await expect(backgroundChoice).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+        await expect(backgroundChoice).toHaveCSS('box-shadow', 'none');
+        const inspectorPanel = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+        const labels = inspectorPanel.locator(
+          '[data-ui="shared.ui.compact-inspector.numeric-row"] > span:first-child, [data-ui="shared.ui.compact-inspector.select-field"] > span:first-child'
+        );
+        const fonts = await labels.evaluateAll((nodes) =>
+          nodes.map((node) => {
+            const style = getComputedStyle(node);
+            return `${style.fontSize}|${style.fontWeight}|${style.color}`;
+          })
+        );
+        expect(new Set(fonts).size).toBe(1);
+        const preset = dialog
+          .locator('[data-ui="gallery.videoReview.gradientPresets"] button')
+          .first();
+        await preset.click();
+        await expect(preset).toHaveAttribute('aria-pressed', 'true');
+        await expect(preset).toHaveCSS('outline-style', 'solid');
+
         await button('gallery.videoReview.exportSettings').click();
         const exporting = dialog.locator('[data-ui="gallery.videoReview.exportSettings"]');
         await expect(exporting).toBeVisible();

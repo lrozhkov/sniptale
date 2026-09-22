@@ -66,7 +66,7 @@ export function ReviewInterval({ start, end }: { start: number; end: number }) {
       className="flex min-h-8 items-center justify-between gap-3 py-0.5"
       data-ui="gallery.videoReview.interval"
     >
-      <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+      <span className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
         {translate(
           start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
         )}
@@ -81,11 +81,7 @@ export function ReviewInterval({ start, end }: { start: number; end: number }) {
 }
 
 /** Inline parameter selectors use the same geometry and typography as numeric rows. */
-export const reviewSelectFieldClassName =
-  '!min-h-8 !rounded-none !border-0 !bg-transparent !px-0 !py-0 ' +
-  '[&>span]:!whitespace-normal [&>span]:!overflow-visible [&>span]:!text-xs ' +
-  '[&>span]:!font-semibold [&>span]:!text-[var(--sniptale-color-text-secondary)] ' +
-  '[&>div]:!w-auto [&>div]:!max-w-[65%]';
+export const reviewSelectFieldClassName = '!min-h-9 !border-0 !bg-transparent !px-0 !py-0';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({

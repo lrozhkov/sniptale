@@ -1,4 +1,5 @@
 import { InspectFxPanel } from './inspection/fx';
+import '../../../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import { InspectorSelectionFamilyContext } from './grouped-inspector/presentation';
 import { InspectorDetails } from './shared/details';
@@ -35,7 +36,7 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
     <InspectorSelectionFamilyContext.Provider value={family}>
       <div
         data-ui="video-editor.inspector.content"
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
+        className="sniptale-inspector-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
       >
         <div className={PANEL_STACK_CLASS_NAME}>
           <SelectionBody {...props} />

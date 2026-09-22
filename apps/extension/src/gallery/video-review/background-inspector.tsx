@@ -56,6 +56,7 @@ export function ReviewBackgroundInspector(props: {
       <div
         className="grid grid-cols-2 gap-1"
         role="group"
+        data-inspector-choices
         aria-label={translate('gallery.videoReview.background')}
       >
         <input
@@ -105,6 +106,7 @@ export function ReviewBackgroundInspector(props: {
         <div
           className="grid grid-cols-5 gap-2"
           role="group"
+          aria-label={translate('videoEditor.sidebar.sceneBackgroundPresetLabel')}
           data-ui="gallery.videoReview.gradientPresets"
         >
           {presets
@@ -122,7 +124,10 @@ export function ReviewBackgroundInspector(props: {
                   serializePaintToCss({ kind: 'gradient', gradient: preset.gradient })
                 }
                 className="h-8 min-w-0 rounded border border-[var(--sniptale-color-border-subtle)]
-                    transition-opacity hover:opacity-80"
+                    transition-opacity hover:opacity-80
+                    aria-pressed:outline aria-pressed:outline-2 aria-pressed:outline-offset-2
+                    aria-pressed:outline-[var(--sniptale-color-accent)]
+                    focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
                 style={{
                   background: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
                 }}
@@ -140,7 +145,16 @@ export function ReviewBackgroundInspector(props: {
           label={translate('gallery.videoReview.background')}
           title={translate('gallery.videoReview.background')}
           value={paint}
-          recentColors={[]}
+          palette={[
+            '#18181b',
+            '#fafafa',
+            '#334155',
+            '#2563eb',
+            '#0f766e',
+            '#14b8a6',
+            '#f97316',
+            '#e11d48',
+          ]}
           onChange={(next: Paint) =>
             onChange(
               next.kind === 'solid'

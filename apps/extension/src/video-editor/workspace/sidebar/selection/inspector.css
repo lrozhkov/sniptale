@@ -1,94 +1,73 @@
+@layer theme, base, components, utilities;
+
 [data-ui='video-editor.inspector.content'] {
-  container: inspector-body / inline-size;
+  container: inspector-surface / inline-size;
 }
-
-[data-ui='video-editor.inspector.content'] [data-ui='shared.ui.compact-inspector.select-field'] {
-  display: grid;
-  grid-template-columns: fit-content(42%) minmax(0, 1fr);
-  align-items: center;
-  column-gap: 12px;
-}
-
-[data-ui='video-editor.inspector.content']
-  [data-ui='shared.ui.compact-inspector.select-field']
-  > :last-child {
-  min-width: 100%;
-  max-width: none;
-  margin-left: 0;
-}
-
-[data-ui='video-editor.inspector.content']
-  [data-ui='shared.ui.compact-inspector.select-field']
-  > span,
-[data-ui='video-editor.inspector.content']
-  [data-ui='shared.ui.compact-inspector.numeric-row']
-  > span,
-[data-ui='video-editor.inspector.content']
-  [data-ui='shared.ui.compact-inspector.color-field']
-  > span {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  overflow: visible;
-  font-weight: 400;
-}
-
-[data-ui='video-editor.inspector.content'] button[aria-haspopup='listbox'] {
-  height: auto;
-  min-height: 32px;
-  padding-block: 5px;
-}
-
-[data-ui='video-editor.inspector.content'] button[aria-haspopup='listbox'] .truncate,
 .video-editor-inspector-select-menu .truncate {
+  overflow: visible;
   white-space: normal;
   overflow-wrap: anywhere;
-  overflow: visible;
-  text-overflow: clip;
-  line-height: 1.4;
+  line-height: 1.5;
 }
-
-[data-ui='video-editor.inspector.content'] [data-ui='shared.ui.compact-inspector.color-field'] {
-  min-height: 36px;
-  border-color: transparent;
-  background: transparent;
-  padding: 0;
-}
-
 [data-ui='video-editor.inspector.actions'] {
-  width: 100%;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 6px;
   margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--sniptale-color-border-subtle);
+  padding-block: 12px 4px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
 }
 
-[data-inspector-action] {
-  border-radius: var(--sniptale-radius-md) !important;
-  min-width: 0;
-  max-width: 100%;
-  height: auto;
-  min-height: 32px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  line-height: 1.35;
-  padding: 6px 10px;
+[data-ui='video-editor.inspector.content'] [data-inspector-action]:hover:not(:disabled) {
+  border-color: var(--sniptale-color-border-soft);
+}
+[data-ui='video-editor.inspector.content'] [data-inspector-action]:disabled {
+  opacity: 0.4;
 }
 
-[data-inspector-action] > svg {
-  flex-shrink: 0;
+[data-ui='video-editor.inspector.content'] [data-inspector-tone='secondary'] {
+  background: transparent;
 }
 
-[data-ui='video-editor.inspector.actions'] > [data-inspector-action] {
-  margin-top: 0;
+/* Match utility-layer priority for controls with explicit compact overrides. */
+@layer utilities {
+  [data-ui='video-editor.inspector.content'] [data-inspector-action] {
+    border-radius: var(--sniptale-radius-sm) !important;
+    height: auto;
+    min-height: 32px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+    padding: 5px 8px;
+    border-color: transparent;
+    box-shadow: none;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  [data-ui='video-editor.inspector.presentation-toggle'] {
+    color: var(--sniptale-color-text-secondary) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  [data-ui='video-editor.inspector.presentation-toggle']:hover {
+    color: var(--sniptale-color-text-primary-strong) !important;
+  }
 }
 
-@container inspector-body (max-width: 360px) {
-  [data-ui='shared.ui.compact-inspector.select-field'] {
-    grid-template-columns: minmax(0, 1fr) !important;
-    gap: 2px;
+@layer utilities {
+  [data-ui='video-editor.inspector.content'] [data-inspector-tone='toggle'] {
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--sniptale-color-text-secondary) !important;
+  }
+  [data-ui='video-editor.inspector.content'] [data-inspector-tone='toggle'][aria-pressed='true'] {
+    background: var(--sniptale-color-surface-hover) !important;
+    color: var(--sniptale-color-text-primary) !important;
+  }
+  [data-ui='video-editor.inspector.content'] [data-inspector-tone='toggle']:hover:not(:disabled) {
+    color: var(--sniptale-color-text-primary-strong) !important;
   }
 }

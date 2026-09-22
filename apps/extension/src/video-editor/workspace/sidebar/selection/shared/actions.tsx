@@ -14,7 +14,13 @@ export function InspectorActionButton({
   ...props
 }: ProductActionButtonProps & { separated?: boolean }) {
   const button = (
-    <ProductActionButton {...props} compact tone={tone} data-inspector-action="true" />
+    <ProductActionButton
+      {...props}
+      compact
+      tone={tone}
+      data-inspector-action="true"
+      data-inspector-tone={tone}
+    />
   );
   return separated ? <InspectorActions>{button}</InspectorActions> : button;
 }

@@ -1,0 +1,82 @@
+@layer theme, base, components, utilities;
+
+[data-ui='gallery.videoReview.inspector'] :is(h3, h4) {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  font: 600 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+}
+[data-ui='gallery.videoReview.inspector'] :is(label, legend) {
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+}
+[data-ui='gallery.videoReview.inspector']
+  input:not([type='range']):not([type='checkbox']):not([type='file']),
+[data-ui='gallery.videoReview.inspector'] textarea {
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-panel);
+  border-radius: var(--sniptale-radius-sm);
+}
+[data-ui='gallery.videoReview.inspector']
+  input:not([type='range']):not([type='checkbox']):not([type='file']):focus-visible,
+[data-ui='gallery.videoReview.inspector'] textarea:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: -1px;
+}
+[data-ui='gallery.videoReview.inspector'] button:not([aria-pressed]):disabled {
+  opacity: 0.4;
+}
+.review-inspector-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 8px;
+  border-color: transparent;
+  background: transparent;
+}
+.review-inspector-list > li[data-editing='true'] {
+  display: block;
+}
+.review-inspector-list > li:hover,
+.review-inspector-list > li:focus-within {
+  background: var(--sniptale-color-surface-hover);
+}
+.review-inspector-list > li > button > span:last-child {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .review-inspector-list > li:not(:hover):not(:focus-within) .review-inspector-row-actions {
+    opacity: 0;
+  }
+}
+
+.review-inspector-list > li[data-selected='true'] {
+  background: var(--sniptale-color-surface-hover);
+  border-color: var(--sniptale-color-border-strong);
+}
+[data-ui='gallery.videoReview.inspector']
+  [data-ui='shared.ui.compact-inspector.numeric-value-field']
+  > input {
+  outline: none;
+  background: transparent;
+}
+
+/* Match utility-layer priority for controls with explicit compact overrides. */
+@layer utilities {
+  .review-inspector-row-actions button {
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--sniptale-color-text-secondary) !important;
+  }
+  .review-inspector-row-actions button:hover:not(:disabled) {
+    color: var(--sniptale-color-text-primary-strong) !important;
+  }
+  .review-inspector-row-actions button:last-child:hover:not(:disabled) {
+    color: var(--sniptale-color-danger) !important;
+  }
+}

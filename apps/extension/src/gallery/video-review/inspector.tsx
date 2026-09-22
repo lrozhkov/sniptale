@@ -1,3 +1,5 @@
+import '../../ui/compact-inspector-controls/inspector-surface.css';
+import './inspector.css';
 import './inspector-navigation.css';
 import {
   ChevronsDownUp,
@@ -87,7 +89,7 @@ export function ReviewInspector(props: {
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
-      className={`flex min-h-0 flex-col gap-2 overflow-hidden border-l
+      className={`sniptale-inspector-surface flex min-h-0 flex-col gap-2 overflow-hidden border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
           props.fullHeight
             ? 'min-[800px]:col-start-2 min-[800px]:row-start-1 min-[800px]:row-span-2'
@@ -130,7 +132,6 @@ export function ReviewInspector(props: {
           data-ui="gallery.videoReview.inspectorNavigation"
         >
           <SegmentedSwitch<Section>
-            wrap
             density="compact"
             activeId={shown}
             ariaLabel={translate('gallery.videoReview.inspector')}
@@ -174,10 +175,12 @@ function ReviewAnnotationList(props: {
   onDelete(value: ReviewAnnotation): void;
 }) {
   return (
-    <ol className="space-y-2">
+    <ol className="review-inspector-list space-y-2">
       {props.annotations.map((annotation) => (
         <li
           key={annotation.id}
+          data-selected={props.selectedId === annotation.id}
+          data-editing={props.editingId === annotation.id}
           className={`group relative rounded-lg ${props.editingId === annotation.id ? '' : 'border p-3'}
               ${
                 props.selectedId === annotation.id
@@ -194,6 +197,7 @@ function ReviewAnnotationList(props: {
               <button
                 type="button"
                 className="block w-full text-left"
+                aria-pressed={props.selectedId === annotation.id}
                 onClick={() => props.onSelect(annotation)}
               >
                 <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
@@ -205,7 +209,7 @@ function ReviewAnnotationList(props: {
                   {annotation.text}
                 </span>
               </button>
-              <div className="mt-2 flex justify-end gap-1">
+              <div className="review-inspector-row-actions flex justify-end gap-1">
                 <ReviewButton
                   label={translate('gallery.videoReview.editComment')}
                   disabled={props.busy}
