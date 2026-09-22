@@ -425,6 +425,89 @@ it('exports visual blur through the shared renderer without authoring handles', 
   dom.close();
 });
 
+it('lays out one content frame above one bottom toolbar that owns every control', async () => {
+  const dom = open(await buildTourPlayerHtml(fixture()));
+  const document = dom.window.document;
+  const main = document.getElementById('tour-player')!;
+  const viewport = document.querySelector('.tour-viewport')!;
+  const toolbar = document.querySelector('.tour-toolbar')!;
+  expect(document.querySelectorAll('.tour-viewport')).toHaveLength(1);
+  expect(document.querySelectorAll('.tour-toolbar')).toHaveLength(1);
+  expect(document.querySelector('header')).toBeNull();
+  expect(document.querySelector('.tour-transport')).toBeNull();
+  expect(main.firstElementChild).toBe(viewport);
+  expect(viewport.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const ordered = [
+    '[data-tour-contents]',
+    '[data-tour-play]',
+    '[data-tour-seek]',
+    '[data-tour-previous]',
+    '[data-tour-next]',
+  ];
+  const nodes = ordered.map((selector) => document.querySelector(selector)!);
+  for (const node of nodes) expect(toolbar.contains(node)).toBe(true);
+  for (let index = 1; index < nodes.length; index += 1)
+    expect(
+      nodes[index - 1]!.compareDocumentPosition(nodes[index]!) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  for (const selector of ordered) expect(document.querySelectorAll(selector)).toHaveLength(1);
+  expect(document.querySelectorAll('[data-tour-counter]')).toHaveLength(1);
+  expect(document.querySelectorAll('[data-tour-status]')).toHaveLength(1);
+  expect(toolbar.contains(document.querySelector('[data-tour-title]'))).toBe(true);
+  expect(toolbar.contains(document.querySelector('[data-tour-status]'))).toBe(true);
+  dom.close();
+});
+
+it.each([
+  ['Explanation', 'Explanation'],
+  ['  explanation  ', 'Explanation'],
+  ['Explanation.', 'Explanation'],
+  ['Open the menu', 'Open the menu — then save the page'],
+])('uses the neutral disclosure heading when label "%s" repeats the body', async (label, text) => {
+  const args = fixture();
+  args.tour.style.textAppearance.presentation = 'caption-bottom';
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.hotspots[0]!.label = label;
+  slide.hotspots[0]!.text = text;
+  const dom = open(await buildTourPlayerHtml(args));
+  const doc = dom.window.document;
+  const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
+  const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
+  expect(toggle.textContent?.trim()).toBe('Details');
+  expect(body.textContent).toBe(text);
+  expect(toggle.getAttribute('aria-label')).toBe('Collapse explanation: Details');
+  toggle.click();
+  expect(body.hidden).toBe(true);
+  expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
+  dom.close();
+});
+
+it('keeps a distinct authored label and falls back when the label is missing', async () => {
+  const args = fixture();
+  args.tour.style.textAppearance.presentation = 'caption-bottom';
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.hotspots[0]!.label = 'Continue';
+  slide.hotspots[0]!.text = 'Explanation';
+  slide.annotations = [
+    {
+      id: 'note',
+      anchor: null,
+      text: 'Slide note body',
+      appearance: null,
+    },
+  ];
+  const dom = open(await buildTourPlayerHtml(args));
+  const doc = dom.window.document;
+  const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
+  expect(toggle.textContent?.trim()).toBe('Continue');
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('Slide note body');
+  expect(toggle.textContent?.trim()).toBe('Details');
+  dom.close();
+});
+
 it('rejects invalid embedded media before export', async () => {
   const broken = fixture();
   broken.assets = [{ id: 'image', mime: 'image/png', base64: 'not base64!!' }];

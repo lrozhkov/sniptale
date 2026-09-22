@@ -82,3 +82,36 @@ it('opens the contents menu as a non-modal list anchored to its trigger', async 
   expect(document.activeElement).toBe(trigger);
   void player;
 });
+
+/** The trigger sits in the bottom toolbar: the menu opens upward and stays inside the player. */
+it('anchors the menu above the bottom toolbar trigger and inside the player', async () => {
+  const { root } = await mount();
+  const navigation = root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!;
+  const trigger = root.querySelector<HTMLButtonElement>('[data-tour-contents]')!;
+  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    right: 800,
+    bottom: 600,
+    width: 800,
+    height: 600,
+  } as DOMRect);
+  vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+    left: 12,
+    top: 552,
+    right: 100,
+    bottom: 588,
+    width: 88,
+    height: 36,
+  } as DOMRect);
+  Object.defineProperty(navigation, 'offsetWidth', { value: 320, configurable: true });
+  Object.defineProperty(navigation, 'offsetHeight', { value: 220, configurable: true });
+  trigger.click();
+  expect(navigation.open).toBe(true);
+  expect(navigation.style.top).toBe('326px');
+  expect(navigation.style.left).toBe('12px');
+  navigation.removeAttribute('open');
+  Object.defineProperty(navigation, 'offsetHeight', { value: 700, configurable: true });
+  trigger.click();
+  expect(navigation.style.top).toBe('4px');
+});

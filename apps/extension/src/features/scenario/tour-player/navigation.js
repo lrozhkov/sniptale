@@ -52,12 +52,18 @@ export function createTourNavigation({
       list.append(button);
     });
     navigation.append(list);
-    const player = root.getBoundingClientRect();
-    const bounds = trigger.getBoundingClientRect();
-    navigation.style.left = `${bounds.left - player.left}px`;
-    navigation.style.top = `${bounds.bottom - player.top + 6}px`;
     navigation.setAttribute('open', '');
     trigger.setAttribute('aria-expanded', 'true');
+    const player = root.getBoundingClientRect();
+    const bounds = trigger.getBoundingClientRect();
+    const width = navigation.offsetWidth;
+    const height = navigation.offsetHeight;
+    // The trigger lives in the bottom toolbar: the menu opens upward and stays inside the player.
+    navigation.style.left = `${Math.max(
+      4,
+      Math.min(bounds.left - player.left, player.width - width - 4)
+    )}px`;
+    navigation.style.top = `${Math.max(4, bounds.top - player.top - height - 6)}px`;
     current?.scrollIntoView?.({ block: 'nearest' });
     current?.focus({ preventScroll: true });
     root.ownerDocument.addEventListener('keydown', onContentsKey, true);

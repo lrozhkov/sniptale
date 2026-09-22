@@ -8,8 +8,6 @@ const FACES = {
 /** Disposable transport DOM; elapsed time and navigation remain owned by the player. */
 export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   const document = root.ownerDocument;
-  const panel = document.createElement('div');
-  panel.className = 'tour-playback';
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'tour-button tour-icon-button';
@@ -28,12 +26,10 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   range.dataset.tourSeek = '';
   range.setAttribute('aria-label', labels.seek);
   range.addEventListener('input', () => onSeek(Number(range.value)), { signal });
-  const status = document.createElement('span');
-  status.className = 'tour-playback-status';
-  status.setAttribute('role', 'status');
-  panel.append(button, time, range, status);
-  root.querySelector('.tour-transport').prepend(panel);
-  signal.addEventListener('abort', () => panel.remove(), { once: true });
+  const status = root.querySelector('[data-tour-status]');
+  const playback = root.querySelector('[data-tour-playback]');
+  playback.append(button, time, range);
+  signal.addEventListener('abort', () => playback.replaceChildren(), { once: true });
   return ({ elapsed, duration, playing, state }) => {
     const face = transportFace(state, playing);
     const text = state === 'error' ? labels.retry : playing ? labels.pause : labels.play;
@@ -48,6 +44,10 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
     button.setAttribute('aria-pressed', String(playing));
     range.max = String(duration);
     range.value = String(elapsed);
+    range.style.setProperty(
+      '--tour-scrub-fill',
+      `${duration > 0 ? Math.min(100, Math.max(0, (elapsed / duration) * 100)) : 0}%`
+    );
     range.disabled = state === 'empty';
     const value = `${formatTime(elapsed)} / ${formatTime(duration)}`;
     range.setAttribute('aria-valuetext', value);

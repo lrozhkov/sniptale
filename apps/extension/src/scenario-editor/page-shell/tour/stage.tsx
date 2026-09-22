@@ -103,7 +103,8 @@ export function TourStage({
             <style>{`
               :host { display: block; height: 100%; min-height: 0; font: 14px system-ui, sans-serif; }
               #tour-player { height: 100%; background: transparent; }
-              .tour-toolbar, .tour-transport { display: none; }
+              .tour-toolbar { display: none; }
+              .tour-viewport { margin: 0; border: 0; border-radius: 0; background: transparent; }
               .tour-scene[data-dragging=true], .tour-scene[data-dragging=true] * { cursor: grabbing !important; }
               :host([data-view=frame]) .tour-hint,
               :host([data-view=frame]) .tour-hotspot,
@@ -142,10 +143,6 @@ function TourStageScaffold({
 }) {
   return (
     <div id="tour-player" ref={root}>
-      <header className="tour-toolbar">
-        <button data-tour-contents>{labels.contents}</button>
-        <span data-tour-title />
-      </header>
       <div className="tour-viewport" data-tour-viewport>
         <section className="tour-stage" data-tour-stage>
           <div className="tour-scene" data-tour-scene />
@@ -177,10 +174,20 @@ function TourStageScaffold({
           </div>
         </aside>
       </div>
-      <footer className="tour-transport">
-        <button data-tour-previous>{labels.previous}</button>
-        <span data-tour-counter />
-        <button data-tour-next>{labels.next}</button>
+      <footer className="tour-toolbar">
+        <div className="tour-feedback">
+          <span className="tour-title" data-tour-title aria-live="polite" />
+          <span className="tour-playback-status" data-tour-status role="status" hidden />
+        </div>
+        <div className="tour-controls">
+          <button data-tour-contents>{labels.contents}</button>
+          <div className="tour-playback" data-tour-playback />
+          <div className="tour-nav">
+            <button data-tour-previous>{labels.previous}</button>
+            <span data-tour-counter />
+            <button data-tour-next>{labels.next}</button>
+          </div>
+        </div>
       </footer>
       <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
     </div>

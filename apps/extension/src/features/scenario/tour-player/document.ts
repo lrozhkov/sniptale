@@ -133,18 +133,6 @@ async function buildTourPlayerShell(args: {
 </head>
 <body>
 <main id="tour-player">
-<header class="tour-toolbar">
-<button class="tour-button tour-contents-trigger" data-tour-contents
- aria-haspopup="dialog" aria-expanded="false"
- aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
-</svg>
-<span>${escape(labels.contents)}</span>
-</button>
-<span class="tour-title" data-tour-title aria-live="polite">
-</span>
-</header>
 <div class="tour-viewport" data-tour-viewport>
 <section class="tour-stage" data-tour-stage>
 <div class="tour-scene" data-tour-scene>
@@ -166,7 +154,23 @@ ${escape(labels.previous)}</button>
 </div>
 </aside>
 </div>
-<footer class="tour-transport">
+<footer class="tour-toolbar">
+<div class="tour-feedback">
+<span class="tour-title" data-tour-title aria-live="polite">
+</span>
+<span class="tour-playback-status" data-tour-status role="status" hidden></span>
+</div>
+<div class="tour-controls">
+<button class="tour-button tour-contents-trigger" data-tour-contents
+ aria-haspopup="dialog" aria-expanded="false"
+ aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+</svg>
+<span>${escape(labels.contents)}</span>
+</button>
+<div class="tour-playback" data-tour-playback></div>
+<div class="tour-nav">
 <button class="tour-button tour-icon-button" data-tour-previous
  aria-label="${escape(labels.previous)}" title="${escape(labels.previous)}">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -181,6 +185,8 @@ ${escape(labels.previous)}</button>
 <path d="m9 18 6-6-6-6"/>
 </svg>
 </button>
+</div>
+</div>
 </footer>
 <dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
 </dialog>
