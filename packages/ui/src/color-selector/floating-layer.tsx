@@ -52,6 +52,7 @@ function resolveSideLayerStyle(args: {
   uiScale: number;
   viewportHeight: number;
   viewportWidth: number;
+  layerHeight: number;
 }): CSSProperties | null {
   const boundaryRight = args.boundaryRect.x + args.boundaryRect.width;
   const rightRoom = args.viewportWidth - boundaryRight - COLOR_SELECTOR_VIEWPORT_PADDING;
@@ -66,7 +67,7 @@ function resolveSideLayerStyle(args: {
     Math.max(args.anchorRect.y, COLOR_SELECTOR_VIEWPORT_PADDING),
     Math.max(
       COLOR_SELECTOR_VIEWPORT_PADDING,
-      args.viewportHeight - COLOR_SELECTOR_VIEWPORT_PADDING - 420
+      args.viewportHeight - COLOR_SELECTOR_VIEWPORT_PADDING - args.layerHeight
     )
   );
   const clientPosition = projectContentUiPointToClient(
@@ -90,7 +91,8 @@ function resolveSideLayerStyle(args: {
 function resolveColorSelectorLayerStyle(
   anchor: HTMLElement | null,
   placement: ColorSelectorFloatingPlacement,
-  boundary: HTMLElement | null
+  boundary: HTMLElement | null,
+  layer: HTMLElement | null = null
 ): CSSProperties {
   if (!anchor || typeof window === 'undefined') {
     return { width: COLOR_SELECTOR_LAYER_WIDTH };
@@ -114,6 +116,7 @@ function resolveColorSelectorLayerStyle(
       uiScale,
       viewportHeight,
       viewportWidth,
+      layerHeight: layer ? projectElementRect(layer, uiScale).rect.height : 420,
     });
     if (sideStyle) return sideStyle;
   }
@@ -155,22 +158,32 @@ export function useColorSelectorLayerStyle(
   anchor: HTMLElement | null,
   open: boolean,
   placement: ColorSelectorFloatingPlacement = 'auto',
-  boundary: HTMLElement | null = null
+  boundary: HTMLElement | null = null,
+  layerRef?: RefObject<HTMLElement | null>,
+  layerKind: 'palette' | 'picker' = 'palette'
 ) {
   const [style, setStyle] = useState<CSSProperties>(() =>
     resolveColorSelectorLayerStyle(anchor, placement, boundary)
   );
   const updateStyle = useCallback(() => {
-    setStyle(resolveColorSelectorLayerStyle(anchor, placement, boundary));
-  }, [anchor, boundary, placement]);
+    setStyle(resolveColorSelectorLayerStyle(anchor, placement, boundary, layerRef?.current));
+  }, [anchor, boundary, layerRef, placement]);
 
   useEffect(() => {
     if (!open) {
       return undefined;
     }
 
-    return bindFloatingInteractionPositionListeners(anchor, updateStyle);
-  }, [anchor, open, updateStyle]);
+    const unbind = bindFloatingInteractionPositionListeners(anchor, updateStyle);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateStyle);
+    if (anchor) observer?.observe(anchor);
+    if (boundary) observer?.observe(boundary);
+    if (layerRef?.current) observer?.observe(layerRef.current);
+    return () => {
+      unbind?.();
+      observer?.disconnect();
+    };
+  }, [anchor, boundary, layerKind, layerRef, open, updateStyle]);
 
   return style;
 }

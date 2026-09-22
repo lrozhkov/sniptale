@@ -392,6 +392,11 @@ it('keeps palette commit and picker cancellation on the existing owner in swatch
   });
   expect(document.querySelector('[data-ui="shared.ui.color-selector.picker"]')).not.toBeNull();
   await act(async () =>
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.color-selector.mode-cycle"]')!
+      .focus()
+  );
+  await act(async () =>
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
   expect(document.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();

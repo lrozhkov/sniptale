@@ -37,6 +37,9 @@
   background: var(--sniptale-color-accent-soft);
   color: var(--sniptale-color-text-primary);
 }
+.guide-page-header .tour-representation-switch .guide-section-tab svg {
+  color: var(--sniptale-color-text-primary);
+}
 .tour-drop-zone {
   position: relative;
   display: flex;

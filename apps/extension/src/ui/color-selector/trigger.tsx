@@ -81,10 +81,7 @@ function PickerTriggerButton(props: {
       aria-label={translate('shared.ui.colorSelectorChooseColor')}
       title={displayValue}
       onClick={props.onOpenPicker}
-      className={cx(
-        PICKER_ACTION_CLASS_NAME,
-        props.variant === 'swatch' && '!w-7 !flex-none !justify-center'
-      )}
+      className={cx(PICKER_ACTION_CLASS_NAME, props.variant === 'swatch' && '!justify-start')}
       data-ui="shared.ui.color-selector.picker-trigger"
     >
       <span
@@ -104,7 +101,12 @@ function PickerTriggerButton(props: {
           backgroundSize: '100% 100%, 8px 8px',
         }}
       />
-      <span className={props.variant === 'swatch' ? 'sr-only' : valueClassName}>
+      <span
+        className={cx(
+          valueClassName,
+          props.variant === 'swatch' && '!whitespace-normal !overflow-visible break-words text-left'
+        )}
+      >
         {displayValue}
       </span>
     </button>

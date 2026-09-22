@@ -486,11 +486,11 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       const segment = panel
         .locator('.guide-inspector-choice [role="group"] button[aria-pressed="true"]')
         .first();
-      await expect.soft(segment).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(segment).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(
         panel.locator('.guide-inspector-choice [role="group"] > span[aria-hidden]').first()
       ).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect(segment).not.toHaveCSS('box-shadow', 'none');
+      await expect(segment).toHaveCSS('box-shadow', 'none');
       const valueFonts = await panel
         .locator(
           '.guide-inspector-choice [role="group"] button[aria-pressed="true"], .guide-inspector-choice [data-ui="shared.ui.compact-select"] > button'
@@ -510,7 +510,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect(new Set(valueFonts).size).toBe(1);
 
       await segment.hover();
-      await expect(segment).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(segment).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
       const accent = panel.locator('.guide-style-accent');
       const colorSpacing = await accent.evaluate(

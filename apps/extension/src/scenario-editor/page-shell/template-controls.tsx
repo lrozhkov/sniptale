@@ -86,6 +86,7 @@ export function GuideTemplateControls({
           t={t}
         />
         <ProductActionButton
+          className="scenario-inspector-action"
           hidden={saving}
           tone="secondary"
           compact

@@ -171,7 +171,10 @@ it('uses a swatch and explicit palette icon without losing the value or separate
   const picker = getButton('shared.ui.colorSelectorChooseColor')!;
   const palette = getButton('shared.ui.colorSelectorPalette')!;
   expect(picker.title).toBe('#123456');
-  expect(picker.querySelector('.sr-only')?.textContent).toBe('#123456');
+  expect(picker.querySelector('span:last-child')?.textContent).toBe('#123456');
+  expect(picker.querySelector('.sr-only')).toBeNull();
+  renderTrigger({ variant: 'swatch', formatMode: 'rgb', onOpenPicker, onToggleExpanded });
+  expect(picker.querySelector('span:last-child')?.textContent).toBe('RGB(18, 52, 86)');
   expect(palette.querySelector('.lucide-palette')).not.toBeNull();
   expect(palette.querySelector('.lucide-chevron-down')).toBeNull();
   await act(async () => {

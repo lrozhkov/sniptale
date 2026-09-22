@@ -146,7 +146,9 @@ function ColorSelectorPanels(props: ColorSelectorPanelsProps) {
     props.rootNode,
     open,
     props.floatingPlacement,
-    props.floatingBoundaryRef?.current ?? null
+    props.floatingBoundaryRef?.current ?? null,
+    props.state.layerRef,
+    props.pickerOpen ? 'picker' : 'palette'
   );
 
   if (!open || !portalTarget) {

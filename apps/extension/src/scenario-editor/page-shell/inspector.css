@@ -294,6 +294,7 @@
   font: inherit;
   text-align: start;
   cursor: pointer;
+  border-radius: var(--sniptale-radius-sm);
 }
 .guide-inspector-disclosure > span {
   flex: 1;
@@ -406,7 +407,7 @@
 
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
   align-items: center;
   gap: 8px;
   min-height: 36px;
@@ -418,12 +419,13 @@
   color: var(--sniptale-color-text-primary);
 }
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] > div {
-  width: 56px !important;
+  width: 100% !important;
   max-width: 100%;
   margin-inline-start: 0;
 }
 .guide-inspector-panel [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch'] {
-  height: 32px;
+  height: auto;
+  min-height: 32px;
   border-radius: var(--sniptale-radius-sm);
 }
 .guide-inspector-panel [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch'] button {
@@ -564,8 +566,8 @@
 }
 .guide-inspector-panel .guide-style-accent {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) 24px;
+  align-items: center;
   gap: 8px;
 }
 .guide-inspector-panel .guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
@@ -583,15 +585,17 @@
   justify-content: flex-start;
 }
 .guide-inspector-panel .guide-style-accent > button {
-  align-self: end;
-  margin-bottom: 2px;
-  height: 32px;
+  align-self: center;
+  margin-bottom: 0;
+  height: 24px;
 }
 
 /* One label contract across primitive field types, including nested tour settings. */
 .guide-inspector-panel
   :is(
     .guide-number-toggle,
+    .guide-block-inspector .guide-inspector-group-body > span,
+    .guide-html-switch > span,
     .guide-inspector-number > span,
     .guide-inspector-choice > span,
     .guide-numbering-field,
@@ -602,7 +606,7 @@
     [data-ui='shared.ui.surface-style-selector'] > div:first-child > span
   ) {
   font: 500 12px / 1.5 var(--sniptale-font-sans);
-  color: var(--sniptale-color-text-primary);
+  color: var(--sniptale-color-text-secondary);
 }
 
 .guide-inspector-panel [data-ui='shared.ui.color-selector.trigger']:focus-within {
@@ -638,7 +642,9 @@
   .guide-inspector-choice
   [role='group']
   button[aria-pressed='true'] {
-  box-shadow: inset 0 0 0 1px var(--sniptale-color-border-strong);
+  background: var(--sniptale-color-surface-hover);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 /* Auxiliary header actions share the close button's square target. */
@@ -838,4 +844,64 @@
 }
 .guide-inspector-panel .tour-action-field > :nth-child(n + 3) {
   grid-column: 1 / -1;
+}
+
+@container (max-width: 300px) {
+  .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+.guide-inspector-panel .guide-block-inspector > .scenario-inspector-navigation {
+  margin-bottom: 8px;
+}
+.guide-inspector-panel .guide-block-inspector button:has(> svg.lucide-rotate-ccw) {
+  justify-content: flex-start;
+  text-align: start;
+}
+.guide-page .guide-inspector-panel [data-ui='shared.ui.compact-inspector.segmented-row'] button {
+  color: var(--sniptale-color-text-secondary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 400;
+}
+.guide-page
+  .guide-inspector-panel
+  [data-ui='shared.ui.compact-inspector.segmented-row']
+  button[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-hover);
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 500;
+}
+.guide-page
+  .guide-inspector-panel
+  [data-ui='shared.ui.compact-inspector.segmented-row']
+  button:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+}
+
+.guide-inspector-categorized > .guide-style-fields + .guide-inspector-hint {
+  margin-top: 8px;
+}
+
+.guide-page
+  .guide-inspector-panel
+  [data-ui='shared.ui.compact-select']
+  > button:is([aria-expanded='true'], :focus) {
+  border-color: var(--sniptale-color-border-accent-strong);
+}
+
+.guide-inspector-panel [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch'] {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.guide-inspector-panel
+  [data-ui='shared.ui.color-selector.trigger'][data-variant='swatch']:has(button:focus-visible) {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
 }
