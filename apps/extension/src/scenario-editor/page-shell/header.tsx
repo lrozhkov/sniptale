@@ -15,6 +15,7 @@ type GuidePageHeaderProps = {
   aiSelection?: { stepId: string | null; blockId: string | null };
   onAiOpen?: () => void;
   onAppearance: () => void;
+  appearanceActive?: boolean;
   leftControls?: ReactNode;
   contextControls?: ReactNode;
   representationControls?: ReactNode;
@@ -44,6 +45,7 @@ export function GuidePageHeader({
   aiSelection,
   onAiOpen,
   onAppearance,
+  appearanceActive = false,
   leftControls,
   contextControls,
   representationControls,
@@ -114,6 +116,7 @@ export function GuidePageHeader({
                 className="guide-labeled-action"
                 data-header-collapse="2"
                 title={t('scenario.editor.appearance')}
+                aria-pressed={appearanceActive}
                 onClick={onAppearance}
               >
                 <Palette size={16} aria-hidden="true" />

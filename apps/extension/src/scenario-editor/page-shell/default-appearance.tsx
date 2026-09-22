@@ -1,6 +1,5 @@
 import type { GuideStyle } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { Layers } from 'lucide-react';
 import type { Translate } from '../../platform/i18n';
 import { GuideStyleFields } from './style-controls';
 
@@ -18,11 +17,6 @@ export function GuideDefaultAppearance({
 }) {
   return (
     <div className="guide-default-appearance">
-      <div className="guide-inspector-context">
-        <Layers size={16} aria-hidden="true" />
-        <strong>{t('scenario.editor.guideEntireDocument')}</strong>
-      </div>
-      <p className="guide-inspector-hint">{t('scenario.editor.guideDefaultScopeHint')}</p>
       <GuideStyleFields
         style={style}
         disabled={disabled}

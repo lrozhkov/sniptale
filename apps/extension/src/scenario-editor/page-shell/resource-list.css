@@ -106,7 +106,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  font: 600 13px / 1.5 var(--sniptale-font-sans);
+  font: 600 13px / 20px var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
 }
 .guide-library-panel :is(.guide-image-upload-compact, .tour-audio-acquisition) {
@@ -225,6 +225,8 @@
 }
 .guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 > svg {
   flex: none;
+  width: 16px;
+  height: 16px;
 }
 .guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 > span {
   min-width: 0;

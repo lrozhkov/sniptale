@@ -1,3 +1,4 @@
+import { GuideActionMenu } from '../action-menu';
 import { TourAudioResources } from './audio-materials';
 import { TourNarrationAcquisition } from './narration-acquisition';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
@@ -24,6 +25,9 @@ import {
   GripVertical,
   Flag,
   BookOpen,
+  MoreHorizontal,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideImageUpload } from '../image-upload';
@@ -83,7 +87,12 @@ export function TourLibraryPanel(
             </ContentToolbarButton>
           ))}
         </div>
-        <ContentToolbarButton title={t('scenario.editor.close')} onClick={panels.toggleLeft}>
+        <ContentToolbarButton
+          tone="utility"
+          size="compact"
+          title={t('scenario.editor.close')}
+          onClick={panels.toggleLeft}
+        >
           <X size={16} />
         </ContentToolbarButton>
       </div>
@@ -242,28 +251,15 @@ function TourSlideList({
                   {slide.title || t('scenario.editor.tourUntitled')}
                 </span>
               </button>
-              <div className="tour-slide-actions">
-                <ContentToolbarButton
-                  className="tour-slide-action"
-                  disabled={disabled}
-                  title={t('scenario.editor.tourDuplicate')}
-                  onClick={() => {
-                    const newId = crypto.randomUUID();
-                    if (state.command({ kind: 'duplicate-slide', slideId: slide.id, newId }))
-                      onSelect(newId);
-                  }}
-                >
-                  <Copy size={14} />
-                </ContentToolbarButton>
-                <ContentToolbarButton
-                  className="tour-slide-action"
-                  disabled={disabled}
-                  title={t('common.actions.delete')}
-                  onClick={() => remove(slide.id)}
-                >
-                  <Trash2 size={14} />
-                </ContentToolbarButton>
-              </div>
+              <TourSlideActions
+                slides={project.tour!.slides}
+                index={index}
+                disabled={disabled}
+                command={state.command}
+                onSelect={onSelect}
+                onRemove={remove}
+                t={t}
+              />
             </div>
           </div>
         );
@@ -306,6 +302,75 @@ function TourSlideList({
 }
 
 /** Keeps pointer and keyboard reordering on the same canonical move command. */
+/** The row menu shares canonical commands with drag and keyboard movement. */
+function TourSlideActions({
+  slides,
+  index,
+  disabled,
+  command,
+  onSelect,
+  onRemove,
+  t,
+}: {
+  slides: TourSlide[];
+  index: number;
+  disabled: boolean;
+  command: ReturnType<typeof useTourSelection>['command'];
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+  t: Translate;
+}) {
+  const slideId = slides[index]!.id;
+  return (
+    <div className="tour-slide-actions">
+      <GuideActionMenu
+        label={t('scenario.editor.tourSlideActions')}
+        icon={<MoreHorizontal size={16} aria-hidden="true" />}
+        tone="utility"
+        disabled={disabled}
+        items={[
+          {
+            label: t('scenario.editor.guideMoveUp'),
+            icon: <ArrowUp size={15} />,
+            disabled: index === 0,
+            onSelect: () =>
+              command({
+                kind: 'move-slide',
+                slideId: slideId,
+                beforeId: slides[index - 1]!.id,
+              }),
+          },
+          {
+            label: t('scenario.editor.guideMoveDown'),
+            icon: <ArrowDown size={15} />,
+            disabled: index === slides.length - 1,
+            onSelect: () =>
+              command({
+                kind: 'move-slide',
+                slideId: slideId,
+                ...(slides[index + 2] ? { beforeId: slides[index + 2]!.id } : {}),
+              }),
+          },
+          {
+            label: t('scenario.editor.tourDuplicate'),
+            icon: <Copy size={15} />,
+            onSelect: () => {
+              const newId = crypto.randomUUID();
+              if (command({ kind: 'duplicate-slide', slideId: slideId, newId })) onSelect(newId);
+            },
+          },
+          {
+            label: t('common.actions.delete'),
+            icon: <Trash2 size={15} />,
+            danger: true,
+            onSelect: () => onRemove(slideId),
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
 function TourSlideMoveHandle({
   slideId,
   index,
@@ -326,6 +391,7 @@ function TourSlideMoveHandle({
   return (
     <ContentToolbarButton
       className="tour-slide-grip"
+      tone="utility"
       onPointerDown={(event) => onPointerStart(event, slideId)}
       disabled={disabled}
       title={t('scenario.editor.tourMoveSlide')}

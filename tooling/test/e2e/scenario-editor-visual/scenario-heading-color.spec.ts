@@ -23,7 +23,8 @@ for (const theme of ['light', 'dark'] as const) {
       const mode = page.locator('.tour-representation-switch [aria-pressed="true"]');
       await page.mouse.move(700, 100);
       const idleBorder = await mode.evaluate((node) => getComputedStyle(node).borderTopColor);
-      await check(mode).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await check(mode).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await check(mode).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await check(mode.locator('span')).toHaveCSS('font-size', '13px');
       await check(mode.locator('svg')).toHaveCSS(
         'color',

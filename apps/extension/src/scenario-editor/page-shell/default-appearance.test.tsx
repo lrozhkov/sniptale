@@ -62,6 +62,7 @@ it('does not mutate defaults while disabled', async () => {
 it('renders document appearance inline without a modal or focus trap', async () => {
   await render();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(host.textContent).toContain('Entire guide');
+  expect(host.textContent).not.toContain('Entire guide');
+  expect(host.textContent).toContain('Paper theme');
   expect(document.activeElement).toBe(opener);
 });

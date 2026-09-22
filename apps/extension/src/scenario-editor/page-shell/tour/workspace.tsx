@@ -179,6 +179,8 @@ function TourSettingsPanel({
         <h2 title={inspectorTitle}>{inspectorTitle}</h2>
         {grouped && (
           <ContentToolbarButton
+            tone="utility"
+            size="compact"
             title={t(
               panels.presentation === 'all'
                 ? 'scenario.editor.inspectorShowSections'
@@ -193,7 +195,12 @@ function TourSettingsPanel({
             )}
           </ContentToolbarButton>
         )}
-        <ContentToolbarButton title={t('scenario.editor.close')} onClick={panels.toggleRight}>
+        <ContentToolbarButton
+          tone="utility"
+          size="compact"
+          title={t('scenario.editor.close')}
+          onClick={panels.toggleRight}
+        >
           <X size={16} />
         </ContentToolbarButton>
       </div>

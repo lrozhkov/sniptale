@@ -270,9 +270,9 @@
 .guide-inspector-panel [data-ui='shared.categorized-inspector.section-heading'] {
   min-width: 0;
   min-height: 45px;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--sniptale-color-border-soft);
+  margin-bottom: 8px;
+  padding-bottom: 0;
+  border-bottom: 0;
   font-size: 13px;
   font-weight: 600;
   line-height: 1.5;

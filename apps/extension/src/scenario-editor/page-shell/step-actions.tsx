@@ -9,12 +9,14 @@ export function GuideStepActions({
   project,
   itemId,
   disabled,
+  tone = 'default',
   onOperate,
   t,
 }: {
   project: GuideProject;
   itemId: string;
   disabled: boolean;
+  tone?: 'default' | 'utility';
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
 }) {
@@ -24,7 +26,12 @@ export function GuideStepActions({
   return (
     <div className="guide-item-actions">
       <GuideActionMenu
-        label={t('scenario.editor.guideStepActions')}
+        label={t(
+          item.kind === 'section'
+            ? 'scenario.editor.guideSectionActions'
+            : 'scenario.editor.guideStepActions'
+        )}
+        tone={tone}
         icon={<MoreHorizontal size={16} aria-hidden="true" />}
         disabled={disabled}
         items={[

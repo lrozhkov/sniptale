@@ -207,6 +207,7 @@ function GuideDocumentWorkspace({
           selectedId={state.selectedId}
           disabled={disabled}
           onSelect={framing.selectStep}
+          onOperate={operate}
           onAddStep={() => operate({ kind: 'add-step' })}
           inspectedBlockKind={framing.target?.block.kind}
           itemActions={
@@ -291,6 +292,7 @@ function ScenarioHeader({
           }
         : {})}
       onAppearance={() => panels.openRight('document')}
+      appearanceActive={panels.rightOpen && panels.rightScope === 'document'}
       onPreview={reader.open}
       previewRef={reader.trigger}
       previewDisabled={disabled || (tourMode && !project?.tour?.slides.length)}
@@ -334,7 +336,11 @@ function ScenarioHeader({
       onDuplicate={state.duplicate}
       onDelete={state.remove}
       onReload={state.reload}
-      leftControls={project && <GuidePanelControls panels={panels} t={t} side="left" />}
+      leftControls={
+        project && (
+          <GuidePanelControls panels={panels} t={t} side="left" representation={representation} />
+        )
+      }
       panelControls={project && <GuidePanelControls panels={panels} t={t} side="right" />}
       project={project}
       disabled={disabled}

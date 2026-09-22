@@ -25,6 +25,7 @@ afterEach(() => {
 async function draw(
   options: {
     commandsDisabled?: boolean;
+    appearanceActive?: boolean;
     contextControls?: ReactNode;
     representationControls?: ReactNode;
   } = {}
@@ -45,6 +46,7 @@ async function draw(
         representationControls={options.representationControls}
         disabled={false}
         onAppearance={appearance}
+        appearanceActive={options.appearanceActive ?? false}
         onDuplicate={duplicate}
         onDelete={remove}
         onReload={reload}
@@ -126,4 +128,12 @@ it('keeps Appearance enabled across an autosave lock while project mutations sta
   expect(duplicate).not.toHaveBeenCalled();
   expect(remove).not.toHaveBeenCalled();
   expect(reload).not.toHaveBeenCalled();
+});
+
+it('reports appearance selection from the inspector scope without owning another state', async () => {
+  await draw({ appearanceActive: true });
+  const button = () => host.querySelector<HTMLButtonElement>('button[title="Appearance"]')!;
+  expect(button().getAttribute('aria-pressed')).toBe('true');
+  await draw({ appearanceActive: false });
+  expect(button().getAttribute('aria-pressed')).toBe('false');
 });

@@ -335,8 +335,8 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   const mode = container.querySelector<HTMLButtonElement>('[aria-label="Camera mode"]');
   expect(mode?.disabled).toBe(false);
   await click('Resources');
-  const upload = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
-    (node) => node.textContent === 'Upload image'
+  const upload = container.querySelector<HTMLButtonElement>(
+    '.guide-image-resources button[title="Image"]'
   );
   expect(upload?.disabled).toBe(true);
   await choose('Camera mode', 'Manual');
@@ -384,7 +384,7 @@ it('switches representations directly from the header and keeps only the active 
   expect(choices().map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
   expect(choices()[0]?.querySelector('span')).not.toBeNull();
   expect(choices()[1]?.querySelector('span')).toBeNull();
-  expect(container.querySelector('.guide-header-actions')?.firstElementChild?.className).toBe(
+  expect(container.querySelector('.guide-page-header')?.firstElementChild?.className).toBe(
     'tour-representation-switch'
   );
   await act(async () => choices()[0]?.click());
@@ -398,7 +398,7 @@ it('switches representations directly from the header and keeps only the active 
   expect(container.querySelector('.guide-document-scroll')).not.toBeNull();
 });
 
-it('places tour controls between the title and the representation switch only in tour mode', async () => {
+it('places tour controls after the title and representation switch only in tour mode', async () => {
   const project = createGuideProject('Tour header', 'guide', 100);
   const slide = createTourImageSlide('first');
   slide.image = {
@@ -430,7 +430,7 @@ it('places tour controls between the title and the representation switch only in
   expect(controls).not.toBeNull();
   expect(title.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(
-    controls.compareDocumentPosition(representation) & Node.DOCUMENT_POSITION_FOLLOWING
+    representation.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   const actions = [...controls.querySelectorAll('button')].map((button) => button.title);
   expect(actions).toContain('Preview');

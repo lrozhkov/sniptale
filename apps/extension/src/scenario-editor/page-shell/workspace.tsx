@@ -1,3 +1,5 @@
+import { GuideStepActions } from './step-actions';
+import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { useGuideHoverIntent } from './hover-intent';
 import { GuideImageUpload } from './image-upload';
@@ -24,6 +26,7 @@ type WorkspaceProps = {
   disabled: boolean;
   onSelect: (id: string) => void;
   onAddStep: () => void;
+  onOperate?: (operation: GuideStructureOperation) => void;
   itemActions: ReactNode;
   inspectedBlockKind?: GuideBlock['kind'] | undefined;
   children: ReactNode;
@@ -74,7 +77,7 @@ export function GuideWorkspace(props: WorkspaceProps) {
 }
 
 function GuideWorkspaceLibrary(props: WorkspaceProps) {
-  const { project, selectedId, onSelect, t } = props;
+  const { t } = props;
   return (
     <FloatingChromePanel
       role="complementary"
@@ -120,7 +123,7 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
       </div>
       <div className="guide-panel-scroll">
         {props.panels.leftSection === 'structure' ? (
-          <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
+          <GuideOutline {...props} />
         ) : (
           <section
             className="guide-image-resources"
@@ -194,31 +197,44 @@ export function ScenarioWorkspaceFrame({
 }
 
 function GuideOutline({
+  onOperate,
+  disabled,
   project,
   selectedId,
   onSelect,
   t,
-}: Pick<WorkspaceProps, 'project' | 'selectedId' | 'onSelect' | 't'>) {
+}: Pick<WorkspaceProps, 'project' | 'selectedId' | 'onSelect' | 'onOperate' | 'disabled' | 't'>) {
   const numbers = resolveGuideNumbering(project.items);
   return (
     <nav aria-label={t('scenario.editor.outline')} className="guide-outline">
       {project.items.map((item) => {
         return (
-          <a
-            key={item.id}
-            href={`#${encodeURIComponent(item.id)}`}
-            className={item.kind === 'section' ? 'guide-outline-section' : 'guide-outline-step'}
-            aria-current={selectedId === item.id ? 'step' : undefined}
-            onClick={(event) => {
-              event.preventDefault();
-              onSelect(item.id);
-            }}
-          >
-            <span className="guide-outline-number" aria-hidden="true">
-              {item.kind === 'step' ? numbers.get(item.id)?.label : <FileText size={14} />}
-            </span>
-            <span>{item.title || t('scenario.editor.untitledStep')}</span>
-          </a>
+          <div className="guide-outline-row" key={item.id} data-current={selectedId === item.id}>
+            <a
+              href={`#${encodeURIComponent(item.id)}`}
+              className={item.kind === 'section' ? 'guide-outline-section' : 'guide-outline-step'}
+              aria-current={selectedId === item.id ? 'step' : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                onSelect(item.id);
+              }}
+            >
+              <span className="guide-outline-number" aria-hidden="true">
+                {item.kind === 'step' ? numbers.get(item.id)?.label : <FileText size={14} />}
+              </span>
+              <span>{item.title || t('scenario.editor.untitledStep')}</span>
+            </a>
+            {onOperate && (
+              <GuideStepActions
+                project={project}
+                itemId={item.id}
+                disabled={disabled}
+                tone="utility"
+                onOperate={onOperate}
+                t={t}
+              />
+            )}
+          </div>
         );
       })}
     </nav>
@@ -310,16 +326,18 @@ export function GuidePanelControls({
   panels,
   t,
   side,
+  representation = 'guide',
 }: {
   panels: ReturnType<typeof useGuidePanels>;
   t: Translate;
   side: 'left' | 'right';
+  representation?: 'guide' | 'tour';
 }) {
   if (side === 'right')
     return panels.rightOpen ? null : (
       <ContentToolbarButton
         tone="utility"
-        size="compact"
+        className="guide-panel-reopen"
         title={t('scenario.editor.guideInspector')}
         aria-controls="guide-inspector-panel"
         onClick={panels.toggleRight}
@@ -332,16 +350,22 @@ export function GuidePanelControls({
     <div className="guide-collapsed-sections">
       <ContentToolbarButton
         tone="utility"
-        size="compact"
-        title={t('scenario.editor.outline')}
+        className="guide-panel-reopen"
+        title={t(
+          representation === 'tour' ? 'scenario.editor.tourSlides' : 'scenario.editor.outline'
+        )}
         aria-controls="guide-library-panel"
         onClick={() => panels.openLeft('structure')}
       >
-        <FileText size={16} aria-hidden="true" />
+        {representation === 'tour' ? (
+          <List size={16} aria-hidden="true" />
+        ) : (
+          <FileText size={16} aria-hidden="true" />
+        )}
       </ContentToolbarButton>
       <ContentToolbarButton
         tone="utility"
-        size="compact"
+        className="guide-panel-reopen"
         title={t('scenario.editor.guideResources')}
         aria-controls="guide-library-panel"
         onClick={() => panels.openLeft('resources')}

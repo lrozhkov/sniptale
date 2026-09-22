@@ -317,6 +317,7 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideAddSection: { ru: 'Добавить раздел', en: 'Add section' },
   guideSectionTitle: { ru: 'Заголовок раздела', en: 'Section title' },
   guideShowNumber: { ru: 'Показывать номер шага', en: 'Show step number' },
+  guideSectionActions: { ru: 'Действия с разделом', en: 'Section actions' },
   guideStepActions: { ru: 'Действия с шагом', en: 'Step actions' },
   guideBlockActions: { ru: 'Действия с блоком', en: 'Block actions' },
   guideMoveUp: { ru: 'Выше', en: 'Move up' },

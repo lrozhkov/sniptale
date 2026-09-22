@@ -131,7 +131,8 @@ it('duplicates, reorders by keyboard and repairs incoming links only after expli
   await render();
   const before = current.items;
   const rows = () => host.querySelectorAll('.tour-slide-row');
-  await click('Duplicate slide', rows()[0]!);
+  await click('Slide actions', rows()[0]!);
+  await click('Duplicate slide', document.body);
   expect(current.tour!.slides).toHaveLength(3);
   const duplicated = current.tour!.slides[1]!.id;
   const handle = rows()[1]!.querySelector('button')!;
@@ -139,11 +140,13 @@ it('duplicates, reorders by keyboard and repairs incoming links only after expli
   expect(current.tour!.slides.at(-1)?.id).toBe(duplicated);
   await key(host.querySelectorAll('.tour-slide-row')[2]!.querySelector('button')!, 'Home');
   expect(current.tour!.slides[0]!.id).toBe(duplicated);
-  await click('Delete', rows()[1]!);
+  await click('Slide actions', rows()[1]!);
+  await click('Delete', document.body);
   expect(host.textContent).toContain('Other slides link here');
   await click('Cancel');
   expect(current.tour!.slides).toHaveLength(3);
-  await click('Delete', rows()[1]!);
+  await click('Slide actions', rows()[1]!);
+  await click('Delete', document.body);
   await click('Delete', host.querySelector('.tour-review-notice')!);
   expect(current.tour!.slides.some((s) => s.id === 'first')).toBe(false);
   const second = current.tour!.slides.find((s) => s.id === 'second');
@@ -156,11 +159,12 @@ it('keeps slide actions inside the selectable card and selection on the card', a
   const card = row().querySelector('.tour-slide-card')!;
   expect(card).not.toBeNull();
   expect(card.querySelector('.tour-slide-select')).not.toBeNull();
-  expect(card.querySelectorAll('.tour-slide-action')).toHaveLength(2);
+  expect(card.querySelectorAll('.tour-slide-actions button')).toHaveLength(1);
   expect(card.getAttribute('data-current')).toBe('true');
   await click('2Second', host);
   expect(row().querySelector('.tour-slide-card')?.getAttribute('data-current')).toBe('false');
-  await click('Duplicate slide', row());
+  await click('Slide actions', row());
+  await click('Duplicate slide', document.body);
   expect(
     host
       .querySelectorAll('.tour-slide-row')[1]!
@@ -351,7 +355,8 @@ it('lists each affected navigation source before clearing links to a removed sli
   };
   project.tour!.slides.push(navigation);
   await render(project);
-  await click('Delete', host.querySelector('.tour-slide-row')!);
+  await click('Slide actions', host.querySelector('.tour-slide-row')!);
+  await click('Delete', document.body);
   const notice = host.querySelector('.tour-review-notice')!;
   expect(notice.textContent).toContain('Second — Automatic transition');
   expect(notice.textContent).toContain('Second — Go first');

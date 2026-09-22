@@ -21,24 +21,38 @@
   background: transparent;
   box-shadow: none;
 }
-.guide-page-header .tour-representation-switch .guide-section-tab:hover {
-  background: var(--sniptale-color-surface-hover);
-}
 .tour-representation-switch .guide-section-tab span {
   display: block;
   font: 500 13px / 20px var(--sniptale-font-sans);
 }
-.guide-page .guide-page-header .tour-representation-switch .guide-section-tab[aria-pressed='true'],
+.guide-page .guide-page-header .tour-representation-switch .guide-section-tab {
+  color: var(--sniptale-color-text-muted);
+  border-color: transparent;
+  border-radius: var(--sniptale-radius-sm);
+  transition:
+    background-color var(--sniptale-duration-fast) ease,
+    color var(--sniptale-duration-fast) ease;
+}
+.guide-page .guide-page-header .tour-representation-switch .guide-section-tab:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+  background: var(--sniptale-color-surface-input) !important;
+  border-color: transparent;
+}
+.guide-page .guide-page-header .tour-representation-switch .guide-section-tab[aria-pressed='true'] {
+  background: var(--sniptale-color-surface-hover) !important;
+  color: var(--sniptale-color-text-primary);
+  border-color: transparent;
+}
 .guide-page
   .guide-page-header
   .tour-representation-switch
   .guide-section-tab[aria-pressed='true']:hover:not(:disabled) {
-  border-color: var(--sniptale-color-accent);
-  background: var(--sniptale-color-accent-soft);
-  color: var(--sniptale-color-text-primary);
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 12%, transparent) !important;
+  color: var(--sniptale-color-text-primary-strong);
+  border-color: transparent;
 }
 .guide-page-header .tour-representation-switch .guide-section-tab svg {
-  color: var(--sniptale-color-text-primary);
+  color: inherit;
 }
 .tour-drop-zone {
   position: relative;
@@ -154,9 +168,9 @@
   align-items: center;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
   border: 1px solid transparent;
   border-radius: var(--sniptale-radius-sm);
+  transition: background-color var(--sniptale-duration-fast) ease;
 }
 .tour-slide-card:hover,
 .tour-slide-card:focus-within {
@@ -165,35 +179,53 @@
 .tour-slide-card[data-current='true'],
 .tour-slide-card[data-current='true']:hover,
 .tour-slide-card[data-current='true']:focus-within {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
 }
 .tour-slide-actions {
   display: flex;
   align-items: center;
-  gap: 0.125rem;
-  flex: none;
-  width: 0;
+  flex: 0 0 28px;
   opacity: 0;
-  overflow: hidden;
   pointer-events: none;
+  transition: opacity var(--sniptale-duration-fast) ease;
 }
-.tour-slide-card:hover .tour-slide-actions,
-.tour-slide-card:focus-within .tour-slide-actions {
-  width: max-content;
+.tour-slide-row:hover .tour-slide-actions,
+.tour-slide-card:focus-within .tour-slide-actions,
+.tour-slide-actions:has([aria-expanded='true']) {
   opacity: 1;
   pointer-events: auto;
 }
-.tour-slide-card .tour-slide-action {
-  width: 1.5rem;
-  min-width: 1.5rem;
+.tour-slide-actions .guide-action-menu-anchor > button {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
   padding: 0;
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
 }
-.tour-slide-card .tour-slide-action:hover {
-  background: var(--sniptale-color-surface-hover);
+.tour-slide-card[data-current='true'] .tour-slide-title {
+  font-weight: 600;
+}
+.tour-slide-card[data-current='true']:hover {
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 12%, transparent);
+}
+.tour-slide-select:focus-visible,
+.tour-end-row:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: -2px;
+}
+.tour-slide-list {
+  container: tour-slides / inline-size;
+}
+@container tour-slides (max-width: 240px) {
+  .tour-slide-select img {
+    display: none;
+  }
+}
+@media (hover: none) {
+  .tour-slide-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .tour-slide-grip {
   cursor: grab;
@@ -256,8 +288,11 @@ html[data-tour-reordering] * {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 .tour-slide-select img {
   width: 3rem;
@@ -276,8 +311,8 @@ html[data-tour-reordering] * {
   background: var(--sniptale-color-surface-hover);
 }
 .tour-slide-row:not(:has(.tour-slide-card)) > .tour-slide-select[aria-current] {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
 }
 .tour-object-add .guide-action-menu-anchor {
   width: auto;
@@ -500,6 +535,14 @@ html[data-tour-reordering] * {
   background: var(--sniptale-color-surface-hover);
 }
 .tour-end-row[aria-current] {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-slide-card,
+  .tour-slide-actions,
+  .guide-page .guide-page-header .tour-representation-switch .guide-section-tab {
+    transition: none;
+  }
 }

@@ -22,11 +22,13 @@ export function GuideActionMenu({
   icon,
   items,
   disabled = false,
+  tone = 'default',
 }: {
   label: string;
   icon: ReactNode;
   items: GuideMenuItem[];
   disabled?: boolean;
+  tone?: 'default' | 'utility';
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +71,7 @@ export function GuideActionMenu({
     >
       <ContentToolbarButton
         ref={trigger}
+        tone={tone}
         type="button"
         title={label}
         aria-expanded={open}

@@ -222,6 +222,7 @@ export const scenarioTourMessages = {
   referenceMode: { ru: 'Руководство', en: 'Guide' },
   tourMode: { ru: 'Интерактивный тур', en: 'Interactive tour' },
   tourSlides: { ru: 'Слайды', en: 'Slides' },
+  tourSlideActions: { ru: 'Действия со слайдом', en: 'Slide actions' },
   tourMoveSlide: { ru: 'Переместить слайд', en: 'Move slide' },
   tourDuplicate: { ru: 'Дублировать слайд', en: 'Duplicate slide' },
   tourPreviewImage: { ru: 'Посмотреть изображение', en: 'View image' },
