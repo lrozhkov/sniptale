@@ -163,6 +163,16 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await row.hover();
       await expect(actions).toHaveCSS('opacity', '1');
       expect(await row.locator('.tour-object-row').boundingBox()).toEqual(before);
+      await expect
+        .soft(panel.locator('ol.tour-object-list > li'))
+        .toHaveCount(await panel.locator('.tour-object-item').count());
+      await expect.soft(row.locator('.tour-object-row > svg')).toHaveCount(1);
+      const iconAction = actions.locator('button:not(:disabled)').first();
+      const idleColor = await iconAction.evaluate((node) => getComputedStyle(node).color);
+      await iconAction.hover();
+      await expect.soft(iconAction).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(iconAction).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(iconAction).not.toHaveCSS('color', idleColor);
       const dividerGap = await row.evaluate(
         (node) =>
           node.getBoundingClientRect().bottom -
@@ -194,18 +204,44 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       );
       await expect(library.locator('.guide-resource-footer')).toHaveCount(0);
       const images = library.locator('.guide-image-resources');
+      const previewButton = images
+        .getByRole('button', {
+          name: ru ? 'Посмотреть изображение' : 'View image',
+          exact: true,
+        })
+        .first();
+      await images.locator('.tour-resource-row').first().hover();
+      await previewButton.click();
+      const previewDialog = page.locator('#tour-resource-preview');
+      await expect(previewDialog).toBeVisible();
+      await expect.soft(library.locator('#tour-resource-preview')).toHaveCount(0);
+      const previewBounds = await previewDialog.boundingBox();
+      expect.soft(previewBounds!.x + previewBounds!.width).toBeGreaterThan(800);
+      await page.keyboard.press('Escape');
+      await expect(previewButton).toBeFocused();
       await expect(
         images.getByRole('button', {
           name: ru ? 'Загрузить изображение' : 'Upload image',
           exact: true,
         })
+      ).toHaveCount(0);
+      await images
+        .locator('.guide-image-upload-compact .guide-action-menu-anchor > button')
+        .click();
+      await expect(
+        page.getByRole('button', {
+          name: ru ? 'Загрузить изображение' : 'Upload image',
+          exact: true,
+        })
       ).toBeVisible();
-      const order = await images.evaluate(
-        (node) =>
-          node.querySelector('.guide-image-upload-compact')!.getBoundingClientRect().bottom <=
-          node.querySelector('.tour-resource-list')!.getBoundingClientRect().top
-      );
-      expect(order).toBe(true);
+      await page
+        .getByRole('button', { name: ru ? 'Библиотека изображений' : 'Image library', exact: true })
+        .click();
+      await expect(page.locator('#guide-resource-drawer')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(
+        images.locator('.guide-image-upload-compact .guide-action-menu-anchor > button')
+      ).toBeFocused();
       await expect(library.locator('.tour-audio-resources .tour-audio-acquisition')).toBeVisible();
       await library.locator('.tour-audio-acquisition input[type="file"]').setInputFiles({
         name: 'Narration.wav',
@@ -213,6 +249,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         buffer: silentAudio(),
       });
       await expect(library.locator('.tour-audio-resource')).toHaveCount(1);
+      await expect(library.locator('.tour-audio-acquisition [aria-expanded]')).toHaveCount(1);
+      await library.locator('.tour-audio-resource').hover();
       await library
         .getByRole('button', {
           name: ru ? 'Озвучить выбранное' : 'Attach to selection',
@@ -243,6 +281,26 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         )
       ).toEqual([]);
       await info.attach(`resources-${locale}-${theme}`, {
+        body: await library.screenshot(),
+        contentType: 'image/png',
+      });
+      await page.getByRole('button', { name: ru ? 'Руководство' : 'Guide', exact: true }).click();
+      await library
+        .getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true })
+        .click();
+      await expect(library.locator('.guide-image-upload-compact [aria-expanded]')).toHaveCount(1);
+      const guideRow = library.locator('.guide-resource-row').first();
+      await guideRow.hover();
+      const guidePreview = guideRow.getByRole('button', {
+        name: ru ? 'Посмотреть изображение' : 'Preview image',
+        exact: true,
+      });
+      await guidePreview.click();
+      await expect(page.locator('#guide-resource-preview')).toBeVisible();
+      await expect(library.locator('#guide-resource-preview')).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await expect(guidePreview).toBeFocused();
+      await info.attach(`guide-resources-${locale}-${theme}`, {
         body: await library.screenshot(),
         contentType: 'image/png',
       });

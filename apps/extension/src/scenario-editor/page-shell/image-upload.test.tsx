@@ -84,3 +84,37 @@ it('aborts explicitly and does not display late failure from the cancelled file'
   await act(async () => finish?.(false));
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
+
+it('keeps file preparation and failure recovery alive behind the populated resource menu', async () => {
+  await act(async () =>
+    root.render(
+      <GuideImageUpload
+        compact
+        menu
+        placement={{ kind: 'steps' }}
+        disabled={false}
+        onUpload={upload}
+        t={createTranslator('en')}
+      />
+    )
+  );
+  const input = host.querySelector('input')!;
+  const pick = vi.spyOn(input, 'click').mockImplementation(() => {});
+  const trigger = host.querySelector<HTMLButtonElement>('.guide-action-menu-anchor > button')!;
+  await act(async () => trigger.click());
+  const options = [...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button')];
+  expect(options.find((button) => button.textContent?.includes('Image library'))?.disabled).toBe(
+    true
+  );
+  await act(async () =>
+    options.find((button) => button.textContent?.includes('Upload image'))?.click()
+  );
+  expect(pick).toHaveBeenCalledOnce();
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  upload.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  await choose();
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  await choose();
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(upload).toHaveBeenCalledTimes(2);
+});

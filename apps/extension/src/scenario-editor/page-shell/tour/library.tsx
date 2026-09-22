@@ -6,7 +6,10 @@ import { useState, type PointerEvent } from 'react';
 import { useTourSlideReorder } from './slide-reorder';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { getTourIncomingReferences } from '../../../features/scenario/project/public';
+import {
+  getTourAudioResources,
+  getTourIncomingReferences,
+} from '../../../features/scenario/project/public';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -95,10 +98,15 @@ export function TourLibraryPanel(
             >
               <h3>
                 <Image size={15} aria-hidden="true" />
-                {t('scenario.editor.guideLibraryImages')}
+                <span>{t('scenario.editor.guideLibraryImages')}</span>
               </h3>
               <GuideImageUpload
                 compact
+                menu={
+                  project.tour?.slides.some((slide) =>
+                    Boolean(slide.kind === 'image' ? slide.image : slide.background.image)
+                  ) ?? false
+                }
                 placement={{ kind: 'tour-slides' }}
                 disabled={importDisabled}
                 onUpload={props.onUpload}
@@ -121,6 +129,7 @@ export function TourLibraryPanel(
                 {props.onImportNarration && (
                   <TourNarrationAcquisition
                     key={`${project.id}:resources`}
+                    menu={getTourAudioResources(project.tour).length > 0}
                     destination={{ slideId: null, objectId: null, expectedNarration: null }}
                     disabled={importDisabled}
                     onImport={props.onImportNarration}
@@ -261,7 +270,7 @@ function TourSlideList({
       })}
       {project.tour && (
         <button
-          className="tour-object-row"
+          className="tour-end-row"
           aria-current={state.selection?.kind === 'end' ? 'step' : undefined}
           onClick={() => {
             state.select({ kind: 'end' });

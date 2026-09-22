@@ -111,7 +111,7 @@ export function TourAudioResources({
     <section className="tour-audio-resources" aria-label={t('scenario.editor.tourAudioResources')}>
       <h3>
         <Music2 size={15} />
-        {t('scenario.editor.tourAudioResources')}
+        <span>{t('scenario.editor.tourAudioResources')}</span>
       </h3>
       {children}
       {!resources.length && (
@@ -130,7 +130,7 @@ export function TourAudioResources({
         return (
           <div
             key={resource.assetId}
-            className="tour-audio-resource"
+            className="tour-audio-resource guide-resource-row"
             data-tour-audio-resource={resource.assetId}
           >
             <button
@@ -139,11 +139,17 @@ export function TourAudioResources({
               aria-expanded={preview === resource.assetId}
               onClick={() => setPreview(preview === resource.assetId ? null : resource.assetId)}
             >
-              <Music2 size={15} />
-              <span>{resource.name || t('scenario.editor.tourNarration')}</span>
-              <small>{formatDurationLabel(resource.duration)}</small>
+              <span className="guide-resource-thumb">
+                <Music2 size={16} />
+              </span>
+              <span className="tour-audio-label">
+                <span className="guide-resource-name">
+                  {resource.name || t('scenario.editor.tourNarration')}
+                </span>
+                <small>{formatDurationLabel(resource.duration)}</small>
+              </span>
             </button>
-            <div className="tour-audio-resource-actions">
+            <div className="tour-audio-resource-actions guide-resource-actions">
               <ContentToolbarButton
                 title={`${t('scenario.editor.tourAudioUsed')}: ${usages.length}`}
                 disabled={!usages.length}
@@ -157,9 +163,6 @@ export function TourAudioResources({
                 }}
               >
                 <ArrowRight size={14} />
-                <span>
-                  {t('scenario.editor.tourAudioUsed')}: {usages.length}
-                </span>
               </ContentToolbarButton>
               <ContentToolbarButton
                 title={t('scenario.editor.tourAudioAttach')}
@@ -186,7 +189,6 @@ export function TourAudioResources({
                 }}
               >
                 <Plus size={15} />
-                <span>{t('scenario.editor.tourAudioAttach')}</span>
               </ContentToolbarButton>
               <ContentToolbarButton
                 tone="danger"

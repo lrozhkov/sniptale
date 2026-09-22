@@ -100,6 +100,10 @@ export function GuideResourceDrawer({
   );
 }
 
+export function useGuideResourceRequest() {
+  return useContext(ResourceRequest);
+}
+
 /** Opens the single runtime-local drawer with an optional exact image destination. */
 export function GuideResourceTrigger({
   t,
@@ -114,7 +118,7 @@ export function GuideResourceTrigger({
   label?: boolean;
   title?: string;
 }) {
-  const request = useContext(ResourceRequest);
+  const request = useGuideResourceRequest();
   const buttonProps = {
     type: 'button' as const,
     title: title ?? t('scenario.editor.guideOpenImageLibrary'),

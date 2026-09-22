@@ -180,9 +180,15 @@ it('shows unique resources, previews them and cycles through their usages withou
   await render();
   await click('Resources');
   expect(host.querySelectorAll('.tour-resource-row')).toHaveLength(1);
+  const previewTrigger = host.querySelector<HTMLButtonElement>('[title="View image"]')!;
+  await act(async () => previewTrigger.focus());
   await click('View image');
   expect(document.querySelector('[role=dialog] img')).not.toBeNull();
+  expect(host.querySelector('#tour-resource-preview')).toBeNull();
+  expect(host.querySelector('.guide-image-resources')?.getAttribute('aria-label')).toBe('Images');
+  expect(host.querySelector('.guide-image-upload-compact [aria-expanded]')).not.toBeNull();
   await click('Close', document.querySelector('[role=dialog]')!);
+  expect(document.activeElement).toBe(previewTrigger);
   await click('Used in slides: 2');
   expect(host.querySelector('.tour-slide-select[aria-current]')).toBeNull();
   await click('Slides');

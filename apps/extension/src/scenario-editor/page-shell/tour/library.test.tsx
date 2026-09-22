@@ -132,3 +132,26 @@ it('keeps structure commands available and omits unsupported audio acquisition',
   expect(host.querySelector('.tour-audio-resource')).not.toBeNull();
   expect(host.querySelector('.tour-audio-acquisition')).toBeNull();
 });
+
+it('offers acquisition from plus menus and previews images outside the library panel', async () => {
+  await act(async () => root.render(<Probe />));
+  await click('Resources');
+  const audioMenu = host.querySelector<HTMLButtonElement>(
+    '.tour-audio-acquisition .guide-action-menu-anchor > button'
+  )!;
+  const input = host.querySelector<HTMLInputElement>('.tour-audio-acquisition input')!;
+  const pick = vi.spyOn(input, 'click').mockImplementation(() => {});
+  await act(async () => audioMenu.click());
+  const uploadButton = [
+    ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
+  ].find((button) => button.textContent?.includes('Upload audio'))!;
+  expect(uploadButton).toBeDefined();
+  await act(async () => uploadButton.click());
+  expect(pick).toHaveBeenCalledOnce();
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  await click('View image');
+  expect(host.querySelector('#tour-resource-preview')).toBeNull();
+  expect(document.querySelector('#tour-resource-preview img')?.getAttribute('src')).toBe(
+    'data:image/png;base64,aA=='
+  );
+});

@@ -13,7 +13,6 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourSlideObjects, TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
-  ChevronRight,
   Crosshair,
   MessageSquare,
   ScanLine,
@@ -464,59 +463,65 @@ function TourImageObjects({
       {objects.length === 0 && (
         <TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />
       )}
-      {objects.map((entry, index) => {
-        const { label, Icon } = tourSlideObjectLabel(entry, t);
-        return (
-          <div className="tour-object-item" key={entry.object.id}>
-            <button
-              className="tour-object-row"
-              data-inspector-object={entry.object.id}
-              onClick={() => onSelect(entry.object.id)}
-              title={label}
-            >
-              <Icon size={15} />
-              <span>{label}</span>
-              <ChevronRight size={15} aria-hidden="true" />
-            </button>
-            <div className="tour-object-item-actions">
-              <ContentToolbarButton
-                title={t('scenario.editor.tourMoveObjectUp')}
-                disabled={disabled || index === 0}
-                onClick={() => move(index, -1)}
-              >
-                <ArrowUp size={14} />
-              </ContentToolbarButton>
-              <ContentToolbarButton
-                title={t('scenario.editor.tourMoveObjectDown')}
-                disabled={disabled || index === objects.length - 1}
-                onClick={() => move(index, 1)}
-              >
-                <ArrowDown size={14} />
-              </ContentToolbarButton>
-              <ContentToolbarButton
-                className="tour-object-delete"
-                title={t('common.actions.delete')}
-                disabled={disabled}
-                onClick={() =>
-                  onChange({
-                    ...slide,
-                    hotspots: slide.hotspots.filter((object) => object.id !== entry.object.id),
-                    annotations: slide.annotations.filter(
-                      (object) => object.id !== entry.object.id
-                    ),
-                    masks: slide.masks.filter((object) => object.id !== entry.object.id),
-                    ...(slide.objectOrder
-                      ? { objectOrder: slide.objectOrder.filter((id) => id !== entry.object.id) }
-                      : {}),
-                  })
-                }
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </ContentToolbarButton>
-            </div>
-          </div>
-        );
-      })}
+      {objects.length > 0 && (
+        <ol className="tour-object-list" aria-label={t('scenario.editor.tourObjects')}>
+          {objects.map((entry, index) => {
+            const { label, Icon } = tourSlideObjectLabel(entry, t);
+            return (
+              <li className="tour-object-item" key={entry.object.id}>
+                <button
+                  className="tour-object-row"
+                  data-inspector-object={entry.object.id}
+                  onClick={() => onSelect(entry.object.id)}
+                  title={label}
+                >
+                  <Icon size={15} aria-hidden="true" />
+                  <span>{label}</span>
+                </button>
+                <div className="tour-object-item-actions">
+                  <ContentToolbarButton
+                    title={t('scenario.editor.tourMoveObjectUp')}
+                    disabled={disabled || index === 0}
+                    onClick={() => move(index, -1)}
+                  >
+                    <ArrowUp size={14} />
+                  </ContentToolbarButton>
+                  <ContentToolbarButton
+                    title={t('scenario.editor.tourMoveObjectDown')}
+                    disabled={disabled || index === objects.length - 1}
+                    onClick={() => move(index, 1)}
+                  >
+                    <ArrowDown size={14} />
+                  </ContentToolbarButton>
+                  <ContentToolbarButton
+                    className="tour-object-delete"
+                    tone="danger"
+                    title={t('common.actions.delete')}
+                    disabled={disabled}
+                    onClick={() =>
+                      onChange({
+                        ...slide,
+                        hotspots: slide.hotspots.filter((object) => object.id !== entry.object.id),
+                        annotations: slide.annotations.filter(
+                          (object) => object.id !== entry.object.id
+                        ),
+                        masks: slide.masks.filter((object) => object.id !== entry.object.id),
+                        ...(slide.objectOrder
+                          ? {
+                              objectOrder: slide.objectOrder.filter((id) => id !== entry.object.id),
+                            }
+                          : {}),
+                      })
+                    }
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </ContentToolbarButton>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </GuideInspectorGroup>
   );
 }

@@ -125,10 +125,14 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
           >
             <h3>
               <Image size={15} aria-hidden="true" />
-              {t('scenario.editor.guideLibraryImages')}
+              <span>{t('scenario.editor.guideLibraryImages')}</span>
             </h3>
             <GuideImageUpload
               compact
+              menu={props.project.items.some(
+                (item) =>
+                  item.kind === 'step' && item.blocks.some((block) => block.kind === 'image')
+              )}
               placement={{ kind: 'steps' }}
               disabled={props.disabled}
               onUpload={props.onUploadFile}

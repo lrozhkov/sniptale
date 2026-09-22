@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Mic, Upload } from 'lucide-react';
+import { GuideActionMenu } from '../action-menu';
+import { Mic, Upload, Plus } from 'lucide-react';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../../platform/i18n';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
@@ -10,12 +11,14 @@ type NarrationDestination = Pick<ImportInput, 'slideId' | 'objectId' | 'expected
 
 /** Shared acquisition UI captures one immutable destination; persistence stays with the page. */
 export function TourNarrationAcquisition({
+  menu = false,
   destination,
   disabled,
   onImport,
   t,
   children,
 }: {
+  menu?: boolean;
   destination: NarrationDestination;
   disabled: boolean;
   onImport: (input: ImportInput) => Promise<boolean>;
@@ -48,21 +51,47 @@ export function TourNarrationAcquisition({
   };
   return (
     <>
-      <fieldset disabled={disabled || pending} className="tour-audio-acquisition">
-        <ScenarioInspectorActionButton
-          disabled={disabled || pending}
-          onClick={() => setRecording(structuredClone(destination))}
-        >
-          <Mic size={15} />
-          {t('scenario.editor.tourRecord')}
-        </ScenarioInspectorActionButton>
-        <ScenarioInspectorActionButton
-          disabled={disabled || pending}
-          onClick={() => input.current?.click()}
-        >
-          <Upload size={15} />
-          {t('scenario.editor.tourAudioUpload')}
-        </ScenarioInspectorActionButton>
+      <fieldset
+        disabled={disabled || pending}
+        className="tour-audio-acquisition"
+        data-acquisition-menu={menu || undefined}
+      >
+        {menu ? (
+          <GuideActionMenu
+            label={t('scenario.editor.tourAudioResources')}
+            icon={<Plus size={16} aria-hidden="true" />}
+            disabled={disabled || pending}
+            items={[
+              {
+                label: t('scenario.editor.tourRecord'),
+                icon: <Mic size={15} />,
+                onSelect: () => setRecording(structuredClone(destination)),
+              },
+              {
+                label: t('scenario.editor.tourAudioUpload'),
+                icon: <Upload size={15} />,
+                onSelect: () => input.current?.click(),
+              },
+            ]}
+          />
+        ) : (
+          <>
+            <ScenarioInspectorActionButton
+              disabled={disabled || pending}
+              onClick={() => setRecording(structuredClone(destination))}
+            >
+              <Mic size={15} />
+              {t('scenario.editor.tourRecord')}
+            </ScenarioInspectorActionButton>
+            <ScenarioInspectorActionButton
+              disabled={disabled || pending}
+              onClick={() => input.current?.click()}
+            >
+              <Upload size={15} />
+              {t('scenario.editor.tourAudioUpload')}
+            </ScenarioInspectorActionButton>
+          </>
+        )}
         {children}
         <input
           ref={input}

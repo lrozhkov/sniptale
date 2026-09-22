@@ -382,38 +382,6 @@
   border-color: transparent;
   margin-bottom: 0;
 }
-.guide-inspector-panel .tour-object-item {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  min-height: 36px;
-  padding-block: 4px;
-  border-bottom: 1px solid var(--sniptale-color-border-soft);
-}
-.guide-inspector-panel .tour-object-row > span {
-  flex: 1;
-  min-width: 0;
-  overflow: visible;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-.guide-inspector-panel .tour-object-item-actions {
-  width: auto;
-  margin-inline-start: auto;
-}
-.guide-inspector-panel .tour-object-item-actions > button {
-  width: 1.5rem;
-  height: 1.5rem;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
-}
-.guide-inspector-panel .tour-object-row {
-  flex: 1;
-  width: auto;
-  min-width: 0;
-  min-height: 36px;
-  font-size: 12px;
-}
 .guide-inspector-panel .tour-object-add button {
   width: 32px;
   min-width: 32px;
@@ -544,10 +512,6 @@
 
 .guide-page .guide-inspector-panel {
   gap: 0;
-}
-
-.guide-inspector-panel .tour-object-item:last-child {
-  border-bottom: none;
 }
 
 .guide-inspector-panel .guide-appearance {
@@ -715,25 +679,8 @@
 .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] > nav button {
   transition: color 120ms ease;
 }
-/* Reserve action space: revealing controls never moves the row title. */
-.guide-inspector-panel .tour-object-item-actions {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease;
-}
-.guide-inspector-panel .tour-object-item:is(:hover, :focus-within) .tour-object-item-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-@media (hover: none), (pointer: coarse) {
-  .guide-inspector-panel .tour-object-item-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] > nav button,
-  .guide-inspector-panel .tour-object-item-actions {
+  .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] > nav button {
     transition: none;
   }
 }
@@ -746,15 +693,15 @@
   color: var(--sniptale-color-text-primary-strong);
 }
 
-/* Contents are one numbered list, independent of library slide-card geometry. */
-.tour-contents-list {
+/* Both inspector lists share geometry and reveal actions without moving titles. */
+:is(.tour-contents-list, .tour-object-list) {
   display: grid;
   gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.tour-contents-row {
+:is(.tour-contents-row, .tour-object-item) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
@@ -763,13 +710,13 @@
   padding: 4px;
   border-radius: var(--sniptale-radius-sm);
 }
-.tour-contents-row:is(:hover, :focus-within) {
+:is(.tour-contents-row, .tour-object-item):is(:hover, :focus-within) {
   background: var(--sniptale-color-surface-hover);
 }
-.tour-contents-select {
+:is(.tour-contents-select, .tour-object-row) {
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
-  align-items: baseline;
+  align-items: start;
   gap: 6px;
   min-width: 0;
   min-height: 36px;
@@ -781,7 +728,7 @@
   text-align: start;
   overflow-wrap: anywhere;
 }
-.tour-contents-select > span:last-child {
+:is(.tour-contents-select, .tour-object-row) > span:last-child {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -792,21 +739,28 @@
   font-variant-numeric: tabular-nums;
   font-weight: 400;
 }
-.tour-contents-actions {
+:is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions) {
   display: flex;
   gap: 2px;
   opacity: 0;
   pointer-events: none;
   transition: opacity 120ms ease;
 }
-.guide-inspector-panel .tour-contents-actions > button {
+.guide-inspector-panel
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions)
+  > button {
   width: 24px;
   min-width: 24px;
   height: 24px;
   min-height: 24px;
   padding: 0;
 }
-.tour-contents-row:is(:hover, :focus-within) .tour-contents-actions {
+:is(.tour-contents-row, .tour-object-item, .guide-resource-row):is(
+    :hover,
+    :focus-within,
+    :has([aria-expanded='true'])
+  )
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions) {
   opacity: 1;
   pointer-events: auto;
 }
@@ -819,13 +773,52 @@
   color: var(--sniptale-color-text-secondary);
 }
 @media (hover: none), (pointer: coarse) {
-  .tour-contents-actions {
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions) {
     opacity: 1;
     pointer-events: auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tour-contents-actions {
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions) {
+    transition: none;
+  }
+}
+
+.guide-inspector-panel .tour-object-row > svg {
+  margin-top: 1px;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-page
+  :is(.guide-inspector-panel, .guide-library-panel)
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions)
+  > button {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-secondary);
+  transition: color 120ms ease;
+}
+.guide-page
+  :is(.guide-inspector-panel, .guide-library-panel)
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions)
+  > button:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-primary-strong);
+}
+.guide-page
+  :is(.guide-inspector-panel, .guide-library-panel)
+  :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions)
+  button.sniptale-btn-danger:hover:not(:disabled) {
+  color: var(--sniptale-color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-page
+    :is(.guide-inspector-panel, .guide-library-panel)
+    :is(.tour-contents-actions, .tour-object-item-actions, .guide-resource-actions)
+    > button {
     transition: none;
   }
 }

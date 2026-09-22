@@ -67,6 +67,15 @@ for (const theme of ['light', 'dark'] as const) {
       await rows.first().hover();
       await expect.poll(effectiveOpacity).toBe(1);
       expect(await main.boundingBox()).toEqual(before);
+      const iconAction = rows
+        .first()
+        .locator('.tour-contents-actions button:not(:disabled)')
+        .first();
+      const idleColor = await iconAction.evaluate((node) => getComputedStyle(node).color);
+      await iconAction.hover();
+      await expect.soft(iconAction).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(iconAction).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(iconAction).not.toHaveCSS('color', idleColor);
       await info.attach(`contents-hover-${locale}-${theme}`, {
         body: await panel.screenshot(),
         contentType: 'image/png',
