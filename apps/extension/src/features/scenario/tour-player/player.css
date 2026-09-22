@@ -50,13 +50,15 @@ a:focus-visible {
    cover the content frame, and auto-hide only changes paint, not geometry. */
 .tour-toolbar {
   flex: none;
-  align-self: stretch;
+  width: var(--tour-frame-width, 100%);
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  padding: 4px 12px calc(8px + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
+  border-radius: 0 0 12px 12px;
   background: var(--tour-surface);
   transition:
     opacity 0.25s ease,
@@ -69,7 +71,11 @@ a:focus-visible {
   min-width: 0;
   min-height: 17px;
 }
+.tour-feedback:has(.tour-playback-status[hidden]) {
+  display: none;
+}
 .tour-title {
+  display: none;
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
@@ -110,10 +116,9 @@ a:focus-visible {
   gap: 6px;
   margin-inline-start: auto;
 }
-[data-tour-chrome-hidden='true'] .tour-toolbar {
+[data-tour-chrome-hidden='true'] .tour-controls {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(4px);
 }
 .tour-button {
   border: 1px solid #ffffff25;
@@ -140,7 +145,7 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  margin: 10px 10px 6px;
+  margin: 10px 10px 0;
 }
 .tour-stage {
   position: relative;
@@ -148,7 +153,8 @@ a:focus-visible {
   overflow: hidden;
   isolation: isolate;
   border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
-  border-radius: 12px;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
 }
 .tour-scene {
   position: absolute;
@@ -435,51 +441,51 @@ a:focus-visible {
   --tour-scrub-fill: 0%;
 }
 .tour-scrub::-webkit-slider-runnable-track {
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
   background: linear-gradient(
     to right,
-    var(--tour-accent) var(--tour-scrub-fill),
-    color-mix(in srgb, var(--tour-text) 26%, transparent) var(--tour-scrub-fill)
+    color-mix(in srgb, var(--tour-text) 80%, var(--tour-surface)) var(--tour-scrub-fill),
+    color-mix(in srgb, var(--tour-text) 20%, transparent) var(--tour-scrub-fill)
   );
 }
 .tour-scrub::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
-  margin-top: -5px;
-  border: 2px solid var(--tour-accent);
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border: 2px solid var(--tour-surface);
   border-radius: 50%;
   background: var(--tour-text);
   box-shadow: 0 1px 4px #0006;
 }
 .tour-scrub::-moz-range-track {
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--tour-text) 26%, transparent);
+  background: color-mix(in srgb, var(--tour-text) 20%, transparent);
 }
 .tour-scrub::-moz-range-progress {
-  height: 6px;
+  height: 4px;
   border-radius: 999px;
-  background: var(--tour-accent);
+  background: color-mix(in srgb, var(--tour-text) 80%, var(--tour-surface));
 }
 .tour-scrub::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--tour-accent);
+  width: 8px;
+  height: 8px;
+  border: 2px solid var(--tour-surface);
   border-radius: 50%;
   background: var(--tour-text);
   box-shadow: 0 1px 4px #0006;
 }
 .tour-scrub:hover:not(:disabled)::-webkit-slider-thumb {
-  background: var(--tour-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tour-text) 16%, transparent);
 }
 .tour-scrub:hover:not(:disabled)::-moz-range-thumb {
-  background: var(--tour-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tour-text) 16%, transparent);
 }
 .tour-scrub:focus-visible {
-  outline: 2px solid var(--tour-accent);
+  outline: 2px solid var(--tour-text);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -494,7 +500,7 @@ a:focus-visible {
   .tour-scrub::-webkit-slider-thumb {
     width: 20px;
     height: 20px;
-    margin-top: -7px;
+    margin-top: -8px;
   }
   .tour-scrub::-moz-range-thumb {
     width: 16px;

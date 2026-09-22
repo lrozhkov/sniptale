@@ -128,6 +128,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
     motion?.cancel({ preserveMediaGate: true });
     stageWidth = nextWidth;
     stageHeight = nextHeight;
+    root.style.setProperty('--tour-frame-width', `${stageWidth}px`);
     viewport.style.width = `${stageWidth}px`;
     viewport.style.height = `${stageHeight}px`;
     stage.style.width = `${stageWidth}px`;

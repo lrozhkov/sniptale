@@ -3,11 +3,22 @@ const FACES = {
   play: { fill: 'currentColor', d: 'M8 5v14l11-7z' },
   pause: { fill: 'currentColor', d: 'M7 5h4v14H7zm6 0h4v14h-4z' },
   retry: { fill: 'none', d: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6' },
+  contents: { fill: 'none', d: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
+  previous: { fill: 'none', d: 'm15 18-6-6 6-6' },
+  next: { fill: 'none', d: 'm9 18 6-6-6-6' },
 };
 
 /** Disposable transport DOM; elapsed time and navigation remain owned by the player. */
 export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   const document = root.ownerDocument;
+  for (const name of ['contents', 'previous', 'next']) {
+    const control = root.querySelector(`[data-tour-${name}]`);
+    if (!control) continue;
+    control.replaceChildren(createIcon(document, FACES[name]));
+    control.classList.add('tour-icon-button');
+    control.setAttribute('aria-label', labels[name]);
+    control.title = labels[name];
+  }
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'tour-button tour-icon-button';
@@ -21,7 +32,7 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   const range = document.createElement('input');
   range.type = 'range';
   range.min = '0';
-  range.step = '100';
+  range.step = 'any';
   range.className = 'tour-scrub';
   range.dataset.tourSeek = '';
   range.setAttribute('aria-label', labels.seek);

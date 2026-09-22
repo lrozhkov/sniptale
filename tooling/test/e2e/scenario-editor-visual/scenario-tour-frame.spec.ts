@@ -33,7 +33,12 @@ async function expectFittedFrame(player: Locator) {
     const frameBox = await stage.boundingBox();
     const toolbarBox = await toolbar.boundingBox();
     expect(toolbarBox!.y - frameBox!.y - frameBox!.height).toBeGreaterThanOrEqual(0);
-    expect(toolbarBox!.y - frameBox!.y - frameBox!.height).toBeLessThan(8);
+    expect(Math.abs(toolbarBox!.y - frameBox!.y - frameBox!.height)).toBeLessThan(1);
+    expect(Math.abs(toolbarBox!.width - frameBox!.width)).toBeLessThan(1);
+    expect(Math.abs(toolbarBox!.x - frameBox!.x)).toBeLessThan(1);
+    await expect(player.locator('.tour-title')).toBeHidden();
+    await expect(player.locator('[data-tour-contents]')).toHaveText('');
+    await expect(player.locator('[data-tour-contents] svg')).toBeVisible();
     await expect(player.locator('.tour-scene')).toHaveCSS('opacity', '1');
   }
 }
@@ -68,6 +73,15 @@ for (const theme of ['light', 'dark'] as const) {
       .locator('.tour-header-controls')
       .getByRole('button', { name: 'Preview', exact: true })
       .click();
+    expect(
+      await host.locator<HTMLInputElement>('[data-tour-seek]').evaluate((range) => {
+        const previous = range.value;
+        range.value = '16.67';
+        const value = range.valueAsNumber;
+        range.value = previous;
+        return value;
+      })
+    ).toBeCloseTo(16.67, 2);
     for (const size of [
       { width: 1280, height: 900 },
       { width: 1920, height: 640 },

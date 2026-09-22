@@ -117,6 +117,7 @@ export function TourStage({
               :host(:not([data-view=preview])) .tour-stage {
                 border-color: var(--sniptale-color-border-soft);
                 border-radius: var(--sniptale-radius-xl);
+                border-bottom-width: 1px;
               }
               .tour-scene[data-dragging=true], .tour-scene[data-dragging=true] * { cursor: grabbing !important; }
               :host([data-view=frame]) .tour-hint,

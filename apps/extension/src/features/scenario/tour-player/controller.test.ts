@@ -61,6 +61,21 @@ it('selects stable slide identities without recording artificial back history', 
   expect(root.dataset['slideId']).toBe('first');
 });
 
+it('keeps fractional seek precision and icon-only accessible transport buttons', async () => {
+  const { root } = await mount();
+  const range = root.querySelector<HTMLInputElement>('[data-tour-seek]')!;
+  expect(range.step).toBe('any');
+  range.value = '1234.5';
+  range.dispatchEvent(new Event('input'));
+  expect(range.valueAsNumber).toBeCloseTo(1234.5, 2);
+  for (const name of ['contents', 'previous', 'next'] as const) {
+    const button = root.querySelector<HTMLButtonElement>(`[data-tour-${name}]`)!;
+    expect(button.textContent).toBe('');
+    expect(button.getAttribute('aria-label')).toBe(labels[name]);
+    expect(button.querySelector('svg')).not.toBeNull();
+  }
+});
+
 it('disposes keyboard, transport and resize activity before remounting the same root', async () => {
   const { player, root } = await mount();
   const next = root.querySelector<HTMLButtonElement>('[data-tour-next]')!;
