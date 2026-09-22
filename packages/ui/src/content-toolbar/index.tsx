@@ -129,7 +129,8 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
     },
     ref
   ) {
-    const dataActive = active ? 'true' : undefined;
+    const selected = active || props['aria-pressed'] === true || props['aria-pressed'] === 'true';
+    const dataActive = selected ? 'true' : undefined;
     const resolvedAriaLabel = ariaLabel ?? (typeof title === 'string' ? title : undefined);
 
     return (
@@ -144,7 +145,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
         className={cx(
           'sniptale-glass-toolbar-button',
           'sniptale-btn',
-          active && 'sniptale-glass-toolbar-button--active',
+          selected && 'sniptale-glass-toolbar-button--active',
           tone === 'danger' && 'sniptale-glass-toolbar-button--danger',
           tone === 'danger' && 'sniptale-btn-danger',
           tone === 'close' && 'sniptale-btn-close',

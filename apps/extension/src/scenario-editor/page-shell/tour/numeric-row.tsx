@@ -42,7 +42,7 @@ export function TourInspectorNumericRow({
       precision={precision}
       scrub={{ min, max, step }}
       disabled={disabled}
-      focusAppearance="quiet"
+      focusAppearance="accent-box"
       onPreviewValue={(value) => {
         setPreview(value);
         onPreview?.(value);

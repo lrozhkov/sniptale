@@ -201,10 +201,12 @@ function getOptionClassName(selected: boolean, disabled: boolean): string {
   return cx(
     'flex min-h-8 w-full items-center gap-2 rounded-[7px] px-2.5 py-1.5 text-left',
     'text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]',
-    'transition',
-    'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_52%,transparent)]',
+    'transition cursor-pointer',
+    !selected &&
+      'enabled:hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_52%,transparent)]',
     'focus-visible:outline-none',
-    'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_62%,transparent)]',
+    !selected &&
+      'enabled:focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-subtle)_62%,transparent)]',
     selected &&
       [
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_18%,transparent)]',

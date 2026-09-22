@@ -58,3 +58,14 @@ describe('ContentToolbar', () => {
     expect(markup).toContain('sniptale-btn-close');
   });
 });
+
+it.each([true, 'true'] as const)(
+  'uses the selected visual contract for aria-pressed=%s',
+  (pressed) => {
+    const markup = renderToStaticMarkup(
+      <ContentToolbarButton aria-pressed={pressed}>Left</ContentToolbarButton>
+    );
+    expect(markup).toContain('data-active="true"');
+    expect(markup).toContain('sniptale-glass-toolbar-button--active');
+  }
+);

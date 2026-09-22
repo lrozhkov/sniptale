@@ -56,7 +56,7 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
         disabled={props.disabled}
         draft={state.draft}
         label={props.label}
-        onClick={state.show}
+        onClick={state.open ? state.cancel : state.show}
         open={state.open}
       />
       <PaintSelectorPortal

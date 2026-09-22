@@ -618,7 +618,7 @@ it('shows one section heading in sections mode and moves object actions into it'
   expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
 });
 
-it('renders tour numeric rows as plain quiet-focus rows with scrub', async () => {
+it('renders tour numeric rows as plain accent-focus rows with scrub', async () => {
   presentation = 'sections';
   draw();
   await click('Slide objects');
@@ -630,7 +630,7 @@ it('renders tour numeric rows as plain quiet-focus rows with scrub', async () =>
   for (const row of rows) {
     expect(row.getAttribute('data-appearance')).toBe('plain');
     const field = row.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')!;
-    expect(field.getAttribute('data-focus-appearance')).toBe('quiet');
+    expect(field.getAttribute('data-focus-appearance')).toBe('accent-box');
     expect(row.querySelector('input[type=range]')).not.toBeNull();
   }
   const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!;

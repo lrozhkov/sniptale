@@ -34,7 +34,7 @@ export function TourNavigationSettings({
   const button = slide.buttons.find((entry) => entry.id === objectId);
   if (button)
     return (
-      <GuideInspectorGroup icon={List} title={t('scenario.editor.tourButton')}>
+      <GuideInspectorGroup collapsible={false} icon={List} title={t('scenario.editor.tourButton')}>
         <TourTextField
           label={t('scenario.editor.textLabel')}
           singleLine
@@ -293,6 +293,19 @@ function TourNavigationButtons({
             onClick={() => move(index, 1)}
           >
             <ArrowDown size={14} />
+          </ContentToolbarButton>
+          <ContentToolbarButton
+            tone="danger"
+            title={t('common.actions.delete')}
+            disabled={disabled}
+            onClick={() =>
+              onChange({
+                ...slide,
+                buttons: slide.buttons.filter((button) => button.id !== entry.id),
+              })
+            }
+          >
+            <Trash2 size={14} aria-hidden="true" />
           </ContentToolbarButton>
         </div>
       ))}

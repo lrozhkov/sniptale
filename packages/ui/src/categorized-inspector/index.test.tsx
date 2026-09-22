@@ -191,3 +191,39 @@ it('reports user selection for both pointer and keyboard without reporting initi
   act(() => fill.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
   expect(onSectionChange).toHaveBeenLastCalledWith('effects');
 });
+
+it.each([false, true])(
+  'mouse hover activation is opt-in (%s) and commits a focused draft',
+  (activateOnHover) => {
+    const blur = vi.fn();
+    const changed = vi.fn();
+    act(() =>
+      root.render(
+        <CategorizedInspector
+          activateOnHover={activateOnHover}
+          ariaLabel="Sections"
+          initialSection="outline"
+          sections={sections}
+          onSectionChange={changed}
+          renderSection={(id) => <input key={id} onBlur={blur} />}
+        />
+      )
+    );
+    const input = container.querySelector('input')!;
+    act(() => input.focus());
+    const fill = container.querySelector<HTMLButtonElement>('[aria-label="Fill"]')!;
+    const enter = (pointerType: string, buttons = 0) => {
+      const event = new MouseEvent('pointerover', { bubbles: true, buttons });
+      Object.defineProperty(event, 'pointerType', { value: pointerType });
+      act(() => fill.dispatchEvent(event));
+    };
+    enter('touch');
+    enter('mouse', 1);
+    expect(changed).not.toHaveBeenCalled();
+    expect(blur).not.toHaveBeenCalled();
+    enter('mouse');
+    expect(fill.getAttribute('aria-pressed')).toBe(String(activateOnHover));
+    expect(blur).toHaveBeenCalledTimes(activateOnHover ? 1 : 0);
+    expect(changed).toHaveBeenCalledTimes(activateOnHover ? 1 : 0);
+  }
+);

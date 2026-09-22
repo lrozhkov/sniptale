@@ -53,7 +53,7 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`numeric inspector input keeps quiet focus without a squared outline in ${theme}`, async ({
+  test(`numeric inspector input focuses the full field without a nested outline in ${theme}`, async ({
     page,
     hostOrigin,
   }) => {
@@ -75,11 +75,8 @@ for (const theme of ['light', 'dark'] as const) {
       outline,
       'nested numeric input must not render the squared accent outline'
     ).toMatchObject({ style: 'none' });
-    const underline = await field
-      .locator('span[aria-hidden="true"]')
-      .first()
-      .evaluate((node) => Number(getComputedStyle(node).opacity));
-    expect(underline, 'quiet underline must keep keyboard focus visible').toBeGreaterThan(0);
+    await expect(field).toHaveAttribute('data-focus-appearance', 'accent-box');
+    await expect(field).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
     issues.assertClean();
   });
 }
@@ -264,7 +261,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   await header.getByRole('button', { name: 'Отменить', exact: true }).click();
   await expect(objects).toHaveCount(count);
 
-  // Nested numeric inputs keep the quiet focus treatment in the tour inspector too.
+  // Nested numeric inputs leave focus decoration to the full field in the tour inspector too.
   await panel.getByRole('button', { name: 'Камера', exact: true }).click();
   await panel.getByRole('button', { name: 'Приближение', exact: true }).click();
   await page.getByRole('option', { name: 'Вручную', exact: true }).click();

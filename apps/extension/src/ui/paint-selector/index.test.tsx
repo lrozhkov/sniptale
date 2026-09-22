@@ -83,6 +83,9 @@ it('renders the shared selector trigger with a labeled value and transparency pr
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
   act(() => trigger.click());
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  act(() => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBeNull();
   act(() => root.unmount());
   host.remove();
 });
@@ -530,7 +533,7 @@ it('uses a compact solid-color layout and shows the palette in the same dialog',
   host.remove();
 });
 
-it('cancels preview on Escape and when disabled while open', () => {
+it('cancels preview on repeated trigger, Escape and when disabled while open', () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -553,6 +556,10 @@ it('cancels preview on Escape and when disabled while open', () => {
   act(() => host.querySelector<HTMLButtonElement>('button')!.click());
   act(() => render(true));
   expect(reset).toHaveBeenCalledTimes(2);
+  act(() => render());
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  expect(reset).toHaveBeenCalledTimes(3);
   expect(document.querySelector('[data-ui="shared.ui.paint-selector.popup"]')).toBeNull();
   act(() => root.unmount());
   host.remove();
