@@ -111,9 +111,9 @@ async function click(label: string) {
 }
 async function choose(label: string, option: string) {
   await click(label);
-  const entry = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
-    (n) => n.textContent?.trim() === option
-  );
+  const entry = [
+    ...document.querySelectorAll<HTMLElement>('[role=option], .guide-action-menu button'),
+  ].find((n) => n.textContent?.trim() === option);
   if (!entry) throw new Error(`Missing option ${option}`);
   await act(async () => entry.click());
 }
@@ -245,19 +245,21 @@ it('derives the object list without a stored order and swaps the actions for one
   expect(objectsGroup.querySelector('.guide-inspector-group-body [aria-label="Add"]')).toBeNull();
   const add = host.querySelector<HTMLButtonElement>('[aria-label="Add"]')!;
   expect(add).not.toBeNull();
-  expect(add.textContent).toContain('Add');
+  expect(add.textContent).toBe('');
   await act(async () => add.click());
-  const option = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
+  const option = [...document.querySelectorAll<HTMLElement>('.guide-action-menu button')].find(
     (node) => node.textContent?.trim() === 'Highlight'
   )!;
   await act(async () =>
     option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
-  expect(document.querySelector('[role=listbox]')).toBeNull();
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
   expect(document.activeElement).toBe(add);
   await act(async () => add.click());
-  await act(async () => document.body.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-  expect(document.querySelector('[role=listbox]')).toBeNull();
+  await act(async () =>
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  );
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
   await choose('Add', 'Hotspot');
   expect(current().hotspots).toHaveLength(1);
   await click('Back to slide settings');
@@ -275,6 +277,20 @@ it('restores empty-state direct actions after the last object is deleted', async
   expect(current().objectOrder).toBeUndefined();
   expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
   expect(host.querySelector('[aria-label="Add"]')).toBeNull();
+});
+
+it('deletes directly from the object row and removes its ordering entry', async () => {
+  await click('Explanation');
+  await click('Back to slide settings');
+  const slide = current();
+  slide.objectOrder = [slide.annotations[0]!.id];
+  draw();
+  const remove = host.querySelector<HTMLButtonElement>('.tour-object-delete')!;
+  expect(remove).not.toBeNull();
+  await act(async () => remove.click());
+  expect(current().annotations).toHaveLength(0);
+  expect(current().objectOrder).toEqual([]);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
 });
 
 it('moves the Add control into the objects heading seam in both presentations', async () => {

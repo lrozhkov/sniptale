@@ -47,7 +47,10 @@ export function TourStage({
   callbacks.current = { onSelectObject, onMoveObject, onResizeObject, onFrameCamera, disabled };
   const labels = useRef(tourPlayerLabels(t)).current;
   const input = {
-    tour: view === 'preview' ? cameraPreviewTour(tour, selection) : tour,
+    tour:
+      view === 'preview'
+        ? { ...tour, playback: { ...tour.playback, autoplay: true, loop: false } }
+        : tour,
     labels,
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
@@ -57,6 +60,9 @@ export function TourStage({
     if (!root.current) return;
     const player = createTourPlayer(root.current, latest.current.input, {
       preview: view === 'preview',
+      ...(view === 'preview' && latest.current.selection?.kind === 'slide'
+        ? { initialSlideId: latest.current.selection.slideId }
+        : {}),
       authoring:
         view === 'preview'
           ? undefined
@@ -102,9 +108,12 @@ export function TourStage({
             <style>{styles}</style>
             <style>{`
               :host { display: block; height: 100%; min-height: 0; font: 14px system-ui, sans-serif; }
-              #tour-player { height: 100%; background: transparent; }
-              .tour-toolbar { display: none; }
-              .tour-viewport { margin: 0; border: 0; border-radius: 0; background: transparent; }
+              #tour-player { height: 100%; min-height: 0; }
+              :host(:not([data-view=preview])) #tour-player { background: transparent; }
+              :host(:not([data-view=preview])) .tour-toolbar { display: none; }
+              :host(:not([data-view=preview])) .tour-viewport {
+                margin: 0; border: 0; border-radius: 0; background: transparent;
+              }
               .tour-scene[data-dragging=true], .tour-scene[data-dragging=true] * { cursor: grabbing !important; }
               :host([data-view=frame]) .tour-hint,
               :host([data-view=frame]) .tour-hotspot,
@@ -180,28 +189,22 @@ function TourStageScaffold({
           <span className="tour-playback-status" data-tour-status role="status" hidden />
         </div>
         <div className="tour-controls">
-          <button data-tour-contents>{labels.contents}</button>
+          <button className="tour-button" data-tour-contents>
+            {labels.contents}
+          </button>
           <div className="tour-playback" data-tour-playback />
           <div className="tour-nav">
-            <button data-tour-previous>{labels.previous}</button>
+            <button className="tour-button" data-tour-previous>
+              {labels.previous}
+            </button>
             <span data-tour-counter />
-            <button data-tour-next>{labels.next}</button>
+            <button className="tour-button" data-tour-next>
+              {labels.next}
+            </button>
           </div>
         </div>
       </footer>
       <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
     </div>
   );
-}
-
-function cameraPreviewTour(tour: TourDocument, selection: TourSelection | null): TourDocument {
-  const slide = tour.slides.find(
-    (entry) => entry.id === (selection?.kind === 'slide' ? selection.slideId : null)
-  );
-  return {
-    ...tour,
-    slides: slide ? [slide] : [],
-    playback: { ...tour.playback, autoplay: true, loop: false },
-    endScreen: { ...tour.endScreen, enabled: false },
-  };
 }

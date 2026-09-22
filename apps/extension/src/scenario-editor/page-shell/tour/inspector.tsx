@@ -21,6 +21,7 @@ import {
   ArrowDown,
   ArrowUp,
   Trash2,
+  Plus,
   ScanSearch,
   Play,
   Layers,
@@ -33,6 +34,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
+import { GuideActionMenu } from '../action-menu';
 import { TourTextField, TourTextPresentation } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
 import { TourNavigationSettings, TourAddButtonControl } from './navigation-settings';
@@ -472,6 +474,26 @@ function TourImageObjects({
               >
                 <ArrowDown size={14} />
               </ContentToolbarButton>
+              <ContentToolbarButton
+                className="tour-object-delete"
+                title={t('common.actions.delete')}
+                disabled={disabled}
+                onClick={() =>
+                  onChange({
+                    ...slide,
+                    hotspots: slide.hotspots.filter((object) => object.id !== entry.object.id),
+                    annotations: slide.annotations.filter(
+                      (object) => object.id !== entry.object.id
+                    ),
+                    masks: slide.masks.filter((object) => object.id !== entry.object.id),
+                    ...(slide.objectOrder
+                      ? { objectOrder: slide.objectOrder.filter((id) => id !== entry.object.id) }
+                      : {}),
+                  })
+                }
+              >
+                <Trash2 size={14} aria-hidden="true" />
+              </ContentToolbarButton>
             </div>
           </div>
         );
@@ -593,15 +615,19 @@ function TourAddObjectMenu({
   t: Translate;
 }) {
   return (
-    <CompactSelect
-      aria-label={t('scenario.editor.tourAddObject')}
-      controlSize="sm"
-      disabled={disabled || !slide.image}
-      placeholder={t('scenario.editor.tourAddObject')}
-      value=""
-      options={tourAddObjectOptions(slide, t)}
-      onChange={onAdd}
-    />
+    <div className="tour-object-add">
+      <GuideActionMenu
+        label={t('scenario.editor.tourAddObject')}
+        icon={<Plus size={16} aria-hidden="true" />}
+        disabled={disabled || !slide.image}
+        items={tourAddObjectOptions(slide, t).map((option) => ({
+          label: option.label,
+          icon: option.icon,
+          disabled: option.disabled,
+          onSelect: () => onAdd(option.value),
+        }))}
+      />
+    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 import { GuideSnapButton } from './layout-assistance';
 import { GuideVoiceField } from './voice-field';
-import { type ReactNode, type Ref, type ComponentProps } from 'react';
+import { useLayoutEffect, useRef, type ReactNode, type Ref, type ComponentProps } from 'react';
 import { GuideAiEntry } from './ai-assistant';
 import { GuideProjectActions } from './project-actions';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -65,10 +65,12 @@ export function GuidePageHeader({
   onChange,
   t,
 }: GuidePageHeaderProps) {
+  const headerRef = useHeaderFit();
   return (
     <>
-      <header className="guide-page-header">
+      <header className="guide-page-header" ref={headerRef}>
         {leftControls}
+        {representationControls}
         {project?.purpose === 'step-template' && (
           <span className="guide-template-mode">{t('scenario.editor.templateEditing')}</span>
         )}
@@ -91,7 +93,6 @@ export function GuidePageHeader({
         {feedback}
         <div className="guide-header-actions">
           {contextControls}
-          {representationControls}
           {aiSelection && onAiOpen && (
             <GuideAiEntry
               images={images}
@@ -111,6 +112,7 @@ export function GuidePageHeader({
               {showSnap && <GuideSnapButton t={t} disabled={disabled} />}
               <ContentToolbarButton
                 className="guide-labeled-action"
+                data-header-collapse="2"
                 title={t('scenario.editor.appearance')}
                 onClick={onAppearance}
               >
@@ -119,6 +121,7 @@ export function GuidePageHeader({
               </ContentToolbarButton>
               <ContentToolbarButton
                 className="guide-labeled-action"
+                data-header-collapse="1"
                 ref={previewRef}
                 title={t('scenario.editor.guideReaderOpen')}
                 disabled={previewDisabled}
@@ -167,4 +170,28 @@ export function GuidePageHeader({
       </header>
     </>
   );
+}
+
+/** Collapse action labels in product priority order using actual available header width. */
+function useHeaderFit() {
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const header = ref.current;
+    if (!header) return;
+    const fit = () => {
+      const buttons = [...header.querySelectorAll<HTMLElement>('[data-header-collapse]')].sort(
+        (a, b) => Number(a.dataset['headerCollapse']) - Number(b.dataset['headerCollapse'])
+      );
+      for (const button of buttons) button.removeAttribute('data-icon-only');
+      for (const button of buttons) {
+        if (header.scrollWidth <= header.clientWidth) break;
+        button.setAttribute('data-icon-only', 'true');
+      }
+    };
+    fit();
+    const observer = globalThis.ResizeObserver ? new ResizeObserver(fit) : null;
+    observer?.observe(header);
+    return () => observer?.disconnect();
+  });
+  return ref;
 }

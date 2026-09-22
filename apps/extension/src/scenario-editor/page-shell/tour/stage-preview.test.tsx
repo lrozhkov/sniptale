@@ -178,3 +178,19 @@ it('plays preview narration and releases it when the preview player is disposed'
   expect(pause).toHaveBeenCalled();
   expect(shadow().querySelector('audio')).toBeNull();
 });
+
+it('starts at the selected slide and navigates the entire tour without editing selection', async () => {
+  const props = fixture();
+  props.selection.slideId = 'second';
+  instantImages();
+  await renderPreview(props);
+  const player = shadow().querySelector<HTMLElement>('#tour-player')!;
+  expect(player.dataset['slideId']).toBe('second');
+  expect(shadow().querySelector('[data-tour-counter]')!.textContent).toBe('2 / 2');
+  expect(shadow().querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('true');
+  act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-previous]')!.click());
+  expect(player.dataset['slideId']).toBe('first');
+  act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-next]')!.click());
+  expect(player.dataset['slideId']).toBe('second');
+  expect(props.onSelectObject).not.toHaveBeenCalled();
+});

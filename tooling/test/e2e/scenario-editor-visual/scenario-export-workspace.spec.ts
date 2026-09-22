@@ -128,7 +128,10 @@ test('tour HTML export prepares the sandboxed preview inside the shared workspac
   issues.assertClean();
 });
 
-test('tour preview paints the selected slide in the browser', async ({ page, hostOrigin }) => {
+test('tour preview paints the selected slide in the browser', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
   const issues = createPageIssueCollector(page);
   await openVisualHarness(
     page,
@@ -140,7 +143,7 @@ test('tour preview paints the selected slide in the browser', async ({ page, hos
     { tourFixture: '1' }
   );
   await page.getByRole('button', { name: 'Interactive tour', exact: true }).click();
-  const slide = page.locator('.tour-slide-select:has(img)').first();
+  const slide = page.locator('.tour-slide-select:has(img)').nth(1);
   await expect(slide).toBeVisible();
   await slide.click();
   const controls = page.locator('.tour-header-controls');
@@ -194,6 +197,24 @@ test('tour preview paints the selected slide in the browser', async ({ page, hos
     );
   };
   await expect.poll(painted, { message: 'preview paints a decoded visible image' }).toBe(true);
+  await expect(stage.locator('.tour-toolbar')).toBeVisible();
+  await expect(stage.locator('[data-tour-play]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(stage.locator('[data-tour-counter]')).toHaveText('2 / 2');
+  await stage.locator('[data-tour-contents]').click();
+  await expect(stage.locator('[data-tour-navigation]')).toBeVisible();
+  await stage.locator('[data-tour-navigation] button').first().click();
+  await expect(stage.locator('[data-tour-counter]')).toHaveText('1 / 2');
+  await stage.locator('[data-tour-next]').click();
+  await expect.poll(painted).toBe(true);
+  await stage.locator('[data-tour-previous]').click();
+  await expect(stage.locator('[data-tour-counter]')).toHaveText('1 / 2');
+  await stage.locator('[data-tour-next]').click();
+  await expect(stage.locator('[data-tour-counter]')).toHaveText('2 / 2');
+  await expect.poll(painted).toBe(true);
+  await testInfo.attach('full-editor-tour-player', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
   const paint = await readPaint();
   expect(paint.missing).toBe(false);
   await expect(page.locator('.tour-preview-status')).toHaveCount(0);

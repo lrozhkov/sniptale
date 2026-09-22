@@ -95,6 +95,7 @@ export function TourWorkspace(props: TourWorkspaceProps) {
                   className="guide-labeled-action"
                   title={t('scenario.editor.guideEditImage')}
                   data-tour-edit-image={editImage.slideId}
+                  data-header-collapse="3"
                   disabled={editImage.disabled}
                   onClick={() => props.onEditImage?.(editImage.slideId)}
                 >

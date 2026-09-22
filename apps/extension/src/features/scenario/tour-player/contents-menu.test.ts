@@ -83,6 +83,27 @@ it('opens the contents menu as a non-modal list anchored to its trigger', async 
   void player;
 });
 
+it('keeps clicks inside an editor shadow-root menu until the selected action runs', async () => {
+  const { root } = await mount();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.append(root);
+  try {
+    root.querySelector<HTMLButtonElement>('[data-tour-contents]')!.click();
+    const navigation = root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!;
+    const second = navigation.querySelectorAll<HTMLButtonElement>('button')[1]!;
+    second.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+    expect(navigation.open).toBe(true);
+    second.click();
+    expect(root.dataset['slideId']).toBe('second');
+    expect(navigation.open).toBe(false);
+  } finally {
+    document.body.append(root);
+    host.remove();
+  }
+});
+
 /** The trigger sits in the bottom toolbar: the menu opens upward and stays inside the player. */
 it('anchors the menu above the bottom toolbar trigger and inside the player', async () => {
   const { root } = await mount();

@@ -13,6 +13,8 @@ export function createTourPlayer(
   root: HTMLElement,
   input: TourPlayerInput,
   options?: {
+    /** Start playback at this slide without an intervening manual navigation pause. */
+    initialSlideId?: string;
     /** Bounded editor preview: interactive with audio, but URL actions never navigate. */
     preview?: boolean;
     authoring?:

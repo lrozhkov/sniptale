@@ -102,7 +102,7 @@ it('renders contextual controls between the project title and the representation
   expect(context.closest('.guide-header-actions')).not.toBeNull();
   expect(title.compareDocumentPosition(context) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(
-    context.compareDocumentPosition(representation) & Node.DOCUMENT_POSITION_FOLLOWING
+    representation.compareDocumentPosition(context) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   expect(
     representation.compareDocumentPosition(headerButton('Appearance')!) &

@@ -158,14 +158,14 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
         title.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING
       ),
       beforeSwitch: Boolean(
-        controls.compareDocumentPosition(representation) & Node.DOCUMENT_POSITION_FOLLOWING
+        representation.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING
       ),
       controlsBottom: controls.getBoundingClientRect().bottom,
       stageTop: stage.getBoundingClientRect().top,
     };
   });
   expect.soft(geometry.afterTitle, 'tour controls follow the project title').toBe(true);
-  expect.soft(geometry.beforeSwitch, 'tour controls precede the representation switch').toBe(true);
+  expect.soft(geometry.beforeSwitch, 'representation switch precedes the project title').toBe(true);
   expect
     .soft(
       geometry.controlsBottom <= geometry.stageTop + 1,
@@ -220,13 +220,49 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   }
   const add = panel.getByRole('button', { name: 'Добавить', exact: true });
   await expect(add).toBeVisible();
+  expect((await add.boundingBox())!.width).toBeLessThanOrEqual(32);
+  await expect(add).toHaveText('');
   await add.click();
   for (const label of ['Точка действия', 'Пояснение', 'Выделение']) {
     await expect
-      .soft(page.getByRole('option', { name: label, exact: true }), `object option ${label}`)
+      .soft(
+        page.locator('.guide-action-menu').getByRole('button', { name: label, exact: true }),
+        `object option ${label}`
+      )
       .toBeVisible();
   }
   await page.keyboard.press('Escape');
+
+  const objects = panel.locator('.tour-object-item');
+  const count = await objects.count();
+  await objects.first().hover();
+  const remove = objects.first().locator('.tour-object-delete');
+  await expect(remove).toBeVisible();
+  await remove.hover();
+  await expect
+    .poll(() =>
+      remove.evaluate((node) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--sniptale-color-danger)';
+        node.append(probe);
+        const expected = getComputedStyle(probe).color;
+        probe.remove();
+        const actual = getComputedStyle(node).color;
+        return actual === expected;
+      })
+    )
+    .toBe(true);
+  expect(await remove.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)'
+  );
+  await testInfo.attach('object-hover-actions', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  await remove.click();
+  await expect(objects).toHaveCount(count - 1);
+  await header.getByRole('button', { name: 'Отменить', exact: true }).click();
+  await expect(objects).toHaveCount(count);
 
   // Nested numeric inputs keep the quiet focus treatment in the tour inspector too.
   await panel.getByRole('button', { name: 'Камера', exact: true }).click();
@@ -374,7 +410,15 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
   }) => {
     const labels = HEADER_LABELS[locale];
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, 'light', locale, { width: 1280, height: 900 });
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      'light',
+      locale,
+      { width: 1280, height: 900 },
+      'compare',
+      { tourFixture: '1' }
+    );
     const readMetrics = () =>
       page.evaluate(() => {
         const header = document.querySelector('.guide-page-header');
@@ -383,7 +427,8 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
         );
         if (!header || !reference) return { missing: true } as const;
         const measure = (node: HTMLElement) => {
-          const style = getComputedStyle(node);
+          const style = getComputedStyle(node.querySelector('span') ?? node);
+          const boxStyle = getComputedStyle(node);
           const rect = node.getBoundingClientRect();
           const icon = node.querySelector('svg')?.getBoundingClientRect();
           return {
@@ -391,8 +436,8 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
             fontSize: style.fontSize,
             fontWeight: style.fontWeight,
             lineHeight: style.lineHeight,
-            borderRadius: style.borderTopLeftRadius,
-            borderWidth: style.borderTopWidth,
+            borderRadius: boxStyle.borderTopLeftRadius,
+            borderWidth: boxStyle.borderTopWidth,
             iconWidth: icon?.width ?? 0,
             iconHeight: icon?.height ?? 0,
           };
@@ -436,6 +481,8 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
         for (const key of [
           'height',
           'fontSize',
+          'fontWeight',
+          'lineHeight',
           'borderRadius',
           'borderWidth',
           'iconWidth',
@@ -454,7 +501,16 @@ for (const locale of SCENARIO_VISUAL_LOCALES) {
     await assertUniform('guide');
     await page.getByRole('button', { name: labels.tour, exact: true }).click();
     await assertUniform('tour');
+    await headerPreview();
+    await assertUniform('tour preview');
     issues.assertClean();
+
+    async function headerPreview() {
+      await page
+        .locator('.tour-header-controls')
+        .getByRole('button', { name: locale === 'ru' ? 'Просмотр' : 'Preview', exact: true })
+        .click();
+    }
   });
 }
 
@@ -472,6 +528,45 @@ test('scenario header undo and redo stay icon-only and accessible', async ({
     await expect(button.locator('svg')).toBeVisible();
   }
   issues.assertClean();
+});
+
+test('scenario title stays compact on hover and expands only for editing', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  const header = page.locator('.guide-page-header');
+  const title = header.locator('.guide-project-name');
+  const input = title.locator('input');
+  const width = async () => (await title.boundingBox())!.width;
+  const compact = await width();
+  await title.hover();
+  expect(await width()).toBeCloseTo(compact, 0);
+  await input.focus();
+  expect(await width()).toBeGreaterThan(compact + 30);
+  await input.press('Tab');
+  await header.getByRole('button', { name: 'Appearance', exact: true }).focus();
+  expect(await width()).toBeCloseTo(compact, 0);
+  const order = await header.evaluate((node) => {
+    const representation = node.querySelector('.tour-representation-switch')!;
+    const title = node.querySelector('.guide-project-name')!;
+    return Boolean(
+      representation.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING
+    );
+  });
+  expect(order).toBe(true);
+  const switcher = header.locator('.tour-representation-switch');
+  expect(await switcher.evaluate((node) => getComputedStyle(node).borderInlineStartWidth)).toBe(
+    '0px'
+  );
+  await page.locator('#guide-library-panel button[aria-controls="guide-library-panel"]').click();
+  expect(await switcher.evaluate((node) => getComputedStyle(node).borderInlineStartWidth)).toBe(
+    '1px'
+  );
+  await testInfo.attach('header-title-layout', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
 });
 
 for (const theme of ['light', 'dark'] as const) {

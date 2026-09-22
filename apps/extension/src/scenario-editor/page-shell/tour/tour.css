@@ -7,6 +7,10 @@
   margin-inline-end: 0.25rem;
   border-inline-end: 1px solid var(--sniptale-color-border-soft);
 }
+.guide-collapsed-sections + .tour-representation-switch {
+  border-inline-start: 1px solid var(--sniptale-color-border-soft);
+  padding-inline-start: 0.5rem;
+}
 .guide-page-header .tour-representation-switch .guide-section-tab {
   width: auto;
   min-width: 2rem;
@@ -302,6 +306,21 @@ html[data-tour-reordering] * {
 .tour-object-item-actions > button:hover {
   background: var(--sniptale-color-surface-hover);
 }
+.tour-object-item .tour-object-item-actions > .tour-object-delete:hover:not(:disabled) {
+  color: var(--sniptale-color-danger);
+  background: transparent;
+}
+.tour-object-add .guide-action-menu-anchor {
+  width: auto;
+  flex: none;
+}
+.tour-object-add button {
+  width: 1.75rem;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0.25rem;
+}
 .tour-object-row {
   display: flex;
   align-items: center;
@@ -410,9 +429,6 @@ html[data-tour-reordering] * {
   font-size: 0.75rem;
 }
 @media (max-width: 1100px) {
-  .tour-representation-switch {
-    flex-basis: 10.75rem;
-  }
   .tour-canvas {
     padding: 0.5rem;
   }
@@ -540,7 +556,8 @@ html[data-tour-reordering] * {
 .tour-header-controls {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   gap: 0.25rem;
   max-width: 100%;
   padding-inline-end: 0.5rem;

@@ -17,7 +17,10 @@ export function createTourPlayer(root, input, options = {}) {
   const next = query('next');
   const contents = query('contents');
   const navigation = query('navigation');
-  let index = 0;
+  let index = Math.max(
+    0,
+    tour.slides.findIndex((slide) => slide.id === options.initialSlideId)
+  );
   let ended = false;
   const history = [];
   const view = createTourScene(root, input, act, lifetime.signal, options);

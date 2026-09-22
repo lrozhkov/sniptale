@@ -91,7 +91,16 @@ export function createTourNavigation({
   function onContentsPointerDown(event) {
     const navigation = root.querySelector('[data-tour-navigation]');
     if (!navigation.open || !(event.target instanceof globalThis.Element)) return;
-    if (navigation.contains(event.target) || event.target.closest('[data-tour-contents]')) return;
+    if (
+      event
+        .composedPath()
+        .some(
+          (node) =>
+            node === navigation ||
+            (node instanceof globalThis.Element && node.matches('[data-tour-contents]'))
+        )
+    )
+      return;
     closeContents(false);
   }
 

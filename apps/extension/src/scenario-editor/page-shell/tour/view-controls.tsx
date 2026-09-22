@@ -80,6 +80,7 @@ export function TourViewControls({
       <ContentToolbarButton
         className="guide-labeled-action"
         ref={returnButton}
+        data-header-collapse="5"
         title={t('scenario.editor.tourReturnToEditing')}
         onClick={activate(mode.edit)}
       >
@@ -89,6 +90,7 @@ export function TourViewControls({
       <ContentToolbarButton
         className="guide-labeled-action"
         title={t('scenario.editor.tourReplayPreview')}
+        data-header-collapse="4"
         onClick={mode.replayPreview}
       >
         <RotateCcw size={16} aria-hidden="true" />
@@ -100,6 +102,7 @@ export function TourViewControls({
       <ContentToolbarButton
         className="guide-labeled-action"
         ref={previewButton}
+        data-header-collapse="5"
         title={t('scenario.editor.tourPreviewSlide')}
         disabled={previewDisabled}
         onClick={activate(mode.preview)}
@@ -111,6 +114,7 @@ export function TourViewControls({
         <ContentToolbarButton
           className="guide-labeled-action"
           title={t('scenario.editor.tourCameraFrame')}
+          data-header-collapse="6"
           aria-pressed={mode.view === 'frame'}
           disabled={disabled}
           onClick={mode.toggleFrame}
