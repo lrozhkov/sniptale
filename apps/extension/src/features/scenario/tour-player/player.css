@@ -10,7 +10,7 @@ body {
 }
 body {
   font-family: system-ui, sans-serif;
-  background: #111827;
+  background: transparent;
   color: #fff;
 }
 button,
@@ -40,14 +40,17 @@ a:focus-visible {
   height: 100svh;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
   min-width: 0;
   color: var(--tour-text);
-  background: var(--tour-surface);
+  background: transparent;
 }
 /* One bottom toolbar owns every chrome control; it stays in flow so it can never
    cover the content frame, and auto-hide only changes paint, not geometry. */
 .tour-toolbar {
   flex: none;
+  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -132,20 +135,20 @@ a:focus-visible {
 .tour-viewport {
   position: relative;
   min-height: 0;
-  flex: 1;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   margin: 10px 10px 6px;
-  border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--tour-surface) 45%, #000);
 }
 .tour-stage {
   position: relative;
+  flex: none;
   overflow: hidden;
   isolation: isolate;
+  border: 1px solid color-mix(in srgb, var(--tour-text) 16%, transparent);
+  border-radius: 12px;
 }
 .tour-scene {
   position: absolute;

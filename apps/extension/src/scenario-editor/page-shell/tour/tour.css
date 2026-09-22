@@ -41,7 +41,7 @@
   min-height: 0;
   overflow: hidden;
   padding: 1rem;
-  background: var(--sniptale-color-surface-canvas);
+  background: var(--sniptale-color-surface-panel);
 }
 .tour-stage-host {
   flex: 1;

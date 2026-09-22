@@ -9,7 +9,6 @@ export function createTourPlayer(root, input, options = {}) {
   const lifetime = new AbortController();
   delete root.dataset.slideId;
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
-  const viewport = query('viewport');
   const scene = query('scene');
   const title = query('title');
   const counter = query('counter');
@@ -104,7 +103,7 @@ export function createTourPlayer(root, input, options = {}) {
     Home: () => manualGo(0),
     End: () => manualGo(tour.slides.length - 1),
   });
-  observeViewport(viewport, view.resize, lifetime.signal);
+  observeViewport(root, view.resize, lifetime.signal);
   view.resize();
   render();
   return {
@@ -164,6 +163,8 @@ function observeViewport(viewport, resize, signal) {
   const observer = globalThis.ResizeObserver ? new globalThis.ResizeObserver(resize) : null;
   if (observer) {
     observer.observe(viewport);
+    const toolbar = viewport.querySelector('.tour-toolbar');
+    if (toolbar) observer.observe(toolbar);
     signal.addEventListener('abort', () => observer.disconnect(), { once: true });
   } else globalThis.addEventListener('resize', resize, { signal: signal });
 }

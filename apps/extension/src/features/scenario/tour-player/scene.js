@@ -128,6 +128,8 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
     motion?.cancel({ preserveMediaGate: true });
     stageWidth = nextWidth;
     stageHeight = nextHeight;
+    viewport.style.width = `${stageWidth}px`;
+    viewport.style.height = `${stageHeight}px`;
     stage.style.width = `${stageWidth}px`;
     stage.style.height = `${stageHeight}px`;
     render();
@@ -226,8 +228,18 @@ function applySceneStyle(root, stage, tour) {
 /** Viewport geometry and font metrics jointly determine scene and explanation layout. */
 function measureScene(root, viewport, aspect) {
   const [width, height] = aspect.split(':').map(Number);
-  const availableWidth = viewport.clientWidth || 640;
-  const availableHeight = viewport.clientHeight || 360;
+  const spacing = globalThis.getComputedStyle(viewport);
+  const horizontal = (parseFloat(spacing.marginLeft) || 0) + (parseFloat(spacing.marginRight) || 0);
+  const vertical = (parseFloat(spacing.marginTop) || 0) + (parseFloat(spacing.marginBottom) || 0);
+  const toolbarHeight = root.querySelector('.tour-toolbar')?.offsetHeight || 0;
+  const availableWidth = Math.max(
+    1,
+    (root.clientWidth || viewport.clientWidth || 640) - horizontal
+  );
+  const availableHeight = Math.max(
+    1,
+    (root.clientHeight || viewport.clientHeight || 360) - toolbarHeight - vertical
+  );
   const stageWidth = Math.min(availableWidth, (availableHeight * width) / height);
   return {
     width: stageWidth,
