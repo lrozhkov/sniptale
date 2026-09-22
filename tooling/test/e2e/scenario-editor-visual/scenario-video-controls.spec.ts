@@ -54,7 +54,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await drawer
         .locator('.guide-video-field')
         .nth(index)
-        .getByRole('button', { name: /^Clear text:/ })
+        .getByRole('button', { name: 'Clear text', exact: true })
         .click();
       await expect(field).toHaveValue('');
       await expect(field).toBeFocused();

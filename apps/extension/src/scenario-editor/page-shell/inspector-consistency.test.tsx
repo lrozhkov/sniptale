@@ -84,7 +84,7 @@ it('keeps document entry separate and only shows presentation controls for the s
   await click('Show all settings');
   expect(
     panel.querySelector('[aria-label="Show settings sections"]')?.getAttribute('aria-pressed')
-  ).toBe('true');
+  ).toBeNull();
   await click('Select block');
   expect(panel.querySelector('h2')?.textContent).toBe('Text');
   expect(panel.querySelector('[aria-label="Show settings sections"]')).toBeNull();

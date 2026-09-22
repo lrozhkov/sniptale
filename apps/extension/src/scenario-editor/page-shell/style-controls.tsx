@@ -7,6 +7,7 @@ import { CompactSelect } from '../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from './inspector';
 import type { Translate } from '../../platform/i18n';
 import { guideDocumentStyle } from './document-appearance';
+import { DEFAULT_DRAWING_COLORS } from '../../features/drawing/public';
 
 const choices = {
   theme: [
@@ -117,10 +118,12 @@ export function GuideStyleFields({
         />
         <div className="guide-style-accent">
           <ColorField
+            layout="stacked"
             label={t('scenario.editor.appearanceAccent')}
             title={t('scenario.editor.appearanceAccent')}
             value={guideDocumentStyle(style)['--guide-accent']!}
             disabled={disabled}
+            palette={DEFAULT_DRAWING_COLORS}
             allowAlpha={false}
             allowTransparent={false}
             onChange={(accentColor) => onChange({ accentColor })}

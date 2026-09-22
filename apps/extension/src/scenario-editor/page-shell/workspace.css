@@ -1893,3 +1893,38 @@ html[data-guide-height-resizing] * {
   text-align: center;
   overflow: hidden;
 }
+
+/* Navigation selection accents the icon without turning the label into an action. */
+.guide-page .guide-left-navigation .guide-section-tab,
+.guide-page .guide-left-navigation .guide-section-tab:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--sniptale-color-text-primary);
+}
+.guide-page .guide-voice-control > .guide-text-clear,
+.guide-page .guide-voice-control > .guide-text-clear:hover:not(:disabled) {
+  border-color: transparent;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+}
+
+/* Enabled commands are readable before hover; disabled commands remain visibly muted. */
+.guide-page
+  .sniptale-glass-toolbar-button:not(:disabled):not([data-active='true']):not(
+    .sniptale-btn-danger
+  ) {
+  color: var(--sniptale-color-text-primary);
+}
+.guide-page .sniptale-btn-danger:not(:disabled) {
+  color: var(--sniptale-color-text-primary);
+}
+.guide-page .sniptale-btn-danger:hover:not(:disabled) {
+  color: var(--sniptale-color-danger);
+}
+.guide-page button.sniptale-glass-toolbar-button:disabled {
+  color: var(--sniptale-color-text-dim);
+  opacity: 0.38;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  cursor: not-allowed;
+}

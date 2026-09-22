@@ -23,6 +23,15 @@ it('emits only each edited style property so other defaults remain inherited', a
         />
       )
     );
+    const paletteTrigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.color-selector.palette-trigger"]'
+    )!;
+    await act(async () => paletteTrigger.click());
+    const palette = document.querySelector('[data-ui="shared.ui.color-selector.expanded"]')!;
+    const colors = palette.querySelectorAll<HTMLButtonElement>('button');
+    expect(colors.length).toBeGreaterThanOrEqual(8);
+    await act(async () => colors[0]!.click());
+    expect(change.mock.lastCall?.[0]).toHaveProperty('accentColor');
     const cases = [
       ['Warm', { theme: 'warm' }],
       ['Serif', { font: 'serif' }],

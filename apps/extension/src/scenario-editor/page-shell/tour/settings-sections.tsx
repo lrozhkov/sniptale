@@ -25,7 +25,6 @@ export function useTourInspectorSections(presentation: 'all' | 'sections', t: Tr
       ));
     return (
       <CategorizedInspector
-        activateOnHover
         dataUi="scenario-editor.inspector-categories"
         key={context}
         ariaLabel={t('scenario.editor.inspectorShowSections')}

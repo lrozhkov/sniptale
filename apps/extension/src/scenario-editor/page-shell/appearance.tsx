@@ -146,7 +146,6 @@ export function GuideAppearance({
         sections.map(({ id }) => <div key={id}>{renderSection(id)}</div>)
       ) : (
         <CategorizedInspector
-          activateOnHover
           dataUi="scenario-editor.inspector-categories"
           ariaLabel={t('scenario.editor.guideStepSettings')}
           initialSection={activeSection}

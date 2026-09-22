@@ -1,3 +1,4 @@
+import { DEFAULT_DRAWING_COLORS } from '../../../features/drawing/public';
 import { TourMaskSettings } from './mask-settings';
 import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
@@ -18,7 +19,6 @@ import {
   ScanLine,
   Palette,
   Image,
-  ChevronDown,
   ArrowDown,
   ArrowUp,
   Trash2,
@@ -637,12 +637,7 @@ function TourAddObjectMenu({
     <div className="tour-object-add">
       <GuideActionMenu
         label={t('scenario.editor.tourAddObject')}
-        icon={
-          <>
-            <Plus size={16} aria-hidden="true" />
-            <ChevronDown size={10} aria-hidden="true" />
-          </>
-        }
+        icon={<Plus size={16} aria-hidden="true" />}
         disabled={disabled || !slide.image}
         items={tourAddObjectOptions(slide, t).map((option) => ({
           label: option.label,
@@ -723,6 +718,8 @@ function TourDocumentSettings({
             />
           </div>
           <ColorField
+            layout="stacked"
+            palette={DEFAULT_DRAWING_COLORS}
             label={t('scenario.editor.tourBackground')}
             title={t('scenario.editor.tourBackground')}
             value={tour.stage.background}
@@ -738,6 +735,8 @@ function TourDocumentSettings({
             ] as const
           ).map(({ key, label }) => (
             <ColorField
+              layout="stacked"
+              palette={DEFAULT_DRAWING_COLORS}
               key={key}
               label={label}
               title={label}

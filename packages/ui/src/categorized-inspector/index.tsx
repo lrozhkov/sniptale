@@ -4,9 +4,7 @@ import {
   useState,
   type ComponentType,
   type KeyboardEvent,
-  type PointerEvent,
   type ReactNode,
-  type RefObject,
 } from 'react';
 
 export type CategorizedInspectorSection<SectionId extends string> = {
@@ -43,7 +41,6 @@ function InspectorSectionNavigationItem<SectionId extends string>(props: {
   active: boolean;
   buttonRef: (element: HTMLButtonElement | null) => void;
   onClick: () => void;
-  onPointerEnter: (event: PointerEvent<HTMLButtonElement>) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   section: CategorizedInspectorSection<SectionId>;
 }) {
@@ -54,7 +51,7 @@ function InspectorSectionNavigationItem<SectionId extends string>(props: {
         aria-label={props.section.label}
         aria-pressed={props.active}
         className={[
-          'inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[7px]',
+          'inline-flex h-9 w-9 items-center justify-center rounded-[7px]',
           'focus-visible:outline-none focus-visible:ring-2',
           'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
           props.active
@@ -62,7 +59,6 @@ function InspectorSectionNavigationItem<SectionId extends string>(props: {
             : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
         ].join(' ')}
         onClick={props.onClick}
-        onPointerEnter={props.onPointerEnter}
         onKeyDown={props.onKeyDown}
         ref={props.buttonRef}
         title={props.section.label}
@@ -111,8 +107,6 @@ function useRequestedInspectorSection<SectionId extends string>(
 }
 
 export function CategorizedInspector<SectionId extends string>(props: {
-  /** Mouse hover may select a category; keyboard and touch retain explicit activation. */
-  activateOnHover?: boolean;
   activeSectionRequest?: { id: SectionId; token: number };
   ariaLabel: string;
   dataUi?: string;
@@ -123,12 +117,23 @@ export function CategorizedInspector<SectionId extends string>(props: {
   sections: readonly CategorizedInspectorSection<SectionId>[];
   showSectionHeading?: boolean;
 }) {
-  const contentRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const { activeSection: resolvedSection, setActiveSection } = useRequestedInspectorSection(
     props.initialSection,
     props.activeSectionRequest,
     props.sections
   );
+
+  const handleNavigation = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const nextIndex = getNextSectionIndex(event.key, index, props.sections.length);
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = props.sections[nextIndex];
+    if (!next) return;
+    setActiveSection(next.id);
+    props.onSectionChange?.(next.id);
+    buttonRefs.current[nextIndex]?.focus();
+  };
 
   if (!resolvedSection) return null;
   const resolvedSectionDefinition = props.sections.find(
@@ -137,18 +142,30 @@ export function CategorizedInspector<SectionId extends string>(props: {
 
   return (
     <div className="grid min-h-48 grid-cols-[3rem_minmax(0,1fr)]" data-ui={props.dataUi}>
-      <InspectorSectionNavigation
-        activateOnHover={props.activateOnHover === true}
-        activeSection={resolvedSection}
-        ariaLabel={props.ariaLabel}
-        contentRef={contentRef}
-        sections={props.sections}
-        onSelect={(section) => {
-          setActiveSection(section);
-          props.onSectionChange?.(section);
-        }}
-      />
-      <div ref={contentRef} className="min-w-0 p-2.5">
+      <nav
+        aria-label={props.ariaLabel}
+        className={[
+          'grid content-start gap-1 border-r border-solid p-1.5',
+          'border-[color:var(--sniptale-color-border-soft)]',
+        ].join(' ')}
+      >
+        {props.sections.map((section, index) => (
+          <InspectorSectionNavigationItem
+            active={section.id === resolvedSection}
+            buttonRef={(element) => {
+              buttonRefs.current[index] = element;
+            }}
+            key={section.id}
+            onClick={() => {
+              setActiveSection(section.id);
+              props.onSectionChange?.(section.id);
+            }}
+            onKeyDown={(event) => handleNavigation(event, index)}
+            section={section}
+          />
+        ))}
+      </nav>
+      <div className="min-w-0 p-2.5">
         {props.showSectionHeading && resolvedSectionDefinition ? (
           <InspectorSectionHeading
             control={props.renderSectionHeadingControl?.(resolvedSection)}
@@ -158,64 +175,5 @@ export function CategorizedInspector<SectionId extends string>(props: {
         {props.renderSection(resolvedSection)}
       </div>
     </div>
-  );
-}
-
-/** Owns category activation and focus handoff before replacing the content pane. */
-function InspectorSectionNavigation<SectionId extends string>(props: {
-  activateOnHover: boolean;
-  activeSection: SectionId;
-  ariaLabel: string;
-  contentRef: RefObject<HTMLDivElement | null>;
-  onSelect: (section: SectionId) => void;
-  sections: readonly CategorizedInspectorSection<SectionId>[];
-}) {
-  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const handleNavigation = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const nextIndex = getNextSectionIndex(event.key, index, props.sections.length);
-    if (nextIndex === null) return;
-    event.preventDefault();
-    const next = props.sections[nextIndex];
-    if (!next) return;
-    props.onSelect(next.id);
-    buttonRefs.current[nextIndex]?.focus();
-  };
-
-  const handleHover = (event: PointerEvent<HTMLButtonElement>, section: SectionId) => {
-    if (
-      !props.activateOnHover ||
-      event.pointerType !== 'mouse' ||
-      event.buttons !== 0 ||
-      section === props.activeSection
-    )
-      return;
-    const focused = props.contentRef.current?.ownerDocument.activeElement;
-    if (focused instanceof HTMLElement && props.contentRef.current?.contains(focused))
-      focused.blur();
-    props.onSelect(section);
-  };
-
-  return (
-    <nav
-      aria-label={props.ariaLabel}
-      className={[
-        'grid content-start gap-1 border-r border-solid p-1.5',
-        'border-[color:var(--sniptale-color-border-soft)]',
-      ].join(' ')}
-    >
-      {props.sections.map((section, index) => (
-        <InspectorSectionNavigationItem
-          active={section.id === props.activeSection}
-          buttonRef={(element) => {
-            buttonRefs.current[index] = element;
-          }}
-          key={section.id}
-          onClick={() => props.onSelect(section.id)}
-          onPointerEnter={(event) => handleHover(event, section.id)}
-          onKeyDown={(event) => handleNavigation(event, index)}
-          section={section}
-        />
-      ))}
-    </nav>
   );
 }

@@ -95,6 +95,12 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .getByRole('navigation')
         .getByRole('button', { name: appearance, exact: true })
         .click();
+      const guideInset = await panel.evaluate(
+        (node) =>
+          node.querySelector('nav button')!.getBoundingClientRect().top -
+          node.querySelector('.guide-panel-heading')!.getBoundingClientRect().bottom
+      );
+      expect.soft(guideInset).toBe(12);
       const divider = page.locator('.guide-panel-divider-right');
       await divider.focus();
       await page.keyboard.press('Home');
@@ -221,6 +227,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .click();
       await expect(tourPanel.locator('[data-inspector-object]')).toBeFocused();
       await expect(tourPanel.locator('.tour-object-item-actions')).toBeVisible();
+      await expect(tourPanel.locator('.tour-object-add button svg')).toHaveCount(1);
       await expect(tourPanel.locator('.tour-object-item-actions button').first()).toBeDisabled();
     });
   }
@@ -258,6 +265,18 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       expect.soft(await title.evaluate((node) => getComputedStyle(node).borderRadius)).toBe(radius);
       await expect(title).toHaveCSS('height', '36px');
       await expect(title).toHaveCSS('font-size', '12px');
+      const leftTab = page.locator('.guide-left-navigation [aria-pressed="true"]');
+      await expect.soft(leftTab).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await expect
+        .soft(leftTab)
+        .toHaveCSS('color', await panel.evaluate((node) => getComputedStyle(node).color));
+      await title.fill('Navigation title');
+      const controls = title.locator('..').locator('.guide-voice-control');
+      const clear = controls.locator('button').last();
+      await expect.soft(clear).toHaveAttribute('title', ru ? 'Очистить текст' : 'Clear text');
+      await clear.hover();
+      await expect.soft(clear).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+
       const railGeometry = await panel.evaluate((node) => {
         const nav = node.querySelector('nav')!;
         const button = nav.querySelector('button')!;
@@ -280,7 +299,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .getByRole('navigation')
         .getByRole('button', { name: ru ? 'Композиция' : 'Composition', exact: true });
       await composition.hover();
-      await expect.soft(composition).toHaveAttribute('aria-pressed', 'true', { timeout: 1000 });
+      await expect.soft(composition).toHaveAttribute('aria-pressed', 'false', { timeout: 1000 });
       await composition.click();
       const labels = await panel
         .locator(
@@ -303,8 +322,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       const align = panel.getByRole('button', { name: ru ? 'Справа' : 'Right', exact: true });
       await align.click();
       await expect(align).toHaveAttribute('aria-pressed', 'true');
-      const accentColors = await align.evaluate((node) =>
-        ['accent', 'accent-emphasis'].map((token) => {
+      const selectedColors = await align.evaluate((node) =>
+        ['text-primary'].map((token) => {
           const probe = document.createElement('span');
           probe.style.color = `var(--sniptale-color-${token})`;
           node.append(probe);
@@ -315,14 +334,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       );
       await expect
         .poll(async () =>
-          accentColors.includes(await align.evaluate((node) => getComputedStyle(node).color))
+          selectedColors.includes(await align.evaluate((node) => getComputedStyle(node).color))
         )
         .toBe(true);
       await expect(align).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await page.mouse.move(800, 500);
       await expect
         .poll(async () =>
-          accentColors.includes(await align.evaluate((node) => getComputedStyle(node).color))
+          selectedColors.includes(await align.evaluate((node) => getComputedStyle(node).color))
         )
         .toBe(true);
       const number = panel
@@ -339,7 +358,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .getByRole('navigation')
         .getByRole('button', { name: ru ? 'Пункты оглавления' : 'Contents links', exact: true });
       await contents.hover();
-      await expect.soft(contents).toHaveAttribute('aria-pressed', 'true', { timeout: 1000 });
+      await expect.soft(contents).toHaveAttribute('aria-pressed', 'false', { timeout: 1000 });
       await contents.click();
       await panel
         .getByRole('button', { name: ru ? 'Добавить кнопку' : 'Add button', exact: true })
@@ -356,6 +375,37 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         })
         .click();
       const row = panel.locator('.tour-slide-row');
+      const rowCenters = await row.locator('button').evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          return box.top + box.height / 2;
+        })
+      );
+      expect.soft(Math.max(...rowCenters) - Math.min(...rowCenters)).toBeLessThanOrEqual(1);
+      const resize = page.locator('.guide-panel-divider-right');
+      await resize.focus();
+      for (let index = 0; index < 10; index++) await page.keyboard.press('ArrowRight');
+      await expect(resize).toHaveAttribute('aria-valuenow', '260');
+      const narrowRow = await row.locator('button').evaluateAll((buttons) =>
+        buttons.map((button) => {
+          const box = button.getBoundingClientRect();
+          return { center: box.top + box.height / 2, right: box.right };
+        })
+      );
+      expect(
+        Math.max(...narrowRow.map((box) => box.center)) -
+          Math.min(...narrowRow.map((box) => box.center))
+      ).toBeLessThanOrEqual(1);
+      expect(Math.max(...narrowRow.map((box) => box.right))).toBeLessThanOrEqual(
+        (await panel.boundingBox())!.x + 260
+      );
+      await info.attach(`contents-row-${locale}-${theme}-260`, {
+        body: await panel.screenshot(),
+        contentType: 'image/png',
+      });
+      await resize.focus();
+      await page.keyboard.press('Home');
+
       await expect
         .soft(row.getByRole('button', { name: ru ? 'Удалить' : 'Delete', exact: true }))
         .toHaveCount(1);
@@ -389,6 +439,12 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await panel
         .locator('[aria-label="' + (ru ? 'Показать все настройки' : 'Show all settings') + '"]')
         .click();
+      await expect
+        .soft(panel.locator('.guide-panel-heading button').first())
+        .not.toHaveAttribute('aria-pressed');
+      await expect
+        .soft(panel.locator('.guide-inspector-group-heading h3').first())
+        .toHaveCSS('font-weight', '600');
       const separators = await panel.locator('.guide-inspector-section').evaluateAll((sections) =>
         sections.slice(1).map((section) => {
           const group = section.querySelector('.guide-inspector-group')!;
@@ -404,6 +460,136 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         body: await panel.screenshot(),
         contentType: 'image/png',
       });
+    });
+  }
+}
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  for (const locale of ['ru', 'en'] as const) {
+    test(`inspector field vocabulary in ${locale} ${theme}`, async ({ page, hostOrigin }, info) => {
+      const ru = locale === 'ru';
+      await openVisualHarness(
+        page,
+        hostOrigin,
+        theme,
+        locale,
+        { width: 1600, height: 1000 },
+        'compare',
+        { tourFixture: '1' }
+      );
+      const panel = page.locator('#guide-inspector-panel');
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
+        .click();
+      const segment = panel
+        .locator('.guide-inspector-choice [role="group"] button[aria-pressed="true"]')
+        .first();
+      await expect.soft(segment).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(
+        panel.locator('.guide-inspector-choice [role="group"] > span[aria-hidden]').first()
+      ).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(segment).not.toHaveCSS('box-shadow', 'none');
+      const valueFonts = await panel
+        .locator(
+          '.guide-inspector-choice [role="group"] button[aria-pressed="true"], .guide-inspector-choice [data-ui="shared.ui.compact-select"] > button'
+        )
+        .evaluateAll((nodes) =>
+          nodes.map((node) => {
+            const style = getComputedStyle(node);
+            return [
+              style.fontFamily,
+              style.fontSize,
+              style.fontWeight,
+              style.lineHeight,
+              style.color,
+            ].join('|');
+          })
+        );
+      expect(new Set(valueFonts).size).toBe(1);
+
+      await segment.hover();
+      await expect(segment).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+      const accent = panel.locator('.guide-style-accent');
+      const colorSpacing = await accent.evaluate(
+        (node) =>
+          node.querySelector(':scope > button')!.getBoundingClientRect().left -
+          node
+            .querySelector('[data-ui="shared.ui.color-selector.trigger"]')!
+            .getBoundingClientRect().right
+      );
+      expect.soft(colorSpacing).toBe(8);
+      await accent.locator('[data-ui="shared.ui.color-selector.palette-trigger"]').click();
+      const palette = page.locator('[data-ui="shared.ui.color-selector.expanded"]');
+      expect.soft(await palette.locator('button').count()).toBeGreaterThanOrEqual(8);
+      await page.keyboard.press('Escape');
+      await info.attach(`guide-colors-${locale}-${theme}`, {
+        body: await panel.screenshot(),
+        contentType: 'image/png',
+      });
+      await page
+        .getByRole('button', { name: ru ? 'Интерактивный тур' : 'Interactive tour', exact: true })
+        .click();
+      await page
+        .locator('.guide-page-header')
+        .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
+        .click();
+      const parameterLabels =
+        '.guide-number-toggle, .tour-text-field > span:not(.guide-voice-field), [data-ui="shared.ui.compact-inspector.numeric-row"] > span, [data-ui="shared.ui.compact-inspector.color-field"] > span, [data-ui="shared.ui.surface-style-selector"] > div:first-child > span';
+      for (const section of [
+        ru ? 'Воспроизведение' : 'Playback',
+        ru ? 'Пояснения' : 'Explanations',
+      ]) {
+        await panel
+          .getByRole('navigation')
+          .getByRole('button', { name: section, exact: true })
+          .click();
+        const fonts = await panel.locator(parameterLabels).evaluateAll((nodes) =>
+          nodes.map((node) => {
+            const style = getComputedStyle(node);
+            return [
+              style.fontFamily,
+              style.fontSize,
+              style.fontWeight,
+              style.lineHeight,
+              style.color,
+            ].join('|');
+          })
+        );
+        expect(fonts.length).toBeGreaterThan(2);
+        expect.soft(new Set(fonts).size).toBe(1);
+        for (const toggle of await panel.getByRole('switch').all()) {
+          await expect.soft(toggle).toHaveCSS('width', '32px');
+          await expect.soft(toggle).toHaveCSS('height', '20px');
+        }
+        const numeric = panel
+          .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+          .first();
+        await numeric.hover();
+        const scrub = numeric.locator(
+          '[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]'
+        );
+        await expect(scrub).toHaveCSS('opacity', '1');
+        const fill = await scrub.evaluate((node) =>
+          getComputedStyle(node).getPropertyValue('--sniptale-range-fill-color').trim()
+        );
+        expect.soft(fill).not.toBe('');
+        await info.attach(`document-${section}-${locale}-${theme}`, {
+          body: await panel.screenshot(),
+          contentType: 'image/png',
+        });
+      }
+      const redo = page
+        .locator('.guide-page-header')
+        .getByRole('button', { name: ru ? 'Повторить' : 'Redo', exact: true });
+      await expect(redo).toBeDisabled();
+      const create = page.locator('.tour-list-actions button').first();
+      await expect(create).toBeEnabled();
+      await expect(create).toHaveCSS('opacity', '1');
+      expect
+        .soft(Number(await redo.evaluate((node) => getComputedStyle(node).opacity)))
+        .toBeLessThanOrEqual(0.4);
     });
   }
 }

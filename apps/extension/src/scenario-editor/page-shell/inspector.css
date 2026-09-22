@@ -54,7 +54,7 @@
   margin: 0;
   min-width: 0;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 .guide-inspector-group-body {
@@ -265,7 +265,7 @@
 }
 .guide-inspector-panel > .guide-panel-heading h2 {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
 }
 .guide-inspector-panel > .guide-panel-scroll {
@@ -281,7 +281,7 @@
   padding-bottom: 12px;
   border-bottom: 1px solid var(--sniptale-color-border-soft);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -294,7 +294,7 @@
   gap: 8px;
   width: 100%;
   min-height: 32px;
-  padding: 0 8px;
+  padding: 0;
   border: 0;
   background: transparent;
   color: inherit;
@@ -316,6 +316,9 @@
 }
 .guide-inspector-disclosure:hover {
   background: var(--sniptale-color-surface-hover);
+  box-shadow:
+    8px 0 0 var(--sniptale-color-surface-hover),
+    -8px 0 0 var(--sniptale-color-surface-hover);
 }
 .guide-inspector-disclosure:focus-visible {
   outline: 2px solid var(--sniptale-color-accent);
@@ -380,8 +383,10 @@
 .guide-inspector-panel .tour-object-item,
 .guide-inspector-panel .tour-slide-row {
   display: flex;
-  flex-wrap: wrap;
-  padding-block: 4px;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-height: 36px;
+  padding-block: 0;
   border-bottom: 1px solid var(--sniptale-color-border-soft);
 }
 .guide-inspector-panel .tour-object-row > span,
@@ -400,14 +405,18 @@
 }
 .guide-inspector-panel .tour-object-item-actions > button,
 .guide-inspector-panel .tour-slide-row > button:not(.tour-slide-select) {
-  width: 1.75rem;
-  height: 1.75rem;
-  min-width: 1.75rem;
-  min-height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
 }
 .guide-inspector-panel .tour-object-row,
 .guide-inspector-panel .tour-slide-select {
-  flex-basis: 100%;
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  font-size: 12px;
 }
 .guide-inspector-panel .tour-slide-select + button {
   margin-inline-start: auto;
@@ -545,4 +554,126 @@
 .guide-inspector-panel .tour-slide-row:last-child,
 .guide-inspector-panel .tour-object-item:last-child {
   border-bottom: none;
+}
+
+.guide-inspector-panel .guide-appearance {
+  margin-block: 0;
+}
+
+.guide-inspector-panel .sniptale-product-toggle {
+  width: 32px;
+  height: 20px;
+  min-height: 20px;
+}
+.guide-inspector-panel .sniptale-product-toggle-thumb {
+  width: 14px;
+  height: 14px;
+}
+.guide-inspector-panel .sniptale-product-toggle-checked .sniptale-product-toggle-thumb {
+  transform: translateX(12px);
+}
+.guide-inspector-panel .guide-number-toggle {
+  min-height: 32px;
+}
+.guide-inspector-panel [data-ui='shared.ui.compact-inspector.numeric-range-scrub'] {
+  --sniptale-range-fill-color: var(--sniptale-color-accent);
+}
+.guide-inspector-panel input.sniptale-range::-webkit-slider-thumb {
+  background: var(--sniptale-color-accent);
+  border-color: var(--sniptale-color-accent);
+  box-shadow: 0 0 0 2px var(--sniptale-color-surface-panel);
+}
+.guide-inspector-panel input.sniptale-range::-moz-range-thumb {
+  background: var(--sniptale-color-accent);
+  border-color: var(--sniptale-color-accent);
+  box-shadow: 0 0 0 2px var(--sniptale-color-surface-panel);
+}
+.guide-inspector-panel .guide-inspector-choice [role='group'] > span[aria-hidden] {
+  background: transparent;
+  box-shadow: none;
+}
+.guide-inspector-panel
+  [data-ui='scenario-editor.inspector-categories']
+  > nav
+  button[aria-pressed='true'] {
+  background: transparent;
+  color: var(--sniptale-color-accent);
+  box-shadow: inset 0 0 0 1px var(--sniptale-color-accent);
+}
+.guide-inspector-panel .guide-style-accent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px;
+  align-items: end;
+  gap: 8px;
+}
+.guide-inspector-panel .guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.guide-inspector-panel .guide-style-accent [data-ui='shared.ui.color-selector.trigger'] {
+  min-height: 36px;
+  border-color: var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+}
+.guide-inspector-panel .guide-style-accent [data-ui='shared.ui.color-selector.picker-trigger'] {
+  justify-content: flex-start;
+}
+.guide-inspector-panel .guide-style-accent > button {
+  height: 36px;
+  margin: 0;
+}
+
+/* One label contract across primitive field types, including nested tour settings. */
+.guide-inspector-panel
+  :is(
+    .guide-number-toggle,
+    .guide-inspector-number > span,
+    .guide-inspector-choice > span,
+    .guide-numbering-field,
+    .tour-text-field > span:not(.guide-voice-field),
+    .tour-layout-setting > span,
+    [data-ui='shared.ui.compact-inspector.numeric-row'] > span,
+    [data-ui='shared.ui.compact-inspector.color-field'] > span,
+    [data-ui='shared.ui.surface-style-selector'] > div:first-child > span
+  ) {
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+}
+
+.guide-inspector-panel [data-ui='shared.ui.color-selector.trigger']:focus-within {
+  border-color: var(--sniptale-color-border-accent-strong);
+}
+.guide-page
+  .guide-inspector-panel
+  [data-ui='shared.ui.color-selector.trigger']
+  button:focus-visible {
+  outline: none;
+}
+
+/* Textual values share typography; selection is neutral and editing keeps the accent. */
+.guide-inspector-panel [data-ui='shared.ui.compact-select'] > button,
+.guide-inspector-panel [data-ui='shared.ui.surface-style-selector.trigger'] > span:last-of-type,
+.guide-inspector-panel [data-ui='shared.ui.color-selector.picker-trigger'] > span:last-of-type,
+.guide-inspector-panel [data-ui='shared.ui.compact-inspector.numeric-value-field'] > input,
+.guide-inspector-panel .guide-inspector-choice [role='group'] button {
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+}
+.guide-inspector-panel .guide-inspector-choice [role='group'] button[aria-pressed='false'] {
+  font-weight: 400;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-page .guide-inspector-panel [role='group'] button[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  background: transparent;
+  border-color: var(--sniptale-color-border-strong);
+  font-weight: 500;
+}
+.guide-page
+  .guide-inspector-panel
+  .guide-inspector-choice
+  [role='group']
+  button[aria-pressed='true'] {
+  box-shadow: inset 0 0 0 1px var(--sniptale-color-border-strong);
 }

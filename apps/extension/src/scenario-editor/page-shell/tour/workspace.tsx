@@ -184,7 +184,6 @@ function TourSettingsPanel({
                 ? 'scenario.editor.inspectorShowSections'
                 : 'scenario.editor.inspectorShowAll'
             )}
-            aria-pressed={panels.presentation === 'all'}
             onClick={panels.togglePresentation}
           >
             {panels.presentation === 'all' ? (

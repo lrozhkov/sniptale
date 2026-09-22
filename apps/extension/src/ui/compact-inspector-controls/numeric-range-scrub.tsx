@@ -11,10 +11,12 @@ import { clampNumber, cx, type CompactInspectorNumericScrub } from './shared';
 
 const NUMERIC_ROW_RANGE_INLINE_INSET = 'calc(0.75rem + var(--sniptale-range-thumb-size) / 2)';
 const NUMERIC_ROW_RANGE_THUMB_OUTSET = 'calc(var(--sniptale-range-thumb-size) / -2)';
+const NUMERIC_ROW_RANGE_FILL_COLOR =
+  'var(--sniptale-range-fill-color, color-mix(in srgb, var(--sniptale-color-accent) 88%, white 12%))';
 const NUMERIC_ROW_RANGE_TRACK_BACKGROUND = [
   'linear-gradient(90deg,',
-  'color-mix(in srgb, var(--sniptale-color-accent) 88%, white 12%) 0,',
-  'color-mix(in srgb, var(--sniptale-color-accent) 88%, white 12%) var(--sniptale-range-fill-ratio),',
+  `${NUMERIC_ROW_RANGE_FILL_COLOR} 0,`,
+  `${NUMERIC_ROW_RANGE_FILL_COLOR} var(--sniptale-range-fill-ratio),`,
   [
     'color-mix(in srgb, var(--sniptale-color-border-subtle) 76%,',
     'var(--sniptale-color-surface-canvas) 24%) var(--sniptale-range-fill-ratio),',

@@ -258,7 +258,6 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
                 ? 'scenario.editor.inspectorShowSections'
                 : 'scenario.editor.inspectorShowAll'
             )}
-            aria-pressed={props.panels.presentation === 'all'}
             onClick={props.panels.togglePresentation}
           >
             {props.panels.presentation === 'all' ? (

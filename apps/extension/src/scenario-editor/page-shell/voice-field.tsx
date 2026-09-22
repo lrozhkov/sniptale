@@ -131,15 +131,6 @@ export function GuideVoiceField(props: VoiceFieldProps) {
         <Textarea {...attributes} rows={props.rows ?? 1} />
       )}
       <span className="guide-voice-control" onMouseDown={(event) => event.preventDefault()}>
-        {props.clearable && (
-          <ContentToolbarButton
-            title={`${translate('scenario.editor.guideClearText')}: ${props['aria-label']}`}
-            disabled={props.disabled || !props.value}
-            onClick={clear}
-          >
-            <X size={14} aria-hidden="true" />
-          </ContentToolbarButton>
-        )}
         <VoiceInputButton
           dataUi="scenario.voice-input"
           disabled={props.disabled ?? false}
@@ -152,6 +143,16 @@ export function GuideVoiceField(props: VoiceFieldProps) {
           onStart={start}
           onStop={stop}
         />
+        {props.clearable && (
+          <ContentToolbarButton
+            title={translate('scenario.editor.guideClearText')}
+            className="guide-text-clear"
+            disabled={props.disabled || !props.value}
+            onClick={clear}
+          >
+            <X size={14} aria-hidden="true" />
+          </ContentToolbarButton>
+        )}
       </span>
     </span>
   );
