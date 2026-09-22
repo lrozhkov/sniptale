@@ -151,7 +151,7 @@ function PresetLibraryActions({
       {' '}
       {naming ? (
         <form
-          className="flex gap-2"
+          className="video-inspector-preset-form"
           onSubmit={(event) => {
             event.preventDefault();
             if (!name.trim()) return;
@@ -171,7 +171,7 @@ function PresetLibraryActions({
             aria-label={translate('videoEditor.effectsLibrary.presetName')}
             onChange={(event) => setName(event.target.value)}
             className={[
-              'min-w-0 flex-1 rounded-[4px] border bg-transparent px-2 text-sm',
+              'min-w-0 w-full rounded-[var(--sniptale-radius-sm)] border bg-transparent px-2 text-xs',
               'border-[var(--sniptale-color-border-soft)]',
             ].join(' ')}
           />
@@ -183,7 +183,7 @@ function PresetLibraryActions({
           </InspectorActionButton>
         </form>
       ) : (
-        <div className="flex justify-end gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
+        <div data-ui="video-editor.inspector.actions">
           <InspectorActionButton
             disabled={
               !available || busy || !Object.keys(values).length || preferences.presets.length >= 16
@@ -194,6 +194,7 @@ function PresetLibraryActions({
           </InspectorActionButton>
           {selected.startsWith('user:') && (
             <InspectorActionButton
+              tone="danger"
               disabled={busy}
               onClick={() => {
                 const id = selected.slice(5);

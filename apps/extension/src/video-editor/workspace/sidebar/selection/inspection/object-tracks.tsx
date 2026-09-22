@@ -3,13 +3,7 @@ import { InspectorActionButton } from '../shared/actions';
 import type { VideoObjectTrack } from '../../../../../features/video/project/object-tracks';
 import { isInternalVideoObjectTrack } from '../../../../../features/video/project/object-tracks';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { DangerButton } from '../effect-controls/fields';
-import {
-  DetailItem,
-  DetailList,
-  PANEL_DIVIDER_CLASS_NAME,
-  PANEL_HEADING_CLASS_NAME,
-} from '../shared/panel';
+import { DetailItem, DetailList, PANEL_DIVIDER_CLASS_NAME } from '../shared/panel';
 
 export function SceneObjectTracksPanel(props: {
   objectTracks: VideoObjectTrack[];
@@ -20,20 +14,15 @@ export function SceneObjectTracksPanel(props: {
   const visibleTracks = props.objectTracks.filter((track) => !isInternalVideoObjectTrack(track));
   return (
     <div className="space-y-3">
-      <p className={PANEL_HEADING_CLASS_NAME}>
-        {translate('videoEditor.sidebar.objectTracksTitle')}
-      </p>
-      <div className="space-y-3">
-        {visibleTracks.map((track) => (
-          <ObjectTrackSummaryCard
-            key={track.id}
-            track={track}
-            onDeleteObjectTrack={props.onDeleteObjectTrack}
-            onSelectObjectTrack={props.onSelectObjectTrack}
-            selected={props.selectedObjectTrackId === track.id}
-          />
-        ))}
-      </div>
+      {visibleTracks.map((track) => (
+        <ObjectTrackSummaryCard
+          key={track.id}
+          track={track}
+          onDeleteObjectTrack={props.onDeleteObjectTrack}
+          onSelectObjectTrack={props.onSelectObjectTrack}
+          selected={props.selectedObjectTrackId === track.id}
+        />
+      ))}
     </div>
   );
 }
@@ -48,37 +37,29 @@ export function ObjectTrackSummaryCard(props: {
 
   return (
     <div className={`space-y-3 pt-3 first:pt-0 first:border-t-0 ${PANEL_DIVIDER_CLASS_NAME}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          {!props.selected ? (
-            <p className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-              {summary.title}
-            </p>
-          ) : null}
+      {!props.selected && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="min-w-0 break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
+            {summary.title}
+          </p>
+          <InspectorActionButton
+            data-ui="video-editor.object-track.select"
+            disabled={!props.onSelectObjectTrack}
+            onClick={() => props.onSelectObjectTrack?.(props.track.id)}
+          >
+            {translate('videoEditor.sidebar.objectTrackSelectLabel')}
+          </InspectorActionButton>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {!props.selected ? (
-            <InspectorActionButton
-              compact
-              data-ui="video-editor.object-track.select"
-              disabled={props.selected}
-              type="button"
-              onClick={() => props.onSelectObjectTrack?.(props.track.id)}
-            >
-              {translate(
-                props.selected
-                  ? 'videoEditor.sidebar.objectTrackSelectedLabel'
-                  : 'videoEditor.sidebar.objectTrackSelectLabel'
-              )}
-            </InspectorActionButton>
-          ) : null}
-        </div>
-      </div>
+      )}
       <SceneObjectTrackDetails detectorVersion={props.track.detectorVersion} summary={summary} />
-      <DangerButton
-        label={translate('videoEditor.sidebar.objectTrackDeleteLabel')}
+      <InspectorActionButton
+        tone="danger"
+        separated
+        disabled={!props.onDeleteObjectTrack}
         onClick={() => props.onDeleteObjectTrack?.(props.track.id)}
-      />
+      >
+        {translate('videoEditor.sidebar.objectTrackDeleteLabel')}
+      </InspectorActionButton>
     </div>
   );
 }

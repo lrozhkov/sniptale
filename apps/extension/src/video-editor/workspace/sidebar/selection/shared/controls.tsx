@@ -58,6 +58,7 @@ export function SelectInput<T extends string>({
 
   return (
     <CompactSelect
+      appearance="plain"
       aria-label={translate('videoEditor.sidebar.selectInputLabel')}
       value={value}
       onChange={onChange}

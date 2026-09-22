@@ -71,3 +71,38 @@
     color: var(--sniptale-color-text-primary-strong) !important;
   }
 }
+
+.video-inspector-camera-layout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(32px, 1fr));
+  gap: 4px;
+}
+.video-inspector-preset-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-block: 8px 4px;
+}
+.video-inspector-preset-form > input {
+  flex: 1 0 100%;
+  min-height: 32px;
+  font-weight: 500;
+}
+.video-inspector-preset-form > input:focus-visible {
+  outline: 1px solid var(--sniptale-color-border-accent-strong);
+  outline-offset: -1px;
+}
+@layer utilities {
+  [data-ui='video-editor.inspector.content'] [data-inspector-icon] {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    flex: none;
+    padding: 0;
+    justify-self: center;
+  }
+  [data-ui='video-editor.inspector.content'] [data-inspector-icon]:hover:not(:disabled) {
+    border-color: transparent !important;
+    color: var(--sniptale-color-text-primary-strong);
+  }
+}

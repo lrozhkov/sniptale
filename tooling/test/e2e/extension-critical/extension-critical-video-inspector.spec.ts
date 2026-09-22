@@ -2,6 +2,7 @@ import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 
 for (const locale of ['ru', 'en'] as const) {
@@ -16,6 +17,10 @@ for (const locale of ['ru', 'en'] as const) {
         videoProjects: [project],
         storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
       });
+      await page.addInitScript(
+        (value) => localStorage.setItem('sniptale-locale-preference', value),
+        locale
+      );
       await page.setViewportSize({ width: 1600, height: 1000 });
       await page.goto(
         `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${theme}`
@@ -78,6 +83,89 @@ for (const locale of ['ru', 'en'] as const) {
           contentType: 'image/png',
         });
       }
+    });
+  }
+}
+
+for (const locale of ['ru', 'en'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`video camera inspector narrow geometry ${locale} ${theme}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      const project = createVideoProjectFromMultiSourceRecording({
+        name: 'Camera inspector',
+        videos: [
+          {
+            duration: 12,
+            filename: 'screen.webm',
+            height: 1080,
+            mimeType: 'video/webm',
+            recordingId: 'screen',
+            size: 1024,
+            width: 1920,
+          },
+        ],
+        webcamVideo: {
+          duration: 12,
+          filename: 'camera.webm',
+          height: 720,
+          mimeType: 'video/webm',
+          recordingId: 'camera',
+          size: 512,
+          width: 1280,
+        },
+      });
+      const track = project.tracks.find((item) => item.role === 'CAMERA')!;
+      const clip = project.clips.find((item) => item.trackId === track.id)!;
+      await page.emulateMedia({ colorScheme: theme });
+      await applyHarnessBootstrap(page, {
+        apiBehavior: { runtimeFallback: 'typed-success' },
+        videoProjects: [project],
+        storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+      });
+      await page.addInitScript(
+        (value) => localStorage.setItem('sniptale-locale-preference', value),
+        locale
+      );
+      await page.setViewportSize({ width: 1600, height: 1000 });
+      await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`);
+      await page.locator(`[data-project-timeline-clip="${clip.id}"]`).click();
+      const panel = page.locator('[data-ui="video-editor.inspector.content"]');
+      const controls = panel.locator('[data-ui="video-editor.camera-placement-controls"]');
+      await expect(controls).toBeVisible();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(
+        controls.locator('[data-ui="video-editor.camera-layout-fullframe"]')
+      ).toHaveAttribute('aria-label', locale === 'ru' ? 'На весь кадр' : 'Full frame');
+      for (const width of [420, 280]) {
+        await page
+          .locator('[data-ui="video-editor.floating.context-inspector"]')
+          .evaluate((node, size) => {
+            (node as HTMLElement).style.width = `${size}px`;
+          }, width);
+        await expect
+          .poll(() =>
+            controls.evaluate((node) => {
+              const bounds = node.getBoundingClientRect();
+              return Math.max(
+                ...[...node.querySelectorAll('button')].map(
+                  (button) => button.getBoundingClientRect().right - bounds.right
+                )
+              );
+            })
+          )
+          .toBeLessThanOrEqual(1);
+        await info.attach(`camera-${width}`, {
+          body: await panel.screenshot(),
+          contentType: 'image/png',
+        });
+      }
+      const full = controls.locator('[data-ui="video-editor.camera-layout-fullframe"]');
+      await full.click();
+      await expect(full).toHaveAttribute('aria-pressed', 'true');
+      await full.hover();
+      await expect(full).toHaveCSS('box-shadow', 'none');
     });
   }
 }

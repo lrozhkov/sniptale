@@ -50,23 +50,21 @@ export function GuideExportWorkspace({
       <section className="guide-export-stage" aria-label={stageLabel}>
         {stage}
       </section>
-      <aside className="guide-export-inspector" aria-label={title}>
-        <div className="guide-export-inspector-body">
-          <div className="guide-export-heading">
-            <ContentToolbarButton
-              className="guide-labeled-action"
-              ref={back}
-              title={backLabel}
-              onClick={onClose}
-            >
-              <ArrowLeft size={16} aria-hidden="true" />
-              <span>{backLabel}</span>
-            </ContentToolbarButton>
-            <h1>{title}</h1>
-            {headingMeta}
-          </div>
-          {inspector}
-        </div>
+      <aside className="guide-export-inspector guide-export-controls" aria-label={title}>
+        <header className="guide-export-heading">
+          <ContentToolbarButton
+            className="guide-labeled-action"
+            ref={back}
+            title={backLabel}
+            onClick={onClose}
+          >
+            <ArrowLeft size={16} aria-hidden="true" />
+            <span>{backLabel}</span>
+          </ContentToolbarButton>
+          <h1>{title}</h1>
+          {headingMeta}
+        </header>
+        <div className="guide-export-inspector-body">{inspector}</div>
         <footer className="guide-export-actions">
           {status}
           {actions}

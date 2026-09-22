@@ -61,7 +61,7 @@ describe('workspace-sidebar/selection/inspect-scene/object-tracks', () => {
     });
     clickGroup('videoEditor.sidebar.inspectorGroupObjectTracks');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.objectTracksTitle');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.objectTracksTitle');
     expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackKindVisualCursor');
     expect(container?.textContent).toContain(
       'videoEditor.sidebar.objectTrackSourceVisualDetection'

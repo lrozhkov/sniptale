@@ -79,7 +79,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
     <div className="space-y-3" data-ui="video-editor.camera-placement-controls">
       <CameraPositionNavigation {...props} />
       <div
-        className="flex justify-between gap-1"
+        className="video-inspector-camera-layout"
         role="group"
         aria-label={translate('videoEditor.sidebar.cameraLayoutLabel')}
       >
@@ -88,7 +88,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
           return (
             <InspectorActionButton
               key={option.placement}
-              className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0 [&:not(:focus-visible)]:shadow-none!"
+              iconOnly
               compact
               tone="toggle"
               active={active}
@@ -130,7 +130,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
             key={id}
             compact
             tone="toggle"
-            className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0 [&:not(:focus-visible)]:shadow-none!"
+            iconOnly
             data-ui={`video-editor.camera-layout-${id.toLowerCase()}`}
             aria-label={translate(labelKey)}
             title={translate(labelKey)}
@@ -257,7 +257,7 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
       </div>
       <InspectorActionButton
         compact
-        className="h-7! min-h-7! w-7! rounded-md! shrink-0 p-0!"
+        iconOnly
         tone="secondary"
         aria-label={translate('videoEditor.sidebar.cameraAddPosition')}
         title={translate('videoEditor.sidebar.cameraAddPosition')}
@@ -269,9 +269,10 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
       </InspectorActionButton>
       <InspectorActionButton
         compact
-        className="h-7! min-h-7! w-7! rounded-md! shrink-0 p-0!"
+        iconOnly
         tone="secondary"
         aria-label={translate('videoEditor.sidebar.cameraRemovePosition')}
+        title={translate('videoEditor.sidebar.cameraRemovePosition')}
         disabled={props.disabled || !position || !props.onEditCameraPosition}
         onClick={() => position && edit({ kind: 'remove', id: position.id })}
       >

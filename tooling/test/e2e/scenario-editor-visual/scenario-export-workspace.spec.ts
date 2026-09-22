@@ -228,3 +228,63 @@ test('tour preview paints the selected slide in the browser', async ({
   await expect(controls.getByRole('button', { name: 'Preview', exact: true })).toBeVisible();
   issues.assertClean();
 });
+
+for (const locale of ['ru', 'en'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`output inspector presentation ${locale} ${theme}`, async ({ page, hostOrigin }, info) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await openVisualHarness(page, hostOrigin, theme, locale, { width: 1024, height: 640 });
+      const editingSelect = page
+        .locator('.guide-inspector-panel [data-ui="shared.ui.compact-select"] > button')
+        .first();
+      await expect(editingSelect).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await page
+        .getByRole('button', { name: locale === 'ru' ? 'Экспорт' : 'Export', exact: true })
+        .click();
+      const inspector = page.locator('.guide-export-inspector');
+      const selected = inspector.locator('[role="group"] button[aria-pressed="true"]').first();
+      await expect(selected).toHaveCSS('font-size', '12px');
+      await selected.hover();
+      await expect(selected).toHaveCSS('box-shadow', 'none');
+      await expect(
+        inspector.locator('[data-ui="shared.ui.compact-select"] > button').first()
+      ).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await inspector
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Сохранить автономный HTML' : 'Save standalone HTML',
+          exact: true,
+        })
+        .click();
+      const heading = inspector.locator('.guide-export-heading');
+      const top = (await heading.boundingBox())!.y;
+      const body = inspector.locator('.guide-export-inspector-body');
+      await body.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+      });
+      expect((await heading.boundingBox())!.y).toBeCloseTo(top, 0);
+      await expect
+        .poll(() => body.evaluate((node) => node.scrollWidth - node.clientWidth))
+        .toBeLessThanOrEqual(1);
+      await expect(inspector.locator('.guide-export-actions')).toBeInViewport();
+      await info.attach('output-inspector', {
+        body: await inspector.screenshot(),
+        contentType: 'image/png',
+      });
+      await page.keyboard.press('Escape');
+      await inspector
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Печать / PDF' : 'Print / PDF',
+          exact: true,
+        })
+        .click();
+      const print = page.locator('.guide-print-settings');
+      await expect(print).toBeVisible();
+      for (const button of await print.locator('[aria-pressed="true"]').all()) {
+        await expect(button).toHaveCSS('font-size', '12px');
+        await expect(button).toHaveCSS('box-shadow', 'none');
+      }
+      await page.keyboard.press('Escape');
+      await expect(inspector).toBeVisible();
+    });
+  }
+}

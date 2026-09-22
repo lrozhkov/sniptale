@@ -177,18 +177,15 @@ export function MediaApplyVisualsButton(
   props: Pick<MediaFrameFieldProps, 'clip' | 'disabled' | 'onApplyMediaClipVisualsToTrack'>
 ) {
   return (
-    <div className="flex justify-end">
-      <InspectorActionButton
-        compact
-        tone="secondary"
-        disabled={props.disabled || !props.onApplyMediaClipVisualsToTrack}
-        onClick={() => props.onApplyMediaClipVisualsToTrack?.(props.clip.id)}
-        separated
-        className="self-end"
-      >
-        {translate('videoEditor.sidebar.fitApplyToTrackLabel')}
-      </InspectorActionButton>
-    </div>
+    <InspectorActionButton
+      compact
+      tone="secondary"
+      disabled={props.disabled || !props.onApplyMediaClipVisualsToTrack}
+      onClick={() => props.onApplyMediaClipVisualsToTrack?.(props.clip.id)}
+      separated
+    >
+      {translate('videoEditor.sidebar.fitApplyToTrackLabel')}
+    </InspectorActionButton>
   );
 }
 
@@ -258,7 +255,9 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
                 />
               </svg>
             </svg>
-            <span className="max-w-full truncate text-[11px]">{labels[index]}</span>
+            <span className="max-w-full whitespace-normal text-[12px] leading-normal">
+              {labels[index]}
+            </span>
           </InspectorActionButton>
         );
       })}

@@ -7,6 +7,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import type { Translate } from '../../platform/i18n';
 import { GuideReadDocument } from './reader-document';
 import './print.css';
+import './export-workspace.css';
 
 /** Output settings and browser print readiness are disposable, never project mutations. */
 export function GuidePrint({
@@ -106,7 +107,7 @@ export function GuidePrint({
           {t('scenario.editor.guidePrintAction')}
         </ProductActionButton>
       </header>
-      <fieldset className="guide-print-settings" disabled={pending}>
+      <fieldset className="guide-print-settings guide-export-controls" disabled={pending}>
         <legend className="sr-only">{t('scenario.editor.guidePrintSettings')}</legend>
         <SegmentedSwitch
           density="compact"

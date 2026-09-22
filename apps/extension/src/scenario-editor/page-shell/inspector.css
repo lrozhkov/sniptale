@@ -905,3 +905,13 @@
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 2px;
 }
+
+/* Plain selects retain an explicit editing/open boundary without a resting surface. */
+.guide-inspector-panel [data-ui='shared.ui.compact-select'] > button {
+  background: transparent;
+}
+.guide-inspector-panel
+  [data-ui='shared.ui.compact-select']
+  > button:not(:hover):not(:focus-visible):not([aria-expanded='true']) {
+  border-color: transparent;
+}
