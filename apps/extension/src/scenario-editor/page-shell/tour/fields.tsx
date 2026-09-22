@@ -77,6 +77,7 @@ export function TourPointFields({
 
 export function TourTextPresentation({
   inherit = true,
+  allowCallout = true,
   value,
   defaults,
   disabled,
@@ -84,6 +85,7 @@ export function TourTextPresentation({
   t,
 }: {
   inherit?: boolean;
+  allowCallout?: boolean;
   value: TourTextAppearance | null;
   defaults: TourTextAppearance;
   disabled: boolean;
@@ -101,7 +103,15 @@ export function TourTextPresentation({
           ...(inherit
             ? [{ value: 'inherit' as const, label: t('scenario.editor.tourInherited') }]
             : []),
-          { value: 'callout', label: t('scenario.editor.tourCallout') },
+          ...(allowCallout || value?.presentation === 'callout'
+            ? [
+                {
+                  value: 'callout' as const,
+                  label: t('scenario.editor.tourCallout'),
+                  disabled: !allowCallout,
+                },
+              ]
+            : []),
           { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
           { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
         ]}
@@ -123,7 +133,7 @@ export function TourTextPresentation({
             ]}
             onChange={(alignment) => onChange({ ...value, alignment })}
           />
-          {value.presentation === 'callout' && (
+          {value.presentation === 'callout' && allowCallout && (
             <>
               <span>{t('scenario.editor.tourTextPlacement')}</span>
               <CompactSelect

@@ -2,6 +2,7 @@ import { renderTourCameraFrame } from './camera-frame.js';
 import { resolveTourCamera, resolveTourEditingCamera } from './camera.js';
 import { renderTourMask } from './image-mask.js';
 import { bindTourObjectDrag } from './authoring.js';
+import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 function projectImagePoint(box, point) {
   return { x: box.x + point.x * box.width, y: box.y + point.y * box.height };
@@ -48,7 +49,11 @@ export function renderTourImage(
     plane.append(
       renderTourMask(mask, imageBox, slide.image.width, { element, labels, authoring, signal })
     );
-  slide.hotspots.forEach((hotspot, number) => {
+  const explanations = getTourSlideObjects(slide).flatMap((entry) =>
+    entry.type === 'mask' ? [] : [entry.object.id]
+  );
+  slide.hotspots.forEach((hotspot) => {
+    const number = explanations.indexOf(hotspot.id);
     const button = actionButton(
       '',
       hotspot.action.kind === 'url' ? hotspot.action : { kind: 'none' },
@@ -84,22 +89,6 @@ export function renderTourImage(
       );
     scene.append(button);
   });
-  if (authoring)
-    for (const annotation of slide.annotations) {
-      const anchor = annotation.anchor ?? { x: 0.5, y: 0.5 };
-      const marker = actionButton(
-        'i',
-        { kind: 'none' },
-        'tour-hotspot tour-annotation-anchor',
-        annotation.id
-      );
-      const position = projectImagePoint(imageBox, anchor);
-      marker.style.left = `${position.x}px`;
-      marker.style.top = `${position.y}px`;
-      marker.setAttribute('aria-label', labels.details);
-      bindTourObjectDrag(marker, { id: annotation.id, point: anchor }, imageBox, authoring, signal);
-      scene.append(marker);
-    }
   if (authoring?.cameraFrame && slide.camera.mode === 'manual') {
     const frame = renderTourCameraFrame(slide, { stageWidth, stageHeight }, imageBox, {
       element,

@@ -2,6 +2,14 @@ import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
 import { createTourHints } from './hints.js';
+import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
+
+/** Explanation hints follow the authored mixed-object order; masks stay purely visual. */
+function slideExplanations(slide) {
+  return getTourSlideObjects(slide)
+    .filter((entry) => entry.type !== 'mask')
+    .map((entry) => entry.object);
+}
 
 /** Owns current scene geometry and explanation state, independent from playback history. */
 export function createTourScene(root, input, onAction, signal, authoring) {
@@ -21,6 +29,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   let lastFontSize = '';
   let stageWidth = 640;
   let stageHeight = 360;
+  let hints = [];
   const { element, actionButton } = sceneElements(root.ownerDocument, onAction, authoring);
   const hintController = createTourHints(root, tour.style.textAppearance, {
     signal,
@@ -28,8 +37,9 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     onClose: () => {},
     labels,
     focusTrigger: (activeIndex) => {
+      const object = hints[activeIndex];
       const trigger =
-        scene.querySelectorAll('.tour-hotspot')[activeIndex] ??
+        (object ? scene.querySelector(`[data-tour-object-id="${object.id}"]`) : null) ??
         scene.querySelector('.tour-details') ??
         query('contents');
       trigger.focus();
@@ -50,7 +60,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     const focused = root.getRootNode().activeElement;
     scene.replaceChildren();
     let imageBox = null;
-    let hints = [];
+    hints = [];
     const slide = ended ? endSlide(tour, labels) : current;
     if (slide?.kind === 'image') {
       imageBox = renderTourImage(
@@ -69,7 +79,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
           autoZoom: tour.playback.autoZoom,
         }
       );
-      hints = slide.image ? [...slide.hotspots, ...slide.annotations] : [];
+      hints = slide.image ? slideExplanations(slide) : [];
     } else if (slide) {
       const rendered = navigationController.render(slide, stageWidth, stageHeight);
       scene.append(rendered.panel);
@@ -114,7 +124,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
       markTourSelection(scene, selectedObjectId);
       const hintIndex =
         current?.kind === 'image'
-          ? [...current.hotspots, ...current.annotations].findIndex((item) => item.id === id)
+          ? slideExplanations(current).findIndex((item) => item.id === id)
           : -1;
       if (hintIndex >= 0) hintController.select(hintIndex);
     },

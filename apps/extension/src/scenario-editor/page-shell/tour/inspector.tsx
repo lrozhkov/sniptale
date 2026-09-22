@@ -8,7 +8,9 @@ import type {
   TourDocument,
   TourImageSlide,
   TourSlide,
+  TourSlideObject,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { getTourSlideObjects, TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 import {
   Crosshair,
   MessageSquare,
@@ -16,6 +18,8 @@ import {
   Palette,
   Image,
   ArrowLeft,
+  ArrowDown,
+  ArrowUp,
   Trash2,
   ScanSearch,
   Play,
@@ -25,6 +29,7 @@ import {
 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
@@ -75,6 +80,16 @@ function TourSlideCategories({
         t={t}
       />
     ) : null;
+  const objectControl =
+    slide.kind === 'image' &&
+    slide.hotspots.length + slide.annotations.length + slide.masks.length > 0 ? (
+      <TourAddObjectMenu
+        slide={slide}
+        disabled={disabled}
+        onAdd={(kind) => commitTourImageObject(slide, kind, t, onChangeSlide, onSelectObject)}
+        t={t}
+      />
+    ) : null;
   return slide.kind === 'image'
     ? [
         { id: 'content', icon: Image, label: t('scenario.editor.tourSlide'), categorized: true },
@@ -89,6 +104,7 @@ function TourSlideCategories({
           icon: Crosshair,
           label: t('scenario.editor.tourObjects'),
           categorized: true,
+          headingControl: objectControl,
         },
       ]
     : [
@@ -377,6 +393,9 @@ function TourImageObjectSettings({
                 hotspots: slide.hotspots.filter((entry) => entry.id !== objectId),
                 annotations: slide.annotations.filter((entry) => entry.id !== objectId),
                 masks: slide.masks.filter((entry) => entry.id !== objectId),
+                ...(slide.objectOrder
+                  ? { objectOrder: slide.objectOrder.filter((id) => id !== objectId) }
+                  : {}),
               })
             )
               onSelect(null);
@@ -403,37 +422,88 @@ function TourImageObjects({
   onSelect: (id: string) => void;
   t: Translate;
 }) {
-  const add = (kind: 'hotspot' | 'annotation' | 'mask') => {
-    const { slide: next, id } = addTourImageObject(slide, kind, t);
-    if (onChange(next)) onSelect(id);
+  const objects = getTourSlideObjects(slide);
+  const add = (kind: 'hotspot' | 'annotation' | 'mask') =>
+    commitTourImageObject(slide, kind, t, onChange, onSelect);
+  const move = (index: number, offset: number) => {
+    const order = objects.map((entry) => entry.object.id);
+    const [entry] = order.splice(index, 1);
+    if (!entry) return;
+    order.splice(index + offset, 0, entry);
+    onChange({ ...slide, objectOrder: order });
   };
   return (
-    <GuideInspectorGroup icon={Crosshair} title={t('scenario.editor.tourObjects')}>
-      <TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />
-      {[
-        ...slide.hotspots.map((entry) => ({
-          id: entry.id,
-          label: entry.label || t('scenario.editor.tourHotspot'),
-          Icon: Crosshair,
-        })),
-        ...slide.annotations.map((entry) => ({
-          id: entry.id,
-          label: entry.text || t('scenario.editor.tourAnnotation'),
-          Icon: MessageSquare,
-        })),
-        ...slide.masks.map((entry) => ({
-          id: entry.id,
-          label: t('scenario.editor.tourMask'),
-          Icon: ScanLine,
-        })),
-      ].map(({ id, label, Icon }) => (
-        <button className="tour-object-row" key={id} onClick={() => onSelect(id)} title={label}>
-          <Icon size={15} />
-          <span>{label}</span>
-        </button>
-      ))}
+    <GuideInspectorGroup
+      icon={Crosshair}
+      title={t('scenario.editor.tourObjects')}
+      action={
+        objects.length > 0 ? (
+          <TourAddObjectMenu slide={slide} disabled={disabled} onAdd={add} t={t} />
+        ) : undefined
+      }
+    >
+      {objects.length === 0 && (
+        <TourImageObjectActions slide={slide} disabled={disabled} onAdd={add} t={t} />
+      )}
+      {objects.map((entry, index) => {
+        const { label, Icon } = tourSlideObjectLabel(entry, t);
+        return (
+          <div className="tour-object-item" key={entry.object.id}>
+            <button
+              className="tour-object-row"
+              onClick={() => onSelect(entry.object.id)}
+              title={label}
+            >
+              <Icon size={15} />
+              <span>{label}</span>
+            </button>
+            <div className="tour-object-item-actions">
+              <ContentToolbarButton
+                title={t('scenario.editor.tourMoveObjectUp')}
+                disabled={disabled || index === 0}
+                onClick={() => move(index, -1)}
+              >
+                <ArrowUp size={14} />
+              </ContentToolbarButton>
+              <ContentToolbarButton
+                title={t('scenario.editor.tourMoveObjectDown')}
+                disabled={disabled || index === objects.length - 1}
+                onClick={() => move(index, 1)}
+              >
+                <ArrowDown size={14} />
+              </ContentToolbarButton>
+            </div>
+          </div>
+        );
+      })}
     </GuideInspectorGroup>
   );
+}
+
+function tourSlideObjectLabel(entry: TourSlideObject, t: Translate) {
+  switch (entry.type) {
+    case 'hotspot':
+      return { label: entry.object.label || t('scenario.editor.tourHotspot'), Icon: Crosshair };
+    case 'annotation':
+      return {
+        label: entry.object.text || t('scenario.editor.tourAnnotation'),
+        Icon: MessageSquare,
+      };
+    case 'mask':
+      return { label: t('scenario.editor.tourMask'), Icon: ScanLine };
+  }
+}
+
+/** Adds one object then selects it; the single path shared by the Add menu and empty-state actions. */
+function commitTourImageObject(
+  slide: TourImageSlide,
+  kind: 'hotspot' | 'annotation' | 'mask',
+  t: Translate,
+  onChange: (slide: TourImageSlide, group?: string | null) => boolean,
+  onSelect: (id: string) => void
+) {
+  const { slide: next, id } = addTourImageObject(slide, kind, t);
+  if (onChange(next)) onSelect(id);
 }
 
 /** Adds one object with a fresh id through a single slide update. */
@@ -443,10 +513,12 @@ function addTourImageObject(
   t: Translate
 ): { slide: TourImageSlide; id: string } {
   const id = crypto.randomUUID();
+  const ordered = slide.objectOrder ? { objectOrder: [...slide.objectOrder, id] } : {};
   const next: TourImageSlide =
     kind === 'hotspot'
       ? {
           ...slide,
+          ...ordered,
           hotspots: [
             ...slide.hotspots,
             {
@@ -464,13 +536,12 @@ function addTourImageObject(
       : kind === 'annotation'
         ? {
             ...slide,
-            annotations: [
-              ...slide.annotations,
-              { id, text: '', anchor: { x: 0.5, y: 0.5 }, appearance: null },
-            ],
+            ...ordered,
+            annotations: [...slide.annotations, { id, text: '', anchor: null, appearance: null }],
           }
         : {
             ...slide,
+            ...ordered,
             masks: [
               ...slide.masks,
               {
@@ -485,6 +556,56 @@ function addTourImageObject(
   return { slide: next, id };
 }
 
+/** Creation choices with per-type limits; shared by the Add menu and the empty-state actions. */
+function tourAddObjectOptions(slide: TourImageSlide, t: Translate) {
+  return [
+    {
+      value: 'hotspot' as const,
+      label: t('scenario.editor.tourHotspot'),
+      icon: <Crosshair size={15} aria-hidden="true" />,
+      disabled: slide.hotspots.length >= TOUR_LIMITS.maxHotspots,
+    },
+    {
+      value: 'annotation' as const,
+      label: t('scenario.editor.tourAnnotation'),
+      icon: <MessageSquare size={15} aria-hidden="true" />,
+      disabled: slide.annotations.length >= TOUR_LIMITS.maxAnnotations,
+    },
+    {
+      value: 'mask' as const,
+      label: t('scenario.editor.tourMask'),
+      icon: <ScanLine size={15} aria-hidden="true" />,
+      disabled: slide.masks.length >= TOUR_LIMITS.maxMasks,
+    },
+  ];
+}
+
+/** One localized Add menu rendered at the objects heading seam in both inspector presentations. */
+function TourAddObjectMenu({
+  slide,
+  disabled,
+  onAdd,
+  t,
+}: {
+  slide: TourImageSlide;
+  disabled: boolean;
+  onAdd: (kind: 'hotspot' | 'annotation' | 'mask') => void;
+  t: Translate;
+}) {
+  return (
+    <CompactSelect
+      aria-label={t('scenario.editor.tourAddObject')}
+      controlSize="sm"
+      disabled={disabled || !slide.image}
+      placeholder={t('scenario.editor.tourAddObject')}
+      value=""
+      options={tourAddObjectOptions(slide, t)}
+      onChange={onAdd}
+    />
+  );
+}
+
+/** Empty-state direct creation actions; the heading Add menu replaces them once objects exist. */
 function TourImageObjectActions({
   slide,
   disabled,
@@ -498,30 +619,17 @@ function TourImageObjectActions({
 }) {
   return (
     <div className="tour-object-actions">
-      <ScenarioInspectorActionButton
-        disabled={disabled || !slide.image || slide.hotspots.length >= 20}
-        title={t('scenario.editor.tourHotspot')}
-        onClick={() => onAdd('hotspot')}
-      >
-        <Crosshair size={15} aria-hidden="true" />
-        {t('scenario.editor.tourHotspot')}
-      </ScenarioInspectorActionButton>
-      <ScenarioInspectorActionButton
-        disabled={disabled || !slide.image || slide.annotations.length >= 20}
-        title={t('scenario.editor.tourAnnotation')}
-        onClick={() => onAdd('annotation')}
-      >
-        <MessageSquare size={15} aria-hidden="true" />
-        {t('scenario.editor.tourAnnotation')}
-      </ScenarioInspectorActionButton>
-      <ScenarioInspectorActionButton
-        disabled={disabled || !slide.image || slide.masks.length >= 20}
-        title={t('scenario.editor.tourMask')}
-        onClick={() => onAdd('mask')}
-      >
-        <ScanLine size={15} aria-hidden="true" />
-        {t('scenario.editor.tourMask')}
-      </ScenarioInspectorActionButton>
+      {tourAddObjectOptions(slide, t).map((option) => (
+        <ScenarioInspectorActionButton
+          key={option.value}
+          disabled={disabled || !slide.image || option.disabled}
+          title={option.label}
+          onClick={() => onAdd(option.value)}
+        >
+          {option.icon}
+          {option.label}
+        </ScenarioInspectorActionButton>
+      ))}
     </div>
   );
 }

@@ -167,7 +167,6 @@ a:focus-visible {
   z-index: 2;
   cursor: pointer;
 }
-.tour-hotspot.tour-annotation-anchor,
 .tour-motion-hotspot {
   border: 2px solid #fff;
   background: var(--tour-accent);

@@ -350,9 +350,6 @@ function moveObject(
   return {
     ...slide,
     hotspots: slide.hotspots.map((entry) => (entry.id === id ? { ...entry, point } : entry)),
-    annotations: slide.annotations.map((entry) =>
-      entry.id === id ? { ...entry, anchor: point } : entry
-    ),
     masks: slide.masks.map((entry) =>
       entry.id === id ? { ...entry, rect: { ...entry.rect, ...point } } : entry
     ),

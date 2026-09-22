@@ -264,6 +264,44 @@ html[data-tour-reordering] * {
   border-color: color-mix(in srgb, var(--sniptale-color-accent) 28%, transparent);
   background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
 }
+.tour-object-item {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.tour-object-item .tour-object-row {
+  flex: 1;
+}
+.tour-object-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  flex: none;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tour-object-item:hover .tour-object-item-actions,
+.tour-object-item:focus-within .tour-object-item-actions {
+  width: max-content;
+  opacity: 1;
+  pointer-events: auto;
+}
+.tour-object-item-actions > button {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.tour-object-item-actions > button:hover {
+  background: var(--sniptale-color-surface-hover);
+}
 .tour-object-row {
   display: flex;
   align-items: center;

@@ -123,24 +123,8 @@ export function TourAnnotationSettings({
         disabled={disabled}
         onChange={(text) => onChange({ ...value, text })}
       />
-      <label className="guide-number-toggle">
-        <ProductToggle
-          size="sm"
-          disabled={disabled}
-          aria-label={t('scenario.editor.tourAnchor')}
-          checked={value.anchor !== null}
-          onClick={() => onChange({ ...value, anchor: value.anchor ? null : { x: 0.5, y: 0.5 } })}
-        />
-        {t('scenario.editor.tourAnchor')}
-      </label>
-      {value.anchor && (
-        <TourPointFields
-          point={value.anchor}
-          disabled={disabled}
-          onChange={(anchor) => onChange({ ...value, anchor })}
-        />
-      )}
       <TourTextPresentation
+        allowCallout={false}
         value={value.appearance}
         defaults={tour.style.textAppearance}
         disabled={disabled}

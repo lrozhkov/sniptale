@@ -124,6 +124,64 @@ it('retains detached audio materials and audio bound only to objects', () => {
   expect([...getScenarioResourceReferences(project).assets]).toEqual(['detached', 'object-audio']);
 });
 
+it('orders narration targets by the stored mixed object order', async () => {
+  const { getTourNarrationTargets } = await import('./tour-resources');
+  const slide = createTourImageSlide('slide');
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Point',
+      text: '',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: false,
+    },
+  ];
+  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null }];
+  slide.masks = [
+    {
+      id: 'mask',
+      rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+      kind: 'highlight',
+      color: '#f97316',
+      opacity: 0.3,
+    },
+  ];
+  const ids = (value: typeof slide) =>
+    getTourNarrationTargets(value).map((target) => ('id' in target ? target.id : null));
+  expect(ids(slide)).toEqual(['slide', 'point', 'note', 'mask']);
+  slide.objectOrder = ['mask', 'note', 'point'];
+  expect(ids(slide)).toEqual(['slide', 'mask', 'note', 'point']);
+});
+
+it('remaps stored object order ids together with object identities', () => {
+  const tour = createTourDocument('tour');
+  const slide = createTourImageSlide('first');
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Point',
+      text: '',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: false,
+    },
+  ];
+  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null }];
+  slide.objectOrder = ['note', 'point'];
+  tour.slides = [slide];
+  let index = 0;
+  remapTourIdentities(tour, () => `new-${++index}`, new Map());
+  expect(slide.objectOrder).toEqual(['new-4', 'new-3']);
+  expect(slide.hotspots[0]?.id).toBe('new-3');
+  expect(slide.annotations[0]?.id).toBe('new-4');
+  expect(parseTourDocument(tour).status).toBe('ok');
+});
+
 it('projects ordered entry cues and only the explicitly activated object', async () => {
   const { getTourNarrationCues } = await import('./tour-resources');
   const slide = createTourImageSlide('slide');

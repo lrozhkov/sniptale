@@ -230,7 +230,7 @@ it('imports files into the selected destination and commits source-coordinate ob
     host.querySelector('#guide-inspector-panel input[type=file][accept^="image/"]')
   ).toBeNull();
   const shadow = () => host.querySelector('.tour-stage-host')!.shadowRoot!;
-  for (const id of ['point', 'note', 'mask']) {
+  for (const id of ['point', 'mask']) {
     const marker = shadow().querySelector<HTMLElement>(`[data-tour-object-id="${id}"]`)!;
     const pointer = (name: string, x: number) => {
       const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x, clientY: 0 });
@@ -246,9 +246,32 @@ it('imports files into the selected destination and commits source-coordinate ob
   const result = current.tour!.slides[0]!;
   if (result.kind !== 'image') throw new Error('Expected image');
   expect(result.hotspots[0]!.point.x).toBeGreaterThan(0.5);
-  expect(result.annotations[0]!.anchor!.x).toBeGreaterThan(0.2);
   expect(result.masks[0]!.rect.x).toBeGreaterThan(0.1);
   expect(host.textContent).toContain('Back to slide settings');
+});
+it('keeps explanations slide-level: no canvas point marker and a preserved legacy anchor', async () => {
+  const project = fixture();
+  const slide = project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.annotations = [
+    {
+      id: 'note',
+      text: 'Note',
+      anchor: { x: 0.2, y: 0.2 },
+      appearance: { presentation: 'callout', alignment: 'start', placement: 'auto' },
+    },
+  ];
+  await render(project);
+  const shadow = host.querySelector('.tour-stage-host')!.shadowRoot!;
+  expect(shadow.querySelector('[data-tour-object-id="note"]')).toBeNull();
+  const result = current.tour!.slides[0]!;
+  if (result.kind !== 'image') throw new Error('Expected image');
+  expect(result.annotations[0]!.anchor).toEqual({ x: 0.2, y: 0.2 });
+  expect(result.annotations[0]!.appearance?.presentation).toBe('callout');
+  const hint = shadow.querySelector<HTMLElement>('[data-tour-hint]')!;
+  expect(hint.dataset['presentation']).toBe('caption-bottom');
+  expect(hint.querySelector('[data-tour-hint-title]')!.textContent).toBe('Explanation');
+  expect(hint.querySelector('[data-tour-hint-text]')!.textContent).toBe('Note');
 });
 it('keeps resource payloads identity-only', async () => {
   await render();

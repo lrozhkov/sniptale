@@ -149,6 +149,48 @@ it('duplicates authored object identities and self-navigation without cloning by
   expect(original.tour?.slides).toHaveLength(2);
 });
 
+it('duplicates a mixed object order through remapped identities', () => {
+  const original = project();
+  const slide = original.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('image expected');
+  slide.hotspots = [
+    {
+      id: 'hotspot',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Again',
+      text: '',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: true,
+    },
+  ];
+  slide.annotations = [{ id: 'annotation', text: 'Note', anchor: null, appearance: null }];
+  slide.masks = [
+    {
+      id: 'mask',
+      rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+      kind: 'highlight',
+      color: '#f97316',
+      opacity: 0.3,
+    },
+  ];
+  slide.objectOrder = ['mask', 'annotation', 'hotspot'];
+  let id = 0;
+  const result = applyTourCommands(
+    original,
+    [{ kind: 'duplicate-slide', slideId: 'first', newId: 'copy' }],
+    resources,
+    () => `object-${++id}`
+  );
+  const copy = result.tour?.slides[1];
+  if (copy?.kind !== 'image') throw new Error('image expected');
+  expect(copy.objectOrder).toEqual(['object-3', 'object-2', 'object-1']);
+  expect(copy.hotspots.map((entry) => entry.id)).toEqual(['object-1']);
+  expect(copy.annotations.map((entry) => entry.id)).toEqual(['object-2']);
+  expect(copy.masks.map((entry) => entry.id)).toEqual(['object-3']);
+});
+
 it('keeps provenance and duration capabilities immutable while allowing authored text and trim', () => {
   const original = project();
   const slide = structuredClone(original.tour!.slides[0]!);

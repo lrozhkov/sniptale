@@ -29,7 +29,10 @@ export function createTourCaption(hint, text, labels, redraw, signal) {
       close.hidden = enabled;
       text.hidden = false;
       hint.dataset.collapsed = 'false';
-      const heading = current.label || (current.text || '').split(/\r?\n/u)[0] || labels.details;
+      // The heading is semantic: authored label when it differs from body text, else a fixed label.
+      const heading =
+        (current.text && current.label && current.label !== current.text ? current.label : '') ||
+        labels.details;
       title.textContent = heading;
       toggle.title = heading;
     },

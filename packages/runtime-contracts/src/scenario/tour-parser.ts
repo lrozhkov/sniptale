@@ -160,6 +160,10 @@ const imageSlide = z
     hotspots: z.array(tourObjectSchemas.hotspot).max(TOUR_LIMITS.maxHotspots),
     annotations: z.array(tourObjectSchemas.annotation).max(TOUR_LIMITS.maxAnnotations),
     masks: z.array(tourObjectSchemas.mask).max(TOUR_LIMITS.maxMasks),
+    objectOrder: z
+      .array(id)
+      .max(TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations + TOUR_LIMITS.maxMasks)
+      .optional(),
     narration: narration.nullable(),
     timing,
   })
@@ -292,6 +296,20 @@ function validReferences(document: TourDocument): boolean {
       if (!slide.hotspots.every((hotspot) => claim(hotspot.id) && actionExists(hotspot.action)))
         return false;
       if (![...slide.annotations, ...slide.masks].every((item) => claim(item.id))) return false;
+      if (slide.objectOrder !== undefined) {
+        const objects = new Set([
+          ...slide.hotspots.map((object) => object.id),
+          ...slide.annotations.map((object) => object.id),
+          ...slide.masks.map((object) => object.id),
+        ]);
+        const listed = new Set(slide.objectOrder);
+        if (
+          listed.size !== slide.objectOrder.length ||
+          listed.size !== objects.size ||
+          slide.objectOrder.some((objectId) => !objects.has(objectId))
+        )
+          return false;
+      }
     }
   }
   return true;

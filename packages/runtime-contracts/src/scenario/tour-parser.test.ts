@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parseTourDocument, tourDocumentSchema } from './tour-parser';
-import { TOUR_HINT_SURFACE, type TourDocument, type TourImageSlide } from './types/tour';
+import {
+  getTourSlideObjects,
+  TOUR_HINT_SURFACE,
+  TOUR_LIMITS,
+  type TourDocument,
+  type TourImageSlide,
+} from './types/tour';
 
 function imageSlide(): TourImageSlide {
   return {
@@ -425,4 +431,73 @@ it('bounds the camera entrance duration, delay and explicit automatic zoom', () 
       ]).success
     ).toBe(false);
   }
+});
+
+describe('slide object order', () => {
+  const ordered = (change: (slide: TourImageSlide) => void) =>
+    parseTourDocument(mutateSlide(change));
+  it('roundtrips a valid mixed order and derives legacy order without the field', () => {
+    const value = mutateSlide((slide) => {
+      slide.objectOrder = ['mask', 'point', 'hint'];
+    });
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    const parsed = parseTourDocument(document());
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') throw new Error('Expected document');
+    const slide = parsed.document.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    expect(slide.objectOrder).toBeUndefined();
+    expect(getTourSlideObjects(slide).map((entry) => entry.object.id)).toEqual([
+      'point',
+      'hint',
+      'mask',
+    ]);
+  });
+  it('orders mixed objects by stored ids and appends unlisted objects deterministically', () => {
+    const slide = imageSlide();
+    slide.objectOrder = ['mask', 'point', 'hint'];
+    expect(getTourSlideObjects(slide).map((entry) => entry.object.id)).toEqual([
+      'mask',
+      'point',
+      'hint',
+    ]);
+    expect(
+      getTourSlideObjects({ ...slide, objectOrder: ['hint'] }).map((entry) => entry.object.id)
+    ).toEqual(['hint', 'point', 'mask']);
+  });
+  it.each([
+    ['duplicate ids', ['point', 'point', 'hint', 'mask']],
+    ['a missing object', ['point', 'hint']],
+    ['an unknown id', ['point', 'hint', 'mask', 'other']],
+    ['an empty list on a populated slide', []],
+  ])('rejects an explicit order with %s', (_name, objectOrder) => {
+    expect(
+      ordered((slide) => {
+        slide.objectOrder = objectOrder;
+      }).status
+    ).toBe('invalid');
+  });
+  it('rejects an order above the combined object limit and malformed ids', () => {
+    const limit = TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations + TOUR_LIMITS.maxMasks;
+    expect(
+      ordered((slide) => {
+        slide.objectOrder = Array.from({ length: limit + 1 }, (_value, index) => `o-${index}`);
+      }).status
+    ).toBe('invalid');
+    expect(
+      ordered((slide) => {
+        slide.objectOrder = ['point', 'hint', 'mask', 'bad id!'];
+      }).status
+    ).toBe('invalid');
+  });
+  it('keeps navigation slides free of the field under strict parsing', () => {
+    const value = document();
+    const slide = value.slides[1]!;
+    expect(
+      parseTourDocument({
+        ...value,
+        slides: [value.slides[0]!, { ...slide, objectOrder: ['button'] }],
+      }).status
+    ).toBe('invalid');
+  });
 });

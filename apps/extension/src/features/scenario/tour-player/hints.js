@@ -74,8 +74,9 @@ export function createTourHints(
     activeHintId = current.id;
     hint.hidden = false;
     const authoredAppearance = current.appearance ?? defaultAppearance;
+    // Slide-level explanations never anchor to a point; legacy callout input projects to a caption.
     const appearance =
-      stageWidth < 480 && authoredAppearance.presentation === 'callout'
+      authoredAppearance.presentation === 'callout' && (stageWidth < 480 || !current.point)
         ? { ...authoredAppearance, presentation: 'caption-bottom' }
         : authoredAppearance;
     hint.dataset.presentation = appearance.presentation;
@@ -176,7 +177,7 @@ function positionHint({ hint, viewport, geometry, current, appearance }) {
   const { stageWidth: hintWidth, stageHeight: hintHeight, imageBox } = geometry;
   const offsetX = ((viewport.clientWidth || hintWidth) - hintWidth) / 2;
   const offsetY = ((viewport.clientHeight || hintHeight) - hintHeight) / 2;
-  const anchor = current.point ?? current.anchor;
+  const anchor = current.point;
   const point =
     anchor && imageBox
       ? { x: imageBox.x + anchor.x * imageBox.width, y: imageBox.y + anchor.y * imageBox.height }

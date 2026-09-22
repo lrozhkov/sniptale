@@ -152,8 +152,39 @@ export interface TourImageSlide {
   hotspots: TourHotspot[];
   annotations: TourAnnotation[];
   masks: TourMask[];
+  /**
+   * Authored display order over the hotspot, annotation and mask ids.
+   * Absent derives hotspots → annotations → masks; when present it must list each object once.
+   */
+  objectOrder?: string[] | undefined;
   narration: TourNarration | null;
   timing: TourTiming;
+}
+
+export type TourSlideObject =
+  | { type: 'hotspot'; object: TourHotspot }
+  | { type: 'annotation'; object: TourAnnotation }
+  | { type: 'mask'; object: TourMask };
+
+/**
+ * One displayed object sequence per image slide. A stored order is honored first;
+ * objects missing from it keep deterministic type order at the end so none are lost.
+ */
+export function getTourSlideObjects(slide: TourImageSlide): TourSlideObject[] {
+  const grouped: TourSlideObject[] = [
+    ...slide.hotspots.map((object) => ({ type: 'hotspot' as const, object })),
+    ...slide.annotations.map((object) => ({ type: 'annotation' as const, object })),
+    ...slide.masks.map((object) => ({ type: 'mask' as const, object })),
+  ];
+  if (!slide.objectOrder) return grouped;
+  const pending = new Map(grouped.map((entry) => [entry.object.id, entry]));
+  const ordered = slide.objectOrder.flatMap((objectId) => {
+    const entry = pending.get(objectId);
+    if (!entry) return [];
+    pending.delete(objectId);
+    return [entry];
+  });
+  return [...ordered, ...pending.values()];
 }
 
 export interface TourNavigationButton {
