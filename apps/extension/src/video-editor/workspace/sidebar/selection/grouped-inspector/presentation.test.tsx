@@ -7,6 +7,7 @@ import {
   useWorkspacePreference,
 } from '../../../../runtime/controller/workspace-preferences';
 import { InspectorGroupedPanel } from './panel';
+import { InspectorGroupFocusContext, type InspectorGroupFocusIntent } from './focus';
 import { InspectorSectionMemoryProvider, InspectorSelectionFamilyContext } from './presentation';
 import { DEFAULT_WORKSPACE_PREFERENCES } from '../../../../persistence/workspace-preferences';
 vi.mock('../../../../persistence/workspace-preferences', async (original) => ({
@@ -17,6 +18,7 @@ vi.mock('../../../../persistence/workspace-preferences', async (original) => ({
 let root: ReturnType<typeof createRoot>;
 let container: HTMLDivElement;
 let family = 'scene';
+let focusIntent: InspectorGroupFocusIntent | null = null;
 let extra = true;
 function Content() {
   const [mode, setMode] = useWorkspacePreference('inspectorPresentation');
@@ -52,7 +54,9 @@ const render = () =>
   root.render(
     <WorkspacePreferencesProvider>
       <InspectorSectionMemoryProvider>
-        <Content />
+        <InspectorGroupFocusContext.Provider value={focusIntent}>
+          <Content />
+        </InspectorGroupFocusContext.Provider>
       </InspectorSectionMemoryProvider>
     </WorkspacePreferencesProvider>
   );
@@ -61,6 +65,7 @@ const click = (selector: string) =>
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   family = 'scene';
+  focusIntent = null;
   extra = true;
   container = document.createElement('div');
   root = createRoot(container);
@@ -100,4 +105,25 @@ it('falls back when a remembered section disappears', () => {
   extra = false;
   act(render);
   expect(container.querySelector('[aria-label="Main field"]')).not.toBeNull();
+});
+
+it('preserves collapsed drafts and opens the section for a new focus intent', () => {
+  click('[data-mode]');
+  const section = container.querySelector<HTMLElement>('[data-section="main"]')!;
+  const disclosure = section.querySelector('details')!;
+  const input = section.querySelector('input')!;
+  expect(disclosure.open).toBe(true);
+  input.value = 'draft';
+  act(() => {
+    disclosure.open = false;
+  });
+  act(render);
+  expect(disclosure.open).toBe(false);
+  expect(section.querySelector('input')).toBe(input);
+  expect(input.value).toBe('draft');
+  section.scrollIntoView = vi.fn();
+  focusIntent = { groupId: 'main', token: 'open-main' };
+  act(render);
+  expect(disclosure.open).toBe(true);
+  expect(section.scrollIntoView).toHaveBeenCalled();
 });

@@ -536,7 +536,7 @@ it('leaves Space ownership with text-entry targets', async () => {
   editable.remove();
 });
 
-it('routes Space from a nested summary and the workspace to playback', () => {
+it('preserves native summary activation and routes workspace Space to playback', () => {
   const togglePlayback = vi.fn();
   renderShortcutHarness(root!, togglePlayback);
   const details = document.createElement('details');
@@ -545,10 +545,10 @@ it('routes Space from a nested summary and the workspace to playback', () => {
   summary.append(label);
   details.append(summary);
   document.body.append(details);
-  expect(dispatchSpaceKeyDownInAct(label).defaultPrevented).toBe(true);
-  expect(togglePlayback).toHaveBeenCalledOnce();
+  expect(dispatchSpaceKeyDownInAct(label).defaultPrevented).toBe(false);
+  expect(togglePlayback).not.toHaveBeenCalled();
   expect(dispatchSpaceKeyDownInAct(document.body).defaultPrevented).toBe(true);
-  expect(togglePlayback).toHaveBeenCalledTimes(2);
+  expect(togglePlayback).toHaveBeenCalledOnce();
   details.remove();
 });
 

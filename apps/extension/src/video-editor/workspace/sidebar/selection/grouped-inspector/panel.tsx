@@ -1,4 +1,5 @@
 import './panel.css';
+import { InspectorDetails } from '../shared/details';
 import { useWorkspacePreference } from '../../../../runtime/controller/workspace-preferences';
 import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
@@ -82,6 +83,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
       const section = [
         ...(surface.current?.querySelectorAll<HTMLElement>('[data-section]') ?? []),
       ].find((node) => node.dataset['section'] === requestedGroup.id);
+      section?.querySelector('details')?.setAttribute('open', '');
       section?.scrollIntoView({ block: 'nearest' });
       section?.focus({ preventScroll: true });
     } else button?.focus();
@@ -90,8 +92,13 @@ export function InspectorGroupedPanel<TId extends string>(props: {
   if (!defaultId) return null;
   if (groups.length === 1) {
     const group = groups[0]!;
+    const Icon = SECTION_ICONS[group.semantic];
     return (
       <div ref={surface} data-ui="video-editor.inspector.sections" data-section={group.id}>
+        <h3 data-ui="video-editor.inspector.section-heading" className="flex items-center gap-2">
+          <Icon size={16} aria-hidden="true" />
+          <span>{group.label}</span>
+        </h3>
         <InspectorGroupSection meta={group.meta}>{group.content}</InspectorGroupSection>
       </div>
     );
@@ -112,23 +119,11 @@ export function InspectorGroupedPanel<TId extends string>(props: {
               data-section={group.id}
               tabIndex={-1}
               aria-label={group.label}
-              className="py-4 first:pt-0 last:pb-0 focus:outline-none"
+              className="py-3 first:pt-0 last:pb-0 focus:outline-none"
             >
-              <h3
-                data-ui="video-editor.inspector.section-heading"
-                className={[
-                  'mb-3 flex items-center gap-2 text-[13px] font-semibold',
-                  'text-[var(--sniptale-color-text-primary)]',
-                ].join(' ')}
-              >
-                <Icon
-                  size={16}
-                  aria-hidden="true"
-                  className="text-[var(--sniptale-color-text-secondary)]"
-                />
-                {group.label}
-              </h3>
-              <InspectorGroupSection meta={group.meta}>{group.content}</InspectorGroupSection>
+              <InspectorDetails label={group.label} icon={Icon} initiallyOpen>
+                <InspectorGroupSection meta={group.meta}>{group.content}</InspectorGroupSection>
+              </InspectorDetails>
             </section>
           );
         })}

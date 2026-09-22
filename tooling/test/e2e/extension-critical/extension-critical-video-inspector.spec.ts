@@ -45,6 +45,22 @@ for (const locale of ['ru', 'en'] as const) {
       }
       await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
       await expect(panel.locator('[data-presentation="all"]')).toBeVisible();
+      const section = panel.locator('[data-presentation="all"] > section').first();
+      const disclosure = section.locator(':scope > details');
+      const summary = disclosure.locator(':scope > summary');
+      await expect(disclosure).toHaveAttribute('open', '');
+      await expect(summary).toHaveCSS('font-size', '13px');
+      await expect(summary).toHaveCSS('font-weight', '600');
+      await expect(disclosure).toHaveCSS('border-top-width', '0px');
+      await expect(summary).toHaveCSS('min-height', '32px');
+      const draft = section.getByRole('textbox').first();
+      await draft.fill('Draft survives collapse');
+      await summary.click();
+      await expect(disclosure).not.toHaveAttribute('open', '');
+      await expect(draft).toBeHidden();
+      await summary.press('Enter');
+      await expect(draft).toBeVisible();
+      await expect(draft).toHaveValue('Draft survives collapse');
       const numeric = panel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').first();
       const input = numeric.getByRole('textbox');
       await input.click();
@@ -138,6 +154,21 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(
         controls.locator('[data-ui="video-editor.camera-layout-fullframe"]')
       ).toHaveAttribute('aria-label', locale === 'ru' ? 'На весь кадр' : 'Full frame');
+      const nested = panel.locator('[data-ui="video-editor.inspector.disclosure"]').first();
+      const nestedHeading = nested.locator(':scope > summary');
+      await expect(nested).not.toHaveAttribute('open', '');
+      await expect(nestedHeading).toHaveCSS('font-weight', '600');
+      await nestedHeading.hover();
+      await expect(nestedHeading).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      const textBox = (await nestedHeading.locator('h3').boundingBox())!;
+      const iconBox = (await nestedHeading.locator('svg').last().boundingBox())!;
+      expect(
+        Math.abs(textBox.y + textBox.height / 2 - iconBox.y - iconBox.height / 2)
+      ).toBeLessThanOrEqual(1);
+      await nestedHeading.press('Space');
+      await expect(nested).toHaveAttribute('open', '');
+      await nestedHeading.click();
+      await expect(nested).not.toHaveAttribute('open', '');
       for (const width of [420, 280]) {
         await page
           .locator('[data-ui="video-editor.floating.context-inspector"]')
