@@ -25,7 +25,7 @@
     [data-ui='shared.ui.compact-inspector.color-field']
   ) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8.5rem, (100% - 8px) / 2)), 1fr));
   align-items: center;
 }
 
@@ -130,16 +130,6 @@
 }
 .sniptale-inspector-surface summary:hover {
   color: var(--sniptale-color-text-primary-strong);
-}
-@container inspector-surface (max-width: 280px) {
-  .sniptale-inspector-surface
-    :is(
-      [data-ui='shared.ui.compact-inspector.select-field'],
-      [data-ui='shared.ui.compact-inspector.color-field']
-    ) {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
 }
 
 .sniptale-inspector-surface .sniptale-glass-switch {

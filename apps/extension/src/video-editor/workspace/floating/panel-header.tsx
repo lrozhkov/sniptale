@@ -14,14 +14,5 @@ export function WorkspacePanelHeader(props: { children: ReactNode; actions: Reac
 }
 
 export function WorkspacePanelButton(props: Omit<ContentToolbarButtonProps, 'className'>) {
-  return (
-    <ContentToolbarButton
-      type="button"
-      {...props}
-      className={[
-        '!h-7 !w-7 !min-w-7 !p-0 !rounded-md',
-        'text-[var(--sniptale-color-text-muted)] [&_svg]:size-4',
-      ].join(' ')}
-    />
-  );
+  return <ContentToolbarButton type="button" {...props} tone="utility" size="compact" />;
 }

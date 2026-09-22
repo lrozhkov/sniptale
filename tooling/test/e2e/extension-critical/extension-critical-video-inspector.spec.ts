@@ -1,3 +1,4 @@
+import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
@@ -32,6 +33,9 @@ for (const locale of ['ru', 'en'] as const) {
       await page.locator(`[data-project-timeline-clip="${clip.id}"]`).click();
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       const panel = page.locator('[data-ui="video-editor.inspector.content"]');
+      await page.locator('[data-ui="video-editor.floating.context-inspector"]').evaluate((node) => {
+        (node as HTMLElement).style.width = '320px';
+      });
       const categories = panel.locator('[data-ui="video-editor.inspector.categories"]');
       const active = categories.locator('nav button[aria-pressed="true"]');
       const activeName = await active.getAttribute('aria-label');
@@ -46,9 +50,24 @@ for (const locale of ['ru', 'en'] as const) {
       for (const button of await categories.locator('nav button').all()) {
         await button.click();
         expect((await headings.boundingBox())!.y).toBeCloseTo(top, 0);
+        await checkInspectorLabels(panel);
       }
+      await checkInspectorUtility(
+        page,
+        page.locator('[data-ui="video-editor.inspector.presentation-toggle"]')
+      );
       await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
       await expect(panel.locator('[data-presentation="all"]')).toBeVisible();
+      await checkInspectorUtility(
+        page,
+        page.locator('[data-ui="video-editor.inspector.presentation-toggle"]')
+      );
+      await checkInspectorUtility(page, page.locator('[data-ui="video-editor.inspector.close"]'));
+      const height = page.locator('[data-ui="video-editor.inspector.dock-toggle"]');
+      await height.click();
+      await checkInspectorUtility(page, height);
+      await height.click();
+      await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
       const section = panel.locator('[data-presentation="all"] > section').first();
       const disclosure = section.locator(':scope > details');
       const summary = disclosure.locator(':scope > summary');
@@ -260,6 +279,22 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(full).toHaveAttribute('aria-pressed', 'true');
       await full.hover();
       await expect(full).toHaveCSS('box-shadow', 'none');
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Стиль' : 'Style',
+          exact: true,
+        })
+        .click();
+      for (const width of [420, 380, 360, 340, 320, 280]) {
+        await page
+          .locator('[data-ui="video-editor.floating.context-inspector"]')
+          .evaluate((node, size) => {
+            (node as HTMLElement).style.width = `${size}px`;
+          }, width);
+        await checkInspectorLabels(panel);
+        await panel.screenshot({ path: info.outputPath(`camera-style-${width}.png`) });
+      }
     });
   }
 }

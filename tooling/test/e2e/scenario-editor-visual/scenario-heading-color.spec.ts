@@ -1,3 +1,4 @@
+import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
@@ -17,6 +18,8 @@ for (const theme of ['light', 'dark'] as const) {
         { tourFixture: '1' }
       );
       const panel = page.locator('#guide-inspector-panel');
+      await checkInspectorUtility(page, panel.locator('.guide-panel-heading > button').last());
+      await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
       const mode = page.locator('.tour-representation-switch [aria-pressed="true"]');
       await page.mouse.move(700, 100);
       const idleBorder = await mode.evaluate((node) => getComputedStyle(node).borderTopColor);
@@ -77,6 +80,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.keyboard.press('Home');
       for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
       await expect(divider).toHaveAttribute('aria-valuenow', '260');
+      await checkInspectorLabels(panel);
       const valueGeometry = await picker.locator('span:last-child').evaluate((node) => ({
         width: node.clientWidth,
         content: node.scrollWidth,
@@ -178,6 +182,27 @@ for (const theme of ['light', 'dark'] as const) {
         body: await panel.screenshot(),
         contentType: 'image/png',
       });
+      await page
+        .locator('#guide-library-panel')
+        .getByRole('button', {
+          name: ru ? 'Навигационный слайд' : 'Navigation slide',
+          exact: true,
+        })
+        .click();
+      const title = panel.getByRole('textbox', { name: ru ? 'Заголовок' : 'Title', exact: true });
+      await title.fill('Navigation title');
+      const clear = title.locator('..').locator('.guide-text-clear');
+      await page.mouse.move(0, 0);
+      const textColorValue = await title.evaluate((node) => getComputedStyle(node).color);
+      await expect(clear).not.toHaveCSS('color', textColorValue);
+      await expect(clear).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await clear.hover();
+      await expect(clear).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await clear.click();
+      await expect(title).toHaveValue('');
+      await expect(title).toBeFocused();
+      await expect(clear).toBeDisabled();
+      await expect(clear).toHaveCSS('opacity', '0.4');
     });
   }
 }

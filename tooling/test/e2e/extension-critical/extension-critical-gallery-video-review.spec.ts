@@ -1,3 +1,4 @@
+import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createHash } from 'node:crypto';
 import { expect, test, type Page, type Locator } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
@@ -3091,9 +3092,16 @@ for (const locale of ['ru', 'en'] as const) {
         await expect(modes.locator('[aria-pressed="true"]')).toHaveCSS('font-weight', '500');
         await expect(modes.locator('[aria-pressed="true"]')).toHaveCSS('box-shadow', 'none');
         const toggle = panel.locator('[data-ui="gallery.videoReview.inspectorPresentation"]');
+        for (const utility of await panel.locator('header button').all()) {
+          await checkInspectorUtility(page, utility);
+        }
+        await checkInspectorLabels(panel);
+        await page.screenshot({ path: info.outputPath('inspector-utilities.png') });
         const toggleClass = await toggle.getAttribute('class');
         await toggle.click();
         await expect(toggle).toHaveAttribute('class', toggleClass!);
+        await checkInspectorUtility(page, toggle);
+        await checkInspectorLabels(panel);
         const categories = panel.locator('[data-ui="gallery.videoReview.inspectorCategories"]');
         const railGeometry = await categories.evaluate((node) => {
           const nav = node.querySelector('nav')!.getBoundingClientRect();

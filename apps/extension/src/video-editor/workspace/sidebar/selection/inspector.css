@@ -45,15 +45,6 @@
     font-size: 12px;
     font-weight: 500;
   }
-  [data-ui='video-editor.inspector.presentation-toggle'] {
-    color: var(--sniptale-color-text-secondary) !important;
-    border-color: transparent !important;
-    background: transparent !important;
-    box-shadow: none !important;
-  }
-  [data-ui='video-editor.inspector.presentation-toggle']:hover {
-    color: var(--sniptale-color-text-primary-strong) !important;
-  }
 }
 
 @layer utilities {

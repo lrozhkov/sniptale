@@ -145,6 +145,7 @@ export function GuideVoiceField(props: VoiceFieldProps) {
         />
         {props.clearable && (
           <ContentToolbarButton
+            tone="utility"
             title={translate('scenario.editor.guideClearText')}
             className="guide-text-clear"
             disabled={props.disabled || !props.value}

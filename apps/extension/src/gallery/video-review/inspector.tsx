@@ -1,10 +1,11 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ReviewInspectorPresentation } from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import './inspector-navigation.css';
 import {
   List,
-  PanelsTopLeft,
+  PanelLeft,
   ChevronsDownUp,
   ChevronsUpDown,
   Pencil,
@@ -336,56 +337,65 @@ function ReviewInspectorHeader(
 ) {
   return (
     <header className="flex shrink-0 items-center gap-1">
-      <ReviewButton
-        label={translate('gallery.videoReview.back')}
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        size="compact"
+        title={translate('gallery.videoReview.back')}
         disabled={props.busy}
         onClick={props.onBack}
-        className={reviewIconButtonClassName}
       >
         <ArrowLeft size={16} aria-hidden="true" />
-      </ReviewButton>
+      </ContentToolbarButton>
       <h2 className="min-w-0 flex-1 text-sm font-semibold">
         {translate('gallery.videoReview.editorTitle')}
       </h2>
-      {props.section === 'scene' ||
-      (props.section === 'selected' && props.selectionHasSections === true) ? (
-        <ReviewButton
-          label={translate(
-            props.presentation === 'all'
-              ? 'scenario.editor.inspectorShowSections'
-              : 'scenario.editor.inspectorShowAll'
-          )}
-          className={reviewIconButtonClassName}
-          data-ui="gallery.videoReview.inspectorPresentation"
-          onClick={props.onTogglePresentation}
-        >
-          {props.presentation === 'all' ? (
-            <PanelsTopLeft size={16} aria-hidden="true" />
-          ) : (
-            <List size={16} aria-hidden="true" />
-          )}
-        </ReviewButton>
-      ) : null}
-      <ReviewButton
-        label={translate(
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        size="compact"
+        title={translate(
           props.fullHeight
             ? 'videoEditor.app.panelRestoreHeight'
             : 'videoEditor.app.panelFullHeight'
         )}
         aria-pressed={!!props.fullHeight}
-        className={reviewIconButtonClassName}
         onClick={props.onToggleHeight}
       >
         {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
-      </ReviewButton>
-      <ReviewButton
-        label={translate('common.actions.close')}
+      </ContentToolbarButton>
+      {props.section === 'scene' ||
+      (props.section === 'selected' && props.selectionHasSections === true) ? (
+        <ContentToolbarButton
+          type="button"
+          tone="utility"
+          size="compact"
+          title={translate(
+            props.presentation === 'all'
+              ? 'scenario.editor.inspectorShowSections'
+              : 'scenario.editor.inspectorShowAll'
+          )}
+          dataUi="gallery.videoReview.inspectorPresentation"
+          onClick={props.onTogglePresentation}
+        >
+          {props.presentation === 'all' ? (
+            <List size={16} aria-hidden="true" />
+          ) : (
+            <PanelLeft size={16} aria-hidden="true" />
+          )}
+        </ContentToolbarButton>
+      ) : null}
+
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        size="compact"
+        title={translate('common.actions.close')}
         disabled={props.busy}
         onClick={props.onClose ?? props.onBack}
-        className={reviewIconButtonClassName}
       >
         <X size={16} aria-hidden="true" />
-      </ReviewButton>
+      </ContentToolbarButton>
     </header>
   );
 }

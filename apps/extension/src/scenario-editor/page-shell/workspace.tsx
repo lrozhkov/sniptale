@@ -108,6 +108,8 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
           ))}
         </div>
         <ContentToolbarButton
+          tone="utility"
+          size="compact"
           title={t('scenario.editor.close')}
           aria-controls="guide-library-panel"
           aria-expanded={true}
@@ -269,6 +271,8 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         <h2 title={inspectorTitle(props)}>{inspectorTitle(props)}</h2>
         {grouped && (
           <ContentToolbarButton
+            tone="utility"
+            size="compact"
             title={t(
               props.panels.presentation === 'all'
                 ? 'scenario.editor.inspectorShowSections'
@@ -284,6 +288,8 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
           </ContentToolbarButton>
         )}
         <ContentToolbarButton
+          tone="utility"
+          size="compact"
           title={t('scenario.editor.close')}
           aria-controls="guide-inspector-panel"
           aria-expanded={true}
@@ -312,6 +318,8 @@ export function GuidePanelControls({
   if (side === 'right')
     return panels.rightOpen ? null : (
       <ContentToolbarButton
+        tone="utility"
+        size="compact"
         title={t('scenario.editor.guideInspector')}
         aria-controls="guide-inspector-panel"
         onClick={panels.toggleRight}
@@ -323,6 +331,8 @@ export function GuidePanelControls({
   return (
     <div className="guide-collapsed-sections">
       <ContentToolbarButton
+        tone="utility"
+        size="compact"
         title={t('scenario.editor.outline')}
         aria-controls="guide-library-panel"
         onClick={() => panels.openLeft('structure')}
@@ -330,6 +340,8 @@ export function GuidePanelControls({
         <FileText size={16} aria-hidden="true" />
       </ContentToolbarButton>
       <ContentToolbarButton
+        tone="utility"
+        size="compact"
         title={t('scenario.editor.guideResources')}
         aria-controls="guide-library-panel"
         onClick={() => panels.openLeft('resources')}

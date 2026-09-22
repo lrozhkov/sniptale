@@ -407,7 +407,7 @@
 
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8.5rem, (100% - 8px) / 2)), 1fr));
   align-items: center;
   gap: 8px;
   min-height: 36px;
@@ -846,13 +846,6 @@
   grid-column: 1 / -1;
 }
 
-@container (max-width: 300px) {
-  .guide-inspector-panel [data-ui='shared.ui.compact-inspector.color-field'] {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
-}
-
 .guide-inspector-panel .guide-block-inspector > .scenario-inspector-navigation {
   margin-bottom: 8px;
 }
@@ -922,7 +915,7 @@
     > span + [data-ui='shared.ui.compact-select']
   ) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8.5rem, (100% - 8px) / 2)), 1fr));
   align-items: center;
   gap: 8px;
 }
@@ -937,28 +930,14 @@
 .guide-inspector-panel
   :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field)
   > span:has(+ [data-ui='shared.ui.compact-select']) {
-  grid-column: 1;
+  grid-column: auto;
 }
 .guide-inspector-panel
   :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field)
   > span
   + [data-ui='shared.ui.compact-select'] {
-  grid-column: 2;
+  grid-column: auto;
   width: 100%;
-}
-@container (max-width: 280px) {
-  .guide-inspector-panel
-    :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field):has(
-      > span + [data-ui='shared.ui.compact-select']
-    ) {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .guide-inspector-panel
-    :is(.tour-text-field, .guide-inspector-choice, .guide-numbering-field)
-    > span
-    + [data-ui='shared.ui.compact-select'] {
-    grid-column: 1;
-  }
 }
 
 /* A static title with one selector is a field row, not a separate disclosure. */
@@ -967,7 +946,7 @@
     > .guide-inspector-group-body > [data-ui='shared.ui.compact-select']:only-child
   ) {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8.5rem, (100% - 8px) / 2)), 1fr));
   align-items: center;
   gap: 8px;
 }

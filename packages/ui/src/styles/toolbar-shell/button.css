@@ -145,3 +145,44 @@
     var(--sniptale-shadow-sm),
     0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
 }
+
+/* Workspace chrome is neutral even when it reports a toggled layout state. */
+.sniptale-btn.sniptale-btn-utility {
+  color: var(--sniptale-color-text-muted);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: var(--sniptale-radius-sm);
+}
+.sniptale-btn.sniptale-btn-utility:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-utility:active:not(:disabled) {
+  background: var(--sniptale-color-surface-input);
+  transform: none;
+}
+.sniptale-btn.sniptale-btn-utility:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+  border-color: transparent;
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-utility:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sniptale-btn.sniptale-btn-compact {
+  width: var(--sniptale-size-icon-compact);
+  height: var(--sniptale-size-icon-compact);
+  min-width: var(--sniptale-size-icon-compact);
+  min-height: var(--sniptale-size-icon-compact);
+  padding: 0;
+  flex-shrink: 0;
+}
+.sniptale-btn.sniptale-btn-compact svg {
+  width: 16px;
+  height: 16px;
+}

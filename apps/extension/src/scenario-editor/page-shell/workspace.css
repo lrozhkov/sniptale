@@ -1128,13 +1128,7 @@
 .guide-panel-heading h2 {
   flex: 1;
 }
-.guide-panel-heading > button {
-  width: min(1.75rem, var(--sniptale-size-toolbar));
-  height: min(1.75rem, var(--sniptale-size-toolbar));
-  min-width: min(1.75rem, var(--sniptale-size-toolbar));
-  min-height: min(1.75rem, var(--sniptale-size-toolbar));
-  padding: 0.25rem;
-}
+
 .guide-collapsed-sections {
   display: flex;
   gap: 0.25rem;
@@ -1900,8 +1894,7 @@ html[data-guide-height-resizing] * {
   border-color: transparent;
   color: var(--sniptale-color-text-primary);
 }
-.guide-page .guide-voice-control > .guide-text-clear,
-.guide-page .guide-voice-control > .guide-text-clear:hover:not(:disabled) {
+.guide-page .guide-voice-control > .guide-text-clear {
   border-color: transparent;
   border-radius: var(--sniptale-radius-sm);
   background: transparent;
@@ -1909,9 +1902,9 @@ html[data-guide-height-resizing] * {
 
 /* Enabled commands are readable before hover; disabled commands remain visibly muted. */
 .guide-page
-  .sniptale-glass-toolbar-button:not(:disabled):not([data-active='true']):not(
-    .sniptale-btn-danger
-  ) {
+  .sniptale-glass-toolbar-button:not(.sniptale-btn-utility):not(:disabled):not(
+    [data-active='true']
+  ):not(.sniptale-btn-danger) {
   color: var(--sniptale-color-text-primary);
 }
 .guide-page .sniptale-btn-danger:not(:disabled) {
@@ -1920,7 +1913,7 @@ html[data-guide-height-resizing] * {
 .guide-page .sniptale-btn-danger:hover:not(:disabled) {
   color: var(--sniptale-color-danger);
 }
-.guide-page button.sniptale-glass-toolbar-button:disabled {
+.guide-page button.sniptale-glass-toolbar-button:not(.sniptale-btn-utility):disabled {
   color: var(--sniptale-color-text-dim);
   opacity: 0.38;
   border-color: transparent;
