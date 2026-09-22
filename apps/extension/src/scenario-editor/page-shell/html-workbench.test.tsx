@@ -175,7 +175,7 @@ it('applies selected overrides, restores defaults and releases encoded previews'
     host.querySelector<HTMLButtonElement>('[role=switch][aria-label="Click to view"]')!;
   try {
     await act(async () => render());
-    expect(host.querySelector('.guide-html-preview img')?.getAttribute('src')).toBe('blob:preview');
+    expect(host.querySelector('.guide-export-stage img')?.getAttribute('src')).toBe('blob:preview');
     await act(async () => button('Select all images').click());
     await act(async () => viewer().click());
     expect(
@@ -265,7 +265,7 @@ it('ignores stale image decoding, displays failure and releases the recovered pr
     await act(async () => pending[0]!.resolve(output));
     expect(create).not.toHaveBeenCalled();
     await act(async () => pending[1]!.reject(new Error('decode')));
-    expect(host.querySelector('.guide-html-preview')?.textContent).toContain(
+    expect(host.querySelector('.guide-export-stage')?.textContent).toContain(
       'Could not prepare the image'
     );
     await act(async () =>

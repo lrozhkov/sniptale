@@ -49,7 +49,7 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
   await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-  await expect(page.locator('.guide-html-settings > [role=status]')).toHaveText('HTML saved');
+  await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
   const html = await page.evaluate(() => {
     const value: unknown = Reflect.get(window, 'savedGuideHtml');
     if (typeof value !== 'string') throw new Error('No HTML');

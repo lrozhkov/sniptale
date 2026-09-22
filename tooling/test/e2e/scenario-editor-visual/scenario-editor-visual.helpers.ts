@@ -28,13 +28,15 @@ export async function openVisualHarness(
   theme: 'light' | 'dark',
   locale: 'ru' | 'en',
   viewport: ViewportSize,
-  stepId = 'compare'
+  stepId = 'compare',
+  extraParams?: Record<string, string>
 ) {
   const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
   url.searchParams.set('projectId', `guide-${crypto.randomUUID()}`);
   url.searchParams.set('theme', theme);
   url.searchParams.set('locale', locale);
   url.searchParams.set('stepId', stepId);
+  for (const [key, value] of Object.entries(extraParams ?? {})) url.searchParams.set(key, value);
   await page.setViewportSize(viewport);
   await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });

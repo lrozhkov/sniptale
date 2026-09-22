@@ -38,6 +38,19 @@ it('sends the exact prepared Blob to the isolated preview and saves the same art
   await act(async () =>
     root.render(<TourHtmlExport project={createGuideProject('Guide')} t={t} onClose={() => {}} />)
   );
+  const main = host.querySelector('main.guide-export-workspace.tour-export')!;
+  expect(main.querySelector('.guide-page-header')).toBeNull();
+  const stage = main.querySelector('.guide-export-stage')!;
+  const inspector = main.querySelector('.guide-export-inspector')!;
+  expect(stage.querySelector('iframe')).toBeNull();
+  const back = inspector.querySelector<HTMLButtonElement>('.guide-export-heading button')!;
+  expect(back.title).toBe(t('scenario.editor.guideReaderBack'));
+  expect(document.activeElement).toBe(back);
+  expect(
+    [...inspector.querySelectorAll<HTMLButtonElement>('.guide-export-actions button')].map(
+      (node) => node.title
+    )
+  ).toEqual([t('scenario.editor.tourHtmlPrepare'), t('scenario.editor.htmlSave')]);
   const button = (key: 'tourHtmlPrepare' | 'htmlSave') =>
     [...host.querySelectorAll<HTMLButtonElement>('button')].find(
       (node) => node.title === t(`scenario.editor.${key}`)

@@ -40,7 +40,7 @@ for (const theme of ['light', 'dark'] as const) {
       contentType: 'image/png',
     });
     await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-html-settings > [role=status]')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
     await expect(page.locator('html')).toHaveAttribute('data-file-closed', 'true');
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'savedGuideHtml');

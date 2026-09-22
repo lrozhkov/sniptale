@@ -14,6 +14,8 @@ import {
   createGuideStep,
   createGuideImageBlock,
   createGuideParagraphs,
+  createTourDocument,
+  createTourImageSlide,
 } from '../../../apps/extension/src/features/scenario/project/public';
 import { commitScenarioAggregateMutation } from '../../../apps/extension/src/composition/persistence/scenario/aggregate-mutations';
 import { getScenarioProject } from '../../../apps/extension/src/composition/persistence/scenario/projects';
@@ -51,7 +53,7 @@ async function createFixtureImage(): Promise<Blob> {
   );
 }
 
-async function seedGuide(projectId: string): Promise<void> {
+async function seedGuide(projectId: string, withTour: boolean): Promise<void> {
   if (await getScenarioProject(projectId)) return;
   const project = createGuideProject('Local step guide', projectId);
   const { assetEntry } = await createScenarioAssetEntryFromBlob({
@@ -89,6 +91,25 @@ async function seedGuide(projectId: string): Promise<void> {
     step,
     createGuideStep('Text-only step', 'text-only'),
   ];
+  if (withTour) {
+    project.tour = {
+      ...createTourDocument('fixture-tour'),
+      slides: ['before', 'after'].map((id) => {
+        const slide = createTourImageSlide(`tour-${id}`);
+        slide.title = `Tour ${id}`;
+        slide.image = {
+          assetId: assetEntry.id,
+          width: 960,
+          height: 540,
+          alt: `${id} screenshot`,
+          galleryAssetId: null,
+          editDocumentId: null,
+          source: { kind: 'import', filename: 'example.png' },
+        };
+        return slide;
+      }),
+    };
+  }
   await commitScenarioAggregateMutation(project, { children: { assetPuts: [assetEntry] } });
 }
 
@@ -141,7 +162,7 @@ async function mountGuideHarness(): Promise<void> {
   initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
   const projectId = params.get('projectId') ?? 'guide-visual';
-  await seedGuide(projectId);
+  await seedGuide(projectId, params.get('tourFixture') === '1');
   if (params.get('clearHistory') === '1') {
     const project = await getScenarioProject(projectId);
     if (!project) throw new Error('Missing retention fixture');

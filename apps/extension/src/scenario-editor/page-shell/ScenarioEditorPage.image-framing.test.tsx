@@ -452,7 +452,7 @@ it('opens standalone tour export and returns to the selected slide', async () =>
   expect(container.querySelector('.tour-export')).not.toBeNull();
   expect(container.textContent).toContain('Prepare and preview');
   await act(async () =>
-    container.querySelector<HTMLButtonElement>('.tour-export header button')?.click()
+    container.querySelector<HTMLButtonElement>('.tour-export .guide-export-heading button')?.click()
   );
   expect(container.querySelector('.tour-export')).toBeNull();
   expect(container.querySelector('.tour-slide-list')?.textContent).toContain('Export slide');

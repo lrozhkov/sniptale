@@ -1,9 +1,20 @@
 import { GuideReadingControls } from './reader-navigation';
 import { DEFAULT_GUIDE_READING, type GuideReadingOptions } from './reader-pages';
 import { formatBytes } from '../../platform/i18n/format-bytes';
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, Circle, Download, Image, RotateCcw, X } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
+import {
+  BookOpen,
+  Check,
+  Circle,
+  Download,
+  Images,
+  RotateCcw,
+  SlidersHorizontal,
+  X,
+  ZoomIn,
+} from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
@@ -14,6 +25,7 @@ import {
 } from './html-image-settings';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { GuideInspectorGroup } from './inspector';
+import { GuideExportWorkspace } from './export-workspace';
 import { useHtmlExportJob, useHtmlImagePreview } from './html-workbench-state';
 import './html-workbench.css';
 
@@ -44,80 +56,55 @@ export function GuideHtmlWorkbench({
   const block = entries.find((entry) => entry.block.id === active)?.block;
   const { preview, failed } = useHtmlImagePreview(project, block);
   const job = useHtmlExportJob(project, t, reading);
-  const back = useRef<HTMLButtonElement>(null);
-  useLayoutEffect(() => {
-    back.current?.focus();
-  }, []);
   const busy = job.status === 'pending';
   return (
-    <main
+    <GuideExportWorkspace
       className="guide-html-workbench"
-      onKeyDown={(event) => {
-        if (event.key === 'Escape' && !event.defaultPrevented) {
-          event.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <header className="guide-page-header">
-        <ContentToolbarButton
-          className="guide-labeled-action"
-          ref={back}
-          title={t('scenario.editor.htmlBack')}
-          onClick={onClose}
-        >
-          <ArrowLeft size={16} aria-hidden="true" />
-          <span>{t('scenario.editor.htmlBack')}</span>
-        </ContentToolbarButton>
-        <h1>{t('scenario.editor.htmlImages')}</h1>
-        {job.measurement && <output>{formatBytes(job.measurement.size)}</output>}
-        <ContentToolbarButton
-          className="guide-labeled-action"
-          title={t('scenario.editor.htmlMeasure')}
-          disabled={busy}
-          onClick={() => void job.run(false)}
-        >
-          <span>{t('scenario.editor.htmlMeasure')}</span>
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          className="guide-labeled-action"
-          title={t('scenario.editor.htmlSave')}
-          disabled={busy || !job.measurement}
-          onClick={() => void job.run(true)}
-        >
-          <Download size={16} aria-hidden="true" />
-          <span>{t('scenario.editor.htmlSave')}</span>
-        </ContentToolbarButton>
-        {busy && (
-          <ContentToolbarButton
-            className="guide-labeled-action"
-            title={t('common.actions.cancel')}
-            onClick={job.cancel}
-          >
-            <X size={16} aria-hidden="true" />
-          </ContentToolbarButton>
-        )}
-      </header>
-      <GuideReadingControls value={reading} onChange={setReading} disabled={busy} t={t} />
-      <div className="guide-html-body">
-        <GuideHtmlImageList
-          project={project}
-          images={images}
-          active={active}
-          selected={selected}
-          busy={busy}
-          onActive={setActive}
-          onSelected={(next) => {
-            setSelected(next);
-            setScope('selected');
-          }}
-          t={t}
-        />
-        <section className="guide-html-preview" aria-label={t('scenario.editor.htmlPreview')}>
-          <header>
-            <span>
-              {preview && `${preview.width} × ${preview.height} · ${formatBytes(preview.size)}`}
-            </span>
+      title={t('scenario.editor.htmlImages')}
+      backLabel={t('scenario.editor.htmlBack')}
+      headingMeta={
+        job.measurement ? <output>{formatBytes(job.measurement.size)}</output> : undefined
+      }
+      stageLabel={t('scenario.editor.htmlPreview')}
+      onClose={onClose}
+      stage={
+        <div className="guide-html-preview-image" data-zoom={zoom}>
+          {preview ? (
+            <img src={preview.url} alt={block?.alt ?? ''} />
+          ) : (
+            <p role="status">
+              {t(
+                !block
+                  ? 'scenario.editor.htmlEmpty'
+                  : failed
+                    ? 'scenario.editor.htmlPreviewFailed'
+                    : 'scenario.editor.htmlPreviewLoading'
+              )}
+            </p>
+          )}
+        </div>
+      }
+      inspector={
+        <>
+          <GuideInspectorGroup icon={BookOpen} title={t('scenario.editor.guideReaderMode')}>
+            <GuideReadingControls value={reading} onChange={setReading} disabled={busy} t={t} />
+          </GuideInspectorGroup>
+          <GuideInspectorGroup icon={Images} title={t('scenario.editor.htmlImages')}>
+            <GuideHtmlImageList
+              project={project}
+              images={images}
+              active={active}
+              selected={selected}
+              busy={busy}
+              onActive={setActive}
+              onSelected={(next) => {
+                setSelected(next);
+                setScope('selected');
+              }}
+              t={t}
+            />
+          </GuideInspectorGroup>
+          <GuideInspectorGroup icon={ZoomIn} title={t('scenario.editor.htmlPreview')}>
             <SegmentedSwitch
               density="compact"
               ariaLabel={t('scenario.editor.htmlPreview')}
@@ -128,35 +115,69 @@ export function GuideHtmlWorkbench({
               ]}
               onChange={setZoom}
             />
-          </header>
-          <div className="guide-html-preview-image" data-zoom={zoom}>
-            {preview ? (
-              <img src={preview.url} alt={block?.alt ?? ''} />
-            ) : (
-              <p role="status">
-                {t(
-                  !block
-                    ? 'scenario.editor.htmlEmpty'
-                    : failed
-                      ? 'scenario.editor.htmlPreviewFailed'
-                      : 'scenario.editor.htmlPreviewLoading'
-                )}
+            {preview && (
+              <p className="guide-html-preview-meta">
+                {`${preview.width} × ${preview.height} · ${formatBytes(preview.size)}`}
               </p>
             )}
-          </div>
-        </section>
-        <GuideHtmlSettings
-          project={project}
-          feedback={feedback}
-          selected={selected}
-          scope={scope}
-          onScope={setScope}
-          job={job}
-          onChange={onChange}
-          t={t}
-        />
-      </div>
-    </main>
+          </GuideInspectorGroup>
+          <GuideHtmlSettings
+            project={project}
+            selected={selected}
+            scope={scope}
+            onScope={setScope}
+            job={job}
+            onChange={onChange}
+            t={t}
+          />
+          <p className="guide-html-hint">{t('scenario.editor.htmlMeasureHint')}</p>
+          {feedback}
+        </>
+      }
+      status={
+        job.status === 'idle' ? undefined : (
+          <p
+            role="status"
+            className="guide-export-status"
+            data-tone={
+              job.status === 'failed' || job.status === 'history-failed' ? 'error' : undefined
+            }
+          >
+            {t(exportStatusMessages[job.status])}
+          </p>
+        )
+      }
+      actions={
+        <>
+          <ProductActionButton
+            tone="secondary"
+            title={t('scenario.editor.htmlMeasure')}
+            disabled={busy}
+            onClick={() => void job.run(false)}
+          >
+            {t('scenario.editor.htmlMeasure')}
+          </ProductActionButton>
+          <ProductActionButton
+            title={t('scenario.editor.htmlSave')}
+            disabled={busy || !job.measurement}
+            onClick={() => void job.run(true)}
+          >
+            <Download size={16} aria-hidden="true" />
+            {t('scenario.editor.htmlSave')}
+          </ProductActionButton>
+          {busy && (
+            <ProductActionButton
+              tone="secondary"
+              title={t('common.actions.cancel')}
+              onClick={job.cancel}
+            >
+              <X size={16} aria-hidden="true" />
+              {t('common.actions.cancel')}
+            </ProductActionButton>
+          )}
+        </>
+      }
+    />
   );
 }
 
@@ -181,7 +202,7 @@ function GuideHtmlImageList({
 }) {
   const entries = guideHtmlImages(project);
   return (
-    <aside className="guide-html-list" aria-label={t('scenario.editor.htmlImages')}>
+    <div className="guide-html-list">
       <ContentToolbarButton
         className="guide-labeled-action"
         title={t('scenario.editor.htmlSelectAll')}
@@ -243,13 +264,12 @@ function GuideHtmlImageList({
           </button>
         </div>
       ))}
-      {!entries.length && <p>{t('scenario.editor.htmlEmpty')}</p>}
-    </aside>
+      {!entries.length && <p className="guide-html-hint">{t('scenario.editor.htmlEmpty')}</p>}
+    </div>
   );
 }
 function GuideHtmlSettings({
   project,
-  feedback,
   selected,
   scope,
   onScope,
@@ -258,7 +278,6 @@ function GuideHtmlSettings({
   t,
 }: {
   project: GuideProject;
-  feedback?: ReactNode;
   selected: Set<string>;
   scope: 'common' | 'selected';
   onScope: (scope: 'common' | 'selected') => void;
@@ -284,7 +303,7 @@ function GuideHtmlSettings({
   const resetTitle = t(common ? 'scenario.editor.htmlResetAll' : 'scenario.editor.htmlReset');
   const unavailable = busy || (!common && !chosen.length);
   return (
-    <aside className="guide-html-settings">
+    <GuideInspectorGroup icon={SlidersHorizontal} title={title}>
       <SegmentedSwitch
         density="compact"
         ariaLabel={t('scenario.editor.htmlImages')}
@@ -295,42 +314,37 @@ function GuideHtmlSettings({
         ]}
         onChange={onScope}
       />
-      <GuideInspectorGroup icon={Image} title={title}>
-        {mixed && <p>{t('scenario.editor.htmlMixed')}</p>}
-        <GuideHtmlImageFields
-          value={value}
-          disabled={unavailable}
-          onChange={(patch) =>
-            onChange(
-              scope === 'common'
-                ? { ...project, htmlExport: { ...value, ...patch } }
-                : changeHtmlImageSettings(project, selected, patch)
+      {mixed && <p className="guide-html-hint">{t('scenario.editor.htmlMixed')}</p>}
+      <GuideHtmlImageFields
+        value={value}
+        disabled={unavailable}
+        onChange={(patch) =>
+          onChange(
+            scope === 'common'
+              ? { ...project, htmlExport: { ...value, ...patch } }
+              : changeHtmlImageSettings(project, selected, patch)
+          )
+        }
+        t={t}
+      />
+      <ContentToolbarButton
+        className="guide-labeled-action"
+        title={resetTitle}
+        disabled={unavailable}
+        onClick={() =>
+          onChange(
+            changeHtmlImageSettings(
+              project,
+              scope === 'common' ? new Set(entries.map((entry) => entry.block.id)) : selected,
+              null
             )
-          }
-          t={t}
-        />
-        <ContentToolbarButton
-          className="guide-labeled-action"
-          title={resetTitle}
-          disabled={unavailable}
-          onClick={() =>
-            onChange(
-              changeHtmlImageSettings(
-                project,
-                scope === 'common' ? new Set(entries.map((entry) => entry.block.id)) : selected,
-                null
-              )
-            )
-          }
-        >
-          <RotateCcw size={14} aria-hidden="true" />
-          <span>{resetTitle}</span>
-        </ContentToolbarButton>
-      </GuideInspectorGroup>
-      <p>{t('scenario.editor.htmlMeasureHint')}</p>
-      {feedback}
-      {job.status !== 'idle' && <p role="status">{t(exportStatusMessages[job.status])}</p>}
-    </aside>
+          )
+        }
+      >
+        <RotateCcw size={14} aria-hidden="true" />
+        <span>{resetTitle}</span>
+      </ContentToolbarButton>
+    </GuideInspectorGroup>
   );
 }
 
