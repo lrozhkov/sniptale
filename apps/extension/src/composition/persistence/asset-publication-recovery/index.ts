@@ -24,6 +24,7 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   WEB_SNAPSHOTS_STORE,
+  initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
@@ -267,6 +268,10 @@ export async function recoverAssetPublications(
   permit?: DurableAssetOperationPermit,
   transitionPermit?: PersistenceMutationTransitionPermit
 ): Promise<number> {
+  // Cold database admission reserves the exclusive transition gate; it must settle before
+  // the durable operation and lifecycle locks are held or nested IndexedDB mutations would
+  // queue it behind this context's own holds.
+  await initDB();
   return runWithDurableAssetOperationRecovery(permit, async () => {
     await collectQuiescentWritingObjects();
     await runWithDurableAssetLifecycleLock(recoverBackupRestoreOperations);

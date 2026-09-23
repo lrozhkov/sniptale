@@ -201,7 +201,14 @@ function EditorFloatingLayersPanelBody(props: {
     props.documentController
   );
   return (
-    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]">
+    <div
+      className={[
+        'min-h-0 flex-1 overflow-x-hidden p-3',
+        props.activeMode === 'frame'
+          ? 'overflow-y-hidden'
+          : 'overflow-y-auto [scrollbar-gutter:stable]',
+      ].join(' ')}
+    >
       <EditorInspectorContent
         {...contentProps}
         inspector={props.activeMode}

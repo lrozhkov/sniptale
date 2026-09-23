@@ -1,4 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const { initDBMock } = vi.hoisted(() => ({
+  initDBMock: vi.fn(async () => undefined),
+}));
+
+vi.mock('../../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../infrastructure/indexed-db/core')>()),
+  initDB: initDBMock,
+}));
+
 import * as assets from '../../assets';
 import type { AssetObjectWriter } from '../../assets';
 import {
@@ -63,6 +73,34 @@ async function openArtifact(
 }
 
 describe('recording staging coordinator', () => {
+  it('settles database admission before any artifact writer lease is acquired', async () => {
+    const order: string[] = [];
+    initDBMock.mockImplementationOnce(async () => {
+      order.push('initDB');
+    });
+    const factory = createWriterFactory();
+    const createWriter = vi.fn(async (input: { mimeType: string }) => {
+      order.push('createWriter');
+      return factory.createWriter(input);
+    });
+    const coordinator = await createRecordingStagingCoordinator({
+      admitBytes: vi.fn().mockResolvedValue(undefined),
+      createWriter,
+    });
+
+    await openArtifact(coordinator);
+
+    expect(order).toEqual(['initDB', 'createWriter']);
+    await coordinator.abort();
+  });
+
+  it('rejects coordinator creation when database admission rejects', async () => {
+    const admissionError = new Error('IndexedDB admission blocked');
+    initDBMock.mockRejectedValueOnce(admissionError);
+
+    await expect(createRecordingStagingCoordinator()).rejects.toBe(admissionError);
+  });
+
   it('rejects an invalid pending-byte budget', async () => {
     await expect(createRecordingStagingCoordinator({ pendingBytesLimit: 0 })).rejects.toThrow(
       'positive safe integer'

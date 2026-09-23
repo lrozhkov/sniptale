@@ -13,7 +13,7 @@ interface SizeControlsHeaderProps {
 export function SizeControlsHeader(props: SizeControlsHeaderProps) {
   return (
     <div className={cx('flex items-center justify-between gap-3', props.className)}>
-      <span className="text-[12px] font-bold uppercase text-[color:var(--sniptale-color-text-secondary)]">
+      <span className="text-[12px] font-medium text-[color:var(--sniptale-color-text-secondary)]">
         {props.label}
       </span>
       {props.valueText ? (

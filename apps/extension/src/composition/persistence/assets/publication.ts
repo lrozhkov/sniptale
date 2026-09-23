@@ -5,6 +5,7 @@ import {
   writeReadyJournal,
 } from './opfs-store';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import { initDB } from '../infrastructure/indexed-db/core';
 
 const IMMEDIATE_PUBLICATION_ATTEMPTS = 3;
 
@@ -36,8 +37,13 @@ export async function publishReadyJournalWithRetry(
   journal: AssetReadyJournal,
   publish: (journal: AssetReadyJournal) => Promise<void>
 ): Promise<void> {
+  // Cold database admission reserves the exclusive transition gate; it must settle before
+  // the durable asset lifecycle lock is held or callers waiting on that lock can deadlock
+  // against this context's shared transition leases. Admission runs inside the guarded
+  // section so a rejection still reaches the staged-lease release below.
   let publicationError: unknown;
   try {
+    await initDB();
     await runWithDurableAssetLifecycleLock(() => publishReadyJournal(journal, publish));
   } catch (error) {
     publicationError = error;

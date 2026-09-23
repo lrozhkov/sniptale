@@ -104,7 +104,7 @@ export function EditorFloatingLayersNavigation(props: {
       )}
     >
       {layersMode ? renderModeButton(layersMode, props) : null}
-      <LayerInsertImageControl />
+      {props.collapsed ? <LayerInsertImageControl /> : null}
       {settingsModes.map((mode) => renderModeButton(mode, props))}
       <span aria-hidden="true" className={props.collapsed ? 'h-5 w-px' : 'ml-auto'} />
       {props.collapsed || !props.onCollapse ? null : (

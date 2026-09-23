@@ -204,15 +204,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders storage and autosave status with a compact separator and routes quick actions', async () => {
+it('renders a draft badge and compact autosave marker while routing quick actions', async () => {
   const controller = createController();
   renderDocumentBar(createProps({}, controller));
 
   expect(container?.textContent).toContain('Captured page');
   await act(async () => Promise.resolve());
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-  expect(container?.textContent).toContain(`·${translate('common.states.saved')}`);
-  expect(container?.querySelector('[data-state="saved"]')).not.toBeNull();
+  expect(container?.textContent).not.toContain(translate('common.states.saved'));
+  expect(container?.querySelector('[data-storage-class="temporary"]')?.className).toContain(
+    'border'
+  );
+  expect(container?.querySelector('[data-state="saved"]')?.getAttribute('aria-label')).toBe(
+    translate('common.states.saved')
+  );
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.file-menu-button"]')
   ).toBeNull();
@@ -316,11 +321,13 @@ it('shows storage state separately and promotes a linked draft without changing 
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.title).toBe(translate('editor.documentActions.saveToLibrary'));
+  expect(promote.textContent).toContain(translate('editor.documentActions.saveToLibrary'));
   expect(promote.previousElementSibling?.className).toContain('flex-col');
   await act(async () => promote.click());
 
   expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
   expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.querySelector('[data-storage-class="library"]')).not.toBeNull();
   window.history.replaceState(null, '', '/');
 });
 
@@ -358,6 +365,16 @@ it('prevents duplicate promotion while the durable commit is pending', async () 
 
   expect(mocks.commitImagePresentation).toHaveBeenCalledOnce();
   expect(getButton('editor.floating.document-bar.promote-button').disabled).toBe(true);
+  expect(getButton('editor.floating.document-bar.promote-button').getAttribute('aria-busy')).toBe(
+    'true'
+  );
+  expect(getButton('editor.floating.document-bar.promote-button').title).toBe(
+    translate('editor.documentActions.savingToLibrary')
+  );
+  expect(getButton('editor.floating.document-bar.promote-button').textContent).toContain(
+    translate('editor.documentActions.savingToLibrary')
+  );
+  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   await act(async () => commit.resolve());
 });
 
@@ -471,6 +488,31 @@ it('ignores stale storage reads after the active document changes', async () => 
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
   ).toBeNull();
+});
+
+it('does not show the previous document library state while the next document loads', async () => {
+  mocks.getMediaLibraryEntry.mockResolvedValueOnce({
+    lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+  });
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+
+  const nextRead = createDeferred<{
+    lifecycle: { savedAt: null; storageClass: 'temporary'; updatedAt: number };
+  }>();
+  mocks.getMediaLibraryEntry.mockImplementationOnce(() => nextRead.promise);
+  storeState.value = { ...storeState.value, sessionId: 'asset-2' };
+  rerenderDocumentBar();
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.querySelector('[data-storage-class="temporary"]')).not.toBeNull();
+
+  await act(async () =>
+    nextRead.resolve({
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
+    })
+  );
+  expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
 });
 
 it('keeps promotion available when library metadata cannot be read', async () => {
@@ -646,8 +688,12 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
     renderDocumentBar();
     await act(async () => Promise.resolve());
     expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-    expect(container?.textContent).toContain(`·${expectedLabel}`);
-    expect(container?.querySelector(`[data-state="${state.saveState}"]`)).not.toBeNull();
+    const status = container?.querySelector(`[data-state="${state.saveState}"]`);
+    expect(status?.getAttribute('aria-label')).toBe(expectedLabel);
+    expect(status?.getAttribute('title')).toBe(expectedLabel);
+    expect(status?.textContent).toBe(
+      state.saveState === 'saved' || state.saveState === 'saving' ? '' : expectedLabel
+    );
     expect(container?.textContent).not.toContain('Disk error');
     act(() => root?.unmount());
     root = null;

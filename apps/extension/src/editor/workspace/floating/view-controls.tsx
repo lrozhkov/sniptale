@@ -22,18 +22,34 @@ const VIEW_CONTROLS_CLASS_NAME = floatingChromeClassNames(
   'relative max-w-[calc(100vw-1.5rem-var(--editor-floating-edge-right,0px))] overflow-visible'
 );
 
-function useDismissViewPopover(closeAny: () => void, closeTransient: () => void) {
+function useDismissViewPopover(
+  activePopover: ViewPopoverId | null,
+  closeAny: () => void,
+  closeTransient: () => void
+) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const restoreFocus = () => {
+      if (activePopover) {
+        rootRef.current
+          ?.querySelector<HTMLButtonElement>(
+            `[data-ui="editor.floating.view-controls.${activePopover}"]`
+          )
+          ?.focus();
+      }
+    };
     const handlePointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
+      if (activePopover !== 'map' && !rootRef.current?.contains(event.target as Node)) {
         closeTransient();
+        restoreFocus();
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.defaultPrevented && activePopover) {
+        event.stopPropagation();
         closeAny();
+        restoreFocus();
       }
     };
 
@@ -43,7 +59,7 @@ function useDismissViewPopover(closeAny: () => void, closeTransient: () => void)
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [closeAny, closeTransient]);
+  }, [activePopover, closeAny, closeTransient]);
 
   return rootRef;
 }
@@ -88,6 +104,7 @@ export function EditorFloatingViewControls(
   const updateWorkspace = useEditorStore((state) => state.updateWorkspace);
   const { toolbarRef, toolbarWidth } = useMeasuredToolbarWidth();
   const rootRef = useDismissViewPopover(
+    activePopover,
     () => setActivePopover(null),
     () => setActivePopover((current) => (current === 'map' ? current : null))
   );

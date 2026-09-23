@@ -31,6 +31,7 @@ function selectEditorInspectorDimensionState(
 function selectEditorInspectorCanvasState(controller: SidebarExpandedController) {
   return {
     frameDraft: controller.frameDraft,
+    lastFillModeRef: controller.lastFillModeRef,
     framePaddingSummary: controller.framePaddingSummary,
     layoutModeLabel: controller.layoutModeLabel,
     backgroundModeLabel: controller.backgroundModeLabel,

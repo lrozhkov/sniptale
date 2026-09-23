@@ -13,6 +13,10 @@ export const editorSceneMessages = defineMessageSource({
     ru: 'Тип фона',
     en: 'Background type',
   },
+  backgroundFillMode: {
+    ru: 'Заливка',
+    en: 'Fill',
+  },
   scenePreviewSection: {
     ru: 'Превью сцены',
     en: 'Scene preview',

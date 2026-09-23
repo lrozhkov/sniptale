@@ -9,6 +9,8 @@ import {
   type EditorInspectorDocumentActionsSectionProps,
 } from '../content-sections';
 import { createEditorInspectorContentBodyProps } from './params';
+import '../../../ui/compact-inspector-controls/inspector-surface.css';
+import '../grouped/inspector.css';
 
 import type { EditorInspectorContentProps } from './types';
 
@@ -44,7 +46,12 @@ export const EditorInspectorContent: React.FC<EditorInspectorContentProps> = (pr
 
   return (
     <>
-      <div className="space-y-5">
+      <div
+        className={[
+          'sniptale-inspector-surface editor-inspector-surface space-y-3',
+          props.inspector === 'frame' ? 'h-full min-h-0' : '',
+        ].join(' ')}
+      >
         {props.hasImage ? renderEditorInspectorContentBody(contentBodyProps, controller) : null}
       </div>
       {confirmDialog}

@@ -5,7 +5,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
-import { EditorInspectorFrameSourceImageSection } from './source-image';
+import { EditorInspectorFrameSourceImageFields } from './source-image';
 
 vi.mock('../../chrome/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../chrome/ui')>()),
@@ -82,7 +82,7 @@ it('keeps core source image geometry visible and expands advanced settings on de
   const applyFramePatch = vi.fn();
 
   await renderUi(
-    <EditorInspectorFrameSourceImageSection
+    <EditorInspectorFrameSourceImageFields
       applyFramePatch={applyFramePatch}
       frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
       lineStyleOptions={[{ label: 'Dot', value: 'dot' }]}

@@ -20,25 +20,28 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('previews selected data in canonical order and inserts it as a row', () => {
+it('offers layout only for multiple fields and inserts them in canonical order', () => {
   const onInsert = vi.fn();
   act(() => root.render(<EditorTechnicalDataPicker onInsert={onInsert} />));
 
   const buttons = Array.from(container.querySelectorAll('button'));
-  const layout = buttons.find(
-    (button) => button.textContent === 'editor.compact.technicalDataLayoutRow'
-  );
+  expect(container.textContent).not.toContain('editor.compact.technicalDataLayoutRow');
 
   act(() => {
-    layout?.click();
-    buttons.find((button) => button.textContent === 'editor.compact.browser')?.click();
-    buttons.find((button) => button.textContent === 'editor.compact.pageUrl')?.click();
+    buttons
+      .find((button) => button.getAttribute('aria-label') === 'editor.compact.browser')
+      ?.click();
+    buttons
+      .find((button) => button.getAttribute('aria-label') === 'editor.compact.pageUrl')
+      ?.click();
   });
 
-  const preview = container.querySelector('[aria-label="editor.compact.technicalDataPreview"]');
-  expect(preview?.textContent).toContain('editor.compact.pageUrl');
-  expect(preview?.textContent).toContain('editor.compact.browser');
-  expect(preview?.textContent).toContain('·');
+  const layout = Array.from(container.querySelectorAll('button')).find(
+    (button) => button.textContent === 'editor.compact.technicalDataLayoutRow'
+  );
+  expect(layout).toBeTruthy();
+  act(() => layout?.click());
+  expect(container.querySelector('[aria-label="editor.compact.technicalDataPreview"]')).toBeNull();
 
   const insert = Array.from(container.querySelectorAll('button')).find(
     (button) => button.textContent === 'editor.compact.technicalDataInsert'

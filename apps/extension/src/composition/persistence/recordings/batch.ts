@@ -21,6 +21,7 @@ import {
   recoverRecordingAssetPublications,
   type RecordingPublicationPayload,
 } from './asset-publication';
+import { initDB } from '../infrastructure/indexed-db/core';
 
 export interface SaveRecordingBatchInput {
   blob?: Blob;
@@ -126,7 +127,10 @@ async function saveRecordingEntries(
   // restarted MV3 worker, because that recovery is itself waiting for this asset lease to release.
   if (!inputs.some((input) => input.preparedAsset !== undefined)) {
     await recoverRecordingAssetPublications();
+    await initDB();
   }
+  // Prepared assets already hold transition leases. Let publication own admission
+  // and release them on failure rather than rejecting outside its cleanup scope.
   const preparedInputs = await writeInputsToAssets(inputs);
   const entries = createEntries(preparedInputs);
   let journalCreated = false;

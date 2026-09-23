@@ -10,7 +10,7 @@ import type { EditorFloatingDocumentController } from './document-bar';
 const LAYER_EFFECTS_PANEL_CLASS_NAME = floatingChromeClassNames(
   [
     'absolute bottom-0 right-[calc(100%+0.75rem)] z-40',
-    'flex h-[min(40rem,calc(100vh-13rem))] min-h-0 w-[21rem]',
+    'flex max-h-[min(40rem,calc(100vh-13rem))] min-h-0 w-[21rem]',
     'flex-col overflow-hidden',
   ].join(' ')
 );
@@ -32,10 +32,10 @@ const LAYER_EFFECTS_HEADER_CLASS_NAME = [
 ].join(' ');
 
 const LAYER_EFFECTS_HEADER_TITLE_CLASS_NAME =
-  'truncate text-[12px] font-bold uppercase leading-4 text-[color:var(--sniptale-color-text-secondary)]';
+  'truncate text-[12px] font-medium leading-4 text-[color:var(--sniptale-color-text-secondary)]';
 
 const LAYER_EFFECTS_BODY_CLASS_NAME =
-  'min-h-0 overflow-x-hidden overflow-y-auto p-4 [scrollbar-gutter:stable_both-edges]';
+  'min-h-0 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]';
 
 function LayerEffectsPanelBody({
   documentController,

@@ -54,19 +54,15 @@ afterEach(() => {
   container = null;
 });
 
-it('sorts applied effects first and keeps compact applied badge typography', () => {
+it('sorts applied effects first and marks applied options as pressed', () => {
   renderCatalog();
 
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-  const appliedBadge = buttons[0]?.querySelectorAll('span')[1];
 
   expect(buttons[0]?.textContent).toContain('editor.layerEffects.brightness');
-  expect(buttons[0]?.className).toContain(
-    'border-[color:var(--sniptale-color-border-accent-strong)]'
-  );
-  expect(buttons[1]?.className).toContain('border-[color:var(--sniptale-color-border-soft)]');
-  expect(appliedBadge?.className).toContain('font-semibold uppercase');
-  expect(appliedBadge?.className).not.toContain('tracking-');
+  expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
+  expect(buttons[0]?.textContent).toContain('editor.toolbar.layerEffectsAppliedShort');
+  expect(buttons[1]?.getAttribute('aria-pressed')).toBe('false');
 });
 
 it('opens a catalog effect without delegating ownership to the parent surface', () => {

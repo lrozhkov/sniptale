@@ -35,7 +35,7 @@ it('renders layer effects beside expanded layers and closes through inspector ro
   expect(markup).toContain('right-[calc(100%+0.75rem)]');
   expect(markup).toContain('Color correction');
   expect(markup).not.toContain('Layer effects');
-  expect(markup).toContain('text-[12px] font-bold uppercase');
+  expect(markup).toContain('text-[12px] font-medium');
   expect(markup).toContain('data-inspector="layer-effects"');
 });
 

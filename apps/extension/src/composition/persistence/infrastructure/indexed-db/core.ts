@@ -5,6 +5,7 @@ import { createMemoryStateDomainAdapter } from '@sniptale/platform/data/state-ma
 import { stateManager } from '../state-manager';
 import {
   isActivePersistenceMutationPermit,
+  isPersistenceMutationTransitionHeld,
   runWithPersistentDataErasureBarrier,
   runWithPersistenceMutationPermit,
   type PersistenceMutationPermit,
@@ -281,6 +282,17 @@ export { inspectDatabaseAdmission };
 async function prepareDatabase(allowAlphaReset = false): Promise<void> {
   const state = getDbCoreState();
   if (state.databaseReady) return;
+  // Do not queue exclusive admission behind this context's staged shared lease.
+  // Fail before joining an in-flight preparation too: it may already wait for that
+  // lease. The publication owner releases the lease on rejection; a fresh retry
+  // then enters the normal erasure barrier. Never bypass that barrier for reset.
+  if (isPersistenceMutationTransitionHeld()) {
+    throw new DatabaseAdmissionError({
+      databaseVersion: null,
+      reason: 'connection-blocked',
+      status: 'blocked',
+    });
+  }
   if (state.preparationPromise) return state.preparationPromise;
   const preparation = runWithPersistentDataErasureBarrier(async () => {
     let admission = await inspectDatabaseAdmission();

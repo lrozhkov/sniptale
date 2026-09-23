@@ -24,9 +24,9 @@ export function createAfterRenderHandler(
   > &
     Pick<EditorControllerEventObjectBindings, 'getActiveCropRect'>
 ) {
-  return () => {
+  return (event: { ctx: CanvasRenderingContext2D }) => {
     const canvas = bindings.getCanvas();
-    if (!canvas || !canvas.contextTop) {
+    if (!canvas || !canvas.contextTop || event.ctx !== canvas.getContext()) {
       return;
     }
 

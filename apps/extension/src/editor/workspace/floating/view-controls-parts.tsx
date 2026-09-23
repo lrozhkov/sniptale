@@ -1,4 +1,4 @@
-import { Grid2x2, Magnet, Map, Palette } from 'lucide-react';
+import { Magnet, Map, Palette } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -6,10 +6,7 @@ import { translate } from '../../../platform/i18n';
 import { EditorViewportPreview } from '../viewport-preview';
 import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import type { EditorFloatingDocumentController } from './document-bar';
-import {
-  CompactGridPopoverContent,
-  CompactWorkspacePopoverContent,
-} from './view-controls-popovers';
+import { CompactWorkspacePopoverContent } from './view-controls-popovers';
 
 const VIEW_POPOVER_CLASS_NAME = floatingChromeClassNames(
   'absolute right-0 top-[calc(100%+0.75rem)] z-50',
@@ -22,7 +19,7 @@ const VIEW_MAP_POPOVER_CLASS_NAME = floatingChromeClassNames(
   'w-[var(--editor-view-toolbar-width,min(18rem,calc(100vw-1.5rem)))] p-3'
 );
 
-export type ViewPopoverId = 'workspace' | 'grid' | 'map';
+export type ViewPopoverId = 'workspace' | 'map';
 
 function ViewToolbarPopoverAnchor(props: {
   active: boolean;
@@ -69,34 +66,13 @@ function WorkspacePopoverButton(props: {
   return (
     <ViewToolbarPopoverAnchor
       id="workspace"
-      title={getDocumentRequiredTitle(translate('editor.toolbar.workspace'), props.hasImage)}
+      title={getDocumentRequiredTitle(translate('editor.toolbar.viewSettings'), props.hasImage)}
       active={props.activePopover === 'workspace'}
       open={props.activePopover === 'workspace'}
       disabled={!props.hasImage}
       trigger={<Palette size={15} strokeWidth={2} />}
       onToggle={props.onToggle}
       popover={<CompactWorkspacePopoverContent {...props} />}
-    />
-  );
-}
-
-function GridPopoverButton(props: {
-  activePopover: ViewPopoverId | null;
-  documentController: EditorFloatingDocumentController;
-  gridEnabled: boolean;
-  hasImage: boolean;
-  onToggle: (id: ViewPopoverId) => void;
-}) {
-  return (
-    <ViewToolbarPopoverAnchor
-      id="grid"
-      title={getDocumentRequiredTitle(translate('editor.toolbar.gridMode'), props.hasImage)}
-      active={props.activePopover === 'grid' || props.gridEnabled}
-      open={props.activePopover === 'grid'}
-      disabled={!props.hasImage}
-      trigger={<Grid2x2 size={15} strokeWidth={2} />}
-      onToggle={props.onToggle}
-      popover={<CompactGridPopoverContent {...props} />}
     />
   );
 }
@@ -154,7 +130,6 @@ export function ViewSettingsControls(props: {
       >
         <Magnet size={15} strokeWidth={2} />
       </ContentToolbarButton>
-      <GridPopoverButton {...props} />
       <MapPopoverButton {...props} />
     </ContentToolbarGroup>
   );

@@ -1,4 +1,3 @@
-import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -121,7 +120,6 @@ export function EditorFloatingToolPropertiesRail({
   hasImage,
   selection,
 }: EditorFloatingToolPropertiesRailProps) {
-  const embed = useEditorEmbedContext();
   const controller = useEditorController();
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const groups = useToolPropertyGroups(documentController.compactCommandGroups);
@@ -183,8 +181,7 @@ export function EditorFloatingToolPropertiesRail({
         dataUi="editor.floating.tool-properties"
         className={floatingChromeClassNames(
           TOOL_PROPERTIES_CLASS_NAME,
-          embed.mode === 'scenario' &&
-            'min-[721px]:max-[1439px]:!top-[8.5rem] min-[721px]:max-[1439px]:!max-h-[calc(100vh-9.25rem)]'
+          'min-[721px]:max-[1439px]:!top-[8.5rem] min-[721px]:max-[1439px]:!max-h-[calc(100vh-9.25rem)]'
         )}
       >
         {drawingOptionsTool ? (

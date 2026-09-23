@@ -3,7 +3,7 @@ import type { EditorImageSettings } from '../../../features/editor/document/imag
 import { normalizeEditorImageSettings } from '../../../features/editor/document/constants';
 import { translate } from '../../../platform/i18n';
 import { ColorField, SelectField, type CompactSelectOption } from '../../chrome/ui';
-import { PanelSection } from '../tools/sections';
+import { EditorInspectorDetails } from '../grouped';
 import { EditorInspectorRangeField } from './shared';
 
 const DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS = [
@@ -17,7 +17,7 @@ function getPercentValue(value: number): string {
 }
 
 function patchSourceImage(
-  props: Pick<EditorInspectorFrameSourceImageSectionProps, 'applyFramePatch' | 'frameDraft'>,
+  props: Pick<EditorInspectorFrameSourceImageFieldsProps, 'applyFramePatch' | 'frameDraft'>,
   patch: Partial<EditorImageSettings>
 ) {
   props.applyFramePatch({
@@ -75,51 +75,44 @@ function resolveSourceImageNumericUnit(valueText: string): '' | '%' | 'deg' | 'p
   return '';
 }
 
-export function EditorInspectorFrameSourceImageSection(
-  props: EditorInspectorFrameSourceImageSectionProps
+export function EditorInspectorFrameSourceImageFields(
+  props: EditorInspectorFrameSourceImageFieldsProps
 ) {
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
 
   return (
-    <PanelSection label={translate('editor.runtime.sourceImage')}>
-      <div className="space-y-3">
-        <SourceImageRangeSection
-          label={translate('editor.compact.opacity')}
-          max={1}
-          step={0.05}
-          value={settings.opacity}
-          valueText={getPercentValue(settings.opacity)}
-          onChange={(opacity) => patchSourceImage(props, { opacity })}
-        />
-        <SourceImageRangeSection
-          label={translate('editor.compact.cornerRadius')}
-          max={80}
-          value={settings.radius}
-          valueText={`${settings.radius}px`}
-          onChange={(radius) => patchSourceImage(props, { radius })}
-        />
-        <details className="group border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
-          <summary
-            className={[
-              'cursor-pointer select-none text-[11px] font-semibold',
-              'text-[var(--sniptale-color-text-secondary)]',
-              'hover:text-[var(--sniptale-color-text-primary)]',
-            ].join(' ')}
-          >
-            {translate('content.callout.additionalSettings')}
-          </summary>
-          <div className="mt-3 space-y-4">
-            <SourceImageShadowSection props={props} settings={settings} />
-            <SourceImageBorderSection props={props} settings={settings} />
-          </div>
-        </details>
-      </div>
-    </PanelSection>
+    <div className="space-y-3">
+      <SourceImageRangeSection
+        label={translate('editor.compact.opacity')}
+        max={1}
+        step={0.05}
+        value={settings.opacity}
+        valueText={getPercentValue(settings.opacity)}
+        onChange={(opacity) => patchSourceImage(props, { opacity })}
+      />
+      <SourceImageRangeSection
+        label={translate('editor.compact.cornerRadius')}
+        max={80}
+        value={settings.radius}
+        valueText={`${settings.radius}px`}
+        onChange={(radius) => patchSourceImage(props, { radius })}
+      />
+      <EditorInspectorDetails
+        preferenceId="frame:source-image-advanced"
+        level="group"
+        label={translate('content.callout.additionalSettings')}
+      >
+        <div className="space-y-4">
+          <SourceImageShadowSection props={props} settings={settings} />
+          <SourceImageBorderSection props={props} settings={settings} />
+        </div>
+      </EditorInspectorDetails>
+    </div>
   );
 }
 
 function SourceImageShadowSection(args: {
-  props: EditorInspectorFrameSourceImageSectionProps;
+  props: EditorInspectorFrameSourceImageFieldsProps;
   settings: EditorImageSettings;
 }) {
   const { props, settings } = args;
@@ -153,7 +146,7 @@ function SourceImageShadowSection(args: {
 }
 
 function SourceImageShadowGeometry(args: {
-  props: EditorInspectorFrameSourceImageSectionProps;
+  props: EditorInspectorFrameSourceImageFieldsProps;
   settings: EditorImageSettings;
 }) {
   const { props, settings } = args;
@@ -185,7 +178,7 @@ function SourceImageShadowGeometry(args: {
 }
 
 function SourceImageBorderSection(args: {
-  props: EditorInspectorFrameSourceImageSectionProps;
+  props: EditorInspectorFrameSourceImageFieldsProps;
   settings: EditorImageSettings;
 }) {
   const { props, settings } = args;
@@ -217,7 +210,7 @@ function SourceImageBorderSection(args: {
 }
 
 function SourceImageBorderColor(args: {
-  props: EditorInspectorFrameSourceImageSectionProps;
+  props: EditorInspectorFrameSourceImageFieldsProps;
   settings: EditorImageSettings;
 }) {
   const { props, settings } = args;
@@ -245,7 +238,7 @@ function SourceImageBorderColor(args: {
   );
 }
 
-interface EditorInspectorFrameSourceImageSectionProps {
+interface EditorInspectorFrameSourceImageFieldsProps {
   applyFramePatch: (patch: Partial<EditorFrameSettings>) => void;
   frameDraft: EditorFrameSettings;
   lineStyleOptions?: CompactSelectOption<EditorImageSettings['strokeStyle']>[] | undefined;

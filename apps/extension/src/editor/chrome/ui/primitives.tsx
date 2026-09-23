@@ -3,9 +3,9 @@ import {
   CompactInput as SharedCompactInput,
   CompactRange as SharedCompactRange,
   CompactSelect as SharedCompactSelect,
-  ColorField,
+  ColorField as SharedColorField,
   FileActionRow,
-  NumericRow,
+  NumericRow as SharedNumericRow,
   NumericValueField,
   OptionRow,
   PresetList,
@@ -48,10 +48,24 @@ export function CompactSelect<T extends string>({
   );
 }
 
+/** Image-editor hosts use the same inspector variants as video controls. */
+export function NumericRow({ className, ...props }: NumericRowProps) {
+  return (
+    <SharedNumericRow
+      appearance="plain"
+      focusAppearance="accent-box"
+      {...props}
+      className={cx('min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!', className)}
+    />
+  );
+}
+
+export function ColorField(props: React.ComponentProps<typeof SharedColorField>) {
+  return <SharedColorField triggerVariant="swatch" floatingPlacement="side" {...props} />;
+}
+
 export {
-  ColorField,
   FileActionRow,
-  NumericRow,
   NumericValueField,
   OptionRow,
   PresetList,

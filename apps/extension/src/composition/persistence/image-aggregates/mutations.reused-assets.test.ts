@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   discardPreparedAsset: vi.fn(async () => undefined),
   initDB: vi.fn(),
   releaseProtection: vi.fn(async () => undefined),
+  recoverStandalone: vi.fn(async () => 0),
   runMutation: vi.fn(),
 }));
 
@@ -37,7 +38,7 @@ vi.mock('../assets', async (importOriginal) => ({
   deleteAssetObject: mocks.deleteAssetObject,
   discardPreparedAsset: mocks.discardPreparedAsset,
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
-  recoverStandaloneAssetPublications: vi.fn(async () => 0),
+  recoverStandaloneAssetPublications: mocks.recoverStandalone,
   releaseAssetReadyProtection: mocks.releaseProtection,
   writeBlobToAsset: vi.fn(async (blob: Blob) => {
     const assetId = `staged-${++mocks.assetSequence}`;
@@ -59,6 +60,7 @@ vi.mock('../../../platform/media-utils/image-thumbnail', () => ({
 }));
 
 import { commitImageWorkspace, imageWorkspacePublicationAdapter } from './mutations';
+import { recoverAndGetStoredImageWorkspace } from '../image-workspaces';
 
 function createMediaRoot(revision: number) {
   return {
@@ -175,4 +177,78 @@ it('journals, replays, and rolls back only newly staged assets in a mixed public
   expect(mocks.discardPreparedAsset).toHaveBeenCalledOnce();
   expect(mocks.discardPreparedAsset).toHaveBeenCalledWith('staged-2');
   expect(mocks.discardPreparedAsset).not.toHaveBeenCalledWith('editor-source');
+});
+
+it('recovers a losing two-tab publication when the winning role owns a different asset', async () => {
+  const losingDocument = createEditorDocumentFixture();
+  losingDocument.sourceImageData = 'blob:hydrated-source';
+  losingDocument.frame.backgroundImageData = 'data:image/png;base64,bG9zZXI=';
+  await commitImageWorkspace({
+    aggregateId: 'image-1',
+    document: losingDocument,
+    expectedRevision: 2,
+    reusableAssetsByRuntimeUrl: new Map([
+      [
+        'blob:hydrated-source',
+        {
+          assetId: 'editor-source',
+          createdAt: 1,
+          location: { kind: 'opfs', objectKey: 'objects/editor-source' },
+          mimeType: 'image/png',
+          sha256: null,
+          size: 6,
+        },
+      ],
+    ]),
+  });
+  const losingJournal = await mocks.createJournal.mock.results[0]!.value;
+  const losingAssetId = losingJournal.assetRefs[0].assetId as string;
+  const losingRole = losingJournal.payload.document.assets.find(
+    (asset: { assetId: string }) => asset.assetId === losingAssetId
+  ).role as string;
+  const winnerAssetId = 'winning-background';
+  const winnerRoot = createMediaRoot(3);
+  const winningDocument = createPersistedEditorDocumentFixture(createEditorDocumentFixture());
+  winningDocument.frame.backgroundImage = { assetId: winnerAssetId };
+  winningDocument.assets.push({ assetId: winnerAssetId, role: losingRole });
+  const winnerWorkspace = {
+    aggregateId: 'image-1',
+    createdAt: 1,
+    document: winningDocument,
+    revision: 3,
+    sourceTitle: null,
+    sourceUrl: null,
+    updatedAt: 3,
+  };
+  const otherWorkspace = { ...winnerWorkspace, aggregateId: 'image-2', revision: 1 };
+  const get = vi.fn(async (store: string, key: unknown) => {
+    if (store === 'media_library' && key === 'image-1') return winnerRoot;
+    if (store === 'image_workspaces' && key === 'image-1') return winnerWorkspace;
+    if (store === 'image_workspaces' && key === 'image-2') return otherWorkspace;
+    if (store === 'asset_owners') {
+      return {
+        assetId: winnerAssetId,
+        ownerKind: 'image-workspace',
+        ownerId: 'image-1',
+        role: losingRole,
+      };
+    }
+    return undefined;
+  });
+  mocks.initDB.mockResolvedValue({ get });
+  mocks.recoverStandalone.mockClear();
+  let pendingJournal: typeof losingJournal | null = losingJournal;
+  mocks.recoverStandalone.mockImplementation(async () => {
+    if (!pendingJournal) return 0;
+    await imageWorkspacePublicationAdapter.publish(pendingJournal);
+    pendingJournal = null;
+    return 1;
+  });
+
+  await expect(recoverAndGetStoredImageWorkspace('image-1')).resolves.toEqual(winnerWorkspace);
+  await expect(recoverAndGetStoredImageWorkspace('image-2')).resolves.toEqual(otherWorkspace);
+  await expect(recoverAndGetStoredImageWorkspace('image-1')).resolves.toEqual(winnerWorkspace);
+  expect(mocks.recoverStandalone).toHaveBeenCalledTimes(3);
+  expect(mocks.deleteAssetObject).toHaveBeenCalledWith(losingAssetId);
+  expect(mocks.deleteAssetObject).not.toHaveBeenCalledWith(winnerAssetId);
 });

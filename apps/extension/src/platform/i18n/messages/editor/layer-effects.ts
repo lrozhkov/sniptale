@@ -1,6 +1,9 @@
 import { defineMessageSource } from '../source';
 
 export const editorLayerEffectsMessages = defineMessageSource({
+  selectedLayer: { ru: 'Выбранный слой', en: 'Selected layer' },
+  availableEffects: { ru: 'Доступные эффекты', en: 'Available effects' },
+  flipAndRotate: { ru: 'Отражение и поворот', en: 'Flip and rotate' },
   brightness: { ru: 'Яркость', en: 'Brightness' },
   contrast: { ru: 'Контраст', en: 'Contrast' },
   gamma: { ru: 'Гамма', en: 'Gamma' },

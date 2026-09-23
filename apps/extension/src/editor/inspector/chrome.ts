@@ -10,7 +10,7 @@ export const INSPECTOR_SECTION_HEADER_CLASS_NAME =
   'flex items-baseline justify-between gap-3 px-0.5';
 
 export const INSPECTOR_SECTION_LABEL_CLASS_NAME =
-  'text-[12px] font-bold uppercase text-[color:var(--sniptale-color-text-secondary)]';
+  'text-[12px] font-medium text-[color:var(--sniptale-color-text-secondary)]';
 
 export const INSPECTOR_SECTION_VALUE_CLASS_NAME =
   'text-[11px] font-medium text-[color:var(--sniptale-color-text-secondary)]';

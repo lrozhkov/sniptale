@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   EditorFrameSettings,
   EditorSelectionState,
@@ -163,6 +163,12 @@ function useLayerDraftState(args: {
 
 function useFrameDraftState(args: { frame: EditorFrameSettings }) {
   const [frameDraft, setFrameDraft] = useState(() => normalizeEditorFrameSettings(args.frame));
+  const lastFillModeRef = useRef<'color' | 'gradient'>(
+    args.frame.backgroundMode === 'gradient' ? 'gradient' : 'color'
+  );
+  if (frameDraft.backgroundMode !== 'image') {
+    lastFillModeRef.current = frameDraft.backgroundMode;
+  }
 
   useEffect(() => {
     setFrameDraft(normalizeEditorFrameSettings(args.frame));
@@ -170,7 +176,7 @@ function useFrameDraftState(args: { frame: EditorFrameSettings }) {
 
   const resetFrameDraft = () => setFrameDraft(normalizeEditorFrameSettings(args.frame));
 
-  return { frameDraft, resetFrameDraft, setFrameDraft };
+  return { frameDraft, lastFillModeRef, resetFrameDraft, setFrameDraft };
 }
 
 export function useInspectorSidebarDraftState(args: {

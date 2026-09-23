@@ -52,6 +52,7 @@ function createSizeSectionHarness() {
       frameBackgroundModeOptions: [{ label: 'Color', value: 'color' }],
       frameBackgroundPalette: ['#ffffff'],
       frameDraft: DEFAULT_EDITOR_FRAME_SETTINGS,
+      lastFillModeRef: { current: 'color' },
       frameGradientPresets: [
         { angle: 90, from: '#111111', id: 'preset', label: 'Preset', to: '#ffffff' },
       ],

@@ -42,6 +42,38 @@ describe('blur backdrop canvas owner', () => {
       { id: 'lower-visible', visible: true },
     ]);
     expect(canvas.viewportTransform).toEqual([2, 0, 0, 2, 10, 20]);
+    expect(canvas.width).toBe(120);
+    expect(canvas.height).toBe(100);
+    expect(canvas.enableRetinaScaling).toBe(true);
+    expect(canvas.skipControlsDrawing).toBe(false);
+  });
+
+  it('restores mutable canvas state when nested backdrop rendering throws', () => {
+    const canvas = createMutableCanvas();
+    const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+    const failure = new Error('backdrop render failed');
+    vi.mocked(canvas.renderCanvas).mockImplementation(() => {
+      expect(canvas.viewportTransform).toEqual([1, 0, 0, 1, -4, -6]);
+      expect(canvas.width).toBe(34);
+      expect(canvas.height).toBe(24);
+      expect(canvas.enableRetinaScaling).toBe(false);
+      expect(canvas.skipControlsDrawing).toBe(true);
+      throw failure;
+    });
+
+    expect(() =>
+      renderBackdropCanvas({
+        backdropCanvas: { height: 24, width: 34 } as HTMLCanvasElement,
+        bounds: { height: 20, left: 4, paddedHeight: 24, paddedWidth: 34, top: 6, width: 30 },
+        canvas,
+        context,
+        objectIndex: 2,
+      })
+    ).toThrow(failure);
+
+    expect(canvas.viewportTransform).toEqual([2, 0, 0, 2, 10, 20]);
+    expect(canvas.width).toBe(120);
+    expect(canvas.height).toBe(100);
     expect(canvas.enableRetinaScaling).toBe(true);
     expect(canvas.skipControlsDrawing).toBe(false);
   });

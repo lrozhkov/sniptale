@@ -39,3 +39,22 @@ it('does not accept a forged mutation permit as an initialization bypass', async
   await erasure;
   await expect(initialization).resolves.toBe(database);
 });
+
+it('rejects cold admission under a staged lease and admits after it is released', async () => {
+  vi.resetModules();
+  const core = await import('./core');
+  const barrier = await import('../mutation-barrier');
+  const lease = await barrier.acquirePersistenceMutationTransition();
+  try {
+    await expect(core.initDB()).rejects.toMatchObject({
+      admission: { reason: 'connection-blocked', status: 'blocked' },
+    });
+    await expect(core.prepareDatabaseForRecovery()).resolves.toMatchObject({
+      reason: 'connection-blocked',
+      status: 'blocked',
+    });
+  } finally {
+    await lease.release();
+  }
+  await expect(core.initDB()).resolves.toBeDefined();
+});

@@ -4,10 +4,9 @@ import type { EditorFrameSettings } from '../../../features/editor/document/type
 import { translate } from '../../../platform/i18n';
 import {
   ProductGlassLinkedPaddingFields,
-  ProductGlassRange,
   type ProductGlassLinkedPaddingValue,
 } from '@sniptale/ui/product-glass-controls';
-import { NumericValueField } from '../../chrome/ui';
+import { NumericRow } from '../../chrome/ui';
 import { PanelSection } from './shared';
 
 function selectFramePadding(frame: EditorFrameSettings): ProductGlassLinkedPaddingValue {
@@ -49,20 +48,11 @@ export function FramePaddingFields(props: {
       }}
       padding={selectFramePadding(props.frameDraft)}
       onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
-      renderUniformField={({ onChange, value }) => (
-        <ProductGlassRange
-          aria-label={translate('highlighter.editor.paddingLabel')}
-          max={512}
-          min={0}
-          onChange={(event) => onChange(Number(event.currentTarget.value))}
-          step={4}
-          value={value}
-        />
-      )}
-      renderValueField={({ compact, label, onChange, side, value }) => (
+      renderValueField={({ label, onChange, side, value }) => (
         <div className="min-w-0" data-padding-side={side}>
-          <NumericValueField
-            className={compact ? '!h-7 !w-[4.75rem] !px-1' : '!w-full'}
+          <NumericRow
+            labelVisible={false}
+            scrub={{ min: 0, max: 512, step: 4 }}
             label={label}
             max={512}
             min={0}
@@ -80,10 +70,14 @@ export function FramePaddingFields(props: {
 export function FramePaddingSection(props: {
   frameDraft: EditorFrameSettings;
   framePaddingSummary?: string;
+  hideHeader?: boolean;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
 }) {
   return (
-    <PanelSection label={translate('editor.scene.scenePaddingSection')}>
+    <PanelSection
+      label={translate('editor.scene.scenePaddingSection')}
+      hideHeader={props.hideHeader ?? false}
+    >
       <FramePaddingFields frameDraft={props.frameDraft} setFrameDraft={props.setFrameDraft} />
     </PanelSection>
   );

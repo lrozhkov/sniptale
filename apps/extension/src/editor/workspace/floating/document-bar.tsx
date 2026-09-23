@@ -1,4 +1,4 @@
-import { Images } from 'lucide-react';
+import { Check, Images, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -24,7 +24,7 @@ const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
 );
 
 const DOCUMENT_TITLE_CLASS_NAME = [
-  'flex min-w-[8rem] max-w-[18rem] flex-col px-2.5',
+  'flex min-w-[8rem] max-w-[18rem] max-[1799px]:max-w-[11rem] flex-col px-2.5',
   'max-[720px]:min-w-0 max-[720px]:max-w-[9.5rem]',
 ].join(' ');
 
@@ -33,11 +33,34 @@ const DOCUMENT_STATUS_CLASS_NAME = [
   'text-[var(--sniptale-color-text-muted)]',
 ].join(' ');
 
+const DOCUMENT_STORAGE_BADGE_CLASS_NAME = 'max-w-full truncate rounded px-1 py-0.5';
+
+const DOCUMENT_STORAGE_BADGE_LIBRARY_CLASS_NAME = 'text-[var(--sniptale-color-text-secondary)]';
+
+const DOCUMENT_STORAGE_BADGE_DRAFT_CLASS_NAME = [
+  'border',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_55%,var(--sniptale-color-border-soft)_45%)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_12%,transparent)]',
+  'text-[var(--sniptale-color-warning)]',
+].join(' ');
+
+const DOCUMENT_PROMOTION_BUTTON_CLASS_NAME = [
+  'relative !w-auto shrink-0 gap-1.5 !px-2 whitespace-nowrap text-xs',
+  'motion-safe:transition-[opacity,transform] motion-safe:duration-150',
+].join(' ');
+
+const DOCUMENT_PROMOTION_STATE_CLASS_NAME = {
+  library: 'scale-90 opacity-0',
+  temporary:
+    'scale-100 opacity-100 !bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_12%,transparent)] ' +
+    '!text-[var(--sniptale-color-warning)]',
+} as const;
+
 const AUTOSAVE_TONE_CLASS_NAME = {
   error: 'text-[var(--sniptale-color-danger)]',
   idle: 'text-[var(--sniptale-color-text-muted)]',
   saved: 'text-[var(--sniptale-color-success)]',
-  saving: 'text-[var(--sniptale-color-accent-emphasis)]',
+  saving: 'text-[var(--sniptale-color-text-secondary)]',
 } as const;
 
 type InFlightDocumentOperation = {
@@ -83,27 +106,43 @@ function updateActiveDocumentGeneration(
 }
 
 function useDocumentLibraryStatus(aggregateId: string | null, enabled: boolean) {
-  const [storageClass, setStorageClass] = useState<LibraryStorageClass | null>(null);
-  const [promotionButtonVisible, setPromotionButtonVisible] = useState(false);
+  const [libraryStatus, setLibraryStatus] = useState<{
+    aggregateId: string;
+    storageClass: LibraryStorageClass;
+    promotionButtonVisible: boolean;
+  } | null>(null);
+  const activeStatus = enabled && libraryStatus?.aggregateId === aggregateId ? libraryStatus : null;
+  const storageClass = activeStatus?.storageClass ?? null;
+  const promotionButtonVisible = activeStatus?.promotionButtonVisible ?? false;
+  const setStorageClass = useCallback(
+    (next: LibraryStorageClass) => {
+      if (!aggregateId) return;
+      setLibraryStatus((current) => ({
+        aggregateId,
+        promotionButtonVisible:
+          current?.aggregateId === aggregateId && current.promotionButtonVisible,
+        storageClass: next,
+      }));
+    },
+    [aggregateId]
+  );
 
   useEffect(() => {
-    if (!enabled || !aggregateId) {
-      setStorageClass(null);
-      setPromotionButtonVisible(false);
-      return;
-    }
+    if (!enabled || !aggregateId) return;
     let cancelled = false;
     void getMediaLibraryEntry(aggregateId)
       .then((entry) => {
         if (cancelled) return;
         const next = entry?.lifecycle?.storageClass ?? 'temporary';
-        setStorageClass(next);
-        setPromotionButtonVisible(next === 'temporary');
+        setLibraryStatus({
+          aggregateId,
+          storageClass: next,
+          promotionButtonVisible: next === 'temporary',
+        });
       })
       .catch(() => {
         if (cancelled) return;
-        setStorageClass('temporary');
-        setPromotionButtonVisible(true);
+        setLibraryStatus({ aggregateId, storageClass: 'temporary', promotionButtonVisible: true });
       });
     return () => {
       cancelled = true;
@@ -113,12 +152,24 @@ function useDocumentLibraryStatus(aggregateId: string | null, enabled: boolean) 
   useEffect(() => {
     if (storageClass !== 'library' || !promotionButtonVisible) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-      setPromotionButtonVisible(false);
+      setLibraryStatus((current) =>
+        current?.aggregateId === aggregateId
+          ? { ...current, promotionButtonVisible: false }
+          : current
+      );
       return;
     }
-    const timer = window.setTimeout(() => setPromotionButtonVisible(false), 180);
+    const timer = window.setTimeout(
+      () =>
+        setLibraryStatus((current) =>
+          current?.aggregateId === aggregateId
+            ? { ...current, promotionButtonVisible: false }
+            : current
+        ),
+      180
+    );
     return () => window.clearTimeout(timer);
-  }, [promotionButtonVisible, storageClass]);
+  }, [aggregateId, promotionButtonVisible, storageClass]);
 
   return { promotionButtonVisible, setStorageClass, storageClass };
 }
@@ -284,6 +335,36 @@ function resolveAutosaveStatus(saveState: ReturnType<typeof useDocumentBarState>
   );
 }
 
+function AutosaveStatus({
+  saveState,
+}: {
+  saveState: ReturnType<typeof useDocumentBarState>['saveState'];
+}) {
+  const label = resolveAutosaveStatus(saveState);
+  return (
+    <span
+      className={AUTOSAVE_TONE_CLASS_NAME[saveState]}
+      data-state={saveState}
+      role={saveState === 'saved' || saveState === 'saving' ? 'img' : undefined}
+      aria-label={label}
+      title={label}
+    >
+      {saveState === 'saved' ? (
+        <Check size={12} strokeWidth={2.4} aria-hidden="true" />
+      ) : saveState === 'saving' ? (
+        <LoaderCircle
+          size={12}
+          strokeWidth={2}
+          className="motion-safe:animate-spin"
+          aria-hidden="true"
+        />
+      ) : (
+        label
+      )}
+    </span>
+  );
+}
+
 function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
@@ -303,20 +384,22 @@ function EditorFloatingDocumentSummary(props: {
         </div>
         {props.hasImage && props.standalone ? (
           <div className={DOCUMENT_STATUS_CLASS_NAME}>
-            <span className="truncate">
+            <span
+              className={[
+                DOCUMENT_STORAGE_BADGE_CLASS_NAME,
+                storage.storageClass === 'library'
+                  ? DOCUMENT_STORAGE_BADGE_LIBRARY_CLASS_NAME
+                  : DOCUMENT_STORAGE_BADGE_DRAFT_CLASS_NAME,
+              ].join(' ')}
+              data-storage-class={storage.storageClass === 'library' ? 'library' : 'temporary'}
+            >
               {translate(
                 storage.storageClass === 'library'
                   ? 'editor.documentActions.inLibrary'
                   : 'editor.documentActions.draft'
               )}
             </span>
-            <span aria-hidden="true">·</span>
-            <span
-              className={AUTOSAVE_TONE_CLASS_NAME[props.documentState.saveState]}
-              data-state={props.documentState.saveState}
-            >
-              {resolveAutosaveStatus(props.documentState.saveState)}
-            </span>
+            <AutosaveStatus saveState={props.documentState.saveState} />
           </div>
         ) : null}
         {storage.hasStaleConflict ? (
@@ -342,17 +425,39 @@ function EditorFloatingDocumentSummary(props: {
       {storage.promotionButtonVisible ? (
         <ContentToolbarButton
           ref={promotionButtonRef}
-          title={translate('editor.documentActions.saveToLibrary')}
+          title={translate(
+            storage.promotionState === 'saving'
+              ? 'editor.documentActions.savingToLibrary'
+              : 'editor.documentActions.saveToLibrary'
+          )}
           disabled={storage.promotionState === 'saving'}
+          aria-busy={storage.promotionState === 'saving'}
           className={[
-            'relative motion-safe:transition-[opacity,transform] motion-safe:duration-150',
-            storage.storageClass === 'library' ? 'scale-90 opacity-0' : 'scale-100 opacity-100',
+            DOCUMENT_PROMOTION_BUTTON_CLASS_NAME,
+            storage.storageClass === 'library'
+              ? DOCUMENT_PROMOTION_STATE_CLASS_NAME.library
+              : DOCUMENT_PROMOTION_STATE_CLASS_NAME.temporary,
           ].join(' ')}
           onClick={() => void storage.promote().catch(() => undefined)}
           dataUi="editor.floating.document-bar.promote-button"
         >
-          <Images size={18} strokeWidth={2} />
-          <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-accent)]" />
+          {storage.promotionState === 'saving' ? (
+            <LoaderCircle
+              size={16}
+              strokeWidth={2}
+              className="motion-safe:animate-spin"
+              aria-hidden="true"
+            />
+          ) : (
+            <Images size={16} strokeWidth={2} aria-hidden="true" />
+          )}
+          <span className="max-[1799px]:sr-only">
+            {translate(
+              storage.promotionState === 'saving'
+                ? 'editor.documentActions.savingToLibrary'
+                : 'editor.documentActions.saveToLibrary'
+            )}
+          </span>
         </ContentToolbarButton>
       ) : null}
       {storage.promotionState === 'error' ? (

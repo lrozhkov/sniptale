@@ -52,6 +52,9 @@ async function expectImageSizeInspectorUsesController(
 
   expect(document.body.textContent).toContain(translate('editor.compact.imageSize'));
   expect(document.body.textContent).not.toContain(translate('editor.compact.cropCanvas'));
+  expect(document.querySelector('[data-section="image-size"]')).not.toBeNull();
+  expect(document.querySelector('[data-section="browser-frame"]')).toBeNull();
+  expect(document.querySelector('[data-section="meta"]')).toBeNull();
   expect(applyImageSizeButton?.hasAttribute('disabled')).toBe(true);
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 }
@@ -68,8 +71,12 @@ async function expectCanvasSizeInspectorUsesController(
   await clickOptionalButton(applyCanvasSizeButton);
 
   expect(applyCanvasSizeButton?.hasAttribute('disabled')).toBe(true);
-  expect(document.body.textContent).toContain(translate('editor.compact.cropCanvas'));
-  expect(document.body.textContent).not.toContain(translate('editor.compact.imageSize'));
+  expect(
+    document.querySelector(`section[aria-label="${translate('editor.compact.cropCanvas')}"]`)
+  ).not.toBeNull();
+  expect(document.querySelector('[data-section="canvas-size"]')).not.toBeNull();
+  expect(document.querySelector('[data-section="image-size"]')).toBeNull();
+  expect(document.querySelector('[data-section="browser-frame"]')).toBeNull();
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 }
 
@@ -80,7 +87,7 @@ async function expectMetaInspectorUsesController(
   await renderSidebarForInspector(controller, { activeTool: 'select', inspector: 'meta' });
 
   const technicalDataOptions = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('.sniptale-glass-option-grid button')
+    document.querySelectorAll<HTMLButtonElement>('[data-inspector-toggle] button')
   );
   const insertTechnicalDataButton = getButtonWithText(
     translate('editor.compact.technicalDataInsert')

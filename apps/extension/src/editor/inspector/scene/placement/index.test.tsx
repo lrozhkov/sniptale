@@ -20,9 +20,9 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => {
 
 import { EditorInspectorFramePlacementSection } from './';
 
-vi.mock('../../../chrome/ui', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../chrome/ui')>()),
-  SelectField: (props: {
+vi.mock('../../grouped', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../grouped')>()),
+  EditorInspectorSelectInput: (props: {
     label: string;
     options: Array<{ label: string; value: EditorFrameSettings['layoutMode'] }>;
     value: EditorFrameSettings['layoutMode'];

@@ -2,6 +2,7 @@ import type {
   BrowserFrameState,
   EditorWorkspaceSettings,
 } from '../../../features/editor/document/types';
+import type { EditorInspector } from '../../state/types';
 
 import { EditorInspectorBrowserFramePanel } from '../environment';
 import type { CompactSelectOption } from '../../chrome/ui';
@@ -18,7 +19,7 @@ export interface EditorInspectorContentSurfaceSectionsProps extends Omit<
   EditorInspectorToolsPanelProps,
   'selectionDuplicateIcon' | 'selectionDeleteIcon'
 > {
-  inspector: string;
+  inspector: EditorInspector;
   scenePresetHeader: EditorInspectorPresetHeaderState | null;
   browserFrame: BrowserFrameState;
   workspace: EditorWorkspaceSettings;

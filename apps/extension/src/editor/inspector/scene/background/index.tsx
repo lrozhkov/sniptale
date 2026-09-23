@@ -64,6 +64,7 @@ export function EditorInspectorFrameBackgroundFillEditor(
 
   return (
     <CompactPaintSelector
+      triggerVariant="swatch"
       allowedModes={['solid', 'linear']}
       showGradientAdvancedControls={false}
       title={translate('editor.scene.sceneBackgroundTitle')}

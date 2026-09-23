@@ -22,8 +22,8 @@ export const editorCompactCropMessages = defineMessageSource({
     en: 'Check the crop area on the canvas and apply it, or leave crop mode.',
   },
   cropWaitingDescription: {
-    ru: 'Протяните область на холсте. После этого здесь появится действие применения.',
-    en: 'Drag an area on the canvas. The apply action will appear here after that.',
+    ru: 'Выделите область на холсте или задайте размеры ниже.',
+    en: 'Select an area on the canvas or enter dimensions below.',
   },
   applyCrop: {
     ru: 'Применить обрезку',

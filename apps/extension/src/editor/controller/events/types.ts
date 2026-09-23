@@ -9,7 +9,7 @@ type TransformOrigin = Pick<import('fabric').Transform, 'originX' | 'originY'>;
 
 export interface EditorControllerEventHandlers {
   handleCanvasBeforeRender: () => void;
-  handleCanvasAfterRender: () => void;
+  handleCanvasAfterRender: (event: { ctx: CanvasRenderingContext2D }) => void;
   handleSelectionChange: (event?: {
     deselected?: FabricObject[];
     selected?: FabricObject[];

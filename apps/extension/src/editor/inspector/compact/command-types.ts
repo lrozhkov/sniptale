@@ -61,6 +61,7 @@ interface EditorInspectorCompactSizeStateParams extends Pick<
 
 interface EditorInspectorCompactFrameStateParams {
   frameDraft: EditorFrameSettings;
+  lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   framePaddingSummary: string;
   layoutModeLabel: string;
   backgroundModeLabel: string;

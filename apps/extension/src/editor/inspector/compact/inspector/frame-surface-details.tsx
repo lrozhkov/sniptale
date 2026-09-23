@@ -3,6 +3,7 @@ import { CompactCommandField, CompactCommandToken, type CompactCommand } from '.
 import type { InspectorCommandParams } from './command-types';
 import { EditorInspectorFrameBackgroundFillEditor } from '../../scene';
 import { EditorInspectorBackgroundBlurControl } from '../../scene/background/blur';
+import { EditorInspectorFrameBackgroundModeControl } from '../../scene/placement/background';
 import { FramePaddingFields } from '../../scene/padding';
 import { EditorInspectorFramePreviewCard } from '../../scene/preview/card';
 
@@ -19,6 +20,13 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
         value={params.backgroundSummary}
       >
         <div className="space-y-3">
+          <EditorInspectorFrameBackgroundModeControl
+            frameDraft={params.frameDraft}
+            lastFillModeRef={params.lastFillModeRef}
+            setBackgroundMode={(backgroundMode) =>
+              params.setFrameDraft((state) => ({ ...state, backgroundMode }))
+            }
+          />
           <EditorInspectorFramePreviewCard
             backgroundPreviewStyle={params.backgroundPreviewStyle}
             frameDraft={params.frameDraft}

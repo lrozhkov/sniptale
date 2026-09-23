@@ -1,4 +1,5 @@
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import type { IDBPDatabase } from 'idb';
 import { expect, it, vi } from 'vitest';
 import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -62,6 +63,7 @@ function fixture() {
     })),
     assertAssetWriteAdmission: vi.fn(async () => undefined),
     createSeekableAssetObjectWriter: vi.fn(async () => writer),
+    initDB: vi.fn(async () => ({}) as IDBPDatabase),
     readAssetFile: vi.fn(async () => result),
     releaseAssetReadyProtection: vi.fn(async () => undefined),
     saveRecordingsBatchSafely: vi.fn(async () => undefined),

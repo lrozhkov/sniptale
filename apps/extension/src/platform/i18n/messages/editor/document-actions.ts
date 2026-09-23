@@ -13,6 +13,10 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'Сохранить в библиотеку',
     en: 'Save to library',
   },
+  savingToLibrary: {
+    ru: 'Сохранение в библиотеку',
+    en: 'Saving to library',
+  },
   saveToLibraryError: {
     ru: 'Не удалось сохранить в библиотеку. Черновик сохранён.',
     en: 'Could not save to the library. Your draft is safe.',

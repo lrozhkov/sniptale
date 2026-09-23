@@ -9,6 +9,7 @@ import {
   createAssetObjectWriter,
   type AssetObjectWriter,
 } from '../../assets';
+import { initDB } from '../../infrastructure/indexed-db/core';
 import {
   createRecordingStagingArtifactOwner,
   type RecordingStagingArtifactOwner,
@@ -51,6 +52,10 @@ function createPendingBytesOverflowError(limit: number): Error {
 export async function createRecordingStagingCoordinator(
   options: CreateRecordingStagingCoordinatorOptions = {}
 ): Promise<RecordingStagingCoordinator> {
+  // Cold database admission reserves the exclusive transition gate; it must settle
+  // before artifact writers hold shared transition leases or publication admission
+  // can deadlock against this context's own leases.
+  await initDB();
   const generation = stagingGeneration;
   const createWriter = options.createWriter ?? createAssetObjectWriter;
   const admitBytes = options.admitBytes ?? assertAssetWriteAdmission;
@@ -143,13 +148,9 @@ export async function createRecordingStagingCoordinator(
         const cleanupResults = await Promise.allSettled(
           [...artifacts.values()].map((artifact) => artifact.abort())
         );
-        const cleanupErrors: unknown[] = [];
-        cleanupResults.forEach((result) => {
-          if (result.status === 'rejected') {
-            const reason: unknown = result.reason;
-            cleanupErrors.push(reason);
-          }
-        });
+        const cleanupErrors = cleanupResults.flatMap((result) =>
+          result.status === 'rejected' ? [result.reason as unknown] : []
+        );
         phase = 'aborted';
         activeCoordinators.delete(coordinator);
         if (cleanupErrors.length > 0) {

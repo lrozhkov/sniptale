@@ -1,12 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Calendar, Link, Monitor } from 'lucide-react';
-import {
-  ProductGlassChip,
-  ProductGlassChipIcon,
-  ProductGlassOptionGrid,
-  ProductGlassRow,
-  ProductGlassSectionLabel,
-} from '@sniptale/ui/product-glass-controls';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   orderTechnicalDataKinds,
@@ -87,42 +82,38 @@ function TechnicalDataLayoutToggle(props: {
   setLayout: React.Dispatch<React.SetStateAction<EditorTechnicalDataLayout>>;
 }) {
   return (
-    <div className="space-y-1.5">
-      <ProductGlassSectionLabel>
+    <section className="space-y-2.5">
+      <h3 className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
         {translate('editor.compact.technicalDataLayout')}
-      </ProductGlassSectionLabel>
-      <ProductGlassRow>
-        {(['column', 'row'] as const).map((layout) => (
-          <ProductGlassChip
-            key={layout}
-            active={props.layout === layout}
-            aria-pressed={props.layout === layout}
-            onClick={() => props.setLayout(layout)}
-          >
-            {getTechnicalDataLayoutLabel(layout)}
-          </ProductGlassChip>
-        ))}
-      </ProductGlassRow>
-    </div>
+      </h3>
+      <SegmentedRow
+        ariaLabel={translate('editor.compact.technicalDataLayout')}
+        columns={2}
+        options={(['column', 'row'] as const).map((layout) => ({
+          value: layout,
+          label: getTechnicalDataLayoutLabel(layout),
+        }))}
+        value={props.layout}
+        onChange={props.setLayout}
+      />
+    </section>
   );
 }
 
-function TechnicalDataOptionRow({
-  checked,
-  onToggle,
-  option,
-  variant,
-}: TechnicalDataOptionRowProps) {
+function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOptionRowProps) {
   return (
-    <ProductGlassChip
-      active={checked}
-      aria-pressed={checked}
-      className={variant === 'expanded' ? 'min-h-9' : ''}
-      onClick={onToggle}
-    >
-      <ProductGlassChipIcon>{option.icon}</ProductGlassChipIcon>
-      {translate(option.labelKey)}
-    </ProductGlassChip>
+    <div data-inspector-toggle className="flex min-h-8 items-center justify-between gap-3">
+      <span className="flex min-w-0 items-center gap-2 text-xs text-[color:var(--sniptale-color-text-secondary)]">
+        {option.icon}
+        {translate(option.labelKey)}
+      </span>
+      <ProductGlassSwitch
+        on={checked}
+        aria-label={translate(option.labelKey)}
+        aria-pressed={checked}
+        onClick={onToggle}
+      />
+    </div>
   );
 }
 
@@ -132,7 +123,11 @@ function TechnicalDataOptionList({
   variant,
 }: TechnicalDataOptionListProps) {
   return (
-    <ProductGlassOptionGrid aria-label={translate('editor.compact.technicalDataFields')}>
+    <div
+      role="group"
+      aria-label={translate('editor.compact.technicalDataFields')}
+      className="space-y-1"
+    >
       {technicalDataOptions.map((option) => {
         const checked = selectedKinds.includes(option.kind);
 
@@ -148,52 +143,7 @@ function TechnicalDataOptionList({
           />
         );
       })}
-    </ProductGlassOptionGrid>
-  );
-}
-
-function TechnicalDataPreview(props: {
-  kinds: readonly EditorTechnicalDataKind[];
-  layout: EditorTechnicalDataLayout;
-}) {
-  const labels = props.kinds.map((kind) => {
-    const option = technicalDataOptions.find((candidate) => candidate.kind === kind);
-    return option ? translate(option.labelKey) : kind;
-  });
-
-  return (
-    <section
-      aria-label={translate('editor.compact.technicalDataPreview')}
-      aria-live="polite"
-      className="space-y-1.5 border-t border-[color:var(--sniptale-color-border-soft)] pt-2.5"
-    >
-      <div className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-        {translate('editor.compact.technicalDataPreview')}
-      </div>
-      {labels.length === 0 ? (
-        <p className="mt-1.5 text-xs text-[color:var(--sniptale-color-text-secondary)]">
-          {translate('editor.compact.technicalDataPreviewEmpty')}
-        </p>
-      ) : (
-        <div
-          className={cx(
-            'mt-2 text-xs text-[color:var(--sniptale-color-text-primary)]',
-            props.layout === 'row' ? 'flex flex-wrap items-center gap-x-2 gap-y-1' : 'space-y-1'
-          )}
-        >
-          {labels.map((label, index) => (
-            <React.Fragment key={props.kinds[index]}>
-              {props.layout === 'row' && index > 0 ? (
-                <span aria-hidden="true" className="text-[color:var(--sniptale-color-text-muted)]">
-                  ·
-                </span>
-              ) : null}
-              <span>{label}</span>
-            </React.Fragment>
-          ))}
-        </div>
-      )}
-    </section>
+    </div>
   );
 }
 
@@ -219,16 +169,21 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
 
   return (
     <div className="space-y-3">
-      <ProductGlassSectionLabel>
-        {translate('editor.compact.technicalDataFields')}
-      </ProductGlassSectionLabel>
-      <TechnicalDataOptionList
-        selectedKinds={selectedKinds}
-        setSelectedKinds={setSelectedKinds}
-        variant={variant}
-      />
-      <TechnicalDataLayoutToggle layout={layout} setLayout={setLayout} />
-      <TechnicalDataPreview kinds={orderedKinds} layout={layout} />
+      <section className="space-y-2.5">
+        <TechnicalDataOptionList
+          selectedKinds={selectedKinds}
+          setSelectedKinds={setSelectedKinds}
+          variant={variant}
+        />
+      </section>
+      {orderedKinds.length > 1 ? (
+        <TechnicalDataLayoutToggle layout={layout} setLayout={setLayout} />
+      ) : null}
+      {!canInsert ? (
+        <p role="status" className="text-xs text-[color:var(--sniptale-color-text-secondary)]">
+          {translate('editor.compact.technicalDataPreviewEmpty')}
+        </p>
+      ) : null}
       <button
         type="button"
         disabled={!canInsert}

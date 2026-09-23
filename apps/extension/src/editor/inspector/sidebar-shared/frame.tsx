@@ -2,7 +2,7 @@ import React from 'react';
 import { Link2 } from 'lucide-react';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
-import { cx } from '../../chrome/ui';
+import { EditorIconButton, cx } from '../../chrome/ui';
 
 export function getAspectRatio(width: number, height: number): number | null {
   if (width <= 0 || height <= 0) {
@@ -43,27 +43,16 @@ type AspectToggleProps = {
 
 function CompactAspectToggle({ checked, onClick }: AspectToggleProps) {
   const title = translate('editor.compact.keepAspectRatio');
-  const compactClass = [
-    'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border',
-    'border-[color:var(--sniptale-color-border-soft)]',
-    'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_86%,transparent)]',
-    'text-[color:var(--sniptale-color-text-muted)] transition hover:brightness-110',
-  ].join(' ');
-  const compactActiveClass =
-    'border-[color:var(--sniptale-color-border-accent-strong)] bg-[color:var(--sniptale-color-accent-soft)] ' +
-    'text-[color:var(--sniptale-color-accent)]';
-
   return (
-    <button
-      type="button"
+    <EditorIconButton
       title={title}
-      aria-label={title}
       aria-pressed={checked}
-      className={cx(compactClass, checked && compactActiveClass)}
+      active={checked}
+      className="h-8 w-8"
       onClick={onClick}
     >
       <Link2 size={16} strokeWidth={2} />
-    </button>
+    </EditorIconButton>
   );
 }
 

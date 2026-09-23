@@ -8,6 +8,7 @@ import {
   readAssetFile,
   releaseAssetReadyProtection,
 } from '../../composition/persistence/assets';
+import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import {
   replayReviewHistory,
@@ -47,6 +48,7 @@ export interface ReviewExportReceipt extends ReviewPacketReceipt {
 const persistence = {
   assertAssetWriteAdmission,
   createSeekableAssetObjectWriter,
+  initDB,
   readAssetFile,
   releaseAssetReadyProtection,
   saveRecordingsBatchSafely,
@@ -211,6 +213,9 @@ export async function exportReviewedVideo(
     : `video-edited.${outputProfile.format}`;
   await deps.assertAssetWriteAdmission(original.file.size + 1024 * 1024);
   signal.throwIfAborted();
+  // Cold database admission reserves the exclusive transition gate; it must settle
+  // before the export writer holds a shared transition lease through publication.
+  await deps.initDB();
   const writer = await deps.createSeekableAssetObjectWriter({
     mimeType: `video/${outputProfile.format}`,
   });

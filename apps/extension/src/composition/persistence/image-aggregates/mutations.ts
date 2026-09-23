@@ -36,6 +36,7 @@ import {
   discardPreparedAsset,
   publishReadyJournalWithRetry,
   parseAssetRef,
+  parseAssetOwner,
   readAssetFile,
   recoverStandaloneAssetPublications,
   releaseAssetReadyProtection,
@@ -291,6 +292,10 @@ async function commitImageWorkspaceMutation(
 export async function commitImageWorkspace(
   input: CommitImageWorkspaceInput
 ): Promise<CommitImageWorkspaceResult> {
+  // Cold database admission reserves the exclusive transition gate; it must settle before
+  // staged assets hold shared transition leases or admission could queue behind them.
+  await initDB();
+  await recoverImageWorkspacePublications();
   const preparedDocument = await preparePersistedEditorDocument(input.document, {
     ...(input.reusableAssetsByRuntimeUrl
       ? { reusableAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl }
@@ -304,7 +309,6 @@ export async function commitImageWorkspace(
   };
   let journalCreated = false;
   try {
-    await recoverImageWorkspacePublications();
     const journal = await createAssetPublicationJournal({
       assetRefs: preparedDocument.objects.map(({ ref }) => ref),
       domain: IMAGE_WORKSPACE_PUBLICATION_DOMAIN,
@@ -461,11 +465,16 @@ async function publishImageWorkspaceJournal(
           db.get(ASSET_OWNERS_STORE, [IMAGE_WORKSPACE_OWNER_KIND, input.aggregateId, role])
         )
       );
-      const hasOwner = owners.some((owner) => owner !== undefined);
-      if ((ref !== undefined) !== hasOwner) {
+      if (owners.some((owner) => owner !== undefined && !parseAssetOwner(owner))) {
         throw new StaleImageWorkspaceError(input.aggregateId);
       }
-      if (hasOwner) continue;
+      const isOwnedByThisWorkspace = owners.some(
+        (owner) => parseAssetOwner(owner)?.assetId === stagedRef.assetId
+      );
+      if ((ref !== undefined) !== isOwnedByThisWorkspace) {
+        throw new StaleImageWorkspaceError(input.aggregateId);
+      }
+      if (isOwnedByThisWorkspace) continue;
       await deleteAssetObject(stagedRef.assetId);
     }
     return null;

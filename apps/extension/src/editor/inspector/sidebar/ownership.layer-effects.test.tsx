@@ -41,13 +41,15 @@ it('opens layer-effects from the hovered layer row actions even when file mode i
   });
   await flushAsyncWork();
 
+  const adjustmentsSegment = Array.from(document.querySelectorAll('button')).find(
+    (button) => button.textContent === translate('editor.toolbar.layerEffectsAdjustments')
+  );
+
   expect(useEditorStore.getState().inspector).toBe('layer-effects');
   expect(useEditorStore.getState().layerEffectsCategory).toBe('adjustments');
   expect(controller.selectLayer).toHaveBeenCalledWith('layer-1', { focusViewport: false });
   expect(document.body.textContent).toContain('Layer 1');
   expect(document.body.textContent).toContain(translate('editor.layerEffects.brightness'));
   expect(document.body.textContent).toContain(translate('editor.toolbar.layerEffectsApply'));
-  expect(document.body.textContent).not.toContain(
-    translate('editor.toolbar.layerEffectsAdjustments')
-  );
+  expect(adjustmentsSegment?.getAttribute('aria-haspopup')).toBe('listbox');
 }, 30000);

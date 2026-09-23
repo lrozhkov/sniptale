@@ -50,6 +50,7 @@ const fallbackQueues = new Map<string, Promise<void>>();
 const activePersistenceMutationPermits = new WeakSet<object>();
 const activePersistenceMutationTransitionPermits = new WeakSet<object>();
 const activeDurableAssetOperationPermits = new WeakSet<object>();
+let heldPersistenceMutationTransitions = 0;
 
 const fallbackLockManager: PersistenceLockManager = {
   request<T>(
@@ -95,6 +96,26 @@ function getPersistenceLockManager(): PersistenceLockManager {
   return fallbackLockManager;
 }
 
+/**
+ * True while this context already holds the shared transition gate — a workflow
+ * transition or a staged writer lease. Cold admission must fail before requesting the exclusive
+ * gate in this state so the workflow can release its lease and retry.
+ */
+export function isPersistenceMutationTransitionHeld(): boolean {
+  return heldPersistenceMutationTransitions > 0;
+}
+
+async function runWithHeldPersistenceMutationTransition<T>(
+  operation: () => T | Promise<T>
+): Promise<T> {
+  heldPersistenceMutationTransitions += 1;
+  try {
+    return await operation();
+  } finally {
+    heldPersistenceMutationTransitions -= 1;
+  }
+}
+
 function runWithPersistenceLock<T>(
   mode: PersistenceLockMode,
   operation: () => T | Promise<T>
@@ -125,7 +146,10 @@ export function runWithExclusivePersistenceMutationPermit<T>(
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    () => runWithPersistenceLock('exclusive', () => runWithActiveMutationPermit(operation))
+    () =>
+      runWithHeldPersistenceMutationTransition(() =>
+        runWithPersistenceLock('exclusive', () => runWithActiveMutationPermit(operation))
+      )
   );
 }
 
@@ -140,17 +164,18 @@ export function runWithPersistenceMutationTransition<T>(
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    async () => {
-      const permit: PersistenceMutationTransitionPermit = {
-        [persistenceMutationTransitionPermitBrand]: true,
-      };
-      activePersistenceMutationTransitionPermits.add(permit);
-      try {
-        return await operation(permit);
-      } finally {
-        activePersistenceMutationTransitionPermits.delete(permit);
-      }
-    }
+    () =>
+      runWithHeldPersistenceMutationTransition(async () => {
+        const permit: PersistenceMutationTransitionPermit = {
+          [persistenceMutationTransitionPermitBrand]: true,
+        };
+        activePersistenceMutationTransitionPermits.add(permit);
+        try {
+          return await operation(permit);
+        } finally {
+          activePersistenceMutationTransitionPermits.delete(permit);
+        }
+      })
   );
 }
 
@@ -178,10 +203,11 @@ export async function acquirePersistenceMutationTransition(): Promise<Persistenc
   const lifetime = getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    async () => {
-      resolveAcquired();
-      await released;
-    }
+    () =>
+      runWithHeldPersistenceMutationTransition(async () => {
+        resolveAcquired();
+        await released;
+      })
   );
   void lifetime.catch(rejectAcquired);
   await acquired;

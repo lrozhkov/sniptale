@@ -164,21 +164,19 @@ it('opens selected effect entries and updates an applied raster effect', () => {
   );
   const amountInput = queryNumericInput('editor.toolbar.layerEffectsAmount');
 
-  expect(brightnessButton).toBeTruthy();
+  expect(brightnessButton).toBeUndefined();
   expect(applyButton).toBeTruthy();
   expect(amountInput).toBeTruthy();
   expect(container?.querySelector('input[type="range"]')).not.toBeNull();
-  expect(container?.textContent).not.toContain('editor.toolbar.layerEffectsAdjustments');
+  expect(container?.textContent).toContain('editor.layerEffects.selectedLayer');
+  expect(container?.textContent).toContain('editor.layerEffects.availableEffects');
   expect(applyButton?.className).toContain(INSPECTOR_PRIMARY_BUTTON_CLASS_NAME);
   expect(applyButton?.className).toContain('bg-transparent');
   expect(applyButton?.className).not.toContain('text-white');
 
-  act(() => brightnessButton?.click());
   act(() => applyButton?.click());
 
-  expect(props.onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'adjustments', 'brightness', {
-    focusViewport: false,
-  });
+  expect(props.onOpenLayerEffects).not.toHaveBeenCalled();
   expect(props.updateLayerEffect).toHaveBeenCalledWith(
     'layer-1',
     expect.objectContaining({ amount: ACTIVE_EFFECT.amount, id: 'brightness' })
@@ -258,11 +256,13 @@ it('renders compact transformation actions and forwards immediate actions plus r
   expect(
     container?.querySelector('input[placeholder="editor.toolbar.layerEffectsSearchPlaceholder"]')
   ).toBeNull();
-  expect(rotateLeftButton?.parentElement?.className).toContain('justify-center');
+  expect(rotateLeftButton?.parentElement?.className).toContain('grid-cols-4');
+  expect(rotateLeftButton?.getAttribute('aria-label')).toBe('editor.layerEffects.rotateLeft');
+  expect(container?.textContent).toContain('editor.layerEffects.flipAndRotate');
   expect(applyButton?.className).toContain(INSPECTOR_PRIMARY_BUTTON_CLASS_NAME);
   expect(applyButton?.className).toContain('bg-transparent');
   expect(applyButton?.className).not.toContain('text-white');
-  expect(container?.textContent).not.toContain('editor.toolbar.layerEffectsTransformations');
+  expect(container?.textContent).toContain('editor.toolbar.layerEffectsTransformations');
   act(() => rotateLeftButton?.click());
   changeInput(inputs[0] as HTMLInputElement, '240');
   act(() => applyButton?.click());
@@ -293,6 +293,33 @@ it('sorts catalog entries with applied effects first inside compact lists', () =
   );
 
   expect(catalogButtons[0]?.textContent).toContain('editor.layerEffects.blur');
-  expect(container?.textContent).not.toContain('Layer 1');
-  expect(container?.textContent).not.toContain('editor.toolbar.layerEffectsFilters');
+  expect(container?.textContent).toContain('Layer 1');
+  expect(container?.textContent).toContain('editor.toolbar.layerEffectsFilters');
+});
+
+it('keeps the selected effect form visible without a catalog above it and returns explicitly', () => {
+  const props = renderPanel();
+  expect(container?.querySelector('[data-section="effects"]')).toBeNull();
+  expect(container?.querySelector('[data-section="effect"] details')).toBeNull();
+  const back = container?.querySelector<HTMLButtonElement>('[data-ui="editor.effects.back"]');
+  expect(back).not.toBeNull();
+  act(() => back?.click());
+  expect(props.onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'adjustments', null, {
+    focusViewport: false,
+  });
+});
+
+it('moves keyboard focus between the catalog and effect form on selection changes', () => {
+  const props = renderPanel();
+  act(() =>
+    root?.render(
+      <EditorInspectorLayerEffectsPanel
+        {...props}
+        layerEffectsState={{ ...props.layerEffectsState, activeEffectId: null }}
+      />
+    )
+  );
+  expect(document.activeElement).toBe(container?.querySelector('[data-section="effects"]'));
+  act(() => root?.render(<EditorInspectorLayerEffectsPanel {...props} />));
+  expect(document.activeElement).toBe(container?.querySelector('[data-section="effect"]'));
 });

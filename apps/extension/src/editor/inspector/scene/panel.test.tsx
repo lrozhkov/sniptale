@@ -21,20 +21,17 @@ vi.mock('../presets', async (importOriginal) => ({
   },
 }));
 
-vi.mock('./placement/modes', () => ({
-  EditorInspectorFrameModeButtons: (props: {
-    options: Array<{ value: string; label: string }>;
-    value: string;
-    onChange: (value: string) => void;
+vi.mock('./placement/background', () => ({
+  EditorInspectorFrameBackgroundModeControl: (props: {
+    frameDraft: EditorFrameSettings;
+    setBackgroundMode: (value: string) => void;
   }) => {
-    const firstOption = props.options[0];
-    if (!firstOption) {
-      return null;
-    }
-
     return (
-      <div data-testid="mode-buttons" data-value={props.value}>
-        <button type="button" onClick={() => props.onChange(firstOption.value)}>
+      <div
+        data-testid="mode-buttons"
+        data-value={props.frameDraft.backgroundMode === 'image' ? 'image' : 'fill'}
+      >
+        <button type="button" onClick={() => props.setBackgroundMode('color')}>
           change-mode
         </button>
       </div>
@@ -64,28 +61,6 @@ vi.mock('./placement', () => ({
   },
 }));
 
-vi.mock('./placement/background', () => ({
-  EditorInspectorFrameBackgroundSection: (props: {
-    children?: React.ReactNode;
-    frameBackgroundModeOptions: Array<{ value: string; label: string }>;
-    setBackgroundMode: (value: string) => void;
-  }) => {
-    const firstOption = props.frameBackgroundModeOptions[0];
-    if (!firstOption) {
-      return null;
-    }
-
-    return (
-      <div data-testid="background-section">
-        <button type="button" onClick={() => props.setBackgroundMode(firstOption.value)}>
-          set-background
-        </button>
-        {props.children}
-      </div>
-    );
-  },
-}));
-
 vi.mock('./background', () => ({
   EditorInspectorFrameBackgroundFillEditor: (props: { frameDraft: EditorFrameSettings }) => {
     previewSection(props);
@@ -98,12 +73,12 @@ vi.mock('./background/blur', () => ({
 }));
 
 vi.mock('./source-image', () => ({
-  EditorInspectorFrameSourceImageSection: () => <div data-testid="source-image-section" />,
+  EditorInspectorFrameSourceImageFields: () => <div data-testid="source-image-section" />,
 }));
 
 vi.mock('./padding', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./padding')>()),
-  FramePaddingFields: (props: {
+  FramePaddingSection: (props: {
     setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
   }) => {
     paddingSection(props);
@@ -168,6 +143,7 @@ function createPanelProps() {
     props: {
       scenePresetHeader: { value: 'scene-default' } as never,
       frameDraft: FRAME,
+      lastFillModeRef: { current: 'color' as const },
       backgroundPreviewStyle: { backgroundColor: '#fff' },
       framePaddingSummary: '12 / 12 / 12 / 12',
       frameLayoutModeOptions: [{ value: 'fit-image' as const, label: 'Fit' }],
@@ -224,32 +200,44 @@ afterEach(async () => {
 });
 
 function expectPanelSectionOrder() {
-  const presetHeaderElement = container?.querySelector('.space-y-3');
+  const panel = container?.querySelector("[data-ui='editor.inspector.sections']");
   expect(
-    Array.from(presetHeaderElement?.children ?? []).map((element) =>
-      element.getAttribute('data-testid')
+    Array.from(panel?.children ?? []).map(
+      (element) => element.getAttribute('data-section') ?? element.getAttribute('data-ui')
     )
-  ).toEqual(['background-section', 'placement-section', 'source-image-section', 'apply-button']);
+  ).toEqual(['background', 'placement', 'source-image']);
 }
 
 function expectFramePanelSections() {
   expect(container?.querySelector('[data-testid="preset-header"]')).toBeNull();
   expect(container?.querySelector('[data-testid="placement-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="background-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="mode-buttons"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="frame-preview"]')).toBeNull();
   expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="background-blur-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="background-blur-section"]')).toBeNull();
   expect(container?.querySelector('[data-testid="padding-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="source-image-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
   expectPanelSectionOrder();
 }
 
+function expectDisclosureGroups() {
+  const disclosures = Array.from(
+    container?.querySelectorAll("[data-ui='editor.inspector.disclosure']") ?? []
+  );
+  expect(disclosures).toHaveLength(1);
+  expect(
+    container?.querySelector('[data-testid="padding-section"]')?.closest('details')
+  ).toBeNull();
+  expect(
+    container?.querySelector('[data-testid="background-fill-section"]')?.closest('details')
+  ).toBeNull();
+}
+
 async function clickFramePanelActions() {
   await act(async () => {
     clickPanelButton('[data-testid="mode-buttons"] button');
     clickPanelButton('[data-testid="placement-section"] button');
-    clickPanelButton('[data-testid="background-section"] button');
     clickPanelButton('[data-testid="padding-section"] button');
     container
       ?.querySelector('[data-testid="apply-button"]')
@@ -272,6 +260,7 @@ it('wires the inspector scene panel sections and actions', async () => {
   await renderUi(<EditorInspectorFramePanel {...props} />);
 
   expectFramePanelSections();
+  expectDisclosureGroups();
   await clickFramePanelActions();
 
   expect(previewSection).toHaveBeenCalled();
@@ -291,5 +280,13 @@ it('renders scene controls without the template wrapper when no state is provide
   await renderUi(<EditorInspectorFramePanel {...props} scenePresetHeader={null} />);
 
   expect(container?.querySelector('[data-testid="preset-header"]')).toBeNull();
-  expect(container?.querySelector('[data-testid="background-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="mode-buttons"]')).not.toBeNull();
+});
+
+it('keeps an existing blur editable even on a solid fill', async () => {
+  const { props } = createPanelProps();
+  await renderUi(
+    <EditorInspectorFramePanel {...props} frameDraft={{ ...FRAME, backgroundBlurAmount: 4 }} />
+  );
+  expect(container?.querySelector('[data-testid="background-blur-section"]')).not.toBeNull();
 });

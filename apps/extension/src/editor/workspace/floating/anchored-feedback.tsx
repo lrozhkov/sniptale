@@ -4,15 +4,22 @@ import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useFloatingPositionRefresh } from './position-refresh';
 
-function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number): CSSProperties {
+function useAnchoredPopoverPosition(
+  anchorEl: HTMLElement | null,
+  width: number,
+  clearToolbar = false
+): CSSProperties {
   useFloatingPositionRefresh(anchorEl);
   if (!anchorEl) {
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }
   const margin = 12;
-  const gap = 8;
+  const gap = clearToolbar ? 12 : 8;
   const resolvedWidth = Math.min(width, window.innerWidth - margin * 2);
   const anchor = anchorEl.getBoundingClientRect();
+  const toolbarBottom = clearToolbar
+    ? anchorEl.closest('.sniptale-toolbar-root')?.getBoundingClientRect().bottom
+    : undefined;
   const left = Math.max(
     margin,
     Math.min(
@@ -23,7 +30,7 @@ function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number)
   return {
     left,
     position: 'fixed',
-    top: anchor.bottom + gap,
+    top: Math.max(anchor.bottom, toolbarBottom ?? anchor.bottom) + gap,
     width: resolvedWidth,
     zIndex: 2147483647,
   };
@@ -98,7 +105,7 @@ export function EditorAnchoredConfirmPopover(props: {
   const popoverRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef(false);
   const [pending, setPending] = useState(false);
-  const style = useAnchoredPopoverPosition(props.anchorEl, 320);
+  const style = useAnchoredPopoverPosition(props.anchorEl, 320, true);
   useAnchoredDialogLifecycle({
     anchorEl: props.anchorEl,
     initialFocusSelector: '[data-confirm-action="true"]',
@@ -127,7 +134,7 @@ export function EditorAnchoredConfirmPopover(props: {
       popoverRef={popoverRef}
       style={style}
     >
-      <div role="alertdialog" aria-labelledby={`${props.dataUi}.title`} className="space-y-3 p-1">
+      <div role="alertdialog" aria-labelledby={`${props.dataUi}.title`} className="space-y-4 p-2">
         <div>
           <div
             id={`${props.dataUi}.title`}
@@ -135,7 +142,7 @@ export function EditorAnchoredConfirmPopover(props: {
           >
             {props.title}
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+          <p className="mt-2 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
             {props.message}
           </p>
         </div>

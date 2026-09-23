@@ -1,5 +1,5 @@
 import React from 'react';
-import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
+import { FlipHorizontal2, FlipVertical2, Move, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import type { EditorRasterEffect } from '../../../features/editor/document/effects';
 import {
@@ -8,9 +8,9 @@ import {
   type EditorLayerEffectCommandId,
   type EditorLayerTransformationId,
 } from '../../controller/layer-effects/registry';
-import { EditorIconButton } from '../../chrome/ui';
+import { EditorIconButton, ToggleGrid } from '../../chrome/ui';
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
-import { PanelSection } from '../tools/sections';
+import { EditorInspectorDetails } from '../grouped';
 import { EditorRasterEffectForm } from './form';
 import { translateLayerEffectName, translateLayerEffects } from './helpers';
 import { ResizeTransformationControls } from './resize-controls';
@@ -44,23 +44,23 @@ const TRANSFORMATION_ACTIONS: Array<{
   },
 ];
 
+const EDITOR_INSPECTOR_SECTION_CLASS_NAME = 'py-3 first:pt-0 last:pb-0 focus:outline-none';
+
 function LayerTransformationActions(props: {
   applyLayerTransformation: EditorInspectorLayerEffectsProps['applyLayerTransformation'];
   layerId: string;
 }) {
   return (
-    <div className="flex items-center justify-center gap-1">
-      {TRANSFORMATION_ACTIONS.map((action) => (
-        <EditorIconButton
-          key={action.id}
-          title={translateLayerEffectName(action.titleKey)}
-          className="h-8 w-8"
-          onClick={() => void props.applyLayerTransformation(props.layerId, action.id)}
-        >
-          {action.icon}
-        </EditorIconButton>
-      ))}
-    </div>
+    <ToggleGrid
+      ariaLabel={translateLayerEffects('editor.layerEffects.flipAndRotate')}
+      columns={4}
+      options={TRANSFORMATION_ACTIONS.map((action) => ({
+        active: false,
+        icon: action.icon,
+        label: translateLayerEffectName(action.titleKey),
+        onToggle: () => void props.applyLayerTransformation(props.layerId, action.id),
+      }))}
+    />
   );
 }
 
@@ -82,11 +82,24 @@ function TransformationEditor(
   }
 ) {
   return (
-    <>
-      <LayerTransformationActions
-        applyLayerTransformation={props.applyLayerTransformation}
-        layerId={props.layerId}
-      />
+    <section
+      aria-label={translateLayerEffects('editor.toolbar.layerEffectsTransformations')}
+      className={EDITOR_INSPECTOR_SECTION_CLASS_NAME}
+      data-section="transformations"
+      tabIndex={-1}
+    >
+      <EditorInspectorDetails
+        icon={Move}
+        initiallyOpen
+        label={translateLayerEffects('editor.layerEffects.flipAndRotate')}
+        level="section"
+        preferenceId="layer-effects:transformations"
+      >
+        <LayerTransformationActions
+          applyLayerTransformation={props.applyLayerTransformation}
+          layerId={props.layerId}
+        />
+      </EditorInspectorDetails>
       {props.showResizeControls ? (
         <ResizeTransformationControls
           layerId={props.layerId}
@@ -100,7 +113,7 @@ function TransformationEditor(
           onResizeLayer={props.onResizeLayer}
         />
       ) : null}
-    </>
+    </section>
   );
 }
 
@@ -114,11 +127,18 @@ function RasterEffectEditor(props: {
   removeLayerEffect: EditorInspectorLayerEffectsProps['removeLayerEffect'];
   onChange: (effect: EditorRasterEffect) => void;
 }) {
+  const focusForm = React.useCallback((node: HTMLElement | null) => node?.focus(), []);
   return (
-    <PanelSection
-      label={translateLayerEffects('editor.toolbar.layerEffectsEditor')}
-      value={translateLayerEffectName(`editor.layerEffects.${props.draftEffect.id}`)}
+    <section
+      ref={focusForm}
+      aria-label={translateLayerEffects('editor.toolbar.layerEffectsEditor')}
+      className={EDITOR_INSPECTOR_SECTION_CLASS_NAME}
+      data-section="effect"
+      tabIndex={-1}
     >
+      <h3 className="mb-3 text-xs font-medium text-[color:var(--sniptale-color-text-primary)]">
+        {translateLayerEffectName(`editor.layerEffects.${props.draftEffect.id}`)}
+      </h3>
       <div className="space-y-4">
         <EditorRasterEffectForm draftEffect={props.draftEffect} onChange={props.onChange} />
         <RasterEffectActions
@@ -130,7 +150,7 @@ function RasterEffectEditor(props: {
           removeLayerEffect={props.removeLayerEffect}
         />
       </div>
-    </PanelSection>
+    </section>
   );
 }
 
@@ -174,7 +194,7 @@ function RasterEffectActions(props: {
   const applied = isAppliedRasterEffect(props.layer, props.draftEffect.id);
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3 border-t border-[color:var(--sniptale-color-border-soft)] pt-3">
       <button
         type="button"
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}

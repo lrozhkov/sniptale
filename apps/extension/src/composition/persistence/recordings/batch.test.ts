@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   assertAdmission: vi.fn(),
   discard: vi.fn(),
+  initDB: vi.fn(async () => undefined),
   preparePublication: vi.fn(),
   publishJournal: vi.fn(),
   publishWithRetry: vi.fn(),
@@ -26,6 +27,11 @@ vi.mock('./asset-publication', async (importOriginal) => ({
   publishRecordingAssetJournal: mocks.publishJournal,
   RECORDING_ASSET_PUBLICATION_DOMAIN: 'recording-assets',
   recoverRecordingAssetPublications: mocks.recover,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: mocks.initDB,
 }));
 
 import { saveRecordingsBatch, saveRecordingsBatchWithCompletion } from './batch';
@@ -130,6 +136,7 @@ describe('recording asset publication', () => {
     expect(mocks.assertAdmission).not.toHaveBeenCalled();
     expect(mocks.writeBlob).not.toHaveBeenCalled();
     expect(mocks.recover).not.toHaveBeenCalled();
+    expect(mocks.initDB).not.toHaveBeenCalled();
     expect(mocks.preparePublication).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
@@ -201,5 +208,6 @@ describe('recording asset publication', () => {
       ])
     ).rejects.toThrow('media metadata is invalid');
     expect(mocks.recover).not.toHaveBeenCalled();
+    expect(mocks.initDB).not.toHaveBeenCalled();
   });
 });

@@ -1,0 +1,115 @@
+@layer theme, base, components, utilities;
+
+[data-ui='editor.inspector.content'] {
+  container: inspector-surface / inline-size;
+}
+.editor-inspector-select-menu .truncate {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+[data-ui='editor.inspector.actions'] {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+  margin-top: 12px;
+  padding-block: 12px 4px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+
+/* Focused category heading — mirrors the video inspector's active-section heading. */
+[data-ui='editor.inspector.sections'] [data-ui='editor.inspector.section-heading']:not(.sr-only) {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: 8px;
+  font: 600 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+  overflow-wrap: anywhere;
+}
+[data-ui='editor.inspector.section-heading'] > svg {
+  flex-shrink: 0;
+}
+
+/* Top-level groups and nested disclosures share a heading and interaction language. */
+[data-ui='editor.inspector.disclosure'] {
+  min-width: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+[data-ui='editor.inspector.disclosure'] > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sniptale-radius-sm);
+  list-style: none;
+  cursor: pointer;
+  font: 600 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+}
+[data-ui='editor.inspector.disclosure'] > summary::-webkit-details-marker {
+  display: none;
+}
+[data-ui='editor.inspector.disclosure'] > summary > :is(h3, h4) {
+  margin: 0;
+  font: inherit;
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+[data-ui='editor.inspector.disclosure'] > summary > svg {
+  flex: none;
+  color: var(--sniptale-color-text-secondary);
+}
+[data-ui='editor.inspector.disclosure'] > summary > svg:last-child {
+  transition: transform 120ms ease;
+}
+[data-ui='editor.inspector.disclosure']:not([open]) > summary > svg:last-child {
+  transform: rotate(-90deg);
+}
+[data-ui='editor.inspector.disclosure'] > summary:hover {
+  background: var(--sniptale-color-surface-hover);
+  box-shadow:
+    6px 0 0 var(--sniptale-color-surface-hover),
+    -6px 0 0 var(--sniptale-color-surface-hover);
+}
+[data-ui='editor.inspector.disclosure'] > summary:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+[data-ui='editor.inspector.disclosure-meta'] {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 500 11px / 16px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ui='editor.inspector.disclosure'] > summary > svg:last-child {
+    transition: none;
+  }
+}
+
+[data-ui='editor.inspector.disclosure'][data-level='group'] > summary {
+  min-height: 28px;
+  font: 500 12px / 18px var(--sniptale-font-sans);
+}
+
+/* Leave enough room for localized values in the image editor's narrow rail. */
+.editor-inspector-surface [data-ui='shared.ui.compact-inspector.select-field'] {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+.editor-inspector-surface [data-ui='shared.ui.compact-inspector.option-row'] {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}

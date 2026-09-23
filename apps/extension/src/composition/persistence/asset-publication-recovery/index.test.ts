@@ -28,6 +28,11 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: mocks.runMutation,
 }));
 
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: vi.fn(async () => undefined),
+}));
+
 vi.mock('../recordings/asset-publication', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../recordings/asset-publication')>()),
   RECORDING_ASSET_OWNER_KIND: 'recording',

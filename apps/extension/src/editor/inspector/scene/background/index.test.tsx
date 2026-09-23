@@ -8,6 +8,7 @@ import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../features/editor/docum
 import type { EditorFrameSettings } from '../../../../features/editor/document/types';
 import { translate } from '../../../../platform/i18n';
 import { EditorInspectorFrameBackgroundFillEditor } from './';
+import { EditorInspectorFrameBackgroundImageEditor } from './image';
 
 vi.mock('../../../chrome/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../chrome/ui')>()),
@@ -244,4 +245,25 @@ it('renders the image branch and forwards image mode updates', async () => {
   expect(onPickBackgroundImage).toHaveBeenCalledTimes(1);
   expect(onClearBackgroundImage).toHaveBeenCalledTimes(1);
   expect(applyFramePatch).toHaveBeenCalledWith({ backgroundImageFit: 'cover' });
+});
+
+it('offers image acquisition before fit controls, then reveals fit after picking an image', async () => {
+  const props = {
+    applyFramePatch: vi.fn(),
+    frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
+    frameDraft: { ...FRAME, backgroundMode: 'image' as const },
+    onClearBackgroundImage: vi.fn(),
+    onPickBackgroundImage: vi.fn(),
+  };
+  await renderUi(<EditorInspectorFrameBackgroundImageEditor {...props} />);
+  expect(container?.querySelector('[data-testid="select-field"]')).toBeNull();
+  await act(async () => container?.querySelector('button')?.click());
+  expect(props.onPickBackgroundImage).toHaveBeenCalledOnce();
+  await renderUi(
+    <EditorInspectorFrameBackgroundImageEditor
+      {...props}
+      frameDraft={{ ...props.frameDraft, backgroundImageData: 'data:image/png;base64,abc' }}
+    />
+  );
+  expect(container?.querySelector('[data-testid="select-field"]')).not.toBeNull();
 });

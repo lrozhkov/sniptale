@@ -50,6 +50,11 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
   ),
 }));
 
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: vi.fn(async () => undefined),
+}));
+
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from './operations';
 import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
 import { recoverStandaloneAssetPublications } from './recovery';

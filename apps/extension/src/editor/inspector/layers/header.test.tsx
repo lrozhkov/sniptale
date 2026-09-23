@@ -32,6 +32,9 @@ it('renders layer header collapse affordance and insert action', () => {
   expect(markup).toContain('editor.toolbar.layerAutoNavigate');
   expect(markup).toContain('data-active="true"');
   expect(markup).toContain('mock.insert');
+  expect(markup).toMatch(
+    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.auto-navigate"/
+  );
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('text-[12px] font-semibold uppercase');
   expect(markup).not.toContain(
@@ -69,7 +72,7 @@ it('renders layer rows or empty state with stable scroll classes', () => {
   expect(empty).toContain('editor.toolbar.noLayers');
 });
 
-it('keeps only title, count, and selected-layer navigation in the integrated layers header', () => {
+it('places image insertion immediately before selected-layer navigation in the integrated header', () => {
   const markup = renderToStaticMarkup(
     <EditorInspectorLayersHeader
       expanded
@@ -83,7 +86,10 @@ it('keeps only title, count, and selected-layer navigation in the integrated lay
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('editor.layers.auto-navigate');
   expect(markup).toContain('4 editor.toolbar.layerCountSuffix');
-  expect(markup).not.toContain('mock.insert');
+  expect(markup).toMatch(
+    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.auto-navigate"/
+  );
+  expect(markup.match(/data-ui="mock.insert"/g)).toHaveLength(1);
   expect(markup).not.toContain('lucide-layers-3');
-  expect(markup.match(/<button/g)).toHaveLength(1);
+  expect(markup.match(/<button/g)).toHaveLength(2);
 });

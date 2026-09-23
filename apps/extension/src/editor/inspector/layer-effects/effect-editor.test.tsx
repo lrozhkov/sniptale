@@ -179,6 +179,41 @@ it('previews raster effect drafts immediately without committing transformations
   expect(props.previewLayerEffect).toHaveBeenCalledTimes(1);
 });
 
+it('cleans up the old layer preview when the selected layer changes', () => {
+  const props = renderEditor();
+
+  act(() => {
+    root?.render(<LayerEffectsEditor {...props} layer={createLayer({ id: 'layer-2' })} />);
+  });
+
+  expect(props.resetLayerEffectPreview).toHaveBeenCalledWith('layer-1');
+  expect(props.previewLayerEffect).toHaveBeenCalledWith('layer-2', {
+    blue: 1.15,
+    enabled: true,
+    green: 1.15,
+    id: 'gamma',
+    red: 1.15,
+  });
+});
+
+it('removes an applied effect after clearing its preview', () => {
+  const props = renderEditor({
+    layer: createLayer({
+      effectCount: 1,
+      effects: [{ blue: 1.2, enabled: true, green: 1.1, id: 'gamma', red: 0.9 }],
+    }),
+  });
+  const removeButton = container?.querySelector(
+    'button[title="editor.toolbar.layerEffectsRemove"]'
+  ) as HTMLButtonElement | null;
+
+  expect(removeButton).not.toBeNull();
+  act(() => removeButton?.click());
+
+  expect(props.resetLayerEffectPreview).toHaveBeenCalledWith('layer-1');
+  expect(props.removeLayerEffect).toHaveBeenCalledWith('layer-1', 'gamma');
+});
+
 it('shows resize controls for source-image layers with raster effects', () => {
   renderEditor({
     activeEffectId: null,

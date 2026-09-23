@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { translate } from '../../../platform/i18n';
-import { ProductGlassChip, ProductGlassRow } from '@sniptale/ui/product-glass-controls';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import type { ImageEditorController } from '../../controller';
 import { SelectField } from '../../chrome/ui';
 import {
-  applyCurrentAspectRatio,
+  applySelectedAspectRatio,
   applySizePreset,
   buildAspectRatioOptions,
   buildSizePresetOptions,
@@ -18,10 +17,9 @@ import { useCanvasResizePreview } from './resize-tool-preview';
 import {
   INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
   INSPECTOR_SECONDARY_BUTTON_CLASS_NAME,
-  INSPECTOR_SECTION_LABEL_CLASS_NAME,
   INSPECTOR_SECTION_SURFACE_CLASS_NAME,
 } from '../chrome';
-import { SizeControlsHeader, SizeControlsRow } from '../size-controls';
+import { SizeControlsRow } from '../size-controls';
 
 type ResizeToolMode = 'canvas' | 'image';
 
@@ -117,33 +115,18 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {isCanvasMode ? (
-        <div
+        <p
           aria-live="polite"
-          className={[
-            'rounded-[10px] px-3 py-2.5',
-            'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_32%,transparent)]',
-          ].join(' ')}
+          className="text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]"
         >
-          <div
-            className={[
-              'text-[11px] font-semibold',
-              'text-[color:var(--sniptale-color-text-primary)]',
-            ].join(' ')}
-          >
-            {translate(
-              props.cropReady ? 'editor.compact.cropAreaReady' : 'editor.compact.cropAreaWaiting'
-            )}
-          </div>
-          <p className="mt-1 text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]">
-            {translate(
-              props.cropReady
-                ? 'editor.compact.cropReadyDescription'
-                : 'editor.compact.cropWaitingDescription'
-            )}
-          </p>
-        </div>
+          {translate(
+            props.cropReady
+              ? 'editor.compact.cropReadyDescription'
+              : 'editor.compact.cropWaitingDescription'
+          )}
+        </p>
       ) : null}
       <ResizeToolSizePanel
         active={active}
@@ -215,8 +198,7 @@ function ResizeToolSizePanel(props: {
     : translate('editor.compact.imageSize');
 
   return (
-    <section className={INSPECTOR_SECTION_SURFACE_CLASS_NAME}>
-      <SizeControlsHeader label={label} valueText={props.active.sizeText} />
+    <section aria-label={label} className={INSPECTOR_SECTION_SURFACE_CLASS_NAME}>
       <div className="space-y-3">
         <ResizeToolDimensionRow active={props.active} updateLockedDraft={props.updateLockedDraft} />
         {props.isCanvasMode ? null : <ResizeToolSizePresetField active={props.active} />}
@@ -249,7 +231,13 @@ function updateSizeDraft(
   value: number
 ) {
   props.active.setDraft((state) =>
-    props.updateLockedDraft(state, field, value, props.active.locked, props.active.aspectRatio)
+    props.updateLockedDraft(
+      state,
+      field,
+      value,
+      props.active.locked,
+      state.width / Math.max(1, state.height)
+    )
   );
 }
 
@@ -258,9 +246,6 @@ function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {
 
   return (
     <div className="space-y-2">
-      <span className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-        {translate('editor.compact.sizePreset')}
-      </span>
       <SelectField
         label={translate('editor.compact.sizePreset')}
         value={currentPresetValue}
@@ -272,50 +257,15 @@ function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {
 }
 
 function ResizeToolAspectRatioField(props: { active: ActiveResizeState }) {
-  const { draft } = props.active;
-  const [selectedValue, setSelectedValue] = useState(() => findAspectRatioValue(draft) ?? 'custom');
-
-  useEffect(() => {
-    const exactValue = findAspectRatioValue(draft);
-    if (exactValue) {
-      setSelectedValue(exactValue);
-    }
-  }, [draft]);
+  const currentValue = findAspectRatioValue(props.active.draft) ?? 'custom';
 
   return (
-    <div className="space-y-2">
-      <span className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
-        {translate('editor.compact.aspectRatioPreset')}
-      </span>
-      <SelectField
-        label={translate('editor.compact.aspectRatioPreset')}
-        value={selectedValue}
-        onChange={setSelectedValue}
-        options={buildAspectRatioOptions(selectedValue)}
-      />
-      <ResizeToolAspectRatioButtons active={props.active} currentValue={selectedValue} />
-    </div>
-  );
-}
-
-function ResizeToolAspectRatioButtons(props: { active: ActiveResizeState; currentValue: string }) {
-  return (
-    <ProductGlassRow>
-      <ProductGlassChip
-        type="button"
-        onClick={() => applyCurrentAspectRatio(props.active.setDraft, props.currentValue, 'long')}
-        disabled={props.currentValue === 'custom'}
-      >
-        {translate('editor.compact.fitAspectByLongSide')}
-      </ProductGlassChip>
-      <ProductGlassChip
-        type="button"
-        onClick={() => applyCurrentAspectRatio(props.active.setDraft, props.currentValue, 'short')}
-        disabled={props.currentValue === 'custom'}
-      >
-        {translate('editor.compact.fitAspectByShortSide')}
-      </ProductGlassChip>
-    </ProductGlassRow>
+    <SelectField
+      label={translate('editor.compact.aspectRatioPreset')}
+      value={currentValue}
+      onChange={(value) => applySelectedAspectRatio(props.active.setDraft, value)}
+      options={buildAspectRatioOptions(currentValue)}
+    />
   );
 }
 

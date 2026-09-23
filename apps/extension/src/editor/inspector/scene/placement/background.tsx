@@ -1,25 +1,25 @@
 import { translate } from '../../../../platform/i18n';
-import { PanelSection } from '../shared';
+import { SegmentedRow } from '../../../../ui/compact-inspector-controls';
 import type { EditorInspectorFramePanelProps } from '../types';
-import type { ReactNode } from 'react';
 
-import { EditorInspectorFrameModeButtons } from './modes';
+type BackgroundModeProps = Pick<
+  EditorInspectorFramePanelProps,
+  'frameDraft' | 'lastFillModeRef' | 'setBackgroundMode'
+>;
 
-export function EditorInspectorFrameBackgroundSection(
-  props: Pick<
-    EditorInspectorFramePanelProps,
-    'frameBackgroundModeOptions' | 'frameDraft' | 'setBackgroundMode'
-  > & { children?: ReactNode }
-) {
+export function EditorInspectorFrameBackgroundModeControl(props: BackgroundModeProps) {
   return (
-    <PanelSection label={translate('editor.scene.backgroundTypeSection')}>
-      <EditorInspectorFrameModeButtons
-        ariaLabel={translate('editor.scene.backgroundTypeSection')}
-        options={props.frameBackgroundModeOptions}
-        value={props.frameDraft.backgroundMode}
-        onChange={props.setBackgroundMode}
-      />
-      {props.children ? <div className="mt-3 space-y-3">{props.children}</div> : null}
-    </PanelSection>
+    <SegmentedRow
+      columns={2}
+      ariaLabel={translate('editor.scene.backgroundTypeSection')}
+      options={[
+        { value: 'fill', label: translate('editor.scene.backgroundFillMode') },
+        { value: 'image', label: translate('editor.compact.frameBackgroundModeImage') },
+      ]}
+      value={props.frameDraft.backgroundMode === 'image' ? 'image' : 'fill'}
+      onChange={(value) =>
+        props.setBackgroundMode(value === 'image' ? 'image' : props.lastFillModeRef.current)
+      }
+    />
   );
 }

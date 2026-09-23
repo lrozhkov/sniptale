@@ -40,6 +40,7 @@ it('keeps every mode and immediate image action available when collapsed', () =>
   expect(markup).not.toContain('aria-pressed="true"');
   expect(markup.match(/aria-pressed="false"/g)).toHaveLength(6);
   expect(markup).toContain('insert');
+  expect(markup.match(/data-ui="mock.insert-image"/g)).toHaveLength(1);
   expect(markup).toContain('pointer-events-auto flex shrink-0 items-center');
   expect(markup).toContain('flex-row rounded-[14px]');
   expect(markup).not.toContain('editor.floating.layers.collapse-button');
@@ -56,6 +57,7 @@ it('keeps the canonical header order when expanded', () => {
   );
 
   expectToolbarOrder(markup, true);
+  expect(markup).not.toContain('mock.insert-image');
   expect(markup).toContain('editor.floating.layers.collapse-button');
   expect(markup).toContain(`title="${translate('editor.toolbar.collapseLayers')}"`);
   expect(markup).toContain('lucide-chevron-down');
@@ -64,7 +66,7 @@ it('keeps the canonical header order when expanded', () => {
 function expectToolbarOrder(markup: string, includeCollapse: boolean) {
   const selectors = [
     'editor.floating.layers.mode.layers',
-    'mock.insert-image',
+    ...(!includeCollapse ? ['mock.insert-image'] : []),
     'editor.floating.layers.mode.frame',
     'editor.floating.layers.mode.browser-frame',
     'editor.floating.layers.mode.meta',

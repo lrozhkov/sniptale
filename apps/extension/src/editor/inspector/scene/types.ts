@@ -8,6 +8,7 @@ import type { CompactSelectOption } from '../../chrome/ui';
 export interface EditorInspectorFramePanelProps {
   scenePresetHeader: EditorInspectorPresetHeaderState | null;
   frameDraft: EditorFrameSettings;
+  lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   backgroundPreviewStyle: React.CSSProperties;
   framePaddingSummary: string;
   frameLayoutModeOptions: CompactSelectOption<EditorFrameSettings['layoutMode']>[];

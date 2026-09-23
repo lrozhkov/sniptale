@@ -2,11 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
   deleteReadyJournalMock,
+  initDBMock,
   listReadyJournalsMock,
   releaseTransitionsMock,
   writeReadyJournalMock,
 } = vi.hoisted(() => ({
   deleteReadyJournalMock: vi.fn(),
+  initDBMock: vi.fn(async () => undefined),
   listReadyJournalsMock: vi.fn(),
   releaseTransitionsMock: vi.fn(),
   writeReadyJournalMock: vi.fn(),
@@ -18,6 +20,11 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   listReadyJournals: listReadyJournalsMock,
   releaseAssetPublicationTransitions: releaseTransitionsMock,
   writeReadyJournal: writeReadyJournalMock,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: initDBMock,
 }));
 
 import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
@@ -126,6 +133,34 @@ it('keeps ready durable after bounded immediate retries are exhausted', async ()
   expect(publish).toHaveBeenCalledTimes(3);
   expect(deleteReadyJournalMock).not.toHaveBeenCalled();
   expect(releaseTransitionsMock).toHaveBeenCalledWith(['asset-1']);
+});
+
+it('releases staged publication transitions when database admission rejects', async () => {
+  const journal = createJournal();
+  const admissionError = new Error('IndexedDB admission blocked');
+  initDBMock.mockRejectedValueOnce(admissionError);
+  const publish = vi.fn();
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toBe(admissionError);
+
+  expect(publish).not.toHaveBeenCalled();
+  expect(releaseTransitionsMock).toHaveBeenCalledWith(['asset-1']);
+});
+
+it('combines admission rejection with a transition-release failure', async () => {
+  const journal = createJournal();
+  const admissionError = new Error('IndexedDB admission blocked');
+  const releaseError = new Error('transition release failed');
+  initDBMock.mockRejectedValueOnce(admissionError);
+  releaseTransitionsMock.mockRejectedValueOnce(releaseError);
+  const publish = vi.fn();
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toMatchObject({
+    cause: admissionError,
+    errors: [admissionError, releaseError],
+    message: 'Asset publication failed and persistence admission could not be released.',
+  });
+  expect(publish).not.toHaveBeenCalled();
 });
 
 it('surfaces both publication and transition-release failures', async () => {

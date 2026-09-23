@@ -87,6 +87,7 @@ function EditorInspectorLayersHeaderActions(props: {
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      <LayerInsertImageControl />
       <button
         type="button"
         title={translate('editor.toolbar.layerAutoNavigate')}
@@ -101,7 +102,6 @@ function EditorInspectorLayersHeaderActions(props: {
       </button>
       {props.streamlined ? null : (
         <>
-          <LayerInsertImageControl />
           <button
             type="button"
             title={translate('editor.toolbar.layersTitle')}

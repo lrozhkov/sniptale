@@ -84,6 +84,58 @@ it('renders a compact anchored destructive dialog and confirms once while pendin
   expect(confirm?.disabled).toBe(false);
 });
 
+it.each([
+  ['reset', 'en', 'light', 'Reset to original?', 'Discard all edits?'],
+  ['reset', 'ru', 'dark', 'Сбросить?', 'Удалить все изменения?'],
+  ['close', 'en', 'dark', 'Close document?', 'Close this document?'],
+  ['close', 'ru', 'light', 'Закрыть документ?', 'Закрыть этот документ?'],
+])('spaces the %s confirmation in %s with %s theme', (consumer, locale, theme, title, message) => {
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar-root';
+  toolbar.dataset['theme'] = theme;
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue({
+    bottom: 60,
+    height: 40,
+    left: 12,
+    right: 300,
+    top: 20,
+    width: 288,
+    x: 12,
+    y: 20,
+    toJSON: () => ({}),
+  });
+
+  act(() => {
+    root.render(
+      <EditorAnchoredConfirmPopover
+        anchorEl={anchor}
+        cancelText={locale === 'ru' ? 'Отмена' : 'Cancel'}
+        confirmText={locale === 'ru' ? 'Подтвердить' : 'Confirm'}
+        dataUi={`${consumer}.confirm`}
+        message={message}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        title={title}
+      />
+    );
+  });
+
+  const surface = document.querySelector<HTMLElement>(`[data-ui="${consumer}.confirm"]`);
+  const positioner = surface?.parentElement;
+  const dialog = surface?.querySelector<HTMLElement>('[role="alertdialog"]');
+  expect(positioner?.style.top).toBe('72px');
+  expect(dialog?.className).toContain('p-2');
+  expect(dialog?.className).toContain('space-y-4');
+  expect(dialog?.querySelector('p')?.className).toContain('mt-2');
+  expect(dialog?.textContent).toContain(title);
+  expect(dialog?.textContent).toContain(message);
+  expect(surface?.getAttribute('data-theme')).toBe(theme);
+
+  toolbar.remove();
+});
+
 it('dismisses on Escape or an outside pointer without dismissing from its own anchor', () => {
   const onCancel = vi.fn();
   renderConfirm({ onCancel });

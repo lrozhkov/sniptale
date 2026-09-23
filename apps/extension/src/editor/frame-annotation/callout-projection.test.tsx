@@ -94,7 +94,6 @@ it('previews an inline badge edit and commits its editing transaction on finish'
         onSnapshotChange={vi.fn()}
         onSnapshotPreview={onSnapshotPreview}
         onSettingsOpen={vi.fn()}
-        onOccupiedBoundsChange={vi.fn()}
       />
     )
   );
@@ -144,7 +143,6 @@ it('starts a newly enabled empty comment in editing mode and suppresses formatti
         onSnapshotChange={vi.fn()}
         onSnapshotPreview={vi.fn()}
         onSettingsOpen={vi.fn()}
-        onOccupiedBoundsChange={vi.fn()}
       />
     )
   );

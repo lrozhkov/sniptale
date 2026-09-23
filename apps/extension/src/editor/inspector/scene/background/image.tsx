@@ -33,11 +33,13 @@ export function EditorInspectorFrameBackgroundImageEditor(
         onClearBackgroundImage={onClearBackgroundImage}
         onPickBackgroundImage={onPickBackgroundImage}
       />
-      <EditorInspectorFrameBackgroundImageMode
-        applyFramePatch={applyFramePatch}
-        frameBackgroundImageFitOptions={frameBackgroundImageFitOptions}
-        frameDraft={frameDraft}
-      />
+      {frameDraft.backgroundImageData ? (
+        <EditorInspectorFrameBackgroundImageMode
+          applyFramePatch={applyFramePatch}
+          frameBackgroundImageFitOptions={frameBackgroundImageFitOptions}
+          frameDraft={frameDraft}
+        />
+      ) : null}
     </div>
   );
 }
