@@ -21,6 +21,22 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'Не удалось сохранить в библиотеку. Черновик сохранён.',
     en: 'Could not save to the library. Your draft is safe.',
   },
+  conflictTitle: {
+    ru: 'Изображение изменено в другой вкладке',
+    en: 'Image changed in another tab',
+  },
+  conflictDescription: {
+    ru: 'Сохраните свои правки отдельной копией или загрузите последнюю версию. При загрузке текущие правки будут заменены.',
+    en: 'Save your edits as a separate copy or load the latest version. Loading it will replace your current edits.',
+  },
+  saveErrorTitle: {
+    ru: 'Не удалось сохранить изменения',
+    en: 'Could not save changes',
+  },
+  saveErrorDescription: {
+    ru: 'Последние правки не сохранены. Не закрывайте вкладку. Скачайте изображение через панель, чтобы сохранить результат.',
+    en: 'Your latest edits have not been saved. Keep this tab open. Download the image from the toolbar to keep your work.',
+  },
   reloadLatest: {
     ru: 'Загрузить актуальную версию',
     en: 'Reload latest',

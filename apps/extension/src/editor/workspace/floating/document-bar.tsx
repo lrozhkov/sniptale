@@ -15,6 +15,7 @@ import { connectAggregateEditorPresence } from '../../../workflows/aggregate-edi
 import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-library';
 import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
+import { DocumentSaveError } from './document-save-conflict';
 import { EditorAnchoredAlert } from './anchored-feedback';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
@@ -399,26 +400,16 @@ function EditorFloatingDocumentSummary(props: {
                   : 'editor.documentActions.draft'
               )}
             </span>
-            <AutosaveStatus saveState={props.documentState.saveState} />
-          </div>
-        ) : null}
-        {storage.hasStaleConflict ? (
-          <div className="mt-1 flex items-center gap-2 text-[11px]">
-            <button
-              type="button"
-              className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
-              onClick={() => window.location.reload()}
-            >
-              {translate('editor.documentActions.reloadLatest')}
-            </button>
-            <button
-              type="button"
-              className="text-[var(--sniptale-color-accent-emphasis)] hover:underline"
-              disabled={storage.promotionState === 'saving'}
-              onClick={() => void storage.saveConflictCopy().catch(() => undefined)}
-            >
-              {translate('editor.documentActions.saveCopy')}
-            </button>
+            {storage.hasStaleConflict || props.documentState.saveState === 'error' ? (
+              <DocumentSaveError
+                key={props.documentState.sessionId}
+                conflict={storage.hasStaleConflict}
+                pending={storage.promotionState === 'saving'}
+                onSaveCopy={storage.saveConflictCopy}
+              />
+            ) : (
+              <AutosaveStatus saveState={props.documentState.saveState} />
+            )}
           </div>
         ) : null}
       </div>

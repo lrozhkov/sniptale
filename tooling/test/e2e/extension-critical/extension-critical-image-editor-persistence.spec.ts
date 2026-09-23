@@ -125,6 +125,46 @@ async function readImageWorkspaceRevision(page: Page, aggregateId: string): Prom
   return (await readImageWorkspaceRecord(page, aggregateId)).revision;
 }
 
+async function verifySaveErrorPopover(page: Page) {
+  const trigger = page.locator('[data-ui="editor.floating.document-bar.error-trigger"]');
+  const popup = page.locator('[data-ui="editor.floating.document-bar.save-error"]');
+  const toolbar = page.locator('[data-ui="editor.floating.document-bar"]');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(popup).toBeVisible();
+  await expect(popup).toContainText('Изображение изменено в другой вкладке');
+  const expandedBar = await toolbar.boundingBox();
+  const expandedPopup = await popup.boundingBox();
+  expect(expandedPopup!.y).toBeGreaterThanOrEqual(expandedBar!.y + expandedBar!.height + 8);
+  await popup.getByRole('button', { name: 'Закрыть', exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  expect((await toolbar.boundingBox())!.height).toBe(expandedBar!.height);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await expect(popup).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(popup).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.setViewportSize({ width: 740, height: 600 });
+  await expect(popup).toBeInViewport();
+  const narrow = await popup.boundingBox();
+  expect(narrow!.x).toBeGreaterThanOrEqual(0);
+  expect(narrow!.x + narrow!.width).toBeLessThanOrEqual(740);
+  await popup.evaluate(async (node) => {
+    await Promise.all(node.getAnimations().map((animation) => animation.finished));
+  });
+  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-save-error-narrow.png` });
+  await page.evaluate(async () => {
+    await chrome.storage.local.set({ 'sniptale-theme-preference': 'dark' });
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(popup.getByRole('button', { name: 'Сохранить копию', exact: true })).toHaveCSS(
+    'color',
+    'rgb(250, 250, 250)'
+  );
+  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-save-error-dark.png` });
+}
+
 test('same image in two tabs rejects the stale publication and keeps the winner', async ({
   context,
   hostOrigin,
@@ -161,6 +201,8 @@ test('same image in two tabs rejects the stale publication and keeps the winner'
     pageA.locator('[data-ui="editor.floating.document-bar"] [data-state="error"]')
   ).toBeVisible();
   await expect.poll(() => readImageWorkspaceRevision(pageA, assetId)).toBe(3);
+
+  await verifySaveErrorPopover(pageA);
 
   const staleScreenshot = testInfo.outputPath('two-tab-stale-rejected.png');
   await pageA.screenshot({ path: staleScreenshot });

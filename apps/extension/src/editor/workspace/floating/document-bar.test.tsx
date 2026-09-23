@@ -455,7 +455,7 @@ it('keeps stale-copy actions disabled while promotion owns the aggregate lock', 
 
   act(() => getButton('editor.floating.document-bar.promote-button').click());
   await act(async () => Promise.resolve());
-  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
   );
   expect(saveCopy?.disabled).toBe(true);
@@ -549,8 +549,8 @@ it('offers reload and an atomic copy when another tab made the workspace stale',
   };
   renderDocumentBar();
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.reloadLatest'));
-  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  expect(document.body.textContent).toContain(translate('editor.documentActions.reloadLatest'));
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
   );
   await act(async () => saveCopy?.click());
@@ -569,7 +569,7 @@ it('does not rebind a stale conflict copy after an A to B to A activation change
   mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
   mocks.saveImageAggregateCopyFromDocument.mockImplementationOnce(() => copy.promise);
   renderDocumentBar();
-  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
   );
   await act(async () => {
@@ -758,4 +758,24 @@ it('keeps apply disabled before loading and blocks duplicate apply or cancel dur
   await act(async () => finish());
   expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(false);
   expect(getButton('editor.floating.document-bar.cancel-scenario-button').disabled).toBe(false);
+});
+
+it('automatically opens a new error after recovery and never exposes diagnostic text', async () => {
+  storeState.value.saveState = 'error';
+  storeState.value.saveErrorMessage = 'internal-record-id=secret';
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+  let trigger = container?.querySelector<HTMLButtonElement>('[data-state="error"]');
+  expect(document.querySelector('#editor-save-error')?.textContent).toContain(
+    translate('editor.documentActions.saveErrorDescription')
+  );
+  expect(document.body.textContent).not.toContain('internal-record-id');
+  act(() => trigger?.click());
+  storeState.value.saveState = 'saved';
+  rerenderDocumentBar();
+  expect(document.querySelector('#editor-save-error')).toBeNull();
+  storeState.value.saveState = 'error';
+  rerenderDocumentBar();
+  trigger = container?.querySelector<HTMLButtonElement>('[data-state="error"]');
+  expect(trigger?.getAttribute('aria-expanded')).toBe('true');
 });
