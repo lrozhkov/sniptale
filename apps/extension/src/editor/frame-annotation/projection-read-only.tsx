@@ -6,10 +6,12 @@ import {
 import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/frame-annotation/step-badge/interactive-surface';
 import type { FrameAnnotationSnapshotV1 } from '../../features/highlighter/frame-annotation';
 import type { resolveFrameAnnotationVisualScene } from '../../features/highlighter/frame-annotation';
+import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
 import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 /** Renders crop-mode frame content without editing controls. */
 export function FrameProjectionReadOnlyOverlays(props: {
+  coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsRoot: HTMLDivElement | null;
   scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
   sceneRoot: HTMLDivElement | null;
@@ -24,6 +26,7 @@ export function FrameProjectionReadOnlyOverlays(props: {
           <FrameCalloutExportSurface
             callout={callout}
             calloutIndex={index}
+            coordinateSpace={props.coordinateSpace}
             frame={props.snapshot}
             key={getFrameCalloutKey(props.snapshot, index)}
             portalTarget={props.sceneRoot!}

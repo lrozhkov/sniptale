@@ -102,6 +102,7 @@ export function FrameProjection(props: {
         />
       ) : props.showVisualOverlays ? (
         <FrameProjectionReadOnlyOverlays
+          coordinateSpace={props.coordinateSpace}
           controlsRoot={props.controlsRoot}
           scene={scene}
           sceneRoot={props.sceneRoot}

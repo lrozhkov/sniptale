@@ -3,7 +3,10 @@ import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 
-import { identityFrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
+import {
+  createScaledFrameAnnotationCoordinateSpace,
+  identityFrameAnnotationCoordinateSpace,
+} from '../../features/highlighter/frame-annotation/coordinate-space';
 import { createFrameAnnotationSnapshot } from '../../features/highlighter/frame-annotation';
 import {
   createDefaultFrameCallout,
@@ -218,6 +221,84 @@ it('keeps a frame comment and number visible but not editable during canvas crop
   document.body.replaceChildren();
 });
 
+it('keeps the crop-mode comment bubble at its logical size when the scene is zoomed out', async () => {
+  const host = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  sceneRoot.style.transform = 'scale(0.5)';
+  document.body.append(host, sceneRoot);
+  const root = createRoot(host);
+  const defaultCallout = createDefaultFrameCallout();
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-scaled-crop',
+      x: 40,
+      y: 40,
+      width: 200,
+      height: 120,
+      callout: {
+        ...defaultCallout,
+        content: { bodyHtml: 'Visible comment', titleText: '' },
+      },
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({ frame: snapshot, label: 'Frame', ordering: 0 });
+  const originalGetBoundingClientRect = HTMLDivElement.prototype.getBoundingClientRect;
+  const measure = vi
+    .spyOn(HTMLDivElement.prototype, 'getBoundingClientRect')
+    .mockImplementation(function (this: HTMLDivElement) {
+      if (
+        this.parentElement?.classList.contains('sniptale-callout') &&
+        this.querySelector('[data-sniptale-callout-body-layout]')
+      ) {
+        return DOMRect.fromRect({ x: 0, y: 0, width: 100, height: 40 });
+      }
+      return originalGetBoundingClientRect.call(this);
+    });
+
+  try {
+    await act(async () =>
+      root.render(
+        <FrameProjection
+          coordinateSpace={createScaledFrameAnnotationCoordinateSpace({
+            origin: { x: 0, y: 0 },
+            scale: 0.5,
+            viewport: { width: 800, height: 600 },
+          })}
+          controlsRoot={null}
+          interactive={false}
+          showVisualOverlays
+          object={object}
+          sceneRoot={sceneRoot}
+          selected={false}
+          scale={0.5}
+          snapshot={snapshot}
+          settingsAnchor={null}
+          settingsMenu={null}
+          onCommand={vi.fn()}
+          onDraftCommit={vi.fn()}
+          onCloseSettings={vi.fn()}
+          onOpenSettings={vi.fn()}
+          onMoveStart={vi.fn()}
+          onResizeStart={vi.fn()}
+          onSnapshotChange={vi.fn()}
+          onSnapshotPreview={vi.fn()}
+          onStepBadgeReorder={vi.fn()}
+        />
+      )
+    );
+    const surface = sceneRoot.querySelector<HTMLElement>(
+      '[data-ui="content.callout.surface-compositor"]'
+    );
+    expect(surface?.style.width).toBe('204px');
+    expect(Number.parseFloat(surface?.style.height ?? '')).toBeGreaterThan(90);
+  } finally {
+    act(() => root.unmount());
+    measure.mockRestore();
+    document.body.replaceChildren();
+  }
+});
+
 it('omits disabled frame visuals and tolerates an unavailable crop scene', async () => {
   const host = document.createElement('div');
   const sceneRoot = document.createElement('div');
@@ -236,6 +317,7 @@ it('omits disabled frame visuals and tolerates an unavailable crop scene', async
     0
   );
   const props = {
+    coordinateSpace: identityFrameAnnotationCoordinateSpace,
     controlsRoot: null,
     scene: { borderColor: '#000', borderWidth: 1 } as never,
     snapshot,
