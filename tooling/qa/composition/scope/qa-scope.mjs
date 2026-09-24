@@ -201,7 +201,7 @@ export function createScopedQaContext(context, { suite = PRODUCT_QA_SUITE } = {}
   const allQualityCodeFiles =
     context.allQualityCodeFiles ??
     context.qualityCodeFiles ??
-    collectCodeFiles(allExistingTargetFiles);
+    (allExistingTargetFiles.length > 0 ? collectCodeFiles(allExistingTargetFiles) : []);
   const allQualityJsLikeFiles =
     context.allQualityJsLikeFiles ??
     context.qualityJsLikeFiles ??

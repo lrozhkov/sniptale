@@ -75,7 +75,7 @@ export function collectPreflightContext({ files = [] } = {}) {
       mode: 'explicit-files',
       targetFiles,
       existingTargetFiles,
-      codeFiles: collectCodeFiles(existingTargetFiles),
+      codeFiles: existingTargetFiles.length > 0 ? collectCodeFiles(existingTargetFiles) : [],
       jsLikeFiles: existingTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
       untrackedFiles: [],
       fingerprint: '',
@@ -190,7 +190,11 @@ export function collectPreflightReport({ files = [] } = {}) {
   const collectedContext = collectPreflightContext({ files });
   const context = createAnalysisContext(collectedContext, files);
   const structuralFiles =
-    files.length > 0 ? collectCodeFiles(context.allExistingTargetFiles) : context.codeFiles;
+    files.length > 0
+      ? context.allExistingTargetFiles.length > 0
+        ? collectCodeFiles(context.allExistingTargetFiles)
+        : []
+      : context.codeFiles;
   const structuralResult =
     structuralFiles.length === 0
       ? {

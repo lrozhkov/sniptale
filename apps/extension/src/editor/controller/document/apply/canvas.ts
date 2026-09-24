@@ -7,11 +7,12 @@ export function prepareCanvasForDocumentLoad(options: {
   canvas: Canvas;
   canvasSize: { width: number; height: number };
   zoomLevel: number;
+  preserveViewport?: boolean;
   viewportDevicePixelRatioBaseline?: number;
 }): void {
   Reflect.deleteProperty(options.canvas, 'backgroundImage');
   options.canvas.setZoom(1);
-  setEditorEditingSurfaceDimensions(options.canvas, options.canvasSize);
+  setEditorEditingSurfaceDimensions(options.canvas, options.canvasSize, options.preserveViewport);
   applyEditorViewportZoom(
     options.canvas,
     options.canvasSize,
@@ -20,9 +21,35 @@ export function prepareCanvasForDocumentLoad(options: {
   );
   if (options.canvas instanceof EditorCanvas) {
     options.canvas.ensureWorkspaceContainsObjects();
-    options.canvas.centerDocumentInViewport();
+    if (!options.preserveViewport) options.canvas.centerDocumentInViewport();
   }
   options.canvas.backgroundColor = 'transparent';
+}
+
+/** Holds the visible tile while Fabric clears and asynchronously restores history objects. */
+export function freezeCanvasVisualDuringLoad(canvas: Canvas): (() => void) | undefined {
+  const element = (canvas as Canvas & { lowerCanvasEl?: HTMLCanvasElement }).lowerCanvasEl;
+  const wrapper = (canvas as Canvas & { wrapperEl?: HTMLElement }).wrapperEl;
+  if (!element || !wrapper || element.width <= 0 || element.height <= 0) return undefined;
+  const snapshot = document.createElement('canvas');
+  snapshot.width = element.width;
+  snapshot.height = element.height;
+  const context = snapshot.getContext('2d');
+  if (!context) return undefined;
+  try {
+    context.drawImage(element, 0, 0);
+  } catch {
+    return undefined;
+  }
+  snapshot.style.position = 'absolute';
+  snapshot.style.left = '0';
+  snapshot.style.top = '0';
+  snapshot.style.width = element.style.width || `${element.width}px`;
+  snapshot.style.height = element.style.height || `${element.height}px`;
+  snapshot.style.zIndex = '30';
+  snapshot.style.pointerEvents = 'none';
+  wrapper.append(snapshot);
+  return () => snapshot.remove();
 }
 
 export function renderCanvasAfterDocumentLoad(canvas: Canvas): void {

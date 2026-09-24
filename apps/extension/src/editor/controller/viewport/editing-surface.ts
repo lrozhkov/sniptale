@@ -66,7 +66,11 @@ export function getEditorDocumentClientRect(
   };
 }
 
-export function setEditorEditingSurfaceDimensions(canvas: Canvas, size: DocumentSize): void {
+export function setEditorEditingSurfaceDimensions(
+  canvas: Canvas,
+  size: DocumentSize,
+  preserveWorkspace = false
+): void {
   if (typeof canvas.setViewportTransform !== 'function') {
     canvas.setDimensions(size);
     return;
@@ -85,7 +89,7 @@ export function setEditorEditingSurfaceDimensions(canvas: Canvas, size: Document
   const surface = getEditorEditingSurfaceSize(size);
   const margin = getEditorWorkspaceMargin(size);
   if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
-    canvas.setDocumentGeometry(size, margin);
+    canvas.setDocumentGeometry(size, margin, preserveWorkspace);
     return;
   }
   const devicePixelRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;

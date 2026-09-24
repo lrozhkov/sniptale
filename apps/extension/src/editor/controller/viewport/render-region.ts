@@ -48,6 +48,38 @@ export class EditorCanvas extends Canvas {
     return { ...this.workspaceInsets };
   }
 
+  captureDocumentViewportPosition(): { x: number; y: number } | null {
+    if (!this.renderViewport || !this.documentSize) return null;
+    return {
+      x: this.renderViewport.scrollLeft - this.workspaceInsets.left * this.presentationScale,
+      y: this.renderViewport.scrollTop - this.workspaceInsets.top * this.presentationScale,
+    };
+  }
+
+  restoreDocumentViewportPosition(position: { x: number; y: number }): void {
+    if (!this.renderViewport || !this.documentSize) return;
+    const scale = this.presentationScale;
+    const surface = getEditorWorkspaceSurfaceSize(this.documentSize, this.workspaceInsets);
+    const left = this.workspaceInsets.left * scale + position.x;
+    const top = this.workspaceInsets.top * scale + position.y;
+    this.growWorkspace({
+      left: Math.max(0, Math.ceil(-left / scale)),
+      top: Math.max(0, Math.ceil(-top / scale)),
+      right: Math.max(
+        0,
+        Math.ceil((left + this.renderViewport.clientWidth - surface.width * scale) / scale)
+      ),
+      bottom: Math.max(
+        0,
+        Math.ceil((top + this.renderViewport.clientHeight - surface.height * scale) / scale)
+      ),
+    });
+    this.renderViewport.scrollLeft =
+      this.workspaceInsets.left * this.presentationScale + position.x;
+    this.renderViewport.scrollTop = this.workspaceInsets.top * this.presentationScale + position.y;
+    this.refreshVirtualViewport();
+  }
+
   setExpandingCanvasWorkspace(enabled: boolean): void {
     this.expandingCanvasWorkspace = enabled;
   }
@@ -159,7 +191,9 @@ export class EditorCanvas extends Canvas {
     this.requestRenderAll();
   }
 
-  setDocumentGeometry(size: DocumentSize, margin: number): void {
+  setDocumentGeometry(size: DocumentSize, margin: number, preserveWorkspace = false): void {
+    const sameSize =
+      this.documentSize?.width === size.width && this.documentSize.height === size.height;
     this.documentSize = size.width > 0 && size.height > 0 ? size : null;
     if (!this.documentSize) {
       this.workspaceInsets = createEditorWorkspaceInsets(0);
@@ -176,7 +210,9 @@ export class EditorCanvas extends Canvas {
     const pending = this.pendingCropWorkspace;
     const rebase =
       pending?.size.width === size.width && pending.size.height === size.height ? pending : null;
-    this.workspaceInsets = rebase?.insets ?? createEditorWorkspaceInsets(margin);
+    this.workspaceInsets =
+      rebase?.insets ??
+      (preserveWorkspace && sameSize ? this.workspaceInsets : createEditorWorkspaceInsets(margin));
     this.pendingCropWorkspace = null;
     this.updateWorkspaceSurface();
     if (rebase && this.renderViewport) {

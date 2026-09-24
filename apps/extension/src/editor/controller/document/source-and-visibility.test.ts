@@ -36,7 +36,10 @@ class MockFabricImage {
   }
 }
 
-vi.mock('fabric', () => ({ FabricImage: { fromURL: mocks.FabricImageFromURLMock } }));
+vi.mock('fabric', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('fabric')>()),
+  FabricImage: { fromURL: mocks.FabricImageFromURLMock },
+}));
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: mocks.translateMock,

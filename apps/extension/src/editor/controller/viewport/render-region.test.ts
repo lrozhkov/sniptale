@@ -37,6 +37,93 @@ it('keeps replacement documents centered after crop, image resize, undo, and red
   expect(viewport.scrollTop).toBe(2048);
 });
 
+it('keeps a panned drawing at the same screen position while history restores the canvas', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+    scrollLeft: { value: 0, writable: true },
+    scrollTop: { value: 0, writable: true },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 1200, height: 900 }, 2048);
+  canvas.setDocumentGeometry({ width: 1200, height: 900 }, 2048);
+  viewport.scrollLeft = 2340;
+  viewport.scrollTop = 2170;
+
+  prepareCanvasForDocumentLoad({
+    canvas,
+    canvasSize: { width: 1200, height: 900 },
+    zoomLevel: 1,
+    preserveViewport: true,
+  });
+
+  expect(viewport.scrollLeft).toBe(2340);
+  expect(viewport.scrollTop).toBe(2170);
+});
+
+it('restores the same document point under the viewport after a size-changing undo', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+    scrollLeft: { value: 2300, writable: true },
+    scrollTop: { value: 2200, writable: true },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 1200, height: 900 }, 2048);
+  const position = canvas.captureDocumentViewportPosition()!;
+
+  prepareCanvasForDocumentLoad({
+    canvas,
+    canvasSize: { width: 1800, height: 1100 },
+    zoomLevel: 1,
+    preserveViewport: true,
+  });
+  canvas.restoreDocumentViewportPosition(position);
+
+  expect(canvas.captureDocumentViewportPosition()).toEqual(position);
+  expect(viewport.scrollLeft).toBe(2300);
+  expect(viewport.scrollTop).toBe(2200);
+});
+
+it('keeps a far panned position reachable when history restores a smaller document', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+    scrollLeft: { value: 7000, writable: true },
+    scrollTop: { value: 6000, writable: true },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 8000, height: 7000 }, 512);
+  const position = canvas.captureDocumentViewportPosition()!;
+
+  prepareCanvasForDocumentLoad({
+    canvas,
+    canvasSize: { width: 1000, height: 800 },
+    zoomLevel: 1,
+    preserveViewport: true,
+  });
+  canvas.restoreDocumentViewportPosition(position);
+
+  expect(canvas.captureDocumentViewportPosition()).toEqual(position);
+  expect(Number.parseFloat(surface.style.width)).toBeGreaterThanOrEqual(viewport.scrollLeft + 800);
+  expect(Number.parseFloat(surface.style.height)).toBeGreaterThanOrEqual(viewport.scrollTop + 600);
+});
+
 it('makes restored off-image layers reachable without changing their document positions', () => {
   const surface = document.createElement('div');
   const viewport = document.createElement('div');

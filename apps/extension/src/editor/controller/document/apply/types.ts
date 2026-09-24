@@ -15,5 +15,6 @@ export type LoadPreparedDocumentOptions = {
   canvas: Canvas;
   prepared: PreparedAppliedDocument;
   zoomLevel: number;
+  preserveViewport?: boolean;
   viewportDevicePixelRatioBaseline?: number;
 };

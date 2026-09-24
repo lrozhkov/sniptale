@@ -149,7 +149,7 @@ it('shrinks corner handles smoothly for compact selected objects', () => {
 it('activates hidden edge resize controls along the whole border except corner handle zones', () => {
   const controls = createControlSet();
   const object = {
-    canvas: { getActiveObject: vi.fn() },
+    canvas: { getActiveObject: vi.fn(), viewportTransform: [1, 0, 0, 1, 0, 0] },
     controls,
     getCoords: () => [
       { x: 100, y: 100 },

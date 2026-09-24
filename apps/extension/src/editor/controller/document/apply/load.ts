@@ -25,6 +25,7 @@ export async function loadPreparedDocumentOnCanvas(
     canvas: options.canvas,
     canvasSize: options.prepared.canvasSize,
     zoomLevel: options.zoomLevel,
+    ...(options.preserveViewport ? { preserveViewport: true } : {}),
   };
   if (options.viewportDevicePixelRatioBaseline !== undefined) {
     canvasPrepareOptions.viewportDevicePixelRatioBaseline =
@@ -69,7 +70,7 @@ export async function loadPreparedDocumentOnCanvas(
   await options.rebuildFrameDecorations(options.prepared.browserFrame);
   if (options.canvas instanceof EditorCanvas) {
     options.canvas.ensureWorkspaceContainsObjects();
-    options.canvas.centerDocumentInViewport();
+    if (!options.preserveViewport) options.canvas.centerDocumentInViewport();
   }
   renderCanvasAfterDocumentLoad(options.canvas);
   return source;

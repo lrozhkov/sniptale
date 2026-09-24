@@ -19,6 +19,7 @@ export interface CropSelection {
 export interface ApplyDocumentOptions {
   resetHistory?: boolean;
   updateOriginal?: boolean;
+  preserveViewport?: boolean;
 }
 
 export interface OpenImageOptions {

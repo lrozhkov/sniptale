@@ -17,6 +17,7 @@ export async function applyEditorControllerDocumentState(
     canvas: options.canvas,
     document: options.document,
     zoomLevel: options.zoomLevel,
+    ...(options.applyOptions.preserveViewport ? { preserveViewport: true } : {}),
     ...getViewportDevicePixelRatioBaselinePatch(options.viewportDevicePixelRatioBaseline),
     prepareObject: options.prepareObject,
     ...syncBackgroundLayerPatch,

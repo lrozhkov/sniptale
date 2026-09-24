@@ -154,6 +154,28 @@ it('accepts explicit files for pre-edit planning', async () => {
   );
 });
 
+it('does not scan the repository when an explicit planned file does not exist yet', async () => {
+  const root = createTempRoot('qa-preflight-planned-file-');
+  writeFile(root, 'apps/extension/src/editor/existing.ts', 'export const existing = true;\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.collectPreflightReport({
+      files: ['apps/extension/src/editor/planned.test.ts'],
+    });
+  });
+
+  expect(result.context.targetFiles).toEqual(['apps/extension/src/editor/planned.test.ts']);
+  expect(result.context.existingTargetFiles).toEqual([]);
+  expect(result.context.codeFiles).toEqual([]);
+  expect(result.context.allQualityCodeFiles).toEqual([]);
+  expect(result.structuralReport.files).toEqual([]);
+  expect(result.ownerRuntime).toEqual(['extension:editor:planned.test.ts']);
+});
+
 it('reports harness owners for QA tooling preflight', async () => {
   const root = createTempRoot('qa-preflight-harness-owner-');
   writeFile(root, 'tooling/qa/wrappers/example.mjs', 'export const value = true;\n');

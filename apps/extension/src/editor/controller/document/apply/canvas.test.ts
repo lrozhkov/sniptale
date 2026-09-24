@@ -14,6 +14,7 @@ vi.mock('../../viewport', async (importOriginal) => ({
 }));
 
 import {
+  freezeCanvasVisualDuringLoad,
   maskCanvasElementDuringLoad,
   prepareCanvasForDocumentLoad,
   renderCanvasAfterDocumentLoad,
@@ -64,6 +65,30 @@ function registerPrepareCanvasTest() {
 }
 
 function registerCanvasMaskTest() {
+  it('keeps the previous canvas pixels visible until history replay finishes', () => {
+    const element = document.createElement('canvas');
+    element.width = 20;
+    element.height = 10;
+    const wrapper = document.createElement('div');
+    wrapper.append(element);
+    const context = element.getContext('2d')!;
+    context.fillStyle = '#ff0000';
+    context.fillRect(0, 0, 20, 10);
+
+    const restore = freezeCanvasVisualDuringLoad({
+      lowerCanvasEl: element,
+      wrapperEl: wrapper,
+    } as never);
+    const snapshot = wrapper.querySelector('canvas:last-child') as HTMLCanvasElement;
+    expect(snapshot).not.toBe(element);
+    expect(Array.from(snapshot.getContext('2d')!.getImageData(5, 5, 1, 1).data)).toEqual([
+      255, 0, 0, 255,
+    ]);
+    expect(snapshot.style.pointerEvents).toBe('none');
+    restore?.();
+    expect(wrapper.children).toHaveLength(1);
+  });
+
   it('masks and restores canvas element background during load', () => {
     const style = { backgroundColor: 'initial' };
     const restore = maskCanvasElementDuringLoad(

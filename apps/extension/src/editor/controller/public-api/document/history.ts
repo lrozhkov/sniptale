@@ -58,6 +58,7 @@ async function undoEditorControllerSnapshotInTurn(
     await applyHistoryDocument(controller, document, {
       resetHistory: false,
       updateOriginal: false,
+      preserveViewport: true,
     });
   } catch (error) {
     if (await restoreHistoryDocument(controller, previousDocument, error)) {
@@ -87,6 +88,7 @@ async function redoEditorControllerSnapshotInTurn(
     await applyHistoryDocument(controller, document, {
       resetHistory: false,
       updateOriginal: false,
+      preserveViewport: true,
     });
   } catch (error) {
     if (await restoreHistoryDocument(controller, previousDocument, error)) {
@@ -108,6 +110,7 @@ async function restoreHistoryDocument(
     await controller.applyDocument(previousDocument, {
       resetHistory: false,
       updateOriginal: false,
+      preserveViewport: true,
     });
     return true;
   } catch (recoveryError) {

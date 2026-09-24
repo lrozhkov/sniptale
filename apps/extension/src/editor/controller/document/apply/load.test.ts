@@ -46,6 +46,7 @@ import { undoEditorControllerSnapshot } from '../../public-api/document/history'
 import { createMockDocument } from '../../instance/bindings/test-fixtures-document';
 import { prepareAppliedDocument } from '..';
 import type { EditorDocument } from '../../../../features/editor/document/types';
+import { EditorCanvas } from '../../viewport/render-region';
 
 function createPreparedDocument() {
   return {
@@ -105,6 +106,32 @@ describe('document apply load owner', () => {
       title: 'Restored title',
     });
     expect(mocks.renderCanvasAfterDocumentLoad).toHaveBeenCalledWith(canvas);
+  });
+
+  it('centers a newly opened document but keeps history replay at its current viewport', async () => {
+    const canvas = Object.assign(Object.create(EditorCanvas.prototype) as EditorCanvas, {
+      add: vi.fn(),
+      centerDocumentInViewport: vi.fn(),
+      ensureWorkspaceContainsObjects: vi.fn(),
+      getObjects: vi.fn(() => []),
+      loadFromJSON: vi.fn(async () => undefined),
+    });
+    const options = {
+      canvas,
+      prepared: createPreparedDocument() as never,
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: vi.fn(async () => undefined),
+      zoomLevel: 1,
+    };
+
+    await loadPreparedDocumentOnCanvas(options);
+    await loadPreparedDocumentOnCanvas({ ...options, preserveViewport: true });
+
+    expect(canvas.centerDocumentInViewport).toHaveBeenCalledOnce();
+    expect(canvas.ensureWorkspaceContainsObjects).toHaveBeenCalledTimes(2);
+    expect(mocks.prepareCanvasForDocumentLoad).toHaveBeenLastCalledWith(
+      expect.objectContaining({ preserveViewport: true })
+    );
   });
 
   it('recovers both the canvas and cursor when a history load fails after replacing objects', async () => {

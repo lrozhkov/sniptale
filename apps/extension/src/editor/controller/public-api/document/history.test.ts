@@ -84,10 +84,12 @@ it('applies available undo, redo, and original documents with expected history o
   expect(applyDocument).toHaveBeenCalledWith(createEditorDocument('undo'), {
     resetHistory: false,
     updateOriginal: false,
+    preserveViewport: true,
   });
   expect(applyDocument).toHaveBeenCalledWith(createEditorDocument('redo'), {
     resetHistory: false,
     updateOriginal: false,
+    preserveViewport: true,
   });
   expect(applyDocument).toHaveBeenCalledWith(createEditorDocument('original'), {
     resetHistory: true,
@@ -165,6 +167,7 @@ it('undoes a pending frame comment draft before restoring the document', async (
     expect(applyDocument).toHaveBeenCalledWith(original, {
       resetHistory: false,
       updateOriginal: false,
+      preserveViewport: true,
     });
     expect(history.getState().canRedo).toBe(true);
   } finally {
@@ -190,6 +193,7 @@ it('restores a drawn scene from an in-memory hydrated workspace snapshot', async
   expect(applyDocument).toHaveBeenCalledWith(original, {
     resetHistory: false,
     updateOriginal: false,
+    preserveViewport: true,
   });
   expect(publishHistoryDocument).toHaveBeenCalledWith(original);
   expect(history.getState().canRedo).toBe(true);
