@@ -1,10 +1,7 @@
 import React from 'react';
 import type { Canvas } from 'fabric';
 import type { EditorTool } from '../../features/editor/document/types';
-import {
-  EDITOR_CANVAS_CROP_GUIDE_STROKE,
-  EDITOR_CANVAS_CROP_OVERLAY,
-} from '../color/palette/constants';
+import { EDITOR_CANVAS_CROP_OVERLAY } from '../color/palette/constants';
 
 type CropBounds = { left: number; top: number; width: number; height: number };
 
@@ -55,16 +52,6 @@ export function EditorCropOverlay(props: {
         d={`M 0 0 H ${width} V ${height} H 0 Z ${hole}`}
         fill={EDITOR_CANVAS_CROP_OVERLAY}
         fillRule="evenodd"
-      />
-      <rect
-        x={bounds.left}
-        y={bounds.top}
-        width={bounds.width}
-        height={bounds.height}
-        fill="none"
-        stroke={EDITOR_CANVAS_CROP_GUIDE_STROKE}
-        strokeWidth={2}
-        strokeDasharray="6 4"
       />
     </svg>
   );

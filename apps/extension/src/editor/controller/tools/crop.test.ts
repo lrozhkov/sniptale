@@ -58,7 +58,8 @@ function runEditorControllerCropGuideSuite() {
     expect(rect.left).toBe(10);
     expect(rect.top).toBe(20);
     expect(rect.sniptaleRole).toBe('crop-guide');
-    expect(rect.stroke).toBe(rect.borderColor);
+    expect(rect.strokeWidth).toBe(0);
+    expect(rect.hasBorders).toBe(false);
     expect(rect.cornerColor).toBe(rect.borderColor);
     expect(isEditorCropGuide(rect)).toBe(true);
     expect(isEditorCropGuide(new Rect())).toBe(false);
@@ -79,7 +80,17 @@ function runEditorControllerCropGuideSuite() {
     applyCropGuideSelection(rect, { height: 0, left: 3, top: 4, width: 0 }, 'preview');
     expect(rect.sniptaleCropGuideMode).toBe('preview');
     expect(rect.selectable).toBe(true);
-    expect(setControlsVisibility).toHaveBeenCalledWith({ mtr: false });
+    expect(setControlsVisibility).toHaveBeenCalledWith({
+      bl: true,
+      br: true,
+      mb: false,
+      ml: false,
+      mr: false,
+      mt: false,
+      mtr: false,
+      tl: true,
+      tr: true,
+    });
     configureCropGuideForEditing(rect);
     expect(
       normalizeEditorCropSelection(

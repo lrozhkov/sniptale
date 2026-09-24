@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { EditorCropOverlay } from './crop-overlay';
 
-it('projects the live crop mask and outline above frame annotations without taking pointer input', () => {
+it('projects the live crop mask without an outline above frame annotations', () => {
   const guide = {
     sniptaleRole: 'crop-guide',
     getBoundingRect: vi.fn(() => ({ left: 20, top: 10, width: 80, height: 40 })),
@@ -33,12 +33,12 @@ it('projects the live crop mask and outline above frame annotations without taki
   );
   const overlay = host.querySelector<SVGSVGElement>('[data-ui="editor.crop-overlay"]');
   expect(overlay?.style.pointerEvents).toBe('none');
-  expect(overlay?.querySelector('rect')?.getAttribute('x')).toBe('20');
-  expect(overlay?.querySelector('rect')?.getAttribute('width')).toBe('80');
+  expect(overlay?.querySelector('rect')).toBeNull();
+  expect(overlay?.querySelector('path')?.getAttribute('d')).toContain('M 20 10 h 80 v 40');
 
   guide.getBoundingRect.mockReturnValue({ left: 60, top: 15, width: 80, height: 40 });
   act(() => afterRender?.());
-  expect(overlay?.querySelector('rect')?.getAttribute('x')).toBe('60');
+  expect(overlay?.querySelector('path')?.getAttribute('d')).toContain('M 60 15 h 80 v 40');
 
   act(() =>
     root.render(

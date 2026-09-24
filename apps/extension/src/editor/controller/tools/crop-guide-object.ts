@@ -1,11 +1,7 @@
 import type { Point } from 'fabric';
 import { Rect } from 'fabric';
 import type { CropSelection } from '../core/types';
-import {
-  EDITOR_CANVAS_CROP_GUIDE_FILL,
-  EDITOR_CANVAS_CROP_GUIDE_STROKE,
-  EDITOR_CANVAS_ACCENT,
-} from '../../color/palette/constants';
+import { EDITOR_CANVAS_CROP_GUIDE_FILL, EDITOR_CANVAS_ACCENT } from '../../color/palette/constants';
 
 export function createCropGuideRect(point: Point): Rect {
   const crop = new Rect({
@@ -14,9 +10,8 @@ export function createCropGuideRect(point: Point): Rect {
     width: 1,
     height: 1,
     fill: EDITOR_CANVAS_CROP_GUIDE_FILL,
-    stroke: EDITOR_CANVAS_CROP_GUIDE_STROKE,
-    strokeWidth: 2,
-    strokeDashArray: [6, 4],
+    strokeWidth: 0,
+    hasBorders: false,
     borderColor: EDITOR_CANVAS_ACCENT,
     cornerColor: EDITOR_CANVAS_ACCENT,
     selectable: false,
@@ -42,7 +37,17 @@ export function configureCropGuideForEditing(cropGuide: Rect): void {
     hasRotatingPoint: false,
     lockRotation: true,
   });
-  cropGuide.setControlsVisibility?.({ mtr: false });
+  cropGuide.setControlsVisibility?.({
+    bl: true,
+    br: true,
+    mb: false,
+    ml: false,
+    mr: false,
+    mt: false,
+    mtr: false,
+    tl: true,
+    tr: true,
+  });
   cropGuide.setCoords();
 }
 
