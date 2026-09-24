@@ -195,6 +195,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   const svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('data-ui', 'editor.canvas.selection-chrome');
   svg.setAttribute('aria-hidden', 'true');
+  const upperCanvasZIndex = Number(getComputedStyle(canvas.upperCanvasEl).zIndex) || 0;
   Object.assign(svg.style, {
     position: 'absolute',
     inset: '0',
@@ -202,7 +203,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     height: '100%',
     overflow: 'visible',
     pointerEvents: 'none',
-    zIndex: '2',
+    zIndex: String(upperCanvasZIndex + 1),
   });
   container.appendChild(svg);
   Reflect.set(canvas, 'skipControlsDrawing', true);

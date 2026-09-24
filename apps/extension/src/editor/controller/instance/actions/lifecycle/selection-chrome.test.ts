@@ -24,6 +24,7 @@ it('keeps selection controls bounded in screen pixels across editor zoom', () =>
 it('renders selection and magnet as sharp vectors while preserving the Fabric hit surface', () => {
   const container = document.createElement('div');
   const upperCanvasEl = document.createElement('canvas');
+  upperCanvasEl.style.zIndex = '10';
   container.appendChild(upperCanvasEl);
   let displayedWidth = 400;
   upperCanvasEl.getBoundingClientRect = () => ({ width: displayedWidth }) as DOMRect;
@@ -67,6 +68,9 @@ it('renders selection and magnet as sharp vectors while preserving the Fabric hi
 
   mountEditorSelectionChrome(canvas as never, magnet as never);
   const svg = container.querySelector('svg')!;
+  expect(Number(getComputedStyle(svg).zIndex)).toBeGreaterThan(
+    Number(getComputedStyle(upperCanvasEl).zIndex)
+  );
   expect(canvas).toHaveProperty('skipControlsDrawing', true);
   expect(svg.getAttribute('viewBox')).toBe('0 0 100 100');
   expect(svg.querySelector('polygon')?.getAttribute('vector-effect')).toBe('non-scaling-stroke');
