@@ -130,6 +130,7 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
       ) : null}
       <ResizeToolSizePanel
         active={active}
+        canvasSize={props.canvasSize}
         isCanvasMode={isCanvasMode}
         updateLockedDraft={props.updateLockedDraft}
       />
@@ -190,6 +191,7 @@ function selectActiveResizeState(
 
 function ResizeToolSizePanel(props: {
   active: ActiveResizeState;
+  canvasSize: SizeDraft;
   isCanvasMode: boolean;
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
@@ -202,7 +204,10 @@ function ResizeToolSizePanel(props: {
       <div className="space-y-3">
         <ResizeToolDimensionRow active={props.active} updateLockedDraft={props.updateLockedDraft} />
         {props.isCanvasMode ? null : <ResizeToolSizePresetField active={props.active} />}
-        <ResizeToolAspectRatioField active={props.active} />
+        <ResizeToolAspectRatioField
+          active={props.active}
+          bounds={props.isCanvasMode ? props.canvasSize : undefined}
+        />
       </div>
     </section>
   );
@@ -256,14 +261,17 @@ function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {
   );
 }
 
-function ResizeToolAspectRatioField(props: { active: ActiveResizeState }) {
+function ResizeToolAspectRatioField(props: {
+  active: ActiveResizeState;
+  bounds: SizeDraft | undefined;
+}) {
   const currentValue = findAspectRatioValue(props.active.draft) ?? 'custom';
 
   return (
     <SelectField
       label={translate('editor.compact.aspectRatioPreset')}
       value={currentValue}
-      onChange={(value) => applySelectedAspectRatio(props.active.setDraft, value)}
+      onChange={(value) => applySelectedAspectRatio(props.active.setDraft, value, props.bounds)}
       options={buildAspectRatioOptions(currentValue)}
     />
   );

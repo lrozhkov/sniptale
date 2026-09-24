@@ -5,5 +5,9 @@ export {
   isEditorCropGuide,
 } from './crop-guide-object';
 export { cropRenderedEditorDocument } from './crop-render';
-export { createCropSelectionFromRect, normalizeEditorCropSelection } from './crop-selection';
+export {
+  createCropSelectionFromRect,
+  normalizeEditorCropSelection,
+  clampEditorCropSelectionPosition,
+} from './crop-selection';
 export { getActiveEditorCropRect } from './crop-session';

@@ -4,6 +4,7 @@ import type { CropSelection } from '../core/types';
 import {
   EDITOR_CANVAS_CROP_GUIDE_FILL,
   EDITOR_CANVAS_CROP_GUIDE_STROKE,
+  EDITOR_CANVAS_ACCENT,
 } from '../../color/palette/constants';
 
 export function createCropGuideRect(point: Point): Rect {
@@ -16,6 +17,8 @@ export function createCropGuideRect(point: Point): Rect {
     stroke: EDITOR_CANVAS_CROP_GUIDE_STROKE,
     strokeWidth: 2,
     strokeDashArray: [6, 4],
+    borderColor: EDITOR_CANVAS_ACCENT,
+    cornerColor: EDITOR_CANVAS_ACCENT,
     selectable: false,
     evented: false,
     hasRotatingPoint: false,

@@ -45,3 +45,25 @@ it('ignores regular objects and syncs crop-guide selections through crop binding
     expect.objectContaining({ normalized: true })
   );
 });
+
+it('keeps the guide size when movement reaches the right or bottom edge', () => {
+  const bindings = {
+    getCanvasDocumentSize: vi.fn(() => ({ height: 100, width: 200 })),
+    setCropState: vi.fn(),
+  };
+  const target = { id: 'crop-guide' };
+  mocks.isEditorCropGuide.mockReturnValueOnce(true);
+  mocks.createCropSelectionFromRect.mockReturnValueOnce({
+    left: 180,
+    top: 90,
+    width: 80,
+    height: 50,
+  });
+
+  expect(syncCropGuideInteraction(bindings as never, target as never, 'move')).toBe(true);
+  expect(mocks.applyCropGuideSelection).toHaveBeenCalledWith(
+    target,
+    { left: 120, top: 50, width: 80, height: 50 },
+    'selection'
+  );
+});

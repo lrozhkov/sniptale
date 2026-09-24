@@ -3,8 +3,8 @@ import { Point } from 'fabric';
 import type { CropSelection } from '../core/types';
 import {
   applyCropGuideSelection,
+  clampEditorCropSelectionPosition,
   createCropGuideRect,
-  normalizeEditorCropSelection,
 } from '../tools/crop';
 
 type CropGuideState = {
@@ -28,9 +28,8 @@ export function previewEditorCanvasSizeSelection(
     return null;
   }
 
-  const mode = context.cropSelection ? 'selection' : 'preview';
   const baseSelection = context.cropSelection ?? { left: 0, top: 0, width: 1, height: 1 };
-  const nextSelection = {
+  const requestedSelection = {
     left: baseSelection.left,
     top: baseSelection.top,
     width: Math.max(1, Math.round(context.width)),
@@ -38,24 +37,47 @@ export function previewEditorCanvasSizeSelection(
   };
 
   if (
-    mode === 'preview' &&
-    nextSelection.width === context.canvasDocumentSize.width &&
-    nextSelection.height === context.canvasDocumentSize.height
+    !context.cropSelection &&
+    requestedSelection.width === context.canvasDocumentSize.width &&
+    requestedSelection.height === context.canvasDocumentSize.height
   ) {
     return null;
   }
 
-  const nextCropSelection =
-    mode === 'selection'
-      ? normalizeEditorCropSelection(nextSelection, context.canvasDocumentSize)
-      : null;
+  const expandsCanvas =
+    !context.cropSelection &&
+    (requestedSelection.width > context.canvasDocumentSize.width ||
+      requestedSelection.height > context.canvasDocumentSize.height);
+
+  if (expandsCanvas) {
+    const cropGuide = context.cropGuide ?? createCropGuideRect(new Point(0, 0));
+    applyCropGuideSelection(cropGuide, requestedSelection, 'preview');
+    cropGuide.set({ selectable: false, evented: false });
+    if (!context.cropGuide) context.canvas.add(cropGuide);
+    context.canvas.requestRenderAll();
+    return { cropGuide, cropSelection: null };
+  }
+
+  const fit = Math.min(
+    1,
+    context.canvasDocumentSize.width / requestedSelection.width,
+    context.canvasDocumentSize.height / requestedSelection.height
+  );
+  const nextCropSelection = clampEditorCropSelectionPosition(
+    {
+      ...requestedSelection,
+      width: Math.max(1, Math.round(requestedSelection.width * fit)),
+      height: Math.max(1, Math.round(requestedSelection.height * fit)),
+    },
+    context.canvasDocumentSize
+  );
 
   if (nextCropSelection && isSameCropSelection(nextCropSelection, context.cropSelection)) {
     return null;
   }
 
   const cropGuide = context.cropGuide ?? createCropGuideRect(new Point(0, 0));
-  applyCropGuideSelection(cropGuide, nextCropSelection ?? nextSelection, mode);
+  applyCropGuideSelection(cropGuide, nextCropSelection, 'selection');
   if (!context.cropGuide) {
     context.canvas.add(cropGuide);
   }

@@ -1,7 +1,7 @@
 export const EDITOR_CANVAS_ACCENT = '#f97316';
 export const EDITOR_CANVAS_CONTROL_SURFACE = '#f8fafc';
 export const EDITOR_CANVAS_CROP_GUIDE_FILL = 'rgba(250, 250, 250, 0.08)';
-export const EDITOR_CANVAS_CROP_GUIDE_STROKE = '#fafafa';
+export const EDITOR_CANVAS_CROP_GUIDE_STROKE = EDITOR_CANVAS_ACCENT;
 export const EDITOR_CANVAS_CROP_OVERLAY = 'rgba(24, 24, 27, 0.42)';
 export const EDITOR_CANVAS_TEXT_INVERSE = '#ffffff';
 

@@ -7,22 +7,25 @@ import {
   createCropSelectionFromRect,
   isEditorCropGuide,
   normalizeEditorCropSelection,
+  clampEditorCropSelectionPosition,
 } from '../tools/crop';
 
 type CanvasObject = import('fabric').FabricObject;
 
 export function syncCropGuideInteraction(
   bindings: EditorControllerEventStateBindings & EditorControllerEventCropBindings,
-  target: CanvasObject
+  target: CanvasObject,
+  interaction: 'move' | 'scale' = 'scale'
 ): boolean {
   if (!isEditorCropGuide(target)) {
     return false;
   }
 
-  const selection = normalizeEditorCropSelection(
-    createCropSelectionFromRect(target),
-    bindings.getCanvasDocumentSize()
-  );
+  const rawSelection = createCropSelectionFromRect(target);
+  const selection =
+    interaction === 'move'
+      ? clampEditorCropSelectionPosition(rawSelection, bindings.getCanvasDocumentSize())
+      : normalizeEditorCropSelection(rawSelection, bindings.getCanvasDocumentSize());
   applyCropGuideSelection(target, selection, 'selection');
   bindings.setCropState(target, selection);
   return true;

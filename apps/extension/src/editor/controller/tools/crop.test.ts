@@ -12,6 +12,7 @@ import {
   getActiveEditorCropRect,
   isEditorCropGuide,
   normalizeEditorCropSelection,
+  clampEditorCropSelectionPosition,
 } from './crop';
 
 class ImageMock {
@@ -41,6 +42,14 @@ beforeEach(() => {
 });
 
 function runEditorControllerCropGuideSuite() {
+  it('keeps crop dimensions while clamping a moved guide to canvas edges', () => {
+    expect(
+      clampEditorCropSelectionPosition(
+        { left: 180, top: 90, width: 80, height: 50 },
+        { width: 200, height: 100 }
+      )
+    ).toEqual({ left: 120, top: 50, width: 80, height: 50 });
+  });
   it('creates and normalizes crop guides', () => {
     const rect = createCropGuideRect(new Point(10, 20));
     const setControlsVisibility = vi.fn();
@@ -49,6 +58,8 @@ function runEditorControllerCropGuideSuite() {
     expect(rect.left).toBe(10);
     expect(rect.top).toBe(20);
     expect(rect.sniptaleRole).toBe('crop-guide');
+    expect(rect.stroke).toBe(rect.borderColor);
+    expect(rect.cornerColor).toBe(rect.borderColor);
     expect(isEditorCropGuide(rect)).toBe(true);
     expect(isEditorCropGuide(new Rect())).toBe(false);
     rect.set({ width: 20, height: 10, scaleX: 2, scaleY: 3 });

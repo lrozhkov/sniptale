@@ -87,11 +87,20 @@ export function buildAspectRatioOptions(currentValue: string): CompactSelectOpti
 
 export function applySelectedAspectRatio(
   setDraft: React.Dispatch<React.SetStateAction<SizeDraft>>,
-  value: string
+  value: string,
+  bounds?: SizeDraft
 ) {
   const preset = ASPECT_RATIO_PRESETS.find((item) => item.value === value);
   if (preset) {
-    setDraft((state) => fitSizeDraftToAspectRatio(state, preset.ratio, 'long'));
+    setDraft((state) => {
+      const draft = fitSizeDraftToAspectRatio(state, preset.ratio, 'long');
+      if (!bounds) return draft;
+      const fit = Math.min(1, bounds.width / draft.width, bounds.height / draft.height);
+      return {
+        width: Math.max(1, Math.round(draft.width * fit)),
+        height: Math.max(1, Math.round(draft.height * fit)),
+      };
+    });
   }
 }
 

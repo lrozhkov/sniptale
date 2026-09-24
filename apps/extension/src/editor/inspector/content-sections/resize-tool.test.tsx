@@ -206,6 +206,20 @@ it('previews a crop area after the user changes its aspect ratio', () => {
   expect(controller.resizeCanvas).toHaveBeenCalledWith(1200, 675);
 });
 
+it('fits a square crop preset inside a landscape canvas', () => {
+  const controller = createController();
+  renderResizeTool(controller);
+
+  act(() => {
+    getSelect(translate('editor.compact.aspectRatioPreset')).value = '1:1';
+    getSelect(translate('editor.compact.aspectRatioPreset')).dispatchEvent(
+      new Event('change', { bubbles: true })
+    );
+  });
+
+  expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(900, 900);
+});
+
 it('leaves crop mode from the secondary cancel action', () => {
   const controller = createController();
   renderResizeTool(controller);

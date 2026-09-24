@@ -68,6 +68,15 @@ function completeCropDrawSession(
   };
 }
 
+function isUndersizedPointerDraw(drawSession: DrawSession, minDrawSize: number): boolean {
+  const { start, lastPoint, tool } = drawSession;
+  return Boolean(
+    lastPoint &&
+    (tool === 'crop' || tool === 'shape' || tool === 'arrow' || tool === 'blur') &&
+    Math.max(Math.abs(lastPoint.x - start.x), Math.abs(lastPoint.y - start.y)) < minDrawSize
+  );
+}
+
 export function completeEditorDrawSession(options: {
   drawSession: DrawSession;
   canvasDocumentSize: { width: number; height: number };
@@ -83,6 +92,10 @@ export function completeEditorDrawSession(options: {
 
   if (options.drawSession.tool === 'text' && object.type === 'textbox') {
     return completeTextDrawSession(options.drawSession, object);
+  }
+
+  if (isUndersizedPointerDraw(options.drawSession, options.minDrawSize)) {
+    return { kind: 'discard', drawSession: null };
   }
 
   if (

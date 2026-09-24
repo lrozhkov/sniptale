@@ -30,6 +30,20 @@ export function normalizeEditorCropSelection(
   return { left, top, width, height };
 }
 
+export function clampEditorCropSelectionPosition(
+  selection: CropSelection,
+  canvasDocumentSize: { width: number; height: number }
+): CropSelection {
+  const width = Math.min(canvasDocumentSize.width, Math.max(1, Math.round(selection.width)));
+  const height = Math.min(canvasDocumentSize.height, Math.max(1, Math.round(selection.height)));
+  return {
+    left: clamp(Math.round(selection.left), 0, canvasDocumentSize.width - width),
+    top: clamp(Math.round(selection.top), 0, canvasDocumentSize.height - height),
+    width,
+    height,
+  };
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
