@@ -214,6 +214,37 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(() => renderEditorCanvasToDataUrl(null, { format: 'png', quality: 100 })).toThrow();
   });
 
+  it('omits crop guides from the rendered image and restores their visibility', () => {
+    const canvas = createExportCanvas();
+    const cropGuide = { sniptaleRole: 'crop-guide', visible: true };
+    const shape = { sniptaleRole: 'drawing', visible: true };
+    canvas.getObjects.mockReturnValue([cropGuide, shape] as never);
+    canvas.toCanvasElement.mockImplementation(() => {
+      expect(cropGuide.visible).toBe(false);
+      expect(shape.visible).toBe(true);
+      return canvas.renderedCanvas;
+    });
+
+    renderEditorCanvasToDataUrl(canvas as never, { format: 'png', quality: 100 });
+
+    expect(cropGuide.visible).toBe(true);
+  });
+
+  it('restores crop guides when raster rendering fails', () => {
+    const canvas = createExportCanvas();
+    const cropGuide = { sniptaleRole: 'crop-guide', visible: true };
+    canvas.getObjects.mockReturnValue([cropGuide] as never);
+    canvas.toCanvasElement.mockImplementation(() => {
+      expect(cropGuide.visible).toBe(false);
+      throw new Error('allocation failed');
+    });
+
+    expect(() =>
+      renderEditorCanvasToDataUrl(canvas as never, { format: 'png', quality: 100 })
+    ).toThrow('allocation failed');
+    expect(cropGuide.visible).toBe(true);
+  });
+
   it('renders without finalizing the active pointer transform', () => {
     const canvas = createExportCanvas();
     const currentTransform = canvas._currentTransform;

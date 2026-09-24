@@ -65,7 +65,19 @@ function resolveRenderedCanvasElement(
   canvas: Canvas,
   outputSize?: EditorRenderedImageSize
 ): HTMLCanvasElement {
-  const sourceCanvas = canvas.toCanvasElement(1);
+  const cropGuides = canvas.getObjects().filter((object) => object.sniptaleRole === 'crop-guide');
+  const visibility = cropGuides.map((object) => object.visible);
+  cropGuides.forEach((object) => {
+    object.visible = false;
+  });
+  let sourceCanvas: HTMLCanvasElement;
+  try {
+    sourceCanvas = canvas.toCanvasElement(1);
+  } finally {
+    cropGuides.forEach((object, index) => {
+      object.visible = visibility[index] ?? true;
+    });
+  }
   if (!outputSize) {
     return sourceCanvas;
   }

@@ -146,6 +146,36 @@ it('does not clear the canvas crop guide when active selection dimensions rerend
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
 });
 
+it('does not recreate a removed crop guide when drawing another area or leaving crop mode', () => {
+  const controller = createController();
+  const Harness = ({
+    cropSelection,
+  }: {
+    cropSelection: { height: number; width: number } | null;
+  }) => {
+    useCanvasResizePreview({
+      canvasSizeDraft: { height: 600, width: 900 },
+      canvasSizeMatchesDraft: false,
+      controller,
+      cropSelection,
+      cropSelectionMatchesDraft: cropSelection !== null,
+      isCanvasMode: true,
+    });
+    return null;
+  };
+
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() => root?.render(<Harness cropSelection={{ height: 600, width: 900 }} />));
+  controller.previewCanvasSize.mockClear();
+
+  act(() => root?.render(<Harness cropSelection={null} />));
+  act(() => root?.render(<Harness cropSelection={null} />));
+
+  expect(controller.previewCanvasSize).not.toHaveBeenCalled();
+});
+
 it('clears canvas previews and disables crop pointer ownership outside canvas mode', () => {
   const controller = createController();
   const HookProbe = () => {

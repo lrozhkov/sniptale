@@ -65,6 +65,7 @@ it('keeps crop cleanup and replacement inside the draw-session owner', () => {
   });
   expect(replacement.clearedExistingCropGuide).toBe(true);
   expect(replacement.drawSession.pointerId).toBeNull();
+  expect(canvas.getObjects()).not.toContain(existingGuide);
   canvas.dispose();
 });
 

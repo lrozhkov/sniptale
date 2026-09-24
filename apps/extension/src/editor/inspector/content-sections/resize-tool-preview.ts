@@ -18,7 +18,9 @@ interface UseCanvasResizePreviewArgs {
 }
 
 export function useCanvasResizePreview(args: UseCanvasResizePreviewArgs) {
+  const { width: draftWidth, height: draftHeight } = args.canvasSizeDraft;
   const previousCropSelectionRef = useRef<SizeDraft | null>(null);
+  const previousCanvasSizeDraftRef = useRef<SizeDraft | null>(null);
   const cropSelectionChanged = hasSizeDraftChanged(
     previousCropSelectionRef.current,
     args.cropSelection
@@ -47,16 +49,21 @@ export function useCanvasResizePreview(args: UseCanvasResizePreviewArgs) {
   }, [args.cropSelection]);
 
   useEffect(() => {
-    if (cropSelectionChanged) {
+    const draftChanged = hasSizeDraftChanged(previousCanvasSizeDraftRef.current, {
+      width: draftWidth,
+      height: draftHeight,
+    });
+    previousCanvasSizeDraftRef.current = { width: draftWidth, height: draftHeight };
+    if (cropSelectionChanged || !draftChanged) {
       return;
     }
 
     if (args.isCanvasMode && !args.canvasSizeMatchesDraft && !args.cropSelectionMatchesDraft) {
-      args.controller.previewCanvasSize(args.canvasSizeDraft.width, args.canvasSizeDraft.height);
+      args.controller.previewCanvasSize(draftWidth, draftHeight);
     }
   }, [
-    args.canvasSizeDraft.height,
-    args.canvasSizeDraft.width,
+    draftHeight,
+    draftWidth,
     args.canvasSizeMatchesDraft,
     args.controller,
     args.cropSelectionMatchesDraft,
