@@ -24,6 +24,17 @@ export type EditorPageServices = {
   controller: ImageEditorController;
 };
 
+/** Gallery presentation is a preview; editable source and objects are saved separately. */
+function getAutosavePresentationSize(size: { width: number; height: number }) {
+  const width = Math.max(1, size.width);
+  const height = Math.max(1, size.height);
+  const scale = Math.min(1, 2048 / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
 function beginEditorPageBootstrapRevision(services: EditorPageServices): number {
   services.bootstrapRevision = (services.bootstrapRevision ?? 0) + 1;
   return services.bootstrapRevision;
@@ -100,7 +111,14 @@ export async function openEditorBootstrapPayload(
     aggregateId,
     durableRevision: 0,
     renderPresentation: () =>
-      services.controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
+      services.controller.renderForExport(
+        {
+          format: 'png',
+          quality: 1,
+          outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
+        },
+        'committed'
+      ),
     sourceUrl: payload.url ?? '',
     sourceTitle: payload.title ?? '',
   });
@@ -138,7 +156,14 @@ export async function bootstrapEditorPageSession(
     aggregateId,
     durableRevision: 0,
     renderPresentation: () =>
-      services.controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
+      services.controller.renderForExport(
+        {
+          format: 'png',
+          quality: 1,
+          outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
+        },
+        'committed'
+      ),
     sourceUrl: null,
     sourceTitle: null,
   });

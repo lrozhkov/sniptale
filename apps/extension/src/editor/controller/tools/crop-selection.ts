@@ -1,6 +1,10 @@
 import type { Rect } from 'fabric';
 import type { CropSelection } from '../core/types';
 import { getEditorWorkspaceMargin } from '../viewport/editing-surface';
+import {
+  createEditorWorkspaceInsets,
+  type EditorWorkspaceInsets,
+} from '../viewport/workspace-extent';
 
 export function createCropSelectionFromRect(cropGuide: Rect): CropSelection {
   return {
@@ -43,15 +47,17 @@ export function normalizeEditorCropSelection(
 
 export function getEditorFreeCanvasBounds(
   canvasDocumentSize: { width: number; height: number },
-  zoom = 1
+  zoom = 1,
+  insets: EditorWorkspaceInsets = createEditorWorkspaceInsets(
+    getEditorWorkspaceMargin(canvasDocumentSize)
+  )
 ) {
-  const margin = getEditorWorkspaceMargin(canvasDocumentSize);
   const inset = Math.ceil(20 / Math.max(0.2, zoom));
   return {
-    left: -margin + inset,
-    top: -margin + inset,
-    right: canvasDocumentSize.width + margin - inset,
-    bottom: canvasDocumentSize.height + margin - inset,
+    left: -insets.left + inset,
+    top: -insets.top + inset,
+    right: canvasDocumentSize.width + insets.right - inset,
+    bottom: canvasDocumentSize.height + insets.bottom - inset,
   };
 }
 
@@ -59,9 +65,10 @@ export function getEditorFreeCanvasBounds(
 export function normalizeEditorFreeCanvasSelection(
   selection: CropSelection,
   canvasDocumentSize: { width: number; height: number },
-  zoom = 1
+  zoom = 1,
+  insets?: EditorWorkspaceInsets
 ): CropSelection {
-  const bounds = getEditorFreeCanvasBounds(canvasDocumentSize, zoom);
+  const bounds = getEditorFreeCanvasBounds(canvasDocumentSize, zoom, insets);
   const left = clamp(Math.round(selection.left), bounds.left, bounds.right - 1);
   const top = clamp(Math.round(selection.top), bounds.top, bounds.bottom - 1);
   const right = clamp(
@@ -85,9 +92,10 @@ export function normalizeEditorFreeCanvasSelection(
 export function clampEditorFreeCanvasSelectionPosition(
   selection: CropSelection,
   canvasDocumentSize: { width: number; height: number },
-  zoom = 1
+  zoom = 1,
+  insets?: EditorWorkspaceInsets
 ): CropSelection {
-  const bounds = getEditorFreeCanvasBounds(canvasDocumentSize, zoom);
+  const bounds = getEditorFreeCanvasBounds(canvasDocumentSize, zoom, insets);
   const width = Math.min(bounds.right - bounds.left, Math.max(1, Math.round(selection.width)));
   const height = Math.min(bounds.bottom - bounds.top, Math.max(1, Math.round(selection.height)));
   return {

@@ -99,7 +99,7 @@ describe('image autosave mode', () => {
     expect(document).not.toHaveBeenCalled();
 
     autosave.setEnabled(true, document);
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(document).toHaveBeenCalledOnce();
     expect(commitWorkspaceMock).toHaveBeenCalledWith(
       expect.objectContaining({ document: expect.objectContaining({ sourceImageData: 'latest' }) })

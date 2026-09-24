@@ -1,5 +1,6 @@
 import type { Canvas } from 'fabric';
 import { EditorCanvas } from './render-region';
+import { createEditorWorkspaceInsets, type EditorWorkspaceInsets } from './workspace-extent';
 
 export const EDITOR_WORKSPACE_MARGIN = 2048;
 const MIN_EDITOR_WORKSPACE_MARGIN = 512;
@@ -27,6 +28,15 @@ export function getEditorEditingSurfaceSize(size: DocumentSize): DocumentSize {
     width: size.width + margin * 2,
     height: size.height + margin * 2,
   };
+}
+
+export function getEditorCanvasWorkspaceInsets(
+  canvas: Canvas | null,
+  size: DocumentSize
+): EditorWorkspaceInsets {
+  return canvas instanceof EditorCanvas
+    ? canvas.getWorkspaceInsets()
+    : createEditorWorkspaceInsets(getEditorWorkspaceMargin(size));
 }
 
 export function getEditorEditingDocumentSize(canvas: Canvas): DocumentSize | null {

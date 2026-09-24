@@ -1,15 +1,31 @@
 import { Canvas } from 'fabric';
+import {
+  createEditorWorkspaceInsets,
+  getEditorWorkspaceSurfaceSize,
+  rebaseEditorWorkspaceInsets,
+  type EditorWorkspaceInsets,
+} from './workspace-extent';
 
 type RenderRect = { x: number; y: number; width: number; height: number };
 type DocumentSize = { width: number; height: number };
 const MAX_INTERACTIVE_BACKING_PIXELS = 4_000_000;
+const MAX_WORKSPACE_SIDE = 200_000;
+const WORKSPACE_EDGE_TRIGGER_PX = 160;
+const WORKSPACE_GROWTH_PX = 768;
 
 /** The backing canvas covers the scrollable workspace; interactive frames paint only its visible part. */
 export class EditorCanvas extends Canvas {
   private renderViewport: HTMLElement | null = null;
   private virtualStage: HTMLElement | null = null;
   private documentSize: DocumentSize | null = null;
-  private documentMargin = 0;
+  private workspaceInsets = createEditorWorkspaceInsets(0);
+  private pendingCropWorkspace: {
+    size: DocumentSize;
+    insets: EditorWorkspaceInsets;
+    scrollX: number;
+    scrollY: number;
+  } | null = null;
+  private expandingCanvasWorkspace = false;
   private presentationScale = 1;
   private showOutsideCanvas = true;
 
@@ -27,6 +43,115 @@ export class EditorCanvas extends Canvas {
     return this.documentSize;
   }
 
+  getWorkspaceInsets(): EditorWorkspaceInsets {
+    return { ...this.workspaceInsets };
+  }
+
+  setExpandingCanvasWorkspace(enabled: boolean): void {
+    this.expandingCanvasWorkspace = enabled;
+  }
+
+  prepareWorkspaceForCrop(crop: {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }): void {
+    if (!this.documentSize) return;
+    this.pendingCropWorkspace = {
+      size: { width: crop.width, height: crop.height },
+      ...rebaseEditorWorkspaceInsets(this.workspaceInsets, this.documentSize, crop, 512),
+    };
+  }
+
+  extendWorkspaceAtScrollEdge(): boolean {
+    const viewport = this.renderViewport;
+    if (!this.expandingCanvasWorkspace || !viewport || !this.documentSize) return false;
+    const surface = getEditorWorkspaceSurfaceSize(this.documentSize, this.workspaceInsets);
+    const scale = this.presentationScale;
+    const growth = Math.max(512, Math.ceil(WORKSPACE_GROWTH_PX / scale));
+    return this.growWorkspace({
+      left: viewport.scrollLeft <= WORKSPACE_EDGE_TRIGGER_PX ? growth : 0,
+      top: viewport.scrollTop <= WORKSPACE_EDGE_TRIGGER_PX ? growth : 0,
+      right:
+        viewport.scrollLeft + viewport.clientWidth >=
+        surface.width * scale - WORKSPACE_EDGE_TRIGGER_PX
+          ? growth
+          : 0,
+      bottom:
+        viewport.scrollTop + viewport.clientHeight >=
+        surface.height * scale - WORKSPACE_EDGE_TRIGGER_PX
+          ? growth
+          : 0,
+    });
+  }
+
+  extendWorkspaceToContain(bounds: {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+  }): boolean {
+    if (!this.expandingCanvasWorkspace || !this.documentSize) return false;
+    const inset = Math.ceil(80 / this.presentationScale);
+    const growth = Math.max(512, Math.ceil(WORKSPACE_GROWTH_PX / this.presentationScale));
+    return this.growWorkspace(
+      {
+        left: Math.max(
+          0,
+          Math.min(MAX_WORKSPACE_SIDE, -bounds.left + inset - this.workspaceInsets.left)
+        ),
+        top: Math.max(
+          0,
+          Math.min(MAX_WORKSPACE_SIDE, -bounds.top + inset - this.workspaceInsets.top)
+        ),
+        right: Math.max(
+          0,
+          bounds.right + inset - this.documentSize.width - this.workspaceInsets.right
+        ),
+        bottom: Math.max(
+          0,
+          bounds.bottom + inset - this.documentSize.height - this.workspaceInsets.bottom
+        ),
+      },
+      growth
+    );
+  }
+
+  private growWorkspace(
+    amounts: Record<keyof EditorWorkspaceInsets, number>,
+    minimumGrowth = 0
+  ): boolean {
+    const next = { ...this.workspaceInsets };
+    for (const side of ['left', 'top', 'right', 'bottom'] as const) {
+      if (amounts[side] > 0) {
+        next[side] = Math.min(
+          MAX_WORKSPACE_SIDE,
+          next[side] + Math.max(minimumGrowth, amounts[side])
+        );
+      }
+    }
+    if (
+      next.left === this.workspaceInsets.left &&
+      next.top === this.workspaceInsets.top &&
+      next.right === this.workspaceInsets.right &&
+      next.bottom === this.workspaceInsets.bottom
+    ) {
+      return false;
+    }
+    const scrollX = next.left - this.workspaceInsets.left;
+    const scrollY = next.top - this.workspaceInsets.top;
+    this.workspaceInsets = next;
+    this.updateWorkspaceSurface();
+    if (this.renderViewport) {
+      this.renderViewport.scrollLeft += scrollX * this.presentationScale;
+      this.renderViewport.scrollTop += scrollY * this.presentationScale;
+    }
+    this.refreshVirtualViewport();
+    this.requestRenderAll();
+    return true;
+  }
+
   setShowOutsideCanvas(show: boolean): void {
     if (this.showOutsideCanvas === show) return;
     this.showOutsideCanvas = show;
@@ -35,8 +160,9 @@ export class EditorCanvas extends Canvas {
 
   setDocumentGeometry(size: DocumentSize, margin: number): void {
     this.documentSize = size.width > 0 && size.height > 0 ? size : null;
-    this.documentMargin = this.documentSize ? margin : 0;
     if (!this.documentSize) {
+      this.workspaceInsets = createEditorWorkspaceInsets(0);
+      this.pendingCropWorkspace = null;
       const surface = this.wrapperEl.parentElement;
       if (surface) {
         surface.style.removeProperty('width');
@@ -45,6 +171,16 @@ export class EditorCanvas extends Canvas {
       this.wrapperEl.style.removeProperty('left');
       this.wrapperEl.style.removeProperty('top');
       return;
+    }
+    const pending = this.pendingCropWorkspace;
+    const rebase =
+      pending?.size.width === size.width && pending.size.height === size.height ? pending : null;
+    this.workspaceInsets = rebase?.insets ?? createEditorWorkspaceInsets(margin);
+    this.pendingCropWorkspace = null;
+    this.updateWorkspaceSurface();
+    if (rebase && this.renderViewport) {
+      this.renderViewport.scrollLeft += rebase.scrollX * this.presentationScale;
+      this.renderViewport.scrollTop += rebase.scrollY * this.presentationScale;
     }
     this.refreshVirtualViewport();
   }
@@ -60,8 +196,8 @@ export class EditorCanvas extends Canvas {
     const rect = this.wrapperEl.parentElement?.getBoundingClientRect();
     if (!rect) return null;
     return {
-      left: rect.left + this.documentMargin * this.presentationScale,
-      top: rect.top + this.documentMargin * this.presentationScale,
+      left: rect.left + this.workspaceInsets.left * this.presentationScale,
+      top: rect.top + this.workspaceInsets.top * this.presentationScale,
       width: this.documentSize.width * this.presentationScale,
       height: this.documentSize.height * this.presentationScale,
     };
@@ -83,10 +219,7 @@ export class EditorCanvas extends Canvas {
     const surface = this.wrapperEl.parentElement;
     if (!surface) return;
     const scale = this.presentationScale;
-    const logicalWidth = this.documentSize.width + this.documentMargin * 2;
-    const logicalHeight = this.documentSize.height + this.documentMargin * 2;
-    surface.style.width = `${logicalWidth * scale}px`;
-    surface.style.height = `${logicalHeight * scale}px`;
+    const { width: logicalWidth, height: logicalHeight } = this.updateWorkspaceSurface();
     const width = Math.max(1, this.renderViewport.clientWidth);
     const height = Math.max(1, this.renderViewport.clientHeight);
     const devicePixelRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
@@ -111,10 +244,50 @@ export class EditorCanvas extends Canvas {
       0,
       0,
       scale,
-      this.documentMargin * scale - left,
-      this.documentMargin * scale - top,
+      this.workspaceInsets.left * scale - left,
+      this.workspaceInsets.top * scale - top,
     ]);
     this.calcOffset();
+  }
+
+  private updateWorkspaceSurface(): DocumentSize {
+    const size = getEditorWorkspaceSurfaceSize(
+      this.documentSize ?? { width: 0, height: 0 },
+      this.workspaceInsets
+    );
+    const surface = this.wrapperEl.parentElement;
+    if (!surface || !this.documentSize) return size;
+    surface.style.width = `${size.width * this.presentationScale}px`;
+    surface.style.height = `${size.height * this.presentationScale}px`;
+    surface.style.setProperty(
+      '--editor-workspace-image-left',
+      `${(this.workspaceInsets.left / size.width) * 100}%`
+    );
+    surface.style.setProperty(
+      '--editor-workspace-image-top',
+      `${(this.workspaceInsets.top / size.height) * 100}%`
+    );
+    surface.style.setProperty(
+      '--editor-workspace-image-right',
+      `${((this.workspaceInsets.left + this.documentSize.width) / size.width) * 100}%`
+    );
+    surface.style.setProperty(
+      '--editor-workspace-image-bottom',
+      `${((this.workspaceInsets.top + this.documentSize.height) / size.height) * 100}%`
+    );
+    surface.style.setProperty(
+      '--editor-workspace-image-width',
+      `${(this.documentSize.width / size.width) * 100}%`
+    );
+    surface.style.setProperty(
+      '--editor-workspace-image-height',
+      `${(this.documentSize.height / size.height) * 100}%`
+    );
+    surface.style.setProperty(
+      '--editor-workspace-bottom-inset',
+      `${(this.workspaceInsets.bottom / size.height) * 100}%`
+    );
+    return size;
   }
 
   private getVisibleRenderRect(): RenderRect | null {

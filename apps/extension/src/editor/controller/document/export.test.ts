@@ -9,6 +9,7 @@ import {
 } from './export';
 import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 import { Canvas } from 'fabric';
+import { EditorCanvas } from '../viewport/render-region';
 import {
   getEditorWorkspaceMargin,
   setEditorEditingSurfaceDimensions,
@@ -289,6 +290,30 @@ describe('renderEditorCanvasToDataUrl', () => {
       width: documentSize.width,
       height: documentSize.height,
     });
+  });
+
+  it('renders a bounded virtual canvas directly at the requested preview scale', () => {
+    const element = document.createElement('canvas');
+    const surface = document.createElement('div');
+    const viewport = document.createElement('div');
+    surface.append(element);
+    const canvas = new EditorCanvas(element);
+    canvas.setRenderViewport(viewport, document.createElement('div'));
+    setEditorEditingSurfaceDimensions(canvas, { width: 8000, height: 7000 });
+    const output = document.createElement('canvas');
+    output.width = 2048;
+    output.height = 1792;
+    output.toDataURL = vi.fn(() => 'data:image/png;base64,preview');
+    const render = vi.spyOn(canvas, 'renderDocumentCanvas').mockReturnValue(output);
+
+    expect(
+      renderEditorCanvasToDataUrl(canvas, {
+        format: 'png',
+        quality: 1,
+        outputSize: { width: 2048, height: 1792 },
+      })
+    ).toBe('data:image/png;base64,preview');
+    expect(render).toHaveBeenCalledWith(2048 / 8000);
   });
 
   it('resamples the rendered image to an explicit output size', () => {

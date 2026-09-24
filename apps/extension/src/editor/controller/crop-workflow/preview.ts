@@ -1,5 +1,7 @@
 import type { Canvas, Rect } from 'fabric';
 import { Point } from 'fabric';
+import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
+import { EditorCanvas } from '../viewport/render-region';
 import type { CropSelection } from '../core/types';
 import {
   applyCropGuideSelection,
@@ -34,18 +36,26 @@ export function previewEditorCanvasSizeSelection(
   if (context.mode === 'expand') {
     const width = Math.max(1, Math.round(context.width));
     const height = Math.max(1, Math.round(context.height));
+    const left = context.cropSelection?.left ?? 0;
+    const top = context.cropSelection?.top ?? 0;
+    if (context.canvas instanceof EditorCanvas) {
+      context.canvas.extendWorkspaceToContain({
+        left,
+        top,
+        right: left + width,
+        bottom: top + height,
+      });
+    }
     const nextSelection = normalizeEditorFreeCanvasSelection(
       {
-        left:
-          context.cropSelection?.left ?? Math.round((context.canvasDocumentSize.width - width) / 2),
-        top:
-          context.cropSelection?.top ??
-          Math.round((context.canvasDocumentSize.height - height) / 2),
+        left,
+        top,
         width,
         height,
       },
       context.canvasDocumentSize,
-      context.canvas.getZoom()
+      context.canvas.getZoom(),
+      getEditorCanvasWorkspaceInsets(context.canvas, context.canvasDocumentSize)
     );
     if (isSameCropSelection(nextSelection, context.cropSelection)) return null;
     const cropGuide = context.cropGuide ?? createCropGuideRect(new Point(0, 0));

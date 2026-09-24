@@ -15,17 +15,27 @@ import {
   type EditorSessionAutosaveState,
 } from './state';
 
-const EDITOR_AUTOSAVE_DEBOUNCE_MS = 400;
+const EDITOR_AUTOSAVE_DEBOUNCE_MS = 2_000;
 const logger = createLogger({ namespace: 'EditorSession' });
 
 async function updateImagePresentation(
   context: ActiveEditorSessionContext,
-  revision: number
+  revision: number,
+  editRevision: number,
+  state: EditorSessionAutosaveState
 ): Promise<void> {
   if (!context.renderPresentation) return;
+  const isCurrent = () =>
+    state.activeContext?.aggregateId === context.aggregateId &&
+    state.activeContext.durableRevision === revision &&
+    state.autosaveRevision === editRevision &&
+    state.pendingDocument === null;
+  if (!isCurrent()) return;
   try {
     const previewBlob = await dataUrlToBlob(await context.renderPresentation());
+    if (!isCurrent()) return;
     const thumbnailBlob = await createImageThumbnailBlob(previewBlob);
+    if (!isCurrent()) return;
     await commitImagePresentation({
       aggregateId: context.aggregateId,
       expectedWorkspaceRevision: revision,
@@ -68,7 +78,7 @@ async function persistEditorSessionDocument(args: {
       args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
     }
     args.state.lastWriteError = null;
-    void updateImagePresentation(args.context, result.revision);
+    void updateImagePresentation(args.context, result.revision, args.revision, args.state);
 
     if (
       args.state.activeContext?.aggregateId === args.context.aggregateId &&
@@ -136,6 +146,7 @@ export function queuePendingAutosave(
   }
 
   state.pendingDocument = document;
+  state.autosaveRevision += 1;
   setEditorSaveErrorMessage(null);
   setEditorSaveState('saving');
   clearPendingAutosaveTimer(state);

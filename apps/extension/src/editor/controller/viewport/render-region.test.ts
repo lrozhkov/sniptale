@@ -27,6 +27,55 @@ it('keeps the interactive backing near the viewport instead of the scrollable wo
   expect(surface.style.height).toBe('5176px');
 });
 
+it('adds scrollable crop workspace at an approached edge without increasing the raster backing', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+    scrollLeft: { value: 0, writable: true },
+    scrollTop: { value: 0, writable: true },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 100, height: 80 }, 2048);
+  canvas.setExpandingCanvasWorkspace(true);
+  const initialWidth = Number.parseFloat(surface.style.width);
+
+  expect(canvas.extendWorkspaceAtScrollEdge()).toBe(true);
+  expect(canvas.getWorkspaceInsets().left).toBeGreaterThan(2048);
+  expect(viewport.scrollLeft).toBeGreaterThan(0);
+  expect(Number.parseFloat(surface.style.width)).toBeGreaterThan(initialWidth);
+  expect(canvas.getWidth()).toBe(800);
+});
+
+it('keeps the same workspace span across repeated canvas expansion applies', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 100, height: 80 }, 2048);
+  const initialWidth = surface.style.width;
+
+  canvas.prepareWorkspaceForCrop({ left: -100, top: 0, width: 300, height: 80 });
+  canvas.setDocumentGeometry({ width: 300, height: 80 }, 2048);
+  expect(surface.style.width).toBe(initialWidth);
+  expect(canvas.getWorkspaceInsets()).toEqual({ left: 1948, top: 2048, right: 1948, bottom: 2048 });
+
+  canvas.prepareWorkspaceForCrop({ left: -100, top: 0, width: 500, height: 80 });
+  canvas.setDocumentGeometry({ width: 500, height: 80 }, 2048);
+  expect(surface.style.width).toBe(initialWidth);
+  expect(canvas.getWidth()).toBe(800);
+});
+
 it('projects a far off-image object into the viewport after scrolling', () => {
   const surface = document.createElement('div');
   const stage = document.createElement('div');

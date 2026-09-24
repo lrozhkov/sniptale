@@ -1,4 +1,4 @@
-import type { Control } from 'fabric';
+import { Point, util, type Control } from 'fabric';
 
 const EDITOR_BORDER_RESIZE_HIT_DISTANCE = 10;
 const EDITOR_BORDER_RESIZE_CORNER_GUARD = 22;
@@ -90,9 +90,8 @@ function isPointOnResizableBorder(
   }
 
   const hitState = getPointToSegmentHitState(point, segment[0], segment[1]);
-  const logicalWidth = object.canvas?.getWidth?.();
-  const screenWidth = object.canvas?.upperCanvasEl?.getBoundingClientRect?.().width;
-  const zoom = logicalWidth && screenWidth ? screenWidth / logicalWidth : 1;
+  const transform = object.canvas?.viewportTransform;
+  const zoom = transform ? Math.hypot(transform[0], transform[1]) : 1;
 
   return Boolean(
     hitState &&
@@ -103,10 +102,16 @@ function isPointOnResizableBorder(
 }
 
 function createEdgeControlShouldActivate(controlKey: EdgeControlKey): Control['shouldActivate'] {
-  return (_controlKey, object, pointer) =>
-    Object.is(object.canvas?.getActiveObject(), object) &&
-    object.isControlVisible(controlKey) &&
-    isPointOnResizableBorder(controlKey, object, pointer);
+  return (_controlKey, object, pointer) => {
+    const canvas = object.canvas;
+    if (!canvas || canvas.getActiveObject() !== object || !object.isControlVisible(controlKey)) {
+      return false;
+    }
+    const scenePoint = new Point(pointer.x, pointer.y).transform(
+      util.invertTransform(canvas.viewportTransform)
+    );
+    return isPointOnResizableBorder(controlKey, object, scenePoint);
+  };
 }
 
 export function patchEdgeControl(control: Control | undefined, key: EdgeControlKey): void {

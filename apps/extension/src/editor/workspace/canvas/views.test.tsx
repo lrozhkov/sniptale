@@ -73,7 +73,10 @@ it('shows a muted, nonblocking workspace around the image rectangle', () => {
   expect(markup).toContain('clip-path:inset(1px)');
   expect(markup).toContain('editor.canvas.workspace-mask-left');
   const verticalMaskInset = (EDITOR_WORKSPACE_MARGIN / (80 + EDITOR_WORKSPACE_MARGIN * 2)) * 100;
-  expect(markup).toContain(`top:${verticalMaskInset}%;bottom:${verticalMaskInset}%`);
+  expect(markup).toContain(
+    `top:var(--editor-workspace-image-top, ${verticalMaskInset}%);` +
+      `bottom:var(--editor-workspace-bottom-inset, ${verticalMaskInset}%)`
+  );
   expect(markup.match(/background-image:/g)).toHaveLength(1);
   expect(markup).toContain('background-color:#f5f5f5');
   expect(markup.match(/pointer-events-none absolute z-40/g)).toHaveLength(5);

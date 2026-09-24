@@ -18,6 +18,7 @@ import {
   startEditorDrawSession,
 } from './draw-session';
 import type { CropSelection, DrawSession } from '../core/types';
+import type { EditorWorkspaceInsets } from '../viewport/workspace-extent';
 
 type RectInstance = Rect<TOptions<RectProps>, SerializedRectProps, ObjectEvents>;
 
@@ -55,13 +56,14 @@ function completeCropDrawSession(
   canvasDocumentSize: { width: number; height: number },
   object: FabricObject,
   mode: 'crop' | 'expand',
-  zoom: number
+  zoom: number,
+  workspaceInsets?: EditorWorkspaceInsets
 ): EditorDrawSessionCompletion {
   const cropGuide = object as RectInstance;
   const rawSelection = createCropSelectionFromRect(cropGuide);
   const cropSelection =
     mode === 'expand'
-      ? normalizeEditorFreeCanvasSelection(rawSelection, canvasDocumentSize, zoom)
+      ? normalizeEditorFreeCanvasSelection(rawSelection, canvasDocumentSize, zoom, workspaceInsets)
       : normalizeEditorCropSelection(rawSelection, canvasDocumentSize);
   applyCropGuideSelection(cropGuide, cropSelection, 'selection');
   cropGuide.hasBorders = false;
@@ -89,6 +91,7 @@ export function completeEditorDrawSession(options: {
   minDrawSize: number;
   cropMode?: 'crop' | 'expand';
   zoom?: number;
+  workspaceInsets?: EditorWorkspaceInsets;
 }): EditorDrawSessionCompletion {
   const object = options.drawSession.object;
   if (!object) {
@@ -123,7 +126,8 @@ export function completeEditorDrawSession(options: {
       options.canvasDocumentSize,
       object,
       options.cropMode ?? 'crop',
-      options.zoom ?? 1
+      options.zoom ?? 1,
+      options.workspaceInsets
     );
   }
 

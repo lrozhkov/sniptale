@@ -7,6 +7,7 @@ import type { DrawWorkflowState } from './completion-types';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { updateEditorDrawingPathDraft } from '../../drawing/object/vector';
 import { useEditorStore } from '../../state/useEditorStore';
+import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
 
 function finalizeFreehandPreview(drawSession: DrawSession): void {
   const object = drawSession.object;
@@ -39,6 +40,7 @@ export function completeEditorDrawWorkflow(options: {
     minDrawSize,
     cropMode: useEditorStore.getState().canvasCropMode,
     zoom: canvas.getZoom?.() ?? 1,
+    workspaceInsets: getEditorCanvasWorkspaceInsets(canvas, canvasDocumentSize),
   });
 
   switch (completion.kind) {

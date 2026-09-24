@@ -2,6 +2,7 @@
 
 import { Point, Rect } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isEditorHiddenEdgeControl } from '../document/interaction-border-controls';
 
 import {
   applyCropGuideSelection,
@@ -98,6 +99,7 @@ function runEditorControllerCropGuideSuite() {
     expect(rect.sniptaleRole).toBe('crop-guide');
     expect(rect.strokeWidth).toBe(0);
     expect(rect.hasBorders).toBe(false);
+    expect(isEditorHiddenEdgeControl(rect.controls['mr'])).toBe(true);
     expect(rect.cornerColor).toBe(rect.borderColor);
     expect(isEditorCropGuide(rect)).toBe(true);
     expect(isEditorCropGuide(new Rect())).toBe(false);
@@ -121,10 +123,10 @@ function runEditorControllerCropGuideSuite() {
     expect(setControlsVisibility).toHaveBeenCalledWith({
       bl: true,
       br: true,
-      mb: false,
-      ml: false,
-      mr: false,
-      mt: false,
+      mb: true,
+      ml: true,
+      mr: true,
+      mt: true,
       mtr: false,
       tl: true,
       tr: true,

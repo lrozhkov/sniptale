@@ -99,7 +99,11 @@ it('renders the Fabric base without proxies and restores proxy visibility after 
       renderOptions: { format: 'png', outputSize: { width: 100, height: 50 }, quality: 100 },
     })
   ).resolves.toBe('data:image/png;base64,final');
-  expect(mocks.renderCanvas).toHaveBeenCalledWith(canvas, { format: 'png', quality: 1 });
+  expect(mocks.renderCanvas).toHaveBeenCalledWith(canvas, {
+    format: 'png',
+    quality: 1,
+    outputSize: { width: 100, height: 50 },
+  });
   expect(proxy.visible).toBe(true);
   expect(mocks.rasterize).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -303,7 +307,7 @@ it('omits a hidden frame annotation from the DOM raster export', async () => {
   expect(proxy.visible).toBe(false);
 });
 
-it('surfaces optimized export as a successful warning', async () => {
+it('keeps downscaled frame export silent', async () => {
   const { canvas } = createCanvas();
   mocks.rasterize.mockResolvedValueOnce({
     blob: new Blob(['output'], { type: 'image/png' }),
@@ -314,7 +318,26 @@ it('surfaces optimized export as a successful warning', async () => {
     canvasDocumentSize: { width: 200, height: 100 },
     renderOptions: { format: 'png', quality: 100 },
   });
-  expect(mocks.showToast).toHaveBeenCalledWith(expect.any(String), 'warning');
+  expect(mocks.showToast).not.toHaveBeenCalled();
+});
+
+it('keeps repeated downscaled autosave presentation renders silent', async () => {
+  const { canvas } = createCanvas();
+  mocks.rasterize.mockResolvedValue({
+    blob: new Blob(['output'], { type: 'image/png' }),
+    metadata: { downscaled: true, outputHeight: 7000, outputScale: 0.875, outputWidth: 8000 },
+  });
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 9000, height: 8000 },
+    draftPolicy: 'committed' as const,
+    renderOptions: { format: 'png' as const, quality: 1 },
+  };
+
+  await renderEditorWithFrameAnnotations(options);
+  await renderEditorWithFrameAnnotations(options);
+
+  expect(mocks.showToast).not.toHaveBeenCalled();
 });
 
 it.each([

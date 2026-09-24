@@ -24,6 +24,8 @@ import {
   normalizeEditorFreeCanvasSelection,
 } from '../tools/crop';
 import { useEditorStore } from '../../state/useEditorStore';
+import { EditorCanvas } from '../viewport/render-region';
+import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
 
 function collectFreehandSamples(canvas: Canvas, events: readonly TPointerEvent[]): DrawingSample[] {
   return events.flatMap((event) => {
@@ -70,7 +72,17 @@ function updateCropDraft(
 ): void {
   const size = bindings.getCanvasDocumentSize();
   const mode = useEditorStore.getState().canvasCropMode;
-  const freeBounds = mode === 'expand' ? getEditorFreeCanvasBounds(size, canvas.getZoom()) : null;
+  if (mode === 'expand' && canvas instanceof EditorCanvas) {
+    canvas.extendWorkspaceToContain({
+      left: point.x,
+      top: point.y,
+      right: point.x,
+      bottom: point.y,
+    });
+  }
+  const insets = getEditorCanvasWorkspaceInsets(canvas, size);
+  const freeBounds =
+    mode === 'expand' ? getEditorFreeCanvasBounds(size, canvas.getZoom(), insets) : null;
   const constrainedPoint = freeBounds
     ? {
         x: Math.max(freeBounds.left, Math.min(freeBounds.right, point.x)),
@@ -87,7 +99,8 @@ function updateCropDraft(
       : normalizeEditorFreeCanvasSelection(
           { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height },
           size,
-          canvas.getZoom()
+          canvas.getZoom(),
+          insets
         );
   object.set({
     left: selection.left,

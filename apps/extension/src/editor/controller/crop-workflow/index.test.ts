@@ -112,7 +112,7 @@ it('does not create a canvas size preview for the current canvas size', () => {
   expect(canvas.add).not.toHaveBeenCalled();
 });
 
-it('creates an editable expansion guide centered around the original image', () => {
+it('anchors manual expansion at the image origin so existing layers keep their position', () => {
   const canvas = {
     add: vi.fn(),
     getZoom: () => 1,
@@ -130,10 +130,10 @@ it('creates an editable expansion guide centered around the original image', () 
     mode: 'expand',
   });
 
-  expect(result?.cropSelection).toEqual({ left: 0, top: -150, width: 1200, height: 1200 });
+  expect(result?.cropSelection).toEqual({ left: 0, top: 0, width: 1200, height: 1200 });
   expect(mocks.applyCropGuideSelectionMock).toHaveBeenCalledWith(
     expect.anything(),
-    { left: 0, top: -150, width: 1200, height: 1200 },
+    { left: 0, top: 0, width: 1200, height: 1200 },
     'selection'
   );
   expect(canvas.setActiveObject).toHaveBeenCalledWith(result?.cropGuide);

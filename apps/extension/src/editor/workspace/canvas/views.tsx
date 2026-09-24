@@ -125,12 +125,12 @@ function CanvasStage(
   const top = `${(margin / Math.max(1, surfaceSize.height)) * 100}%`;
   const right = `${((margin + documentSize.width) / Math.max(1, surfaceSize.width)) * 100}%`;
   const bottom = `${((margin + documentSize.height) / Math.max(1, surfaceSize.height)) * 100}%`;
-  const bottomInset = `${(margin / Math.max(1, surfaceSize.height)) * 100}%`;
+  const bottomInset = `var(--editor-workspace-bottom-inset, ${(margin / Math.max(1, surfaceSize.height)) * 100}%)`;
   const imageStyle = {
-    left,
-    top,
-    width: `${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%`,
-    height: `${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%`,
+    left: `var(--editor-workspace-image-left, ${left})`,
+    top: `var(--editor-workspace-image-top, ${top})`,
+    width: `var(--editor-workspace-image-width, ${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%)`,
+    height: `var(--editor-workspace-image-height, ${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%)`,
   } satisfies React.CSSProperties;
   const freeCanvasSelection = props.activeTool === 'crop' && props.canvasCropMode === 'expand';
   const revealOutside = props.showOutsideCanvas !== false || freeCanvasSelection;
@@ -179,21 +179,39 @@ function CanvasStage(
             <>
               <div
                 className={maskClassName}
-                style={{ ...maskStyle, left: 0, right: 0, top: 0, height: top }}
+                style={{ ...maskStyle, left: 0, right: 0, top: 0, height: imageStyle.top }}
               />
               <div
                 className={maskClassName}
-                style={{ ...maskStyle, left: 0, right: 0, top: bottom, bottom: 0 }}
+                style={{
+                  ...maskStyle,
+                  left: 0,
+                  right: 0,
+                  top: `var(--editor-workspace-image-bottom, ${bottom})`,
+                  bottom: 0,
+                }}
               />
               <div
                 className={maskClassName}
                 data-ui="editor.canvas.workspace-mask-left"
-                style={{ ...maskStyle, left: 0, top, bottom: bottomInset, width: left }}
+                style={{
+                  ...maskStyle,
+                  left: 0,
+                  top: imageStyle.top,
+                  bottom: bottomInset,
+                  width: imageStyle.left,
+                }}
               />
               <div
                 className={maskClassName}
                 data-ui="editor.canvas.workspace-mask-right"
-                style={{ ...maskStyle, left: right, top, bottom: bottomInset, right: 0 }}
+                style={{
+                  ...maskStyle,
+                  left: `var(--editor-workspace-image-right, ${right})`,
+                  top: imageStyle.top,
+                  bottom: bottomInset,
+                  right: 0,
+                }}
               />
               <div
                 className="pointer-events-none absolute z-40 border border-[var(--sniptale-color-border-soft)]"

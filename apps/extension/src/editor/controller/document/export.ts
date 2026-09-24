@@ -81,7 +81,14 @@ function resolveRenderedCanvasElement(
     const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
     sourceCanvas =
       canvas instanceof EditorCanvas && canvas.hasVirtualViewport
-        ? canvas.renderDocumentCanvas()
+        ? canvas.renderDocumentCanvas(
+            documentSize && outputSize
+              ? Math.min(
+                  normalizeOutputSize(outputSize).width / documentSize.width,
+                  normalizeOutputSize(outputSize).height / documentSize.height
+                )
+              : 1
+          )
         : documentSize
           ? canvas.toCanvasElement(1, {
               left: margin,

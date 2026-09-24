@@ -2,6 +2,7 @@ import type { Point } from 'fabric';
 import { Rect } from 'fabric';
 import type { CropSelection } from '../core/types';
 import { EDITOR_CANVAS_CROP_GUIDE_FILL, EDITOR_CANVAS_ACCENT } from '../../color/palette/constants';
+import { applyEditorObjectInteractionControls } from '../document/interaction-controls/apply';
 
 export function createCropGuideRect(point: Point): Rect {
   const crop = new Rect({
@@ -23,6 +24,7 @@ export function createCropGuideRect(point: Point): Rect {
   });
   crop.sniptaleRole = 'crop-guide';
   crop.sniptaleCropGuideMode = 'selection';
+  applyEditorObjectInteractionControls(crop);
   return crop;
 }
 
@@ -40,10 +42,10 @@ export function configureCropGuideForEditing(cropGuide: Rect): void {
   cropGuide.setControlsVisibility?.({
     bl: true,
     br: true,
-    mb: false,
-    ml: false,
-    mr: false,
-    mt: false,
+    mb: true,
+    ml: true,
+    mr: true,
+    mt: true,
     mtr: false,
     tl: true,
     tr: true,

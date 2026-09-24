@@ -12,6 +12,8 @@ import {
   normalizeEditorFreeCanvasSelection,
 } from '../tools/crop';
 import { useEditorStore } from '../../state/useEditorStore';
+import { EditorCanvas } from '../viewport/render-region';
+import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
 
 type CanvasObject = import('fabric').FabricObject;
 
@@ -26,12 +28,22 @@ export function syncCropGuideInteraction(
 
   const rawSelection = createCropSelectionFromRect(target);
   const size = bindings.getCanvasDocumentSize();
-  const zoom = bindings.getCanvas()?.getZoom() ?? 1;
+  const canvas = bindings.getCanvas();
+  const zoom = canvas?.getZoom() ?? 1;
+  if (useEditorStore.getState().canvasCropMode === 'expand' && canvas instanceof EditorCanvas) {
+    canvas.extendWorkspaceToContain({
+      left: rawSelection.left,
+      top: rawSelection.top,
+      right: rawSelection.left + rawSelection.width,
+      bottom: rawSelection.top + rawSelection.height,
+    });
+  }
+  const insets = getEditorCanvasWorkspaceInsets(canvas, size);
   const selection =
     useEditorStore.getState().canvasCropMode === 'expand'
       ? interaction === 'move'
-        ? clampEditorFreeCanvasSelectionPosition(rawSelection, size, zoom)
-        : normalizeEditorFreeCanvasSelection(rawSelection, size, zoom)
+        ? clampEditorFreeCanvasSelectionPosition(rawSelection, size, zoom, insets)
+        : normalizeEditorFreeCanvasSelection(rawSelection, size, zoom, insets)
       : interaction === 'move'
         ? clampEditorCropSelectionPosition(rawSelection, size)
         : normalizeEditorCropSelection(rawSelection, size);

@@ -47,7 +47,9 @@ function handleViewportWheel(bindings: PanEventBindings, event: WheelEvent): voi
 
 function handleViewportScroll(bindings: PanEventBindings): void {
   const canvas = bindings.getCanvas();
-  if (canvas instanceof EditorCanvas) canvas.refreshVirtualViewport();
+  if (canvas instanceof EditorCanvas) {
+    if (!canvas.extendWorkspaceAtScrollEdge()) canvas.refreshVirtualViewport();
+  }
   canvas?.requestRenderAll();
   scheduleEditorViewportStateSyncFrame({
     viewportSyncFrame: bindings.getViewportSyncFrame(),

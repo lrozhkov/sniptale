@@ -5,8 +5,6 @@ import { CUSTOM_JSON_PROPS } from '../../../document/model';
 import type { EditorRenderToDataUrlOptions } from '../../../document/model/render-options';
 import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft-coordinator';
 import { collectFrameAnnotationProxies } from '../../../frame-annotation/proxy';
-import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import { translate } from '../../../../platform/i18n';
 import { rasterizeFrameAnnotations } from '../../../../composition/frame-annotation-raster-client';
 import { createRuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
 import { EditorCanvas } from '../../viewport/render-region';
@@ -49,7 +47,8 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
     input: {
       baseImage: await renderBaseImage(
         canvas,
-        entries.map((entry) => entry.object)
+        entries.map((entry) => entry.object),
+        options.renderOptions.outputSize
       ),
       width: options.canvasDocumentSize.width,
       height: options.canvasDocumentSize.height,
@@ -66,9 +65,6 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
   const result = await convertRasterBlob(output.blob, options.renderOptions);
   if (createCanvasVisualSignature(canvas) !== signature) {
     throw new Error('Frame annotation raster result is stale');
-  }
-  if (output.metadata.downscaled) {
-    showToast(translate('highlighter.exportOptimizedSize'), 'warning');
   }
   return result;
 }
@@ -88,11 +84,21 @@ function enqueueFrameAnnotationExport<T>(canvas: Canvas, operation: () => Promis
   });
 }
 
-async function renderBaseImage(canvas: Canvas, proxies: FabricObject[]): Promise<Blob> {
+async function renderBaseImage(
+  canvas: Canvas,
+  proxies: FabricObject[],
+  outputSize?: EditorRenderToDataUrlOptions['outputSize']
+): Promise<Blob> {
   const visibility = proxies.map((object) => ({ object, visible: object.visible !== false }));
   for (const entry of visibility) entry.object.set({ visible: false });
   try {
-    return dataUrlToBlob(renderEditorCanvasToDataUrl(canvas, { format: 'png', quality: 1 }));
+    return dataUrlToBlob(
+      renderEditorCanvasToDataUrl(canvas, {
+        format: 'png',
+        quality: 1,
+        ...(outputSize ? { outputSize } : {}),
+      })
+    );
   } finally {
     for (const entry of visibility) entry.object.set({ visible: entry.visible });
     canvas.requestRenderAll();

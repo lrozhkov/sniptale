@@ -88,10 +88,14 @@ describe('image aggregate autosave', () => {
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
     autosave.scheduleAutosave(createDocument('first'));
+    const { useEditorStore } = await import('../../state/useEditorStore');
+    expect(useEditorStore.getState().saveState).toBe('saving');
+    await vi.advanceTimersByTimeAsync(1_500);
     const latest = createDocument('latest');
     autosave.scheduleAutosave(latest);
-
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(commitWorkspaceMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
 
     expect(commitWorkspaceMock).toHaveBeenCalledTimes(1);
     expect(commitWorkspaceMock).toHaveBeenCalledWith(
@@ -178,7 +182,7 @@ describe('image aggregate autosave', () => {
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
     autosave.scheduleAutosave(createDocument('queued'));
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(useEditorStore.getState().saveState).toBe('error');
     expect(autosave.getDurableRevision()).toBe(0);
   });
@@ -239,7 +243,7 @@ describe('image aggregate autosave', () => {
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
     autosave.scheduleAutosave(createDocument('stale'));
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(autosave.getLastWriteError()).toBeInstanceOf(Error);
 
     autosave.scheduleAutosave(createDocument('must-not-overwrite-copy'));
@@ -288,23 +292,117 @@ describe('image aggregate autosave', () => {
     void rejectedWrite.catch(() => undefined);
     recoveredChainState.writeChain = rejectedWrite;
     queuePendingAutosave(recoveredChainState, createDocument('after-failure'));
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
 
     const detachedState = createAutosaveState();
     activateAutosaveContext(detachedState, context);
     queuePendingAutosave(detachedState, createDocument('detached'));
     detachedState.activeContext = null;
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
 
     const emptyState = createAutosaveState();
     activateAutosaveContext(emptyState, context);
     queuePendingAutosave(emptyState, createDocument('cleared'));
     emptyState.pendingDocument = null;
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(2_000);
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
   });
+});
+
+it('drops an obsolete gallery preview when another edit arrives during rendering', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  let finishRender: (value: string) => void = () => undefined;
+  const renderPresentation = vi.fn(
+    () =>
+      new Promise<string>((resolve) => {
+        finishRender = resolve;
+      })
+  );
+  const autosave = createEditorSessionAutosaveService();
+  autosave.activate({
+    aggregateId: 'image-1',
+    durableRevision: 0,
+    renderPresentation,
+    sourceTitle: null,
+    sourceUrl: null,
+  });
+
+  await autosave.persistSnapshot(() => createDocument('first'));
+  expect(renderPresentation).toHaveBeenCalledOnce();
+  autosave.scheduleAutosave(createDocument('newer'));
+  finishRender('data:image/png;base64,cHJldmlldw==');
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(createThumbnailMock).not.toHaveBeenCalled();
+  expect(commitPresentationMock).not.toHaveBeenCalled();
+});
+
+it('keeps the save indicator pending when another edit follows an in-flight write', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  let finishFirst: (value: {
+    revision: number;
+    documentAssetsByRuntimeUrl: Map<never, never>;
+  }) => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishFirst = resolve;
+      })
+  );
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  autosave.scheduleAutosave(createDocument('first'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+
+  autosave.scheduleAutosave(createDocument('second'));
+  finishFirst({ revision: 1, documentAssetsByRuntimeUrl: new Map<never, never>() });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(useEditorStore.getState().saveState).toBe('saving');
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(useEditorStore.getState().saveState).toBe('saved');
+});
+
+it('skips an old preview after a newer edit has entered its write', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  let finishRender: (value: string) => void = () => undefined;
+  let finishWrite: (value: {
+    revision: number;
+    documentAssetsByRuntimeUrl: Map<never, never>;
+  }) => void = () => undefined;
+  const renderPresentation = vi.fn(
+    () =>
+      new Promise<string>((resolve) => {
+        finishRender = resolve;
+      })
+  );
+  const autosave = createEditorSessionAutosaveService();
+  autosave.activate({
+    aggregateId: 'image-1',
+    durableRevision: 0,
+    renderPresentation,
+    sourceTitle: null,
+    sourceUrl: null,
+  });
+  await autosave.persistSnapshot(() => createDocument('first'));
+  commitWorkspaceMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishWrite = resolve;
+      })
+  );
+
+  autosave.scheduleAutosave(createDocument('second'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  finishRender('data:image/png;base64,cHJldmlldw==');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(createThumbnailMock).not.toHaveBeenCalled();
+  expect(commitPresentationMock).not.toHaveBeenCalled();
+  finishWrite({ revision: 2, documentAssetsByRuntimeUrl: new Map<never, never>() });
+  await vi.advanceTimersByTimeAsync(0);
 });
 
 describe('image workspace hydration freshness', () => {

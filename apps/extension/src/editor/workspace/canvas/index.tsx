@@ -87,6 +87,9 @@ export const CanvasWrapper: React.FC<CanvasWrapperProps> = ({ hasImage }) => {
   useEffect(() => {
     const canvas = controller.getPublicApiAdapter?.().canvas;
     if (canvas instanceof EditorCanvas) {
+      canvas.setExpandingCanvasWorkspace(
+        state.canvasCropMode === 'expand' && state.activeTool === 'crop'
+      );
       canvas.setShowOutsideCanvas(
         state.showOutsideCanvas ||
           (state.canvasCropMode === 'expand' && state.activeTool === 'crop')

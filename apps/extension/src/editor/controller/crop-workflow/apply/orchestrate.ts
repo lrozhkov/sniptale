@@ -2,6 +2,7 @@ import type { Canvas, Rect } from 'fabric';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { normalizeEditorFreeCanvasSelection, normalizeEditorCropSelection } from '../../tools/crop';
 import { useEditorStore } from '../../../state/useEditorStore';
+import { getEditorCanvasWorkspaceInsets } from '../../viewport/editing-surface';
 import type { CropSelection } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
 
@@ -43,7 +44,8 @@ export async function applyEditorControllerCropSelection(
       ? normalizeEditorFreeCanvasSelection(
           context.cropSelection,
           context.canvasDocumentSize,
-          context.canvas.getZoom()
+          context.canvas.getZoom(),
+          getEditorCanvasWorkspaceInsets(context.canvas, context.canvasDocumentSize)
         )
       : normalizeEditorCropSelection(context.cropSelection, context.canvasDocumentSize);
   const restoreCropGuide = hideCropGuideForApply(context.canvas, context.cropGuide);
