@@ -1,4 +1,5 @@
 import { Canvas } from 'fabric';
+import { isBackgroundObject, isUserObject } from '../../document/model';
 import {
   createEditorWorkspaceInsets,
   getEditorWorkspaceSurfaceSize,
@@ -189,6 +190,48 @@ export class EditorCanvas extends Canvas {
     if (!Number.isFinite(scale) || scale <= 0) return;
     this.presentationScale = scale;
     this.refreshVirtualViewport();
+  }
+
+  centerDocumentInViewport(): void {
+    if (!this.renderViewport || !this.documentSize || !this.virtualStage) return;
+    this.renderViewport.scrollLeft = Math.max(
+      0,
+      (this.workspaceInsets.left + this.documentSize.width / 2) * this.presentationScale -
+        this.renderViewport.clientWidth / 2
+    );
+    this.renderViewport.scrollTop = Math.max(
+      0,
+      (this.workspaceInsets.top + this.documentSize.height / 2) * this.presentationScale -
+        this.renderViewport.clientHeight / 2
+    );
+    this.refreshVirtualViewport();
+  }
+
+  ensureWorkspaceContainsObjects(): void {
+    if (!this.documentSize) return;
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
+    for (const object of this.getObjects()) {
+      if (!isUserObject(object) || isBackgroundObject(object)) continue;
+      const rect = object.getBoundingRect();
+      left = Math.min(left, rect.left);
+      top = Math.min(top, rect.top);
+      right = Math.max(right, rect.left + rect.width);
+      bottom = Math.max(bottom, rect.top + rect.height);
+    }
+    if (![left, top, right, bottom].every(Number.isFinite)) return;
+    const padding = Math.ceil(80 / this.presentationScale);
+    this.growWorkspace({
+      left: Math.max(0, -left + padding - this.workspaceInsets.left),
+      top: Math.max(0, -top + padding - this.workspaceInsets.top),
+      right: Math.max(0, right + padding - this.documentSize.width - this.workspaceInsets.right),
+      bottom: Math.max(
+        0,
+        bottom + padding - this.documentSize.height - this.workspaceInsets.bottom
+      ),
+    });
   }
 
   getDocumentClientRect(): Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null {

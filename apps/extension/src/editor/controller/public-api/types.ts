@@ -37,6 +37,7 @@ export type EditorControllerPublicApiAdapter = {
   nextLabelIndex: (type: EditorObjectType) => number;
   commitHistory: () => void;
   syncRuntimeState: () => void;
+  publishHistoryDocument: (document: EditorDocument) => void;
   ensureObjectReachable: (object: FabricObject) => boolean;
   focusObjectInViewport: (object: FabricObject) => void;
   ensureReachableObjects: () => boolean;

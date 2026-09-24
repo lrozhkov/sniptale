@@ -41,10 +41,16 @@ import {
 import type { LoadPreparedDocumentOptions } from './types';
 import { createFrameAnnotationProxy } from '../../../frame-annotation/proxy';
 import { CUSTOM_JSON_PROPS } from '../../../document/model/custom-json-props';
+import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
+import { undoEditorControllerSnapshot } from '../../public-api/document/history';
+import { createMockDocument } from '../../instance/bindings/test-fixtures-document';
+import { prepareAppliedDocument } from '..';
+import type { EditorDocument } from '../../../../features/editor/document/types';
 
 function createPreparedDocument() {
   return {
     canvasSize: { height: 20, width: 30 },
+    browserFrame: { enabled: true, title: 'Restored title' },
     normalizedDocument: {
       canvasJson: '{"objects":[]}',
       frame: { backgroundMode: 'color' },
@@ -69,12 +75,13 @@ describe('document apply load owner', () => {
     const prepareObject = vi.fn();
     const syncBackgroundLayer = vi.fn(async () => undefined);
 
+    const rebuildFrameDecorations = vi.fn(async () => undefined);
     await expect(
       loadPreparedDocumentOnCanvas({
         canvas: canvas as never,
         prepared: createPreparedDocument() as never,
         prepareObject,
-        rebuildFrameDecorations: vi.fn(async () => undefined),
+        rebuildFrameDecorations,
         syncBackgroundLayer,
         viewportDevicePixelRatioBaseline: 2,
         zoomLevel: 1,
@@ -93,7 +100,55 @@ describe('document apply load owner', () => {
       { backgroundMode: 'color' },
       { height: 20, width: 30 }
     );
+    expect(rebuildFrameDecorations).toHaveBeenCalledWith({
+      enabled: true,
+      title: 'Restored title',
+    });
     expect(mocks.renderCanvasAfterDocumentLoad).toHaveBeenCalledWith(canvas);
+  });
+
+  it('recovers both the canvas and cursor when a history load fails after replacing objects', async () => {
+    const original = {
+      ...createMockDocument(),
+      canvasJson: JSON.stringify({ objects: [{ type: 'Rect', sniptaleId: 'original' }] }),
+    };
+    const edited = {
+      ...createMockDocument(),
+      canvasJson: JSON.stringify({ objects: [{ type: 'Rect', sniptaleId: 'edited' }] }),
+    };
+    const history = new SnapshotHistory(JSON.stringify(original));
+    history.push(JSON.stringify(edited));
+    let loadedObjects: Array<{ sniptaleId: string }> = [{ sniptaleId: 'edited' }];
+    const canvas = {
+      add: vi.fn(),
+      getObjects: () => loadedObjects,
+      loadFromJSON: vi.fn(async (json: string) => {
+        loadedObjects = (JSON.parse(json) as { objects: Array<{ sniptaleId: string }> }).objects;
+      }),
+    };
+    let failAfterReplacement = true;
+    const applyDocument = async (document: EditorDocument) => {
+      await loadPreparedDocumentOnCanvas({
+        canvas: createFabricCanvasFixture(canvas),
+        prepared: prepareAppliedDocument(document),
+        prepareObject: vi.fn(),
+        rebuildFrameDecorations: vi.fn(async () => undefined),
+        syncBackgroundLayer: async () => {
+          if (failAfterReplacement) {
+            failAfterReplacement = false;
+            throw new Error('background rebuild failed');
+          }
+        },
+        zoomLevel: 1,
+      });
+    };
+
+    await expect(
+      undoEditorControllerSnapshot({ applyDocument, history, publishHistoryDocument: vi.fn() })
+    ).rejects.toThrow('background rebuild failed');
+    expect(canvas.loadFromJSON).toHaveBeenCalledTimes(2);
+    expect(loadedObjects).toEqual([{ type: 'Rect', sniptaleId: 'edited' }]);
+    expect(history.getState().index).toBe(1);
   });
 
   it('skips rich shapes that cannot be reconstructed', () => {

@@ -11,6 +11,7 @@ import { normalizeFrameAnnotationsInCanvasJson } from '../../../frame-annotation
 import { assertValidEditorDrawingCanvasJson } from '../../../document/import-boundary';
 import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/canonicalize';
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import { EditorCanvas } from '../../viewport/render-region';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
@@ -65,7 +66,11 @@ export async function loadPreparedDocumentOnCanvas(
     options.prepared.normalizedDocument.frame,
     options.prepared.canvasSize
   );
-  await options.rebuildFrameDecorations();
+  await options.rebuildFrameDecorations(options.prepared.browserFrame);
+  if (options.canvas instanceof EditorCanvas) {
+    options.canvas.ensureWorkspaceContainsObjects();
+    options.canvas.centerDocumentInViewport();
+  }
   renderCanvasAfterDocumentLoad(options.canvas);
   return source;
 }

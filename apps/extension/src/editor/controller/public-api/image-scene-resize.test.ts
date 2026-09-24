@@ -1,4 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
+import { createMockDocument } from '../instance/bindings/test-fixtures-document';
+import { undoEditorControllerSnapshot } from './document/history';
 
 const mocks = vi.hoisted(() => ({
   reportEditorActionFailure: vi.fn(),
@@ -91,5 +94,38 @@ it('reports async flatten failures through editor action diagnostics', async () 
   resizeEditorControllerImageScene(controller as never, 120, 80);
   await flushResize();
 
-  expect(mocks.reportEditorActionFailure).toHaveBeenCalledWith('resize-image', error);
+  await vi.waitFor(() => {
+    expect(mocks.reportEditorActionFailure).toHaveBeenCalledWith('resize-image', error);
+  });
+});
+
+it('applies undo after a pending image resize commits its snapshot', async () => {
+  const original = createMockDocument();
+  let visibleDocument = original;
+  let releaseRender: (dataUrl: string) => void = () => undefined;
+  mocks.renderForExport.mockImplementationOnce(
+    () =>
+      new Promise<string>((resolve) => {
+        releaseRender = resolve;
+      })
+  );
+  const history = new SnapshotHistory(JSON.stringify(original));
+  const controller = createController({
+    history,
+    publishHistoryDocument: vi.fn(),
+    applyDocument: vi.fn(async (document: typeof original) => {
+      visibleDocument = document;
+    }),
+    commitHistory: vi.fn(() => history.push(JSON.stringify(visibleDocument))),
+  });
+
+  resizeEditorControllerImageScene(controller as never, 120, 80);
+  const undo = undoEditorControllerSnapshot(controller as never);
+  releaseRender('data:image/png;base64,flat');
+  await undo;
+  await flushResize();
+
+  expect(visibleDocument).toEqual(original);
+  expect(history.getState().index).toBe(0);
+  expect(controller.applyDocument).toHaveBeenCalledTimes(2);
 });

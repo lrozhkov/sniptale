@@ -151,3 +151,32 @@ it('falls back to the next source coordinates when the previous header has no fi
     })
   );
 });
+
+it('uses restored browser frame settings instead of the previous store value', async () => {
+  const canvas = createProjectCanvas();
+  const header = createHeader();
+  mocks.findBrowserFrameHeaderMock.mockReturnValue(header);
+  mocks.getSourceObjectMock.mockReturnValue(undefined);
+  mocks.createBrowserFrameLayerObjectMock.mockResolvedValue({ id: 'restored-header' });
+
+  await rebuildDecorationsWithDefaults(canvas, {
+    browserFrame: { enabled: true, title: 'Restored title' } as never,
+    source: {
+      dataUrl: 'data:image/png;base64,fallback',
+      displayHeight: 180,
+      displayWidth: 320,
+      id: 'source',
+      intrinsicHeight: 180,
+      intrinsicWidth: 320,
+      left: 0,
+      locked: true,
+      name: null,
+      top: 0,
+      visible: true,
+    },
+  });
+
+  expect(mocks.createBrowserFrameLayerObjectMock).toHaveBeenCalledWith(
+    expect.objectContaining({ browserFrame: expect.objectContaining({ title: 'Restored title' }) })
+  );
+});

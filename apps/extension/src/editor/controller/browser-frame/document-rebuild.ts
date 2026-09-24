@@ -58,6 +58,7 @@ async function rebuildExistingBrowserFrameLayer(args: {
 export async function rebuildEditorControllerFrameDecorations(options: {
   canvas: Canvas | null;
   canvasDocumentSize: { width: number; height: number };
+  browserFrame?: BrowserFrameState;
   source?: SourceState | null;
   browserFrameRenderToken: number;
   setBrowserFrameRenderToken: (token: number) => void;
@@ -96,7 +97,7 @@ export async function rebuildEditorControllerFrameDecorations(options: {
   }
 
   await rebuildExistingBrowserFrameLayer({
-    browserFrame: useEditorStore.getState().browserFrame,
+    browserFrame: options.browserFrame ?? useEditorStore.getState().browserFrame,
     canvas,
     ensureBrowserFrameOnTop,
     header,

@@ -6,6 +6,12 @@ export function createEditorSnapshotHistory(document: EditorDocument): SnapshotH
   return new SnapshotHistory<string>(JSON.stringify(document));
 }
 
+export function readCurrentEditorSnapshot(
+  history: SnapshotHistory<string> | null
+): EditorDocument | null {
+  return history ? parseEditorSnapshotDocument(history.getCurrent()) : null;
+}
+
 function parseEditorSnapshotDocument(value: string): EditorDocument | null {
   try {
     const parsed: unknown = JSON.parse(value);
@@ -21,7 +27,9 @@ export function undoEditorSnapshot(history: SnapshotHistory<string> | null): Edi
     return null;
   }
 
-  return parseEditorSnapshotDocument(state.current);
+  const document = parseEditorSnapshotDocument(state.current);
+  if (!document) history?.redo();
+  return document;
 }
 
 export function redoEditorSnapshot(history: SnapshotHistory<string> | null): EditorDocument | null {
@@ -30,7 +38,9 @@ export function redoEditorSnapshot(history: SnapshotHistory<string> | null): Edi
     return null;
   }
 
-  return parseEditorSnapshotDocument(state.current);
+  const document = parseEditorSnapshotDocument(state.current);
+  if (!document) history?.undo();
+  return document;
 }
 
 export function pushEditorSnapshotHistory(options: {

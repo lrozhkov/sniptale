@@ -1,6 +1,7 @@
 import type { Canvas } from 'fabric';
 import { applyEditorViewportZoom } from '../../viewport';
 import { setEditorEditingSurfaceDimensions } from '../../viewport/editing-surface';
+import { EditorCanvas } from '../../viewport/render-region';
 
 export function prepareCanvasForDocumentLoad(options: {
   canvas: Canvas;
@@ -17,6 +18,10 @@ export function prepareCanvasForDocumentLoad(options: {
     options.zoomLevel,
     options.viewportDevicePixelRatioBaseline
   );
+  if (options.canvas instanceof EditorCanvas) {
+    options.canvas.ensureWorkspaceContainsObjects();
+    options.canvas.centerDocumentInViewport();
+  }
   options.canvas.backgroundColor = 'transparent';
 }
 

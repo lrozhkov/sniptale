@@ -3,6 +3,61 @@
 import { Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { EditorCanvas } from './render-region';
+import { prepareCanvasForDocumentLoad } from '../document/apply/canvas';
+
+it('keeps replacement documents centered after crop, image resize, undo, and redo', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+    scrollLeft: { value: 0, writable: true },
+    scrollTop: { value: 0, writable: true },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 8000, height: 7000 }, 512);
+  canvas.prepareWorkspaceForCrop({ left: 6000, top: 5000, width: 2000, height: 1000 });
+  canvas.setDocumentGeometry({ width: 2000, height: 1000 }, 2048);
+  viewport.scrollLeft = 7112;
+  viewport.scrollTop = 5712;
+
+  prepareCanvasForDocumentLoad({ canvas, canvasSize: { width: 1200, height: 600 }, zoomLevel: 1 });
+  expect(viewport.scrollLeft).toBe(2248);
+  expect(viewport.scrollTop).toBe(2048);
+
+  prepareCanvasForDocumentLoad({ canvas, canvasSize: { width: 2000, height: 1000 }, zoomLevel: 1 });
+  expect(viewport.scrollLeft).toBe(2648);
+  expect(viewport.scrollTop).toBe(2248);
+
+  prepareCanvasForDocumentLoad({ canvas, canvasSize: { width: 1200, height: 600 }, zoomLevel: 1 });
+  expect(viewport.scrollLeft).toBe(2248);
+  expect(viewport.scrollTop).toBe(2048);
+});
+
+it('makes restored off-image layers reachable without changing their document positions', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 800 },
+    clientHeight: { value: 600 },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  const restoredLayer = new Rect({ left: -6000, top: -5000, width: 50, height: 40 });
+  canvas.add(restoredLayer);
+
+  prepareCanvasForDocumentLoad({ canvas, canvasSize: { width: 2000, height: 1000 }, zoomLevel: 1 });
+
+  expect(canvas.getWorkspaceInsets().left).toBeGreaterThan(6000);
+  expect(canvas.getWorkspaceInsets().top).toBeGreaterThan(5000);
+  expect(restoredLayer.left).toBe(-6000);
+  expect(restoredLayer.top).toBe(-5000);
+});
 
 it('keeps the interactive backing near the viewport instead of the scrollable workspace', () => {
   const surface = document.createElement('div');

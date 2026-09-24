@@ -11,6 +11,7 @@ function createController() {
     clearSelection: vi.fn(),
     clearCropSelection: vi.fn(),
     commitHistory: vi.fn(),
+    autosaveService: { scheduleAutosave: vi.fn() },
     cropGuide: { id: 'guide' },
     cropSelection: { id: 'selection' },
     drawSession: { id: 'draw' },
@@ -54,6 +55,7 @@ describe('editor-controller public api bindings', () => {
     adapter.prepareObject({ id: 'object' } as never);
     adapter.nextLabelIndex('image');
     adapter.commitHistory();
+    adapter.publishHistoryDocument({ id: 'restored' } as never);
     adapter.syncRuntimeState();
     adapter.ensureObjectReachable({ id: 'object' } as never);
     adapter.focusObjectInViewport({ id: 'object' } as never);
@@ -74,6 +76,9 @@ describe('editor-controller public api bindings', () => {
     adapter.switchToSelectTool();
     adapter.clearSelection();
     adapter.clearCropSelection();
+
+    expect(controller.autosaveService.scheduleAutosave).toHaveBeenCalledWith({ id: 'restored' });
+    expect(controller.syncRuntimeState).toHaveBeenCalled();
 
     adapter.setCanvasDocumentSize({ height: 100, width: 200 } as never);
     adapter.setSource({ id: 'next-source' } as never);
