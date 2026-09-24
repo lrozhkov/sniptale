@@ -16,3 +16,12 @@ it('applies the content drawing selection chrome', () => {
 it('uses the canonical rotation cursor', () => {
   expect(createDrawingRotationControl().cursorStyle).toBe('grab');
 });
+
+it('keeps the rotation handle clear of the corner handle at 400% zoom', () => {
+  const rotate = createDrawingRotationControl();
+  const minimumCenterDistance = 11.25 + 1.25 + 8.125 + 0.8 + 4;
+
+  expect(rotate.x).toBe(0.5);
+  expect(rotate.y).toBe(-0.5);
+  expect(Math.hypot(rotate.offsetX, rotate.offsetY)).toBeGreaterThan(minimumCenterDistance);
+});
