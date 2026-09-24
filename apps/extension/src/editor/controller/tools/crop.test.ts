@@ -12,6 +12,7 @@ import {
   getActiveEditorCropRect,
   isEditorCropGuide,
   normalizeEditorCropSelection,
+  normalizeEditorCanvasExpansion,
   clampEditorCropSelectionPosition,
 } from './crop';
 
@@ -42,6 +43,20 @@ beforeEach(() => {
 });
 
 function runEditorControllerCropGuideSuite() {
+  it('keeps all four original edges inside an expanded rectangle', () => {
+    expect(
+      normalizeEditorCanvasExpansion(
+        { left: -30, top: -20, width: 180, height: 120 },
+        { width: 100, height: 80 }
+      )
+    ).toEqual({ left: -30, top: -20, width: 180, height: 120 });
+    expect(
+      normalizeEditorCanvasExpansion(
+        { left: 10, top: 15, width: 20, height: 20 },
+        { width: 100, height: 80 }
+      )
+    ).toEqual({ left: 0, top: 0, width: 100, height: 80 });
+  });
   it('keeps crop dimensions while clamping a moved guide to canvas edges', () => {
     expect(
       clampEditorCropSelectionPosition(

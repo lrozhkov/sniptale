@@ -59,6 +59,8 @@ interface EditorUiState {
   layerEffectsCategory: EditorLayerEffectCategory;
   viewportPreviewOpen: boolean;
   viewportPreviewAutomationBlockedInSession: boolean;
+  showOutsideCanvas: boolean;
+  canvasCropMode: 'crop' | 'expand';
   saveErrorMessage: string | null;
   saveState: 'idle' | 'saving' | 'saved' | 'error';
   sessionId: string | null;
@@ -91,6 +93,8 @@ interface EditorUiActions {
   setInspectorCollapsed: (collapsed: boolean) => void;
   setViewportPreviewOpenFromUser: (open: boolean) => void;
   setViewportPreviewOpenFromSync: (open: boolean) => void;
+  setShowOutsideCanvas: (show: boolean) => void;
+  setCanvasCropMode: (mode: 'crop' | 'expand') => void;
   setSaveErrorMessage: (message: string | null) => void;
   setSaveState: (saveState: EditorState['saveState']) => void;
   setSessionId: (sessionId: string | null) => void;

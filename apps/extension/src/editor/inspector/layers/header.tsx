@@ -1,5 +1,13 @@
 import React from 'react';
-import { ChevronDown, ChevronUp, Layers3, Minus, SquareMousePointer } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Layers3,
+  Minus,
+  SquareMousePointer,
+} from 'lucide-react';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { cx } from '../../chrome/ui';
@@ -12,6 +20,7 @@ import {
 } from './shared';
 import { LayerInsertImageControl } from './file-input';
 import type { EditorLayerEffectsOpenHandler } from './types';
+import { useEditorStore } from '../../state/useEditorStore';
 
 const HEADER_FRAME_CLASS_NAME =
   'flex h-14 w-full items-center justify-between px-2 pr-3 transition';
@@ -79,6 +88,8 @@ function EditorInspectorLayersHeaderActions(props: {
   onToggleAutoNavigateSelectedLayer: () => void;
 }) {
   const handleClick = props.onCollapsePanel ?? props.onToggle;
+  const showOutsideCanvas = useEditorStore((state) => state.showOutsideCanvas);
+  const setShowOutsideCanvas = useEditorStore((state) => state.setShowOutsideCanvas);
 
   return (
     <div
@@ -88,6 +99,18 @@ function EditorInspectorLayersHeaderActions(props: {
       onClick={(event) => event.stopPropagation()}
     >
       <LayerInsertImageControl />
+      <button
+        type="button"
+        title={translate('editor.toolbar.showOutsideCanvas')}
+        aria-label={translate('editor.toolbar.showOutsideCanvas')}
+        aria-pressed={showOutsideCanvas}
+        data-active={showOutsideCanvas ? 'true' : undefined}
+        data-ui="editor.layers.show-outside-canvas"
+        onClick={() => setShowOutsideCanvas(!showOutsideCanvas)}
+        className={HEADER_NAVIGATION_BUTTON_CLASS_NAME}
+      >
+        {showOutsideCanvas ? <Eye size={16} /> : <EyeOff size={16} />}
+      </button>
       <button
         type="button"
         title={translate('editor.toolbar.layerAutoNavigate')}

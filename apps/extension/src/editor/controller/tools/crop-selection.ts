@@ -30,6 +30,24 @@ export function normalizeEditorCropSelection(
   return { left, top, width, height };
 }
 
+/** Keeps the original image inside the expanded canvas rectangle. */
+export function normalizeEditorCanvasExpansion(
+  selection: CropSelection,
+  canvasDocumentSize: { width: number; height: number }
+): CropSelection {
+  const left = Math.min(0, Math.round(selection.left));
+  const top = Math.min(0, Math.round(selection.top));
+  const right = Math.max(
+    canvasDocumentSize.width,
+    Math.round(selection.left + Math.max(1, selection.width))
+  );
+  const bottom = Math.max(
+    canvasDocumentSize.height,
+    Math.round(selection.top + Math.max(1, selection.height))
+  );
+  return { left, top, width: right - left, height: bottom - top };
+}
+
 export function clampEditorCropSelectionPosition(
   selection: CropSelection,
   canvasDocumentSize: { width: number; height: number }

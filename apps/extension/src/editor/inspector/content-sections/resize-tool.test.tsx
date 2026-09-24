@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { updateLockedDraft } from '../sidebar-shared/frame';
 import { translate } from '../../../platform/i18n';
+import { useEditorStore } from '../../state/useEditorStore';
 import { EditorInspectorResizeToolSection, fitSizeDraftToAspectRatio } from './resize-tool';
 import {
   applyCurrentAspectRatio,
@@ -129,11 +130,34 @@ function renderResizeTool(
 }
 
 afterEach(() => {
+  useEditorStore.getState().setCanvasCropMode('crop');
   act(() => root?.unmount());
   root = null;
   container?.remove();
   container = null;
   vi.clearAllMocks();
+});
+
+it('starts an editable full-canvas guide when expanding and restores bounded crop mode', () => {
+  const controller = createController();
+  renderResizeTool(controller);
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.canvas-size.mode.expand"]')
+      ?.click();
+  });
+  expect(useEditorStore.getState().canvasCropMode).toBe('expand');
+  expect(controller.clearCropSelection).toHaveBeenCalledOnce();
+  expect(controller.previewCanvasSize).toHaveBeenCalledWith(1200, 900);
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.canvas-size.mode.crop"]')
+      ?.click();
+  });
+  expect(useEditorStore.getState().canvasCropMode).toBe('crop');
+  expect(controller.clearCropSelection).toHaveBeenCalledTimes(2);
 });
 
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {

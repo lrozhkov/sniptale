@@ -8,7 +8,9 @@ import {
   isEditorCropGuide,
   normalizeEditorCropSelection,
   clampEditorCropSelectionPosition,
+  normalizeEditorCanvasExpansion,
 } from '../tools/crop';
+import { useEditorStore } from '../../state/useEditorStore';
 
 type CanvasObject = import('fabric').FabricObject;
 
@@ -23,9 +25,11 @@ export function syncCropGuideInteraction(
 
   const rawSelection = createCropSelectionFromRect(target);
   const selection =
-    interaction === 'move'
-      ? clampEditorCropSelectionPosition(rawSelection, bindings.getCanvasDocumentSize())
-      : normalizeEditorCropSelection(rawSelection, bindings.getCanvasDocumentSize());
+    useEditorStore.getState().canvasCropMode === 'expand'
+      ? normalizeEditorCanvasExpansion(rawSelection, bindings.getCanvasDocumentSize())
+      : interaction === 'move'
+        ? clampEditorCropSelectionPosition(rawSelection, bindings.getCanvasDocumentSize())
+        : normalizeEditorCropSelection(rawSelection, bindings.getCanvasDocumentSize());
   applyCropGuideSelection(target, selection, 'selection');
   bindings.setCropState(target, selection);
   return true;

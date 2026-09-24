@@ -198,6 +198,10 @@ export const editorToolbarMessages = defineMessageSource({
     ru: 'Слои',
     en: 'Layers',
   },
+  showOutsideCanvas: {
+    ru: 'Показывать фигуры за границей изображения',
+    en: 'Show shapes outside the image',
+  },
   layersPreferenceSaveFailed: {
     ru: 'Не удалось сохранить состояние панели слоев.',
     en: 'Could not save the layers panel state.',

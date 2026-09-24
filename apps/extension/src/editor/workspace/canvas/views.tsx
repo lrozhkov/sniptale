@@ -65,6 +65,8 @@ export function CanvasViewport(props: {
   activeTool?: EditorTool;
   hasImage: boolean;
   backgroundColor: string;
+  showOutsideCanvas?: boolean;
+  canvasCropMode?: 'crop' | 'expand';
   controller?: EditorFrameAnnotationPlaneController;
   dataUi?: string;
   surfaceRef?: React.Ref<HTMLDivElement>;
@@ -104,6 +106,8 @@ function CanvasStage(
     | 'activeTool'
     | 'canvasRef'
     | 'backgroundColor'
+    | 'showOutsideCanvas'
+    | 'canvasCropMode'
     | 'controller'
     | 'gridStyle'
     | 'hasImage'
@@ -128,7 +132,10 @@ function CanvasStage(
     width: `${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%`,
     height: `${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%`,
   } satisfies React.CSSProperties;
-  const maskClassName = 'pointer-events-none absolute z-40 opacity-[0.78]';
+  const revealOutside =
+    props.showOutsideCanvas !== false ||
+    (props.activeTool === 'crop' && props.canvasCropMode === 'expand');
+  const maskClassName = `pointer-events-none absolute z-40 ${revealOutside ? 'opacity-[0.78]' : ''}`;
   const maskStyle = { backgroundColor: props.backgroundColor };
   return (
     <div
@@ -164,6 +171,7 @@ function CanvasStage(
           {props.hasImage && props.gridStyle ? (
             <div
               className="pointer-events-none absolute z-20"
+              data-ui="editor.canvas.document-grid"
               style={{ ...imageStyle, ...props.gridStyle }}
             />
           ) : null}

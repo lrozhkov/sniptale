@@ -227,6 +227,21 @@ it('captures and restores viewport anchor', () => {
   expect(onSynced).toHaveBeenCalledOnce();
 });
 
+it('preserves a viewport center anchored in the workspace beyond the image', () => {
+  const { stageElement, viewportElement } = createViewportFixture();
+  viewportElement.scrollLeft = 600;
+  viewportElement.scrollTop = 300;
+  const anchor = captureEditorViewportAnchor({
+    canvas: {} as never,
+    viewportElement,
+    stageElement,
+    canvasDocumentSize: DEFAULT_CANVAS_SIZE,
+    zoomLevel: 1,
+  });
+  expect(anchor?.relativeX).toBeGreaterThan(1);
+  expect(anchor?.relativeY).toBeGreaterThan(1);
+});
+
 it('guards null anchors', () => {
   const { stageElement, viewportElement } = createViewportFixture();
 

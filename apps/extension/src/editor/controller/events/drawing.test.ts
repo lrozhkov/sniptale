@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   readDrawing: vi.fn(),
   replaceFabric: vi.fn(() => ({ sniptaleId: 'replacement' })),
   state: {
+    canvasCropMode: 'crop',
     toolSettings: {
       text: {
         backgroundColor: null,
@@ -153,6 +154,7 @@ function fabricPointerEvent(pointerId: number): { e: MouseEvent } {
 
 function resetDrawingMocks() {
   vi.clearAllMocks();
+  mocks.state.canvasCropMode = 'crop';
   mocks.cropDown.mockReturnValue(false);
   mocks.isTextTarget.mockReturnValue(false);
   mocks.isDrawingSelection.mockReturnValue(false);
@@ -185,6 +187,16 @@ describe('shared drawing event orchestration', () => {
     expect(frame.bindings.startDrawSession).not.toHaveBeenCalled();
     expect(frame.handlers.handlePathCreated({} as never)).toBeUndefined();
     expect(frame.handlers.handleMouseDownBefore({} as never)).toBeUndefined();
+  });
+
+  it('leaves the expansion guide handles interactive without starting a crop draft', () => {
+    mocks.state.canvasCropMode = 'expand';
+    const { bindings, canvas, handlers } = createBindings('crop');
+    handlers.handleMouseDown(pointerEvent() as never);
+
+    expect(mocks.cropDown).not.toHaveBeenCalled();
+    expect(bindings.startDrawSession).not.toHaveBeenCalled();
+    expect(canvas.skipTargetFind).toBe(false);
   });
 
   it('does not start any drawing tool or change selection on a middle click', () => {

@@ -2,6 +2,7 @@ import { clamp } from '../../document/model';
 import { getEditorViewportMetrics } from './metrics';
 import { applyEditorViewportZoom } from './zoom';
 import { getDevicePixelRatioBaselineOptions, type ZoomContext } from './actions-types';
+import { EditorCanvas } from './render-region';
 
 type ViewportPoint = { clientX: number; clientY: number };
 type LocalViewportPoint = { x: number; y: number };
@@ -24,18 +25,12 @@ function capturePointAnchor(args: {
   point: LocalViewportPoint;
 }) {
   return {
-    relativeX: clamp(
+    relativeX:
       (args.metrics.scrollLeft + args.point.x - args.metrics.canvasOffsetLeft) /
-        args.metrics.scaledCanvasWidth,
-      0,
-      1
-    ),
-    relativeY: clamp(
+      args.metrics.scaledCanvasWidth,
+    relativeY:
       (args.metrics.scrollTop + args.point.y - args.metrics.canvasOffsetTop) /
-        args.metrics.scaledCanvasHeight,
-      0,
-      1
-    ),
+      args.metrics.scaledCanvasHeight,
   };
 }
 
@@ -73,6 +68,9 @@ function restorePointAnchor(args: {
         metricsAfter.canvasOffsetTop -
         args.localPoint.y
     ) * metricsAfter.domScaleCompensation;
+  if (args.context.canvas instanceof EditorCanvas && args.context.canvas.hasVirtualViewport) {
+    args.context.canvas.refreshVirtualViewport();
+  }
   args.context.syncViewportState();
 }
 
@@ -107,9 +105,9 @@ export function setEditorZoomAtViewportPoint(
     nextZoomLevel,
     context.devicePixelRatioBaseline
   );
-  requestAnimationFrame(() =>
-    restorePointAnchor({ context, localPoint, nextZoomLevel, ...anchor })
-  );
+  const restore = () => restorePointAnchor({ context, localPoint, nextZoomLevel, ...anchor });
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) restore();
+  else requestAnimationFrame(restore);
   canvas.requestRenderAll();
   context.syncRuntimeState();
   return nextZoomLevel;

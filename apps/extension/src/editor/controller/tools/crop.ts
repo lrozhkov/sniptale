@@ -8,6 +8,7 @@ export { cropRenderedEditorDocument } from './crop-render';
 export {
   createCropSelectionFromRect,
   normalizeEditorCropSelection,
+  normalizeEditorCanvasExpansion,
   clampEditorCropSelectionPosition,
 } from './crop-selection';
 export { getActiveEditorCropRect } from './crop-session';

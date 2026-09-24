@@ -112,7 +112,7 @@ it('does not create a canvas size preview for the current canvas size', () => {
   expect(canvas.add).not.toHaveBeenCalled();
 });
 
-it('keeps canvas expansion as a non-applicable size preview', () => {
+it('creates an editable expansion guide centered around the original image', () => {
   const canvas = { add: vi.fn(), requestRenderAll: vi.fn(), setActiveObject: vi.fn() };
   mocks.createCropGuideRectMock.mockReturnValueOnce({ id: 'expansion-guide', set: vi.fn() });
   const result = previewEditorCanvasSizeSelection({
@@ -122,14 +122,16 @@ it('keeps canvas expansion as a non-applicable size preview', () => {
     canvasDocumentSize: { width: 1200, height: 900 },
     width: 1200,
     height: 1200,
+    mode: 'expand',
   });
 
-  expect(result?.cropSelection).toBeNull();
+  expect(result?.cropSelection).toEqual({ left: 0, top: -150, width: 1200, height: 1200 });
   expect(mocks.applyCropGuideSelectionMock).toHaveBeenCalledWith(
     expect.anything(),
-    { left: 0, top: 0, width: 1200, height: 1200 },
-    'preview'
+    { left: 0, top: -150, width: 1200, height: 1200 },
+    'selection'
   );
+  expect(canvas.setActiveObject).toHaveBeenCalledWith(result?.cropGuide);
 });
 
 it('updates an existing crop selection from the canvas size preview owner', () => {

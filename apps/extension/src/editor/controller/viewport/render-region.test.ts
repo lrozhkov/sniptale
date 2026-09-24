@@ -57,6 +57,29 @@ it('projects a far off-image object into the viewport after scrolling', () => {
   ).toBe(object);
 });
 
+it('omits outside pixels from interactive rendering while retaining the object for editing', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 300 },
+    clientHeight: { value: 200 },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 100, height: 80 }, 50);
+  const outside = new Rect({ left: -35, top: 10, width: 25, height: 20, fill: '#ff0000' });
+  canvas.add(outside);
+  canvas.renderAll();
+  expect(canvas.getContext().getImageData(20, 65, 1, 1).data[3]).toBe(255);
+
+  canvas.setShowOutsideCanvas(false);
+  canvas.renderAll();
+  expect(canvas.getContext().getImageData(20, 65, 1, 1).data[3]).toBe(0);
+  expect(canvas.getObjects()).toContain(outside);
+});
+
 it('exports the entire document independent of tile position and zoom', () => {
   const surface = document.createElement('div');
   const viewport = document.createElement('div');

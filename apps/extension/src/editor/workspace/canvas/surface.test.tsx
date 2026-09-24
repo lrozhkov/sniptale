@@ -17,6 +17,8 @@ vi.mock('./views', () => ({
 function createProps(overrides: Partial<Parameters<typeof CanvasWrapperSurface>[0]> = {}) {
   return {
     backgroundColor: '#fff',
+    showOutsideCanvas: true,
+    canvasCropMode: 'crop',
     canvasRef: { current: null },
     contextMenuState: null,
     controller: {} as never,

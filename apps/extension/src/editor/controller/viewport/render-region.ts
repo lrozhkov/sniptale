@@ -11,6 +11,7 @@ export class EditorCanvas extends Canvas {
   private documentSize: DocumentSize | null = null;
   private documentMargin = 0;
   private presentationScale = 1;
+  private showOutsideCanvas = true;
 
   setRenderViewport(viewport: HTMLElement | null, stage?: HTMLElement): void {
     this.renderViewport = viewport;
@@ -24,6 +25,12 @@ export class EditorCanvas extends Canvas {
 
   getDocumentSize(): DocumentSize | null {
     return this.documentSize;
+  }
+
+  setShowOutsideCanvas(show: boolean): void {
+    if (this.showOutsideCanvas === show) return;
+    this.showOutsideCanvas = show;
+    this.requestRenderAll();
   }
 
   setDocumentGeometry(size: DocumentSize, margin: number): void {
@@ -145,6 +152,25 @@ export class EditorCanvas extends Canvas {
     ctx: CanvasRenderingContext2D,
     objects: Parameters<Canvas['renderCanvas']>[1]
   ): void {
+    if (ctx === this.getContext() && !this.showOutsideCanvas && this.documentSize) {
+      const [scaleX, , , scaleY, offsetX, offsetY] = this.viewportTransform;
+      this.clearContext(ctx);
+      ctx.save();
+      try {
+        ctx.beginPath();
+        ctx.rect(
+          offsetX,
+          offsetY,
+          this.documentSize.width * scaleX,
+          this.documentSize.height * scaleY
+        );
+        ctx.clip();
+        super.renderCanvas(ctx, objects);
+      } finally {
+        ctx.restore();
+      }
+      return;
+    }
     const rect = ctx === this.getContext() ? this.getVisibleRenderRect() : null;
     if (!rect) {
       super.renderCanvas(ctx, objects);

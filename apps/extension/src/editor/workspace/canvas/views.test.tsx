@@ -80,6 +80,25 @@ it('shows a muted, nonblocking workspace around the image rectangle', () => {
   expect(markup).toContain('mock.frame-plane');
 });
 
+it('fully masks outside content when visibility is off while leaving pointer events available', () => {
+  const markup = renderToStaticMarkup(
+    <CanvasViewport
+      hasImage
+      showOutsideCanvas={false}
+      backgroundColor="#f5f5f5"
+      canvasRef={{ current: null }}
+      viewportRef={{ current: null }}
+      stageRef={{ current: null }}
+      surfaceRef={{ current: null }}
+      controller={{ canvasDocumentSize: { width: 100, height: 80 } } as never}
+      gridStyle={null}
+    />
+  );
+  expect(markup).toContain('editor.canvas.workspace-mask-left');
+  expect(markup).not.toContain('opacity-[0.78]');
+  expect(markup).toContain('pointer-events-none absolute z-40');
+});
+
 it('opens an image after Fabric moves the canvas into its wrapper', async () => {
   const container = document.createElement('div');
   document.body.appendChild(container);

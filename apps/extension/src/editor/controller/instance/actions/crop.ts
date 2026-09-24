@@ -8,6 +8,7 @@ import {
   previewEditorCanvasSizeSelection,
 } from '../../crop-workflow';
 import { applyEditorViewportZoom } from '../../viewport';
+import { useEditorStore } from '../../../state/useEditorStore';
 
 const logger = createLogger({ namespace: 'EditorCrop' });
 
@@ -37,6 +38,7 @@ export function previewCanvasSizeForController(
     canvasDocumentSize: controller.canvasDocumentSize,
     width,
     height,
+    mode: useEditorStore.getState().canvasCropMode,
   });
   if (!nextState) {
     return;
@@ -77,6 +79,7 @@ export function cancelCropModeForController(controller: EditorControllerInstance
 
   controller.drawSession = nextState.drawSession;
   controller.cropSelection = nextState.cropSelection;
+  useEditorStore.getState().setCanvasCropMode('crop');
 }
 
 export async function applyCropSelectionForController(
@@ -117,4 +120,5 @@ export async function applyCropSelectionForController(
 
   controller.cropGuide = nextState.cropGuide;
   controller.cropSelection = nextState.cropSelection;
+  useEditorStore.getState().setCanvasCropMode('crop');
 }

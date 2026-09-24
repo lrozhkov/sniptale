@@ -62,13 +62,17 @@ describe('canvas wrapper ownership seam', () => {
     expect(controller.mount).toHaveBeenCalledOnce();
     expect(document.querySelector('canvas')).not.toBeNull();
     expect(document.querySelector('[role="button"]')).toBeNull();
-    expect(document.querySelector('canvas')?.parentElement?.style.backgroundImage).toContain(
-      'linear-gradient(45deg'
-    );
+    expect(
+      document.querySelector<HTMLElement>('[data-ui="editor.canvas.document-grid"]')?.style
+        .backgroundImage
+    ).toContain('linear-gradient');
   });
 
   it('renders a checkerboard surface when the workspace background is transparent', async () => {
-    const controller = createControllerMock();
+    const controller = {
+      ...createControllerMock(),
+      canvasDocumentSize: { width: 100, height: 80 },
+    };
     const { CanvasWrapper } = await import('.');
 
     resetEditorStore({
@@ -81,8 +85,10 @@ describe('canvas wrapper ownership seam', () => {
     });
     renderWithController(<CanvasWrapper hasImage />, controller);
 
-    const canvasSurface = document.querySelector('canvas')?.parentElement;
-    const style = canvasSurface?.getAttribute('style') ?? '';
+    const checkerboard = document.querySelector<HTMLElement>(
+      '[data-ui="editor.canvas.document-checkerboard"]'
+    );
+    const style = checkerboard?.getAttribute('style') ?? '';
 
     expect(style).toContain('background-image');
     expect(style).toContain('linear-gradient(45deg');

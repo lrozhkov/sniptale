@@ -32,8 +32,9 @@ it('renders layer header collapse affordance and insert action', () => {
   expect(markup).toContain('editor.toolbar.layerAutoNavigate');
   expect(markup).toContain('data-active="true"');
   expect(markup).toContain('mock.insert');
+  expect(markup).toContain('editor.layers.show-outside-canvas');
   expect(markup).toMatch(
-    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.auto-navigate"/
+    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.show-outside-canvas"/
   );
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('text-[12px] font-semibold uppercase');
@@ -87,9 +88,9 @@ it('places image insertion immediately before selected-layer navigation in the i
   expect(markup).toContain('editor.layers.auto-navigate');
   expect(markup).toContain('4 editor.toolbar.layerCountSuffix');
   expect(markup).toMatch(
-    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.auto-navigate"/
+    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.show-outside-canvas"/
   );
   expect(markup.match(/data-ui="mock.insert"/g)).toHaveLength(1);
   expect(markup).not.toContain('lucide-layers-3');
-  expect(markup.match(/<button/g)).toHaveLength(2);
+  expect(markup.match(/<button/g)).toHaveLength(3);
 });

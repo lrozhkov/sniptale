@@ -22,6 +22,8 @@ export type EditorStoreSetters = Pick<
   | 'setInspectorCollapsed'
   | 'setViewportPreviewOpenFromUser'
   | 'setViewportPreviewOpenFromSync'
+  | 'setShowOutsideCanvas'
+  | 'setCanvasCropMode'
   | 'setSaveErrorMessage'
   | 'setSaveState'
   | 'setSessionId'
@@ -58,6 +60,8 @@ export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStore
     setViewportPreviewOpenFromUser: (open) =>
       set((state) => createManualViewportPreviewPatch(state, open)),
     setViewportPreviewOpenFromSync: (viewportPreviewOpen) => set({ viewportPreviewOpen }),
+    setShowOutsideCanvas: (showOutsideCanvas) => set({ showOutsideCanvas }),
+    setCanvasCropMode: (canvasCropMode) => set({ canvasCropMode }),
     setSaveErrorMessage: (saveErrorMessage) => set({ saveErrorMessage }),
     setSaveState: (saveState) => set({ saveState }),
     setSessionId: (sessionId) => set({ sessionId }),

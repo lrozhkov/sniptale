@@ -77,6 +77,10 @@ export const editorCompactDocumentMessages = defineMessageSource({
     ru: 'Применить обрезку',
     en: 'Apply crop',
   },
+  applyExpandCanvas: {
+    ru: 'Применить расширение',
+    en: 'Apply expansion',
+  },
   resizeTarget: {
     ru: 'Что изменить',
     en: 'Resize target',

@@ -1,6 +1,7 @@
 import { clamp } from '../../../document/model';
 import { applyEditorViewportZoom, getEditorViewportFitArea, getEditorViewportMetrics } from '..';
 import { getDevicePixelRatioBaselineOptions, type ZoomContext } from '../actions-types';
+import { EditorCanvas } from '../render-region';
 
 export function zoomEditorToFit(context: ZoomContext): number {
   const {
@@ -27,7 +28,7 @@ export function zoomEditorToFit(context: ZoomContext): number {
   const zoomLevel = Math.round(clamp(nextZoom, 0.2, 4) * 1000) / 1000;
 
   applyEditorViewportZoom(canvas, canvasDocumentSize, zoomLevel, devicePixelRatioBaseline);
-  requestAnimationFrame(() => {
+  const center = () => {
     const viewport = getEditorViewportMetrics({
       viewportElement,
       stageElement,
@@ -41,8 +42,13 @@ export function zoomEditorToFit(context: ZoomContext): number {
     viewportElement.scrollTop =
       Math.max(0, viewport.scaledCanvasHeight / 2 + viewport.canvasOffsetTop - fitArea.centerY) *
       viewport.domScaleCompensation;
+    if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+      canvas.refreshVirtualViewport();
+    }
     syncViewportState();
-  });
+  };
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) center();
+  else requestAnimationFrame(center);
   canvas.requestRenderAll();
   syncRuntimeState();
   return zoomLevel;

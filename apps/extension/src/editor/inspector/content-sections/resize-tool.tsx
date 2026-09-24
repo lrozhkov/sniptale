@@ -20,6 +20,7 @@ import {
   INSPECTOR_SECTION_SURFACE_CLASS_NAME,
 } from '../chrome';
 import { SizeControlsRow } from '../size-controls';
+import { useEditorStore } from '../../state/useEditorStore';
 
 type ResizeToolMode = 'canvas' | 'image';
 
@@ -71,6 +72,46 @@ type ActiveResizeState = {
   sizeText: string;
 };
 
+const CROP_MODE_BUTTON_CLASS = [
+  'rounded-md px-2 py-1.5 text-xs',
+  'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+].join(' ');
+
+function CanvasCropModeSwitch(props: {
+  mode: 'crop' | 'expand';
+  onSelect: (mode: 'crop' | 'expand') => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--sniptale-color-surface-hover)] p-1">
+      {(['crop', 'expand'] as const).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={props.mode === mode}
+          data-ui={`editor.canvas-size.mode.${mode}`}
+          className={[
+            CROP_MODE_BUTTON_CLASS,
+            props.mode === mode
+              ? [
+                  'bg-[var(--sniptale-color-surface-panel)] font-medium shadow-sm',
+                  'text-[var(--sniptale-color-text-primary)]',
+                ].join(' ')
+              : [
+                  'text-[var(--sniptale-color-text-secondary)]',
+                  'hover:bg-[var(--sniptale-color-surface-panel)]',
+                ].join(' '),
+          ].join(' ')}
+          onClick={() => props.onSelect(mode)}
+        >
+          {translate(
+            mode === 'crop' ? 'editor.compact.cropWithinCanvas' : 'editor.compact.expandCanvas'
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function isSameSize(left: SizeDraft, right: SizeDraft | null): boolean {
   return Boolean(right && left.width === right.width && left.height === right.height);
 }
@@ -91,6 +132,8 @@ function parseSizeText(value: string): SizeDraft | null {
 }
 
 export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) {
+  const canvasCropMode = useEditorStore((state) => state.canvasCropMode);
+  const setCanvasCropMode = useEditorStore((state) => state.setCanvasCropMode);
   const mode = props.mode;
   const isCanvasMode = mode === 'canvas';
   const active = selectActiveResizeState(props, mode);
@@ -101,8 +144,19 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
   );
   const cropSelectionMatchesDraft = isSameSize(props.canvasSizeDraft, props.cropSelection ?? null);
   const activeSizeIsValid = isValidSize(active.draft);
+  const cropSizeExceedsCanvas =
+    isCanvasMode &&
+    canvasCropMode === 'crop' &&
+    (active.draft.width > props.canvasSize.width || active.draft.height > props.canvasSize.height);
+  const expansionWouldShrink =
+    isCanvasMode &&
+    canvasCropMode === 'expand' &&
+    (active.draft.width < props.canvasSize.width || active.draft.height < props.canvasSize.height);
   const applyDisabled =
     !activeSizeIsValid ||
+    cropSizeExceedsCanvas ||
+    expansionWouldShrink ||
+    (isCanvasMode && canvasCropMode === 'expand' && canvasSizeMatchesDraft) ||
     (mode === 'canvas' ? canvasSizeMatchesDraft && !props.cropReady : imageSizeMatchesDraft);
 
   useCanvasResizePreview({
@@ -117,14 +171,30 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
   return (
     <div className="space-y-3">
       {isCanvasMode ? (
+        <CanvasCropModeSwitch
+          mode={canvasCropMode}
+          onSelect={(cropMode) => {
+            if (canvasCropMode === cropMode) return;
+            setCanvasCropMode(cropMode);
+            props.controller.clearCropSelection();
+            props.setCanvasSizeDraft(props.canvasSize);
+            if (cropMode === 'expand') {
+              props.controller.previewCanvasSize(props.canvasSize.width, props.canvasSize.height);
+            }
+          }}
+        />
+      ) : null}
+      {isCanvasMode ? (
         <p
           aria-live="polite"
           className="text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]"
         >
           {translate(
-            props.cropReady
-              ? 'editor.compact.cropReadyDescription'
-              : 'editor.compact.cropWaitingDescription'
+            canvasCropMode === 'expand'
+              ? 'editor.compact.expandCanvasDescription'
+              : props.cropReady
+                ? 'editor.compact.cropReadyDescription'
+                : 'editor.compact.cropWithinCanvasDescription'
           )}
         </p>
       ) : null}
@@ -137,6 +207,11 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
       {!activeSizeIsValid ? (
         <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
           {translate('editor.compact.invalidImageDimensions')}
+        </p>
+      ) : null}
+      {cropSizeExceedsCanvas ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('editor.compact.cropSizeExceedsCanvas')}
         </p>
       ) : null}
       <div className={isCanvasMode ? 'grid grid-cols-2 gap-2' : undefined}>
@@ -153,10 +228,14 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
           type="button"
           className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
           disabled={applyDisabled}
-          onClick={() => applyResizeToolMode(props, mode)}
+          onClick={() => applyResizeToolMode(props, mode, canvasCropMode)}
         >
           {translate(
-            mode === 'image' ? 'editor.compact.applyImageSize' : 'editor.compact.applyCropCanvas'
+            mode === 'image'
+              ? 'editor.compact.applyImageSize'
+              : canvasCropMode === 'expand'
+                ? 'editor.compact.applyExpandCanvas'
+                : 'editor.compact.applyCropCanvas'
           )}
         </button>
       </div>
@@ -277,13 +356,17 @@ function ResizeToolAspectRatioField(props: {
   );
 }
 
-function applyResizeToolMode(props: ResizeToolSectionProps, mode: ResizeToolMode) {
+function applyResizeToolMode(
+  props: ResizeToolSectionProps,
+  mode: ResizeToolMode,
+  canvasCropMode: 'crop' | 'expand'
+) {
   if (mode === 'image') {
     props.controller.resizeImage(props.imageSizeDraft.width, props.imageSizeDraft.height);
     return;
   }
 
-  if (props.cropReady) {
+  if (canvasCropMode === 'expand' || props.cropReady) {
     void fireAndReportEditorAction('inspector-apply-crop-selection', () =>
       props.controller.applyCropSelection()
     );

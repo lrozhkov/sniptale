@@ -5,6 +5,7 @@ import {
   applyCropGuideSelection,
   clampEditorCropSelectionPosition,
   createCropGuideRect,
+  normalizeEditorCanvasExpansion,
 } from '../tools/crop';
 
 type CropGuideState = {
@@ -19,6 +20,7 @@ interface PreviewEditorCanvasSizeSelectionContext {
   canvasDocumentSize: { width: number; height: number };
   width: number;
   height: number;
+  mode?: 'crop' | 'expand';
 }
 
 export function previewEditorCanvasSizeSelection(
@@ -29,6 +31,27 @@ export function previewEditorCanvasSizeSelection(
   }
 
   const baseSelection = context.cropSelection ?? { left: 0, top: 0, width: 1, height: 1 };
+  if (context.mode === 'expand') {
+    const width = Math.max(context.canvasDocumentSize.width, Math.round(context.width));
+    const height = Math.max(context.canvasDocumentSize.height, Math.round(context.height));
+    const nextSelection = normalizeEditorCanvasExpansion(
+      {
+        left: Math.round((context.canvasDocumentSize.width - width) / 2),
+        top: Math.round((context.canvasDocumentSize.height - height) / 2),
+        width,
+        height,
+      },
+      context.canvasDocumentSize
+    );
+    if (isSameCropSelection(nextSelection, context.cropSelection)) return null;
+    const cropGuide = context.cropGuide ?? createCropGuideRect(new Point(0, 0));
+    applyCropGuideSelection(cropGuide, nextSelection, 'selection');
+    cropGuide.hasBorders = true;
+    if (!context.cropGuide) context.canvas.add(cropGuide);
+    context.canvas.setActiveObject(cropGuide);
+    context.canvas.requestRenderAll();
+    return { cropGuide, cropSelection: nextSelection };
+  }
   const requestedSelection = {
     left: baseSelection.left,
     top: baseSelection.top,
@@ -42,20 +65,6 @@ export function previewEditorCanvasSizeSelection(
     requestedSelection.height === context.canvasDocumentSize.height
   ) {
     return null;
-  }
-
-  const expandsCanvas =
-    !context.cropSelection &&
-    (requestedSelection.width > context.canvasDocumentSize.width ||
-      requestedSelection.height > context.canvasDocumentSize.height);
-
-  if (expandsCanvas) {
-    const cropGuide = context.cropGuide ?? createCropGuideRect(new Point(0, 0));
-    applyCropGuideSelection(cropGuide, requestedSelection, 'preview');
-    cropGuide.set({ selectable: false, evented: false });
-    if (!context.cropGuide) context.canvas.add(cropGuide);
-    context.canvas.requestRenderAll();
-    return { cropGuide, cropSelection: null };
   }
 
   const fit = Math.min(

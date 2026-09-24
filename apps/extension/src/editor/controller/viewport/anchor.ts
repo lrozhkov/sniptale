@@ -1,7 +1,7 @@
 import type { Canvas } from 'fabric';
-import { clamp } from '../../document/model';
 import { getEditorViewportMetrics } from './metrics';
 import type { ViewportAnchor } from '../core/types';
+import { EditorCanvas } from './render-region';
 
 export function captureEditorViewportAnchor(options: {
   canvas: Canvas | null;
@@ -21,18 +21,12 @@ export function captureEditorViewportAnchor(options: {
   }
 
   return {
-    relativeX: clamp(
+    relativeX:
       (metrics.scrollLeft + metrics.viewportWidth / 2 - metrics.canvasOffsetLeft) /
-        metrics.scaledCanvasWidth,
-      0,
-      1
-    ),
-    relativeY: clamp(
+      metrics.scaledCanvasWidth,
+    relativeY:
       (metrics.scrollTop + metrics.viewportHeight / 2 - metrics.canvasOffsetTop) /
-        metrics.scaledCanvasHeight,
-      0,
-      1
-    ),
+      metrics.scaledCanvasHeight,
   };
 }
 
@@ -51,7 +45,7 @@ export function restoreEditorViewportAnchor(options: {
   }
   const anchor = options.anchor;
 
-  requestAnimationFrame(() => {
+  const restore = () => {
     if (!options.canvas || !options.viewportElement) {
       return;
     }
@@ -71,6 +65,11 @@ export function restoreEditorViewportAnchor(options: {
           metrics.canvasOffsetTop -
           metrics.viewportHeight / 2
       ) * metrics.domScaleCompensation;
+    if (options.canvas instanceof EditorCanvas && options.canvas.hasVirtualViewport) {
+      options.canvas.refreshVirtualViewport();
+    }
     options.onSynced();
-  });
+  };
+  if (options.canvas instanceof EditorCanvas && options.canvas.hasVirtualViewport) restore();
+  else requestAnimationFrame(restore);
 }
