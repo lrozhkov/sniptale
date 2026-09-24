@@ -166,6 +166,10 @@ it('keeps frame comments and numbers above the crop mask in the same scaled scen
   expect(scene?.querySelector('[data-ui="editor.crop-overlay"]')?.nextElementSibling).toBe(
     scene?.querySelector('[data-ui="test.frame-projection"]')
   );
+  expect(scene?.hasAttribute('inert')).toBe(true);
+  expect(interactionMocks.projection).toHaveBeenCalledWith(
+    expect.objectContaining({ interactive: false, showVisualOverlays: true })
+  );
   act(() => root.unmount());
 });
 

@@ -16,6 +16,7 @@ import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/
 import { FrameAnnotationResizeHandleLayer } from '../../features/highlighter/frame-annotation/interaction/resize-handles';
 import type { ResizeDirection } from '../../features/highlighter/contracts';
 import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/frame-annotation/step-badge/interactive-surface';
+import { FrameProjectionReadOnlyOverlays } from './projection-read-only';
 import { MIN_FRAME_SIZE } from './interaction-controller';
 import { EditorFrameCallout, resolveCalloutCenter } from './callout-projection';
 import {
@@ -36,6 +37,7 @@ export function FrameProjection(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsRoot: HTMLDivElement | null;
   interactive: boolean;
+  showVisualOverlays?: boolean;
   object: FabricObject | null;
   sceneRoot: HTMLDivElement | null;
   selected: boolean;
@@ -68,7 +70,8 @@ export function FrameProjection(props: {
   React.useEffect(() => {
     if (!getFrameCallout(props.snapshot, activeCalloutIndex)) setActiveCalloutIndex(0);
   }, [activeCalloutIndex, props.snapshot]);
-  const toolbarSelected = props.selected && props.object?.sniptaleLocked !== true;
+  const toolbarSelected =
+    props.interactive && props.selected && props.object?.sniptaleLocked !== true;
   const editingSelected = toolbarSelected && props.settingsMenu === null;
   const scene = resolveFrameAnnotationVisualScene({
     frame: props.snapshot,
@@ -96,6 +99,13 @@ export function FrameProjection(props: {
           frameRect={frameRect}
           scene={scene}
           setActiveCalloutIndex={setActiveCalloutIndex}
+        />
+      ) : props.showVisualOverlays ? (
+        <FrameProjectionReadOnlyOverlays
+          controlsRoot={props.controlsRoot}
+          scene={scene}
+          sceneRoot={props.sceneRoot}
+          snapshot={props.snapshot}
         />
       ) : null}
       {toolbarSelected && props.controlsRoot ? (

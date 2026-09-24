@@ -105,6 +105,7 @@ export function EditorFrameAnnotationPlane(props: {
       <div
         ref={setSceneRoot}
         data-ui="editor.frame-annotation-scene"
+        inert={props.activeTool === 'crop'}
         style={{
           height: documentSize.height,
           width: documentSize.width,
@@ -135,6 +136,7 @@ export function EditorFrameAnnotationPlane(props: {
               entry.object?.sniptaleLocked !== true &&
               (props.activeTool === 'frame-annotation' || props.activeTool === 'select')
             }
+            showVisualOverlays={props.activeTool === 'crop'}
             scale={interaction.projection.scale}
             snapshot={entry.snapshot}
             settingsAnchor={

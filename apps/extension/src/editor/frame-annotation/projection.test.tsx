@@ -11,6 +11,9 @@ import {
 } from '../../features/highlighter/frame-annotation/defaults';
 import { createFrameAnnotationProxy } from './proxy';
 import { FrameProjection } from './projection';
+import { FrameProjectionReadOnlyOverlays } from './projection-read-only';
+import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
+import { DEFAULT_BORDER_PRESET } from '../../features/highlighter/style/defaults';
 
 vi.mock('../../composition/frame-annotation-controls/callout/preset-controller', () => ({
   useCalloutPresetPopoverController: () => ({
@@ -136,6 +139,116 @@ it('does not mount any interactive overlay for a locked selected frame', () => {
   expect(controlsRoot.childElementCount).toBe(0);
   expect(sceneRoot.childElementCount).toBe(0);
   expect(host.querySelector('[data-frame-control="resize-handle"]')).toBeNull();
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
+it('keeps a frame comment and number visible but not editable during canvas crop', async () => {
+  const host = document.createElement('div');
+  const controlsRoot = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
+  const root = createRoot(host);
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-crop',
+      x: 40,
+      y: 40,
+      width: 200,
+      height: 120,
+      borderSettings: {
+        ...projectBorderPresetToAppliedSettings(DEFAULT_BORDER_PRESET),
+        fillPaint: { kind: 'solid', color: '#ff0000' },
+        shadow: 6,
+      },
+      callout: {
+        ...createDefaultFrameCallout(),
+        enabled: true,
+        content: { bodyHtml: 'Visible comment', titleText: '' },
+      },
+      stepBadge: {
+        ...createDefaultFrameStepBadge(),
+        enabled: true,
+        value: '7',
+        auto: false,
+        style: {
+          ...createDefaultFrameStepBadge().style,
+          backgroundColorSource: 'frame-fill',
+        },
+      },
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({ frame: snapshot, label: 'Frame', ordering: 0 });
+
+  await act(async () =>
+    root.render(
+      <FrameProjection
+        coordinateSpace={identityFrameAnnotationCoordinateSpace}
+        controlsRoot={controlsRoot}
+        interactive={false}
+        showVisualOverlays
+        object={object}
+        sceneRoot={sceneRoot}
+        selected={false}
+        scale={1}
+        snapshot={snapshot}
+        settingsAnchor={null}
+        settingsMenu={null}
+        onCommand={vi.fn()}
+        onDraftCommit={vi.fn()}
+        onCloseSettings={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onMoveStart={vi.fn()}
+        onResizeStart={vi.fn()}
+        onSnapshotChange={vi.fn()}
+        onSnapshotPreview={vi.fn()}
+        onStepBadgeReorder={vi.fn()}
+      />
+    )
+  );
+
+  expect(sceneRoot.textContent).toContain('Visible comment');
+  expect(sceneRoot.textContent).toContain('7');
+  const badge = sceneRoot.querySelector<HTMLElement>('.sniptale-step-badge');
+  expect(badge?.style.backgroundColor).toBe('rgb(255, 0, 0)');
+  expect(badge?.style.boxShadow).not.toBe('');
+  expect(controlsRoot.childElementCount).toBe(0);
+  act(() => root.unmount());
+  document.body.replaceChildren();
+});
+
+it('omits disabled frame visuals and tolerates an unavailable crop scene', async () => {
+  const host = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, sceneRoot);
+  const root = createRoot(host);
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'frame-disabled',
+      x: 0,
+      y: 0,
+      width: 100,
+      height: 80,
+      callout: { ...createDefaultFrameCallout(), enabled: false },
+      stepBadge: { ...createDefaultFrameStepBadge(), enabled: false },
+    },
+    0
+  );
+  const props = {
+    controlsRoot: null,
+    scene: { borderColor: '#000', borderWidth: 1 } as never,
+    snapshot,
+  };
+
+  await act(async () =>
+    root.render(<FrameProjectionReadOnlyOverlays {...props} sceneRoot={null} />)
+  );
+  expect(sceneRoot.childElementCount).toBe(0);
+  await act(async () =>
+    root.render(<FrameProjectionReadOnlyOverlays {...props} sceneRoot={sceneRoot} />)
+  );
+  expect(sceneRoot.childElementCount).toBe(0);
   act(() => root.unmount());
   document.body.replaceChildren();
 });
