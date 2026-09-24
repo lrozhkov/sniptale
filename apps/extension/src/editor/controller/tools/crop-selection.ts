@@ -1,5 +1,6 @@
 import type { Rect } from 'fabric';
 import type { CropSelection } from '../core/types';
+import { getEditorWorkspaceMargin } from '../viewport/editing-surface';
 
 export function createCropSelectionFromRect(cropGuide: Rect): CropSelection {
   return {
@@ -24,28 +25,77 @@ export function normalizeEditorCropSelection(
   const canvasHeight = Math.max(1, canvasDocumentSize.height);
   const left = clamp(Math.round(selection.left), 0, canvasWidth - 1);
   const top = clamp(Math.round(selection.top), 0, canvasHeight - 1);
-  const width = Math.min(canvasWidth - left, Math.max(1, Math.round(selection.width)));
-  const height = Math.min(canvasHeight - top, Math.max(1, Math.round(selection.height)));
+  const right = clamp(
+    Math.round(selection.left + Math.max(1, selection.width)),
+    left + 1,
+    canvasWidth
+  );
+  const bottom = clamp(
+    Math.round(selection.top + Math.max(1, selection.height)),
+    top + 1,
+    canvasHeight
+  );
+  const width = right - left;
+  const height = bottom - top;
 
   return { left, top, width, height };
 }
 
-/** Keeps the original image inside the expanded canvas rectangle. */
-export function normalizeEditorCanvasExpansion(
+export function getEditorFreeCanvasBounds(
+  canvasDocumentSize: { width: number; height: number },
+  zoom = 1
+) {
+  const margin = getEditorWorkspaceMargin(canvasDocumentSize);
+  const inset = Math.ceil(20 / Math.max(0.2, zoom));
+  return {
+    left: -margin + inset,
+    top: -margin + inset,
+    right: canvasDocumentSize.width + margin - inset,
+    bottom: canvasDocumentSize.height + margin - inset,
+  };
+}
+
+/** Keeps free selection handles reachable at the scrollable workspace edge. */
+export function normalizeEditorFreeCanvasSelection(
   selection: CropSelection,
-  canvasDocumentSize: { width: number; height: number }
+  canvasDocumentSize: { width: number; height: number },
+  zoom = 1
 ): CropSelection {
-  const left = Math.min(0, Math.round(selection.left));
-  const top = Math.min(0, Math.round(selection.top));
-  const right = Math.max(
-    canvasDocumentSize.width,
-    Math.round(selection.left + Math.max(1, selection.width))
+  const bounds = getEditorFreeCanvasBounds(canvasDocumentSize, zoom);
+  const left = clamp(Math.round(selection.left), bounds.left, bounds.right - 1);
+  const top = clamp(Math.round(selection.top), bounds.top, bounds.bottom - 1);
+  const right = clamp(
+    Math.round(selection.left + Math.max(1, selection.width)),
+    left + 1,
+    bounds.right
   );
-  const bottom = Math.max(
-    canvasDocumentSize.height,
-    Math.round(selection.top + Math.max(1, selection.height))
+  const bottom = clamp(
+    Math.round(selection.top + Math.max(1, selection.height)),
+    top + 1,
+    bounds.bottom
   );
-  return { left, top, width: right - left, height: bottom - top };
+  return {
+    left,
+    top,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+
+export function clampEditorFreeCanvasSelectionPosition(
+  selection: CropSelection,
+  canvasDocumentSize: { width: number; height: number },
+  zoom = 1
+): CropSelection {
+  const bounds = getEditorFreeCanvasBounds(canvasDocumentSize, zoom);
+  const width = Math.min(bounds.right - bounds.left, Math.max(1, Math.round(selection.width)));
+  const height = Math.min(bounds.bottom - bounds.top, Math.max(1, Math.round(selection.height)));
+  return {
+    left: clamp(Math.round(selection.left), bounds.left, bounds.right - width),
+    top: clamp(Math.round(selection.top), bounds.top, bounds.bottom - height),
+    width,
+    height,
+  };
 }
 
 export function clampEditorCropSelectionPosition(

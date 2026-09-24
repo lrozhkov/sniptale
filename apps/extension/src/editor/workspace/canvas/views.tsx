@@ -132,10 +132,10 @@ function CanvasStage(
     width: `${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%`,
     height: `${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%`,
   } satisfies React.CSSProperties;
-  const revealOutside =
-    props.showOutsideCanvas !== false ||
-    (props.activeTool === 'crop' && props.canvasCropMode === 'expand');
-  const maskClassName = `pointer-events-none absolute z-40 ${revealOutside ? 'opacity-[0.78]' : ''}`;
+  const freeCanvasSelection = props.activeTool === 'crop' && props.canvasCropMode === 'expand';
+  const revealOutside = props.showOutsideCanvas !== false || freeCanvasSelection;
+  const maskOpacity = freeCanvasSelection ? 'opacity-0' : revealOutside ? 'opacity-[0.78]' : '';
+  const maskClassName = `pointer-events-none absolute z-40 ${maskOpacity}`;
   const maskStyle = { backgroundColor: props.backgroundColor };
   return (
     <div

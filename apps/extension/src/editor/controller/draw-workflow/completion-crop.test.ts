@@ -5,6 +5,7 @@ it('publishes completed crop state only after updating the Fabric selection', ()
   const canvas = {
     requestRenderAll: vi.fn(),
     setActiveObject: vi.fn(),
+    skipTargetFind: true,
   };
   const completion = {
     cropGuide: { id: 'crop-guide' },
@@ -20,4 +21,5 @@ it('publishes completed crop state only after updating the Fabric selection', ()
   });
   expect(canvas.setActiveObject).toHaveBeenCalledWith(completion.cropGuide);
   expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
+  expect(canvas.skipTargetFind).toBe(false);
 });

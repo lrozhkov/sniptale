@@ -244,6 +244,56 @@ it('fits a square crop preset inside a landscape canvas', () => {
   expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(900, 900);
 });
 
+it('settles oversized manual crop dimensions at the image limits', () => {
+  const controller = createController();
+  renderResizeTool(controller, { canvasSizeDraft: { height: 500, width: 800 } });
+
+  editDimension(translate('editor.compact.widthDimension'), '2400');
+  expect(getInput(translate('editor.compact.widthDimension')).value).toBe('1200');
+  expect(getInput(translate('editor.compact.heightDimension')).value).toBe('500');
+  expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(1200, 500);
+
+  editDimension(translate('editor.compact.heightDimension'), '1800');
+  expect(getInput(translate('editor.compact.heightDimension')).value).toBe('900');
+  expect(getButton(translate('editor.compact.applyCropCanvas')).disabled).toBe(true);
+});
+
+it('keeps both dimensions within the image when aspect lock is on', () => {
+  const controller = createController();
+  renderResizeTool(controller, { canvasSizeDraft: { height: 400, width: 800 } });
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>(`[title="${translate('editor.compact.keepAspectRatio')}"]`)
+      ?.click()
+  );
+
+  editDimension(translate('editor.compact.widthDimension'), '2400');
+  expect(getInput(translate('editor.compact.widthDimension')).value).toBe('1200');
+  expect(getInput(translate('editor.compact.heightDimension')).value).toBe('600');
+  expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(1200, 600);
+});
+
+it('allows a free canvas selection larger than the old image through dimensions and ratio presets', () => {
+  const controller = createController();
+  renderResizeTool(controller);
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.canvas-size.mode.expand"]')
+      ?.click()
+  );
+
+  editDimension(translate('editor.compact.widthDimension'), '2400');
+  expect(getInput(translate('editor.compact.widthDimension')).value).toBe('2400');
+  expect(controller.previewCanvasSize).toHaveBeenLastCalledWith(2400, 900);
+
+  act(() => {
+    const select = getSelect(translate('editor.compact.aspectRatioPreset'));
+    select.value = '1:1';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(getInput(translate('editor.compact.heightDimension')).value).toBe('2400');
+});
+
 it('leaves crop mode from the secondary cancel action', () => {
   const controller = createController();
   renderResizeTool(controller);
@@ -356,6 +406,16 @@ function getSelect(label: string): HTMLSelectElement {
   }
 
   return select;
+}
+
+function editDimension(label: string, value: string) {
+  const input = getInput(label);
+  act(() => input.focus());
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
 }
 
 it('keeps a selected preset ratio during locked dimension edits', () => {

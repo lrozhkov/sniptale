@@ -112,9 +112,8 @@ function startDrawing(
 ): boolean {
   const tool = bindings.getActiveTool();
   if (tool === 'select') return false;
-  if (tool === 'crop' && useEditorStore.getState().canvasCropMode === 'expand') return false;
   if (event.transform && isEditorDrawingSelection(event.transform.target)) return false;
-  if (cropDown(bindings, canvas, tool, event)) return true;
+  if (tool === 'crop') return cropDown(bindings, canvas, tool, event);
   const point = canvas.getScenePoint(event.e);
   const pointerId = readEditorDrawingPointerId(event.e);
   if (tool === 'step') {

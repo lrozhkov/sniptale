@@ -133,7 +133,7 @@ it('aligns the DOM scene to the canvas origin and excludes floating controls fro
   act(() => root.unmount());
 });
 
-it('places the crop mask after frame visuals in the same scaled scene', () => {
+it('keeps frame comments and numbers above the crop mask in the same scaled scene', () => {
   interactionMocks.projected.push({
     object: {},
     snapshot: { id: 'frame-1' },
@@ -163,11 +163,8 @@ it('places the crop mask after frame visuals in the same scaled scene', () => {
   );
 
   const scene = host.querySelector('[data-ui="editor.frame-annotation-scene"]');
-  expect(scene?.querySelector('[data-ui="test.frame-projection"]')?.nextElementSibling).toBe(
-    scene?.querySelector('[data-ui="editor.crop-overlay"]')
-  );
-  expect(scene?.querySelector<SVGSVGElement>('[data-ui="editor.crop-overlay"]')?.style.zIndex).toBe(
-    '2147483647'
+  expect(scene?.querySelector('[data-ui="editor.crop-overlay"]')?.nextElementSibling).toBe(
+    scene?.querySelector('[data-ui="test.frame-projection"]')
   );
   act(() => root.unmount());
 });

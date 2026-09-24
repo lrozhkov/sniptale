@@ -2,6 +2,8 @@ import React from 'react';
 import type { Canvas } from 'fabric';
 import type { EditorTool } from '../../features/editor/document/types';
 import { EDITOR_CANVAS_CROP_OVERLAY } from '../color/palette/constants';
+import { getEditorWorkspaceMargin } from '../controller/viewport/editing-surface';
+import { useEditorStore } from '../state/useEditorStore';
 
 type CropBounds = { left: number; top: number; width: number; height: number };
 
@@ -12,6 +14,7 @@ export function EditorCropOverlay(props: {
 }) {
   const [bounds, setBounds] = React.useState<CropBounds | null>(null);
   const { canvas, activeTool } = props;
+  const canvasCropMode = useEditorStore((state) => state.canvasCropMode);
 
   React.useEffect(() => {
     if (!canvas || activeTool !== 'crop') {
@@ -38,15 +41,20 @@ export function EditorCropOverlay(props: {
   }, [canvas, activeTool]);
 
   if (activeTool !== 'crop' || !bounds) return null;
-  const { width, height } = props.documentSize;
-  const hole = `M ${bounds.left} ${bounds.top} h ${bounds.width} v ${bounds.height} h ${-bounds.width} Z`;
+  const margin = canvasCropMode === 'expand' ? getEditorWorkspaceMargin(props.documentSize) : 0;
+  const width = props.documentSize.width + margin * 2;
+  const height = props.documentSize.height + margin * 2;
+  const hole = [
+    `M ${bounds.left + margin} ${bounds.top + margin}`,
+    `h ${bounds.width} v ${bounds.height} h ${-bounds.width} Z`,
+  ].join(' ');
   return (
     <svg
       data-ui="editor.crop-overlay"
       aria-hidden="true"
       width={width}
       height={height}
-      style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2_147_483_647 }}
+      style={{ position: 'absolute', left: -margin, top: -margin, pointerEvents: 'none' }}
     >
       <path
         d={`M 0 0 H ${width} V ${height} H 0 Z ${hole}`}

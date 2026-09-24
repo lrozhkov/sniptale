@@ -10,6 +10,7 @@ export function createDiscardDrawWorkflowState(
   if (drawSession.object) {
     canvas.remove(drawSession.object);
   }
+  if (drawSession.tool === 'crop') canvas.skipTargetFind = false;
   syncRuntimeState();
 
   return {

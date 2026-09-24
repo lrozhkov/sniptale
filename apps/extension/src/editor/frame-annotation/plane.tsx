@@ -118,6 +118,11 @@ export function EditorFrameAnnotationPlane(props: {
         }}
       >
         <FrameEffectSurfaces documentSize={documentSize} projection={interaction.projection} />
+        <EditorCropOverlay
+          activeTool={props.activeTool}
+          canvas={props.controller.canvas}
+          documentSize={documentSize}
+        />
         {interaction.projection.projected.map((entry) => (
           <FrameProjection
             key={entry.snapshot.id}
@@ -180,11 +185,6 @@ export function EditorFrameAnnotationPlane(props: {
             }
           />
         ))}
-        <EditorCropOverlay
-          activeTool={props.activeTool}
-          canvas={props.controller.canvas}
-          documentSize={documentSize}
-        />
       </div>
       {createPortal(
         <div

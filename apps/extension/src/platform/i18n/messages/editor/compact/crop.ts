@@ -34,8 +34,8 @@ export const editorCompactCropMessages = defineMessageSource({
     en: 'Expand canvas',
   },
   expandCanvasDescription: {
-    ru: 'Потяните углы рамки за границу изображения или задайте новый размер. Исходное изображение останется внутри холста.',
-    en: 'Drag the frame corners beyond the image or enter a new size. The original image stays inside the canvas.',
+    ru: 'Выделите любую область рабочей зоны или задайте размер. Выбранная область станет новым холстом.',
+    en: 'Select any area of the workspace or enter a size. The selected area becomes the new canvas.',
   },
   cropWithinCanvasDescription: {
     ru: 'Выделение и его маркеры упираются в текущие границы изображения.',

@@ -113,7 +113,12 @@ it('does not create a canvas size preview for the current canvas size', () => {
 });
 
 it('creates an editable expansion guide centered around the original image', () => {
-  const canvas = { add: vi.fn(), requestRenderAll: vi.fn(), setActiveObject: vi.fn() };
+  const canvas = {
+    add: vi.fn(),
+    getZoom: () => 1,
+    requestRenderAll: vi.fn(),
+    setActiveObject: vi.fn(),
+  };
   mocks.createCropGuideRectMock.mockReturnValueOnce({ id: 'expansion-guide', set: vi.fn() });
   const result = previewEditorCanvasSizeSelection({
     canvas: canvas as never,
@@ -132,6 +137,7 @@ it('creates an editable expansion guide centered around the original image', () 
     'selection'
   );
   expect(canvas.setActiveObject).toHaveBeenCalledWith(result?.cropGuide);
+  expect(result?.cropGuide?.hasBorders).toBe(false);
 });
 
 it('updates an existing crop selection from the canvas size preview owner', () => {

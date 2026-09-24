@@ -7,9 +7,10 @@ import {
   type TOptions,
 } from 'fabric';
 import {
-  configureCropGuideForEditing,
+  applyCropGuideSelection,
   createCropSelectionFromRect,
   normalizeEditorCropSelection,
+  normalizeEditorFreeCanvasSelection,
 } from '../tools/crop';
 import {
   cancelEditorCropDrawSession,
@@ -52,19 +53,24 @@ function completeTextDrawSession(
 
 function completeCropDrawSession(
   canvasDocumentSize: { width: number; height: number },
-  object: FabricObject
+  object: FabricObject,
+  mode: 'crop' | 'expand',
+  zoom: number
 ): EditorDrawSessionCompletion {
   const cropGuide = object as RectInstance;
-  configureCropGuideForEditing(cropGuide);
+  const rawSelection = createCropSelectionFromRect(cropGuide);
+  const cropSelection =
+    mode === 'expand'
+      ? normalizeEditorFreeCanvasSelection(rawSelection, canvasDocumentSize, zoom)
+      : normalizeEditorCropSelection(rawSelection, canvasDocumentSize);
+  applyCropGuideSelection(cropGuide, cropSelection, 'selection');
+  cropGuide.hasBorders = false;
 
   return {
     kind: 'crop',
     drawSession: null,
     cropGuide,
-    cropSelection: normalizeEditorCropSelection(
-      createCropSelectionFromRect(cropGuide),
-      canvasDocumentSize
-    ),
+    cropSelection,
   };
 }
 
@@ -81,6 +87,8 @@ export function completeEditorDrawSession(options: {
   drawSession: DrawSession;
   canvasDocumentSize: { width: number; height: number };
   minDrawSize: number;
+  cropMode?: 'crop' | 'expand';
+  zoom?: number;
 }): EditorDrawSessionCompletion {
   const object = options.drawSession.object;
   if (!object) {
@@ -111,7 +119,12 @@ export function completeEditorDrawSession(options: {
   }
 
   if (options.drawSession.tool === 'crop' && object instanceof Rect) {
-    return completeCropDrawSession(options.canvasDocumentSize, object);
+    return completeCropDrawSession(
+      options.canvasDocumentSize,
+      object,
+      options.cropMode ?? 'crop',
+      options.zoom ?? 1
+    );
   }
 
   return {

@@ -12,7 +12,9 @@ import {
   getActiveEditorCropRect,
   isEditorCropGuide,
   normalizeEditorCropSelection,
-  normalizeEditorCanvasExpansion,
+  normalizeEditorFreeCanvasSelection,
+  clampEditorFreeCanvasSelectionPosition,
+  getEditorFreeCanvasBounds,
   clampEditorCropSelectionPosition,
 } from './crop';
 
@@ -43,19 +45,40 @@ beforeEach(() => {
 });
 
 function runEditorControllerCropGuideSuite() {
-  it('keeps all four original edges inside an expanded rectangle', () => {
+  it('allows a free canvas rectangle anywhere relative to the original image', () => {
     expect(
-      normalizeEditorCanvasExpansion(
+      normalizeEditorFreeCanvasSelection(
         { left: -30, top: -20, width: 180, height: 120 },
         { width: 100, height: 80 }
       )
     ).toEqual({ left: -30, top: -20, width: 180, height: 120 });
     expect(
-      normalizeEditorCanvasExpansion(
-        { left: 10, top: 15, width: 20, height: 20 },
+      normalizeEditorFreeCanvasSelection(
+        { left: 110, top: 115, width: 20, height: 20 },
         { width: 100, height: 80 }
       )
-    ).toEqual({ left: 0, top: 0, width: 100, height: 80 });
+    ).toEqual({ left: 110, top: 115, width: 20, height: 20 });
+    const workspace = getEditorFreeCanvasBounds({ width: 100, height: 80 }, 0.5);
+    const stretched = normalizeEditorFreeCanvasSelection(
+      { left: workspace.left - 50, top: workspace.top - 20, width: 300, height: 200 },
+      { width: 100, height: 80 },
+      0.5
+    );
+    expect(stretched.left).toBe(workspace.left);
+    expect(stretched.top).toBe(workspace.top);
+    expect(stretched.left + stretched.width).toBe(workspace.left + 250);
+    expect(
+      clampEditorFreeCanvasSelectionPosition(
+        { left: workspace.right + 10, top: workspace.bottom + 10, width: 80, height: 60 },
+        { width: 100, height: 80 },
+        0.5
+      )
+    ).toEqual({
+      left: workspace.right - 80,
+      top: workspace.bottom - 60,
+      width: 80,
+      height: 60,
+    });
   });
   it('keeps crop dimensions while clamping a moved guide to canvas edges', () => {
     expect(
@@ -118,6 +141,12 @@ function runEditorControllerCropGuideSuite() {
       width: 300,
       height: 1,
     });
+    expect(
+      normalizeEditorCropSelection(
+        { left: -30, top: 10, width: 130, height: 40 },
+        { width: 300, height: 200 }
+      )
+    ).toEqual({ left: 0, top: 10, width: 100, height: 40 });
   });
 }
 

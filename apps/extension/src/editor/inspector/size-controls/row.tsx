@@ -5,6 +5,8 @@ import { SizeControlInput } from './input';
 interface SizeControlsRowProps {
   width: number;
   height: number;
+  maxWidth?: number | undefined;
+  maxHeight?: number | undefined;
   locked: boolean;
   onWidthChange: (value: number) => void;
   onHeightChange: (value: number) => void;
@@ -42,6 +44,7 @@ export function SizeControlsRow(props: SizeControlsRowProps) {
         {...widthInputProps}
         label={translate('editor.compact.widthDimension')}
         value={props.width}
+        max={props.maxWidth}
         onChange={props.onWidthChange}
       />
       <AspectToggle compact checked={props.locked} onClick={props.onToggleLock} />
@@ -49,6 +52,7 @@ export function SizeControlsRow(props: SizeControlsRowProps) {
         {...heightInputProps}
         label={translate('editor.compact.heightDimension')}
         value={props.height}
+        max={props.maxHeight}
         onChange={props.onHeightChange}
       />
     </div>

@@ -3,6 +3,7 @@ import { NumericValueField } from '../../chrome/ui';
 interface SizeControlInputProps {
   dataUi?: string;
   label: string;
+  max?: number | undefined;
   value: number;
   onChange: (value: number) => void;
 }
@@ -19,6 +20,7 @@ export function SizeControlInput(props: SizeControlInputProps) {
         label={props.label}
         value={props.value}
         min={1}
+        max={props.max}
         precision={0}
         normalizeValue={(value) => Math.max(1, Math.round(value))}
         onPreviewValue={() => undefined}

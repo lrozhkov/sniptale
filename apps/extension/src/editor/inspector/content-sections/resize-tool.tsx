@@ -148,15 +148,9 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
     isCanvasMode &&
     canvasCropMode === 'crop' &&
     (active.draft.width > props.canvasSize.width || active.draft.height > props.canvasSize.height);
-  const expansionWouldShrink =
-    isCanvasMode &&
-    canvasCropMode === 'expand' &&
-    (active.draft.width < props.canvasSize.width || active.draft.height < props.canvasSize.height);
   const applyDisabled =
     !activeSizeIsValid ||
     cropSizeExceedsCanvas ||
-    expansionWouldShrink ||
-    (isCanvasMode && canvasCropMode === 'expand' && canvasSizeMatchesDraft) ||
     (mode === 'canvas' ? canvasSizeMatchesDraft && !props.cropReady : imageSizeMatchesDraft);
 
   useCanvasResizePreview({
@@ -200,7 +194,7 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
       ) : null}
       <ResizeToolSizePanel
         active={active}
-        canvasSize={props.canvasSize}
+        bounds={isCanvasMode && canvasCropMode === 'crop' ? props.canvasSize : undefined}
         isCanvasMode={isCanvasMode}
         updateLockedDraft={props.updateLockedDraft}
       />
@@ -270,7 +264,7 @@ function selectActiveResizeState(
 
 function ResizeToolSizePanel(props: {
   active: ActiveResizeState;
-  canvasSize: SizeDraft;
+  bounds: SizeDraft | undefined;
   isCanvasMode: boolean;
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
@@ -281,12 +275,13 @@ function ResizeToolSizePanel(props: {
   return (
     <section aria-label={label} className={INSPECTOR_SECTION_SURFACE_CLASS_NAME}>
       <div className="space-y-3">
-        <ResizeToolDimensionRow active={props.active} updateLockedDraft={props.updateLockedDraft} />
-        {props.isCanvasMode ? null : <ResizeToolSizePresetField active={props.active} />}
-        <ResizeToolAspectRatioField
+        <ResizeToolDimensionRow
           active={props.active}
-          bounds={props.isCanvasMode ? props.canvasSize : undefined}
+          bounds={props.bounds}
+          updateLockedDraft={props.updateLockedDraft}
         />
+        {props.isCanvasMode ? null : <ResizeToolSizePresetField active={props.active} />}
+        <ResizeToolAspectRatioField active={props.active} bounds={props.bounds} />
       </div>
     </section>
   );
@@ -294,12 +289,15 @@ function ResizeToolSizePanel(props: {
 
 function ResizeToolDimensionRow(props: {
   active: ActiveResizeState;
+  bounds: SizeDraft | undefined;
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
   return (
     <SizeControlsRow
       width={props.active.draft.width}
       height={props.active.draft.height}
+      maxWidth={props.bounds?.width}
+      maxHeight={props.bounds?.height}
       locked={props.active.locked}
       onWidthChange={(width) => updateSizeDraft(props, 'width', width)}
       onHeightChange={(height) => updateSizeDraft(props, 'height', height)}
@@ -314,15 +312,27 @@ function updateSizeDraft(
   field: 'width' | 'height',
   value: number
 ) {
-  props.active.setDraft((state) =>
-    props.updateLockedDraft(
+  props.active.setDraft((state) => {
+    const next = props.updateLockedDraft(
       state,
       field,
       value,
       props.active.locked,
       state.width / Math.max(1, state.height)
-    )
-  );
+    );
+    if (!props.bounds) return next;
+    if (!props.active.locked) {
+      return {
+        width: Math.min(next.width, props.bounds.width),
+        height: Math.min(next.height, props.bounds.height),
+      };
+    }
+    const fit = Math.min(1, props.bounds.width / next.width, props.bounds.height / next.height);
+    return {
+      width: Math.min(props.bounds.width, Math.max(1, Math.round(next.width * fit))),
+      height: Math.min(props.bounds.height, Math.max(1, Math.round(next.height * fit))),
+    };
+  });
 }
 
 function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {

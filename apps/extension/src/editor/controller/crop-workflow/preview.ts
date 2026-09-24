@@ -5,7 +5,7 @@ import {
   applyCropGuideSelection,
   clampEditorCropSelectionPosition,
   createCropGuideRect,
-  normalizeEditorCanvasExpansion,
+  normalizeEditorFreeCanvasSelection,
 } from '../tools/crop';
 
 type CropGuideState = {
@@ -32,21 +32,25 @@ export function previewEditorCanvasSizeSelection(
 
   const baseSelection = context.cropSelection ?? { left: 0, top: 0, width: 1, height: 1 };
   if (context.mode === 'expand') {
-    const width = Math.max(context.canvasDocumentSize.width, Math.round(context.width));
-    const height = Math.max(context.canvasDocumentSize.height, Math.round(context.height));
-    const nextSelection = normalizeEditorCanvasExpansion(
+    const width = Math.max(1, Math.round(context.width));
+    const height = Math.max(1, Math.round(context.height));
+    const nextSelection = normalizeEditorFreeCanvasSelection(
       {
-        left: Math.round((context.canvasDocumentSize.width - width) / 2),
-        top: Math.round((context.canvasDocumentSize.height - height) / 2),
+        left:
+          context.cropSelection?.left ?? Math.round((context.canvasDocumentSize.width - width) / 2),
+        top:
+          context.cropSelection?.top ??
+          Math.round((context.canvasDocumentSize.height - height) / 2),
         width,
         height,
       },
-      context.canvasDocumentSize
+      context.canvasDocumentSize,
+      context.canvas.getZoom()
     );
     if (isSameCropSelection(nextSelection, context.cropSelection)) return null;
     const cropGuide = context.cropGuide ?? createCropGuideRect(new Point(0, 0));
     applyCropGuideSelection(cropGuide, nextSelection, 'selection');
-    cropGuide.hasBorders = true;
+    cropGuide.hasBorders = false;
     if (!context.cropGuide) context.canvas.add(cropGuide);
     context.canvas.setActiveObject(cropGuide);
     context.canvas.requestRenderAll();

@@ -160,4 +160,5 @@ it('completes text, crop, and regular drawing sessions through their canonical o
       minDrawSize: 4,
     })
   ).toEqual(expect.objectContaining({ cropGuide: crop, kind: 'crop' }));
+  expect(crop.hasBorders).toBe(false);
 });

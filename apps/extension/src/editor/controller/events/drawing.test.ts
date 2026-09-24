@@ -11,7 +11,12 @@ const mocks = vi.hoisted(() => ({
   ]),
   complete: vi.fn(),
   createBlur: vi.fn(() => ({ set: vi.fn(), setCoords: vi.fn() })),
-  createBounds: vi.fn(() => ({ x: 1, y: 2, width: 30, height: 40 })),
+  createBounds: vi.fn((_start: { x: number; y: number }, _point: { x: number; y: number }) => ({
+    x: 1,
+    y: 2,
+    width: 30,
+    height: 40,
+  })),
   createDrawing: vi.fn(),
   createFabric: vi.fn(() => ({ sniptaleId: 'draft-1' })),
   cropDown: vi.fn(() => false),
@@ -92,6 +97,7 @@ function createCanvas() {
     getScenePoint: vi.fn(
       (event: { point?: { x: number; y: number } }) => event.point ?? { x: 10, y: 20 }
     ),
+    getZoom: vi.fn(() => 1),
     remove: vi.fn(),
     requestRenderAll: vi.fn(),
     setCursor: vi.fn(),
@@ -117,6 +123,7 @@ function createBindings(tool = 'pencil') {
     }),
     getActiveTool: vi.fn(() => tool),
     getCanvas: vi.fn(() => canvas),
+    getCanvasDocumentSize: vi.fn(() => ({ width: 800, height: 600 })),
     getDrawSession: vi.fn(() => drawSession),
     getSource: vi.fn(() => ({ id: 'source-1' })),
     nextLabelIndex: vi.fn(() => 1),
@@ -192,11 +199,23 @@ describe('shared drawing event orchestration', () => {
   it('leaves the expansion guide handles interactive without starting a crop draft', () => {
     mocks.state.canvasCropMode = 'expand';
     const { bindings, canvas, handlers } = createBindings('crop');
-    handlers.handleMouseDown(pointerEvent() as never);
+    canvas.getActiveObjects.mockReturnValue([{ sniptaleRole: 'crop-guide' }]);
+    handlers.handleMouseDown({
+      ...pointerEvent(),
+      target: { sniptaleRole: 'crop-guide' },
+    } as never);
 
-    expect(mocks.cropDown).not.toHaveBeenCalled();
+    expect(mocks.cropDown).toHaveBeenCalledOnce();
     expect(bindings.startDrawSession).not.toHaveBeenCalled();
     expect(canvas.skipTargetFind).toBe(false);
+    expect(canvas.discardActiveObject).not.toHaveBeenCalled();
+  });
+
+  it('starts a fresh expansion selection on empty workspace', () => {
+    mocks.state.canvasCropMode = 'expand';
+    const { handlers } = createBindings('crop');
+    handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.cropDown).toHaveBeenCalledOnce();
   });
 
   it('does not start any drawing tool or change selection on a middle click', () => {
@@ -334,6 +353,66 @@ describe('shared drawing event orchestration', () => {
     });
     expect(cropObject.setCoords).toHaveBeenCalledOnce();
     expect(crop.canvas.requestRenderAll).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the live bounded crop rectangle inside the image while dragging from outside', () => {
+    const cropObject = { set: vi.fn(), setCoords: vi.fn() };
+    const crop = createBindings('crop');
+    crop.bindings.getDrawSession.mockReturnValue({
+      object: cropObject,
+      start: { x: -50, y: -30 },
+      tool: 'crop',
+    });
+    mocks.createBounds.mockImplementationOnce((start, point) => ({
+      x: Math.min(start.x, point.x),
+      y: Math.min(start.y, point.y),
+      width: Math.abs(point.x - start.x),
+      height: Math.abs(point.y - start.y),
+    }));
+
+    crop.handlers.handleMouseMove(pointerEvent({ point: { x: 900, y: 700 } }) as never);
+
+    expect(cropObject.set).toHaveBeenCalledWith({
+      left: 0,
+      top: 0,
+      width: 800,
+      height: 600,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  });
+});
+
+describe('drawing beyond the image and canvas', () => {
+  beforeEach(resetDrawingMocks);
+
+  it('keeps a free crop draft inside the scrollable workspace while dragging beyond its edge', () => {
+    mocks.state.canvasCropMode = 'expand';
+    const cropObject = { set: vi.fn(), setCoords: vi.fn() };
+    const crop = createBindings('crop');
+    crop.bindings.getDrawSession.mockReturnValue({
+      object: cropObject,
+      start: { x: -100, y: -80 },
+      tool: 'crop',
+    });
+    mocks.createBounds.mockImplementationOnce((start, point) => ({
+      x: Math.min(start.x, point.x),
+      y: Math.min(start.y, point.y),
+      width: Math.abs(point.x - start.x),
+      height: Math.abs(point.y - start.y),
+    }));
+
+    crop.handlers.handleMouseMove(pointerEvent({ point: { x: 5000, y: 5000 } }) as never);
+
+    expect(mocks.createBounds).toHaveBeenCalledWith({ x: -100, y: -80 }, { x: 2828, y: 2628 });
+    expect(cropObject.set).toHaveBeenCalledWith({
+      left: -100,
+      top: -80,
+      width: 2928,
+      height: 2708,
+      scaleX: 1,
+      scaleY: 1,
+    });
   });
 
   it('continues and completes a drawing when the pointer leaves the Fabric canvas', () => {

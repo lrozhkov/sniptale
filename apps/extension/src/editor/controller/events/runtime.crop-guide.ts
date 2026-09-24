@@ -4,11 +4,12 @@ import type {
 } from './types';
 import {
   applyCropGuideSelection,
+  clampEditorFreeCanvasSelectionPosition,
   createCropSelectionFromRect,
   isEditorCropGuide,
   normalizeEditorCropSelection,
   clampEditorCropSelectionPosition,
-  normalizeEditorCanvasExpansion,
+  normalizeEditorFreeCanvasSelection,
 } from '../tools/crop';
 import { useEditorStore } from '../../state/useEditorStore';
 
@@ -24,12 +25,16 @@ export function syncCropGuideInteraction(
   }
 
   const rawSelection = createCropSelectionFromRect(target);
+  const size = bindings.getCanvasDocumentSize();
+  const zoom = bindings.getCanvas()?.getZoom() ?? 1;
   const selection =
     useEditorStore.getState().canvasCropMode === 'expand'
-      ? normalizeEditorCanvasExpansion(rawSelection, bindings.getCanvasDocumentSize())
+      ? interaction === 'move'
+        ? clampEditorFreeCanvasSelectionPosition(rawSelection, size, zoom)
+        : normalizeEditorFreeCanvasSelection(rawSelection, size, zoom)
       : interaction === 'move'
-        ? clampEditorCropSelectionPosition(rawSelection, bindings.getCanvasDocumentSize())
-        : normalizeEditorCropSelection(rawSelection, bindings.getCanvasDocumentSize());
+        ? clampEditorCropSelectionPosition(rawSelection, size)
+        : normalizeEditorCropSelection(rawSelection, size);
   applyCropGuideSelection(target, selection, 'selection');
   bindings.setCropState(target, selection);
   return true;
