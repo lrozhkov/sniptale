@@ -34,10 +34,11 @@ export interface EditorControllerEventHandlers {
   handleWindowKeyUp: (event: KeyboardEvent) => void;
   handleWindowBlur: () => void;
   handleViewportMouseDown: (event: MouseEvent) => void;
+  handleViewportContextMenu: (event: MouseEvent) => void;
   handleViewportWheel: (event: WheelEvent) => void;
   handleViewportScroll: () => void;
   handleWindowMouseMove: (event: MouseEvent) => void;
-  handleWindowMouseUp: () => void;
+  handleWindowMouseUp: (event: MouseEvent) => void;
   handleWindowPointerMove: (event: PointerEvent) => void;
   handleWindowPointerUp: (event: PointerEvent) => void;
 }

@@ -186,6 +186,7 @@ function registerPanTests() {
     viewport.scrollTop = 80;
 
     expect(shouldStartViewportPan({ button: 1 } as MouseEvent, false)).toBe(true);
+    expect(shouldStartViewportPan({ button: 2 } as MouseEvent, false)).toBe(true);
     expect(shouldStartViewportPan({ button: 0 } as MouseEvent, true)).toBe(true);
     expect(shouldStartViewportPan({ button: 0 } as MouseEvent, false)).toBe(false);
 

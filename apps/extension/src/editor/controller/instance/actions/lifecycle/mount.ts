@@ -17,6 +17,7 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
     altActionKey: 'ctrlKey',
     centeredKey: 'ctrlKey',
     enablePointerEvents: true,
+    fireMiddleClick: false,
     preserveObjectStacking: true,
     selection: true,
     selectionKey: 'ctrlKey',

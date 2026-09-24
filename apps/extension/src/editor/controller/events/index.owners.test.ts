@@ -41,9 +41,10 @@ it('combines runtime, drawing, and pan event owners', () => {
   });
   const event = new MouseEvent('mousemove');
   handlers.handleWindowMouseMove(event);
-  handlers.handleWindowMouseUp();
+  const mouseUp = new MouseEvent('mouseup');
+  handlers.handleWindowMouseUp(mouseUp);
   expect(mocks.panHandlers.handleWindowMouseMove).toHaveBeenCalledWith(event);
-  expect(mocks.panHandlers.handleWindowMouseUp).toHaveBeenCalledOnce();
+  expect(mocks.panHandlers.handleWindowMouseUp).toHaveBeenCalledWith(mouseUp);
   const pointer = new Event('pointermove') as PointerEvent;
   handlers.handleWindowPointerMove(pointer);
   expect(mocks.drawingHandlers.handleWindowPointerMove).toHaveBeenCalledWith(pointer);
@@ -81,5 +82,5 @@ it('attaches and detaches every canvas, window, viewport, and resize observer li
   ]);
   expect(canvas.off).toHaveBeenCalledTimes(15);
   expect(disconnect).toHaveBeenCalledOnce();
-  expect(viewportElement.removeEventListener).toHaveBeenCalledTimes(3);
+  expect(viewportElement.removeEventListener).toHaveBeenCalledTimes(4);
 });

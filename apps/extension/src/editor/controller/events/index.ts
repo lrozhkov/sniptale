@@ -18,8 +18,8 @@ function composeEditorControllerEventHandlers(
     handleWindowMouseMove: (event) => {
       pan.handleWindowMouseMove(event);
     },
-    handleWindowMouseUp: () => {
-      pan.handleWindowMouseUp();
+    handleWindowMouseUp: (event) => {
+      pan.handleWindowMouseUp(event);
     },
   };
 }
@@ -61,6 +61,7 @@ export function attachEditorControllerEventHandlers(options: {
   window.addEventListener('pointerup', handlers.handleWindowPointerUp);
   window.addEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement.addEventListener('mousedown', handlers.handleViewportMouseDown, true);
+  viewportElement.addEventListener('contextmenu', handlers.handleViewportContextMenu, true);
   viewportElement.addEventListener('wheel', handlers.handleViewportWheel, { passive: false });
   viewportElement.addEventListener('scroll', handlers.handleViewportScroll, { passive: true });
 
@@ -100,6 +101,7 @@ export function detachEditorControllerEventHandlers(options: {
   window.removeEventListener('pointerup', handlers.handleWindowPointerUp);
   window.removeEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement?.removeEventListener('mousedown', handlers.handleViewportMouseDown, true);
+  viewportElement?.removeEventListener('contextmenu', handlers.handleViewportContextMenu, true);
   viewportElement?.removeEventListener('wheel', handlers.handleViewportWheel);
   viewportElement?.removeEventListener('scroll', handlers.handleViewportScroll);
   viewportResizeObserver?.disconnect();

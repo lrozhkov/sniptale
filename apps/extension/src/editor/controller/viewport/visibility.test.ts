@@ -129,6 +129,10 @@ describe('viewport, visibility, and zoom seams', () => {
     } as any;
 
     const panSession = startEditorViewportPan({ event, isSpacePressed: false, viewportElement });
+    expect(viewportElement.classList.add).toHaveBeenCalledWith(
+      'cursor-grabbing',
+      '[&_*]:!cursor-grabbing'
+    );
     moveEditorViewportPan({
       event: { preventDefault: vi.fn() } as any,
       panSession,
@@ -136,7 +140,10 @@ describe('viewport, visibility, and zoom seams', () => {
     });
     expect(mocks.applyViewportPanSessionMock).toHaveBeenCalled();
     expect(finishEditorViewportPan({ panSession, viewportElement })).toBeNull();
-    expect(viewportElement.classList.remove).toHaveBeenCalledWith('cursor-grabbing');
+    expect(viewportElement.classList.remove).toHaveBeenCalledWith(
+      'cursor-grabbing',
+      '[&_*]:!cursor-grabbing'
+    );
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);

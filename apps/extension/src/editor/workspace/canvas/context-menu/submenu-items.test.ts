@@ -179,6 +179,30 @@ it('resolves empty, selected, and directly targeted canvas context requests', ()
   expect(controller.clearSelection).toHaveBeenCalledOnce();
 });
 
+it('targets the frame annotation under a DOM context menu event', () => {
+  const controller = createController();
+  const frameLayer = { ...layer, id: 'frame-1', type: 'frame-annotation' as const };
+  const frame = document.createElement('div');
+  frame.dataset['frameId'] = frameLayer.id;
+  let request: ReturnType<typeof resolveCanvasContextMenuRequest> = null;
+  frame.addEventListener('contextmenu', (event) => {
+    request = resolveCanvasContextMenuRequest({
+      controller,
+      event,
+      hasImage: true,
+      layers: [frameLayer],
+      selection,
+    });
+  });
+
+  frame.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+
+  expect(request).toEqual(
+    expect.objectContaining({ kind: 'single', layer: expect.objectContaining({ id: 'frame-1' }) })
+  );
+  expect(controller.selectLayer).toHaveBeenCalledWith('frame-1');
+});
+
 it('clamps menu placement and chooses a submenu side from available space', () => {
   const wrapperElement = document.createElement('div');
   vi.spyOn(wrapperElement, 'getBoundingClientRect').mockReturnValue({

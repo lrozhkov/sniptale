@@ -187,6 +187,20 @@ describe('shared drawing event orchestration', () => {
     expect(frame.handlers.handleMouseDownBefore({} as never)).toBeUndefined();
   });
 
+  it('does not start any drawing tool or change selection on a middle click', () => {
+    for (const tool of ['pencil', 'shape', 'text', 'blur', 'crop', 'step']) {
+      const { bindings, canvas, handlers } = createBindings(tool);
+      canvas.getActiveObjects.mockReturnValue([{}]);
+      handlers.handleMouseDown(pointerEvent({ button: 1 }) as never);
+
+      expect(bindings.startDrawSession).not.toHaveBeenCalled();
+      expect(canvas.discardActiveObject).not.toHaveBeenCalled();
+      expect(canvas.setActiveObject).not.toHaveBeenCalled();
+      expect(mocks.cropDown).not.toHaveBeenCalled();
+      expect(mocks.stepDown).not.toHaveBeenCalled();
+    }
+  });
+
   it('creates shared vector, shape, text, and blur drafts through their canonical owners', () => {
     const pencilDrawing = {
       id: 'pencil-1',

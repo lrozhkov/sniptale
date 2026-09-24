@@ -43,6 +43,10 @@ function resolveCanvasContextMenuTriggerPolicy(args: {
     return 'open';
   }
 
+  if (args.target instanceof Element && args.target.closest('[data-frame-id]')) {
+    return 'open';
+  }
+
   return isSurfaceContextTarget({
     hasImage: args.hasImage,
     surfaceRef: args.surfaceRef,

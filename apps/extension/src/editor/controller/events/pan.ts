@@ -22,14 +22,14 @@ type PanEventBindings = Pick<
 > &
   Pick<EditorControllerEventCommandBindings, 'syncViewportState' | 'zoomViewportAtPoint'>;
 
-function handleViewportMouseDown(bindings: PanEventBindings, event: MouseEvent): void {
-  bindings.setPanSession(
-    startEditorViewportPan({
-      viewportElement: bindings.getViewportElement(),
-      isSpacePressed: bindings.getIsSpacePressed(),
-      event,
-    }) ?? bindings.getPanSession()
-  );
+function handleViewportMouseDown(bindings: PanEventBindings, event: MouseEvent): boolean {
+  const started = startEditorViewportPan({
+    viewportElement: bindings.getViewportElement(),
+    isSpacePressed: bindings.getIsSpacePressed(),
+    event,
+  });
+  bindings.setPanSession(started ?? bindings.getPanSession());
+  return started !== null;
 }
 
 function handleViewportWheel(bindings: PanEventBindings, event: WheelEvent): void {
@@ -61,30 +61,85 @@ function handleWindowMouseMove(bindings: PanEventBindings, event: MouseEvent): v
   });
 }
 
-function handleWindowMouseUp(bindings: PanEventBindings): void {
-  bindings.setPanSession(
-    finishEditorViewportPan({
-      viewportElement: bindings.getViewportElement(),
-      panSession: bindings.getPanSession(),
-    })
-  );
-}
-
 export function createPanEventHandlers(
   bindings: PanEventBindings
 ): Pick<
   EditorControllerEventHandlers,
   | 'handleViewportMouseDown'
+  | 'handleViewportContextMenu'
   | 'handleViewportScroll'
   | 'handleViewportWheel'
   | 'handleWindowMouseMove'
   | 'handleWindowMouseUp'
 > {
+  let panButton: number | null = null;
+  let suppressRightContextMenu = false;
+  let earlyRightContextMenu: { target: EventTarget; clientX: number; clientY: number } | null =
+    null;
+  let replayingRightContextMenu = false;
   return {
-    handleViewportMouseDown: (event) => handleViewportMouseDown(bindings, event),
+    handleViewportMouseDown: (event) => {
+      if (event.button === 2) {
+        suppressRightContextMenu = false;
+        earlyRightContextMenu = null;
+      }
+      if (handleViewportMouseDown(bindings, event)) panButton = event.button;
+    },
+    handleViewportContextMenu: (event) => {
+      if (replayingRightContextMenu || event.button !== 2) return;
+      if (panButton === 2 && !suppressRightContextMenu && event.target) {
+        earlyRightContextMenu = {
+          target: event.target,
+          clientX: event.clientX,
+          clientY: event.clientY,
+        };
+      }
+      if (panButton !== 2 && !suppressRightContextMenu) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
     handleViewportWheel: (event) => handleViewportWheel(bindings, event),
     handleViewportScroll: () => handleViewportScroll(bindings),
-    handleWindowMouseMove: (event) => handleWindowMouseMove(bindings, event),
-    handleWindowMouseUp: () => handleWindowMouseUp(bindings),
+    handleWindowMouseMove: (event) => {
+      if (panButton === 2 && bindings.getPanSession()) {
+        const session = bindings.getPanSession();
+        if (
+          session &&
+          Math.hypot(event.clientX - session.startX, event.clientY - session.startY) > 3
+        ) {
+          suppressRightContextMenu = true;
+        }
+      }
+      handleWindowMouseMove(bindings, event);
+    },
+    handleWindowMouseUp: (event) => {
+      if (panButton !== null && event.button !== panButton) return;
+      const shouldReplayMenu = panButton === 2 && !suppressRightContextMenu;
+      const pendingMenu = earlyRightContextMenu;
+      earlyRightContextMenu = null;
+      panButton = null;
+      bindings.setPanSession(
+        finishEditorViewportPan({
+          viewportElement: bindings.getViewportElement(),
+          panSession: bindings.getPanSession(),
+        })
+      );
+      if (shouldReplayMenu && pendingMenu) {
+        replayingRightContextMenu = true;
+        try {
+          pendingMenu.target.dispatchEvent(
+            new MouseEvent('contextmenu', {
+              bubbles: true,
+              button: 2,
+              cancelable: true,
+              clientX: pendingMenu.clientX,
+              clientY: pendingMenu.clientY,
+            })
+          );
+        } finally {
+          replayingRightContextMenu = false;
+        }
+      }
+    },
   };
 }

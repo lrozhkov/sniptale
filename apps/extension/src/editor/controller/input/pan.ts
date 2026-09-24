@@ -1,7 +1,7 @@
 import type { PanSession } from '../core/types';
 
 export function shouldStartViewportPan(event: MouseEvent, isSpacePressed: boolean): boolean {
-  return event.button === 1 || (event.button === 0 && isSpacePressed);
+  return event.button === 1 || event.button === 2 || (event.button === 0 && isSpacePressed);
 }
 
 export function createViewportPanSession(

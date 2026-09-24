@@ -109,6 +109,14 @@ export function resolveCanvasContextMenuRequest(args: {
   }
 
   const selectionIds = getSelectionIds(selection, layers);
+  const frameElement =
+    event.target instanceof Element ? event.target.closest('[data-frame-id]') : null;
+  const frameId = frameElement?.getAttribute('data-frame-id');
+  const frameLayer = findLayer(layers, frameId);
+  if (frameLayer?.type === 'frame-annotation') {
+    controller.withHistoryMuted(() => controller.selectLayer(frameLayer.id));
+    return buildSelectionRequest([frameLayer.id], layers);
+  }
   const target = resolveCanvasTarget(controller, event);
   if (target && controller.canvas && isTargetInCurrentSelection(controller.canvas, target)) {
     return buildSelectionRequest(selectionIds, layers);

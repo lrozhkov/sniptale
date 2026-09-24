@@ -205,7 +205,7 @@ export function createEditorDrawingEventHandlers(
           selectionModifierGesture
         );
       }
-      if ('button' in event.e && event.e.button === 2) return;
+      if ('button' in event.e && event.e.button !== 0) return;
       if (!canvas || !bindings.getSource()) return;
       if (bindings.getActiveTool() === 'text' && isTextTarget(event.target)) {
         const point = canvas.getScenePoint(event.e);

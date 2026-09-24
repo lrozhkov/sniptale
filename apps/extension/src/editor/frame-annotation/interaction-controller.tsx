@@ -240,6 +240,7 @@ function createObjectDragActions(input: ObjectActionInput) {
       snapshot: FrameAnnotationSnapshotV1,
       event: React.PointerEvent
     ) => {
+      if (event.button !== 0) return;
       if (props.activeTool !== 'frame-annotation' && props.activeTool !== 'select') return;
       if (!canMutateFrameAnnotationProxy(object)) return;
       input.commitPendingHistory();
@@ -261,6 +262,7 @@ function createObjectDragActions(input: ObjectActionInput) {
       direction: ResizeDirection,
       calloutCenter: { x: number; y: number } | null
     ) => {
+      if (event.button !== 0) return;
       if (!canMutateFrameAnnotationProxy(object)) return;
       input.commitPendingHistory();
       startExistingDrag(

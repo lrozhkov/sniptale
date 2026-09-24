@@ -16,7 +16,7 @@ export function startEditorViewportPan(options: {
   }
 
   const panSession = createViewportPanSession(viewportElement, event);
-  viewportElement.classList.add('cursor-grabbing');
+  viewportElement.classList.add('cursor-grabbing', '[&_*]:!cursor-grabbing');
   event.preventDefault();
   event.stopPropagation();
   return panSession;
@@ -45,7 +45,7 @@ export function finishEditorViewportPan(options: {
     return panSession;
   }
 
-  viewportElement.classList.remove('cursor-grabbing');
+  viewportElement.classList.remove('cursor-grabbing', '[&_*]:!cursor-grabbing');
   return null;
 }
 
