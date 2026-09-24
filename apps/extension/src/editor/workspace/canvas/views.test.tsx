@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { CanvasEmptyState, CanvasViewport } from './views';
@@ -71,6 +75,52 @@ it('shows a muted, nonblocking workspace around the image rectangle', () => {
   expect(markup).toContain('background-color:#f5f5f5');
   expect(markup.match(/pointer-events-none absolute z-40/g)).toHaveLength(5);
   expect(markup).toContain('mock.frame-plane');
+});
+
+it('opens an image after Fabric moves the canvas into its wrapper', async () => {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const canvasRef = { current: null as HTMLCanvasElement | null };
+  const props = {
+    backgroundColor: '#f5f5f5',
+    canvasRef,
+    viewportRef: { current: null },
+    stageRef: { current: null },
+    surfaceRef: { current: null },
+    gridStyle: null,
+  };
+
+  try {
+    await act(async () => {
+      root.render(<CanvasViewport {...props} hasImage={false} />);
+    });
+    const canvas = canvasRef.current;
+    if (!canvas) throw new Error('Canvas did not mount');
+    const parent = canvas.parentElement;
+    if (!parent) throw new Error('Canvas has no parent');
+    const fabricWrapper = document.createElement('div');
+    parent.replaceChild(fabricWrapper, canvas);
+    fabricWrapper.appendChild(canvas);
+
+    await act(async () => {
+      root.render(
+        <CanvasViewport
+          {...props}
+          hasImage
+          controller={{ canvasDocumentSize: { width: 100, height: 80 } } as never}
+        />
+      );
+    });
+    expect(
+      container.querySelector('[data-ui="editor.canvas.document-checkerboard"]')
+    ).not.toBeNull();
+
+    parent.replaceChild(canvas, fabricWrapper);
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+  }
 });
 
 it('renders the active empty dropzone without exposing the hidden viewport', () => {

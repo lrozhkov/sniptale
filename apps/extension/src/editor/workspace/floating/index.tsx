@@ -242,24 +242,29 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
       onWheel={(event) => event.stopPropagation()}
       style={getFloatingWorkspaceEdgeInsetStyle(edgeInsets)}
     >
-      <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
-      <EditorFloatingToolRail {...railProps} leftDrawerOpen={surfaceRoute.leftDrawer !== null} />
-      <EditorFloatingWorkspaceOverlays documentController={documentController} />
       {hasImage ? (
-        <EditorFloatingLoadedSurfaces
-          collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
-          documentController={documentController}
-          hasImage={hasImage}
-          layersCollapsed={layersCollapsed}
-          layersHeightRatio={layersHeightRatio}
-          layersPreferenceError={layersPreferenceError}
-          onCollapseLayers={() => setLayersCollapsed(true)}
-          onExpandLayers={() => setLayersCollapsed(false)}
-          onLayersHeightRatioChange={setLayersHeightRatio}
-          setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
-          surfaceRoute={surfaceRoute}
-          toolbarProps={toolbarProps}
-        />
+        <>
+          <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
+          <EditorFloatingToolRail
+            {...railProps}
+            leftDrawerOpen={surfaceRoute.leftDrawer !== null}
+          />
+          <EditorFloatingWorkspaceOverlays documentController={documentController} />
+          <EditorFloatingLoadedSurfaces
+            collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
+            documentController={documentController}
+            hasImage={hasImage}
+            layersCollapsed={layersCollapsed}
+            layersHeightRatio={layersHeightRatio}
+            layersPreferenceError={layersPreferenceError}
+            onCollapseLayers={() => setLayersCollapsed(true)}
+            onExpandLayers={() => setLayersCollapsed(false)}
+            onLayersHeightRatioChange={setLayersHeightRatio}
+            setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
+            surfaceRoute={surfaceRoute}
+            toolbarProps={toolbarProps}
+          />
+        </>
       ) : null}
     </FloatingChromeRoot>
   );

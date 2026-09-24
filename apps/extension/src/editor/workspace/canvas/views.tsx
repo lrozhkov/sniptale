@@ -148,16 +148,15 @@ function CanvasStage(
           className={props.hasImage ? 'rounded-none' : 'border-transparent shadow-none'}
           {...(props.surfaceStyle === undefined ? {} : { style: props.surfaceStyle })}
         >
-          {props.hasImage && documentSize.width > 0 && documentSize.height > 0 ? (
-            <div
-              className="pointer-events-none absolute z-0"
-              data-ui="editor.canvas.document-checkerboard"
-              style={{
-                ...annotatableImageCheckerboardStyle,
-                ...imageStyle,
-              }}
-            />
-          ) : null}
+          <div
+            className="pointer-events-none absolute z-0"
+            data-ui="editor.canvas.document-checkerboard"
+            style={
+              props.hasImage && documentSize.width > 0 && documentSize.height > 0
+                ? { ...annotatableImageCheckerboardStyle, ...imageStyle }
+                : { display: 'none' }
+            }
+          />
           <canvas ref={props.canvasRef} className="relative z-10 block" />
           {props.hasImage && props.controller ? (
             <EditorFrameAnnotationPlane
