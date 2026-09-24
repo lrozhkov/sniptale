@@ -25,6 +25,8 @@ it('covers viewport metric fallbacks for stage, viewport, and absent elements', 
   const viewportElement = createViewport();
   const stageElement = document.createElement('div');
   Object.defineProperties(stageElement, {
+    clientHeight: { configurable: true, value: 500 },
+    clientWidth: { configurable: true, value: 600 },
     scrollHeight: { configurable: true, value: 500 },
     scrollWidth: { configurable: true, value: 600 },
   });
@@ -57,6 +59,32 @@ it('covers viewport metric fallbacks for stage, viewport, and absent elements', 
       zoomLevel: 1,
     })
   ).toEqual(expect.objectContaining({ canvasOffsetLeft: 80, canvasOffsetTop: 60 }));
+});
+
+it('keeps the image centered when a frame callout overflows a short stage', () => {
+  const viewportElement = createViewport();
+  const stageElement = document.createElement('div');
+  Object.defineProperties(stageElement, {
+    clientHeight: { configurable: true, value: 500 },
+    clientWidth: { configurable: true, value: 600 },
+    scrollHeight: { configurable: true, value: 740 },
+    scrollWidth: { configurable: true, value: 760 },
+  });
+  vi.spyOn(window, 'getComputedStyle').mockReturnValue({
+    paddingBottom: '0px',
+    paddingLeft: '0px',
+    paddingRight: '0px',
+    paddingTop: '0px',
+  } as CSSStyleDeclaration);
+
+  expect(
+    getEditorViewportMetrics({
+      viewportElement,
+      stageElement,
+      canvasDocumentSize: { width: 160, height: 120 },
+      zoomLevel: 1,
+    })
+  ).toEqual(expect.objectContaining({ canvasOffsetLeft: 220, canvasOffsetTop: 190 }));
 });
 
 it('covers viewport state source and empty-source branches', () => {

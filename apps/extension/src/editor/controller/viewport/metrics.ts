@@ -45,8 +45,8 @@ export function getEditorViewportMetrics(options: {
     options.viewportElement,
     options.devicePixelRatioBaseline
   );
-  const measuredContentWidth = (options.stageElement?.scrollWidth ?? 0) / domScaleCompensation;
-  const measuredContentHeight = (options.stageElement?.scrollHeight ?? 0) / domScaleCompensation;
+  const measuredContentWidth = (options.stageElement?.clientWidth ?? 0) / domScaleCompensation;
+  const measuredContentHeight = (options.stageElement?.clientHeight ?? 0) / domScaleCompensation;
   const contentWidth = Math.max(
     viewportWidth,
     measuredContentWidth,
