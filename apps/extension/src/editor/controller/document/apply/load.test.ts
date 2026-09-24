@@ -159,4 +159,35 @@ describe('document apply load owner', () => {
       })
     ).rejects.toThrow('Invalid frame annotation proxy');
   });
+
+  it('loads a saved frame proxy from validated metadata when serialized Fabric geometry drifted', async () => {
+    const proxy = createFrameAnnotationProxy({
+      frame: { id: 'frame-1', x: 1, y: 2, width: 100, height: 80 },
+      label: 'Frame 1',
+      ordering: 0,
+    });
+    const canvas = {
+      add: vi.fn(),
+      getObjects: vi.fn(() => []),
+      loadFromJSON: vi.fn(async (_json: string) => undefined),
+    };
+    const prepared = createPreparedDocument();
+    prepared.normalizedDocument.richShapes = [];
+    prepared.normalizedDocument.canvasJson = JSON.stringify({
+      objects: [{ ...proxy.toObject([...CUSTOM_JSON_PROPS]), left: 48 }],
+    });
+
+    await loadPreparedDocumentOnCanvas({
+      canvas: createFabricCanvasFixture(canvas),
+      prepared: createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>(prepared),
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: vi.fn(async () => undefined),
+      zoomLevel: 1,
+    });
+
+    const loaded = JSON.parse(String(canvas.loadFromJSON.mock.calls[0]?.[0])) as {
+      objects: Array<{ left: number }>;
+    };
+    expect(loaded.objects[0]?.left).toBe(1);
+  });
 });

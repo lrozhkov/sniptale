@@ -42,6 +42,7 @@ import {
 } from './helpers';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { buildPortableAggregatePresentation } from './presentation';
+import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 
 interface VideoInventoryDatabase extends InventoryDatabase, VideoReviewBackupDatabase {}
 
@@ -60,6 +61,13 @@ function readSelectedVideoProjects(
 ): VideoProjectEntry[] {
   return rows
     .flatMap((raw) => {
+      if (options.scope === 'selected') {
+        const selectedIds = options.selected?.videoProjectIds ?? [];
+        if (selectedIds.length === 0) return [];
+        if (isRecord(raw) && typeof raw['id'] === 'string' && !selectedIds.includes(raw['id'])) {
+          return [];
+        }
+      }
       const result = parseVideoProjectEntryResult(raw);
       if (result.status === 'unsupported') {
         throw new UnsupportedEngine1VideoProjectError(result.metadata);

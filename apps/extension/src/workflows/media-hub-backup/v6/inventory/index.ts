@@ -65,7 +65,10 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
       `Selected project requires an excluded draft media item: ${missingDependency}.`
     );
   }
-  const effects = await buildEffectBundleRootInventory(db, paths);
+  const effects =
+    options.scope === 'all' || videoProjects.length > 0
+      ? await buildEffectBundleRootInventory(db, paths)
+      : [];
 
   const scenarioProjects = await buildScenarioProjectRootInventory({
     db,

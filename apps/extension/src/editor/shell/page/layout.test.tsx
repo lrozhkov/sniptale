@@ -50,18 +50,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function renderLayout(hasImage = true) {
+async function renderLayout(hasImage = true, openStatus: 'idle' | 'loading' | 'error' = 'idle') {
   await act(async () => {
     root?.render(
       <EditorPageLayout
         afterLayout={<div data-ui="editor.after-layout">after</div>}
         commandPaletteOpen
         hasImage={hasImage}
+        openStatus={openStatus}
         onCloseCommandPalette={vi.fn()}
       />
     );
   });
 }
+
+it('shows a blocking loading status and a recoverable error without raw exception text', async () => {
+  await renderLayout(false, 'loading');
+  expect(
+    container?.querySelector('[data-ui="editor.page.open-loading"]')?.getAttribute('role')
+  ).toBe('status');
+  expect(container?.querySelector('[data-ui="editor.canvas.empty-dropzone"]')).not.toBeNull();
+
+  await renderLayout(false, 'error');
+  expect(container?.querySelector('[data-ui="editor.page.open-loading"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="editor.page.open-error"]')?.getAttribute('role')).toBe(
+    'alert'
+  );
+  expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
+});
 
 it('renders the canonical canvas, floating workspace, command palette, and extension slot', async () => {
   await renderLayout();

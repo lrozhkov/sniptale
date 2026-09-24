@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { assertValidFrameAnnotationsInCanvasJson } from './import-boundary';
+import {
+  assertValidFrameAnnotationsInCanvasJson,
+  normalizeFrameAnnotationsInCanvasJson,
+} from './import-boundary';
 import { createFrameAnnotationProxy } from './proxy';
 import { CUSTOM_JSON_PROPS } from '../document/model/custom-json-props';
 
@@ -68,6 +71,30 @@ it('keeps fractional snapshot metadata aligned with Fabric serialization precisi
   expect(() => assertValidFrameAnnotationsInCanvasJson(serialized)).not.toThrow();
 });
 
+it('restores a persisted frame proxy whose Fabric geometry drifted from valid snapshot metadata', () => {
+  const drifted = validProxy({ left: 48, opacity: 0.5 });
+  const normalized = JSON.parse(normalizeFrameAnnotationsInCanvasJson(canvasJson(drifted))) as {
+    objects: Array<Record<string, unknown>>;
+  };
+
+  expect(normalized.objects[0]).toMatchObject({ left: 1, opacity: 1, sniptaleId: 'frame-1' });
+  expect(() => assertValidFrameAnnotationsInCanvasJson(JSON.stringify(normalized))).not.toThrow();
+});
+
+it.each([
+  { sniptaleId: 'another-frame' },
+  { sniptaleType: 'text' },
+  { unexpectedRenderOwner: true },
+  { clipPath: { type: 'Rect' } },
+])(
+  'does not normalize a frame proxy with untrusted identity or object structure: %o',
+  (override) => {
+    expect(() => normalizeFrameAnnotationsInCanvasJson(canvasJson(validProxy(override)))).toThrow(
+      'Invalid frame annotation metadata'
+    );
+  }
+);
+
 it.each([
   { type: 'Textbox' },
   { fill: '#ff0000' },
@@ -81,6 +108,7 @@ it.each([
   { clipPath: { type: 'Rect' } },
   { unexpectedRenderOwner: true },
   { sniptaleId: 'other-frame' },
+  { sniptaleType: 'text' },
   { sniptaleRole: 'background' },
   { visible: 'yes' },
 ])('rejects a noncanonical proxy invariant: %o', (override) => {

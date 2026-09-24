@@ -19,10 +19,12 @@ import { useEditorStore } from '../../state/useEditorStore';
 import { createEditorPageEmbedProviderValue, startScenarioEditorEmbed } from './embed';
 import { EditorPageLayout } from './layout';
 import { useEditorDrawingPreferencesSynchronization } from '../../drawing/preferences';
+import { EditorOpenStatusContext, useEditorOpenStatusOwner } from '../../runtime/open-status';
 
 function createEditorPageBootstrapLifecycle(args: {
   services: EditorPageServices;
   setPageTitle: (pageTitle: string) => void;
+  runOpen: (action: () => Promise<void>) => Promise<void>;
 }) {
   let cancelled = false;
   const request = {
@@ -36,7 +38,9 @@ function createEditorPageBootstrapLifecycle(args: {
 
     const detail: unknown = event.detail;
     if (isEditorBootstrapPayload(detail)) {
-      void openEditorBootstrapPayload(detail, request, args.services);
+      void args
+        .runOpen(() => openEditorBootstrapPayload(detail, request, args.services))
+        .catch(() => undefined);
     }
   };
 
@@ -52,22 +56,25 @@ function createEditorPageBootstrapLifecycle(args: {
 function useEditorPageBootstrapEffects(
   hasImageRef: React.MutableRefObject<boolean>,
   setPageTitle: (pageTitle: string) => void,
-  services: EditorPageServices
+  services: EditorPageServices,
+  runOpen: (action: () => Promise<void>) => Promise<void>
 ) {
   useEffect(() => {
     if (readEditorEmbedMode(window.location.search) === 'scenario') {
-      return startScenarioEditorEmbed({ controller: services.controller, setPageTitle });
+      return startScenarioEditorEmbed({ controller: services.controller, setPageTitle, runOpen });
     }
-    const lifecycle = createEditorPageBootstrapLifecycle({ services, setPageTitle });
+    const lifecycle = createEditorPageBootstrapLifecycle({ services, setPageTitle, runOpen });
 
     window.addEventListener(EDITOR_BOOTSTRAP_EVENT, lifecycle.handleBootstrap);
-    void bootstrapEditorPageSession(lifecycle.request, services);
+    void runOpen(() => bootstrapEditorPageSession(lifecycle.request, services)).catch(
+      () => undefined
+    );
 
     return () => {
       lifecycle.cancel();
       window.removeEventListener(EDITOR_BOOTSTRAP_EVENT, lifecycle.handleBootstrap);
     };
-  }, [services, setPageTitle]);
+  }, [services, setPageTitle, runOpen]);
 
   useEffect(() => {
     const handlePageHide = () => flushEditorAutosaveIfNeeded(services, () => hasImageRef.current);
@@ -132,6 +139,7 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   const hasImageRef = useRef(hasImage);
   hasImageRef.current = hasImage;
   const embedProps = createEditorPageEmbedProviderValue(embedMode, services.controller);
+  const openStatus = useEditorOpenStatusOwner(embedMode === 'scenario' ? 'idle' : 'loading');
 
   useCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
@@ -139,21 +147,24 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
     onClose: () => setCommandPaletteOpen(false),
   });
 
-  useEditorPageBootstrapEffects(hasImageRef, setPageTitle, services);
+  useEditorPageBootstrapEffects(hasImageRef, setPageTitle, services, openStatus.runOpen);
   useEditorDrawingPreferencesSynchronization();
   useEditorPageDefaultEffects(hydrateDefaults, hydrateWorkspaceDefaults);
   useEditorPageServiceDisposal(services);
 
   return (
     <EditorControllerProvider controller={services.controller}>
-      <EditorEmbedProvider {...embedProps}>
-        <EditorPageLayout
-          afterLayout={afterLayout}
-          commandPaletteOpen={commandPaletteOpen}
-          hasImage={hasImage}
-          onCloseCommandPalette={() => setCommandPaletteOpen(false)}
-        />
-      </EditorEmbedProvider>
+      <EditorOpenStatusContext.Provider value={openStatus}>
+        <EditorEmbedProvider {...embedProps}>
+          <EditorPageLayout
+            afterLayout={afterLayout}
+            commandPaletteOpen={commandPaletteOpen}
+            hasImage={hasImage}
+            openStatus={openStatus.status}
+            onCloseCommandPalette={() => setCommandPaletteOpen(false)}
+          />
+        </EditorEmbedProvider>
+      </EditorOpenStatusContext.Provider>
     </EditorControllerProvider>
   );
 };

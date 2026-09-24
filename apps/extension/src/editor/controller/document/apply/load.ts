@@ -7,7 +7,7 @@ import { ensureEditorSourceLayer } from '../source';
 import { prepareCanvasForDocumentLoad, renderCanvasAfterDocumentLoad } from './canvas';
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
 import { restoreFrameAnnotationProxyFromMetadata } from '../../../frame-annotation/proxy';
-import { assertValidFrameAnnotationsInCanvasJson } from '../../../frame-annotation/import-boundary';
+import { normalizeFrameAnnotationsInCanvasJson } from '../../../frame-annotation/import-boundary';
 import { assertValidEditorDrawingCanvasJson } from '../../../document/import-boundary';
 import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/canonicalize';
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
@@ -15,9 +15,11 @@ import { readEditorDrawingObject } from '../../../drawing/object/metadata';
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
 ): Promise<SourceState | null> {
-  assertValidFrameAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson);
+  const canvasJson = normalizeFrameAnnotationsInCanvasJson(
+    options.prepared.normalizedDocument.canvasJson
+  );
   assertValidEditorDrawingCanvasJson(options.prepared.normalizedDocument.canvasJson);
-  await options.canvas.loadFromJSON(options.prepared.normalizedDocument.canvasJson);
+  await options.canvas.loadFromJSON(canvasJson);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,
     canvasSize: options.prepared.canvasSize,

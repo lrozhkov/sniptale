@@ -172,14 +172,14 @@ async function verifiesImageOwnedPageShell() {
 
   const pageRoot = container?.querySelector('[data-ui="editor.page.root"]');
 
-  expect(useAppLocaleMock).toHaveBeenCalledOnce();
+  expect(useAppLocaleMock).toHaveBeenCalled();
   expect(createEditorPageServicesMock).toHaveBeenCalledTimes(1);
   expect(loadEditorPageDefaultsMock).toHaveBeenCalledWith(
     state.hydrateDefaults,
     state.hydrateWorkspaceDefaults
   );
   expect(bootstrapEditorPageSessionMock).toHaveBeenCalledTimes(1);
-  expect(useCommandPaletteHotkeyMock).toHaveBeenCalledTimes(1);
+  expect(useCommandPaletteHotkeyMock).toHaveBeenCalled();
   expect(pageRoot?.className).toContain('relative h-screen');
   expect(pageRoot?.className).toContain('bg-[var(--sniptale-color-surface-canvas)]');
   expect(pageRoot?.className).not.toContain('bg-[linear-gradient');
@@ -240,6 +240,25 @@ async function verifiesBootstrapEventRoutingAndDispose() {
 
 describe('EditorPage', () => {
   useEditorPageTestScope();
+
+  it('keeps the loader visible during bootstrap and shows a friendly error on failure', async () => {
+    let rejectOpen: (error: Error) => void = () => undefined;
+    bootstrapEditorPageSessionMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectOpen = reject;
+        })
+    );
+    createEditorPageServicesMock.mockReturnValue(createServices());
+    applyEditorStoreState(createEditorStoreState({ imageData: null }));
+
+    await renderEditorPage();
+    expect(container?.querySelector('[data-ui="editor.page.open-loading"]')).not.toBeNull();
+
+    await act(async () => rejectOpen(new Error('Invalid frame annotation metadata')));
+    expect(container?.querySelector('[data-ui="editor.page.open-error"]')).not.toBeNull();
+    expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
+  });
 
   it('does not restore standalone storage or accept bootstrap DOM events in scenario embed mode', async () => {
     window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session');

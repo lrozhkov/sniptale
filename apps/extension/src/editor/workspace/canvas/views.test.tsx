@@ -64,6 +64,11 @@ it('shows a muted, nonblocking workspace around the image rectangle', () => {
   );
 
   expect(markup).toContain('editor.canvas.document-boundary');
+  expect(markup).toContain('editor.canvas.document-checkerboard');
+  expect(markup).toContain('editor.canvas.workspace-mask-left');
+  expect(markup).toContain('top:46.3768115942029%;bottom:46.3768115942029%');
+  expect(markup.match(/background-image:/g)).toHaveLength(1);
+  expect(markup).toContain('background-color:#f5f5f5');
   expect(markup.match(/pointer-events-none absolute z-40/g)).toHaveLength(5);
   expect(markup).toContain('mock.frame-plane');
 });

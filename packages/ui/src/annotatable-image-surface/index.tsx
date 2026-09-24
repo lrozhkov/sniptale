@@ -16,7 +16,7 @@ const surfaceClassName =
   'bg-[var(--sniptale-color-surface-panel)] ' +
   'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-subtle)_14%,transparent)]';
 
-const checkerboardStyle: CSSProperties = {
+export const annotatableImageCheckerboardStyle: CSSProperties = {
   backgroundColor:
     'color-mix(in srgb, var(--sniptale-color-surface-canvas) 54%, var(--sniptale-color-surface-panel) 46%)',
   backgroundImage: `${checkerGradientLayer},${checkerGradientLayer}`,
@@ -37,7 +37,7 @@ export function AnnotatableImageSurface(
 ) {
   const style = props.checkerboard
     ? {
-        ...checkerboardStyle,
+        ...annotatableImageCheckerboardStyle,
         ...props.style,
       }
     : props.style;

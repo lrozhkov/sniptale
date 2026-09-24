@@ -9,6 +9,18 @@ export const editorPageMessages = defineMessageSource({
     ru: 'Загрузка инспектора',
     en: 'Loading inspector',
   },
+  loadingImage: {
+    ru: 'Открываем изображение…',
+    en: 'Opening image…',
+  },
+  openFailedTitle: {
+    ru: 'Не удалось открыть изображение',
+    en: 'Could not open the image',
+  },
+  openFailedHint: {
+    ru: 'Попробуйте открыть другой файл или повторите попытку. Исходный файл не изменён.',
+    en: 'Try another file or try again. The original file has not been changed.',
+  },
   title: {
     ru: 'Добавьте изображение',
     en: 'Add an image',

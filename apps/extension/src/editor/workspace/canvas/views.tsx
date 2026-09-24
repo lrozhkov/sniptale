@@ -1,7 +1,10 @@
 import { FolderOpen, ImagePlus } from 'lucide-react';
 import React from 'react';
 import { translate } from '../../../platform/i18n';
-import { AnnotatableImageSurface } from '@sniptale/ui/annotatable-image-surface';
+import {
+  AnnotatableImageSurface,
+  annotatableImageCheckerboardStyle,
+} from '@sniptale/ui/annotatable-image-surface';
 import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
 import {
   EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI,
@@ -82,6 +85,7 @@ export function CanvasViewport(props: {
     ? ({
         borderWidth: 0,
         boxShadow: 'none',
+        backgroundColor: props.backgroundColor,
       } satisfies React.CSSProperties)
     : undefined;
 
@@ -106,6 +110,7 @@ function CanvasStage(
     Parameters<typeof CanvasViewport>[0],
     | 'activeTool'
     | 'canvasRef'
+    | 'backgroundColor'
     | 'controller'
     | 'gridStyle'
     | 'hasImage'
@@ -122,16 +127,15 @@ function CanvasStage(
   const top = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.height)) * 100}%`;
   const right = `${((EDITOR_WORKSPACE_MARGIN + documentSize.width) / Math.max(1, surfaceSize.width)) * 100}%`;
   const bottom = `${((EDITOR_WORKSPACE_MARGIN + documentSize.height) / Math.max(1, surfaceSize.height)) * 100}%`;
+  const bottomInset = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.height)) * 100}%`;
   const imageStyle = {
     left,
     top,
     width: `${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%`,
     height: `${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%`,
   } satisfies React.CSSProperties;
-  const maskClassName = [
-    'pointer-events-none absolute z-40',
-    'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_78%,transparent)]',
-  ].join(' ');
+  const maskClassName = 'pointer-events-none absolute z-40 opacity-[0.78]';
+  const maskStyle = { backgroundColor: props.backgroundColor };
   return (
     <div
       ref={props.stageRef}
@@ -140,10 +144,20 @@ function CanvasStage(
     >
       <div ref={props.surfaceRef} data-ui={EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI}>
         <AnnotatableImageSurface
-          checkerboard={props.hasImage}
+          checkerboard={false}
           className={props.hasImage ? 'rounded-none' : 'border-transparent shadow-none'}
           {...(props.surfaceStyle === undefined ? {} : { style: props.surfaceStyle })}
         >
+          {props.hasImage && documentSize.width > 0 && documentSize.height > 0 ? (
+            <div
+              className="pointer-events-none absolute z-0"
+              data-ui="editor.canvas.document-checkerboard"
+              style={{
+                ...annotatableImageCheckerboardStyle,
+                ...imageStyle,
+              }}
+            />
+          ) : null}
           <canvas ref={props.canvasRef} className="relative z-10 block" />
           {props.hasImage && props.controller ? (
             <EditorFrameAnnotationPlane
@@ -161,13 +175,24 @@ function CanvasStage(
           ) : null}
           {props.hasImage && documentSize.width > 0 && documentSize.height > 0 ? (
             <>
-              <div className={maskClassName} style={{ left: 0, right: 0, top: 0, height: top }} />
               <div
                 className={maskClassName}
-                style={{ left: 0, right: 0, top: bottom, bottom: 0 }}
+                style={{ ...maskStyle, left: 0, right: 0, top: 0, height: top }}
               />
-              <div className={maskClassName} style={{ left: 0, top, bottom, width: left }} />
-              <div className={maskClassName} style={{ left: right, top, bottom, right: 0 }} />
+              <div
+                className={maskClassName}
+                style={{ ...maskStyle, left: 0, right: 0, top: bottom, bottom: 0 }}
+              />
+              <div
+                className={maskClassName}
+                data-ui="editor.canvas.workspace-mask-left"
+                style={{ ...maskStyle, left: 0, top, bottom: bottomInset, width: left }}
+              />
+              <div
+                className={maskClassName}
+                data-ui="editor.canvas.workspace-mask-right"
+                style={{ ...maskStyle, left: right, top, bottom: bottomInset, right: 0 }}
+              />
               <div
                 className="pointer-events-none absolute z-40 border border-[var(--sniptale-color-border-soft)]"
                 data-ui="editor.canvas.document-boundary"

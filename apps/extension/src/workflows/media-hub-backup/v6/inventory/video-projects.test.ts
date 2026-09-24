@@ -118,6 +118,55 @@ beforeEach(() => {
 });
 
 describe('video project backup inventory', () => {
+  it('ignores an unrelated invalid video project during selected image backup', async () => {
+    const db = database([], new Map(), [{ id: 'unrelated-project', project: null }]);
+    const roots = await buildVideoProjectRootInventory({
+      db,
+      options: createMediaHubBackupExportOptions({
+        scope: 'selected',
+        selected: { mediaAssetIds: ['image-one'], scenarioProjectIds: [], videoProjectIds: [] },
+      }),
+      paths,
+    });
+    expect(roots).toEqual([]);
+  });
+
+  it('still rejects an invalid video project explicitly selected for backup', async () => {
+    const db = database([], new Map(), [{ id: 'selected-project', project: null }]);
+    await expect(
+      buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions({
+          scope: 'selected',
+          selected: {
+            mediaAssetIds: [],
+            scenarioProjectIds: [],
+            videoProjectIds: ['selected-project'],
+          },
+        }),
+        paths,
+      })
+    ).rejects.toThrow('Stored video project is invalid');
+  });
+
+  it('does not silently drop a malformed row when a video project is selected', async () => {
+    const db = database([], new Map(), [{ id: 123, project: null }]);
+    await expect(
+      buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions({
+          scope: 'selected',
+          selected: {
+            mediaAssetIds: [],
+            scenarioProjectIds: [],
+            videoProjectIds: ['selected-project'],
+          },
+        }),
+        paths,
+      })
+    ).rejects.toThrow('Stored video project is invalid');
+  });
+
   it('archives review-referenced external audio assets with portable-safe metadata', async () => {
     const entry = createVideoProjectEntryWithMediaClip();
     const db = database(

@@ -1,16 +1,29 @@
 // policyStateIds: [] - canonical proxy keys are an immutable import allowlist, not authority state.
 import { parseSerializedFrameAnnotationSnapshot } from '../../features/highlighter/frame-annotation';
-import { FRAME_ANNOTATION_PROXY_FILL } from './proxy';
+import { CUSTOM_JSON_PROPS } from '../document/model/custom-json-props';
+import { createFrameAnnotationProxy, FRAME_ANNOTATION_PROXY_FILL } from './proxy';
+
+export function normalizeFrameAnnotationsInCanvasJson(canvasJson: string): string {
+  const parsed = parseCanvasJson(canvasJson);
+  if (!isRecord(parsed) || !Array.isArray(parsed['objects'])) return canvasJson;
+  const objects = parsed['objects'].map((value) => normalizeTopLevelFrameProxy(value));
+  const normalized = JSON.stringify({ ...parsed, objects });
+  assertValidFrameAnnotationsInCanvasJson(normalized);
+  return normalized;
+}
 
 export function assertValidFrameAnnotationsInCanvasJson(canvasJson: string): void {
-  let parsed: unknown;
+  const parsed = parseCanvasJson(canvasJson);
+  if (!isRecord(parsed) || !Array.isArray(parsed['objects'])) return;
+  for (const value of parsed['objects']) validateFabricObject(value, false);
+}
+
+function parseCanvasJson(canvasJson: string): unknown {
   try {
-    parsed = JSON.parse(canvasJson) as unknown;
+    return JSON.parse(canvasJson) as unknown;
   } catch {
     throw new Error('Invalid editor canvas JSON');
   }
-  if (!isRecord(parsed) || !Array.isArray(parsed['objects'])) return;
-  for (const value of parsed['objects']) validateFabricObject(value, false);
 }
 
 const CANONICAL_PROXY_KEYS = new Set([
@@ -56,6 +69,50 @@ const CANONICAL_PROXY_KEYS = new Set([
   'width',
 ]);
 
+function normalizeTopLevelFrameProxy(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  const hasFrameMetadata =
+    value['sniptaleType'] === 'frame-annotation' ||
+    value['sniptaleFrameAnnotationJson'] !== undefined ||
+    value['sniptaleFrameAnnotationRevision'] !== undefined;
+  if (!hasFrameMetadata) {
+    validateFabricObject(value, false);
+    return value;
+  }
+  if (isCanonicalFrameProxy(value)) return value;
+
+  const snapshot = parseSerializedFrameAnnotationSnapshot(value['sniptaleFrameAnnotationJson']);
+  if (
+    !snapshot ||
+    value['type'] !== 'Rect' ||
+    value['sniptaleType'] !== 'frame-annotation' ||
+    value['sniptaleId'] !== snapshot.id ||
+    value['sniptaleRole'] !== 'annotation' ||
+    typeof value['sniptaleLabel'] !== 'string' ||
+    typeof value['visible'] !== 'boolean' ||
+    (value['sniptaleLocked'] !== undefined && typeof value['sniptaleLocked'] !== 'boolean') ||
+    !Number.isSafeInteger(value['sniptaleFrameAnnotationRevision']) ||
+    Number(value['sniptaleFrameAnnotationRevision']) < 1 ||
+    !Object.keys(value).every((key) => CANONICAL_PROXY_KEYS.has(key)) ||
+    value['objects'] !== undefined ||
+    value['clipPath'] !== undefined
+  ) {
+    throw new Error('Invalid frame annotation metadata');
+  }
+
+  const proxy = createFrameAnnotationProxy({
+    frame: snapshot,
+    ordering: snapshot.ordering,
+    label: value['sniptaleLabel'],
+  });
+  proxy.visible = value['visible'];
+  if (typeof value['sniptaleLocked'] === 'boolean') {
+    proxy.sniptaleLocked = value['sniptaleLocked'];
+  }
+  proxy.sniptaleFrameAnnotationRevision = Number(value['sniptaleFrameAnnotationRevision']);
+  return proxy.toObject([...CUSTOM_JSON_PROPS]);
+}
+
 function validateFabricObject(value: unknown, nested: boolean): void {
   if (!isRecord(value)) return;
   const hasFrameMetadata =
@@ -77,8 +134,10 @@ function isCanonicalFrameProxy(value: Record<string, unknown>): boolean {
     snapshot &&
     Object.keys(value).every((key) => CANONICAL_PROXY_KEYS.has(key)) &&
     value['type'] === 'Rect' &&
+    value['sniptaleType'] === 'frame-annotation' &&
     value['sniptaleId'] === snapshot.id &&
     value['sniptaleRole'] === 'annotation' &&
+    typeof value['sniptaleLabel'] === 'string' &&
     value['fill'] === FRAME_ANNOTATION_PROXY_FILL &&
     value['stroke'] === null &&
     value['strokeWidth'] === 0 &&
