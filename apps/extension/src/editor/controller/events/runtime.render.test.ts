@@ -37,7 +37,6 @@ it('draws an invisible freehand draft on the top canvas with the viewport transf
   });
   mocks.readDrawing.mockReturnValue(drawing);
   const handler = createAfterRenderHandler({
-    getActiveCropRect: () => null,
     getCanvas: () =>
       createFabricCanvasFixture({
         contextTop: context,
@@ -45,7 +44,6 @@ it('draws an invisible freehand draft on the top canvas with the viewport transf
         getSelectionContext: () => context,
         viewportTransform: [2, 0, 0, 2, 10, 20],
       }),
-    getCanvasDocumentSize: () => ({ height: 100, width: 200 }),
     getDrawSession: () => ({
       object,
       objectId: 'pencil-1',
@@ -89,12 +87,7 @@ it('draws live overlays only for the main render context during a nested blur ba
   });
   mocks.readDrawing.mockReturnValue(drawing);
   const handler = createAfterRenderHandler({
-    getActiveCropRect: () =>
-      createTypedTestFixture<import('fabric').Rect>({
-        getBoundingRect: () => ({ height: 40, left: 20, top: 10, width: 80 }),
-      }),
     getCanvas: () => canvas,
-    getCanvasDocumentSize: () => ({ height: 100, width: 200 }),
     getDrawSession: () => ({
       object,
       objectId: 'pencil-right',
@@ -118,11 +111,11 @@ it('draws live overlays only for the main render context during a nested blur ba
 
   handler({ ctx: mainContext });
   expect(mocks.renderPreview).toHaveBeenCalledExactlyOnceWith(topContext, drawing);
-  expect(topContext.fillRect).toHaveBeenCalledTimes(4);
+  expect(topContext.fillRect).not.toHaveBeenCalled();
   expect(topContext.transform).toHaveBeenCalledExactlyOnceWith(2, 0, 0, 2, 10, 20);
 });
 
-it('keeps the crop overlay while ignoring an invisible non-freehand draft', () => {
+it('leaves the crop mask to the DOM plane while ignoring an invisible non-freehand draft', () => {
   const object = new FabricObject({ visible: false });
   const mainContext = createTypedTestFixture<CanvasRenderingContext2D>({});
   const context = createTypedTestFixture<CanvasRenderingContext2D>({
@@ -134,10 +127,6 @@ it('keeps the crop overlay while ignoring an invisible non-freehand draft', () =
   });
   mocks.readDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
   const handler = createAfterRenderHandler({
-    getActiveCropRect: () =>
-      createTypedTestFixture<import('fabric').Rect>({
-        getBoundingRect: () => ({ height: 40, left: 20, top: 10, width: 80 }),
-      }),
     getCanvas: () =>
       createFabricCanvasFixture({
         contextTop: context,
@@ -145,7 +134,6 @@ it('keeps the crop overlay while ignoring an invisible non-freehand draft', () =
         getSelectionContext: () => context,
         viewportTransform: [1, 0, 0, 1, 0, 0],
       }),
-    getCanvasDocumentSize: () => ({ height: 100, width: 200 }),
     getDrawSession: () => ({
       object,
       objectId: 'shape-1',
@@ -158,8 +146,7 @@ it('keeps the crop overlay while ignoring an invisible non-freehand draft', () =
   handler({ ctx: mainContext });
 
   expect(mocks.renderPreview).not.toHaveBeenCalled();
-  expect(context.fillRect).toHaveBeenCalledTimes(4);
-  expect(context.fillRect).toHaveBeenLastCalledWith(100, 10, 100, 40);
+  expect(context.fillRect).not.toHaveBeenCalled();
   expect(context.restore).toHaveBeenCalledOnce();
 });
 
@@ -174,7 +161,6 @@ it.each([
     transform: vi.fn(),
   });
   const handler = createAfterRenderHandler({
-    getActiveCropRect: () => null,
     getCanvas: () =>
       createFabricCanvasFixture({
         contextTop: context,
@@ -182,7 +168,6 @@ it.each([
         getSelectionContext: () => context,
         viewportTransform: [1, 0, 0, 1, 0, 0],
       }),
-    getCanvasDocumentSize: () => ({ height: 100, width: 200 }),
     getDrawSession: () =>
       object
         ? {

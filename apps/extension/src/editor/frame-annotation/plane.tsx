@@ -11,6 +11,7 @@ import type { EditorFrameAnnotationPlaneController } from './types';
 import { FrameProjection } from './projection';
 import type { ProjectionSettingsMenu } from './projection-settings';
 import { useEditorFrameCoordinateSpace, useProjectionRect } from './projection-space';
+import { EditorCropOverlay } from './crop-overlay';
 
 type FrameSettingsSession = {
   anchor: HTMLButtonElement;
@@ -29,6 +30,30 @@ function useLockedSettingsSessionCleanup(args: {
     const entry = projected.find((candidate) => candidate.snapshot.id === session.frameId);
     if (!entry || entry.object?.sniptaleLocked === true) setSession(null);
   }, [projected, session, setSession]);
+}
+
+function FrameEffectSurfaces(props: {
+  documentSize: { width: number; height: number };
+  projection: ReturnType<typeof useFrameAnnotationInteraction>['projection'];
+}) {
+  const { documentSize, projection } = props;
+  return (
+    <>
+      {projection.distortionScale > 0 ? (
+        <FrameAnnotationDistortionFilter scale={projection.distortionScale} />
+      ) : null}
+      {projection.focusFrames.length > 0 ? (
+        <FrameAnnotationFocusSurface
+          blurAmount={projection.focusBlurAmount}
+          edgeOverscan={1 / Math.max(0.01, projection.scale)}
+          frames={projection.focusFrames}
+          height={documentSize.height}
+          opacity={projection.focusOpacity}
+          width={documentSize.width}
+        />
+      ) : null}
+    </>
+  );
 }
 
 export function EditorFrameAnnotationPlane(props: {
@@ -86,19 +111,7 @@ export function EditorFrameAnnotationPlane(props: {
           overflow: 'visible',
         }}
       >
-        {interaction.projection.distortionScale > 0 ? (
-          <FrameAnnotationDistortionFilter scale={interaction.projection.distortionScale} />
-        ) : null}
-        {interaction.projection.focusFrames.length > 0 ? (
-          <FrameAnnotationFocusSurface
-            blurAmount={interaction.projection.focusBlurAmount}
-            edgeOverscan={1 / Math.max(0.01, interaction.projection.scale)}
-            frames={interaction.projection.focusFrames}
-            height={documentSize.height}
-            opacity={interaction.projection.focusOpacity}
-            width={documentSize.width}
-          />
-        ) : null}
+        <FrameEffectSurfaces documentSize={documentSize} projection={interaction.projection} />
         {interaction.projection.projected.map((entry) => (
           <FrameProjection
             key={entry.snapshot.id}
@@ -161,6 +174,11 @@ export function EditorFrameAnnotationPlane(props: {
             }
           />
         ))}
+        <EditorCropOverlay
+          activeTool={props.activeTool}
+          canvas={props.controller.canvas}
+          documentSize={documentSize}
+        />
       </div>
       {createPortal(
         <div

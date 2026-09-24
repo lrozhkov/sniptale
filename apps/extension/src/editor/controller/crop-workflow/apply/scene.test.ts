@@ -16,6 +16,10 @@ vi.mock('../../document/source', async (importOriginal) => ({
 }));
 
 import { createPostCropSourceState, runEditorCropSelection } from './scene';
+import {
+  createFrameAnnotationProxy,
+  readFrameAnnotationSnapshot,
+} from '../../../frame-annotation/proxy';
 
 function createObject(overrides: Record<string, unknown> = {}) {
   return {
@@ -56,6 +60,30 @@ function registerSceneMutationTest() {
     expect(canvas.setDimensions).toHaveBeenCalledWith({ height: 20, width: 30 });
     expect(setCanvasDocumentSize).toHaveBeenCalledWith({ height: 20, width: 30 });
     expect(setSource).toHaveBeenCalledWith(expect.objectContaining({ left: 7, top: 8 }));
+  });
+
+  it('moves the frame annotation snapshot with the cropped canvas', async () => {
+    const frame = createFrameAnnotationProxy({
+      frame: { id: 'frame-1', x: 40, y: 35, width: 70, height: 50 },
+      ordering: 0,
+      label: 'Frame 1',
+    });
+    const canvas = {
+      getObjects: vi.fn(() => [frame]),
+      setDimensions: vi.fn(),
+    };
+    await runEditorCropSelection({
+      canvas: canvas as never,
+      crop: { left: 20, top: 15, width: 100, height: 80 },
+      rebuildFrameDecorations: vi.fn(async () => undefined),
+      setCanvasDocumentSize: vi.fn(),
+      setSource: vi.fn(),
+      source: null,
+      syncViewportTransform: vi.fn(),
+    });
+
+    expect(readFrameAnnotationSnapshot(frame)).toMatchObject({ x: 20, y: 20 });
+    expect(frame).toMatchObject({ left: 20, top: 20 });
   });
 }
 

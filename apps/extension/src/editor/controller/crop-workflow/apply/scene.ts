@@ -4,6 +4,7 @@ import { syncSourceStateFromObject } from '../../document/source';
 import type { CropSelection } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
 import { isUserObject } from '../../../document/model';
+import { shiftFrameAnnotationProxyForCrop } from '../../../frame-annotation/proxy';
 
 export async function runEditorCropSelection(context: {
   canvas: Canvas;
@@ -37,6 +38,7 @@ function shiftSceneObjectsForCrop(canvas: Canvas, crop: CropSelection): void {
 }
 
 function shiftObjectByCrop(object: FabricObject, crop: CropSelection): void {
+  if (shiftFrameAnnotationProxyForCrop(object, crop)) return;
   object.set({
     left: (object.left ?? 0) - crop.left,
     top: (object.top ?? 0) - crop.top,

@@ -70,6 +70,20 @@ export function commitFrameAnnotationProxy(
   object.setCoords();
 }
 
+export function shiftFrameAnnotationProxyForCrop(
+  object: FabricObject,
+  offset: { left: number; top: number }
+): boolean {
+  const snapshot = readFrameAnnotationSnapshot(object);
+  if (!snapshot) return false;
+  commitFrameAnnotationProxy(object, {
+    ...snapshot,
+    x: snapshot.x - offset.left,
+    y: snapshot.y - offset.top,
+  });
+  return true;
+}
+
 function normalizeFrameAnnotationProxySnapshot(
   snapshot: FrameAnnotationSnapshotV1
 ): FrameAnnotationSnapshotV1 {

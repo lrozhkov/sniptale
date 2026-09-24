@@ -31,7 +31,7 @@ vi.mock('./interaction-controller', () => ({
 vi.mock('./projection', () => ({
   FrameProjection: (props: { interactive: boolean; selected: boolean }) => {
     interactionMocks.projection(props);
-    return null;
+    return <div data-ui="test.frame-projection" />;
   },
 }));
 
@@ -130,6 +130,45 @@ it('aligns the DOM scene to the canvas origin and excludes floating controls fro
   act(() => plane.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
   expect(interactionMocks.pointerDown).toHaveBeenCalledOnce();
 
+  act(() => root.unmount());
+});
+
+it('places the crop mask after frame visuals in the same scaled scene', () => {
+  interactionMocks.projected.push({
+    object: {},
+    snapshot: { id: 'frame-1' },
+  });
+  const guide = {
+    sniptaleRole: 'crop-guide',
+    getBoundingRect: () => ({ left: 20, top: 15, width: 100, height: 80 }),
+  };
+  const canvas = {
+    getObjects: () => [guide],
+    on: vi.fn(),
+    off: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+
+  act(() =>
+    root.render(
+      <EditorFrameAnnotationPlane
+        activeTool="crop"
+        canvasRef={createRef<HTMLCanvasElement>()}
+        controller={{ ...createPlaneController(), canvas: canvas as never }}
+        layers={[]}
+      />
+    )
+  );
+
+  const scene = host.querySelector('[data-ui="editor.frame-annotation-scene"]');
+  expect(scene?.querySelector('[data-ui="test.frame-projection"]')?.nextElementSibling).toBe(
+    scene?.querySelector('[data-ui="editor.crop-overlay"]')
+  );
+  expect(scene?.querySelector<SVGSVGElement>('[data-ui="editor.crop-overlay"]')?.style.zIndex).toBe(
+    '2147483647'
+  );
   act(() => root.unmount());
 });
 
