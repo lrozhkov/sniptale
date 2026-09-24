@@ -115,7 +115,12 @@ function appendSelectionControl(
     });
     icon.appendChild(
       svgElement('path', {
-        d: 'M -8 3 A 9 9 0 0 1 7 -6 M 7 -9 V -6 H 2 M 8 -3 A 9 9 0 0 1 -7 6 M -7 3 V 6 H -2',
+        d: [
+          'M -9 0 A 9 9 0 0 1 6.364 -6.364 L 9 -4',
+          'M 9 -9 L 9 -4 L 4 -4',
+          'M 9 0 A 9 9 0 0 1 -6.364 6.364 L -9 4',
+          'M -4 4 L -9 4 L -9 9 L -4 4',
+        ].join(' '),
       })
     );
     svg.appendChild(icon);

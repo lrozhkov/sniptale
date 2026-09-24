@@ -146,7 +146,11 @@ it('shows visible custom and rotation controls, point guides, and clears stale s
   mountEditorSelectionChrome(canvas as never, magnet as never);
   const svg = container.querySelector('svg')!;
   expect(svg.querySelector('polygon')?.getAttribute('stroke-dasharray')).toBe('4 3');
-  expect(svg.querySelector('g path')).not.toBeNull();
+  const rotationPath = svg.querySelector('g path')?.getAttribute('d');
+  expect(rotationPath).toContain('M -9 0 A 9 9 0 0 1');
+  expect(rotationPath).toContain('M 9 0 A 9 9 0 0 1');
+  expect(rotationPath).toContain('M 9 -9 L 9 -4 L 4 -4');
+  expect(rotationPath).toContain('M -4 4 L -9 4 L -9 9 L -4 4');
   expect(svg.querySelectorAll('circle')).toHaveLength(2);
   expect(svg.querySelectorAll('path')).toHaveLength(2);
 
