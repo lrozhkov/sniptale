@@ -8,8 +8,8 @@ import type { EditorPresetStorageState } from '../../../features/editor/document
 
 function createSizeDraft(width: number | null | undefined, height: number | null | undefined) {
   return {
-    width: Math.max(1, width ?? 1),
-    height: Math.max(1, height ?? 1),
+    width: Math.max(1, Math.round(width ?? 1)),
+    height: Math.max(1, Math.round(height ?? 1)),
   };
 }
 

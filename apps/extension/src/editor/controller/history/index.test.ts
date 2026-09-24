@@ -35,6 +35,16 @@ it('round-trips editor documents through snapshot history', () => {
   expect(redoEditorSnapshot(history)).toEqual(second);
 });
 
+it('undoes and redoes edits to a hydrated document with a runtime blob source', () => {
+  const first = { ...createMockDocument(), sourceImageData: 'blob:hydrated-source' };
+  const second = { ...first, canvasJson: '{"version":"7.2.0","objects":[{"type":"rect"}]}' };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({ exportDocument: () => second, history, muted: false });
+
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
 it('rejects malformed or invalid editor document snapshots', () => {
   const malformedHistory = new SnapshotHistory<string>('not-json');
   malformedHistory.push(JSON.stringify(createMockDocument()));
@@ -51,6 +61,13 @@ it('rejects malformed or invalid editor document snapshots', () => {
   invalidRedoHistory.undo();
   expect(redoEditorSnapshot(invalidRedoHistory)).toBeNull();
   expect(invalidRedoHistory.getState().index).toBe(0);
+
+  const remoteSourceHistory = new SnapshotHistory<string>(
+    JSON.stringify({ ...createMockDocument(), sourceImageData: 'https://example.com/image.png' })
+  );
+  remoteSourceHistory.push(JSON.stringify(createMockDocument()));
+  expect(undoEditorSnapshot(remoteSourceHistory)).toBeNull();
+  expect(remoteSourceHistory.getState().index).toBe(1);
 });
 
 it('round-trips frame comments and step numbers through editor history', () => {

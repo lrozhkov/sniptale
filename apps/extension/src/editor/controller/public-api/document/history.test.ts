@@ -172,6 +172,29 @@ it('undoes a pending frame comment draft before restoring the document', async (
   }
 });
 
+it('restores a drawn scene from an in-memory hydrated workspace snapshot', async () => {
+  const original = {
+    ...createEditorDocument('hydrated'),
+    sourceImageData: 'blob:hydrated-source',
+  };
+  const drawn = { ...original, canvasJson: '{"version":"7.2.0","objects":[{"type":"rect"}]}' };
+  const history = new SnapshotHistory(JSON.stringify(original));
+  history.push(JSON.stringify(drawn));
+  const actualHistory = await vi.importActual<typeof import('../../history')>('../../history');
+  mocks.undoSnapshot.mockImplementationOnce(actualHistory.undoEditorSnapshot);
+  const applyDocument = vi.fn(async () => undefined);
+  const publishHistoryDocument = vi.fn();
+
+  await undoEditorControllerSnapshot({ applyDocument, history, publishHistoryDocument });
+
+  expect(applyDocument).toHaveBeenCalledWith(original, {
+    resetHistory: false,
+    updateOriginal: false,
+  });
+  expect(publishHistoryDocument).toHaveBeenCalledWith(original);
+  expect(history.getState().canRedo).toBe(true);
+});
+
 it('restores the history cursor when document application fails', async () => {
   const original = createEditorDocument('original');
   const edited = createEditorDocument('edited');

@@ -15,10 +15,26 @@ export function readCurrentEditorSnapshot(
 function parseEditorSnapshotDocument(value: string): EditorDocument | null {
   try {
     const parsed: unknown = JSON.parse(value);
-    return isEditorDocument(parsed) ? parsed : null;
+    return isEditorHistoryDocument(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+function isEditorHistoryDocument(value: unknown): value is EditorDocument {
+  if (isEditorDocument(value)) return true;
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('sourceImageData' in value) ||
+    typeof value.sourceImageData !== 'string' ||
+    !value.sourceImageData.startsWith('blob:') ||
+    value.sourceImageData.length <= 'blob:'.length
+  ) {
+    return false;
+  }
+  // Hydrated workspace assets use runtime Blob URLs; import validation still requires image data URLs.
+  return isEditorDocument({ ...value, sourceImageData: 'data:image/png;base64,QUJDRA==' });
 }
 
 export function undoEditorSnapshot(history: SnapshotHistory<string> | null): EditorDocument | null {

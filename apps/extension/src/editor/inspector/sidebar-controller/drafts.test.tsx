@@ -202,6 +202,22 @@ it('keeps image, canvas, and layer drafts stable across unchanged and clamped in
   expect(hook.getValue()?.canvasSizeDraft).toBe(initialCanvasDraft);
 });
 
+it('keeps image dimensions editable after a crop leaves fractional source geometry', () => {
+  const hook = renderHook({
+    canvasHeight: 1000,
+    canvasWidth: 2000,
+    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    inspector: 'image-size',
+    isResizableLayerSelection: false,
+    selection: DEFAULT_SELECTION,
+    sourceHeight: 999.6,
+    sourceName: 'capture',
+    sourceWidth: 1999.4,
+  });
+
+  expect(hook.getValue()?.imageSizeDraft).toEqual({ height: 1000, width: 1999 });
+});
+
 it('preserves a dirty scene draft when legacy template storage changes and can cancel it', () => {
   const cleanOpenFrame = createCleanOpenFrame();
   const initialPresets = createDefaultEditorPresetStorageState().sceneBackground;

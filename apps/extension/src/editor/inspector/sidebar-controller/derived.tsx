@@ -91,12 +91,14 @@ function buildDerivedMeasurements(args: {
   sourceHeight: number;
   sourceWidth: number;
 }) {
+  const imageWidth = Math.max(1, Math.round(args.sourceWidth));
+  const imageHeight = Math.max(1, Math.round(args.sourceHeight));
   return {
     canvasAspectRatio: getAspectRatio(args.canvasWidth, args.canvasHeight),
     canvasSize: { width: args.canvasWidth, height: args.canvasHeight },
     canvasSizeText: `${args.canvasWidth} × ${args.canvasHeight}`,
-    imageAspectRatio: getAspectRatio(args.sourceWidth, args.sourceHeight),
-    imageSizeText: `${args.sourceWidth} × ${args.sourceHeight}`,
+    imageAspectRatio: getAspectRatio(imageWidth, imageHeight),
+    imageSizeText: `${imageWidth} × ${imageHeight}`,
     layerAspectRatio: getAspectRatio(
       args.selection.selectedObjectWidth ?? 0,
       args.selection.selectedObjectHeight ?? 0

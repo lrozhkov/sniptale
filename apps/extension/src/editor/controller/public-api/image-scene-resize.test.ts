@@ -100,7 +100,7 @@ it('reports async flatten failures through editor action diagnostics', async () 
 });
 
 it('applies undo after a pending image resize commits its snapshot', async () => {
-  const original = createMockDocument();
+  const original = { ...createMockDocument(), sourceImageData: 'blob:hydrated-source' };
   let visibleDocument = original;
   let releaseRender: (dataUrl: string) => void = () => undefined;
   mocks.renderForExport.mockImplementationOnce(
