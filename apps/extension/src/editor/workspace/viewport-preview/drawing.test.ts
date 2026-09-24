@@ -3,6 +3,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { startEditorViewportPreviewLoop } from './drawing';
+import { EditorCanvas } from '../../controller/viewport/render-region';
 import {
   getEditorEditingSurfaceSize,
   getEditorWorkspaceMargin,
@@ -177,4 +178,36 @@ it('renders offscreen image pixels from Fabric instead of the clipped live canva
   expect(Array.from(previewCanvas.getContext('2d')!.getImageData(50, 40, 1, 1).data)).toEqual([
     255, 0, 0, 255,
   ]);
+});
+
+it('uses the virtual canvas document render for the preview', () => {
+  const { context, previewCanvas, sourceCanvas } = createPreviewContext();
+  const surface = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(document.createElement('div'), document.createElement('div'));
+  const rendered = document.createElement('canvas');
+  const renderDocumentCanvas = vi.spyOn(canvas, 'renderDocumentCanvas').mockReturnValue(rendered);
+  const callbacks: FrameRequestCallback[] = [];
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn((callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    })
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+  startEditorViewportPreviewLoop({
+    canvasRef: { current: sourceCanvas },
+    previewCanvasRef: { current: previewCanvas },
+    previewSize: { width: 100, height: 80 },
+    documentSize: { width: 100, height: 80 },
+    getCanvas: () => canvas,
+  });
+  callbacks[0]?.(1000);
+
+  expect(renderDocumentCanvas).toHaveBeenCalledWith(1);
+  expect(context.drawImage).toHaveBeenCalledWith(rendered, 0, 0, 100, 80);
 });

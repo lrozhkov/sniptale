@@ -4,6 +4,7 @@ import {
   scheduleEditorViewportStateSyncFrame,
   startEditorViewportPan,
 } from '../viewport/interactions';
+import { EditorCanvas } from '../viewport/render-region';
 import type {
   EditorControllerEventHandlers,
   EditorControllerEventStateBindings,
@@ -45,7 +46,9 @@ function handleViewportWheel(bindings: PanEventBindings, event: WheelEvent): voi
 }
 
 function handleViewportScroll(bindings: PanEventBindings): void {
-  bindings.getCanvas()?.requestRenderAll();
+  const canvas = bindings.getCanvas();
+  if (canvas instanceof EditorCanvas) canvas.refreshVirtualViewport();
+  canvas?.requestRenderAll();
   scheduleEditorViewportStateSyncFrame({
     viewportSyncFrame: bindings.getViewportSyncFrame(),
     syncViewportState: () => bindings.syncViewportState(),

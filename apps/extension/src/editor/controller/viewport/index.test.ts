@@ -11,6 +11,7 @@ import {
   restoreEditorViewportAnchor,
 } from './';
 import { getEditorEditingSurfaceSize } from './editing-surface';
+import { EditorCanvas } from './render-region';
 
 const DEFAULT_CANVAS_SIZE = { width: 200, height: 100 };
 const DEFAULT_SOURCE = { displayHeight: 100, displayWidth: 200, name: 'image.png' } as never;
@@ -265,6 +266,27 @@ it('applies viewport zoom to the fabric canvas and guards null canvases', () => 
     { cssOnly: true }
   );
   expect(canvas.calcOffset).toHaveBeenCalledOnce();
+});
+
+it('zooms a virtual canvas without growing its backing to the scrollable surface', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 400 },
+    clientHeight: { value: 300 },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 100, height: 80 }, 2048);
+
+  applyEditorViewportZoom(canvas, { width: 100, height: 80 }, 0.5);
+
+  expect(canvas.getWidth()).toBe(400);
+  expect(canvas.getHeight()).toBe(300);
+  expect(canvas.getZoom()).toBe(0.5);
+  expect(surface.style.width).toBe('2098px');
 });
 
 it('keeps logical viewport metrics stable when browser page zoom changes', () => {

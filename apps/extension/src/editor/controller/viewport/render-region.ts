@@ -1,16 +1,117 @@
 import { Canvas } from 'fabric';
 
 type RenderRect = { x: number; y: number; width: number; height: number };
+type DocumentSize = { width: number; height: number };
+const MAX_INTERACTIVE_BACKING_PIXELS = 4_000_000;
 
 /** The backing canvas covers the scrollable workspace; interactive frames paint only its visible part. */
 export class EditorCanvas extends Canvas {
   private renderViewport: HTMLElement | null = null;
+  private virtualStage: HTMLElement | null = null;
+  private documentSize: DocumentSize | null = null;
+  private documentMargin = 0;
+  private presentationScale = 1;
 
-  setRenderViewport(viewport: HTMLElement | null): void {
+  setRenderViewport(viewport: HTMLElement | null, stage?: HTMLElement): void {
     this.renderViewport = viewport;
+    this.virtualStage = stage ?? null;
+    if (this.virtualStage) this.refreshVirtualViewport();
+  }
+
+  get hasVirtualViewport(): boolean {
+    return this.virtualStage !== null;
+  }
+
+  getDocumentSize(): DocumentSize | null {
+    return this.documentSize;
+  }
+
+  setDocumentGeometry(size: DocumentSize, margin: number): void {
+    this.documentSize = size.width > 0 && size.height > 0 ? size : null;
+    this.documentMargin = this.documentSize ? margin : 0;
+    if (!this.documentSize) {
+      const surface = this.wrapperEl.parentElement;
+      if (surface) {
+        surface.style.removeProperty('width');
+        surface.style.removeProperty('height');
+      }
+      this.wrapperEl.style.removeProperty('left');
+      this.wrapperEl.style.removeProperty('top');
+      return;
+    }
+    this.refreshVirtualViewport();
+  }
+
+  setPresentationScale(scale: number): void {
+    if (!Number.isFinite(scale) || scale <= 0) return;
+    this.presentationScale = scale;
+    this.refreshVirtualViewport();
+  }
+
+  getDocumentClientRect(): Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null {
+    if (!this.documentSize) return null;
+    const rect = this.wrapperEl.parentElement?.getBoundingClientRect();
+    if (!rect) return null;
+    return {
+      left: rect.left + this.documentMargin * this.presentationScale,
+      top: rect.top + this.documentMargin * this.presentationScale,
+      width: this.documentSize.width * this.presentationScale,
+      height: this.documentSize.height * this.presentationScale,
+    };
+  }
+
+  renderDocumentCanvas(multiplier = 1): HTMLCanvasElement {
+    if (!this.documentSize) return this.toCanvasElement(multiplier);
+    const scale = this.presentationScale;
+    return this.toCanvasElement(multiplier / scale, {
+      left: this.viewportTransform[4],
+      top: this.viewportTransform[5],
+      width: this.documentSize.width * scale,
+      height: this.documentSize.height * scale,
+    });
+  }
+
+  refreshVirtualViewport(): void {
+    if (!this.virtualStage || !this.renderViewport || !this.documentSize) return;
+    const surface = this.wrapperEl.parentElement;
+    if (!surface) return;
+    const scale = this.presentationScale;
+    const logicalWidth = this.documentSize.width + this.documentMargin * 2;
+    const logicalHeight = this.documentSize.height + this.documentMargin * 2;
+    surface.style.width = `${logicalWidth * scale}px`;
+    surface.style.height = `${logicalHeight * scale}px`;
+    const width = Math.max(1, this.renderViewport.clientWidth);
+    const height = Math.max(1, this.renderViewport.clientHeight);
+    const devicePixelRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+    this.enableRetinaScaling =
+      width * height * devicePixelRatio ** 2 <= MAX_INTERACTIVE_BACKING_PIXELS;
+    if (width !== this.width || height !== this.height) this.setDimensions({ width, height });
+    this.wrapperEl.style.position = 'absolute';
+    const surfaceRect = surface.getBoundingClientRect();
+    const viewportRect = this.renderViewport.getBoundingClientRect();
+    const left = Math.max(
+      0,
+      Math.min(logicalWidth * scale - width, viewportRect.left - surfaceRect.left)
+    );
+    const top = Math.max(
+      0,
+      Math.min(logicalHeight * scale - height, viewportRect.top - surfaceRect.top)
+    );
+    this.wrapperEl.style.left = `${left}px`;
+    this.wrapperEl.style.top = `${top}px`;
+    this.setViewportTransform([
+      scale,
+      0,
+      0,
+      scale,
+      this.documentMargin * scale - left,
+      this.documentMargin * scale - top,
+    ]);
+    this.calcOffset();
   }
 
   private getVisibleRenderRect(): RenderRect | null {
+    if (this.hasVirtualViewport) return null;
     if (!this.renderViewport || this.width <= 0 || this.height <= 0) return null;
     const canvasRect = this.lowerCanvasEl.getBoundingClientRect();
     const viewportRect = this.renderViewport.getBoundingClientRect();

@@ -42,11 +42,14 @@ function screenScale(canvas: Canvas): number {
 function appendSelectionBorder(svg: SVGSVGElement, object: FabricObject, zoom: number): void {
   const corners = object.getCoords();
   if (!object.hasBorders || corners.length !== 4) return;
-  const offsetX = object.canvas?.viewportTransform?.[4] ?? 0;
-  const offsetY = object.canvas?.viewportTransform?.[5] ?? 0;
+  const [a, b, c, d, offsetX, offsetY] = object.canvas?.viewportTransform ?? [1, 0, 0, 1, 0, 0];
   svg.appendChild(
     svgElement('polygon', {
-      points: corners.map((point) => `${point.x + offsetX},${point.y + offsetY}`).join(' '),
+      points: corners
+        .map(
+          (point) => `${point.x * a + point.y * c + offsetX},${point.x * b + point.y * d + offsetY}`
+        )
+        .join(' '),
       fill: 'none',
       stroke: object.borderColor || '#2563eb',
       'stroke-width': resolveSelectionChromeMetrics(zoom).borderWidth,
@@ -215,7 +218,8 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   container.appendChild(svg);
   Reflect.set(canvas, 'skipControlsDrawing', true);
   const touchedControls = new Set<Control>();
-  const render = () => {
+  const render = (event?: { ctx: CanvasRenderingContext2D }) => {
+    if (event && event.ctx !== canvas.getContext()) return;
     const width = canvas.getWidth();
     const height = canvas.getHeight();
     if (width <= 0 || height <= 0) return;
@@ -225,9 +229,9 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     const activeObject = canvas.getActiveObject();
     if (activeObject) appendSelection(svg, activeObject, zoom, touchedControls);
     const guides = svgElement('g', {
-      transform: `translate(${canvas.viewportTransform?.[4] ?? 0} ${canvas.viewportTransform?.[5] ?? 0})`,
+      transform: `matrix(${(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]).join(' ')})`,
     });
-    appendGuides(guides, magnet, zoom);
+    appendGuides(guides, magnet, zoom * (canvas.viewportTransform?.[0] ?? 1));
     svg.appendChild(guides);
   };
   const unsubscribe = canvas.on('after:render', render);

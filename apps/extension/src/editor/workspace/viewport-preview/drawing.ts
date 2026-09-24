@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric';
+import { EditorCanvas } from '../../controller/viewport/render-region';
 import { PREVIEW_FPS } from './helpers';
 import {
   getEditorEditingSurfaceSize,
@@ -25,6 +26,24 @@ function syncPreviewCanvasSize(args: {
 
 function hasDrawableCanvasSize(canvas: HTMLCanvasElement): boolean {
   return canvas.width > 0 && canvas.height > 0;
+}
+
+function renderFabricPreviewSource(
+  canvas: Canvas,
+  documentSize: { width: number; height: number },
+  previewWidth: number
+): HTMLCanvasElement {
+  const multiplier = previewWidth / documentSize.width;
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+    return canvas.renderDocumentCanvas(multiplier);
+  }
+  const margin = getEditorWorkspaceMargin(documentSize);
+  return canvas.toCanvasElement(multiplier, {
+    left: margin,
+    top: margin,
+    width: documentSize.width,
+    height: documentSize.height,
+  });
 }
 
 function drawPreviewFrame(args: {
@@ -58,10 +77,10 @@ function drawPreviewFrame(args: {
   context.imageSmoothingEnabled = true;
   const documentSize = args.documentSize;
   if (documentSize && args.fabricCanvas) {
-    const margin = getEditorWorkspaceMargin(documentSize);
-    const rendered = args.fabricCanvas.toCanvasElement(
-      args.previewSize.width / documentSize.width,
-      { left: margin, top: margin, width: documentSize.width, height: documentSize.height }
+    const rendered = renderFabricPreviewSource(
+      args.fabricCanvas,
+      documentSize,
+      args.previewSize.width
     );
     context.drawImage(rendered, 0, 0, args.previewSize.width, args.previewSize.height);
     return;

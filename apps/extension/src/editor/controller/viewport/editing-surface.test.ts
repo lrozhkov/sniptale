@@ -2,6 +2,7 @@
 
 import { Canvas, Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
+import { EditorCanvas } from './render-region';
 import {
   EDITOR_WORKSPACE_MARGIN,
   getEditorDocumentClientRect,
@@ -100,6 +101,31 @@ it('restores unextended geometry when the image is closed', () => {
   expect(getEditorDocumentClientRect(element, { width: 100, height: 80 }, canvas)).toEqual({
     left: 10,
     top: 20,
+    width: 100,
+    height: 80,
+  });
+});
+
+it('derives the document rect from the scrollable surface, not the viewport tile', () => {
+  const surface = document.createElement('div');
+  const element = document.createElement('canvas');
+  const viewport = document.createElement('div');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 400 },
+    clientHeight: { value: 300 },
+  });
+  surface.getBoundingClientRect = () =>
+    ({ left: -500, top: -300, width: 4196, height: 4176 }) as DOMRect;
+  viewport.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 300 }) as DOMRect;
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  setEditorEditingSurfaceDimensions(canvas, { width: 100, height: 80 });
+  element.getBoundingClientRect = () => ({ left: 0, top: 0, width: 400, height: 300 }) as DOMRect;
+
+  expect(getEditorDocumentClientRect(element, { width: 100, height: 80 }, canvas)).toEqual({
+    left: 1548,
+    top: 1748,
     width: 100,
     height: 80,
   });

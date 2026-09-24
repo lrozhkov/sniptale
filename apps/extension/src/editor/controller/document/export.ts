@@ -22,6 +22,7 @@ import {
   getEditorEditingDocumentSize,
   getEditorWorkspaceMargin,
 } from '../viewport/editing-surface';
+import { EditorCanvas } from '../viewport/render-region';
 
 export function buildEditorCanvasDocument(options: {
   canvas: Canvas | null;
@@ -78,14 +79,17 @@ function resolveRenderedCanvasElement(
   try {
     const documentSize = getEditorEditingDocumentSize(canvas);
     const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
-    sourceCanvas = documentSize
-      ? canvas.toCanvasElement(1, {
-          left: margin,
-          top: margin,
-          width: documentSize.width,
-          height: documentSize.height,
-        })
-      : canvas.toCanvasElement(1);
+    sourceCanvas =
+      canvas instanceof EditorCanvas && canvas.hasVirtualViewport
+        ? canvas.renderDocumentCanvas()
+        : documentSize
+          ? canvas.toCanvasElement(1, {
+              left: margin,
+              top: margin,
+              width: documentSize.width,
+              height: documentSize.height,
+            })
+          : canvas.toCanvasElement(1);
   } finally {
     cropGuides.forEach((object, index) => {
       object.visible = visibility[index] ?? true;

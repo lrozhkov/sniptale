@@ -9,6 +9,7 @@ import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../platform/i18n';
 import { rasterizeFrameAnnotations } from '../../../../composition/frame-annotation-raster-client';
 import { createRuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
+import { EditorCanvas } from '../../viewport/render-region';
 
 const frameAnnotationRasterTransport = createRuntimeMessagingTransport();
 const frameAnnotationExportQueues = new WeakMap<Canvas, Promise<void>>();
@@ -107,16 +108,18 @@ const VISUAL_SIGNATURE_PROPS = [
 ] as const;
 
 function createCanvasVisualSignature(canvas: Canvas): string {
+  const virtualDocumentSize =
+    canvas instanceof EditorCanvas && canvas.hasVirtualViewport ? canvas.getDocumentSize() : null;
   return JSON.stringify({
     backgroundColor: serializeCanvasVisualValue(canvas.backgroundColor),
     backgroundImage: serializeCanvasVisualObject(canvas.backgroundImage),
     clipPath: serializeCanvasVisualObject(canvas.clipPath),
-    height: canvas.height,
+    height: virtualDocumentSize?.height ?? canvas.height,
     objects: canvas.getObjects().map(serializeCanvasVisualObject),
     overlayColor: serializeCanvasVisualValue(canvas.overlayColor),
     overlayImage: serializeCanvasVisualObject(canvas.overlayImage),
-    viewportTransform: canvas.viewportTransform,
-    width: canvas.width,
+    viewportTransform: virtualDocumentSize ? null : canvas.viewportTransform,
+    width: virtualDocumentSize?.width ?? canvas.width,
   });
 }
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Rect } from 'fabric';
 import { createFrameAnnotationProxy } from './proxy';
 import { createFabricCanvasFixture } from '../testing/fabric-canvas.test-support';
+import { EditorCanvas } from '../controller/viewport/render-region';
 import { createDefaultRichShapeObject } from '../../features/editor/document/rich-shape';
 
 const mocks = vi.hoisted(() => ({
@@ -154,6 +155,33 @@ it('rejects a stale frame projection even if the raster adapter returns it', asy
       renderOptions: { format: 'png', quality: 100 },
     })
   ).rejects.toThrow('Frame annotation raster result is stale');
+});
+
+it('keeps a virtual canvas export current when only scroll and viewport size change', async () => {
+  const { canvas } = createCanvas();
+  Object.setPrototypeOf(canvas, EditorCanvas.prototype);
+  Reflect.set(canvas, 'virtualStage', {});
+  Reflect.set(canvas, 'documentSize', { width: 200, height: 100 });
+  Reflect.set(canvas, 'width', 800);
+  Reflect.set(canvas, 'height', 600);
+  Reflect.set(canvas, 'viewportTransform', [1, 0, 0, 1, 100, 100]);
+  mocks.rasterize.mockImplementationOnce(async (options) => {
+    Reflect.set(canvas, 'width', 900);
+    Reflect.set(canvas, 'height', 650);
+    Reflect.set(canvas, 'viewportTransform', [1, 0, 0, 1, -400, -200]);
+    expect(options.isCurrent()).toBe(true);
+    return {
+      blob: new Blob(['output'], { type: 'image/png' }),
+      metadata: { downscaled: false, outputHeight: 100, outputScale: 1, outputWidth: 200 },
+    };
+  });
+  await expect(
+    renderEditorWithFrameAnnotations({
+      canvas: createFabricCanvasFixture(canvas),
+      canvasDocumentSize: { width: 200, height: 100 },
+      renderOptions: { format: 'png', quality: 100 },
+    })
+  ).resolves.toBe('data:image/png;base64,final');
 });
 
 it('rejects a raster result after an ordinary Fabric layer changes', async () => {

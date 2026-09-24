@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric';
+import { EditorCanvas } from './render-region';
 
 export const EDITOR_WORKSPACE_MARGIN = 2048;
 const MIN_EDITOR_WORKSPACE_MARGIN = 512;
@@ -40,6 +41,9 @@ export function getEditorDocumentClientRect(
   const rect = element?.getBoundingClientRect();
   if (!rect) return null;
   if (!canvas || !getEditorEditingDocumentSize(canvas)) return rect;
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+    return canvas.getDocumentClientRect();
+  }
   const surface = getEditorEditingSurfaceSize(size);
   const margin = getEditorWorkspaceMargin(size);
   const scaleX = rect.width / surface.width;
@@ -59,6 +63,9 @@ export function setEditorEditingSurfaceDimensions(canvas: Canvas, size: Document
   }
   if (size.width <= 0 || size.height <= 0) {
     documentSizes.delete(canvas);
+    if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+      canvas.setDocumentGeometry(size, 0);
+    }
     canvas.setDimensions(size);
     canvas.setViewportTransform([1, 0, 0, 1, 0, 0]);
     return;
@@ -67,6 +74,10 @@ export function setEditorEditingSurfaceDimensions(canvas: Canvas, size: Document
   documentSizes.set(canvas, size);
   const surface = getEditorEditingSurfaceSize(size);
   const margin = getEditorWorkspaceMargin(size);
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+    canvas.setDocumentGeometry(size, margin);
+    return;
+  }
   const devicePixelRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   canvas.enableRetinaScaling =
     surface.width * surface.height * devicePixelRatio ** 2 <= MAX_EDITOR_SURFACE_PIXELS;

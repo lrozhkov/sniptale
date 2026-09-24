@@ -174,3 +174,75 @@ it('does not replace Fabric controls when its canvas wrapper is unavailable', ()
   );
   expect(canvas).not.toHaveProperty('skipControlsDrawing');
 });
+
+it('projects the selection border through the virtual viewport transform', () => {
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.append(upperCanvasEl);
+  upperCanvasEl.getBoundingClientRect = () => ({ width: 200 }) as DOMRect;
+  const object = {
+    hasBorders: true,
+    hasControls: false,
+    getCoords: () => [
+      { x: 10, y: 20 },
+      { x: 30, y: 20 },
+      { x: 30, y: 40 },
+      { x: 10, y: 40 },
+    ],
+    canvas: { viewportTransform: [0.5, 0, 0, 0.5, 100, 200] },
+  };
+  const canvas = {
+    upperCanvasEl,
+    viewportTransform: object.canvas.viewportTransform,
+    getWidth: () => 200,
+    getHeight: () => 150,
+    getActiveObject: () => object,
+    on: () => () => undefined,
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    {
+      getVisualGuides: () => ({ lines: [], points: [] }),
+    } as never
+  );
+
+  expect(container.querySelector('polygon')?.getAttribute('points')).toBe(
+    '105,210 115,210 115,220 105,220'
+  );
+  disposeEditorSelectionChrome(canvas as never);
+});
+
+it('keeps live selection chrome unchanged after a temporary preview render', () => {
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.append(upperCanvasEl);
+  upperCanvasEl.getBoundingClientRect = () => ({ width: 200 }) as DOMRect;
+  const liveContext = {} as CanvasRenderingContext2D;
+  let render: ((event: { ctx: CanvasRenderingContext2D }) => void) | undefined;
+  const canvas = {
+    upperCanvasEl,
+    viewportTransform: [1, 0, 0, 1, 0, 0],
+    getContext: () => liveContext,
+    getWidth: () => 200,
+    getHeight: () => 150,
+    getActiveObject: () => null,
+    on: (_event: string, handler: typeof render) => {
+      render = handler;
+      return () => undefined;
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    {
+      getVisualGuides: () => ({ lines: [], points: [{ x: 5, y: 6 }] }),
+    } as never
+  );
+  const svg = container.querySelector('svg')!;
+  const liveMarkup = svg.innerHTML;
+  const liveViewBox = svg.getAttribute('viewBox');
+  canvas.viewportTransform = [2, 0, 0, 2, 100, 200];
+  render?.({ ctx: {} as CanvasRenderingContext2D });
+  expect(svg.getAttribute('viewBox')).toBe(liveViewBox);
+  expect(svg.innerHTML).toBe(liveMarkup);
+  disposeEditorSelectionChrome(canvas as never);
+});

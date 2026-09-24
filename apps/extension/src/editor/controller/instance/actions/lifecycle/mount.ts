@@ -65,7 +65,7 @@ export function mountEditorController(
 
   try {
     const canvas = createMountedCanvas(canvasElement);
-    canvas.setRenderViewport(viewportElement);
+    canvas.setRenderViewport(viewportElement, stageElement);
 
     controller.canvas = canvas;
     controller.viewportElement = viewportElement;

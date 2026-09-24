@@ -1,6 +1,7 @@
 import type { Canvas } from 'fabric';
 import { resolveEditorViewportScaleCompensation } from './scale';
 import { getEditorEditingSurfaceSize } from './editing-surface';
+import { EditorCanvas } from './render-region';
 
 export function applyEditorViewportZoom(
   canvas: Canvas | null,
@@ -13,6 +14,10 @@ export function applyEditorViewportZoom(
   }
 
   const domScaleCompensation = resolveEditorViewportScaleCompensation(devicePixelRatioBaseline);
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+    canvas.setPresentationScale(zoomLevel * domScaleCompensation);
+    return;
+  }
   const surfaceSize = getEditorEditingSurfaceSize(canvasDocumentSize);
   canvas.setDimensions(
     {
