@@ -8,6 +8,11 @@ import {
   renderEditorCanvasToDataUrl,
 } from './export';
 import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
+import { Canvas } from 'fabric';
+import {
+  EDITOR_WORKSPACE_MARGIN,
+  setEditorEditingSurfaceDimensions,
+} from '../viewport/editing-surface';
 
 const writeMock = vi.fn();
 
@@ -265,6 +270,24 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(canvas.toCanvasElement).toHaveBeenCalledWith(1);
     expect(canvas.toDataUrlMock).toHaveBeenCalledWith('image/jpeg', 0.75);
     expect(canvas.setActiveObject).not.toHaveBeenCalled();
+  });
+
+  it('exports the image rectangle without the interactive outer workspace', () => {
+    const canvas = new Canvas(document.createElement('canvas'));
+    setEditorEditingSurfaceDimensions(canvas, { width: 200, height: 100 });
+    const output = document.createElement('canvas');
+    output.toDataURL = vi.fn(() => 'data:image/png;base64,cropped');
+    const render = vi.spyOn(canvas, 'toCanvasElement').mockReturnValue(output);
+
+    expect(renderEditorCanvasToDataUrl(canvas, { format: 'png', quality: 1 })).toBe(
+      'data:image/png;base64,cropped'
+    );
+    expect(render).toHaveBeenCalledWith(1, {
+      left: EDITOR_WORKSPACE_MARGIN,
+      top: EDITOR_WORKSPACE_MARGIN,
+      width: 200,
+      height: 100,
+    });
   });
 
   it('resamples the rendered image to an explicit output size', () => {

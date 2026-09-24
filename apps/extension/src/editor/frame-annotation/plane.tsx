@@ -12,6 +12,7 @@ import { FrameProjection } from './projection';
 import type { ProjectionSettingsMenu } from './projection-settings';
 import { useEditorFrameCoordinateSpace, useProjectionRect } from './projection-space';
 import { EditorCropOverlay } from './crop-overlay';
+import { getEditorDocumentClientRect } from '../controller/viewport/editing-surface';
 
 type FrameSettingsSession = {
   anchor: HTMLButtonElement;
@@ -70,8 +71,13 @@ export function EditorFrameAnnotationPlane(props: {
   const [controlsRoot, setControlsRoot] = React.useState<HTMLDivElement | null>(null);
   const canvasRect = useProjectionRect(props.canvasRef);
   const planeRect = useProjectionRect(planeRef);
+  const documentRect = getEditorDocumentClientRect(
+    props.canvasRef.current,
+    documentSize,
+    props.controller.canvas
+  );
   const coordinateSpace = useEditorFrameCoordinateSpace({
-    canvasRect,
+    canvasRect: documentRect,
     scale: interaction.projection.scale,
     viewport: documentSize,
   });
@@ -103,8 +109,8 @@ export function EditorFrameAnnotationPlane(props: {
           height: documentSize.height,
           width: documentSize.width,
           position: 'absolute',
-          left: (canvasRect?.left ?? 0) - (planeRect?.left ?? 0),
-          top: (canvasRect?.top ?? 0) - (planeRect?.top ?? 0),
+          left: (documentRect?.left ?? canvasRect?.left ?? 0) - (planeRect?.left ?? 0),
+          top: (documentRect?.top ?? canvasRect?.top ?? 0) - (planeRect?.top ?? 0),
           transform: `scale(${interaction.projection.scale})`,
           transformOrigin: 'top left',
           pointerEvents: 'none',

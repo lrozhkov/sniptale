@@ -42,9 +42,11 @@ function screenScale(canvas: Canvas): number {
 function appendSelectionBorder(svg: SVGSVGElement, object: FabricObject, zoom: number): void {
   const corners = object.getCoords();
   if (!object.hasBorders || corners.length !== 4) return;
+  const offsetX = object.canvas?.viewportTransform?.[4] ?? 0;
+  const offsetY = object.canvas?.viewportTransform?.[5] ?? 0;
   svg.appendChild(
     svgElement('polygon', {
-      points: corners.map((point) => `${point.x},${point.y}`).join(' '),
+      points: corners.map((point) => `${point.x + offsetX},${point.y + offsetY}`).join(' '),
       fill: 'none',
       stroke: object.borderColor || '#2563eb',
       'stroke-width': resolveSelectionChromeMetrics(zoom).borderWidth,
@@ -158,7 +160,7 @@ function appendSelection(
   }
 }
 
-function appendGuides(svg: SVGSVGElement, magnet: EditorMagnetManager, zoom: number): void {
+function appendGuides(svg: SVGElement, magnet: EditorMagnetManager, zoom: number): void {
   const { lines, points } = magnet.getVisualGuides();
   const color = 'rgba(14, 165, 233, 0.88)';
   const appendCross = (point: { x: number; y: number }) => {
@@ -222,7 +224,11 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     svg.replaceChildren();
     const activeObject = canvas.getActiveObject();
     if (activeObject) appendSelection(svg, activeObject, zoom, touchedControls);
-    appendGuides(svg, magnet, zoom);
+    const guides = svgElement('g', {
+      transform: `translate(${canvas.viewportTransform?.[4] ?? 0} ${canvas.viewportTransform?.[5] ?? 0})`,
+    });
+    appendGuides(guides, magnet, zoom);
+    svg.appendChild(guides);
   };
   const unsubscribe = canvas.on('after:render', render);
   mountedChrome.set(canvas, () => {

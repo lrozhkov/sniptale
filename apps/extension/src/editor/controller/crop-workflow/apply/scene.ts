@@ -5,6 +5,7 @@ import type { CropSelection } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
 import { isUserObject } from '../../../document/model';
 import { shiftFrameAnnotationProxyForCrop } from '../../../frame-annotation/proxy';
+import { setEditorEditingSurfaceDimensions } from '../../viewport/editing-surface';
 
 export async function runEditorCropSelection(context: {
   canvas: Canvas;
@@ -21,7 +22,7 @@ export async function runEditorCropSelection(context: {
   };
   shiftSceneObjectsForCrop(context.canvas, context.crop);
   context.setCanvasDocumentSize(nextCanvasSize);
-  context.canvas.setDimensions(nextCanvasSize);
+  setEditorEditingSurfaceDimensions(context.canvas, nextCanvasSize);
   context.setSource(createPostCropSourceState(context.canvas, context.source, context.crop));
   context.syncViewportTransform();
   await context.rebuildFrameDecorations();

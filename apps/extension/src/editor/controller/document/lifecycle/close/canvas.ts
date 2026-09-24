@@ -1,6 +1,7 @@
 import type { Canvas } from 'fabric';
 
 import { applyEditorViewportZoom } from '../../../viewport';
+import { setEditorEditingSurfaceDimensions } from '../../../viewport/editing-surface';
 import type { CloseEditorControllerCanvasOptions } from './types';
 
 type CloseEditorControllerCanvasResetOptions = Pick<
@@ -17,7 +18,7 @@ export function resetClosedEditorCanvas(options: CloseEditorControllerCanvasRese
 
   const resetCanvasSize = { width: 0, height: 0 };
   options.setCanvasDocumentSize(resetCanvasSize);
-  options.canvas.setDimensions(resetCanvasSize);
+  setEditorEditingSurfaceDimensions(options.canvas, resetCanvasSize);
   applyEditorViewportZoom(
     options.canvas,
     resetCanvasSize,

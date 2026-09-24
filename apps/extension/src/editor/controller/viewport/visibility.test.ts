@@ -95,9 +95,9 @@ describe('viewport, visibility, and zoom seams', () => {
     );
     expect(
       ensureEditorObjectReachable(canvas, { height: 100, width: 100 }, annotation as never)
-    ).toBe(true);
-    expect(annotation.setCoords).toHaveBeenCalled();
-    expect(ensureEditorObjectsReachable(canvas, { height: 100, width: 100 })).toBe(true);
+    ).toBe(false);
+    expect(annotation.setCoords).not.toHaveBeenCalled();
+    expect(ensureEditorObjectsReachable(canvas, { height: 100, width: 100 })).toBe(false);
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);

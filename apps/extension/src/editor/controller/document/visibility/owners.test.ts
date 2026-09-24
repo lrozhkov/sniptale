@@ -49,9 +49,9 @@ it('sends document frame objects behind content before restoring browser frame o
   expect(ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
 });
 
-it('moves unreachable document objects back into the reachable canvas area', () => {
+it('moves objects that leave the outer workspace back into view', () => {
   const object = {
-    getBoundingRect: () => ({ height: 60, left: -100, top: 260, width: 80 }),
+    getBoundingRect: () => ({ height: 60, left: -700, top: 800, width: 80 }),
     left: 5,
     set: vi.fn(function setPosition(
       this: { left: number; top: number },
@@ -67,7 +67,7 @@ it('moves unreachable document objects back into the reachable canvas area', () 
   expect(
     ensureEditorObjectReachable({} as never, { height: 200, width: 300 }, object as never)
   ).toBe(true);
-  expect(object.set).toHaveBeenCalledWith({ left: 49, top: -77 });
+  expect(object.set).toHaveBeenCalledWith({ left: 137, top: -105 });
   expect(object.setCoords).toHaveBeenCalledOnce();
 
   mocks.getLayerObjectsMock.mockReturnValue([object as never]);

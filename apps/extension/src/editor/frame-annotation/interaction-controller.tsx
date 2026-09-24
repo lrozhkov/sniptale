@@ -21,6 +21,7 @@ import {
 import { registerFrameAnnotationDraftFlusher } from './draft-coordinator';
 import { applyFrameAnnotationCommand } from './commands';
 import type { EditorFrameAnnotationPlaneController } from './types';
+import { getEditorDocumentClientRect } from '../controller/viewport/editing-surface';
 import { createFrameAnnotationFromDefaults } from './creation-defaults';
 import { useFrameAnnotationKeyboard } from './keyboard';
 import { createFrameAnnotationLayerLabel } from './layer-label';
@@ -37,7 +38,7 @@ type DragState = {
 };
 
 type FrameDragCoordinateSpace = {
-  canvasRect: DOMRect;
+  canvasRect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
   documentSize: { width: number; height: number };
 };
 
@@ -192,7 +193,8 @@ function createPlaneEvents(input: {
       input.commitPendingHistory();
       const coordinateSpace = resolveFrameDragCoordinateSpace(
         input.props.canvasRef.current,
-        input.props.controller.canvasDocumentSize
+        input.props.controller.canvasDocumentSize,
+        input.props.controller.canvas
       );
       if (!coordinateSpace) return;
       const point = toLogicalPoint(event, coordinateSpace);
@@ -455,7 +457,11 @@ function buildProjection(
       props.activeTool === 'frame-annotation' || props.activeTool === 'select'
         ? (draft?.id ?? canonicalSelectedId)
         : null,
-    scale: getProjectionScale(props.canvasRef.current, props.controller.canvasDocumentSize),
+    scale: getProjectionScale(
+      props.canvasRef.current,
+      props.controller.canvasDocumentSize,
+      props.controller.canvas
+    ),
     focusFrames,
     focusOpacity: focusFrames.reduce(
       (maximum, frame) => Math.max(maximum, frame.focusSettings?.opacity ?? 0.5),
@@ -571,7 +577,8 @@ function startExistingDrag(
 ) {
   const coordinateSpace = resolveFrameDragCoordinateSpace(
     props.canvasRef.current,
-    props.controller.canvasDocumentSize
+    props.controller.canvasDocumentSize,
+    props.controller.canvas
   );
   if (!coordinateSpace) return;
   const point = toLogicalPoint(event, coordinateSpace);
@@ -636,16 +643,21 @@ function runCommand(input: {
   input.forceRender();
 }
 
-function getProjectionScale(canvas: HTMLCanvasElement | null, size?: { width: number }): number {
-  const rect = canvas?.getBoundingClientRect();
+function getProjectionScale(
+  canvas: HTMLCanvasElement | null,
+  size: { width: number; height: number },
+  fabricCanvas: EditorFrameAnnotationPlaneController['canvas']
+): number {
+  const rect = getEditorDocumentClientRect(canvas, size, fabricCanvas);
   return rect && size && size.width > 0 ? rect.width / size.width : 1;
 }
 
 function resolveFrameDragCoordinateSpace(
   canvas: HTMLCanvasElement | null,
-  size?: { width: number; height: number }
+  size: { width: number; height: number },
+  fabricCanvas: EditorFrameAnnotationPlaneController['canvas']
 ): FrameDragCoordinateSpace | null {
-  const canvasRect = canvas?.getBoundingClientRect();
+  const canvasRect = getEditorDocumentClientRect(canvas, size, fabricCanvas);
   if (!canvasRect || !size || canvasRect.width <= 0 || canvasRect.height <= 0) return null;
   return { canvasRect, documentSize: { ...size } };
 }

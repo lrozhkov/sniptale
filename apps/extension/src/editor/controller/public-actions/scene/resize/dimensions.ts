@@ -3,6 +3,7 @@ import {
   shouldPreserveCanvasForBrowserFrame,
 } from '../../../../browser-frame/layout';
 import { MIN_CANVAS_SIZE } from '../../../../document/model';
+import { setEditorEditingSurfaceDimensions } from '../../../viewport/editing-surface';
 
 import { finalizeSceneResizeMutation } from './finalize';
 import { hasBrowserFrameLayer } from './geometry';
@@ -32,7 +33,7 @@ export function resizeEditorCanvasScene(options: CanvasResizeSceneOptions): void
     });
   } else {
     setCanvasDocumentSize(nextCanvasSize);
-    canvas.setDimensions(nextCanvasSize);
+    setEditorEditingSurfaceDimensions(canvas, nextCanvasSize);
   }
 
   finalizeSceneResizeMutation(options);

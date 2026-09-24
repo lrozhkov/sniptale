@@ -9,6 +9,9 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('./raster-overlay', () => ({
   EditorRasterOverlay: () => <div data-ui="mock.raster-overlay" />,
 }));
+vi.mock('../../frame-annotation/plane', () => ({
+  EditorFrameAnnotationPlane: () => <div data-ui="mock.frame-plane" />,
+}));
 
 it('renders the pannable image viewport with checkerboard surface and grid overlay', () => {
   const markup = renderToStaticMarkup(
@@ -45,6 +48,24 @@ it('keeps the viewport inert and hides image-only styling before an image is loa
 
   expect(markup).toContain('pointer-events-none');
   expect(markup).not.toContain('background-size:10px 10px');
+});
+
+it('shows a muted, nonblocking workspace around the image rectangle', () => {
+  const markup = renderToStaticMarkup(
+    <CanvasViewport
+      hasImage
+      backgroundColor="#f5f5f5"
+      canvasRef={{ current: null }}
+      viewportRef={{ current: null }}
+      stageRef={{ current: null }}
+      controller={{ canvasDocumentSize: { width: 100, height: 80 } } as never}
+      gridStyle={null}
+    />
+  );
+
+  expect(markup).toContain('editor.canvas.document-boundary');
+  expect(markup.match(/pointer-events-none absolute z-40/g)).toHaveLength(5);
+  expect(markup).toContain('mock.frame-plane');
 });
 
 it('renders the active empty dropzone without exposing the hidden viewport', () => {

@@ -4,6 +4,7 @@ import { useEditorStore } from '../../state/useEditorStore';
 import type { SourceState } from '../../document/model/source-state';
 import { createInsertedImageObject, createTechnicalDataTextObject } from '../tools/insertions';
 import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../tools/technical-data';
+import { getEditorEditingDocumentSize } from '../viewport/editing-surface';
 
 export async function insertEditorImageObject(options: {
   canvas: Canvas | null;
@@ -33,8 +34,8 @@ export async function insertEditorImageObject(options: {
     dataUrl,
     name,
     source,
-    canvasWidth: canvas.getWidth(),
-    canvasHeight: canvas.getHeight(),
+    canvasWidth: getEditorEditingDocumentSize(canvas)?.width ?? canvas.getWidth(),
+    canvasHeight: getEditorEditingDocumentSize(canvas)?.height ?? canvas.getHeight(),
     nextLabelIndex: nextLabelIndex('image'),
     prepareObject,
   });

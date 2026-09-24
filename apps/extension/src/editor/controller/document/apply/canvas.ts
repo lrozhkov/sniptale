@@ -1,5 +1,6 @@
 import type { Canvas } from 'fabric';
 import { applyEditorViewportZoom } from '../../viewport';
+import { setEditorEditingSurfaceDimensions } from '../../viewport/editing-surface';
 
 export function prepareCanvasForDocumentLoad(options: {
   canvas: Canvas;
@@ -9,7 +10,7 @@ export function prepareCanvasForDocumentLoad(options: {
 }): void {
   Reflect.deleteProperty(options.canvas, 'backgroundImage');
   options.canvas.setZoom(1);
-  options.canvas.setDimensions(options.canvasSize);
+  setEditorEditingSurfaceDimensions(options.canvas, options.canvasSize);
   applyEditorViewportZoom(
     options.canvas,
     options.canvasSize,

@@ -1,4 +1,8 @@
 import { PREVIEW_FPS } from './helpers';
+import {
+  EDITOR_WORKSPACE_MARGIN,
+  getEditorEditingSurfaceSize,
+} from '../../controller/viewport/editing-surface';
 
 function syncPreviewCanvasSize(args: {
   previewCanvas: HTMLCanvasElement;
@@ -26,6 +30,7 @@ function drawPreviewFrame(args: {
   sourceCanvas: HTMLCanvasElement;
   previewCanvas: HTMLCanvasElement;
   previewSize: { width: number; height: number };
+  documentSize?: { width: number; height: number };
 }) {
   const pixelRatio = window.devicePixelRatio || 1;
   syncPreviewCanvasSize({
@@ -49,12 +54,28 @@ function drawPreviewFrame(args: {
   }
 
   context.imageSmoothingEnabled = true;
+  const documentSize = args.documentSize;
+  const surface = documentSize ? getEditorEditingSurfaceSize(documentSize) : null;
+  const sourceLeft = surface
+    ? (args.sourceCanvas.width * EDITOR_WORKSPACE_MARGIN) / surface.width
+    : 0;
+  const sourceTop = surface
+    ? (args.sourceCanvas.height * EDITOR_WORKSPACE_MARGIN) / surface.height
+    : 0;
+  const sourceWidth =
+    surface && documentSize
+      ? (args.sourceCanvas.width * documentSize.width) / surface.width
+      : args.sourceCanvas.width;
+  const sourceHeight =
+    surface && documentSize
+      ? (args.sourceCanvas.height * documentSize.height) / surface.height
+      : args.sourceCanvas.height;
   context.drawImage(
     args.sourceCanvas,
-    0,
-    0,
-    args.sourceCanvas.width,
-    args.sourceCanvas.height,
+    sourceLeft,
+    sourceTop,
+    sourceWidth,
+    sourceHeight,
     0,
     0,
     args.previewSize.width,
@@ -66,6 +87,7 @@ export function startEditorViewportPreviewLoop(args: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   previewCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   previewSize: { width: number; height: number };
+  documentSize?: { width: number; height: number };
 }) {
   let frameId = 0;
   let lastDrawAt = 0;
@@ -82,7 +104,12 @@ export function startEditorViewportPreviewLoop(args: {
       return;
     }
 
-    drawPreviewFrame({ sourceCanvas, previewCanvas, previewSize: args.previewSize });
+    drawPreviewFrame({
+      sourceCanvas,
+      previewCanvas,
+      previewSize: args.previewSize,
+      ...(args.documentSize ? { documentSize: args.documentSize } : {}),
+    });
   };
 
   const animate = (timestamp: number) => {

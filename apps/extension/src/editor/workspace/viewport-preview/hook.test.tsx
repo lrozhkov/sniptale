@@ -83,6 +83,9 @@ it('derives preview geometry and starts drawing only while open with an image', 
 
   act(() => root?.render(<Probe hasImage open />));
   expect(mocks.startLoop).toHaveBeenCalledOnce();
+  expect(mocks.startLoop).toHaveBeenCalledWith(
+    expect.objectContaining({ documentSize: { width: 800, height: 400 } })
+  );
 });
 
 it('routes preview client points through navigation helper and cleans up drawing', () => {

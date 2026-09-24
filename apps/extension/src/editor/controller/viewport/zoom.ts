@@ -1,5 +1,6 @@
 import type { Canvas } from 'fabric';
 import { resolveEditorViewportScaleCompensation } from './scale';
+import { getEditorEditingSurfaceSize } from './editing-surface';
 
 export function applyEditorViewportZoom(
   canvas: Canvas | null,
@@ -12,10 +13,11 @@ export function applyEditorViewportZoom(
   }
 
   const domScaleCompensation = resolveEditorViewportScaleCompensation(devicePixelRatioBaseline);
+  const surfaceSize = getEditorEditingSurfaceSize(canvasDocumentSize);
   canvas.setDimensions(
     {
-      width: Math.max(1, Math.round(canvasDocumentSize.width * zoomLevel * domScaleCompensation)),
-      height: Math.max(1, Math.round(canvasDocumentSize.height * zoomLevel * domScaleCompensation)),
+      width: Math.max(1, Math.round(surfaceSize.width * zoomLevel * domScaleCompensation)),
+      height: Math.max(1, Math.round(surfaceSize.height * zoomLevel * domScaleCompensation)),
     },
     { cssOnly: true }
   );

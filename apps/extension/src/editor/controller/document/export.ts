@@ -18,6 +18,7 @@ import type {
 } from '../../document/model/render-options';
 
 import type { SourceState } from '../../document/model/source-state';
+import { EDITOR_WORKSPACE_MARGIN, getEditorEditingDocumentSize } from '../viewport/editing-surface';
 
 export function buildEditorCanvasDocument(options: {
   canvas: Canvas | null;
@@ -72,7 +73,15 @@ function resolveRenderedCanvasElement(
   });
   let sourceCanvas: HTMLCanvasElement;
   try {
-    sourceCanvas = canvas.toCanvasElement(1);
+    const documentSize = getEditorEditingDocumentSize(canvas);
+    sourceCanvas = documentSize
+      ? canvas.toCanvasElement(1, {
+          left: EDITOR_WORKSPACE_MARGIN,
+          top: EDITOR_WORKSPACE_MARGIN,
+          width: documentSize.width,
+          height: documentSize.height,
+        })
+      : canvas.toCanvasElement(1);
   } finally {
     cropGuides.forEach((object, index) => {
       object.visible = visibility[index] ?? true;

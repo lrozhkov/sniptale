@@ -11,6 +11,10 @@ import {
 import { EditorFrameAnnotationPlane } from '../../frame-annotation/plane';
 import type { EditorFrameAnnotationPlaneController } from '../../frame-annotation/types';
 import type { EditorLayerItem, EditorTool } from '../../../features/editor/document/types';
+import {
+  EDITOR_WORKSPACE_MARGIN,
+  getEditorEditingSurfaceSize,
+} from '../../controller/viewport/editing-surface';
 
 const emptyStateButtonClassName = [
   'mt-5',
@@ -112,6 +116,22 @@ function CanvasStage(
     surfaceStyle: React.CSSProperties | undefined;
   }
 ) {
+  const documentSize = props.controller?.canvasDocumentSize ?? { width: 0, height: 0 };
+  const surfaceSize = getEditorEditingSurfaceSize(documentSize);
+  const left = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.width)) * 100}%`;
+  const top = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.height)) * 100}%`;
+  const right = `${((EDITOR_WORKSPACE_MARGIN + documentSize.width) / Math.max(1, surfaceSize.width)) * 100}%`;
+  const bottom = `${((EDITOR_WORKSPACE_MARGIN + documentSize.height) / Math.max(1, surfaceSize.height)) * 100}%`;
+  const imageStyle = {
+    left,
+    top,
+    width: `${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%`,
+    height: `${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%`,
+  } satisfies React.CSSProperties;
+  const maskClassName = [
+    'pointer-events-none absolute z-40',
+    'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_78%,transparent)]',
+  ].join(' ');
   return (
     <div
       ref={props.stageRef}
@@ -134,7 +154,26 @@ function CanvasStage(
             />
           ) : null}
           {props.hasImage && props.gridStyle ? (
-            <div className="pointer-events-none absolute inset-0 z-20" style={props.gridStyle} />
+            <div
+              className="pointer-events-none absolute z-20"
+              style={{ ...imageStyle, ...props.gridStyle }}
+            />
+          ) : null}
+          {props.hasImage && documentSize.width > 0 && documentSize.height > 0 ? (
+            <>
+              <div className={maskClassName} style={{ left: 0, right: 0, top: 0, height: top }} />
+              <div
+                className={maskClassName}
+                style={{ left: 0, right: 0, top: bottom, bottom: 0 }}
+              />
+              <div className={maskClassName} style={{ left: 0, top, bottom, width: left }} />
+              <div className={maskClassName} style={{ left: right, top, bottom, right: 0 }} />
+              <div
+                className="pointer-events-none absolute z-40 border border-[var(--sniptale-color-border-soft)]"
+                data-ui="editor.canvas.document-boundary"
+                style={imageStyle}
+              />
+            </>
           ) : null}
         </AnnotatableImageSurface>
       </div>

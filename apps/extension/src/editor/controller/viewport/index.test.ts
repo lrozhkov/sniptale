@@ -258,7 +258,10 @@ it('applies viewport zoom to the fabric canvas and guards null canvases', () => 
   applyEditorViewportZoom(canvas as never, { width: 400, height: 200 }, 1.5);
   applyEditorViewportZoom(null, { width: 400, height: 200 }, 1.5);
 
-  expect(canvas.setDimensions).toHaveBeenCalledWith({ height: 300, width: 600 }, { cssOnly: true });
+  expect(canvas.setDimensions).toHaveBeenCalledWith(
+    { height: 1836, width: 2136 },
+    { cssOnly: true }
+  );
   expect(canvas.calcOffset).toHaveBeenCalledOnce();
 });
 
@@ -301,5 +304,8 @@ it('keeps logical viewport metrics stable when browser page zoom changes', () =>
   };
   applyEditorViewportZoom(canvas as never, { width: 200, height: 100 }, 1, 1);
 
-  expect(canvas.setDimensions).toHaveBeenCalledWith({ height: 200, width: 400 }, { cssOnly: true });
+  expect(canvas.setDimensions).toHaveBeenCalledWith(
+    { height: 2248, width: 2448 },
+    { cssOnly: true }
+  );
 });

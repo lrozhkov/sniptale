@@ -94,3 +94,28 @@ it('skips drawing when the source canvas is not drawable or context is missing',
 
   expect(context.drawImage).not.toHaveBeenCalled();
 });
+
+it('samples only the image rectangle from an expanded editing surface', () => {
+  const { context, previewCanvas, sourceCanvas } = createPreviewContext();
+  sourceCanvas.width = 1124;
+  sourceCanvas.height = 1104;
+  const callbacks: FrameRequestCallback[] = [];
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn((callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    })
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+  startEditorViewportPreviewLoop({
+    canvasRef: { current: sourceCanvas },
+    previewCanvasRef: { current: previewCanvas },
+    previewSize: { width: 100, height: 80 },
+    documentSize: { width: 100, height: 80 },
+  });
+  callbacks[0]?.(1000);
+
+  expect(context.drawImage).toHaveBeenCalledWith(sourceCanvas, 512, 512, 100, 80, 0, 0, 100, 80);
+});

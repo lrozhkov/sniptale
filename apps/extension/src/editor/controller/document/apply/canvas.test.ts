@@ -1,4 +1,8 @@
+// @vitest-environment jsdom
+
+import { Canvas } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { EDITOR_WORKSPACE_MARGIN } from '../../viewport/editing-surface';
 
 const mocks = vi.hoisted(() => ({
   applyEditorViewportZoom: vi.fn(),
@@ -42,6 +46,21 @@ function registerPrepareCanvasTest() {
     );
     expect(canvas.backgroundColor).toBe('transparent');
   });
+
+  it('prepares a real editing surface with image coordinates inset from its edges', () => {
+    const canvas = new Canvas(document.createElement('canvas'));
+
+    prepareCanvasForDocumentLoad({
+      canvas,
+      canvasSize: { width: 100, height: 80 },
+      zoomLevel: 1,
+    });
+
+    expect(canvas.getWidth()).toBe(100 + EDITOR_WORKSPACE_MARGIN * 2);
+    expect(canvas.getHeight()).toBe(80 + EDITOR_WORKSPACE_MARGIN * 2);
+    expect(canvas.viewportTransform[4]).toBe(EDITOR_WORKSPACE_MARGIN);
+    expect(canvas.viewportTransform[5]).toBe(EDITOR_WORKSPACE_MARGIN);
+  });
 }
 
 function registerCanvasMaskTest() {
@@ -55,6 +74,15 @@ function registerCanvasMaskTest() {
     expect(style.backgroundColor).toBe('#112233');
     restore?.();
     expect(style.backgroundColor).toBe('initial');
+  });
+
+  it('uses the legacy lower canvas when needed and tolerates an absent element', () => {
+    const style = { backgroundColor: 'initial' };
+    const restore = maskCanvasElementDuringLoad({ lowerCanvasEl: { style } } as never, '#334455');
+    expect(style.backgroundColor).toBe('#334455');
+    restore?.();
+    expect(style.backgroundColor).toBe('initial');
+    expect(maskCanvasElementDuringLoad({} as never, '#334455')).toBeUndefined();
   });
 }
 

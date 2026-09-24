@@ -40,8 +40,19 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
       canvasRef: args.canvasRef,
       previewCanvasRef,
       previewSize,
+      documentSize: {
+        width: args.viewport.canvasWidth,
+        height: args.viewport.canvasHeight,
+      },
     });
-  }, [args.canvasRef, args.hasImage, args.viewportPreviewOpen, previewSize]);
+  }, [
+    args.canvasRef,
+    args.hasImage,
+    args.viewport.canvasWidth,
+    args.viewport.canvasHeight,
+    args.viewportPreviewOpen,
+    previewSize,
+  ]);
 
   const navigateFromClientPoint = (clientX: number, clientY: number) => {
     navigateEditorViewportFromClientPoint({
