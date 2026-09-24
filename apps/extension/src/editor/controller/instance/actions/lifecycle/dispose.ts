@@ -2,6 +2,7 @@ import { detachEditorControllerEventHandlers } from '../../../events';
 import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 import { detachEditorCanvasPointerCapture } from './pointer-capture';
+import { disposeEditorSelectionChrome } from './selection-chrome';
 
 export function disposeEditorController(controller: EditorControllerInstance): void {
   ensureEditorCanvasReadyHandoff(controller).tearDown();
@@ -16,6 +17,7 @@ export function disposeEditorController(controller: EditorControllerInstance): v
     handlers: controller.eventHandlers,
     viewportResizeObserver: controller.viewportResizeObserver,
   });
+  disposeEditorSelectionChrome(controller.canvas);
   controller.magnetManager?.dispose();
   controller.magnetManager = null;
   controller.viewportResizeObserver = null;

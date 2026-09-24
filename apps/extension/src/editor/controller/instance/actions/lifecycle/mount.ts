@@ -11,6 +11,7 @@ import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 import { createViewportPresentationContext } from '../viewport-context';
 import { attachEditorCanvasPointerCapture } from './pointer-capture';
+import { mountEditorSelectionChrome } from './selection-chrome';
 
 export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   const canvas = new Canvas(canvasElement, {
@@ -89,6 +90,7 @@ export function mountEditorController(
       getCropGuide: () => controller.cropGuide,
       getWorkspace: () => useEditorStore.getState().workspace,
     });
+    mountEditorSelectionChrome(canvas, controller.magnetManager);
     controller.viewportResizeObserver = attachViewportObserver(controller, canvas, viewportElement);
     controller.selectionNudgeSession = null;
     controller.syncRuntimeState();

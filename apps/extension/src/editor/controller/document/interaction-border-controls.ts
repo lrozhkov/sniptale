@@ -18,6 +18,10 @@ function renderHiddenEdgeControl(): void {
   // Edge resize remains targetable through Fabric controls, but the visual language stays corner-only.
 }
 
+export function isEditorHiddenEdgeControl(control: Control | undefined): boolean {
+  return control?.render === renderHiddenEdgeControl;
+}
+
 function distanceBetweenPoints(first: ScenePoint, second: ScenePoint): number {
   return Math.hypot(first.x - second.x, first.y - second.y);
 }
@@ -86,12 +90,15 @@ function isPointOnResizableBorder(
   }
 
   const hitState = getPointToSegmentHitState(point, segment[0], segment[1]);
+  const logicalWidth = object.canvas?.getWidth?.();
+  const screenWidth = object.canvas?.upperCanvasEl?.getBoundingClientRect?.().width;
+  const zoom = logicalWidth && screenWidth ? screenWidth / logicalWidth : 1;
 
   return Boolean(
     hitState &&
-    hitState.distance <= EDITOR_BORDER_RESIZE_HIT_DISTANCE &&
-    hitState.startDistance >= EDITOR_BORDER_RESIZE_CORNER_GUARD &&
-    hitState.endDistance >= EDITOR_BORDER_RESIZE_CORNER_GUARD
+    hitState.distance <= EDITOR_BORDER_RESIZE_HIT_DISTANCE / zoom &&
+    hitState.startDistance >= EDITOR_BORDER_RESIZE_CORNER_GUARD / zoom &&
+    hitState.endDistance >= EDITOR_BORDER_RESIZE_CORNER_GUARD / zoom
   );
 }
 
