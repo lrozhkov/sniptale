@@ -13,14 +13,17 @@ import { createRuntimeMessagingTransport } from '../../../../platform/runtime-me
 const frameAnnotationRasterTransport = createRuntimeMessagingTransport();
 const frameAnnotationExportQueues = new WeakMap<Canvas, Promise<void>>();
 
+export type FrameAnnotationDraftRenderPolicy = 'finalize' | 'committed';
+
 export async function renderEditorWithFrameAnnotations(options: {
   canvas: Canvas | null;
   canvasDocumentSize: { width: number; height: number };
+  draftPolicy?: FrameAnnotationDraftRenderPolicy;
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
   const canvas = options.canvas;
   if (!canvas) {
-    flushActiveFrameAnnotationDraft();
+    if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
     return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
   }
   return enqueueFrameAnnotationExport(canvas, () =>
@@ -31,9 +34,10 @@ export async function renderEditorWithFrameAnnotations(options: {
 async function renderEditorWithFrameAnnotationsInTurn(options: {
   canvas: Canvas;
   canvasDocumentSize: { width: number; height: number };
+  draftPolicy?: FrameAnnotationDraftRenderPolicy;
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
-  flushActiveFrameAnnotationDraft();
+  if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
   const { canvas } = options;
   const entries = collectFrameAnnotationProxies(canvas.getObjects());
   if (entries.length === 0) return renderEditorCanvasToDataUrl(canvas, options.renderOptions);

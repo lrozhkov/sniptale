@@ -8,7 +8,10 @@ interface LocalImageDraftController extends EditorDocumentOpenPort {
   autosaveService: Pick<EditorSessionAutosaveService, 'activate' | 'flushAutosave'> | null;
   exportDocument(): EditorDocument;
   isDocumentReadyForExport(): boolean;
-  renderForExport(options: { format: 'png'; quality: 1 }): Promise<string> | string;
+  renderForExport(
+    options: { format: 'png'; quality: 1 },
+    draftPolicy?: 'finalize' | 'committed'
+  ): Promise<string> | string;
 }
 
 /** Opens a local image as a new durable standalone draft with its own page URL. */
@@ -35,7 +38,8 @@ export function openLocalImageAsEditorDraft(
       if (!autosaveService) return;
       beginEditorPageLocalDraft({
         autosaveService,
-        renderPresentation: () => controller.renderForExport({ format: 'png', quality: 1 }),
+        renderPresentation: () =>
+          controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
         sourceTitle: file.name,
       });
     },

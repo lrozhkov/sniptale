@@ -75,6 +75,7 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
   const { createEditorSessionAutosaveService } = await import('../document/session-autosave');
   const { saveStaleEditorImageCopy } = await import('./save-stale-image-copy');
   const autosaveService = createEditorSessionAutosaveService();
+  const renderForExport = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
   await autosaveService.restoreDraft('image-original');
 
   await expect(
@@ -82,7 +83,7 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
       autosaveService,
       controller: {
         exportDocument: vi.fn(() => document),
-        renderForExport: vi.fn(async () => 'data:image/png;base64,cHJldmlldw=='),
+        renderForExport,
       },
       isSourceActive: () => true,
       pageTitle: 'Copy',
@@ -91,8 +92,12 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
   ).resolves.toBe('saved');
 
   expect(mocks.replaceAggregateId).toHaveBeenCalledWith('image-copy');
+  expect(renderForExport).toHaveBeenCalledWith({ format: 'png', quality: 1 });
   expect(releaseDocumentAssets).not.toHaveBeenCalled();
   await expect(autosaveService.persistSnapshot(() => document)).resolves.toBeUndefined();
+  await vi.waitFor(() =>
+    expect(renderForExport).toHaveBeenCalledWith({ format: 'png', quality: 1 }, 'committed')
+  );
   expect(mocks.commitWorkspace).toHaveBeenCalledWith(
     expect.objectContaining({ aggregateId: 'image-copy', document })
   );

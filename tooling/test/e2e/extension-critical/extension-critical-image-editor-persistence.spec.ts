@@ -1,6 +1,12 @@
 import { expect, type Page } from '@playwright/test';
 import { test } from '../support/extension-fixture';
-import { EDITOR_HARNESS_PATH, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+import {
+  applyHarnessBootstrap,
+  EDITOR_HARNESS_PATH,
+  E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+  GALLERY_HARNESS_PATH,
+} from '../extension-critical.helpers';
+import { createExactBrowserFrameHarnessPayload } from '../../harness/editor/scenarios/browser-frame-exact';
 
 const EVIDENCE_DIR = '/tmp';
 
@@ -382,6 +388,47 @@ test('draft document controls leave the frame tool reachable at desktop and narr
     await expect(frameTool).toBeVisible();
   }
   await page.close();
+});
+
+test('autosave presentation does not finish an active frame drag', async ({ page, hostOrigin }) => {
+  await page.setViewportSize({ width: 1680, height: 1200 });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    editorAutoApplyBrowserFrame: true,
+    editorBootstrapPayload: createExactBrowserFrameHarnessPayload(),
+  });
+  await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+  await waitForEditorReady(page);
+  await page.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+
+  const plane = await page.locator('[data-ui="editor.frame-annotation-plane"]').boundingBox();
+  expect(plane).not.toBeNull();
+  const start = { x: plane!.x + plane!.width / 2 - 70, y: plane!.y + plane!.height / 2 - 40 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 140, start.y + 80, { steps: 4 });
+  await page.mouse.up();
+
+  const frame = page
+    .locator('[data-frame-id]')
+    .filter({ has: page.locator('.sniptale-interactive-frame-fill') })
+    .first();
+  await expect(frame).toBeVisible();
+  const initial = await frame.boundingBox();
+  expect(initial).not.toBeNull();
+  const from = { x: initial!.x + initial!.width / 2, y: initial!.y + initial!.height / 2 };
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 20, from.y + 10);
+  const firstMove = await frame.boundingBox();
+  expect(firstMove).not.toBeNull();
+
+  await page.waitForTimeout(1500);
+  await page.mouse.move(from.x + 80, from.y + 35, { steps: 3 });
+  const secondMove = await frame.boundingBox();
+  await page.mouse.up();
+  expect(secondMove).not.toBeNull();
+  expect(secondMove!.x - firstMove!.x).toBeGreaterThan(30);
 });
 
 test('inspector numeric and paint controls retain shared hover, focus and Escape behavior', async ({

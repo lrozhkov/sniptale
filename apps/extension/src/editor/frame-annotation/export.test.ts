@@ -26,6 +26,7 @@ vi.mock('../../platform/media-utils/data-url', () => ({
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.showToast }));
 
 import { renderEditorWithFrameAnnotations } from '../controller/public-api/document/frame-annotation-export';
+import { registerFrameAnnotationDraftFlusher } from './draft-coordinator';
 
 function createCanvas() {
   const proxy = createFrameAnnotationProxy({
@@ -65,6 +66,27 @@ it('delegates directly when the Fabric canvas is unavailable', async () => {
     })
   ).resolves.toBe('data:image/png;base64,base');
   expect(mocks.renderCanvas).toHaveBeenCalledWith(null, { format: 'png', quality: 100 });
+});
+
+it('keeps the active frame draft during presentation rendering and finalizes it for export', async () => {
+  const { canvas } = createCanvas();
+  const flushDraft = vi.fn();
+  const unregister = registerFrameAnnotationDraftFlusher(flushDraft);
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 200, height: 100 },
+    renderOptions: { format: 'png' as const, quality: 100 },
+  };
+
+  try {
+    await renderEditorWithFrameAnnotations({ ...options, draftPolicy: 'committed' });
+    expect(flushDraft).not.toHaveBeenCalled();
+
+    await renderEditorWithFrameAnnotations(options);
+    expect(flushDraft).toHaveBeenCalledTimes(1);
+  } finally {
+    unregister();
+  }
 });
 
 it('renders the Fabric base without proxies and restores proxy visibility after success', async () => {

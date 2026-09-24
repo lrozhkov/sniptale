@@ -70,7 +70,10 @@ it('flushes the current draft and creates the new identity only after the image 
   });
   const renderPresentation = mocks.beginDraft.mock.calls[0]?.[0].renderPresentation;
   await renderPresentation();
-  expect(controller.renderForExport).toHaveBeenCalledWith({ format: 'png', quality: 1 });
+  expect(controller.renderForExport).toHaveBeenCalledWith(
+    { format: 'png', quality: 1 },
+    'committed'
+  );
 });
 
 it('opens the first local image without exporting the empty start page', async () => {

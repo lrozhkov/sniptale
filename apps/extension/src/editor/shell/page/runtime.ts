@@ -99,7 +99,8 @@ export async function openEditorBootstrapPayload(
   services.autosaveService.activate({
     aggregateId,
     durableRevision: 0,
-    renderPresentation: () => services.controller.renderForExport({ format: 'png', quality: 1 }),
+    renderPresentation: () =>
+      services.controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
     sourceUrl: payload.url ?? '',
     sourceTitle: payload.title ?? '',
   });
@@ -136,7 +137,8 @@ export async function bootstrapEditorPageSession(
   services.autosaveService.activate({
     aggregateId,
     durableRevision: 0,
-    renderPresentation: () => services.controller.renderForExport({ format: 'png', quality: 1 }),
+    renderPresentation: () =>
+      services.controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
     sourceUrl: null,
     sourceTitle: null,
   });

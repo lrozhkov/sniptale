@@ -56,8 +56,11 @@ export abstract class ImageEditorControllerLifecycleActions extends ImageEditorC
     return this.getDocumentCommandService().renderToDataUrl(this.getControllerInstance(), options);
   }
 
-  async renderForExport(options: EditorRenderToDataUrlOptions) {
-    return renderEditorControllerForExport(this.getControllerInstance(), options);
+  async renderForExport(
+    options: EditorRenderToDataUrlOptions,
+    draftPolicy: 'finalize' | 'committed' = 'finalize'
+  ) {
+    return renderEditorControllerForExport(this.getControllerInstance(), options, draftPolicy);
   }
 
   async copyRenderedImage(options?: EditorRenderedImageOptions) {
