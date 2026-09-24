@@ -30,6 +30,7 @@ import { scenarioProjectRootPublisher } from './root-publication/scenario-projec
 import { videoProjectRootPublisher } from './root-publication/video-project';
 import { listGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 import { runWithScenarioResourceRead } from '../../../composition/persistence/scenario/resource-sessions';
+import { backfillScenarioLibraryAssets } from '../../../composition/persistence/scenario/library-publication';
 
 export type MediaHubImportConflictStrategy = ArchiveRestoreStrategy;
 
@@ -63,6 +64,7 @@ export async function inspectLocalMediaHubBackup(
   rawOptions: Partial<MediaHubBackupExportOptions> = {}
 ): Promise<MediaHubLocalBackupSummary> {
   await recoverAssetPublications();
+  await backfillScenarioLibraryAssets();
   const options = createMediaHubBackupExportOptions(rawOptions);
   const plan = await runWithScenarioResourceRead(() =>
     buildMediaHubBackupExportPlanFromLibraryV6(options)
@@ -128,6 +130,7 @@ export async function exportMediaHubBackup(
   } = {}
 ): Promise<void> {
   const options = createMediaHubBackupExportOptions(rawOptions);
+  await backfillScenarioLibraryAssets();
   const sink = await createDirectFileSink({
     description: translate('gallery.backupExportModal.archiveDescription'),
     extension: '.zip',

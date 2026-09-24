@@ -261,7 +261,6 @@ function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
       source?.kind !== 'project-asset' ||
       source.projectAssetId !== parsed.id ||
       metadata.entry?.id !== `project-asset:${parsed.id}` ||
-      !parsed.mimeType.startsWith('video/') ||
       metadata.entry.mimeType !== parsed.mimeType
     ) {
       throw new Error('Portable project video asset association is invalid.');

@@ -19,6 +19,7 @@ import {
   getProjectAsset,
   getProjectExport,
 } from '../projects/index';
+import { readAssetFile, parseAssetRef } from '../assets';
 import { deleteRecording, getRecording } from '../recordings/index';
 import { deleteWebSnapshotMediaAsset, getWebSnapshotPackageFile } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
@@ -28,6 +29,9 @@ import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-ur
 import { createAggregatePresentationKey } from '../aggregate-presentations';
 import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { removeEditorDocumentOwnership } from '../document-assets';
+import { listMediaAssetProjectUsage } from './usage';
+import type { MediaAssetProjectUsage } from './usage';
+import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -100,6 +104,12 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
 
   if (entry.source.kind === 'screenshot') {
     return entry.blob;
+  }
+
+  if (entry.source.kind === 'stored-asset') {
+    const db = await initDB();
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, entry.source.assetId));
+    return ref ? readAssetFile(ref, entry.filename) : undefined;
   }
 
   if (entry.source.kind === 'recording') {
@@ -178,7 +188,10 @@ export async function addMediaLibraryEntryTags(
   });
 }
 
-export async function deleteMediaLibraryAsset(assetId: string): Promise<void> {
+export async function deleteMediaLibraryAsset(
+  assetId: string,
+  options: { expectedUsage?: readonly MediaAssetProjectUsage[] } = {}
+): Promise<void> {
   const pendingWorkspacePublication = (await listReadyJournals()).some(
     (journal) =>
       journal.domain === 'image-workspace' &&
@@ -199,6 +212,34 @@ export async function deleteMediaLibraryAsset(assetId: string): Promise<void> {
 
   if (!entry) {
     return;
+  }
+
+  const consumers = await listMediaAssetProjectUsage(assetId);
+  if (consumers.length > 0 && !options.expectedUsage) {
+    throw new MediaLibraryDeleteError(
+      assetId,
+      'linked-source-cleanup',
+      new Error('The media asset is still used by projects.')
+    );
+  }
+  if (
+    entry.source.kind === 'recording' ||
+    entry.source.kind === 'project-asset' ||
+    entry.source.kind === 'stored-asset'
+  ) {
+    try {
+      await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? []);
+    } catch (error) {
+      throw new MediaLibraryDeleteError(assetId, 'linked-source-cleanup', error);
+    }
+    return;
+  }
+  if (consumers.length > 0) {
+    throw new MediaLibraryDeleteError(
+      assetId,
+      'linked-source-cleanup',
+      new Error('This media source does not support project cascade deletion.')
+    );
   }
 
   if (entry.source.kind === 'web-snapshot') {
@@ -245,6 +286,15 @@ async function deleteMediaLibraryRows(assetId: string): Promise<void> {
       'readwrite'
     );
     try {
+      const entry = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(assetId));
+      if (entry?.source.kind === 'stored-asset') {
+        const physicalId = entry.source.assetId;
+        await tx.objectStore(ASSET_OWNERS_STORE).delete(['media-library', assetId, 'source']);
+        if ((await tx.objectStore(ASSET_OWNERS_STORE).index('assetId').count(physicalId)) === 0) {
+          await tx.objectStore(ASSET_REFS_STORE).delete(physicalId);
+          physicalDelete.assetIds.push(physicalId);
+        }
+      }
       await tx.objectStore(MEDIA_LIBRARY_STORE).delete(assetId);
       await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(assetId);
       await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(assetId);

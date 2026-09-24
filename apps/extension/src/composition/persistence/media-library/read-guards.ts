@@ -89,6 +89,10 @@ function parseMediaAssetSource(value: unknown): MediaAssetSource | null {
   switch (value['kind']) {
     case 'screenshot':
       return { kind: 'screenshot' };
+    case 'stored-asset':
+      return isString(value['assetId']) && value['assetId'].length > 0
+        ? { kind: 'stored-asset', assetId: value['assetId'] }
+        : null;
     case 'recording':
       return isString(value['recordingId'])
         ? { kind: 'recording', recordingId: value['recordingId'] }

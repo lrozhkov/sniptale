@@ -17,6 +17,10 @@ import {
 } from '../items';
 import { deletePersistedVideoProject } from '../../../workflows/media-hub/video-projects';
 import { type GalleryBusyAction, openGalleryConfirmDialog } from './shared';
+import {
+  listMediaAssetProjectUsage,
+  type MediaAssetProjectUsage,
+} from '../../../composition/persistence/media-library/usage';
 
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
@@ -33,20 +37,62 @@ export function createDeleteManyAction(controller: GallerySelectionController) {
       return;
     }
 
+    const { media, scenarios, videoProjects } = splitSelectableTargets(selectableTargets);
+    let expectedUsageById = new Map<string, readonly MediaAssetProjectUsage[]>();
+    let usageLoaded = false;
+    await withBusy(async () => {
+      expectedUsageById = new Map(
+        await Promise.all(
+          media.map(async (item) => {
+            const id = item.entityId ?? item.id;
+            return [id, await listMediaAssetProjectUsage(id)] as const;
+          })
+        )
+      );
+      usageLoaded = true;
+    });
+    if (!usageLoaded) return;
+    const affectedById = new Map<string, MediaAssetProjectUsage>();
+    for (const project of [...expectedUsageById.values()].flat()) {
+      const key = `${project.kind}:${project.id}`;
+      affectedById.set(key, {
+        ...project,
+        primary: project.primary || (affectedById.get(key)?.primary ?? false),
+      });
+    }
+    const affectedProjects = [...affectedById.values()];
+    const primaryProjects = affectedProjects.filter((project) => project.primary);
+    if (primaryProjects.length > 0) {
+      const projectNames = primaryProjects.map((project) => project.name).join(', ');
+      openGalleryConfirmDialog(controller, {
+        title: translate('gallery.app.deleteBlockedTitle'),
+        message: `${translate('gallery.app.deleteBlockedPrimary')} ${projectNames}`,
+        confirmText: translate('common.actions.close'),
+        onConfirm: async () => undefined,
+      });
+      return;
+    }
+    const affectedNames = affectedProjects.map((project) => project.name).join(', ');
+    const warning =
+      affectedProjects.length > 0
+        ? [
+            translate('gallery.app.deleteAffectsProjects'),
+            `${affectedNames}.`,
+            translate('gallery.app.deleteHistoryWarning'),
+          ].join(' ')
+        : '';
     openGalleryConfirmDialog(controller, {
       title: translate('gallery.app.deleteConfirmTitle'),
-      message: translate('gallery.app.deleteSelectedConfirm'),
+      message: `${translate('gallery.app.deleteSelectedConfirm')} ${warning}`.trim(),
       onConfirm: async () => {
         await withBusy(async () => {
-          const { media, scenarios, videoProjects } = splitSelectableTargets(selectableTargets);
-
-          await Promise.all([
-            media.length > 0
-              ? deleteMediaLibraryAssetsBatchSafely(media.map((item) => item.entityId ?? item.id))
-              : Promise.resolve(),
-            ...scenarios.map((item) => deleteScenarioProjectRecord(item.entityId)),
-            ...videoProjects.map((item) => deletePersistedVideoProject(item.entityId)),
-          ]);
+          if (media.length > 0)
+            await deleteMediaLibraryAssetsBatchSafely(
+              media.map((item) => item.entityId ?? item.id),
+              expectedUsageById
+            );
+          for (const item of scenarios) await deleteScenarioProjectRecord(item.entityId);
+          for (const item of videoProjects) await deletePersistedVideoProject(item.entityId);
 
           controller.actions.selection.setSelectedIds(new Set());
           controller.actions.preview.setPreview({

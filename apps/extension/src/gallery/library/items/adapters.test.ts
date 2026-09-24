@@ -272,3 +272,23 @@ it('keeps single recording metadata without presenting it as a recording group',
   ]);
   expect(items[0]).not.toHaveProperty('recordingGroupView');
 });
+
+it.each(['image', 'video', 'audio'] as const)(
+  'keeps available project %s assets in the gallery',
+  (kind) => {
+    const media = createMediaLibraryItem({
+      id: `project-asset:${kind}`,
+      kind,
+      source: { kind: 'project-asset', projectAssetId: kind },
+    });
+    const items = createGalleryItems({
+      mediaItems: [media],
+      scenarioExportsByProjectId: new Map(),
+      scenarioProjects: [],
+      thumbnailIds: new Set(),
+      videoProjects: [],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: media.id, kind, source: media.source });
+  }
+);

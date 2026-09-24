@@ -39,6 +39,7 @@ export function configureSelectorMocks(mocks: {
   mocks.getFilteredGalleryItemsMock.mockReturnValue([createItem()]);
   mocks.getGalleryCountsMock.mockReturnValue({
     all: 2,
+    audio: 0,
     export: 0,
     recording: 0,
     scenario: 1,

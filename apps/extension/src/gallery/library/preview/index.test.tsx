@@ -44,6 +44,7 @@ vi.mock('./sidebar-sections', () => ({
     <div data-ui="preview.tags">{props.tagDraft}</div>
   ),
   PreviewPromotionAction: () => <div data-ui="preview.promotion" />,
+  PreviewProjectUsage: () => <div data-ui="preview.project-usage" />,
 }));
 
 let container: HTMLDivElement | null = null;

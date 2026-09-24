@@ -38,6 +38,7 @@ describe('gallery/state index test support', () => {
     ]);
     expect(mocks.getGalleryCountsMock()).toEqual({
       all: 2,
+      audio: 0,
       export: 0,
       recording: 0,
       scenario: 1,

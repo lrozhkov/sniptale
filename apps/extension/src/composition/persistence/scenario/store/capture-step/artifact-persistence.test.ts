@@ -41,6 +41,7 @@ vi.mock('../../../infrastructure/indexed-db/core', () => ({
   ASSET_OPERATIONS_STORE: 'asset_operations',
   ASSET_OWNERS_STORE: 'asset_owners',
   ASSET_REFS_STORE: 'asset_refs',
+  MEDIA_LIBRARY_STORE: 'media_library',
   initDB: initDBMock,
   SCENARIO_ASSETS_STORE: 'scenario_assets',
   SCENARIO_PROJECTS_STORE: 'scenario_projects',
@@ -172,6 +173,13 @@ async function verifyArtifactPersistenceWithDocument() {
   });
   const { assetRef: _assetRef, ...storedAsset } = assetEntry;
   expect(txPutMock).toHaveBeenCalledWith(storedAsset);
+  expect(txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: 'scenario-asset:asset-1',
+      source: { kind: 'stored-asset', assetId: assetEntry.assetId },
+      lifecycle: expect.objectContaining({ storageClass: 'library' }),
+    })
+  );
   expect(txPutMock).toHaveBeenCalledWith({
     id: project.id,
     project: { ...project, tags: [], updatedAt: 11 },
@@ -216,7 +224,7 @@ async function verifyArtifactPersistenceWithoutDocument() {
     stepDocument: null,
   });
 
-  expect(txPutMock).toHaveBeenCalledTimes(4);
+  expect(txPutMock).toHaveBeenCalledTimes(6);
 }
 
 async function verifyStaleArtifactPersistenceRejectsBeforeWrites() {

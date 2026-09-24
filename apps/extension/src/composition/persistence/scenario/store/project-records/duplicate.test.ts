@@ -15,8 +15,15 @@ const io = vi.hoisted(() => ({
   write: vi.fn(),
   discard: vi.fn(),
   event: vi.fn(),
+  media: vi.fn(),
+  db: vi.fn(),
 }));
 vi.mock('../../projects/assets', () => ({ getScenarioAsset: io.asset }));
+vi.mock('../../../media-library', () => ({ getMediaLibraryEntry: io.media }));
+vi.mock('../../../infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<typeof import('../../../infrastructure/indexed-db/core')>()),
+  initDB: io.db,
+}));
 vi.mock('../../editor-documents', () => ({
   getScenarioStepEditorDocumentForTransfer: io.document,
 }));
@@ -69,6 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   io.commit.mockImplementation(async (project) => ({ project, workspaceRevision: 0 }));
   io.discard.mockResolvedValue(undefined);
+  io.media.mockResolvedValue(undefined);
   io.write.mockImplementation(async (blob: Blob) => ({
     ref: {
       assetId: 'new-physical',
@@ -150,6 +158,79 @@ it('copies repeated images and annotation documents once with independent logica
   );
   expect(io.event).toHaveBeenCalledWith('create', [`scenario:${copied.id}`]);
   expect(io.discard).not.toHaveBeenCalled();
+});
+
+it('shares an immutable source across a duplicate without copying its bytes', async () => {
+  const ref = {
+    assetId: 'source-physical',
+    createdAt: 100,
+    location: { kind: 'opfs' as const, objectKey: 'objects/source-physical' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 5,
+  };
+  io.media.mockResolvedValue({
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    workspaceRevision: 0,
+    imageContentState: 'original',
+  });
+  io.db.mockResolvedValue({ get: async () => ref });
+  await duplicateScenarioProjectRecord(sourceProject(), 'Shared copy');
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts?.[0]).toMatchObject({
+    assetId: ref.assetId,
+    assetRef: ref,
+    borrowedMediaId: 'scenario-asset:source-image',
+    galleryAssetId: 'scenario-asset:source-image',
+  });
+});
+
+it('shares source bytes under a new Library identity when the presentation has been edited', async () => {
+  const ref = {
+    assetId: 'source-physical',
+    createdAt: 100,
+    location: { kind: 'opfs' as const, objectKey: 'objects/source-physical' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 5,
+  };
+  io.media.mockResolvedValue({
+    source: { kind: 'stored-asset', assetId: 'source-physical' },
+    workspaceRevision: 1,
+    imageContentState: 'edited',
+  });
+  io.db.mockResolvedValue({ get: async () => ref });
+  await duplicateScenarioProjectRecord(sourceProject(), 'Edited copy');
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts?.[0]).toMatchObject({
+    assetId: 'source-physical',
+    assetRef: ref,
+    borrowedMediaId: 'scenario-asset:source-image',
+    independentLibraryIdentity: true,
+    galleryAssetId: null,
+  });
+});
+
+it('does not discard a reused source when a copy fails before publication', async () => {
+  const ref = {
+    assetId: 'source-physical',
+    createdAt: 100,
+    location: { kind: 'opfs' as const, objectKey: 'objects/source-physical' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 5,
+  };
+  io.media.mockResolvedValue({
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    workspaceRevision: 1,
+  });
+  io.db.mockResolvedValue({ get: async () => ref });
+  io.document.mockResolvedValue(undefined);
+  await expect(duplicateScenarioProjectRecord(sourceProject(), 'Failed copy')).rejects.toThrow(
+    'annotation document'
+  );
+  expect(io.discard).not.toHaveBeenCalled();
+  expect(io.commit).not.toHaveBeenCalled();
 });
 
 it('copies a text-only guide without reading or staging media', async () => {

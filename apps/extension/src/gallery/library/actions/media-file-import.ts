@@ -1,7 +1,7 @@
 import { assertSafeProjectAssetStorageInput } from '../../../features/media-hub/project-assets';
 import {
   saveRecordingsBatchSafely,
-  saveScreenshotMediaAssetSafely,
+  saveProjectAssetSafely,
 } from '../../../workflows/media-hub/store';
 import type { GalleryImportController } from './controller-types';
 import { registerGalleryImportAbortController } from './backup';
@@ -107,12 +107,13 @@ async function importMediaFile(file: File, signal: AbortSignal): Promise<void> {
   const createdAt = resolveGalleryMediaImportCreatedAt(file);
   const typedBlob = file.type === mimeType ? file : file.slice(0, file.size, mimeType);
   if (mimeType.startsWith('image/')) {
-    await saveScreenshotMediaAssetSafely({
-      blob: typedBlob,
-      createdAt,
-      filename: file.name,
-      kind: 'image',
-    });
+    if (signal.aborted) throw new DOMException('Import cancelled.', 'AbortError');
+    await saveProjectAssetSafely(crypto.randomUUID(), typedBlob, mimeType, file.name, createdAt);
+    return;
+  }
+  if (mimeType.startsWith('audio/')) {
+    if (signal.aborted) throw new DOMException('Import cancelled.', 'AbortError');
+    await saveProjectAssetSafely(crypto.randomUUID(), typedBlob, mimeType, file.name, createdAt);
     return;
   }
   const metadata = await loadVideoFileMetadata(file, signal);

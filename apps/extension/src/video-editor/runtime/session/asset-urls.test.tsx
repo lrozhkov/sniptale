@@ -11,6 +11,7 @@ const assetUrlMocks = vi.hoisted(() => ({
   getProjectAssetMock: vi.fn(),
   getRecordingMock: vi.fn(),
   getScenarioAssetMock: vi.fn(),
+  getMediaAssetBlobMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
@@ -26,6 +27,10 @@ vi.mock('../../../composition/persistence/recordings/index', async (importOrigin
 vi.mock('../../../composition/persistence/scenario/projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/scenario/projects')>()),
   getScenarioAsset: assetUrlMocks.getScenarioAssetMock,
+}));
+
+vi.mock('../../../composition/persistence/media-library/index', () => ({
+  getMediaAssetBlob: assetUrlMocks.getMediaAssetBlobMock,
 }));
 
 import { useVideoEditorAssetUrls } from './asset-urls';
@@ -96,6 +101,7 @@ beforeEach(() => {
   assetUrlMocks.getProjectAssetMock.mockReset();
   assetUrlMocks.getRecordingMock.mockReset();
   assetUrlMocks.getScenarioAssetMock.mockReset();
+  assetUrlMocks.getMediaAssetBlobMock.mockReset();
 });
 
 afterEach(() => {
@@ -195,4 +201,28 @@ it('revokes a URL produced by a cancelled stale load exactly once', async () => 
   expect(onUrlsChange).toHaveBeenLastCalledWith({ 'asset-1': 'blob:new-source' });
   expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:old-source');
+});
+
+it('reads stable library identity and refreshes it without needing a scenario child', async () => {
+  const project = createProjectWithSingleAsset();
+  project.assets[0]!.source = { kind: 'library-asset', mediaId: 'scenario-asset:gone' };
+  const blob = new Blob(['shared']);
+  assetUrlMocks.getMediaAssetBlobMock.mockResolvedValue(blob);
+  assetUrlMocks.getScenarioAssetMock.mockResolvedValue(undefined);
+  const onUrlsChange = vi.fn();
+  await renderHarness({ project, onUrlsChange });
+  expect(assetUrlMocks.getMediaAssetBlobMock).toHaveBeenCalledWith('scenario-asset:gone');
+  expect(assetUrlMocks.getScenarioAssetMock).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+  expect(onUrlsChange).toHaveBeenLastCalledWith({ 'asset-1': 'blob:asset-1' });
+  assetUrlMocks.getMediaAssetBlobMock.mockResolvedValue(undefined);
+  await renderHarness({
+    project: {
+      ...project,
+      assets: [{ ...project.assets[0]!, source: { kind: 'library-asset', mediaId: 'missing' } }],
+    },
+    onUrlsChange,
+  });
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:asset-1');
+  expect(onUrlsChange).toHaveBeenLastCalledWith({});
 });

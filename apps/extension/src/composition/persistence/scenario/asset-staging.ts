@@ -32,7 +32,9 @@ export async function discardScenarioAggregateAssetPuts(
   children: ScenarioAggregateChildMutation | undefined
 ): Promise<void> {
   const results = await Promise.allSettled(
-    (children?.assetPuts ?? []).map((asset) => discardPreparedAsset(asset.assetId))
+    (children?.assetPuts ?? [])
+      .filter((asset) => !asset.borrowedMediaId)
+      .map((asset) => discardPreparedAsset(asset.assetId))
   );
   const errors = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : []

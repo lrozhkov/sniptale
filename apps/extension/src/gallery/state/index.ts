@@ -189,6 +189,10 @@ function getInitialRecordingPreviewId(): string | null {
   return params.get('recordingId');
 }
 
+function getInitialMediaPreviewId(): string | null {
+  return new URLSearchParams(window.location.search).get('mediaId');
+}
+
 function findRecordingPreviewItem(items: GalleryItem[], recordingId: string): GalleryItem | null {
   return (
     items.find(
@@ -208,16 +212,22 @@ function useInitialRecordingPreview({
   setPreview: GalleryPreviewState['actions']['setPreview'];
 }) {
   const initialRecordingIdRef = useRef(getInitialRecordingPreviewId());
+  const initialMediaIdRef = useRef(getInitialMediaPreviewId());
   const appliedRef = useRef(false);
   const quickEditRef = useRef(new URLSearchParams(window.location.search).get('mode') === 'edit');
 
   useEffect(() => {
     const recordingId = initialRecordingIdRef.current;
-    if (appliedRef.current || !recordingId) {
+    const mediaId = initialMediaIdRef.current;
+    if (appliedRef.current || (!recordingId && !mediaId)) {
       return;
     }
 
-    const item = findRecordingPreviewItem(allItems, recordingId);
+    const item = mediaId
+      ? (allItems.find(
+          (entry) => isGalleryMediaItem(entry) && (entry.entityId ?? entry.id) === mediaId
+        ) ?? null)
+      : findRecordingPreviewItem(allItems, recordingId!);
     if (!item) {
       return;
     }

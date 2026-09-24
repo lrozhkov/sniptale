@@ -5,6 +5,7 @@ export const SIDEBAR_FOLDERS: FolderFilter[] = [
   'all',
   'screenshot',
   'recording',
+  'audio',
   'web-snapshot',
   'scenario',
 ];
@@ -13,6 +14,7 @@ export const FOLDER_FILTER_KIND_MAP: Record<
   Exclude<FolderFilter, 'all' | 'scenario'>,
   GalleryItemKind[]
 > = {
+  audio: ['audio'],
   screenshot: ['screenshot', 'image'],
   recording: ['recording', 'video', 'video-project', 'export'],
   export: ['export', 'scenario-export'],

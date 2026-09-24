@@ -13,6 +13,7 @@ import { PreviewMedia } from './media';
 import {
   PreviewActions,
   PreviewMetadataCards,
+  PreviewProjectUsage,
   PreviewPromotionAction,
   PreviewTagEditor,
 } from './sidebar-sections';
@@ -152,6 +153,7 @@ function PreviewPanelSidebar(props: PreviewPanelProps & { onReview?: () => void 
         />
         <UnavailableProjectNotice item={props.item} />
         <PreviewMetadataCards item={props.item} />
+        <PreviewProjectUsage item={props.item} />
         <PreviewSourceField item={props.item} />
         <PreviewTagEditor
           {...(props.allTags === undefined ? {} : { allTags: props.allTags })}

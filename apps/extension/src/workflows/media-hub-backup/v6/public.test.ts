@@ -4,6 +4,10 @@ const io = vi.hoisted(() => ({
   inventory: vi.fn(),
   write: vi.fn(),
   abort: vi.fn(),
+  backfill: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/scenario/library-publication', () => ({
+  backfillScenarioLibraryAssets: io.backfill,
 }));
 vi.mock('../../../composition/archive-transfer', () => ({
   createDirectFileSink: async () => ({ abort: io.abort }),
@@ -35,6 +39,10 @@ beforeEach(() => {
 it('protects physical scenario objects from inventory through completion of archive writing', async () => {
   await exportMediaHubBackup();
   expect(io.inventory).toHaveBeenCalledOnce();
+  expect(io.backfill).toHaveBeenCalledOnce();
+  expect(io.backfill.mock.invocationCallOrder[0]).toBeLessThan(
+    io.inventory.mock.invocationCallOrder[0]!
+  );
   expect(io.write).toHaveBeenCalledOnce();
   expect(io.active).toBe(false);
   expect(io.abort).not.toHaveBeenCalled();

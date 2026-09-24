@@ -100,6 +100,7 @@ export async function cleanupDrafts(args: {
     const refs = collectVideoProjectReferences(project);
     for (const id of refs.recordingIds) referencedRecordingIds.add(id);
     for (const id of refs.projectAssetIds) referencedMediaIds.add(createProjectAssetMediaId(id));
+    for (const id of refs.libraryMediaIds) referencedMediaIds.add(id);
   }
 
   const includeUnexpired = Boolean(args.includeUnexpired);
@@ -300,7 +301,8 @@ function isMediaReferencedByVideoProject(
     return (
       (media.source.kind === 'recording' && refs.recordingIds.has(media.source.recordingId)) ||
       (media.source.kind === 'project-asset' &&
-        refs.projectAssetIds.has(media.source.projectAssetId))
+        refs.projectAssetIds.has(media.source.projectAssetId)) ||
+      refs.libraryMediaIds.has(media.id)
     );
   });
 }
@@ -450,6 +452,7 @@ async function deleteExpiredMedia(
         STORE_NAME,
         VIDEO_PROJECTS_STORE,
         PROJECT_ASSETS_STORE,
+        SCENARIO_ASSETS_STORE,
         RECORDING_TELEMETRY_STORE,
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
@@ -469,6 +472,14 @@ async function deleteExpiredMedia(
     }
     if (
       isMediaReferencedByVideoProject(current, await tx.objectStore(VIDEO_PROJECTS_STORE).getAll())
+    ) {
+      await tx.done;
+      return false;
+    }
+    if (
+      (await tx.objectStore(SCENARIO_ASSETS_STORE).getAll()).some(
+        (raw) => parseScenarioAssetEntry(raw)?.borrowedMediaId === id
+      )
     ) {
       await tx.done;
       return false;
@@ -521,6 +532,14 @@ async function deleteExpiredMedia(
           projectAsset,
           refStore: tx.objectStore(ASSET_REFS_STORE),
         });
+      }
+    }
+    if (current.source.kind === 'stored-asset') {
+      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+      await ownerStore.delete(['media-library', id, 'source']);
+      if ((await ownerStore.index('assetId').count(current.source.assetId)) === 0) {
+        await tx.objectStore(ASSET_REFS_STORE).delete(current.source.assetId);
+        operation.assetIds.push(current.source.assetId);
       }
     }
     if (operation.assetIds.length > 0) {

@@ -26,6 +26,7 @@ const GALLERY_THUMB_FALLBACK_SURFACE_CLASS_NAME = [
 
 export const FOLDER_LABELS: Record<FolderFilter, string> = {
   all: translate('gallery.preview.folderAll'),
+  audio: translate('gallery.preview.kindAudio'),
   screenshot: translate('gallery.preview.folderScreenshot'),
   recording: translate('gallery.preview.folderRecording'),
   export: translate('gallery.preview.folderExport'),

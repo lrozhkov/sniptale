@@ -166,7 +166,7 @@ it('wires sidebar/main/overlay sections and normalizes storage info branches', (
   const withStorage = createLayoutProps();
   withStorage.state = createGalleryState({
     allTags: ['alpha'],
-    counts: { all: 4, export: 1, recording: 1, scenario: 1, screenshot: 2 },
+    counts: { all: 4, audio: 0, export: 1, recording: 1, scenario: 1, screenshot: 2 },
     filteredItems: [createMediaItem({ id: 'asset-1', tags: ['alpha'] })],
     facets: [
       {

@@ -10,6 +10,7 @@ const {
   listScenarioProjectSummariesMock,
   loadSettingsMock,
   listAggregatePresentationsMock,
+  backfillScenarioLibraryAssetsMock,
 } = vi.hoisted(() => ({
   createGalleryItemsMock: vi.fn(),
   getStorageEstimateInfoMock: vi.fn(),
@@ -20,6 +21,11 @@ const {
   listScenarioProjectSummariesMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   listAggregatePresentationsMock: vi.fn().mockResolvedValue([]),
+  backfillScenarioLibraryAssetsMock: vi.fn().mockResolvedValue(0),
+}));
+
+vi.mock('../../composition/persistence/scenario/library-publication', () => ({
+  backfillScenarioLibraryAssets: backfillScenarioLibraryAssetsMock,
 }));
 
 vi.mock('../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
@@ -106,6 +112,10 @@ describe('loadGalleryLibrarySnapshot', () => {
     });
 
     await expect(loadGalleryLibrarySnapshot()).resolves.toEqual({ estimate, nextItems });
+    expect(backfillScenarioLibraryAssetsMock).toHaveBeenCalledOnce();
+    expect(backfillScenarioLibraryAssetsMock.mock.invocationCallOrder[0]).toBeLessThan(
+      listMediaLibraryMock.mock.invocationCallOrder[0]!
+    );
     expect(listMediaLibraryMock).toHaveBeenCalledTimes(1);
     expect(listVideoProjectsMock).toHaveBeenCalledTimes(1);
     expect(listScenarioProjectSummariesMock).toHaveBeenCalledTimes(1);

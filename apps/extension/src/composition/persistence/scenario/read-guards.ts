@@ -71,6 +71,9 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
     !isString(value['id']) ||
     !isString(value['projectId']) ||
     !isNullableString(value['galleryAssetId']) ||
+    (value['borrowedMediaId'] !== undefined &&
+      (!isString(value['borrowedMediaId']) ||
+        value['borrowedMediaId'] !== value['galleryAssetId'])) ||
     !isString(value['mimeType']) ||
     !isNonNegativeNumber(value['width']) ||
     !isNonNegativeNumber(value['height']) ||
@@ -85,6 +88,9 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
     assetId: value['assetId'],
     createdAt: value['createdAt'],
     galleryAssetId: value['galleryAssetId'],
+    ...(typeof value['borrowedMediaId'] === 'string'
+      ? { borrowedMediaId: value['borrowedMediaId'] }
+      : {}),
     ...(typeof value['duration'] === 'number' ? { duration: value['duration'] } : {}),
     height: value['height'],
     id: value['id'],

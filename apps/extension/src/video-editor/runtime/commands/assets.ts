@@ -3,6 +3,7 @@ import { isAudioRecordingRangeAvailable } from '../../project/operations/timelin
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
+import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import { deleteProjectAsset } from '../../../composition/persistence/projects/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -33,7 +34,12 @@ function getProjectAssetId(asset: VideoProjectAsset): string | null {
 
 async function cleanupStaleImportedAsset(asset: VideoProjectAsset): Promise<void> {
   const projectAssetId = getProjectAssetId(asset);
-  if (!projectAssetId) {
+  // A matching library identity denotes reused bytes, never an acquired import.
+  if (
+    !projectAssetId ||
+    (asset.source.kind === 'project-asset' &&
+      asset.source.originMediaId === createProjectAssetMediaId(projectAssetId))
+  ) {
     return;
   }
 

@@ -151,38 +151,63 @@ it('preserves shared project-owned assets when another project still references 
   expect(deleteMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-shared');
 });
 
-it('preserves a project asset saved independently to the library when its draft is deleted', async () => {
-  const { deleteVideoProject } = await import('./index');
-  const asset = {
-    createdAt: 1,
-    id: 'asset-saved',
-    metadata: {
-      audioPeaks: null,
-      duration: 4,
-      hasAudio: false,
-      height: 720,
-      mimeType: 'video/mp4',
-      size: 10,
-      width: 1280,
-    },
-    name: 'Saved project asset',
-    source: { kind: 'project-asset' as const, projectAssetId: 'asset-saved' },
-    type: VideoProjectAssetType.VIDEO,
-  };
-  deleteMocks.txGetMock
-    .mockResolvedValueOnce(createVideoProjectEntry({ assets: [asset] }))
-    .mockResolvedValueOnce(
-      createMediaLibraryEntry({
-        id: 'project-asset:asset-saved',
-        source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
-      })
+it.each(['library', 'temporary'] as const)(
+  'preserves a published %s project asset when its project is deleted',
+  async (storageClass) => {
+    const { deleteVideoProject } = await import('./index');
+    const asset = {
+      createdAt: 1,
+      id: 'asset-saved',
+      metadata: {
+        audioPeaks: null,
+        duration: 4,
+        hasAudio: false,
+        height: 720,
+        mimeType: 'video/mp4',
+        size: 10,
+        width: 1280,
+      },
+      name: 'Saved project asset',
+      source: { kind: 'project-asset' as const, projectAssetId: 'asset-saved' },
+      type: VideoProjectAssetType.VIDEO,
+    };
+    deleteMocks.txGetMock.mockImplementation(async (key: string) =>
+      key === 'project-1'
+        ? createVideoProjectEntry({ assets: [asset] })
+        : key === 'project-asset:asset-saved'
+          ? createMediaLibraryEntry({
+              id: 'project-asset:asset-saved',
+              source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
+              lifecycle: {
+                storageClass,
+                savedAt: storageClass === 'library' ? 1 : null,
+                updatedAt: 1,
+              },
+            })
+          : undefined
     );
 
-  await deleteVideoProject('project-1');
+    await deleteVideoProject('project-1');
 
-  expect(deleteMocks.txDeleteMock).toHaveBeenCalledOnce();
-  expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
-});
+    expect(deleteMocks.txDeleteMock).toHaveBeenCalledOnce();
+    expect(deleteMocks.txDeleteMock).toHaveBeenCalledWith('project-1');
+    if (storageClass === 'temporary') {
+      expect(deleteMocks.txPutMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'project-asset:asset-saved',
+          lifecycle: expect.objectContaining({
+            storageClass: 'library',
+            savedAt: expect.any(Number),
+          }),
+        })
+      );
+    } else {
+      expect(deleteMocks.txPutMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'project-asset:asset-saved' })
+      );
+    }
+  }
+);
 
 it('deletes the project row when the project payload is already missing', async () => {
   const { deleteVideoProject } = await import('./index');

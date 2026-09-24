@@ -217,6 +217,22 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Действия',
     en: 'Actions',
   },
+  usedInProjects: {
+    ru: 'Используется в проектах',
+    en: 'Used in projects',
+  },
+  projectsLoading: {
+    ru: 'Загрузка проектов…',
+    en: 'Loading projects…',
+  },
+  projectsUnavailable: {
+    ru: 'Не удалось загрузить проекты',
+    en: 'Could not load projects',
+  },
+  projectsEmpty: {
+    ru: 'Не используется в проектах',
+    en: 'Not used in any projects',
+  },
   fileActions: {
     ru: 'Файл и копии',
     en: 'File and copies',

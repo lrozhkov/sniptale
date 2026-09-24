@@ -31,7 +31,7 @@ function createProps(): GallerySidebarProps {
   return {
     activeTags: ['alpha'],
     allTags: ['alpha', 'beta'],
-    counts: { all: 2, export: 0, recording: 0, scenario: 1, screenshot: 2 },
+    counts: { all: 2, audio: 0, export: 0, recording: 0, scenario: 1, screenshot: 2 },
     facetFilters: {
       created: [],
       duration: [],

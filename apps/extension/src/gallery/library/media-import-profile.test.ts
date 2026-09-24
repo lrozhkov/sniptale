@@ -10,6 +10,7 @@ import {
 it('accepts supported image and video MIME types', () => {
   expect(GALLERY_MEDIA_IMPORT_ACCEPT).toContain('image/png');
   expect(GALLERY_MEDIA_IMPORT_ACCEPT).toContain('video/mp4');
+  expect(GALLERY_MEDIA_IMPORT_ACCEPT).toContain('audio/mpeg');
   expect(resolveGalleryMediaImportMimeType(new File([], 'clip.mp4', { type: 'video/mp4' }))).toBe(
     'video/mp4'
   );

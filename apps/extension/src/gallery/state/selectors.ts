@@ -196,6 +196,7 @@ export function getGalleryCounts(
 ): GalleryFolderCounts {
   const next: GalleryFolderCounts = {
     all: 0,
+    audio: 0,
     screenshot: 0,
     recording: 0,
     export: 0,
@@ -215,6 +216,10 @@ export function getGalleryCounts(
 
     if (FOLDER_FILTER_KIND_MAP.screenshot.includes(item.kind)) {
       next.screenshot += 1;
+    }
+
+    if (FOLDER_FILTER_KIND_MAP.audio.includes(item.kind)) {
+      next.audio += 1;
     }
 
     if (FOLDER_FILTER_KIND_MAP.recording.includes(item.kind)) {

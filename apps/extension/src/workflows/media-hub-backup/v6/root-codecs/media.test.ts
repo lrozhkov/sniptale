@@ -95,6 +95,45 @@ it('parses a standalone project video review without changing the supplied metad
   expect(input).toEqual(before);
 });
 
+it('admits a durable scenario image and a project audio file as portable library roots', () => {
+  const image = metadata();
+  const { projectExport: _export, videoReview: _review, ...imageRoot } = image;
+  expect(
+    parsePortableMediaMetadata({
+      ...imageRoot,
+      entry: {
+        ...imageRoot.entry,
+        id: 'scenario-asset:one',
+        kind: 'image',
+        mimeType: 'image/png',
+        filename: 'image.png',
+        originalFilename: 'image.png',
+        source: { kind: 'stored-asset', assetId: 'portable' },
+      },
+    }).entry.source
+  ).toEqual({ kind: 'stored-asset', assetId: 'portable' });
+  expect(
+    parsePortableMediaMetadata({
+      ...imageRoot,
+      entry: {
+        ...imageRoot.entry,
+        id: 'project-asset:audio',
+        kind: 'audio',
+        mimeType: 'audio/webm',
+        filename: 'audio.webm',
+        originalFilename: 'audio.webm',
+        source: { kind: 'project-asset', projectAssetId: 'audio' },
+      },
+      projectAsset: {
+        id: 'audio',
+        mimeType: 'audio/webm',
+        size: 6,
+        createdAt: 1,
+      },
+    }).projectAsset?.mimeType
+  ).toBe('audio/webm');
+});
+
 it('rejects invalid byte ownership, local identity, history and review source', () => {
   const input = metadata();
   expect(() =>

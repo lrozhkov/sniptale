@@ -20,7 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, isGalleryScenarioExportItem, isGalleryScenarioItem } from '../items';
 import { GalleryTagInput } from '../tags/input';
@@ -32,6 +32,15 @@ import {
 } from '../ui';
 import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
+import {
+  listMediaAssetProjectUsage,
+  type MediaAssetProjectUsage,
+} from '../../../composition/persistence/media-library/usage';
+import {
+  openGalleryPage,
+  openScenarioEditorPage,
+  openVideoEditorPage,
+} from '../../../platform/navigation/extension-pages';
 
 const previewMetadataCardClassName =
   'flex items-center justify-between gap-3 border-b border-[var(--sniptale-color-border-soft)] ' +
@@ -201,6 +210,67 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
         value={formatDate(item.updatedAt)}
       />
     </div>
+  );
+}
+
+export function PreviewProjectUsage({ item }: Pick<PreviewPanelProps, 'item'>) {
+  const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
+  const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+
+  useEffect(() => {
+    if (!mediaId) return;
+    let active = true;
+    setStatus('loading');
+    void listMediaAssetProjectUsage(mediaId).then(
+      (result) => {
+        if (!active) return;
+        setUsage(result);
+        setStatus('ready');
+      },
+      () => {
+        if (active) setStatus('error');
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [mediaId]);
+
+  if (!mediaId) return null;
+  return (
+    <section aria-label={translate('gallery.preview.usedInProjects')}>
+      <div className={previewActionGroupLabelClassName}>
+        {translate('gallery.preview.usedInProjects')}
+      </div>
+      {status === 'loading' ? <div>{translate('gallery.preview.projectsLoading')}</div> : null}
+      {status === 'error' ? <div>{translate('gallery.preview.projectsUnavailable')}</div> : null}
+      {status === 'ready' && usage.length === 0 ? (
+        <div className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.preview.projectsEmpty')}
+        </div>
+      ) : null}
+      {status === 'ready' ? (
+        <div className="space-y-1">
+          {usage.map((project) => (
+            <button
+              key={`${project.kind}:${project.id}`}
+              type="button"
+              className={previewActionButtonClassName}
+              onClick={() => {
+                if (project.kind === 'video') void openVideoEditorPage(project.id, null);
+                if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
+                if (project.kind === 'review')
+                  void openGalleryPage({ mediaId: project.id, quickEdit: true });
+              }}
+            >
+              <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">{project.name}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

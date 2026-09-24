@@ -254,7 +254,8 @@ describe('media-hub-store recording and asset save flows', () => {
       'asset-1',
       expect.any(Blob),
       'image/png',
-      'asset.png'
+      'asset.png',
+      expect.any(Number)
     );
     expect(mediaHubStoreMocks.commitProjectExportMock).toHaveBeenCalledWith(exportEntry);
     expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenNthCalledWith(
@@ -283,9 +284,21 @@ describe('media-hub-store metadata mutation flows', () => {
       filename: 'renamed.png',
       tags: ['tag'],
     });
-    expect(mediaHubStoreMocks.deleteMediaLibraryAssetMock).toHaveBeenNthCalledWith(1, 'asset-1');
-    expect(mediaHubStoreMocks.deleteMediaLibraryAssetMock).toHaveBeenNthCalledWith(2, 'asset-2');
-    expect(mediaHubStoreMocks.deleteMediaLibraryAssetMock).toHaveBeenNthCalledWith(3, 'asset-3');
+    expect(mediaHubStoreMocks.deleteMediaLibraryAssetMock).toHaveBeenNthCalledWith(
+      1,
+      'asset-1',
+      {}
+    );
+    expect(mediaHubStoreMocks.deleteMediaLibraryAssetMock).toHaveBeenNthCalledWith(
+      2,
+      'asset-2',
+      {}
+    );
+    expect(mediaHubStoreMocks.deleteMediaLibraryAssetMock).toHaveBeenNthCalledWith(
+      3,
+      'asset-3',
+      {}
+    );
     expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenNthCalledWith(
       1,
       'update',

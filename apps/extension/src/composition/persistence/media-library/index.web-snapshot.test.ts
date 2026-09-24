@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from './contracts';
 
 const mocks = vi.hoisted(() => ({
+  listMediaAssetProjectUsage: vi.fn(async () => []),
+  deleteCascade: vi.fn(),
   deleteProjectAsset: vi.fn(),
   deleteProjectExport: vi.fn(),
   deleteRecording: vi.fn(),
@@ -14,6 +16,12 @@ const mocks = vi.hoisted(() => ({
   txDelete: vi.fn(),
   txGet: vi.fn(),
   txPut: vi.fn(),
+}));
+vi.mock('./usage', () => ({
+  listMediaAssetProjectUsage: mocks.listMediaAssetProjectUsage,
+}));
+vi.mock('./delete-cascade', () => ({
+  deleteMediaAssetWithProjectCascade: mocks.deleteCascade,
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -41,8 +49,7 @@ vi.mock('../assets', async (importOriginal) => ({
   listReadyJournals: vi.fn(async () => []),
 }));
 
-import { deleteProjectAsset, deleteProjectExport } from '../projects/index';
-import { deleteRecording } from '../recordings/index';
+import { deleteProjectExport } from '../projects/index';
 import {
   deleteMediaLibraryAsset,
   deleteMediaThumbnail,
@@ -177,11 +184,8 @@ it('deletes regular media assets after cleaning their source records', async () 
   await deleteMediaLibraryAsset('asset-project');
   await deleteMediaLibraryAsset('missing');
 
-  expect(deleteRecording).toHaveBeenCalledWith('recording-1');
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-recording', []);
   expect(deleteProjectExport).toHaveBeenCalledWith('export-1');
-  expect(deleteRecording).toHaveBeenCalledOnce();
-  expect(deleteProjectAsset).toHaveBeenCalledWith('project-asset-1');
-  expect(mocks.txDelete).toHaveBeenCalledWith('asset-recording');
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-project', []);
   expect(mocks.txDelete).toHaveBeenCalledWith('asset-export');
-  expect(mocks.txDelete).toHaveBeenCalledWith('asset-project');
 });

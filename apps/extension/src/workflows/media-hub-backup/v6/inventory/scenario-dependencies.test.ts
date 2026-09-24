@@ -111,6 +111,27 @@ it('includes the scenario root that owns selected video source dependencies', as
     return [];
   });
   mocks.buildScenarios.mockResolvedValue([scenarioRoot('scenario-1')]);
+  mocks.buildMedia.mockResolvedValue([
+    {
+      descriptor: {
+        metadataPath: '_sniptale/metadata/media/scenario-image.json',
+        mediaSubtype: 'library-item',
+        objectCount: 0,
+        rootId: 'scenario-asset:scenario-image',
+        rootKind: 'media',
+        totalBytes: 0,
+      },
+      load: vi.fn(),
+      summary: {
+        draftCount: 0,
+        recordingCount: 0,
+        sourceMetadataCount: 0,
+        telemetryCount: 0,
+        thumbnailCount: 0,
+        webSnapshotCount: 0,
+      },
+    },
+  ]);
 
   await buildMediaHubBackupExportPlanFromLibraryV6(options());
 
@@ -118,6 +139,13 @@ it('includes the scenario root that owns selected video source dependencies', as
     expect.objectContaining({
       options: expect.objectContaining({
         selected: expect.objectContaining({ scenarioProjectIds: ['scenario-1'] }),
+      }),
+    })
+  );
+  expect(mocks.buildMedia).toHaveBeenCalledWith(
+    expect.objectContaining({
+      options: expect.objectContaining({
+        selected: expect.objectContaining({ mediaAssetIds: ['scenario-asset:scenario-image'] }),
       }),
     })
   );

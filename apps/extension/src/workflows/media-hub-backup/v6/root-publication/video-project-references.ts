@@ -71,6 +71,11 @@ function transformAssetSource(
         : {}),
     };
   }
+  if (source.kind === 'library-asset') {
+    const mediaId = rootIds[`media:library-item:${source.mediaId}`];
+    if (!mediaId) throw new Error(UNRESOLVED_SOURCE_ERROR);
+    return { ...source, mediaId };
+  }
   return {
     ...source,
     scenarioAssetId: requireScenarioAssetId(childIds, source.scenarioAssetId),

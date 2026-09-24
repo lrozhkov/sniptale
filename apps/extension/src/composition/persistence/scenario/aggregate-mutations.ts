@@ -5,9 +5,12 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
+  STORE_NAME,
   initDB,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -19,6 +22,12 @@ import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.g
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 import { areScenarioProjectsEqual } from './aggregate-comparison';
 import { isRecord } from '../infrastructure/indexed-db/read-primitives';
+import {
+  assertBorrowedScenarioAsset,
+  assertBorrowedScenarioAssetSource,
+  publishScenarioAssetToLibrary,
+  UnavailableBorrowedScenarioSourceError,
+} from './library-publication';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -48,6 +57,7 @@ import {
   prepareScenarioEditorDocumentMutations,
   SCENARIO_EDITOR_DOCUMENT_OWNER_KIND,
 } from './editor-document-staging';
+import { discardInvalidatedBorrowedPublication } from './invalidated-publication';
 export {
   discardScenarioAggregateAssetPuts,
   SCENARIO_ASSET_OWNER_KIND,
@@ -160,14 +170,21 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
     | typeof ASSET_REFS_STORE
     | typeof ASSET_OWNERS_STORE
     | typeof ASSET_OPERATIONS_STORE
+    | typeof MEDIA_LIBRARY_STORE
+    | typeof PROJECT_ASSETS_STORE
+    | typeof STORE_NAME
   > = [SCENARIO_PROJECTS_STORE];
   if ((children?.assetPuts?.length ?? 0) > 0 || (children?.assetDeletes?.length ?? 0) > 0) {
     storeNames.push(
       SCENARIO_ASSETS_STORE,
       ASSET_REFS_STORE,
       ASSET_OWNERS_STORE,
-      ASSET_OPERATIONS_STORE
+      ASSET_OPERATIONS_STORE,
+      MEDIA_LIBRARY_STORE
     );
+  }
+  if (children?.assetPuts?.some((asset) => asset.borrowedMediaId)) {
+    storeNames.push(PROJECT_ASSETS_STORE, STORE_NAME);
   }
   if (
     (children?.editorDocumentPuts?.length ?? 0) > 0 ||
@@ -209,7 +226,9 @@ export async function commitScenarioAggregateMutation(
     ...(preparedChildren ? { children: preparedChildren } : {}),
   };
   const assetRefs = [
-    ...(preparedChildren?.assetPuts ?? []).map((asset) => asset.assetRef),
+    ...(preparedChildren?.assetPuts ?? [])
+      .filter((asset) => !asset.borrowedMediaId)
+      .map((asset) => asset.assetRef),
     ...(preparedChildren?.editorDocumentPuts ?? []).flatMap((entry) => entry.assetRefs),
   ];
   if (assetRefs.length === 0) {
@@ -218,6 +237,7 @@ export async function commitScenarioAggregateMutation(
     );
   }
   let journalCreated = false;
+  let readyJournal: AssetReadyJournal | undefined;
   try {
     assertChildOwnership(project.id, preparedChildren);
     const db = await initDB();
@@ -254,6 +274,7 @@ export async function commitScenarioAggregateMutation(
       domain: SCENARIO_ASSET_PUBLICATION_DOMAIN,
       payload,
     });
+    readyJournal = journal;
     journalCreated = true;
     let result: ScenarioAggregateMutationResult | undefined;
     await publishReadyJournalWithRetry(journal, async (ready) => {
@@ -263,6 +284,9 @@ export async function commitScenarioAggregateMutation(
     if (!result) throw new Error('Scenario asset publication produced no result.');
     return result;
   } catch (error) {
+    if (readyJournal && error instanceof UnavailableBorrowedScenarioSourceError) {
+      await discardInvalidatedBorrowedPublication(readyJournal);
+    }
     if (!journalCreated) {
       let documentCleanupError: unknown;
       try {
@@ -290,37 +314,48 @@ async function commitScenarioAggregateInTransaction(
 ): Promise<ScenarioAggregateMutationResult> {
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const tx = db.transaction(getMutationStoreNames(options.children), 'readwrite');
-  const projectStore = tx.objectStore(SCENARIO_PROJECTS_STORE);
-  const existing = requireSupportedScenarioEntry(await projectStore.get(project.id));
-  if (
-    existing &&
-    !hasScenarioChildMutations(options.children) &&
-    areScenarioProjectsEqual(existing.project, project)
-  ) {
-    await tx.done;
-    return {
-      project: existing.project,
-      workspaceRevision: existing.workspaceRevision ?? 0,
-    };
-  }
+  let entry: ScenarioProjectEntry;
+  try {
+    const projectStore = tx.objectStore(SCENARIO_PROJECTS_STORE);
+    const existing = requireSupportedScenarioEntry(await projectStore.get(project.id));
+    if (
+      existing &&
+      !hasScenarioChildMutations(options.children) &&
+      areScenarioProjectsEqual(existing.project, project)
+    ) {
+      await tx.done;
+      return {
+        project: existing.project,
+        workspaceRevision: existing.workspaceRevision ?? 0,
+      };
+    }
 
-  assertExpectedScenarioRevision({
-    existing,
-    expectedRevision: options.expectedRevision,
-    expectedUpdatedAt: options.expectedUpdatedAt,
-    projectId: project.id,
-  });
-  const entry = createScenarioAggregateEntry({ existing, options, project });
-  await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
-  await projectStore.put(entry);
-  await applyScenarioDocumentMutations({
-    children: options.children,
-    physicalDelete,
-    projectId: project.id,
-    tx,
-    updatedAt: entry.updatedAt,
-  });
-  await tx.done;
+    assertExpectedScenarioRevision({
+      existing,
+      expectedRevision: options.expectedRevision,
+      expectedUpdatedAt: options.expectedUpdatedAt,
+      projectId: project.id,
+    });
+    entry = createScenarioAggregateEntry({ existing, options, project });
+    await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
+    await projectStore.put(entry);
+    await applyScenarioDocumentMutations({
+      children: options.children,
+      physicalDelete,
+      projectId: project.id,
+      tx,
+      updatedAt: entry.updatedAt,
+    });
+    await tx.done;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* The transaction may already have closed. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
   if (physicalDelete.assetIds.length > 0) {
     await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
   }
@@ -377,15 +412,35 @@ export async function applyScenarioAssetMutations(
         physicalDelete.assetIds.push(existingAsset.assetId);
       }
     }
-    await refStore.put!(ref);
+    if (asset.borrowedMediaId) {
+      if (asset.independentLibraryIdentity) {
+        await assertBorrowedScenarioAssetSource(tx, asset);
+        const currentRef = parseAssetRef(await refStore.get!(asset.assetId));
+        if (!currentRef || JSON.stringify(currentRef.location) !== JSON.stringify(ref.location))
+          throw new Error('Shared scenario source changed before publication.');
+      } else await assertBorrowedScenarioAsset(tx, asset);
+    } else await refStore.put!(ref);
     await ownerStore.put!({
       assetId: asset.assetId,
       ownerId: asset.id,
       ownerKind: SCENARIO_ASSET_OWNER_KIND,
       role: SCENARIO_ASSET_ROLE,
     });
-    const { assetRef: _assetRef, ...storedAsset } = asset;
+    const {
+      assetRef: _assetRef,
+      independentLibraryIdentity: _independentLibraryIdentity,
+      borrowedMediaId: _borrowedMediaId,
+      ...storedFields
+    } = asset;
+    const storedAsset = asset.independentLibraryIdentity
+      ? storedFields
+      : {
+          ...storedFields,
+          ...(asset.borrowedMediaId ? { borrowedMediaId: asset.borrowedMediaId } : {}),
+        };
     await assetStore.put!(storedAsset);
+    if (!asset.borrowedMediaId || asset.independentLibraryIdentity)
+      await publishScenarioAssetToLibrary(tx, storedAsset);
   }
   for (const assetId of children?.assetDeletes ?? []) {
     const rawAsset: unknown = await assetStore.get!(assetId);
@@ -472,11 +527,29 @@ function parseScenarioAggregatePublicationPayload(
   )
     return null;
   const assetPuts: PreparedScenarioAssetEntry[] = [];
-  for (const raw of rawAssetPuts) {
-    const entry = parseScenarioAssetEntry(raw);
+  const rawAssetValues: unknown[] = rawAssetPuts;
+  for (const raw of rawAssetValues) {
+    const independentLibraryIdentity = isRecord(raw)
+      ? raw['independentLibraryIdentity']
+      : undefined;
+    const parsedInput =
+      independentLibraryIdentity === true && isRecord(raw) && raw['galleryAssetId'] === null
+        ? { ...raw, galleryAssetId: raw['borrowedMediaId'] }
+        : raw;
+    const entry = parseScenarioAssetEntry(parsedInput);
     const ref = isRecord(raw) ? parseAssetRef(raw['assetRef']) : null;
     if (!entry || !ref || ref.assetId !== entry.assetId) return null;
-    assetPuts.push({ ...entry, assetRef: ref });
+    if (
+      (independentLibraryIdentity !== undefined && independentLibraryIdentity !== true) ||
+      (independentLibraryIdentity === true && !entry.borrowedMediaId)
+    )
+      return null;
+    assetPuts.push({
+      ...entry,
+      ...(independentLibraryIdentity === true ? { galleryAssetId: null } : {}),
+      assetRef: ref,
+      ...(independentLibraryIdentity === true ? { independentLibraryIdentity: true } : {}),
+    });
   }
   const editorDocumentPuts: PreparedScenarioStepEditorDocumentEntry[] = [];
   for (const raw of rawDocumentPuts) {
@@ -532,7 +605,9 @@ async function publishScenarioAssetJournal(
   const payload = parseScenarioAggregatePublicationPayload(journal.payload);
   const payloadAssetRefs = payload
     ? [
-        ...(payload.children.assetPuts ?? []).map((asset) => asset.assetRef),
+        ...(payload.children.assetPuts ?? [])
+          .filter((asset) => !asset.borrowedMediaId)
+          .map((asset) => asset.assetRef),
         ...(payload.children.editorDocumentPuts ?? []).flatMap((entry) => entry.assetRefs),
       ]
     : [];
@@ -540,7 +615,11 @@ async function publishScenarioAssetJournal(
     throw new Error('Invalid scenario asset publication payload.');
   }
   const journalAssetIds = new Set(journal.assetRefs.map((ref) => ref.assetId));
-  if ((payload.children.assetPuts ?? []).some((asset) => !journalAssetIds.has(asset.assetId))) {
+  if (
+    (payload.children.assetPuts ?? []).some(
+      (asset) => !asset.borrowedMediaId && !journalAssetIds.has(asset.assetId)
+    )
+  ) {
     throw new Error('Scenario publication assets do not match its journal.');
   }
   if (
@@ -566,17 +645,25 @@ async function publishScenarioAssetJournal(
     }
     throw new StaleScenarioAggregateRevisionError(payload.project.id);
   }
-  return runWithIndexedDbMutation((mutationDb) =>
-    commitScenarioAggregateInTransaction(mutationDb, payload.project, {
-      children: payload.children,
-      expectedRevision: payload.baseRevision,
-      ...(payload.expectedUpdatedAt === undefined
-        ? {}
-        : { expectedUpdatedAt: payload.expectedUpdatedAt }),
-      ...(payload.storageClass === undefined ? {} : { storageClass: payload.storageClass }),
-      publicationUpdatedAt: payload.committedAt,
-    })
-  );
+  try {
+    return await runWithIndexedDbMutation((mutationDb) =>
+      commitScenarioAggregateInTransaction(mutationDb, payload.project, {
+        children: payload.children,
+        expectedRevision: payload.baseRevision,
+        ...(payload.expectedUpdatedAt === undefined
+          ? {}
+          : { expectedUpdatedAt: payload.expectedUpdatedAt }),
+        ...(payload.storageClass === undefined ? {} : { storageClass: payload.storageClass }),
+        publicationUpdatedAt: payload.committedAt,
+      })
+    );
+  } catch (error) {
+    if (allowSuperseded && error instanceof UnavailableBorrowedScenarioSourceError) {
+      await discardInvalidatedBorrowedPublication(journal, true);
+      return null;
+    }
+    throw error;
+  }
 }
 
 async function discardSupersededScenarioPublication(
@@ -584,6 +671,7 @@ async function discardSupersededScenarioPublication(
   children: PreparedScenarioAggregateChildMutation
 ): Promise<boolean> {
   for (const prepared of children.assetPuts ?? []) {
+    if (prepared.borrowedMediaId) continue;
     const { owner, ref, stored } = await readPreparedScenarioAssetState(db, prepared);
     if (
       stored?.assetId === prepared.assetId ||
@@ -615,7 +703,9 @@ async function discardSupersededScenarioPublication(
   }
   await Promise.all(
     [
-      ...(children.assetPuts ?? []).map((prepared) => prepared.assetId),
+      ...(children.assetPuts ?? [])
+        .filter((prepared) => !prepared.borrowedMediaId)
+        .map((prepared) => prepared.assetId),
       ...(children.editorDocumentPuts ?? []).flatMap((prepared) =>
         prepared.document.assets.map((asset) => asset.assetId)
       ),

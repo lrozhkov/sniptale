@@ -9,6 +9,7 @@ const FOLDERS = new Set<string>([
   'all',
   'screenshot',
   'recording',
+  'audio',
   'export',
   'web-snapshot',
   'scenario',

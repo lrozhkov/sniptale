@@ -1,16 +1,28 @@
 const IMPORT_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
   avif: 'image/avif',
+  flac: 'audio/flac',
   gif: 'image/gif',
   jpeg: 'image/jpeg',
   jpg: 'image/jpeg',
   mov: 'video/quicktime',
   mp4: 'video/mp4',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  oga: 'audio/ogg',
+  ogg: 'audio/ogg',
   png: 'image/png',
+  wav: 'audio/wav',
   webm: 'video/webm',
   webp: 'image/webp',
 };
 
-const IMPORT_MEDIA_MIME_TYPES = Object.values(IMPORT_MIME_BY_EXTENSION);
+const IMPORT_MEDIA_MIME_TYPES = [
+  ...Object.values(IMPORT_MIME_BY_EXTENSION),
+  'audio/webm',
+  'audio/wave',
+  'audio/x-wav',
+  'audio/x-flac',
+];
 
 export const GALLERY_MEDIA_IMPORT_ACCEPT = Array.from(IMPORT_MEDIA_MIME_TYPES).join(',');
 

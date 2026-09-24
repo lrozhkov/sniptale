@@ -7,6 +7,7 @@ import type { GalleryItem } from './items';
 
 export type FolderFilter =
   | 'all'
+  | 'audio'
   | 'screenshot'
   | 'recording'
   | 'export'

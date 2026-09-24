@@ -126,6 +126,36 @@ it('does not fall back to stale media size when durable authority is missing', a
   });
 });
 
+it('counts one immutable file once when library identities share its physical ref', async () => {
+  mocks.listMediaLibrary.mockResolvedValue([
+    { id: 'recording:one', size: 99, source: { kind: 'recording', recordingId: 'one' } },
+    { id: 'scenario-asset:one', size: 99, source: { kind: 'stored-asset', assetId: 'shared' } },
+  ]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: vi.fn(async (storeName: string) => {
+        if (storeName === 'asset_refs') return [createRef('shared', 17)];
+        if (storeName === 'asset_owners')
+          return [
+            { assetId: 'shared', ownerId: 'one', ownerKind: 'recording', role: 'body' },
+            {
+              assetId: 'shared',
+              ownerId: 'scenario-asset:one',
+              ownerKind: 'media-library',
+              role: 'source',
+            },
+          ];
+        return [];
+      }),
+    })
+  );
+  await expect(getLibraryStorageUsage()).resolves.toEqual({
+    draftsBytes: 0,
+    libraryBytes: 17,
+    totalBytes: 17,
+  });
+});
+
 it('counts both durable package and screenshot bytes for a web snapshot', async () => {
   mocks.listMediaLibrary.mockResolvedValue([
     {

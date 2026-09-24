@@ -266,7 +266,8 @@ export async function prepareProjectAsset(
   blob: Blob,
   mimeType: string,
   filename?: string,
-  id?: string
+  id?: string,
+  createdAt = Date.now()
 ): Promise<PreparedProjectAsset> {
   const entryId = id ?? crypto.randomUUID();
   await recoverProjectMediaPublications();
@@ -276,7 +277,7 @@ export async function prepareProjectAsset(
     assetId: prepared.ref.assetId,
     id: entryId,
     mimeType: prepared.ref.mimeType,
-    createdAt: Date.now(),
+    createdAt,
     size: prepared.ref.size,
   };
   let owned = false;
@@ -307,9 +308,10 @@ export async function saveProjectAsset(
   id: string,
   blob: Blob,
   mimeType: string,
-  filename = id
+  filename = id,
+  createdAt = Date.now()
 ): Promise<void> {
-  const prepared = await prepareProjectAsset(blob, mimeType, filename, id);
+  const prepared = await prepareProjectAsset(blob, mimeType, filename, id, createdAt);
   try {
     await prepared.publish();
   } catch (error) {

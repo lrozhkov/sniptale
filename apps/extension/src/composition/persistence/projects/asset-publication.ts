@@ -19,6 +19,7 @@ import {
   buildProjectAssetMediaEntry,
   buildProjectExportMediaEntry,
 } from '../media-library/entry-mapping';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import type { StoredProjectAssetEntry, StoredProjectExportEntry } from './contracts';
 import { parseProjectAssetEntry, parseProjectExportEntry } from './read-guards';
 
@@ -106,6 +107,7 @@ async function publishProjectMediaAsset(args: {
       args.storeName === PROJECT_ASSETS_STORE
         ? {
             ...buildProjectAssetMediaEntry(args.entry as StoredProjectAssetEntry),
+            lifecycle: createLibraryLifecycle('library', args.entry.createdAt),
             filename: args.filename ?? args.entry.id,
             originalFilename: args.filename ?? args.entry.id,
           }

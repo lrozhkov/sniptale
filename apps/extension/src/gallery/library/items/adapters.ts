@@ -126,21 +126,17 @@ export function createGalleryItems(args: {
       }
     });
   });
-  const rawMediaItems = args.mediaItems
-    .filter((media) => media.source.kind !== 'project-asset')
-    .map((media) => {
-      const item = createGalleryMediaItem(media);
-      if (media.kind !== 'image' && media.kind !== 'screenshot') return item;
-      const presentation = presentations.get(
-        serializeAggregateRef({ id: media.id, kind: 'image' })
-      );
-      return {
-        ...item,
-        hasThumbnail: Boolean(presentation),
-        presentationRevision: presentation?.presentationRevision ?? null,
-        workspaceRevision: media.workspaceRevision ?? 0,
-      };
-    });
+  const rawMediaItems = args.mediaItems.map((media) => {
+    const item = createGalleryMediaItem(media);
+    if (media.kind !== 'image' && media.kind !== 'screenshot') return item;
+    const presentation = presentations.get(serializeAggregateRef({ id: media.id, kind: 'image' }));
+    return {
+      ...item,
+      hasThumbnail: Boolean(presentation),
+      presentationRevision: presentation?.presentationRevision ?? null,
+      workspaceRevision: media.workspaceRevision ?? 0,
+    };
+  });
   const recordingGroupCounts = new Map<string, number>();
   rawMediaItems.forEach((item) => {
     if (!item.recordingGroup) return;

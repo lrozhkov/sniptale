@@ -123,6 +123,7 @@ it('counts gallery items by folder families and returns sorted unique tags', () 
 
   expect(getGalleryCounts(items, [])).toEqual({
     all: 6,
+    audio: 0,
     screenshot: 2,
     recording: 3,
     export: 1,
@@ -195,6 +196,7 @@ it('does not double-count mixed scenario items in folder totals', () => {
 
   expect(getGalleryCounts(items)).toEqual({
     all: 2,
+    audio: 0,
     screenshot: 1,
     recording: 0,
     export: 0,
@@ -563,4 +565,17 @@ it('filters and sorts scenario projects independently from media folders', () =>
       sortMode: 'name-asc',
     }).map((project) => project.id)
   ).toEqual(['project-2', 'project-1']);
+});
+
+it('counts audio separately and filters out images and videos from Audio', () => {
+  const audio = createItem({
+    id: 'audio',
+    kind: 'audio',
+    source: { kind: 'project-asset', projectAssetId: 'audio' },
+  });
+  const items = [...createCountAndTagItems(), audio];
+  expect(getGalleryCounts(items)).toMatchObject({ all: 7, audio: 1, recording: 3, screenshot: 2 });
+  expect(
+    getFilteredIds({ activeTags: [], folderFilter: 'audio', items, search: '', sortMode: 'newest' })
+  ).toEqual(['audio']);
 });

@@ -28,6 +28,7 @@ const MAX_FILTER_VALUE_LENGTH = 256;
 const FOLDERS = new Set<GallerySavedViewFolder>([
   'all',
   'recording',
+  'audio',
   'scenario',
   'screenshot',
   'web-snapshot',

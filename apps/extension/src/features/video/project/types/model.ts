@@ -110,6 +110,11 @@ export type VideoTimelinePlacementMode =
 
 export type VideoProjectAssetSource =
   | {
+      /** Stable library identity survives deletion of its originating workspace. */
+      kind: 'library-asset';
+      mediaId: string;
+    }
+  | {
       kind: 'recording';
       recordingId: string;
     }

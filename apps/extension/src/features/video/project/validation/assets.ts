@@ -19,6 +19,9 @@ function isAssetSource(value: unknown): boolean {
     return false;
   }
 
+  if (value['kind'] === 'library-asset') {
+    return isString(value['mediaId']) && value['mediaId'].length > 0;
+  }
   if (value['kind'] === 'recording') {
     return isString(value['recordingId']);
   }

@@ -80,6 +80,8 @@ function resolveProjectAssetMediaId(asset: VideoProjectAsset): string | null {
     return null;
   }
 
+  if (asset.source.kind === 'library-asset') return asset.source.mediaId;
+
   if (asset.source.kind === 'recording') {
     return createRecordingMediaId(asset.source.recordingId);
   }

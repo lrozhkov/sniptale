@@ -1,10 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { getProjectAssetMock, getRecordingMock, getScenarioAssetMock } = vi.hoisted(() => ({
-  getProjectAssetMock: vi.fn(),
-  getRecordingMock: vi.fn(),
-  getScenarioAssetMock: vi.fn(),
-}));
+const { getProjectAssetMock, getRecordingMock, getScenarioAssetMock, getMediaAssetBlobMock } =
+  vi.hoisted(() => ({
+    getProjectAssetMock: vi.fn(),
+    getRecordingMock: vi.fn(),
+    getScenarioAssetMock: vi.fn(),
+    getMediaAssetBlobMock: vi.fn(),
+  }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/projects/index')>()),
@@ -22,6 +24,10 @@ vi.mock('../../../composition/persistence/scenario/projects', async (importOrigi
   ...(await importOriginal<typeof import('../../../composition/persistence/scenario/projects')>()),
 
   getScenarioAsset: getScenarioAssetMock,
+}));
+
+vi.mock('../../../composition/persistence/media-library/index', () => ({
+  getMediaAssetBlob: getMediaAssetBlobMock,
 }));
 
 import { loadBlobForAsset, loadBlobForSource } from './blob';
@@ -75,4 +81,19 @@ it('does not report an unavailable project asset as not found', async () => {
   await expect(
     loadBlobForSource({ kind: 'project-asset', projectAssetId: 'asset-1' })
   ).rejects.toThrow('Project asset asset-1 unavailable.');
+});
+
+it('loads shared library bytes after their original scenario child is gone', async () => {
+  const blob = new Blob(['shared']);
+  getScenarioAssetMock.mockResolvedValue(undefined);
+  getMediaAssetBlobMock.mockResolvedValue(blob);
+  await expect(
+    loadBlobForSource({ kind: 'library-asset', mediaId: 'scenario-asset:gone' })
+  ).resolves.toBe(blob);
+  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('scenario-asset:gone');
+  expect(getScenarioAssetMock).not.toHaveBeenCalled();
+  getMediaAssetBlobMock.mockResolvedValue(undefined);
+  await expect(loadBlobForSource({ kind: 'library-asset', mediaId: 'gone' })).rejects.toThrow(
+    'Library asset gone not found.'
+  );
 });

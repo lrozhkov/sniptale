@@ -8,6 +8,11 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import type { PreparedScenarioAssetEntry, ScenarioStepEditorDocumentEntry } from '../../contracts';
 import { getScenarioAsset } from '../../projects/assets';
 import { getScenarioStepEditorDocumentForTransfer } from '../../editor-documents';
+import { getMediaLibraryEntry } from '../../../media-library';
+import { ASSET_REFS_STORE, initDB } from '../../../infrastructure/indexed-db/core';
+import { parseAssetRef } from '../../../assets';
+import { scenarioLibraryMediaId } from '../../library-publication';
+import { createScenarioAssetId } from './helpers';
 import {
   createScenarioAssetEntryFromBlob,
   createScenarioAudioAssetEntry,
@@ -29,6 +34,35 @@ export function createCopyChildren(
       const original = await getScenarioAsset(id);
       if (!original || original.projectId !== sourceId)
         throw new Error('A guide image is missing or belongs to another project.');
+      const mediaId = original.borrowedMediaId ?? scenarioLibraryMediaId(original.id);
+      const media = await getMediaLibraryEntry(mediaId);
+      if (
+        media &&
+        (media.source.kind === 'stored-asset' ||
+          media.source.kind === 'project-asset' ||
+          media.source.kind === 'recording') &&
+        (media.source.kind !== 'stored-asset' || media.source.assetId === original.assetId)
+      ) {
+        const db = await initDB();
+        const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, original.assetId));
+        if (ref && ref.size === original.size && ref.mimeType === original.mimeType) {
+          const { file: _file, borrowedMediaId: _borrowedMediaId, ...originalEntry } = original;
+          const canBorrow = media.workspaceRevision === 0 && media.imageContentState !== 'edited';
+          const prepared: PreparedScenarioAssetEntry = {
+            ...originalEntry,
+            id: createScenarioAssetId(),
+            projectId: project.id,
+            galleryAssetId: canBorrow ? mediaId : null,
+            borrowedMediaId: mediaId,
+            ...(canBorrow ? {} : { independentLibraryIdentity: true as const }),
+            assetRef: ref,
+            createdAt: Date.now(),
+          };
+          assets.push(prepared);
+          assetIds.set(id, prepared.id);
+          return prepared.id;
+        }
+      }
       const blob = original.file.type
         ? original.file
         : original.file.slice(0, original.file.size, original.mimeType);

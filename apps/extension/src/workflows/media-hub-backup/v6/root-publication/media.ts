@@ -1,4 +1,5 @@
 import { replaceSanitizedSnapshotPackage } from './page-package';
+import { unlinkMediaAssetOwner } from './media-owner-release';
 import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -111,24 +112,6 @@ function requireObject(
   return object;
 }
 
-async function unlinkAsset(args: {
-  assetId: string;
-  operation: PhysicalDeleteAssetOperation;
-  ownerId: string;
-  ownerKind: string;
-  ownerStore: MutableStore & {
-    index(name: 'assetId'): { count(assetId: string): Promise<number> };
-  };
-  refStore: MutableStore;
-  role: string;
-}) {
-  await args.ownerStore.delete([args.ownerKind, args.ownerId, args.role]);
-  if ((await args.ownerStore.index('assetId').count(args.assetId)) === 0) {
-    await args.refStore.delete(args.assetId);
-    args.operation.assetIds.push(args.assetId);
-  }
-}
-
 async function deleteExistingMediaRoot(args: {
   mediaId: string;
   operation: PhysicalDeleteAssetOperation;
@@ -165,7 +148,7 @@ async function deleteExistingMediaRoot(args: {
       await args.stores.recordings.get(current.source.recordingId)
     );
     if (recording) {
-      await unlinkAsset({
+      await unlinkMediaAssetOwner({
         assetId: recording.assetId,
         operation: args.operation,
         ownerId: recording.id,
@@ -183,7 +166,7 @@ async function deleteExistingMediaRoot(args: {
       await args.stores.snapshots.get(current.source.snapshotId)
     );
     if (snapshot) {
-      await unlinkAsset({
+      await unlinkMediaAssetOwner({
         assetId: snapshot.packageAssetId,
         operation: args.operation,
         ownerId: snapshot.id,
@@ -192,7 +175,7 @@ async function deleteExistingMediaRoot(args: {
         refStore: args.stores.refs,
         role: 'package',
       });
-      await unlinkAsset({
+      await unlinkMediaAssetOwner({
         assetId: snapshot.screenshotAssetId,
         operation: args.operation,
         ownerId: snapshot.id,
@@ -213,7 +196,7 @@ async function deleteExistingMediaRoot(args: {
     const child =
       source.kind === 'project-asset' ? parseProjectAssetEntry(raw) : parseProjectExportEntry(raw);
     if (child)
-      await unlinkAsset({
+      await unlinkMediaAssetOwner({
         assetId: child.assetId,
         operation: args.operation,
         ownerId: id,
@@ -223,6 +206,17 @@ async function deleteExistingMediaRoot(args: {
         role: 'body',
       });
     await store.delete(id);
+  }
+  if (current.source.kind === 'stored-asset') {
+    await unlinkMediaAssetOwner({
+      assetId: current.source.assetId,
+      operation: args.operation,
+      ownerId: args.mediaId,
+      ownerKind: 'media-library',
+      ownerStore: args.stores.owners,
+      refStore: args.stores.refs,
+      role: 'source',
+    });
   }
   await args.stores.media.delete(args.mediaId);
 }
@@ -445,12 +439,17 @@ async function prepareMediaRoot(args: {
     args.strategy === 'duplicate' && (await hasMediaSourceConflict(args.metadata))
   );
   const restoredEntry = rebaseTemporaryLifecycle(targetEntry);
+  const restoredSource =
+    restoredEntry.source.kind === 'stored-asset'
+      ? { kind: 'stored-asset' as const, assetId: original.ref.assetId }
+      : restoredEntry.source;
   const screenshotBlob =
     restoredEntry.source.kind === 'screenshot'
       ? await readAssetFile(original.ref, restoredEntry.filename)
       : undefined;
   const media = parseMediaLibraryEntry({
     ...restoredEntry,
+    source: restoredSource,
     ...(screenshotBlob ? { blob: screenshotBlob } : {}),
   });
   if (!media) throw new Error('Restored media metadata is invalid.');
@@ -558,6 +557,15 @@ async function publishPreparedMedia(args: {
   stores: MediaRestoreStores;
 }) {
   await args.stores.media.put(args.prepared.media);
+  if (args.prepared.media.source.kind === 'stored-asset') {
+    await args.stores.refs.put(args.prepared.original.ref);
+    await args.stores.owners.put({
+      assetId: args.prepared.original.ref.assetId,
+      ownerId: args.prepared.media.id,
+      ownerKind: 'media-library',
+      role: 'source',
+    });
+  }
   if (args.prepared.thumbnail) await args.stores.thumbnails.put(args.prepared.thumbnail);
   await publishProjectVideo(args.prepared, args.stores);
   await publishMediaReviewAssets(args.prepared.reviewAssets, args.stores);

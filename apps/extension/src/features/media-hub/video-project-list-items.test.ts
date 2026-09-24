@@ -99,3 +99,17 @@ it('supports project-owned visual assets and ignores unsupported visual sources'
   );
   expect(createVideoProjectListItem(scenarioProject).thumbnailSourceMediaId).toBeNull();
 });
+
+it('uses stable library identity for the first visual thumbnail source', () => {
+  const project = createProject({
+    assets: [
+      createAsset(VideoProjectAssetType.IMAGE, {
+        kind: 'library-asset',
+        mediaId: 'scenario-asset:deleted-child',
+      }),
+    ],
+  });
+  expect(createVideoProjectListItem(project).thumbnailSourceMediaId).toBe(
+    'scenario-asset:deleted-child'
+  );
+});

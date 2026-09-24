@@ -18,6 +18,7 @@ import {
   getDraftRetentionMs,
 } from '../../composition/persistence/library-lifecycle';
 import { listAggregatePresentations } from '../../composition/persistence/aggregate-presentations';
+import { backfillScenarioLibraryAssets } from '../../composition/persistence/scenario/library-publication';
 
 async function loadScenarioExports(projectId: string) {
   return [projectId, await listScenarioExportRecords(projectId)] as const;
@@ -31,6 +32,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
   estimate: StorageEstimateInfo;
   nextItems: GalleryItem[];
 }> {
+  await backfillScenarioLibraryAssets();
   const [
     mediaItems,
     scenarioProjects,

@@ -11,6 +11,7 @@ import {
 import { createApplySelectionTagAction, createDeleteManyAction } from './selection';
 import { createSelectionBackupAction, createSelectionZipAction } from './selection-export';
 import { translate } from '../../../platform/i18n';
+import type { MediaAssetProjectUsage } from '../../../composition/persistence/media-library/usage';
 
 const {
   addMediaLibraryEntryTagsSafelyMock,
@@ -18,6 +19,7 @@ const {
   deletePersistedVideoProjectMock,
   deleteScenarioProjectRecordMock,
   getMediaAssetBlobMock,
+  listMediaAssetProjectUsageMock,
   updateScenarioProjectRecordMetadataMock,
 } = vi.hoisted(() => ({
   addMediaLibraryEntryTagsSafelyMock: vi.fn(),
@@ -25,7 +27,12 @@ const {
   deletePersistedVideoProjectMock: vi.fn(),
   deleteScenarioProjectRecordMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
+  listMediaAssetProjectUsageMock: vi.fn(async (): Promise<MediaAssetProjectUsage[]> => []),
   updateScenarioProjectRecordMetadataMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/media-library/usage', () => ({
+  listMediaAssetProjectUsage: listMediaAssetProjectUsageMock,
 }));
 
 vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
@@ -92,6 +99,35 @@ describe('gallery app selection delete flows', () => {
     vi.clearAllMocks();
   });
 
+  it('warns about a linked project before deleting its material', async () => {
+    listMediaAssetProjectUsageMock.mockResolvedValueOnce([
+      { id: 'video-1', kind: 'video', name: 'Montage', primary: false },
+    ]);
+    const mediaItem = createMediaItem({ entityId: 'asset-1', id: 'asset-1' });
+    const { controller, getConfirmDialog } = createController();
+    await createDeleteManyAction(controller)([mediaItem], runBusyAction);
+    const dialog = getConfirmDialog();
+    expect(dialog?.message).toContain('Montage');
+    expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
+    await dialog?.onConfirm();
+    expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(
+      ['asset-1'],
+      new Map([['asset-1', [{ id: 'video-1', kind: 'video', name: 'Montage', primary: false }]]])
+    );
+  });
+
+  it('blocks a file required as a primary project source', async () => {
+    listMediaAssetProjectUsageMock.mockResolvedValueOnce([
+      { id: 'video-1', kind: 'video', name: 'Montage', primary: true },
+    ]);
+    const mediaItem = createMediaItem({ entityId: 'asset-1', id: 'asset-1' });
+    const { controller, getConfirmDialog } = createController();
+    await createDeleteManyAction(controller)([mediaItem], runBusyAction);
+    expect(getConfirmDialog()?.message).toContain('Montage');
+    await getConfirmDialog()?.onConfirm();
+    expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
+  });
+
   it('deletes selected media, scenarios, and video projects through their lifecycle owners', async () => {
     const mediaItem = createMediaItem({ entityId: 'asset-1', id: 'asset-1' });
     const scenarioItem = createScenarioItem({ entityId: 'scenario-1', id: 'scenario:scenario-1' });
@@ -115,7 +151,10 @@ describe('gallery app selection delete flows', () => {
     expect(confirmDialog?.message).not.toMatch(/\d+\s+элемент/);
     await confirmDialog?.onConfirm();
 
-    expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(['asset-1']);
+    expect(deleteMediaLibraryAssetsBatchSafelyMock).toHaveBeenCalledWith(
+      ['asset-1'],
+      new Map([['asset-1', []]])
+    );
     expect(deleteScenarioProjectRecordMock).toHaveBeenCalledWith('scenario-1');
     expect(deletePersistedVideoProjectMock).toHaveBeenCalledWith('video-project-1');
     expect(getState().selection.selectedIds.size).toBe(0);

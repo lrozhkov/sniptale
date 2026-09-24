@@ -83,7 +83,8 @@ describe('media-hub project asset storage boundary success', () => {
       'asset-1',
       blob,
       'audio/webm;codecs=opus',
-      'voice.webm'
+      'voice.webm',
+      expect.any(Number)
     );
     expect(storeMocks.publishMediaHubLibraryChanged).toHaveBeenCalledWith('create', [
       'project-asset:asset-1',

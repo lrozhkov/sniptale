@@ -18,6 +18,7 @@ import { listAllProjectExports, listProjectAssets } from '../projects/index';
 import { listRecordings } from '../recordings/index';
 import type { MediaLibraryEntry } from './contracts';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { backfillScenarioLibraryAssets } from '../scenario/library-publication';
 
 interface LegacyMediaStore {
   delete(key: string): Promise<void>;
@@ -29,7 +30,11 @@ interface LegacyThumbnailStore {
 }
 
 function shouldDeleteStaleManagedEntry(entry: MediaLibraryEntry, desiredIds: Set<string>): boolean {
-  if (entry.source.kind === 'screenshot') {
+  if (
+    entry.source.kind !== 'recording' &&
+    entry.source.kind !== 'project-export' &&
+    entry.source.kind !== 'project-asset'
+  ) {
     return false;
   }
 
@@ -37,6 +42,7 @@ function shouldDeleteStaleManagedEntry(entry: MediaLibraryEntry, desiredIds: Set
 }
 
 export async function syncLegacyMediaLibrary(): Promise<void> {
+  await backfillScenarioLibraryAssets();
   await runWithIndexedDbMutation(async (db) => {
     const [recordings, projectExports, projectAssets, currentEntries] = await Promise.all([
       listRecordings(),

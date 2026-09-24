@@ -9,6 +9,7 @@ export type ImageContentState = 'edited' | 'original';
 
 export type MediaAssetSource =
   | { kind: 'screenshot' }
+  | { kind: 'stored-asset'; assetId: string }
   | { kind: 'recording'; recordingId: string }
   | {
       kind: 'project-export';

@@ -31,6 +31,7 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
       loadAssetUsageAuthority(),
     ]);
   const usage: LibraryStorageUsage = { draftsBytes: 0, libraryBytes: 0, totalBytes: 0 };
+  const countedPhysicalAssetIds = new Set<string>();
   const addBytes = (size: number, storageClass: StorageClass) => {
     const safeSize = Math.max(0, size);
     usage.totalBytes += safeSize;
@@ -38,13 +39,24 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     else usage.libraryBytes += safeSize;
   };
   const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  const addPhysicalAsset = (assetId: string, storageClass: StorageClass) => {
+    if (countedPhysicalAssetIds.has(assetId)) return;
+    countedPhysicalAssetIds.add(assetId);
+    addBytes(assetAuthority.refsById.get(assetId)?.size ?? 0, storageClass);
+  };
   const mediaById = new Map(media.map((entry) => [entry.id, entry]));
   const videoById = new Map(videoProjects.map((entry) => [entry.id, entry]));
   const scenarioById = new Map(scenarioProjects.map((entry) => [entry.id, entry]));
 
   for (const entry of media) {
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
-    addBytes(resolveMediaBytes(entry, assetAuthority), storageClass);
+    if (!entry.source) addBytes(entry.size, storageClass);
+    else {
+      for (const assetId of resolveMediaPhysicalAssetIds(entry, assetAuthority)) {
+        addPhysicalAsset(assetId, storageClass);
+      }
+      if (entry.source.kind === 'screenshot') addBytes(entry.size, storageClass);
+    }
     if (entry.hasThumbnail) {
       const thumbnail = await getMediaThumbnail(entry.id);
       if (thumbnail) addBytes(thumbnail.blob.size, storageClass);
@@ -55,10 +67,7 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
     if (parent) {
       addBytes(jsonBytes(workspace), parent.lifecycle?.storageClass ?? 'library');
       for (const assetId of new Set(workspace.document.assets.map((asset) => asset.assetId))) {
-        addBytes(
-          assetAuthority.refsById.get(assetId)?.size ?? 0,
-          parent.lifecycle?.storageClass ?? 'library'
-        );
+        addPhysicalAsset(assetId, parent.lifecycle?.storageClass ?? 'library');
       }
     }
   }
@@ -79,12 +88,12 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
       getMediaThumbnail(`scenario:${entry.id}`),
     ]);
     for (const asset of assets) {
-      addBytes(assetAuthority.refsById.get(asset.assetId)?.size ?? 0, storageClass);
+      addPhysicalAsset(asset.assetId, storageClass);
     }
     for (const stepDocument of stepDocuments) {
       addBytes(jsonBytes(stepDocument), storageClass);
       for (const assetId of new Set(stepDocument.document.assets.map((asset) => asset.assetId))) {
-        addBytes(assetAuthority.refsById.get(assetId)?.size ?? 0, storageClass);
+        addPhysicalAsset(assetId, storageClass);
       }
     }
     if (legacyThumbnail) addBytes(legacyThumbnail.blob.size, storageClass);
@@ -126,11 +135,10 @@ async function loadAssetUsageAuthority(): Promise<AssetUsageAuthority> {
   };
 }
 
-function resolveMediaBytes(
+function resolveMediaPhysicalAssetIds(
   entry: Awaited<ReturnType<typeof listMediaLibrary>>[number],
   authority: AssetUsageAuthority
-): number {
-  if (!entry.source) return entry.size;
+): string[] {
   if (entry.source.kind === 'web-snapshot') {
     return [
       authority.ownersByDomainKey.get(
@@ -139,11 +147,9 @@ function resolveMediaBytes(
       authority.ownersByDomainKey.get(
         ownerDomainKey('web-snapshot', entry.source.snapshotId, 'screenshot')
       ),
-    ].reduce(
-      (total, owner) => total + (owner ? (authority.refsById.get(owner.assetId)?.size ?? 0) : 0),
-      0
-    );
+    ].flatMap((owner) => (owner ? [owner.assetId] : []));
   }
+  if (entry.source.kind === 'stored-asset') return [entry.source.assetId];
   const owner =
     entry.source.kind === 'recording'
       ? authority.ownersByDomainKey.get(
@@ -158,17 +164,7 @@ function resolveMediaBytes(
               ownerDomainKey('project-asset', entry.source.projectAssetId, 'body')
             )
           : undefined;
-  if (owner) return authority.refsById.get(owner.assetId)?.size ?? 0;
-  return isDurableMediaSource(entry.source.kind) ? 0 : entry.size;
-}
-
-function isDurableMediaSource(kind: string): boolean {
-  return (
-    kind === 'recording' ||
-    kind === 'project-export' ||
-    kind === 'project-asset' ||
-    kind === 'web-snapshot'
-  );
+  return owner ? [owner.assetId] : [];
 }
 
 function ownerDomainKey(ownerKind: string, ownerId: string, role: string): string {

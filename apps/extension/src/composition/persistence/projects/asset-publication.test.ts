@@ -137,7 +137,11 @@ it('publishes project assets with the archive filename and rejects workflow jour
   expect(writes).toContainEqual([
     'media_library',
     'put',
-    expect.objectContaining({ filename: 'clip.webm', id: 'project-asset:project-asset-1' }),
+    expect.objectContaining({
+      filename: 'clip.webm',
+      id: 'project-asset:project-asset-1',
+      lifecycle: { storageClass: 'library', savedAt: 2, updatedAt: 2 },
+    }),
   ]);
 
   await expect(

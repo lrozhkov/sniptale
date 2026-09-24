@@ -301,6 +301,34 @@ describe('library material import', () => {
     expect(params.upsertAssets).not.toHaveBeenCalled();
   });
 
+  it.each(['switch', 'unmount'])(
+    'preserves newly attached shared library bytes after %s',
+    async (reason) => {
+      const params = createParams();
+      const imported = await importProjectAssetMock();
+      const asset = structuredClone({
+        ...imported,
+        source: {
+          kind: 'project-asset',
+          projectAssetId: 'shared',
+          originMediaId: 'project-asset:shared',
+        },
+      });
+      vi.mocked(ensureLibraryMediaAssets).mockResolvedValueOnce([asset]);
+      renderHook(params);
+      const pending = latestHandlers!.handleAddLibraryMedia('project-asset:shared');
+      if (reason === 'switch') params.getCurrentProjectId = () => 'other-project';
+      else
+        act(() => {
+          root?.unmount();
+          root = null;
+        });
+      await expect(pending).rejects.toThrow();
+      expect(deleteProjectAssetMock).not.toHaveBeenCalled();
+      expect(params.upsertAssets).not.toHaveBeenCalled();
+    }
+  );
+
   it('retains an existing library copy after target changes', async () => {
     const params = createParams();
     const asset = await importProjectAssetMock();

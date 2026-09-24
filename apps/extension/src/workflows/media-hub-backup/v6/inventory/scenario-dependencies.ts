@@ -11,6 +11,7 @@ import {
 } from '../../../../composition/persistence/scenario/read-guards';
 import { collectVideoProjectReferences } from '../../../../composition/persistence/library-lifecycle/references';
 import { createRecordingMediaId } from '../../../../features/media-hub/media-id';
+import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import type { MediaHubBackupExportOptions } from '../contracts';
 
 interface BackupDependencySelection {
@@ -55,6 +56,10 @@ function collectVideoDependencies(
       scenarioIds.add(entry.project.source.scenarioProjectId);
     }
     for (const asset of entry.project.assets) {
+      if (asset.source.kind === 'library-asset') {
+        mediaIds.add(asset.source.mediaId);
+        continue;
+      }
       if (asset.source.kind !== 'scenario-asset') continue;
       const scenarioAsset = scenarioAssets.get(asset.source.scenarioAssetId);
       if (!scenarioAsset) {
@@ -112,10 +117,10 @@ export async function resolveBackupDependencySelection(
   const selectedMediaIds = new Set(options.selected?.mediaAssetIds ?? []);
   for (const mediaId of videoDependencies.mediaIds) selectedMediaIds.add(mediaId);
   for (const asset of scenarioAssets.values()) {
-    if (asset.galleryAssetId && admittedScenarios.has(asset.projectId)) {
-      selectedMediaIds.add(asset.galleryAssetId);
-      videoDependencies.mediaIds.add(asset.galleryAssetId);
-    }
+    if (!admittedScenarios.has(asset.projectId)) continue;
+    const mediaId = asset.borrowedMediaId ?? scenarioLibraryMediaId(asset.id);
+    selectedMediaIds.add(mediaId);
+    videoDependencies.mediaIds.add(mediaId);
   }
   return {
     media: { required: videoDependencies.mediaIds, selected: [...selectedMediaIds] },

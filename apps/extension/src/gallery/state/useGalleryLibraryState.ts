@@ -167,6 +167,8 @@ function areRecordingGroupViewsEqual(
 function areMediaSourcesEqual(left: GalleryMediaItem['source'], right: GalleryMediaItem['source']) {
   if (left.kind !== right.kind) return false;
   switch (left.kind) {
+    case 'stored-asset':
+      return right.kind === left.kind && left.assetId === right.assetId;
     case 'recording':
       return right.kind === left.kind && left.recordingId === right.recordingId;
     case 'project-export':

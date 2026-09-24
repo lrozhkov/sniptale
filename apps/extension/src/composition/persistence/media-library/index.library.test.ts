@@ -6,6 +6,7 @@ import { createVideoProject } from '../projects/index.test-support';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
 const dbMocks = vi.hoisted(() => ({
+  backfillScenarioLibraryAssetsMock: vi.fn(async () => 0),
   deleteProjectAssetMock: vi.fn(),
   deleteProjectExportMock: vi.fn(),
   deleteRecordingMock: vi.fn(),
@@ -19,11 +20,18 @@ const dbMocks = vi.hoisted(() => ({
   listAllProjectExportsMock: vi.fn(),
   listProjectAssetsMock: vi.fn(),
   listVideoProjectReadResultsMock: vi.fn(),
+  listMediaAssetProjectUsageMock: vi.fn(async () => []),
   listRecordingsMock: vi.fn(),
   objectStoreDeleteMock: vi.fn(),
   putMock: vi.fn(),
   txDeleteMock: vi.fn(),
   txPutMock: vi.fn(),
+}));
+vi.mock('../scenario/library-publication', () => ({
+  backfillScenarioLibraryAssets: dbMocks.backfillScenarioLibraryAssetsMock,
+}));
+vi.mock('./usage', () => ({
+  listMediaAssetProjectUsage: dbMocks.listMediaAssetProjectUsageMock,
 }));
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),

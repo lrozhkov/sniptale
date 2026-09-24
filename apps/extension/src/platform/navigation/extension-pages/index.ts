@@ -68,12 +68,16 @@ function buildVideoEditorProjectUrl(
 
 function buildGalleryPageUrl(options: {
   folder?: string | null;
+  mediaId?: string | null;
   recordingId?: string | null;
   quickEdit?: boolean;
   scope?: 'library' | 'temporary';
 }) {
   const url = new URL(runtimeInfo.getURL('apps/extension/src/gallery/index.html'));
-  if (options.recordingId) {
+  if (options.mediaId) {
+    url.searchParams.set('mediaId', options.mediaId);
+    if (options.quickEdit) url.searchParams.set('mode', 'edit');
+  } else if (options.recordingId) {
     url.searchParams.set('recordingId', options.recordingId);
     if (options.quickEdit) url.searchParams.set('mode', 'edit');
   } else {
@@ -156,6 +160,7 @@ export async function openCameraRecorderPage(params: {
 export async function openGalleryPage(
   options: {
     folder?: 'screenshot' | 'recording';
+    mediaId?: string | null;
     recordingId?: string | null;
     quickEdit?: boolean;
     scope?: 'library' | 'temporary';

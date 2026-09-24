@@ -2,6 +2,7 @@
 export function clearGalleryRecordingPreviewUrlParams(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete('recordingId');
+  url.searchParams.delete('mediaId');
   url.searchParams.delete('mode');
   url.searchParams.delete('folder');
   url.searchParams.delete('scope');

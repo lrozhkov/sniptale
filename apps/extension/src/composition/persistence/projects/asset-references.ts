@@ -106,7 +106,14 @@ async function deleteUnreferencedProjectAssets(
 
     const mediaId = createProjectAssetMediaId(projectAssetId);
     const media = parseMediaLibraryEntry(await mediaLibraryStore.get(mediaId));
-    if (media && media.lifecycle?.storageClass !== 'temporary') {
+    if (media) {
+      // Legacy imports were published as temporary mirrors; detachment retains their library owner.
+      if (media.lifecycle?.storageClass === 'temporary') {
+        await mediaLibraryStore.put({
+          ...media,
+          lifecycle: promoteLibraryLifecycle(media.lifecycle, Date.now()),
+        });
+      }
       continue;
     }
 

@@ -13,9 +13,11 @@ const io = vi.hoisted(() => ({
   commit: vi.fn(),
   reject: vi.fn(),
   event: vi.fn(),
+  media: vi.fn(),
 }));
 vi.mock('../../projects', () => ({ getScenarioProject: io.get }));
 vi.mock('../../projects/assets', () => ({ getScenarioAsset: io.asset }));
+vi.mock('../../../media-library', () => ({ getMediaLibraryEntry: io.media }));
 vi.mock('../capture-step/asset-entry', () => ({ createScenarioAssetEntryFromBlob: io.prepare }));
 vi.mock('../../aggregate-mutations', () => ({ commitScenarioAggregateMutation: io.commit }));
 vi.mock('../../asset-staging', () => ({ rejectScenarioMutationBeforeHandoff: io.reject }));
@@ -57,6 +59,7 @@ function fixture() {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  io.media.mockResolvedValue(undefined);
   io.get.mockResolvedValue(fixture().template);
   io.asset.mockResolvedValue({
     projectId: 'template',

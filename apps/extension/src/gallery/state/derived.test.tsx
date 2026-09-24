@@ -152,6 +152,7 @@ beforeEach(() => {
   selectorMocks.getFilteredGalleryItems.mockReturnValue([item]);
   selectorMocks.getGalleryCounts.mockReturnValue({
     all: 1,
+    audio: 0,
     export: 0,
     recording: 0,
     scenario: 0,

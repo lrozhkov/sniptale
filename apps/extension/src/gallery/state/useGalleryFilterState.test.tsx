@@ -449,3 +449,14 @@ it('clears a stale active saved-view identity after loading the authoritative li
     ).toMatchObject({ activeSavedViewId: null })
   );
 });
+
+it('opens Audio from the URL and restores it after navigation preferences are saved', async () => {
+  window.history.replaceState(null, '', '/?folder=audio');
+  const value = renderHook();
+  expect(value.state.folderFilter).toBe('audio');
+  await act(async () => value.actions.setFolderFilter('audio'));
+  act(() => root?.unmount());
+  window.history.replaceState(null, '', '/');
+  root = createRoot(container!);
+  expect(renderHook().state.folderFilter).toBe('audio');
+});

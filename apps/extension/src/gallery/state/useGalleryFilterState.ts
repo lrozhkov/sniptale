@@ -17,6 +17,7 @@ const GALLERY_FOLDERS = new Set<FolderFilter>([
   'all',
   'screenshot',
   'recording',
+  'audio',
   'export',
   'web-snapshot',
   'scenario',
@@ -34,14 +35,14 @@ const EMPTY_FACET_FILTERS: GalleryFacetFilters = {
 
 function getUrlFolderFilter(): FolderFilter | null {
   const params = new URLSearchParams(window.location.search);
-  if (params.has('recordingId')) return 'all';
+  if (params.has('recordingId') || params.has('mediaId')) return 'all';
   const folder = params.get('folder');
   return GALLERY_FOLDERS.has(folder as FolderFilter) ? (folder as FolderFilter) : null;
 }
 
 function getUrlScope(): GalleryScope | null {
   const params = new URLSearchParams(window.location.search);
-  if (params.has('recordingId')) return 'all';
+  if (params.has('recordingId') || params.has('mediaId')) return 'all';
   const scope = params.get('scope');
   return scope === 'temporary' || scope === 'library' ? scope : null;
 }
@@ -55,7 +56,11 @@ function getInitialFilterPreferences(): GalleryFilterPreferences {
     folderFilter: 'all',
     scope: 'all',
   } satisfies GalleryFilterPreferences;
-  if (new URLSearchParams(window.location.search).has('recordingId')) return defaults;
+  if (
+    new URLSearchParams(window.location.search).has('recordingId') ||
+    new URLSearchParams(window.location.search).has('mediaId')
+  )
+    return defaults;
   const base = stored ?? defaults;
   return {
     ...base,

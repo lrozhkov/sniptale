@@ -29,6 +29,8 @@ export interface ScenarioAssetEntry {
   id: string;
   projectId: string;
   galleryAssetId: string | null;
+  /** Exact existing library identity whose immutable object this child borrows. */
+  borrowedMediaId?: string;
   mimeType: string;
   width: number;
   height: number;
@@ -42,6 +44,8 @@ export interface HydratedScenarioAssetEntry extends ScenarioAssetEntry {
 
 export interface PreparedScenarioAssetEntry extends ScenarioAssetEntry {
   assetRef: AssetRef;
+  /** Transient copy instruction: own a new Library row while reusing borrowed source bytes. */
+  independentLibraryIdentity?: true;
 }
 
 export interface PendingScenarioAssetEntry {

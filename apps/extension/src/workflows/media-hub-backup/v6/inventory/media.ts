@@ -83,11 +83,6 @@ async function readRefFile(
 }
 
 function selected(item: MediaLibraryItem, options: MediaHubBackupExportOptions): boolean {
-  if (
-    (item.source.kind === 'project-asset' || item.source.kind === 'project-export') &&
-    !item.mimeType.startsWith('video/')
-  )
-    return false;
   if (item.source.kind === 'web-snapshot' && !options.includeWebSnapshots) return false;
   const explicitlySelected = Boolean(options.selected?.mediaAssetIds.includes(item.id));
   if (item.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
@@ -309,11 +304,22 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'web-snapshot') {
     return buildWebSnapshotSource({ ...args, entry, snapshotId: entry.source.snapshotId });
   }
+  if (entry.source.kind === 'stored-asset') {
+    const file = await readRefFile(args.db, entry.source.assetId, entry.filename);
+    return {
+      originalObjectId: args.collector.add(
+        file,
+        entry.filename,
+        entry.mimeType,
+        mediaObjectDirectory(entry, args.options)
+      ),
+    };
+  }
   const child =
     entry.source.kind === 'project-asset'
       ? parseProjectAssetEntry(await args.db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId))
       : parseProjectExportEntry(await args.db.get(PROJECT_EXPORTS_STORE, entry.source.exportId));
-  if (!child || !entry.mimeType.startsWith('video/'))
+  if (!child || (entry.source.kind === 'project-export' && !entry.mimeType.startsWith('video/')))
     throw new Error('Project video source is missing.');
   const file = await readRefFile(args.db, child.assetId, entry.filename);
   const storedReview = await readVideoReviewForBackup({

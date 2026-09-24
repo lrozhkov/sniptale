@@ -507,4 +507,20 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Удалённые материалы нельзя будет восстановить.',
     en: 'Deleted items cannot be recovered.',
   },
+  deleteAffectsProjects: {
+    ru: 'Файл также будет удалён из проектов:',
+    en: 'The file will also be removed from these projects:',
+  },
+  deleteHistoryWarning: {
+    ru: 'Связанные состояния истории также будут очищены. Сами проекты останутся.',
+    en: 'Related history states will also be cleared. The projects will remain.',
+  },
+  deleteBlockedTitle: {
+    ru: 'Сначала замените основной файл',
+    en: 'Replace the primary file first',
+  },
+  deleteBlockedPrimary: {
+    ru: 'Файл является обязательным исходником для проектов:',
+    en: 'This file is required as the primary source for:',
+  },
 });

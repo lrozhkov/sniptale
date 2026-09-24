@@ -1,6 +1,7 @@
 import {
   appendCommittedArchiveRootInTransaction,
   completePhysicalDeleteOperation,
+  parseAssetRef,
   type ArchiveRestoreSession,
 } from '../../../../composition/persistence/assets';
 import {
@@ -8,16 +9,20 @@ import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
+  MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_EXPORTS_STORE,
   SCENARIO_PROJECTS_STORE,
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
+  STORE_NAME,
   THUMBNAILS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import { putScenarioProjectBackupRestore } from '../../../../composition/persistence/scenario/backup-restore';
 import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
+import { assertBorrowedScenarioAssetSource } from '../../../../composition/persistence/scenario/library-publication';
 import { scenarioAssetRestoreKey } from '../reference-keys';
 import type { ArchiveRootPublicationResult } from '../restore';
 import type { PreparedScenarioPublication } from './scenario-project-publication';
@@ -65,11 +70,28 @@ export async function commitScenarioProjectPublication(
         THUMBNAILS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
         ASSET_REFS_STORE,
+        MEDIA_LIBRARY_STORE,
+        PROJECT_ASSETS_STORE,
+        STORE_NAME,
         ASSET_OWNERS_STORE,
         ASSET_OPERATIONS_STORE,
       ],
       'readwrite'
     );
+    for (const asset of prepared.root.assets) {
+      if (!asset.entry.borrowedMediaId) continue;
+      await assertBorrowedScenarioAssetSource(tx, asset.entry);
+      const currentRef = parseAssetRef(
+        await tx.objectStore(ASSET_REFS_STORE).get(asset.ref.assetId)
+      );
+      if (
+        !currentRef ||
+        currentRef.assetId !== asset.ref.assetId ||
+        JSON.stringify(currentRef.location) !== JSON.stringify(asset.ref.location)
+      ) {
+        throw new Error('Restored borrowed scenario source changed before publication.');
+      }
+    }
     const restored = await putScenarioProjectBackupRestore({
       operation: prepared.operation,
       root: prepared.root,

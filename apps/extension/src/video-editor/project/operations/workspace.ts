@@ -6,10 +6,7 @@ import { parseHydratableVideoProject } from '../../../features/video/project/val
 import type { RecordingSidecarVideoProjectInput } from '../../../features/video/project/factories/recording-sidecar';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import { getRecording } from '../../../composition/persistence/recordings/index';
-import {
-  deleteProjectAsset,
-  getVideoProject,
-} from '../../../composition/persistence/projects/index';
+import { getVideoProject } from '../../../composition/persistence/projects/index';
 import { resolveVideoProjectReadResult } from '../../../composition/persistence/projects/contracts';
 import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
 import { translate } from '../../../platform/i18n';
@@ -19,19 +16,12 @@ import {
   type VideoProject,
   type VideoProjectAsset,
 } from '../../../features/video/project/types';
-import { ensureRecordingAssets, importRecordingProjectAsset } from './assets';
+import { ensureRecordingAssets } from './assets';
 import { loadVideoMetadata } from '../media-metadata';
 import {
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
 } from './telemetry';
-
-type LegacyRecordingAsset = VideoProjectAsset & {
-  source: {
-    kind: 'recording';
-    recordingId: string;
-  };
-};
 
 async function buildRecordingProject(
   asset: VideoProjectAsset,
@@ -80,12 +70,6 @@ async function buildRecordingProject(
   });
 }
 
-function collectProjectAssetId(asset: VideoProjectAsset, projectAssetIds: string[]): void {
-  if (asset.source.kind === 'project-asset') {
-    projectAssetIds.push(asset.source.projectAssetId);
-  }
-}
-
 function buildWebcamSidecarVideo(
   asset: VideoProjectAsset,
   sourceRecordingId: string
@@ -119,82 +103,13 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
     );
   }
 
-  const createdProjectAssetIds: string[] = [];
-
-  try {
-    const assets = await ensureRecordingAssets(createEmptyVideoProject(), sourceRecordingId);
-    for (const acquired of assets) collectProjectAssetId(acquired, createdProjectAssetIds);
-    const asset = assets[0]!;
-    const sidecarVideos = assets
-      .slice(1)
-      .map((camera) => buildWebcamSidecarVideo(camera, sourceRecordingId));
-    const nextProject = await buildRecordingProject(asset, entry, sourceRecordingId, sidecarVideos);
-    return await commitVideoProjectMutation(nextProject, { baseRevision: null });
-  } catch (saveError) {
-    await cleanupProjectAssetCopies(createdProjectAssetIds);
-    throw saveError;
-  }
-}
-
-function getLegacyRecordingAssets(project: VideoProject): LegacyRecordingAsset[] {
-  return project.assets.filter(
-    (asset): asset is LegacyRecordingAsset =>
-      asset.type === 'RECORDING' && asset.source.kind === 'recording'
-  );
-}
-
-function mergeMigratedRecordingAsset(
-  asset: VideoProjectAsset,
-  migratedAsset: VideoProjectAsset
-): VideoProjectAsset {
-  return {
-    ...migratedAsset,
-    id: asset.id,
-    name: asset.name,
-    createdAt: asset.createdAt,
-    ...(asset.recordingPart ? { recordingPart: asset.recordingPart } : {}),
-  };
-}
-
-async function cleanupProjectAssetCopies(projectAssetIds: string[]): Promise<void> {
-  await Promise.all(
-    projectAssetIds.map(async (projectAssetId) => deleteProjectAsset(projectAssetId))
-  );
-}
-
-async function migratePersistedRecordingAssets(project: VideoProject): Promise<VideoProject> {
-  const legacyAssets = getLegacyRecordingAssets(project);
-  if (legacyAssets.length === 0) {
-    return project;
-  }
-
-  const migratedAssetMap = new Map<string, VideoProjectAsset>();
-  const createdProjectAssetIds: string[] = [];
-
-  try {
-    for (const asset of legacyAssets) {
-      const migratedAsset = await importRecordingProjectAsset(asset.source.recordingId);
-      if (migratedAsset.source.kind === 'project-asset') {
-        createdProjectAssetIds.push(migratedAsset.source.projectAssetId);
-      }
-      migratedAssetMap.set(asset.id, mergeMigratedRecordingAsset(asset, migratedAsset));
-    }
-  } catch {
-    await cleanupProjectAssetCopies(createdProjectAssetIds);
-    return project;
-  }
-
-  const migratedProject = {
-    ...project,
-    assets: project.assets.map((asset) => migratedAssetMap.get(asset.id) ?? asset),
-  };
-
-  try {
-    return await commitVideoProjectMutation(migratedProject, { baseRevision: project.updatedAt });
-  } catch (saveError) {
-    await cleanupProjectAssetCopies(createdProjectAssetIds);
-    throw saveError;
-  }
+  const assets = await ensureRecordingAssets(createEmptyVideoProject(), sourceRecordingId);
+  const asset = assets[0]!;
+  const sidecarVideos = assets
+    .slice(1)
+    .map((camera) => buildWebcamSidecarVideo(camera, sourceRecordingId));
+  const nextProject = await buildRecordingProject(asset, entry, sourceRecordingId, sidecarVideos);
+  return commitVideoProjectMutation(nextProject, { baseRevision: null });
 }
 
 /**
@@ -260,7 +175,7 @@ export async function openPersistedProject(projectId: string): Promise<VideoProj
           expectedWorkspaceRevision: result.workspaceRevision,
         })
       : persistedProject;
-  return migratePersistedRecordingAssets(retainedProject);
+  return retainedProject;
 }
 
 /** Copies the editable document; immutable media references remain shared and reference-counted. */

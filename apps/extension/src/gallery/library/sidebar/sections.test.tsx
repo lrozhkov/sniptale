@@ -61,7 +61,7 @@ it('renders folder actions, highlights the active folder, and forwards selection
 
   render(
     <GalleryFolderList
-      counts={{ all: 7, export: 1, recording: 2, scenario: 3, screenshot: 4 }}
+      counts={{ all: 7, audio: 0, export: 1, recording: 2, scenario: 3, screenshot: 4 }}
       folderFilter="recording"
       onFolderFilterChange={onFolderFilterChange}
     />
@@ -79,7 +79,15 @@ it('renders folder actions, highlights the active folder, and forwards selection
 
   render(
     <GalleryFolderList
-      counts={{ all: 8, export: 1, recording: 2, scenario: 3, screenshot: 4, 'web-snapshot': 5 }}
+      counts={{
+        all: 8,
+        audio: 0,
+        export: 1,
+        recording: 2,
+        scenario: 3,
+        screenshot: 4,
+        'web-snapshot': 5,
+      }}
       folderFilter="web-snapshot"
       onFolderFilterChange={onFolderFilterChange}
     />
@@ -117,7 +125,7 @@ it('renders saved views under their category without icons or counters and reque
   render(
     <GalleryFolderList
       activeSavedView={view}
-      counts={{ all: 7, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
+      counts={{ all: 7, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
       folderFilter="screenshot"
       savedViews={[view]}
       savedViewsLoaded
@@ -167,7 +175,7 @@ it('reveals saved views in batches and requests sibling reordering', () => {
 
   render(
     <GalleryFolderList
-      counts={{ all: 6, export: 0, recording: 0, scenario: 0, screenshot: 6 }}
+      counts={{ all: 6, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 6 }}
       folderFilter="screenshot"
       savedViews={views}
       savedViewsLoaded
@@ -202,7 +210,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
     <GalleryFacetFilters
       activeTags={['beta']}
       allTags={['alpha', 'beta']}
-      counts={{ all: 2, export: 0, recording: 0, scenario: 0, screenshot: 2 }}
+      counts={{ all: 2, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 2 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -316,7 +324,7 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
       activeSavedView={null}
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -383,7 +391,7 @@ it('updates a changed active saved view instead of opening the name field', asyn
       activeSavedView={view}
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -442,7 +450,7 @@ it('hides reset and update actions while the active saved view matches its basel
       activeSavedView={view}
       activeTags={view.filters.activeTags}
       allTags={['review']}
-      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
       facetFilters={view.filters.facetFilters}
       facets={[]}
       filteredItemCount={1}
@@ -474,7 +482,7 @@ it('shows search and scrolling only for facet lists with more than ten values', 
     <GalleryFacetFilters
       activeTags={[]}
       allTags={options.map((option) => option.value)}
-      counts={{ all: 11, export: 0, recording: 0, scenario: 0, screenshot: 11 }}
+      counts={{ all: 11, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 11 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -523,7 +531,7 @@ it('shows result selection for a non-default section without a redundant filter 
     <GalleryFacetFilters
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 3, export: 0, recording: 0, scenario: 0, screenshot: 3 }}
+      counts={{ all: 3, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 3 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -559,7 +567,7 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
     <GalleryFacetFilters
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 1, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -610,7 +618,7 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
   const facetProps = {
     activeTags: [],
     allTags: [],
-    counts: { all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 },
+    counts: { all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 },
     facetFilters: {
       created: [],
       duration: [],
@@ -648,4 +656,20 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
   root = createRoot(container!);
   render(<GalleryFacetFilters {...facetProps} />);
   expect(container?.querySelector('details')?.open).toBe(true);
+});
+
+it('shows the Audio count and selects its section', () => {
+  const onFolderFilterChange = vi.fn();
+  render(
+    <GalleryFolderList
+      counts={{ all: 3, audio: 2, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
+      folderFilter="audio"
+      onFolderFilterChange={onFolderFilterChange}
+    />
+  );
+  const button = findButton(translate('gallery.preview.kindAudio'));
+  expect(button?.textContent).toContain('2');
+  expect(button?.className).toContain('shadow-sm');
+  click(button);
+  expect(onFolderFilterChange).toHaveBeenCalledWith('audio');
 });
