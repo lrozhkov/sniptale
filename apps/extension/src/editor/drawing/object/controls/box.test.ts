@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { FabricObject, util, type Transform } from 'fabric';
+import { Canvas, FabricObject, util, type Transform } from 'fabric';
 import { expect, it } from 'vitest';
 import { createDrawingBoxControls, createDrawingTextControls } from './box';
 
@@ -24,6 +24,32 @@ it('limits drawing text to width resize handles and rotation', () => {
   const object = new FabricObject({ sniptaleType: 'text' });
 
   expect(Object.keys(createDrawingTextControls(object))).toEqual(['ml', 'mr', 'mtr']);
+});
+
+it('keeps corner resize cursors diagonal on elongated drawings and follows rotation', () => {
+  const object = new FabricObject({ height: 12, width: 600, sniptaleType: 'shape' });
+  const controls = createDrawingBoxControls(object);
+  const canvas = new Canvas(document.createElement('canvas'));
+  canvas.add(object);
+  object.controls = controls;
+  object.setCoords();
+  const event = new MouseEvent('mousemove');
+  const cursor = (key: 'tl' | 'tr') =>
+    controls[key]!.cursorStyleHandler(event, controls[key]!, object, object.calcOCoords()[key]!);
+
+  expect(cursor('tl')).toBe('nwse-resize');
+  expect(cursor('tr')).toBe('nesw-resize');
+
+  object.set({ angle: 45 });
+  object.setCoords();
+  expect(cursor('tl')).toBe('ns-resize');
+
+  object.set({ angle: 0, flipX: true });
+  object.setCoords();
+  expect(cursor('tl')).toBe('nesw-resize');
+
+  object.set({ lockScalingX: true });
+  expect(cursor('tl')).toBe('not-allowed');
 });
 
 it('preserves aspect ratio and the opposite-side anchor for Shift side resize', () => {

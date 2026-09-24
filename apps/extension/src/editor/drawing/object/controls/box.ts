@@ -1,5 +1,6 @@
 import { Control, controlsUtils, type FabricObject, type TransformActionHandler } from 'fabric';
 import { createDrawingRotationControl, renderDrawingBoxHandle } from './chrome';
+import { createCornerCursorStyleHandler } from './corner-cursor';
 
 type BoxControlKey = 'tl' | 'mt' | 'tr' | 'mr' | 'br' | 'mb' | 'bl' | 'ml';
 
@@ -88,7 +89,10 @@ function resolveBoxActionHandler(object: FabricObject, key: BoxControlKey) {
 function createBoxControl(object: FabricObject, key: BoxControlKey, x: number, y: number) {
   return new Control({
     actionHandler: resolveBoxActionHandler(object, key),
-    cursorStyleHandler: controlsUtils.scaleCursorStyleHandler,
+    cursorStyleHandler:
+      key === 'tl' || key === 'tr' || key === 'br' || key === 'bl'
+        ? createCornerCursorStyleHandler(controlsUtils.scaleCursorStyleHandler)
+        : controlsUtils.scaleCursorStyleHandler,
     render: renderDrawingBoxHandle as Control['render'],
     sizeX: DRAWING_BOX_CONTROL_SIZE,
     sizeY: DRAWING_BOX_CONTROL_SIZE,
