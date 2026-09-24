@@ -18,7 +18,10 @@ import type {
 } from '../../document/model/render-options';
 
 import type { SourceState } from '../../document/model/source-state';
-import { EDITOR_WORKSPACE_MARGIN, getEditorEditingDocumentSize } from '../viewport/editing-surface';
+import {
+  getEditorEditingDocumentSize,
+  getEditorWorkspaceMargin,
+} from '../viewport/editing-surface';
 
 export function buildEditorCanvasDocument(options: {
   canvas: Canvas | null;
@@ -74,10 +77,11 @@ function resolveRenderedCanvasElement(
   let sourceCanvas: HTMLCanvasElement;
   try {
     const documentSize = getEditorEditingDocumentSize(canvas);
+    const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
     sourceCanvas = documentSize
       ? canvas.toCanvasElement(1, {
-          left: EDITOR_WORKSPACE_MARGIN,
-          top: EDITOR_WORKSPACE_MARGIN,
+          left: margin,
+          top: margin,
           width: documentSize.width,
           height: documentSize.height,
         })

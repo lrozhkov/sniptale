@@ -25,6 +25,7 @@ vi.mock('../viewport/interactions', () => ({
 
 function createBindings() {
   const viewportElement = document.createElement('div');
+  const canvas = { requestRenderAll: vi.fn() };
   const rasterToolSession = {
     hoverCursor: null as { scenePoint: { x: number; y: number }; tool: 'eraser' } | null,
     selection: null,
@@ -51,6 +52,7 @@ function createBindings() {
   });
 
   return {
+    getCanvas: vi.fn(() => canvas),
     getActiveTool: vi.fn(() => 'select'),
     getIsSpacePressed: vi.fn(() => true),
     getPanSession: vi.fn(() => ({ id: 'existing-pan' })),
@@ -79,6 +81,8 @@ function registerPanLifecycleTest() {
 
     handlers.handleViewportMouseDown(event);
     handlers.handleViewportScroll();
+
+    expect(bindings.getCanvas().requestRenderAll).toHaveBeenCalledOnce();
     handlers.handleWindowMouseMove(new MouseEvent('mousemove'));
     handlers.handleWindowMouseUp(new MouseEvent('mouseup', { button: 0 }));
 

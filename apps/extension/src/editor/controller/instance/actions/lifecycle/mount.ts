@@ -1,4 +1,4 @@
-import { Canvas } from 'fabric';
+import type { Canvas } from 'fabric';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { attachEditorControllerEventHandlers } from '../../../events';
 import { createEditorMagnetManager } from '../../../magnet';
@@ -12,9 +12,10 @@ import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-read
 import { createViewportPresentationContext } from '../viewport-context';
 import { attachEditorCanvasPointerCapture } from './pointer-capture';
 import { mountEditorSelectionChrome } from './selection-chrome';
+import { EditorCanvas } from '../../../viewport/render-region';
 
 export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
-  const canvas = new Canvas(canvasElement, {
+  const canvas = new EditorCanvas(canvasElement, {
     altActionKey: 'ctrlKey',
     centeredKey: 'ctrlKey',
     enablePointerEvents: true,
@@ -64,6 +65,7 @@ export function mountEditorController(
 
   try {
     const canvas = createMountedCanvas(canvasElement);
+    canvas.setRenderViewport(viewportElement);
 
     controller.canvas = canvas;
     controller.viewportElement = viewportElement;

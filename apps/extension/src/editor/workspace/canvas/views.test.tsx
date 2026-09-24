@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { CanvasEmptyState, CanvasViewport } from './views';
+import { EDITOR_WORKSPACE_MARGIN } from '../../controller/viewport/editing-surface';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -32,7 +33,7 @@ it('renders the pannable image viewport with checkerboard surface and grid overl
 
   expect(markup).toContain('editor.canvas.viewport');
   expect(markup).toContain('overflow-auto');
-  expect(markup).toContain('max(48rem, 130vw)');
+  expect(markup).not.toContain('max(48rem, 130vw)');
   expect(markup).toContain('background-size:10px 10px');
   expect(markup).not.toContain('mock.raster-overlay');
 });
@@ -69,8 +70,10 @@ it('shows a muted, nonblocking workspace around the image rectangle', () => {
 
   expect(markup).toContain('editor.canvas.document-boundary');
   expect(markup).toContain('editor.canvas.document-checkerboard');
+  expect(markup).toContain('clip-path:inset(1px)');
   expect(markup).toContain('editor.canvas.workspace-mask-left');
-  expect(markup).toContain('top:46.3768115942029%;bottom:46.3768115942029%');
+  const verticalMaskInset = (EDITOR_WORKSPACE_MARGIN / (80 + EDITOR_WORKSPACE_MARGIN * 2)) * 100;
+  expect(markup).toContain(`top:${verticalMaskInset}%;bottom:${verticalMaskInset}%`);
   expect(markup.match(/background-image:/g)).toHaveLength(1);
   expect(markup).toContain('background-color:#f5f5f5');
   expect(markup.match(/pointer-events-none absolute z-40/g)).toHaveLength(5);

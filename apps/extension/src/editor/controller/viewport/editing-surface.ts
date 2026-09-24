@@ -1,15 +1,30 @@
 import type { Canvas } from 'fabric';
 
-export const EDITOR_WORKSPACE_MARGIN = 512;
+export const EDITOR_WORKSPACE_MARGIN = 2048;
+const MIN_EDITOR_WORKSPACE_MARGIN = 512;
+const MAX_EDITOR_SURFACE_PIXELS = 32_000_000;
 
 type DocumentSize = { width: number; height: number };
 const documentSizes = new WeakMap<Canvas, DocumentSize>();
 
+/** Keeps the editing surface within its backing-pixel budget for large images. */
+export function getEditorWorkspaceMargin(size: DocumentSize): number {
+  if (size.width <= 0 || size.height <= 0) return EDITOR_WORKSPACE_MARGIN;
+  const maxMargin = Math.floor(
+    (Math.sqrt((size.width - size.height) ** 2 + 4 * MAX_EDITOR_SURFACE_PIXELS) -
+      size.width -
+      size.height) /
+      4
+  );
+  return Math.max(MIN_EDITOR_WORKSPACE_MARGIN, Math.min(EDITOR_WORKSPACE_MARGIN, maxMargin));
+}
+
 export function getEditorEditingSurfaceSize(size: DocumentSize): DocumentSize {
   if (size.width <= 0 || size.height <= 0) return size;
+  const margin = getEditorWorkspaceMargin(size);
   return {
-    width: size.width + EDITOR_WORKSPACE_MARGIN * 2,
-    height: size.height + EDITOR_WORKSPACE_MARGIN * 2,
+    width: size.width + margin * 2,
+    height: size.height + margin * 2,
   };
 }
 
@@ -26,11 +41,12 @@ export function getEditorDocumentClientRect(
   if (!rect) return null;
   if (!canvas || !getEditorEditingDocumentSize(canvas)) return rect;
   const surface = getEditorEditingSurfaceSize(size);
+  const margin = getEditorWorkspaceMargin(size);
   const scaleX = rect.width / surface.width;
   const scaleY = rect.height / surface.height;
   return {
-    left: rect.left + EDITOR_WORKSPACE_MARGIN * scaleX,
-    top: rect.top + EDITOR_WORKSPACE_MARGIN * scaleY,
+    left: rect.left + margin * scaleX,
+    top: rect.top + margin * scaleY,
     width: size.width * scaleX,
     height: size.height * scaleY,
   };
@@ -49,6 +65,11 @@ export function setEditorEditingSurfaceDimensions(canvas: Canvas, size: Document
   }
 
   documentSizes.set(canvas, size);
-  canvas.setDimensions(getEditorEditingSurfaceSize(size));
-  canvas.setViewportTransform([1, 0, 0, 1, EDITOR_WORKSPACE_MARGIN, EDITOR_WORKSPACE_MARGIN]);
+  const surface = getEditorEditingSurfaceSize(size);
+  const margin = getEditorWorkspaceMargin(size);
+  const devicePixelRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  canvas.enableRetinaScaling =
+    surface.width * surface.height * devicePixelRatio ** 2 <= MAX_EDITOR_SURFACE_PIXELS;
+  canvas.setDimensions(surface);
+  canvas.setViewportTransform([1, 0, 0, 1, margin, margin]);
 }

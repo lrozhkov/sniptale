@@ -1,7 +1,8 @@
+import type { Canvas } from 'fabric';
 import { PREVIEW_FPS } from './helpers';
 import {
-  EDITOR_WORKSPACE_MARGIN,
   getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
 } from '../../controller/viewport/editing-surface';
 
 function syncPreviewCanvasSize(args: {
@@ -28,6 +29,7 @@ function hasDrawableCanvasSize(canvas: HTMLCanvasElement): boolean {
 
 function drawPreviewFrame(args: {
   sourceCanvas: HTMLCanvasElement;
+  fabricCanvas?: Canvas | null;
   previewCanvas: HTMLCanvasElement;
   previewSize: { width: number; height: number };
   documentSize?: { width: number; height: number };
@@ -55,13 +57,19 @@ function drawPreviewFrame(args: {
 
   context.imageSmoothingEnabled = true;
   const documentSize = args.documentSize;
+  if (documentSize && args.fabricCanvas) {
+    const margin = getEditorWorkspaceMargin(documentSize);
+    const rendered = args.fabricCanvas.toCanvasElement(
+      args.previewSize.width / documentSize.width,
+      { left: margin, top: margin, width: documentSize.width, height: documentSize.height }
+    );
+    context.drawImage(rendered, 0, 0, args.previewSize.width, args.previewSize.height);
+    return;
+  }
   const surface = documentSize ? getEditorEditingSurfaceSize(documentSize) : null;
-  const sourceLeft = surface
-    ? (args.sourceCanvas.width * EDITOR_WORKSPACE_MARGIN) / surface.width
-    : 0;
-  const sourceTop = surface
-    ? (args.sourceCanvas.height * EDITOR_WORKSPACE_MARGIN) / surface.height
-    : 0;
+  const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
+  const sourceLeft = surface ? (args.sourceCanvas.width * margin) / surface.width : 0;
+  const sourceTop = surface ? (args.sourceCanvas.height * margin) / surface.height : 0;
   const sourceWidth =
     surface && documentSize
       ? (args.sourceCanvas.width * documentSize.width) / surface.width
@@ -85,6 +93,7 @@ function drawPreviewFrame(args: {
 
 export function startEditorViewportPreviewLoop(args: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  getCanvas?: () => Canvas | null;
   previewCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   previewSize: { width: number; height: number };
   documentSize?: { width: number; height: number };
@@ -106,6 +115,7 @@ export function startEditorViewportPreviewLoop(args: {
 
     drawPreviewFrame({
       sourceCanvas,
+      ...(args.getCanvas ? { fabricCanvas: args.getCanvas() } : {}),
       previewCanvas,
       previewSize: args.previewSize,
       ...(args.documentSize ? { documentSize: args.documentSize } : {}),

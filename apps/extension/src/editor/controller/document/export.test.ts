@@ -10,7 +10,7 @@ import {
 import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 import { Canvas } from 'fabric';
 import {
-  EDITOR_WORKSPACE_MARGIN,
+  getEditorWorkspaceMargin,
   setEditorEditingSurfaceDimensions,
 } from '../viewport/editing-surface';
 
@@ -272,9 +272,10 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(canvas.setActiveObject).not.toHaveBeenCalled();
   });
 
-  it('exports the image rectangle without the interactive outer workspace', () => {
+  it('exports the image rectangle with an adaptive workspace margin', () => {
     const canvas = new Canvas(document.createElement('canvas'));
-    setEditorEditingSurfaceDimensions(canvas, { width: 200, height: 100 });
+    const documentSize = { width: 4000, height: 3000 };
+    setEditorEditingSurfaceDimensions(canvas, documentSize);
     const output = document.createElement('canvas');
     output.toDataURL = vi.fn(() => 'data:image/png;base64,cropped');
     const render = vi.spyOn(canvas, 'toCanvasElement').mockReturnValue(output);
@@ -283,10 +284,10 @@ describe('renderEditorCanvasToDataUrl', () => {
       'data:image/png;base64,cropped'
     );
     expect(render).toHaveBeenCalledWith(1, {
-      left: EDITOR_WORKSPACE_MARGIN,
-      top: EDITOR_WORKSPACE_MARGIN,
-      width: 200,
-      height: 100,
+      left: getEditorWorkspaceMargin(documentSize),
+      top: getEditorWorkspaceMargin(documentSize),
+      width: documentSize.width,
+      height: documentSize.height,
     });
   });
 

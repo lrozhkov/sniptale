@@ -3,8 +3,8 @@ import { clamp } from '../../../document/model';
 import { getLayerObjects } from '../layers';
 import type { CanvasSize } from './types';
 import {
-  EDITOR_WORKSPACE_MARGIN,
   getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
 } from '../../viewport/editing-surface';
 
 function getReachableVisibleSize(boundsSize: number, canvasSize: number) {
@@ -44,19 +44,20 @@ export function ensureEditorObjectReachable(
 
   const bounds = object.getBoundingRect();
   const surfaceSize = getEditorEditingSurfaceSize(canvasDocumentSize);
+  const margin = getEditorWorkspaceMargin(canvasDocumentSize);
   const visibleWidth = getReachableVisibleSize(bounds.width, surfaceSize.width);
   const visibleHeight = getReachableVisibleSize(bounds.height, surfaceSize.height);
   const horizontalBounds = resolveReachableBounds({
     boundsSize: bounds.width,
     canvasSize: surfaceSize.width,
     visibleSize: visibleWidth,
-    origin: -EDITOR_WORKSPACE_MARGIN,
+    origin: -margin,
   });
   const verticalBounds = resolveReachableBounds({
     boundsSize: bounds.height,
     canvasSize: surfaceSize.height,
     visibleSize: visibleHeight,
-    origin: -EDITOR_WORKSPACE_MARGIN,
+    origin: -margin,
   });
 
   const nextBoundsLeft = clamp(bounds.left, horizontalBounds.min, horizontalBounds.max);

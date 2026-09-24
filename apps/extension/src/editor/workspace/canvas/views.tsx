@@ -15,8 +15,8 @@ import { EditorFrameAnnotationPlane } from '../../frame-annotation/plane';
 import type { EditorFrameAnnotationPlaneController } from '../../frame-annotation/types';
 import type { EditorLayerItem, EditorTool } from '../../../features/editor/document/types';
 import {
-  EDITOR_WORKSPACE_MARGIN,
   getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
 } from '../../controller/viewport/editing-surface';
 
 const emptyStateButtonClassName = [
@@ -24,15 +24,8 @@ const emptyStateButtonClassName = [
   getControlPrimaryButtonClassName({ density: 'compact' }),
 ].join(' ');
 
-const stageClassName =
-  'box-border grid h-max min-h-full w-max min-w-full place-items-center ' +
-  'px-6 py-6 sm:px-8 sm:py-8 xl:px-10 xl:py-10';
-
-const stagePannableStyle = {
-  minHeight: 'calc(100% + max(32rem, 100vh))',
-  minWidth: 'calc(100% + max(48rem, 130vw))',
-  padding: 'max(16rem, 50vh) max(24rem, 65vw)',
-} satisfies React.CSSProperties;
+const stageClassName = 'box-border grid h-max min-h-full w-max min-w-full place-items-center';
+const emptyStagePaddingClassName = 'px-6 py-6 sm:px-8 sm:py-8 xl:px-10 xl:py-10';
 
 const emptyStateTitleClassName =
   'mt-5 max-w-[420px] text-3xl font-semibold leading-tight ' +
@@ -123,11 +116,12 @@ function CanvasStage(
 ) {
   const documentSize = props.controller?.canvasDocumentSize ?? { width: 0, height: 0 };
   const surfaceSize = getEditorEditingSurfaceSize(documentSize);
-  const left = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.width)) * 100}%`;
-  const top = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.height)) * 100}%`;
-  const right = `${((EDITOR_WORKSPACE_MARGIN + documentSize.width) / Math.max(1, surfaceSize.width)) * 100}%`;
-  const bottom = `${((EDITOR_WORKSPACE_MARGIN + documentSize.height) / Math.max(1, surfaceSize.height)) * 100}%`;
-  const bottomInset = `${(EDITOR_WORKSPACE_MARGIN / Math.max(1, surfaceSize.height)) * 100}%`;
+  const margin = getEditorWorkspaceMargin(documentSize);
+  const left = `${(margin / Math.max(1, surfaceSize.width)) * 100}%`;
+  const top = `${(margin / Math.max(1, surfaceSize.height)) * 100}%`;
+  const right = `${((margin + documentSize.width) / Math.max(1, surfaceSize.width)) * 100}%`;
+  const bottom = `${((margin + documentSize.height) / Math.max(1, surfaceSize.height)) * 100}%`;
+  const bottomInset = `${(margin / Math.max(1, surfaceSize.height)) * 100}%`;
   const imageStyle = {
     left,
     top,
@@ -139,8 +133,9 @@ function CanvasStage(
   return (
     <div
       ref={props.stageRef}
-      className={stageClassName}
-      style={props.hasImage ? stagePannableStyle : undefined}
+      className={
+        props.hasImage ? stageClassName : `${stageClassName} ${emptyStagePaddingClassName}`
+      }
     >
       <div ref={props.surfaceRef} data-ui={EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI}>
         <AnnotatableImageSurface
@@ -153,7 +148,7 @@ function CanvasStage(
             data-ui="editor.canvas.document-checkerboard"
             style={
               props.hasImage && documentSize.width > 0 && documentSize.height > 0
-                ? { ...annotatableImageCheckerboardStyle, ...imageStyle }
+                ? { ...annotatableImageCheckerboardStyle, ...imageStyle, clipPath: 'inset(1px)' }
                 : { display: 'none' }
             }
           />

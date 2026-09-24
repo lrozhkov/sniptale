@@ -13,6 +13,7 @@ import type {
 type PanEventBindings = Pick<
   EditorControllerEventStateBindings,
   | 'getIsSpacePressed'
+  | 'getCanvas'
   | 'getPanSession'
   | 'getSource'
   | 'getViewportElement'
@@ -44,6 +45,7 @@ function handleViewportWheel(bindings: PanEventBindings, event: WheelEvent): voi
 }
 
 function handleViewportScroll(bindings: PanEventBindings): void {
+  bindings.getCanvas()?.requestRenderAll();
   scheduleEditorViewportStateSyncFrame({
     viewportSyncFrame: bindings.getViewportSyncFrame(),
     syncViewportState: () => bindings.syncViewportState(),

@@ -8,7 +8,7 @@ import type { EditorTextInlineStyleCommand } from '../text-formatting';
 type TransformOrigin = Pick<import('fabric').Transform, 'originX' | 'originY'>;
 
 export interface EditorControllerEventHandlers {
-  handleCanvasBeforeRender: () => void;
+  handleCanvasBeforeRender: (event: { ctx: CanvasRenderingContext2D }) => void;
   handleCanvasAfterRender: (event: { ctx: CanvasRenderingContext2D }) => void;
   handleSelectionChange: (event?: {
     deselected?: FabricObject[];

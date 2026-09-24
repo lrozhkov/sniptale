@@ -3,6 +3,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { startEditorViewportPreviewLoop } from './drawing';
+import {
+  getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
+} from '../../controller/viewport/editing-surface';
 
 function createPreviewContext() {
   const context = {
@@ -97,8 +101,11 @@ it('skips drawing when the source canvas is not drawable or context is missing',
 
 it('samples only the image rectangle from an expanded editing surface', () => {
   const { context, previewCanvas, sourceCanvas } = createPreviewContext();
-  sourceCanvas.width = 1124;
-  sourceCanvas.height = 1104;
+  const documentSize = { width: 4000, height: 3000 };
+  const surfaceSize = getEditorEditingSurfaceSize(documentSize);
+  const margin = getEditorWorkspaceMargin(documentSize);
+  sourceCanvas.width = surfaceSize.width;
+  sourceCanvas.height = surfaceSize.height;
   const callbacks: FrameRequestCallback[] = [];
   vi.stubGlobal(
     'requestAnimationFrame',
@@ -113,9 +120,61 @@ it('samples only the image rectangle from an expanded editing surface', () => {
     canvasRef: { current: sourceCanvas },
     previewCanvasRef: { current: previewCanvas },
     previewSize: { width: 100, height: 80 },
-    documentSize: { width: 100, height: 80 },
+    documentSize,
   });
   callbacks[0]?.(1000);
 
-  expect(context.drawImage).toHaveBeenCalledWith(sourceCanvas, 512, 512, 100, 80, 0, 0, 100, 80);
+  expect(context.drawImage).toHaveBeenCalledWith(
+    sourceCanvas,
+    margin,
+    margin,
+    documentSize.width,
+    documentSize.height,
+    0,
+    0,
+    100,
+    80
+  );
+});
+
+it('renders offscreen image pixels from Fabric instead of the clipped live canvas', () => {
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = 4196;
+  sourceCanvas.height = 4176;
+  const previewCanvas = document.createElement('canvas');
+  const rendered = document.createElement('canvas');
+  rendered.width = 100;
+  rendered.height = 80;
+  rendered.getContext('2d')!.fillStyle = '#ff0000';
+  rendered.getContext('2d')!.fillRect(0, 0, 100, 80);
+  const toCanvasElement = vi.fn(() => rendered);
+  const callbacks: FrameRequestCallback[] = [];
+  vi.stubGlobal('devicePixelRatio', 1);
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn((callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    })
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+
+  startEditorViewportPreviewLoop({
+    canvasRef: { current: sourceCanvas },
+    previewCanvasRef: { current: previewCanvas },
+    previewSize: { width: 100, height: 80 },
+    documentSize: { width: 100, height: 80 },
+    getCanvas: () => ({ toCanvasElement }) as never,
+  });
+  callbacks[0]?.(1000);
+
+  expect(toCanvasElement).toHaveBeenCalledWith(1, {
+    left: 2048,
+    top: 2048,
+    width: 100,
+    height: 80,
+  });
+  expect(Array.from(previewCanvas.getContext('2d')!.getImageData(50, 40, 1, 1).data)).toEqual([
+    255, 0, 0, 255,
+  ]);
 });

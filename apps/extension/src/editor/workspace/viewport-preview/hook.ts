@@ -8,7 +8,7 @@ import { navigateEditorViewportFromClientPoint } from './navigation';
 
 interface UseEditorViewportPreviewArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  controller: Pick<ImageEditorController, 'navigateViewportTo'>;
+  controller: Pick<ImageEditorController, 'navigateViewportTo' | 'canvas'>;
   hasImage: boolean;
   maxWidth?: number;
   viewport: EditorViewportMetrics;
@@ -38,6 +38,7 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
     }
     return startEditorViewportPreviewLoop({
       canvasRef: args.canvasRef,
+      getCanvas: () => args.controller.canvas,
       previewCanvasRef,
       previewSize,
       documentSize: {
@@ -47,6 +48,7 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
     });
   }, [
     args.canvasRef,
+    args.controller.canvas,
     args.hasImage,
     args.viewport.canvasWidth,
     args.viewport.canvasHeight,

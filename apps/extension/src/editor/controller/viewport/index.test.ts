@@ -10,6 +10,7 @@ import {
   getEditorViewportMetrics,
   restoreEditorViewportAnchor,
 } from './';
+import { getEditorEditingSurfaceSize } from './editing-surface';
 
 const DEFAULT_CANVAS_SIZE = { width: 200, height: 100 };
 const DEFAULT_SOURCE = { displayHeight: 100, displayWidth: 200, name: 'image.png' } as never;
@@ -258,8 +259,9 @@ it('applies viewport zoom to the fabric canvas and guards null canvases', () => 
   applyEditorViewportZoom(canvas as never, { width: 400, height: 200 }, 1.5);
   applyEditorViewportZoom(null, { width: 400, height: 200 }, 1.5);
 
+  const surface = getEditorEditingSurfaceSize({ width: 400, height: 200 });
   expect(canvas.setDimensions).toHaveBeenCalledWith(
-    { height: 1836, width: 2136 },
+    { height: Math.round(surface.height * 1.5), width: Math.round(surface.width * 1.5) },
     { cssOnly: true }
   );
   expect(canvas.calcOffset).toHaveBeenCalledOnce();
@@ -304,8 +306,9 @@ it('keeps logical viewport metrics stable when browser page zoom changes', () =>
   };
   applyEditorViewportZoom(canvas as never, { width: 200, height: 100 }, 1, 1);
 
+  const surface = getEditorEditingSurfaceSize({ width: 200, height: 100 });
   expect(canvas.setDimensions).toHaveBeenCalledWith(
-    { height: 2248, width: 2448 },
+    { height: surface.height * 2, width: surface.width * 2 },
     { cssOnly: true }
   );
 });
