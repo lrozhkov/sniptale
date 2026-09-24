@@ -72,8 +72,8 @@ it('continues resizing when the pointer moves outside the annotation plane', () 
 
   act(() => {
     host?.querySelector('[data-ui="resize"]')?.dispatchEvent(pointerEvent('pointerdown', 110, 80));
-    window.dispatchEvent(pointerEvent('pointermove', 250, 180));
-    window.dispatchEvent(pointerEvent('pointerup', 250, 180));
+    document.dispatchEvent(pointerEvent('pointermove', 250, 180));
+    document.dispatchEvent(pointerEvent('pointerup', 250, 180));
   });
 
   expect(controller.snapFrameAnnotationResizeRect).toHaveBeenCalledWith({
@@ -137,17 +137,19 @@ it('captures a fast frame move and ignores movement from another pointer', () =>
   const canvas = host.querySelector('canvas')!;
   const moveButton = host.querySelector<HTMLButtonElement>('[data-ui="move"]')!;
   moveButton.setPointerCapture = vi.fn();
+  moveButton.addEventListener('pointermove', (event) => event.stopPropagation());
+  moveButton.addEventListener('pointerup', (event) => event.stopPropagation());
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(createRect(400, 300));
 
   const down = pointerEvent('pointerdown', 20, 30, 7);
   act(() => {
     moveButton.dispatchEvent(down);
-    window.dispatchEvent(pointerEvent('pointermove', 25, 35, 7));
-    window.dispatchEvent(pointerEvent('pointermove', 30, 40, 7));
-    window.dispatchEvent(pointerEvent('pointermove', 200, 210, 8));
+    moveButton.dispatchEvent(pointerEvent('pointermove', 25, 35, 7));
+    moveButton.dispatchEvent(pointerEvent('pointermove', 30, 40, 7));
+    moveButton.dispatchEvent(pointerEvent('pointermove', 200, 210, 8));
     expect(controller.snapFrameAnnotationRect).toHaveBeenCalledTimes(2);
     animationFrames.shift()?.(0);
-    window.dispatchEvent(pointerEvent('pointerup', 30, 40, 7));
+    moveButton.dispatchEvent(pointerEvent('pointerup', 30, 40, 7));
   });
 
   expect(moveButton.setPointerCapture).toHaveBeenCalledWith(7);

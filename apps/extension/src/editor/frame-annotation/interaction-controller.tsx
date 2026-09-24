@@ -140,14 +140,14 @@ export function useFrameAnnotationInteraction(props: {
       cancelScheduledDragRender();
       finishDragRef.current(event);
     };
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerFinish);
-    window.addEventListener('pointercancel', handlePointerFinish);
+    document.addEventListener('pointermove', handlePointerMove, true);
+    document.addEventListener('pointerup', handlePointerFinish, true);
+    document.addEventListener('pointercancel', handlePointerFinish, true);
     return () => {
       cancelScheduledDragRender();
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerFinish);
-      window.removeEventListener('pointercancel', handlePointerFinish);
+      document.removeEventListener('pointermove', handlePointerMove, true);
+      document.removeEventListener('pointerup', handlePointerFinish, true);
+      document.removeEventListener('pointercancel', handlePointerFinish, true);
     };
   }, [cancelScheduledDragRender, stageDragDraft]);
   React.useEffect(
