@@ -54,12 +54,15 @@ function createAutosaveService(
     flushAutosave: vi.fn(async () => undefined),
     getDurableRevision: vi.fn(() => 0),
     getLastWriteError: vi.fn(() => null),
+    isEnabled: vi.fn(() => true),
     persistSnapshot: vi.fn(async (read) => {
       read();
     }),
     rebindAggregate: vi.fn(),
     restoreDraft: vi.fn(async () => undefined),
     scheduleAutosave: vi.fn(),
+    saveNow: vi.fn(async () => undefined),
+    setEnabled: vi.fn(),
     updateContext: vi.fn(),
     ...overrides,
   };

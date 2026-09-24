@@ -9,6 +9,22 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'В библиотеке',
     en: 'In library',
   },
+  autosaveTitle: {
+    ru: 'Автосохранение',
+    en: 'Autosave',
+  },
+  autosaveOnDescription: {
+    ru: 'Изменения автоматически сохраняются в документ.',
+    en: 'Changes are saved to this document automatically.',
+  },
+  autosaveOffDescription: {
+    ru: 'Новые изменения останутся только в редакторе и пропадут при закрытии.',
+    en: 'New changes stay in the editor and will be lost when you close it.',
+  },
+  autosaveOffStatus: {
+    ru: 'Не сохраняется',
+    en: 'Not saving',
+  },
   saveToLibrary: {
     ru: 'Сохранить в библиотеку',
     en: 'Save to library',

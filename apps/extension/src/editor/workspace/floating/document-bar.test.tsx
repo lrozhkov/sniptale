@@ -1,208 +1,22 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
-import { EditorFloatingDocumentBar } from './document-bar';
-import type { EditorFloatingDocumentController } from './document-bar';
-import type { EditorToolbarContentProps } from '../toolbar/types';
 import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
-
-const mocks = vi.hoisted(() => ({
-  autosaveDiscard: vi.fn(async () => undefined),
-  clearSelection: vi.fn(),
-  embed: {
-    mode: null as null | 'scenario',
-    onApply: null as null | (() => Promise<void>),
-    onClose: null as null | (() => void),
-  },
-  fireAndReport: vi.fn((_label: string, action: () => Promise<void> | void) => action()),
-  runAndReport: vi.fn((_label: string, action: () => Promise<void> | void) => action()),
-  exportSettings: {
-    imageFormat: 'png' as 'png' | 'jpeg' | 'webp',
-    isClipboardCopySupported: true,
-  },
-  getMediaLibraryEntry: vi.fn(),
-  commitImagePresentation: vi.fn(),
-  promoteImageAggregate: vi.fn(),
-  saveImageAggregateCopyFromDocument: vi.fn(),
-  autosaveActivate: vi.fn(),
-  autosaveRebindAggregate: vi.fn(),
-  autosaveLastWriteError: null as unknown,
-  connectAggregateEditorPresence: vi.fn(
-    (_args: { aggregate: { id: string; kind: 'image' }; promote: () => Promise<void> }) => ({
-      dispose: vi.fn(),
-    })
-  ),
-}));
-
-vi.mock('../../../workflows/aggregate-editor-presence/client', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../workflows/aggregate-editor-presence/client')>()),
-  connectAggregateEditorPresence: mocks.connectAggregateEditorPresence,
-}));
-
-vi.mock('../../../composition/persistence/media-library', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/media-library')>()),
-  getMediaLibraryEntry: mocks.getMediaLibraryEntry,
-}));
-vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
-  commitImagePresentation: mocks.commitImagePresentation,
-  promoteImageAggregate: mocks.promoteImageAggregate,
-  saveImageAggregateCopyFromDocument: mocks.saveImageAggregateCopyFromDocument,
-}));
-vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
-  dataUrlToBlob: vi.fn(async () => new Blob(['preview'], { type: 'image/png' })),
-}));
-vi.mock('../../../platform/media-utils/image-thumbnail', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/image-thumbnail')>()),
-  createImageThumbnailBlob: vi.fn(async () => new Blob(['thumbnail'], { type: 'image/webp' })),
-}));
-
-const storeState = vi.hoisted(() => ({
-  value: {
-    pageTitle: 'Captured page',
-    saveErrorMessage: null as string | null,
-    saveState: 'saved' as 'idle' | 'saving' | 'saved' | 'error',
-    sessionId: 'asset-1' as string | null,
-  },
-}));
-
-vi.mock('../../state/useEditorStore', () => ({
-  useEditorStore: (selector: (state: typeof storeState.value) => unknown) =>
-    selector(storeState.value),
-}));
-vi.mock('../../application/controller-context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../application/controller-context')>()),
-  useEditorController: () => ({
-    autosaveService: {
-      activate: mocks.autosaveActivate,
-      rebindAggregate: mocks.autosaveRebindAggregate,
-      discardDraft: mocks.autosaveDiscard,
-      flushAutosave: vi.fn(async () => undefined),
-      getDurableRevision: vi.fn(() => 1),
-      getLastWriteError: vi.fn(() => mocks.autosaveLastWriteError),
-    },
-    clearSelection: mocks.clearSelection,
-    closeDocument: vi.fn(),
-    exportDocument: vi.fn(),
-    renderForExport: vi.fn(async () => 'data:image/png;base64,YQ=='),
-  }),
-}));
-vi.mock('../../application/embed-context/context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../application/embed-context/context')>()),
-  useEditorEmbedContext: () => mocks.embed,
-}));
-vi.mock('../../runtime/async-actions', () => ({
-  fireAndReportEditorAction: mocks.fireAndReport,
-  runAndReportEditorAction: mocks.runAndReport,
-  reportEditorActionFailure: vi.fn(),
-}));
-vi.mock('../../inspector/document-actions/export-settings', () => ({
-  useEditorExportSettingsState: () => mocks.exportSettings,
-}));
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-function createController(
-  overrides: Partial<EditorFloatingDocumentController> = {}
-): EditorFloatingDocumentController {
-  return {
-    canvasSize: { height: 720, width: 1280 },
-    copyRenderedImageDisabledReason: null,
-    defaultImagePresetId: 'default',
-    onCloseDocument: vi.fn(),
-    onCopyRenderedImage: vi.fn(),
-    onExportSession: vi.fn(),
-    onImportSession: vi.fn(),
-    onOpenImage: vi.fn(),
-    onSaveImage: vi.fn(),
-    onSaveImageAs: vi.fn(),
-    savePresets: [{ id: 'default', name: 'Downloads', path: 'Downloads' }],
-    setSavePresetPickerOpen: vi.fn(),
-    saveToPreset: vi.fn(),
-    ...overrides,
-  } as unknown as EditorFloatingDocumentController;
-}
-
-function createProps(
-  overrides: Partial<EditorToolbarContentProps> = {},
-  controller: EditorFloatingDocumentController = createController()
-) {
-  return {
-    documentController: controller,
-    hasImage: true,
-    history: { canRedo: true, canUndo: true, index: 1, size: 2 },
-    onBeforeSelectionAwareAction: vi.fn(),
-    ...overrides,
-  };
-}
-
-function renderDocumentBar(props = createProps()) {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
-  act(() => {
-    root?.render(<EditorFloatingDocumentBar {...props} />);
-  });
-}
-
-function rerenderDocumentBar(props = createProps()) {
-  act(() => root?.render(<EditorFloatingDocumentBar {...props} />));
-}
-
-function createDeferred<T>() {
-  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
-  let reject: (error: Error) => void = () => undefined;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, reject, resolve };
-}
-
-function getButton(dataUi: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`[data-ui="${dataUi}"]`);
-  expect(button).not.toBeNull();
-  return button as HTMLButtonElement;
-}
-
-beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.clearAllMocks();
-  mocks.exportSettings.imageFormat = 'png';
-  mocks.exportSettings.isClipboardCopySupported = true;
-  mocks.embed.mode = null;
-  mocks.embed.onApply = null;
-  mocks.embed.onClose = null;
-  mocks.autosaveLastWriteError = null;
-  mocks.getMediaLibraryEntry.mockResolvedValue({
-    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
-  });
-  mocks.promoteImageAggregate.mockResolvedValue(undefined);
-  mocks.commitImagePresentation.mockResolvedValue(undefined);
-  mocks.saveImageAggregateCopyFromDocument.mockResolvedValue('image-copy');
-  storeState.value = {
-    pageTitle: 'Captured page',
-    saveErrorMessage: null,
-    saveState: 'saved',
-    sessionId: 'asset-1',
-  };
-});
-
-afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  root = null;
-  container?.remove();
-  container = null;
-  vi.unstubAllGlobals();
-});
+import type { EditorFloatingDocumentController } from './document-bar';
+import {
+  container,
+  mocks,
+  storeState,
+  createController,
+  createProps,
+  renderDocumentBar,
+  rerenderDocumentBar,
+  createDeferred,
+  getButton,
+  unmountDocumentBar,
+} from './document-bar.test-support';
 
 it('renders a draft badge and compact autosave marker while routing quick actions', async () => {
   const controller = createController();
@@ -269,6 +83,7 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
     button.getAttribute('data-ui')
   );
   expect(actionIds).toEqual([
+    'editor.floating.document-bar.autosave-trigger',
     'editor.floating.document-bar.promote-button',
     'editor.floating.document-bar.save-button',
     'editor.floating.document-bar.save-as-button',
@@ -321,7 +136,10 @@ it('shows storage state separately and promotes a linked draft without changing 
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.title).toBe(translate('editor.documentActions.saveToLibrary'));
-  expect(promote.textContent).toContain(translate('editor.documentActions.saveToLibrary'));
+  expect(promote.textContent).toBe('');
+  expect(promote.getAttribute('aria-label')).toBe(
+    translate('editor.documentActions.saveToLibrary')
+  );
   expect(promote.previousElementSibling?.className).toContain('flex-col');
   await act(async () => promote.click());
 
@@ -371,9 +189,10 @@ it('prevents duplicate promotion while the durable commit is pending', async () 
   expect(getButton('editor.floating.document-bar.promote-button').title).toBe(
     translate('editor.documentActions.savingToLibrary')
   );
-  expect(getButton('editor.floating.document-bar.promote-button').textContent).toContain(
+  expect(getButton('editor.floating.document-bar.promote-button').getAttribute('aria-label')).toBe(
     translate('editor.documentActions.savingToLibrary')
   );
+  expect(getButton('editor.floating.document-bar.promote-button').textContent).toBe('');
   expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   await act(async () => commit.resolve());
 });
@@ -695,10 +514,7 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
       state.saveState === 'saved' || state.saveState === 'saving' ? '' : expectedLabel
     );
     expect(container?.textContent).not.toContain('Disk error');
-    act(() => root?.unmount());
-    root = null;
-    container?.remove();
-    container = null;
+    unmountDocumentBar();
   };
 
   await renderStatus(
@@ -734,6 +550,31 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
   );
 });
 
+it('toggles autosave in its anchored status popover and keeps the library control icon-only', async () => {
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+  const trigger = getButton('editor.floating.document-bar.autosave-trigger');
+  expect(trigger.getAttribute('data-state')).toBe('saved');
+  act(() => trigger.click());
+  const popover = document.querySelector('#editor-autosave-status');
+  expect(popover?.textContent).toContain(translate('editor.documentActions.autosaveOnDescription'));
+  const toggle = popover?.querySelector<HTMLInputElement>('input[role="switch"]');
+  expect(toggle?.checked).toBe(true);
+  act(() => toggle?.click());
+  expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(false, expect.any(Function));
+  expect(trigger.getAttribute('data-state')).toBe('off');
+  expect(trigger.textContent).toBe(translate('editor.documentActions.autosaveOffStatus'));
+  expect(popover?.textContent).toContain(
+    translate('editor.documentActions.autosaveOffDescription')
+  );
+  act(() => toggle?.click());
+  expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(true, expect.any(Function));
+  expect(trigger.getAttribute('data-state')).toBe('saved');
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(trigger);
+});
+
 it('keeps apply disabled before loading and blocks duplicate apply or cancel during rendering', async () => {
   let finish!: () => void;
   const apply = vi.fn(
@@ -747,7 +588,7 @@ it('keeps apply disabled before loading and blocks duplicate apply or cancel dur
   mocks.embed.onClose = vi.fn();
   renderDocumentBar(createProps({ hasImage: false }));
   expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(true);
-  act(() => root?.render(<EditorFloatingDocumentBar {...createProps()} />));
+  rerenderDocumentBar(createProps());
   act(() => {
     getButton('editor.floating.document-bar.apply-scenario-button').click();
     getButton('editor.floating.document-bar.apply-scenario-button').click();
@@ -778,4 +619,25 @@ it('automatically opens a new error after recovery and never exposes diagnostic 
   rerenderDocumentBar();
   trigger = container?.querySelector<HTMLButtonElement>('[data-state="error"]');
   expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+});
+
+it('keeps autosave control reachable after a failed save while the mode is off', async () => {
+  mocks.autosaveEnabled = false;
+  storeState.value.saveState = 'error';
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+
+  expect(
+    container?.querySelector('[data-ui="editor.floating.document-bar.error-trigger"]')
+  ).not.toBeNull();
+  const trigger = getButton('editor.floating.document-bar.autosave-trigger');
+  expect(trigger.getAttribute('data-state')).toBe('off');
+  act(() => trigger.click());
+  const toggle = document.querySelector<HTMLInputElement>(
+    '#editor-autosave-status input[role="switch"]'
+  );
+  expect(toggle?.checked).toBe(false);
+  act(() => toggle?.click());
+  expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(true, expect.any(Function));
+  expect(trigger.getAttribute('data-state')).toBe('autosave-settings');
 });

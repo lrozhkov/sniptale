@@ -7,7 +7,7 @@ import { createImageThumbnailBlob } from '../../platform/media-utils/image-thumb
 import type { EditorDocument } from '../../features/editor/document/types';
 
 interface PromoteEditorImageToLibraryPort {
-  flushAutosave: (serialize: () => EditorDocument) => Promise<void>;
+  saveNow: (serialize: () => EditorDocument) => Promise<void>;
   getDurableRevision: () => number | null;
   serializeDocument: () => EditorDocument;
   renderPresentation: () => Promise<string>;
@@ -17,7 +17,7 @@ export async function promoteEditorImageToLibrary(args: {
   aggregateId: string;
   port: PromoteEditorImageToLibraryPort;
 }): Promise<void> {
-  await args.port.flushAutosave(args.port.serializeDocument);
+  await args.port.saveNow(args.port.serializeDocument);
   const revision = args.port.getDurableRevision();
   if (revision === null) {
     throw new Error('Image workspace revision is unavailable.');

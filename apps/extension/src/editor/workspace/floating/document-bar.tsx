@@ -1,4 +1,4 @@
-import { Check, Images, LoaderCircle } from 'lucide-react';
+import { Images, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -16,6 +16,7 @@ import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-library';
 import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
 import { DocumentSaveError } from './document-save-conflict';
+import { DocumentAutosaveStatus } from './document-autosave-status';
 import { EditorAnchoredAlert } from './anchored-feedback';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
@@ -46,7 +47,7 @@ const DOCUMENT_STORAGE_BADGE_DRAFT_CLASS_NAME = [
 ].join(' ');
 
 const DOCUMENT_PROMOTION_BUTTON_CLASS_NAME = [
-  'relative !w-auto shrink-0 gap-1.5 !px-2 whitespace-nowrap text-xs',
+  'relative shrink-0',
   'motion-safe:transition-[opacity,transform] motion-safe:duration-150',
 ].join(' ');
 
@@ -55,13 +56,6 @@ const DOCUMENT_PROMOTION_STATE_CLASS_NAME = {
   temporary:
     'scale-100 opacity-100 !bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_12%,transparent)] ' +
     '!text-[var(--sniptale-color-warning)]',
-} as const;
-
-const AUTOSAVE_TONE_CLASS_NAME = {
-  error: 'text-[var(--sniptale-color-danger)]',
-  idle: 'text-[var(--sniptale-color-text-muted)]',
-  saved: 'text-[var(--sniptale-color-success)]',
-  saving: 'text-[var(--sniptale-color-text-secondary)]',
 } as const;
 
 type InFlightDocumentOperation = {
@@ -214,7 +208,7 @@ function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, 
         await promoteEditorImageToLibrary({
           aggregateId,
           port: {
-            flushAutosave: (serialize) => autosaveService.flushAutosave(serialize),
+            saveNow: (serialize) => autosaveService.saveNow(serialize),
             getDurableRevision: () => autosaveService.getDurableRevision(),
             renderPresentation: () =>
               editorController.renderForExport({ format: 'png', quality: 1 }),
@@ -324,48 +318,6 @@ function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
   return hasImage ? translate('editor.page.documentTitle') : translate('editor.page.title');
 }
 
-function resolveAutosaveStatus(saveState: ReturnType<typeof useDocumentBarState>['saveState']) {
-  return translate(
-    saveState === 'saved'
-      ? 'common.states.saved'
-      : saveState === 'saving'
-        ? 'common.states.saving'
-        : saveState === 'error'
-          ? 'common.states.error'
-          : 'common.states.dirty'
-  );
-}
-
-function AutosaveStatus({
-  saveState,
-}: {
-  saveState: ReturnType<typeof useDocumentBarState>['saveState'];
-}) {
-  const label = resolveAutosaveStatus(saveState);
-  return (
-    <span
-      className={AUTOSAVE_TONE_CLASS_NAME[saveState]}
-      data-state={saveState}
-      role={saveState === 'saved' || saveState === 'saving' ? 'img' : undefined}
-      aria-label={label}
-      title={label}
-    >
-      {saveState === 'saved' ? (
-        <Check size={12} strokeWidth={2.4} aria-hidden="true" />
-      ) : saveState === 'saving' ? (
-        <LoaderCircle
-          size={12}
-          strokeWidth={2}
-          className="motion-safe:animate-spin"
-          aria-hidden="true"
-        />
-      ) : (
-        label
-      )}
-    </span>
-  );
-}
-
 function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
@@ -402,14 +354,17 @@ function EditorFloatingDocumentSummary(props: {
             </span>
             {storage.hasStaleConflict || props.documentState.saveState === 'error' ? (
               <DocumentSaveError
-                key={props.documentState.sessionId}
+                key={`save-error:${props.documentState.sessionId}`}
                 conflict={storage.hasStaleConflict}
                 pending={storage.promotionState === 'saving'}
                 onSaveCopy={storage.saveConflictCopy}
               />
-            ) : (
-              <AutosaveStatus saveState={props.documentState.saveState} />
-            )}
+            ) : null}
+            <DocumentAutosaveStatus
+              key={`autosave:${props.documentState.sessionId}`}
+              saveState={props.documentState.saveState}
+              hasSaveError={storage.hasStaleConflict || props.documentState.saveState === 'error'}
+            />
           </div>
         ) : null}
       </div>
@@ -431,6 +386,11 @@ function EditorFloatingDocumentSummary(props: {
           ].join(' ')}
           onClick={() => void storage.promote().catch(() => undefined)}
           dataUi="editor.floating.document-bar.promote-button"
+          aria-label={translate(
+            storage.promotionState === 'saving'
+              ? 'editor.documentActions.savingToLibrary'
+              : 'editor.documentActions.saveToLibrary'
+          )}
         >
           {storage.promotionState === 'saving' ? (
             <LoaderCircle
@@ -442,13 +402,6 @@ function EditorFloatingDocumentSummary(props: {
           ) : (
             <Images size={16} strokeWidth={2} aria-hidden="true" />
           )}
-          <span className="max-[1799px]:sr-only">
-            {translate(
-              storage.promotionState === 'saving'
-                ? 'editor.documentActions.savingToLibrary'
-                : 'editor.documentActions.saveToLibrary'
-            )}
-          </span>
         </ContentToolbarButton>
       ) : null}
       {storage.promotionState === 'error' ? (

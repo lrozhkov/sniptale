@@ -24,6 +24,7 @@ export function activateAutosaveContext(
   state.pendingDocument = null;
   state.lastWriteError = null;
   state.activeContext = context;
+  if (!options.preserveHydratedDocument) state.enabled = true;
   useEditorStore.getState().setSessionId(context.aggregateId);
 }
 
@@ -31,7 +32,9 @@ export function rebindAutosaveAggregate(
   state: EditorSessionAutosaveState,
   context: ActiveEditorSessionContext
 ): void {
+  const enabled = state.enabled;
   activateAutosaveContext(state, context, { preserveHydratedDocument: true });
+  state.enabled = enabled;
 }
 
 export function updateAutosaveContext(
@@ -87,6 +90,7 @@ export async function discardAutosaveDraft(
   state.pendingDocument = null;
   state.lastWriteError = null;
   state.activeContext = null;
+  state.enabled = true;
   useEditorStore.getState().setSessionId(null);
   setEditorSaveState('idle');
 }

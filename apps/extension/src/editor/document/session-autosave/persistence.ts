@@ -99,7 +99,8 @@ async function persistEditorSessionDocument(args: {
 
 function enqueueEditorSessionDocument(
   state: EditorSessionAutosaveState,
-  document: EditorDocument
+  document: EditorDocument,
+  explicit = false
 ): Promise<void> {
   const context = state.activeContext;
   if (!context) {
@@ -113,12 +114,14 @@ function enqueueEditorSessionDocument(
   state.writeChain = state.writeChain
     .catch(() => undefined)
     .then(() =>
-      persistEditorSessionDocument({
-        context,
-        document,
-        revision,
-        state,
-      })
+      !explicit && !state.enabled
+        ? undefined
+        : persistEditorSessionDocument({
+            context,
+            document,
+            revision,
+            state,
+          })
     );
 
   return state.writeChain;
@@ -128,7 +131,7 @@ export function queuePendingAutosave(
   state: EditorSessionAutosaveState,
   document: EditorDocument
 ): void {
-  if (!state.activeContext) {
+  if (!state.activeContext || !state.enabled) {
     return;
   }
 
@@ -141,7 +144,7 @@ export function queuePendingAutosave(
 
     const snapshot = state.pendingDocument;
     state.pendingDocument = null;
-    if (!snapshot) {
+    if (!snapshot || !state.enabled) {
       return;
     }
 
@@ -153,7 +156,7 @@ export async function flushPendingAutosave(
   state: EditorSessionAutosaveState,
   getDocument: () => EditorDocument
 ): Promise<void> {
-  if (!state.activeContext) {
+  if (!state.activeContext || !state.enabled) {
     return;
   }
 
@@ -168,12 +171,21 @@ export async function persistAutosaveSnapshot(
   state: EditorSessionAutosaveState,
   getDocument: () => EditorDocument
 ): Promise<void> {
-  if (!state.activeContext) {
+  if (!state.activeContext || !state.enabled) {
     return;
   }
 
+  await saveEditorSessionSnapshot(state, getDocument);
+}
+
+export async function saveEditorSessionSnapshot(
+  state: EditorSessionAutosaveState,
+  getDocument: () => EditorDocument
+): Promise<void> {
+  if (!state.activeContext) return;
+
   clearPendingAutosaveTimer(state);
   state.pendingDocument = null;
-  await enqueueEditorSessionDocument(state, getDocument());
+  await enqueueEditorSessionDocument(state, getDocument(), true);
   if (state.lastWriteError) throw state.lastWriteError;
 }

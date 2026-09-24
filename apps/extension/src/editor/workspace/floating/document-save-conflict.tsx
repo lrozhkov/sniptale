@@ -16,7 +16,7 @@ interface DocumentSaveErrorProps {
   onSaveCopy: () => Promise<void>;
 }
 
-function useErrorPosition(anchor: HTMLElement | null, layer: HTMLDivElement | null) {
+function useDocumentStatusPosition(anchor: HTMLElement | null, layer: HTMLDivElement | null) {
   const [position, setPosition] = useState<{ style: CSSProperties; arrow: number }>({
     style: { position: 'fixed', visibility: 'hidden', width: 340 },
     arrow: 24,
@@ -54,13 +54,13 @@ function useErrorPosition(anchor: HTMLElement | null, layer: HTMLDivElement | nu
   return position;
 }
 
-function useErrorPopover() {
-  const [open, setOpen] = useState(true);
+export function useDocumentStatusPopover(initialOpen = false) {
+  const [open, setOpen] = useState(initialOpen);
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const [layer, setLayer] = useState<HTMLDivElement | null>(null);
   const manualOpen = useRef(false);
-  const position = useErrorPosition(anchor, layer);
+  const position = useDocumentStatusPosition(anchor, layer);
   const close = () => {
     setOpen(false);
     anchor?.focus({ preventScroll: true });
@@ -105,7 +105,7 @@ function useErrorPopover() {
 
 export function DocumentSaveError(props: DocumentSaveErrorProps) {
   const { open, setOpen, anchor, setAnchor, layerRef, manualOpen, position, close } =
-    useErrorPopover();
+    useDocumentStatusPopover(true);
 
   return (
     <>

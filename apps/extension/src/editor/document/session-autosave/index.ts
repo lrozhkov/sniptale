@@ -8,8 +8,15 @@ import {
   restoreAutosaveDraft,
   updateAutosaveContext,
 } from './lifecycle';
-import { flushPendingAutosave, persistAutosaveSnapshot, queuePendingAutosave } from './persistence';
 import {
+  flushPendingAutosave,
+  persistAutosaveSnapshot,
+  queuePendingAutosave,
+  saveEditorSessionSnapshot,
+  setEditorSaveState,
+} from './persistence';
+import {
+  clearPendingAutosaveTimer,
   createAutosaveState,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
@@ -26,6 +33,9 @@ export interface EditorSessionAutosaveService {
   scheduleAutosave: (document: EditorDocument) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
+  saveNow: (getDocument: () => EditorDocument) => Promise<void>;
+  isEnabled: () => boolean;
+  setEnabled: (enabled: boolean, getDocument?: () => EditorDocument) => void;
   discardDraft: (aggregateId?: string | null) => Promise<void>;
   getDurableRevision: () => number | null;
   getLastWriteError: () => unknown | null;
@@ -45,6 +55,19 @@ function createEditorSessionAutosaveActions(
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
     flushAutosave: (getDocument) => flushPendingAutosave(state, getDocument),
     persistSnapshot: (getDocument) => persistAutosaveSnapshot(state, getDocument),
+    saveNow: (getDocument) => saveEditorSessionSnapshot(state, getDocument),
+    isEnabled: () => state.enabled,
+    setEnabled: (enabled, getDocument) => {
+      if (state.enabled === enabled) return;
+      state.enabled = enabled;
+      clearPendingAutosaveTimer(state);
+      state.pendingDocument = null;
+      if (enabled && state.activeContext && getDocument) {
+        queuePendingAutosave(state, getDocument());
+      } else if (!enabled) {
+        setEditorSaveState('idle');
+      }
+    },
     discardDraft: (aggregateId) => discardAutosaveDraft(state, aggregateId),
     getDurableRevision: () => state.activeContext?.durableRevision ?? null,
     getLastWriteError: () => state.lastWriteError,
