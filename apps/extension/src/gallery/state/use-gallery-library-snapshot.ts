@@ -20,6 +20,9 @@ import {
 } from '../../composition/persistence/library-lifecycle';
 import { listAggregatePresentations } from '../../composition/persistence/aggregate-presentations';
 import { backfillScenarioLibraryAssets } from '../../composition/persistence/scenario/library-publication';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'GalleryLibrarySnapshot' });
 
 async function loadScenarioExports(projectId: string) {
   return [projectId, await listScenarioExportRecords(projectId)] as const;
@@ -35,7 +38,11 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
 }> {
   await backfillScenarioLibraryAssets();
   const settings = await loadSettings().catch(() => null);
-  if (settings) await cleanupDrafts({ policy: settings.localStoragePolicy });
+  if (settings) {
+    await cleanupDrafts({ policy: settings.localStoragePolicy }).catch(() => {
+      logger.warn('Draft maintenance failed; showing current library items.');
+    });
+  }
   const policy = settings?.localStoragePolicy ?? DEFAULT_LOCAL_STORAGE_POLICY;
   const [mediaItems, scenarioProjects, thumbnailIds, estimate, videoProjects, presentations] =
     await Promise.all([

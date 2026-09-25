@@ -38,6 +38,7 @@ vi.mock('../assets', async (importOriginal) => ({
   deleteAssetObject: mocks.deleteAssetObject,
   discardPreparedAsset: mocks.discardPreparedAsset,
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
+  readAssetFile: vi.fn(async () => new File(['original'], 'image.png', { type: 'image/png' })),
   recoverStandaloneAssetPublications: mocks.recoverStandalone,
   releaseAssetReadyProtection: mocks.releaseProtection,
   writeBlobToAsset: vi.fn(async (blob: Blob) => {
@@ -251,4 +252,130 @@ it('recovers a losing two-tab publication when the winning role owns a different
   expect(mocks.recoverStandalone).toHaveBeenCalledTimes(3);
   expect(mocks.deleteAssetObject).toHaveBeenCalledWith(losingAssetId);
   expect(mocks.deleteAssetObject).not.toHaveBeenCalledWith(winnerAssetId);
+});
+
+it.each([
+  ['malformed root', 'media_library', { id: 'image-1' }],
+  ['orphan workspace', 'image_workspaces', { aggregateId: 'image-1' }],
+  ['orphan presentation', 'aggregate_presentations', { aggregateId: 'image-1' }],
+])(
+  'discards a pending image copy when its id has an occupied %s',
+  async (_, occupiedStore, row) => {
+    const document = createEditorDocumentFixture();
+    document.frame.backgroundImageData = 'data:image/png;base64,Y2hhbmdlZA==';
+    await commitImageWorkspace({ aggregateId: 'image-1', document, expectedRevision: 2 });
+    const journal = await mocks.createJournal.mock.results[0]!.value;
+    const copyJournal = {
+      ...journal,
+      payload: { ...journal.payload, requireMissingRoot: true },
+    };
+    mocks.runMutation.mockClear();
+    mocks.initDB.mockResolvedValue({
+      get: vi.fn(async (store: string) => (store === occupiedStore ? row : undefined)),
+    });
+
+    await expect(imageWorkspacePublicationAdapter.publish(copyJournal)).resolves.toBeUndefined();
+    expect(mocks.runMutation).not.toHaveBeenCalled();
+    expect(mocks.deleteAssetObject).toHaveBeenCalledWith(copyJournal.assetRefs[0].assetId);
+  }
+);
+
+it('keeps staged bytes when an occupied copy id has ambiguous asset ownership', async () => {
+  const document = createEditorDocumentFixture();
+  document.frame.backgroundImageData = 'data:image/png;base64,Y2hhbmdlZA==';
+  await commitImageWorkspace({ aggregateId: 'image-1', document, expectedRevision: 2 });
+  const journal = await mocks.createJournal.mock.results[0]!.value;
+  expect(journal.assetRefs).toHaveLength(2);
+  const stagedRef = journal.assetRefs[1];
+  mocks.initDB.mockResolvedValue({
+    get: vi.fn(async (store: string, key: unknown) => {
+      if (store === 'media_library') return { id: 'image-1' };
+      if (store === 'asset_refs' && key === stagedRef.assetId) return stagedRef;
+      return undefined;
+    }),
+  });
+  mocks.deleteAssetObject.mockClear();
+
+  await expect(
+    imageWorkspacePublicationAdapter.publish({
+      ...journal,
+      payload: { ...journal.payload, requireMissingRoot: true },
+    })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+});
+
+it('discards an orphan workspace even when its document matches a pending copy', async () => {
+  const document = createEditorDocumentFixture();
+  document.frame.backgroundImageData = 'data:image/png;base64,Y2hhbmdlZA==';
+  await commitImageWorkspace({ aggregateId: 'image-1', document, expectedRevision: 2 });
+  const journal = await mocks.createJournal.mock.results[0]!.value;
+  const workspace = {
+    aggregateId: 'image-1',
+    createdAt: 1,
+    document: journal.payload.document,
+    revision: 3,
+    sourceTitle: null,
+    sourceUrl: null,
+    updatedAt: 1,
+  };
+  mocks.initDB.mockResolvedValue({
+    get: vi.fn(async (store: string) => (store === 'image_workspaces' ? workspace : undefined)),
+  });
+  mocks.deleteAssetObject.mockClear();
+
+  await imageWorkspacePublicationAdapter.publish({
+    ...journal,
+    payload: { ...journal.payload, requireMissingRoot: true },
+  });
+
+  expect(mocks.deleteAssetObject).toHaveBeenCalledWith(journal.assetRefs[0].assetId);
+});
+
+it('keeps bytes of an already committed copy during journal replay', async () => {
+  const document = createEditorDocumentFixture();
+  document.frame.backgroundImageData = 'data:image/png;base64,Y2hhbmdlZA==';
+  await commitImageWorkspace({ aggregateId: 'image-1', document, expectedRevision: 2 });
+  const journal = await mocks.createJournal.mock.results[0]!.value;
+  const workspace = {
+    aggregateId: 'image-1',
+    createdAt: 1,
+    document: journal.payload.document,
+    revision: 3,
+    sourceTitle: null,
+    sourceUrl: null,
+    updatedAt: 1,
+  };
+  mocks.initDB.mockResolvedValue({
+    get: vi.fn(async (store: string, key: unknown) => {
+      if (store === 'image_workspaces') return workspace;
+      if (store === 'media_library') return createMediaRoot(3);
+      if (store === 'asset_refs') {
+        return journal.assetRefs.find((ref: { assetId: string }) => ref.assetId === key);
+      }
+      if (store === 'asset_owners' && Array.isArray(key)) {
+        const ownedAsset = journal.payload.document.assets.find(
+          (asset: { role: string }) => asset.role === key[2]
+        );
+        if (!ownedAsset) return undefined;
+        return {
+          assetId: ownedAsset.assetId,
+          ownerId: 'image-1',
+          ownerKind: 'image-workspace',
+          role: ownedAsset.role,
+        };
+      }
+      return undefined;
+    }),
+  });
+  mocks.deleteAssetObject.mockClear();
+  mocks.runMutation.mockClear();
+
+  await imageWorkspacePublicationAdapter.publish({
+    ...journal,
+    payload: { ...journal.payload, requireMissingRoot: true },
+  });
+
+  expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+  expect(mocks.runMutation).not.toHaveBeenCalled();
 });

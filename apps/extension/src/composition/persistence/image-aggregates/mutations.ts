@@ -443,18 +443,30 @@ async function publishImageWorkspaceJournal(
     await db.get(IMAGE_WORKSPACES_STORE, input.aggregateId)
   );
   if (
+    !input.requireMissingRoot &&
     existing?.revision === input.expectedRevision + 1 &&
     JSON.stringify(existing.document) === JSON.stringify(input.document)
   ) {
     return { revision: existing.revision, updatedAt: existing.updatedAt };
   }
-  const existingMedia = parseMediaLibraryEntry(
-    await db.get(MEDIA_LIBRARY_STORE, input.aggregateId)
+  const rawMedia: unknown = await db.get(MEDIA_LIBRARY_STORE, input.aggregateId);
+  const rawWorkspace: unknown = await db.get(IMAGE_WORKSPACES_STORE, input.aggregateId);
+  const rawPresentation: unknown = await db.get(
+    AGGREGATE_PRESENTATIONS_STORE,
+    createAggregatePresentationKey({ id: input.aggregateId, kind: 'image' })
   );
+  const existingMedia = parseMediaLibraryEntry(rawMedia);
+  const occupiedSidecar = rawWorkspace !== undefined || rawPresentation !== undefined;
+  const incompatibleRoot =
+    rawMedia !== undefined && (!existingMedia || !isEditableImageAggregateRoot(existingMedia));
   const permanentlySuperseded = input.requireMissingRoot
-    ? existingMedia !== null
-    : (existingMedia?.workspaceRevision ?? 0) !== input.expectedRevision;
+    ? rawMedia !== undefined || occupiedSidecar
+    : incompatibleRoot ||
+      (rawMedia === undefined && occupiedSidecar) ||
+      (rawWorkspace !== undefined && !parseImageWorkspaceEntry(rawWorkspace)) ||
+      (existingMedia?.workspaceRevision ?? 0) !== input.expectedRevision;
   if (allowSuperseded && permanentlySuperseded) {
+    const unownedStagedAssetIds: string[] = [];
     for (const stagedRef of journal.assetRefs) {
       const ref: unknown = await db.get(ASSET_REFS_STORE, stagedRef.assetId);
       const roles = input.document.assets
@@ -474,9 +486,9 @@ async function publishImageWorkspaceJournal(
       if ((ref !== undefined) !== isOwnedByThisWorkspace) {
         throw new StaleImageWorkspaceError(input.aggregateId);
       }
-      if (isOwnedByThisWorkspace) continue;
-      await deleteAssetObject(stagedRef.assetId);
+      if (!isOwnedByThisWorkspace) unownedStagedAssetIds.push(stagedRef.assetId);
     }
+    for (const assetId of unownedStagedAssetIds) await deleteAssetObject(assetId);
     return null;
   }
   const sourceRef = input.refs.find((ref) => ref.assetId === input.document.sourceImage.assetId);

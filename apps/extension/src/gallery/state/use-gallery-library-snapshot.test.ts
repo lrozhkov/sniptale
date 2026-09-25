@@ -200,4 +200,27 @@ describe('loadGalleryLibrarySnapshot', () => {
     await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems: [] });
     expect(cleanupDraftsMock).not.toHaveBeenCalled();
   });
+
+  it('still shows library items when draft maintenance is blocked by an image journal', async () => {
+    const mediaItems = [{ id: 'image-1' }];
+    const nextItems = [{ id: 'image-1' }];
+    loadSettingsMock.mockResolvedValueOnce({
+      localStoragePolicy: {
+        cleanupEnabled: true,
+        defaultDestination: 'temporary',
+        draftRetentionDays: 30,
+        videoDraftRetentionDays: 7,
+      },
+    });
+    cleanupDraftsMock.mockRejectedValueOnce(new Error('image journal collision'));
+    listMediaLibraryMock.mockResolvedValue(mediaItems);
+    listVideoProjectsMock.mockResolvedValue([]);
+    listScenarioProjectSummariesMock.mockResolvedValue([]);
+    listMediaThumbnailIdsMock.mockResolvedValue([]);
+    getStorageEstimateInfoMock.mockResolvedValue({ quota: 100, usage: 20 });
+    createGalleryItemsMock.mockReturnValue(nextItems);
+
+    await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems });
+    expect(listMediaLibraryMock).toHaveBeenCalledWith();
+  });
 });
