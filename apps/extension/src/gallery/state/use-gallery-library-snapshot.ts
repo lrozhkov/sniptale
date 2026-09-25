@@ -14,6 +14,7 @@ import { isGalleryMediaItem } from '../library/items';
 import { isGalleryVideoProjectItem } from '../library/items';
 import { loadSettings } from '../../composition/persistence/settings';
 import {
+  cleanupDrafts,
   DEFAULT_LOCAL_STORAGE_POLICY,
   getDraftRetentionMs,
 } from '../../composition/persistence/library-lifecycle';
@@ -33,23 +34,18 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
   nextItems: GalleryItem[];
 }> {
   await backfillScenarioLibraryAssets();
-  const [
-    mediaItems,
-    scenarioProjects,
-    thumbnailIds,
-    estimate,
-    videoProjects,
-    settings,
-    presentations,
-  ] = await Promise.all([
-    listMediaLibrary(),
-    listScenarioProjectSummaries(),
-    listMediaThumbnailIds(),
-    getStorageEstimateInfo(),
-    listVideoProjects(),
-    loadSettings().catch(() => ({ localStoragePolicy: DEFAULT_LOCAL_STORAGE_POLICY })),
-    listAggregatePresentations(),
-  ]);
+  const settings = await loadSettings().catch(() => null);
+  if (settings) await cleanupDrafts({ policy: settings.localStoragePolicy });
+  const policy = settings?.localStoragePolicy ?? DEFAULT_LOCAL_STORAGE_POLICY;
+  const [mediaItems, scenarioProjects, thumbnailIds, estimate, videoProjects, presentations] =
+    await Promise.all([
+      listMediaLibrary(),
+      listScenarioProjectSummaries(),
+      listMediaThumbnailIds(),
+      getStorageEstimateInfo(),
+      listVideoProjects(),
+      listAggregatePresentations(),
+    ]);
   const scenarioExportsByProject = await loadScenarioExportsByProject(
     scenarioProjects.map((project) => project.id)
   );
@@ -66,7 +62,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
     }).map((item) => {
       if (item.lifecycle?.storageClass !== 'temporary') return item;
       const retention = getDraftRetentionMs(
-        settings.localStoragePolicy,
+        policy,
         (isGalleryMediaItem(item) && item.source.kind === 'recording') ||
           (isGalleryVideoProjectItem(item) && item.project.retentionKind === 'video')
           ? 'video'

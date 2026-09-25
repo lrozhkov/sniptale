@@ -14,6 +14,8 @@ import {
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { createProjectMutationStores } from './mutation-stores';
+import { collectVideoProjectReferences } from '../library-lifecycle/references';
+import { promoteLinkedRecordingLifecycles } from '../library-lifecycle/project-recordings';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import {
   collectProjectOwnedAssetIds,
@@ -91,6 +93,7 @@ export async function saveVideoProject(
       videoDraftStore,
       projectAssetStore,
       projectStore,
+      recordingStore,
       tx,
     } = createProjectMutationStores(db);
     const existing = parseVideoProjectEntry(await projectStore.get(project.id));
@@ -119,14 +122,13 @@ export async function saveVideoProject(
       workspaceRevision: (existing?.workspaceRevision ?? 0) + 1,
     };
 
-    await projectStore.put(entry);
-    await syncProjectAssetMirrorLifecycles({
-      lifecycle: entry.lifecycle!,
+    await persistProjectReferences({
+      entry,
       mediaLibraryStore,
       now,
-      ownerProjectId: project.id,
       projectAssetIds: nextProjectAssetIds,
       projectStore,
+      recordingStore,
     });
     await deleteProjectAssetsUnreferencedByOtherProjects({
       assetOwnerStore,
@@ -149,6 +151,31 @@ export async function saveVideoProject(
   });
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
   return saved;
+}
+
+async function persistProjectReferences(args: {
+  entry: VideoProjectEntry;
+  mediaLibraryStore: ReturnType<typeof createProjectMutationStores>['mediaLibraryStore'];
+  now: number;
+  projectAssetIds: ReadonlySet<string>;
+  projectStore: ReturnType<typeof createProjectMutationStores>['projectStore'];
+  recordingStore: ReturnType<typeof createProjectMutationStores>['recordingStore'];
+}): Promise<void> {
+  await args.projectStore.put(args.entry);
+  await promoteLinkedRecordingLifecycles({
+    mediaStore: args.mediaLibraryStore,
+    now: args.now,
+    recordingIds: collectVideoProjectReferences(args.entry).recordingIds,
+    recordingStore: args.recordingStore,
+  });
+  await syncProjectAssetMirrorLifecycles({
+    lifecycle: args.entry.lifecycle!,
+    mediaLibraryStore: args.mediaLibraryStore,
+    now: args.now,
+    ownerProjectId: args.entry.id,
+    projectAssetIds: args.projectAssetIds,
+    projectStore: args.projectStore,
+  });
 }
 
 function buildSavedProjectLifecycle(

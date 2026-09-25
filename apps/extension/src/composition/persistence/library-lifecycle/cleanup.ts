@@ -40,6 +40,7 @@ import { resolveVideoProjectRetentionKind } from '../../../features/media-hub/vi
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import { getDraftRetentionMs } from './policy';
 import { collectVideoProjectReferences } from './references';
+import { repairLinkedRecordingLifecycles } from './project-recordings';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -86,6 +87,7 @@ export async function cleanupDrafts(args: {
   await recoverProjectMediaPublications();
   await recoverImageWorkspacePublications();
   const now = args.now ?? Date.now();
+  await repairLinkedRecordingLifecycles(now);
   const ordinaryRetention = getDraftRetentionMs(args.policy, 'ordinary');
   const videoRetention = getDraftRetentionMs(args.policy, 'video');
   const [media, videoProjects, scenarioProjects] = await Promise.all([

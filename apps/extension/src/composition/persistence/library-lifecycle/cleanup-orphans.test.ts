@@ -23,6 +23,10 @@ vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
 }));
+vi.mock('./project-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./project-recordings')>()),
+  repairLinkedRecordingLifecycles: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
   listMediaLibrary: persistenceMocks.listMediaLibrary,

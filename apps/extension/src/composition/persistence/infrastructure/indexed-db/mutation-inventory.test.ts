@@ -21,6 +21,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
   'apps/extension/src/composition/persistence/web-snapshots/backup-restore.ts',
+  // Called only from media root publication under its active mutation permit.
+  'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media-owner-release.ts',
 ]);
 const indexedDbMutationPattern =
   /(?:\b(?:db|tx|store|cursor)|\b\w+Store)\.(?:put|delete|clear)\s*\(|\.transaction\([\s\S]{0,180}?["']readwrite["']/m;

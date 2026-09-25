@@ -11,6 +11,7 @@ const {
   loadSettingsMock,
   listAggregatePresentationsMock,
   backfillScenarioLibraryAssetsMock,
+  cleanupDraftsMock,
 } = vi.hoisted(() => ({
   createGalleryItemsMock: vi.fn(),
   getStorageEstimateInfoMock: vi.fn(),
@@ -22,6 +23,11 @@ const {
   loadSettingsMock: vi.fn(),
   listAggregatePresentationsMock: vi.fn().mockResolvedValue([]),
   backfillScenarioLibraryAssetsMock: vi.fn().mockResolvedValue(0),
+  cleanupDraftsMock: vi.fn().mockResolvedValue({ deletedCount: 0, deletedIds: [] }),
+}));
+
+vi.mock('../../composition/persistence/library-lifecycle/cleanup', () => ({
+  cleanupDrafts: cleanupDraftsMock,
 }));
 
 vi.mock('../../composition/persistence/scenario/library-publication', () => ({
@@ -116,6 +122,12 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(backfillScenarioLibraryAssetsMock.mock.invocationCallOrder[0]).toBeLessThan(
       listMediaLibraryMock.mock.invocationCallOrder[0]!
     );
+    expect(cleanupDraftsMock).toHaveBeenCalledWith({
+      policy: expect.objectContaining({ cleanupEnabled: true }),
+    });
+    expect(cleanupDraftsMock.mock.invocationCallOrder[0]).toBeLessThan(
+      listMediaLibraryMock.mock.invocationCallOrder[0]!
+    );
     expect(listMediaLibraryMock).toHaveBeenCalledTimes(1);
     expect(listVideoProjectsMock).toHaveBeenCalledTimes(1);
     expect(listScenarioProjectSummariesMock).toHaveBeenCalledTimes(1);
@@ -173,5 +185,19 @@ describe('loadGalleryLibrarySnapshot', () => {
       expect.objectContaining({ expiresAt: 2_000 + 7 * 24 * 60 * 60 * 1_000 }),
       expect.objectContaining({ id: 'library-1' }),
     ]);
+  });
+
+  it('does not delete drafts under default retention when settings cannot be read', async () => {
+    cleanupDraftsMock.mockClear();
+    loadSettingsMock.mockRejectedValueOnce(new Error('settings unavailable'));
+    listMediaLibraryMock.mockResolvedValue([]);
+    listVideoProjectsMock.mockResolvedValue([]);
+    listScenarioProjectSummariesMock.mockResolvedValue([]);
+    listMediaThumbnailIdsMock.mockResolvedValue([]);
+    getStorageEstimateInfoMock.mockResolvedValue({ quota: 100, usage: 20 });
+    createGalleryItemsMock.mockReturnValue([]);
+
+    await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems: [] });
+    expect(cleanupDraftsMock).not.toHaveBeenCalled();
   });
 });

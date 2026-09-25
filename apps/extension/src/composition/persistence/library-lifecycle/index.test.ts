@@ -40,6 +40,10 @@ vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
 }));
+vi.mock('./project-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./project-recordings')>()),
+  repairLinkedRecordingLifecycles: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('../aggregate-presentations', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../aggregate-presentations')>()),

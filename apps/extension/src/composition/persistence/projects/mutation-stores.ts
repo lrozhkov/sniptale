@@ -10,6 +10,7 @@ import {
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
+  STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 
@@ -19,6 +20,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
   const tx = db.transaction(
     [
       VIDEO_PROJECTS_STORE,
+      STORE_NAME,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
@@ -38,6 +40,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
     videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
+    recordingStore: tx.objectStore(STORE_NAME),
     tx,
   };
 }
