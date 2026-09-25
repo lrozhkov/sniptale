@@ -199,6 +199,34 @@ it('loads preview blobs and seeds filename and tag drafts from the selected item
   expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
 });
 
+it('loads a scenario image preview from its stored asset', async () => {
+  const blob = new Blob(['image'], { type: 'image/png' });
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  getMediaAssetBlobMock.mockResolvedValue(blob);
+
+  act(() => {
+    root?.render(<HookProbe onValue={(value) => values.push(value)} />);
+  });
+  const latest = () => values.at(-1);
+  act(() => {
+    latest()?.actions.setPreview({
+      inspectorCollapsed: false,
+      item: {
+        ...createItem(),
+        kind: 'image',
+        source: { kind: 'stored-asset', assetId: 'asset-1' },
+      },
+      url: null,
+    });
+  });
+  await flushEffects();
+
+  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('asset-1');
+  expect(getAggregatePreviewBlobMock).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+  expect(latest()?.state.session.url).toBe('blob:preview');
+});
+
 it('clears preview url when no item is selected and tolerates null or failed blob loads', async () => {
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
   getAggregatePreviewBlobMock

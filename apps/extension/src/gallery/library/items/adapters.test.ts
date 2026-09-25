@@ -27,6 +27,26 @@ function createMediaLibraryItem(overrides: Partial<MediaLibraryItem> = {}): Medi
   };
 }
 
+it('keeps stored scenario images on the media thumbnail path without an aggregate revision', () => {
+  const [item] = createGalleryItems({
+    mediaItems: [
+      createMediaLibraryItem({
+        id: 'scenario-image-1',
+        source: { kind: 'stored-asset', assetId: 'scenario-image-1' },
+        hasThumbnail: true,
+        workspaceRevision: 0,
+      }),
+    ],
+    scenarioExportsByProjectId: new Map(),
+    scenarioProjects: [],
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+
+  expect(item?.hasThumbnail).toBe(true);
+  expect(item?.presentationRevision).toBeUndefined();
+});
+
 it('creates a mixed gallery list with scenario and export items sorted by freshness', () => {
   const scenarioProject = {
     availability: 'available' as const,

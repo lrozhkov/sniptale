@@ -76,7 +76,7 @@ async function loadPreviewBlob(
   }
 
   const assetId = previewItem.entityId ?? previewItem.id;
-  if (previewItem.kind === 'image' || previewItem.kind === 'screenshot') {
+  if (previewItem.source.kind === 'screenshot') {
     return (await getAggregatePreviewBlob({ id: assetId, kind: 'image' })) ?? null;
   }
   if (previewItem.kind === 'web-archive') {

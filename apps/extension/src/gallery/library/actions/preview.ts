@@ -80,7 +80,7 @@ async function withPreviewItemBlob(
   await withBusy(async () => {
     const assetId = previewItem.entityId ?? previewItem.id;
     const blob =
-      previewItem.kind === 'image' || previewItem.kind === 'screenshot'
+      previewItem.source.kind === 'screenshot'
         ? await getAggregatePreviewBlob({ id: assetId, kind: 'image' })
         : await getMediaAssetBlob(assetId);
     if (!blob) {

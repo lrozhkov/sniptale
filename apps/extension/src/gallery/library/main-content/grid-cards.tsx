@@ -20,6 +20,7 @@ function cx(...values: Array<string | false | null | undefined>) {
 
 function isGalleryPreviewUpdating(item: GalleryItem): boolean {
   return (
+    (!isGalleryMediaItem(item) || item.source.kind === 'screenshot') &&
     item.kind !== 'video-project' &&
     item.workspaceRevision !== undefined &&
     item.presentationRevision !== undefined &&

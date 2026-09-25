@@ -94,6 +94,30 @@ it('returns existing thumbnails without rebuilding them', async () => {
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
 });
 
+it('renders a scenario image thumbnail from its stored asset', async () => {
+  const source = new Blob(['image'], { type: 'image/png' });
+  const thumbnail = new Blob(['thumbnail'], { type: 'image/png' });
+  getMediaThumbnailMock.mockResolvedValue(undefined);
+  getMediaAssetBlobMock.mockResolvedValue(source);
+  createImageThumbnailBlobMock.mockResolvedValue(thumbnail);
+
+  const result = await ensureGalleryItemThumbnail(
+    createMediaItem({
+      id: 'scenario-image-1',
+      kind: 'image',
+      source: { kind: 'stored-asset', assetId: 'scenario-image-1' },
+    })
+  );
+
+  expect(getAggregatePresentationMock).not.toHaveBeenCalled();
+  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('scenario-image-1');
+  expect(createImageThumbnailBlobMock).toHaveBeenCalledWith(source, 320, 180, undefined);
+  expect(saveMediaThumbnailMock).toHaveBeenCalledWith(
+    expect.objectContaining({ assetId: 'scenario-image-1', blob: thumbnail })
+  );
+  expect(result?.blob).toBe(thumbnail);
+});
+
 it('rebuilds legacy video thumbnails with the current renderer revision', async () => {
   const legacyThumbnail = {
     assetId: 'asset-1',

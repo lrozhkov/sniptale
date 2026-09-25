@@ -163,6 +163,26 @@ async function verifyPreviewDownloadAndCopyFlows() {
   expect(setIsBusy).toHaveBeenLastCalledWith(false);
 }
 
+it('downloads and copies scenario images from the stored asset', async () => {
+  const blob = new Blob(['image'], { type: 'image/png' });
+  const { controller } = createController({
+    previewItem: createMediaItem({
+      id: 'scenario-image-1',
+      kind: 'image',
+      source: { kind: 'stored-asset', assetId: 'scenario-image-1' },
+    }),
+  });
+  getMediaAssetBlobMock.mockResolvedValue(blob);
+
+  await downloadPreviewItem(controller, createRunBusy());
+  await copyPreviewItem(controller, createRunBusy());
+
+  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('scenario-image-1');
+  expect(getAggregatePreviewBlobMock).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+  expect(writeBrowserClipboardItemsMock).toHaveBeenCalledTimes(1);
+});
+
 async function verifyPreviewErrorBannerFlow() {
   const { controller } = createController({
     previewItem: createMediaItem({ id: 'asset-2', filename: 'broken.png' }),

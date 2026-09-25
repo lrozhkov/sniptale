@@ -13,7 +13,11 @@ function resolveEditableAggregateRef(item: GalleryItem) {
   if (item.type === 'scenario') {
     return { id: item.entityId, kind: 'scenario' as const };
   }
-  if (item.type === 'media' && (item.kind === 'image' || item.kind === 'screenshot')) {
+  if (
+    item.type === 'media' &&
+    (item.kind === 'image' || item.kind === 'screenshot') &&
+    item.source.kind === 'screenshot'
+  ) {
     return { id: item.entityId ?? item.id, kind: 'image' as const };
   }
   return null;

@@ -128,7 +128,12 @@ export function createGalleryItems(args: {
   });
   const rawMediaItems = args.mediaItems.map((media) => {
     const item = createGalleryMediaItem(media);
-    if (media.kind !== 'image' && media.kind !== 'screenshot') return item;
+    if (
+      (media.kind !== 'image' && media.kind !== 'screenshot') ||
+      media.source.kind !== 'screenshot'
+    ) {
+      return item;
+    }
     const presentation = presentations.get(serializeAggregateRef({ id: media.id, kind: 'image' }));
     return {
       ...item,
