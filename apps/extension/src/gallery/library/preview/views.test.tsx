@@ -230,9 +230,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(videoMarkup).toContain('<video');
   expect(videoMarkup).toContain('data-ui="preview.media.contained"');
   expect(videoMarkup).toContain('preload="metadata"');
-  expect(videoMarkup).toContain(
-    'class="block h-auto max-h-full w-auto max-w-full bg-black object-contain"'
-  );
+  expect(videoMarkup).toContain('class="block h-full w-full bg-black object-contain"');
   expect(videoMarkup).toContain('gallery.preview.videoLoading');
   expect(audioMarkup).toContain('<audio');
   expect(videoProjectMarkup).toContain('lucide-video');
@@ -621,4 +619,41 @@ it('starts a routed video in quick edit and stays in preview after returning', (
   renderNode(<PreviewPanel {...props} previewUrl="blob:loaded" />);
   expect(container!.querySelector('[data-test-review]')).toBeNull();
   expect(container!.querySelector('[data-ui="gallery.videoReview.enter"]')).not.toBeNull();
+});
+
+it('keeps native-size video scrolling keys inside the player without navigating the gallery', () => {
+  const onPrevious = vi.fn();
+  const onNext = vi.fn();
+  renderNode(
+    <PreviewPanel
+      {...createProps({
+        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
+        navigation: { current: 2, total: 3, hasPrevious: true, hasNext: true, onPrevious, onNext },
+      })}
+    />
+  );
+  const scale = container!.querySelector<HTMLSelectElement>(
+    '[aria-label="gallery.preview.player.scale"]'
+  )!;
+  act(() => {
+    scale.value = 'original';
+    scale.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const viewport = container!.querySelector<HTMLElement>(
+    '[data-ui="gallery.preview.player"] [tabindex="0"]'
+  )!;
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    act(() => {
+      viewport.focus();
+      viewport.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+  }
+  expect(onPrevious).not.toHaveBeenCalled();
+  expect(onNext).not.toHaveBeenCalled();
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(onNext).toHaveBeenCalledOnce();
 });

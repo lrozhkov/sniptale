@@ -184,6 +184,7 @@ function handlePreviewKeyDown(
   navigation: PreviewPanelProps['navigation'],
   onClose: PreviewPanelProps['onClose']
 ) {
+  if (event.defaultPrevented || document.fullscreenElement) return;
   if (event.key === 'Escape') {
     onClose();
     return;

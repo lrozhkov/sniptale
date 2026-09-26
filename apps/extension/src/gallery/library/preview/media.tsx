@@ -9,7 +9,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
 import {
   isGalleryMediaItem,
@@ -18,6 +18,7 @@ import {
   isGalleryVideoProjectItem,
 } from '../items';
 import { isImageKind, isVideoKind, MediaThumb } from '../ui';
+import { PreviewVideo } from './video-player';
 import { PreviewScenarioStage } from './scenario-stage';
 import type { PreviewPanelProps } from './types';
 import { usePreviewImageZoom } from './usePreviewImageZoom';
@@ -270,7 +271,7 @@ function PreviewMediaContent(
   }
 
   if (isGalleryMediaItem(props.item) && props.previewUrl && isVideoKind(props.item.kind)) {
-    return <PreviewVideo src={props.previewUrl} />;
+    return <PreviewVideo key={props.previewUrl} src={props.previewUrl} />;
   }
 
   if (isGalleryMediaItem(props.item) && props.previewUrl && props.item.kind === 'audio') {
@@ -286,62 +287,6 @@ function PreviewMediaContent(
   }
 
   return null;
-}
-
-function PreviewVideo({ src }: { src: string }) {
-  const [metadataReady, setMetadataReady] = useState(false);
-  const durationProbeActiveRef = useRef(false);
-
-  useEffect(() => {
-    durationProbeActiveRef.current = false;
-    setMetadataReady(false);
-  }, [src]);
-
-  const handleLoadedMetadata = (video: HTMLVideoElement) => {
-    if (Number.isFinite(video.duration) && video.duration > 0) {
-      setMetadataReady(true);
-      return;
-    }
-
-    durationProbeActiveRef.current = true;
-    video.currentTime = Number.MAX_SAFE_INTEGER;
-  };
-
-  const handleDurationChange = (video: HTMLVideoElement) => {
-    if (!Number.isFinite(video.duration) || video.duration <= 0) {
-      return;
-    }
-
-    if (durationProbeActiveRef.current) {
-      durationProbeActiveRef.current = false;
-      video.currentTime = 0;
-    }
-    setMetadataReady(true);
-  };
-
-  return (
-    <div className="relative flex h-full w-full min-h-0 min-w-0 items-center justify-center">
-      <video
-        src={src}
-        controls
-        preload="metadata"
-        playsInline
-        onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
-        onDurationChange={(event) => handleDurationChange(event.currentTarget)}
-        className="block h-auto max-h-full w-auto max-w-full bg-black object-contain"
-      />
-      {metadataReady ? null : (
-        <div
-          role="status"
-          className="pointer-events-none absolute rounded-[8px]
-            bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_84%,transparent)]
-            px-3 py-2 text-xs text-[var(--sniptale-color-text-secondary)]"
-        >
-          {translate('gallery.preview.videoLoading')}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function PreviewMedia(
