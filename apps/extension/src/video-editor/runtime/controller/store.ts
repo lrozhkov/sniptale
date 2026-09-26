@@ -56,6 +56,7 @@ function selectPlaybackPort(state: VideoEditorState): PlaybackPort {
 function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort {
   return {
     applyTypingCompression: state.applyTypingCompression,
+    placeMaterial: state.placeMaterial,
     appendMaterial: state.appendMaterial,
     insertMaterial: state.insertMaterial,
     overlayMaterial: state.overlayMaterial,

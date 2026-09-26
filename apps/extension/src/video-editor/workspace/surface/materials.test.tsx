@@ -14,6 +14,8 @@ import { VideoEditorMaterials } from './materials';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { translate } from '../../../platform/i18n';
 
+const materialDrag = vi.hoisted(() => ({ pending: false, start: vi.fn() }));
+vi.mock('../../chrome/material-drag', () => ({ useMaterialDrag: () => materialDrag }));
 const onOpenLibrary = vi.fn();
 const container = document.createElement('div');
 let root = createRoot(container);
@@ -22,6 +24,8 @@ afterEach(() => {
   root = createRoot(container);
   container.remove();
   vi.unstubAllGlobals();
+  materialDrag.pending = false;
+  materialDrag.start.mockClear();
 });
 
 function renderMaterials() {
@@ -363,4 +367,28 @@ it('filters used materials and searches names without changing the bulk-removal 
   );
   expect(rows()).toEqual(['unused']);
   expect(onSelect).not.toHaveBeenCalled();
+});
+
+it('starts a local material drag from the source button and prevents it while placement is pending', () => {
+  const { asset } = renderMaterials();
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-material-id] button[aria-pressed]'
+  )!;
+  expect(button.draggable).toBe(true);
+  const transfer = { setData: vi.fn() };
+  const drag = new Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(drag, 'dataTransfer', { value: transfer });
+  act(() => button.dispatchEvent(drag));
+  expect(materialDrag.start).toHaveBeenCalledWith(asset.id, button, transfer);
+  materialDrag.pending = true;
+  renderMaterials();
+  const pendingButton = container.querySelector<HTMLButtonElement>(
+    '[data-material-id] button[aria-pressed]'
+  )!;
+  expect(pendingButton.draggable).toBe(false);
+  const blocked = new Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(blocked, 'dataTransfer', { value: transfer });
+  act(() => pendingButton.dispatchEvent(blocked));
+  expect(blocked.defaultPrevented).toBe(true);
+  expect(materialDrag.start).toHaveBeenCalledTimes(1);
 });

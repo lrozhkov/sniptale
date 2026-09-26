@@ -1,3 +1,4 @@
+import { useTrackMaterialDrop } from './material-drop';
 import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
 import { readVideoEditorEffectDocumentDragPayload } from '../../../../contracts/effect-document-drag';
 import { ClipFxRows } from './clip-fx';
@@ -177,6 +178,13 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
 }
 
 function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
+  const materials = useTrackMaterialDrop({
+    project: props.project,
+    trackId: props.track.id,
+    trackLayout: props.trackLayout,
+    pixelsPerSecond: props.pixelsPerSecond,
+    projection: props.projection,
+  });
   const { drag } = useEffectDocumentDrag();
   const [hover, setHover] = useState<{ time: number; laneId: string | null } | null>(null);
   const preview =
@@ -210,14 +218,20 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       data-track-lane-id={props.track.id}
       data-timeline-lane-muted={!props.track.visible}
       style={{ height: props.trackLayout?.rowHeight }}
-      {...createTrackLaneEventProps(props, drag?.kind, (event) => {
-        const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
-        setHover({
-          time: Math.max(0, (props.projection?.startTime ?? 0) + x / props.pixelsPerSecond),
-          laneId: resolveTimelineLaneIdFromDropEvent(event, props.trackLayout),
-        });
-      })}
+      {...createTrackLaneEventProps(
+        props,
+        drag?.kind,
+        (event) => {
+          const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
+          setHover({
+            time: Math.max(0, (props.projection?.startTime ?? 0) + x / props.pixelsPerSecond),
+            laneId: resolveTimelineLaneIdFromDropEvent(event, props.trackLayout),
+          });
+        },
+        materials
+      )}
     >
+      {materials.preview}
       {preview && (
         <div
           aria-hidden="true"
@@ -329,7 +343,8 @@ function getDragDisplayProject(project: VideoProject, ghost: TimelineClipDragGho
 function createTrackLaneEventProps(
   props: ProjectTimelineTrackLaneProps,
   dragKind: string | undefined,
-  onEffectHover: (event: React.DragEvent<HTMLDivElement>) => void
+  onEffectHover: (event: React.DragEvent<HTMLDivElement>) => void,
+  materials: ReturnType<typeof useTrackMaterialDrop>
 ) {
   const effects = createTrackEffectDropHandlers({
     dragKind,
@@ -351,12 +366,17 @@ function createTrackLaneEventProps(
   });
   return {
     onClick: (event: React.MouseEvent) => event.stopPropagation(),
-    onDragLeave: createTrackFileDragLeaveHandler(props.onSetDropTrackId),
+    onDragLeave: (event: React.DragEvent<HTMLDivElement>) => {
+      materials.onDragLeave(event);
+      createTrackFileDragLeaveHandler(props.onSetDropTrackId)(event);
+    },
     onDragOver: (event: React.DragEvent<HTMLDivElement>) => {
+      if (materials.onDragOver(event)) return;
       if (!effects.onDragOver(event)) fileDrag(event);
       else onEffectHover(event);
     },
     onDrop: (event: React.DragEvent<HTMLDivElement>) => {
+      if (materials.onDrop(event)) return;
       if (!effects.onDrop(event)) fileDrop(event);
     },
     onPointerDown: createTrackLaneRangeSelectionHandler(

@@ -1,3 +1,4 @@
+import { useMaterialDrag } from '../../chrome/material-drag';
 import { formatPreciseTime } from '../../../composition/library-preview/time-format';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
@@ -555,6 +556,7 @@ function MaterialName(props: {
   onSelect: () => void;
   onRename: (name: string) => void;
 }) {
+  const materialDrag = useMaterialDrag();
   const [draft, setDraft] = useState<string | null>(null);
   const editingRef = useRef(false);
   const nameRef = useRef<HTMLDivElement>(null);
@@ -593,6 +595,14 @@ function MaterialName(props: {
             tone="toggle"
             active={props.selected}
             className="!min-h-12 w-full min-w-0 flex-1 flex-col !items-start justify-center !gap-0.5 !px-2 text-left"
+            draggable={!props.disabled && !materialDrag.pending}
+            onDragStart={(event) => {
+              if (props.disabled || materialDrag.pending) {
+                event.preventDefault();
+                return;
+              }
+              materialDrag.start(props.asset.id, event.currentTarget, event.dataTransfer);
+            }}
             aria-pressed={props.selected}
             aria-label={props.asset.name}
             aria-describedby={`material-usage-${props.asset.id}`}

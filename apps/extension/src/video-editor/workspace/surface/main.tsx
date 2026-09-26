@@ -1,3 +1,4 @@
+import { MaterialDragProvider } from '../../chrome/material-drag';
 import { EffectDocumentDragProvider } from '../../chrome/effect-document-drag';
 import { InspectorSectionMemoryProvider } from '../sidebar/selection/grouped-inspector/presentation';
 import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
@@ -78,39 +79,41 @@ export function VideoEditorWorkspaceMain({
           style={workspaceStyle}
           ref={panelSizes.containerRef}
         >
-          <EffectDocumentDragProvider>
-            <WorkspaceTrackPresentation>
-              <VideoProjectStorageStatus />
-              <VideoEditorWorkspaceCanvas
-                inspectorPanel={inspector}
-                onMaterialsOpenChange={toggleMaterials}
-                inspectorFullHeight={inspectorFullHeight}
-                materialsPanel={{
-                  resize: panelSizes.materials,
-                  fullHeight: materialsFullHeight,
-                  onToggle: () => setMaterialsFullHeight((current) => !current),
-                }}
-                materialsOpen={materialsOpen}
-                inspector={
-                  <VideoEditorFloatingInspectorStack
-                    onClose={inspector.onToggle}
-                    resize={panelSizes.inspector}
-                    fullHeight={inspectorFullHeight}
-                    onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
-                  />
-                }
-                activeInsertKind={activeInsertKind}
-                effectBundles={effectBundles}
-                effectOperations={effectOperations}
-                effectsLibraryDockOpen={effectsLibraryDockOpen}
-                effectKind={effectKind}
-                previewHeightStyle={previewHeightStyle}
-                onClearActiveInsertKind={() => setActiveInsertKind(null)}
-                onEffectsLibraryDockOpenChange={changeEffectsOpen}
-              />
-              <VideoEditorWorkspaceOverlays />
-            </WorkspaceTrackPresentation>
-          </EffectDocumentDragProvider>
+          <MaterialDragProvider>
+            <EffectDocumentDragProvider>
+              <WorkspaceTrackPresentation>
+                <VideoProjectStorageStatus />
+                <VideoEditorWorkspaceCanvas
+                  inspectorPanel={inspector}
+                  onMaterialsOpenChange={toggleMaterials}
+                  inspectorFullHeight={inspectorFullHeight}
+                  materialsPanel={{
+                    resize: panelSizes.materials,
+                    fullHeight: materialsFullHeight,
+                    onToggle: () => setMaterialsFullHeight((current) => !current),
+                  }}
+                  materialsOpen={materialsOpen}
+                  inspector={
+                    <VideoEditorFloatingInspectorStack
+                      onClose={inspector.onToggle}
+                      resize={panelSizes.inspector}
+                      fullHeight={inspectorFullHeight}
+                      onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
+                    />
+                  }
+                  activeInsertKind={activeInsertKind}
+                  effectBundles={effectBundles}
+                  effectOperations={effectOperations}
+                  effectsLibraryDockOpen={effectsLibraryDockOpen}
+                  effectKind={effectKind}
+                  previewHeightStyle={previewHeightStyle}
+                  onClearActiveInsertKind={() => setActiveInsertKind(null)}
+                  onEffectsLibraryDockOpenChange={changeEffectsOpen}
+                />
+                <VideoEditorWorkspaceOverlays />
+              </WorkspaceTrackPresentation>
+            </EffectDocumentDragProvider>
+          </MaterialDragProvider>
         </div>
       </InspectorGroupFocusContext.Provider>
     </InspectorSectionMemoryProvider>

@@ -1,8 +1,15 @@
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
-import type { VideoEditorMaterialPlacementResult } from '../../../contracts/insertion';
+import type {
+  VideoEditorMaterialPlacementResult,
+  VideoEditorMaterialTarget,
+} from '../../../contracts/insertion';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import { applyProjectUpdate } from '../helpers';
-import { buildMaterialPlacement, isMaterialSourceRangeValid } from './material-plan';
+import {
+  buildMaterialPlacement,
+  isMaterialSourceRangeValid,
+  getMaterialDropError,
+} from './material-plan';
 import { makeRoomForMaterial } from './material-insert';
 import { reconcileRecordingInteractionAnchors } from '../../operations/source-timed-clips';
 import {
@@ -15,7 +22,8 @@ import { insertMaterialCursorGap } from './material-cursor';
 /** Places an existing source with one admitted project and selection transition. */
 export function createMaterialPlacementAction(
   set: VideoEditorProjectSliceSet,
-  mode: 'append' | 'overlay' | 'insert'
+  mode: 'append' | 'overlay' | 'insert' | 'drop',
+  target?: VideoEditorMaterialTarget
 ): VideoEditorProjectState['appendMaterial'] {
   return (assetId, range, telemetry) => {
     let outcome: VideoEditorMaterialPlacementResult = { status: 'rejected', reason: 'no-project' };
@@ -31,6 +39,13 @@ export function createMaterialPlacementAction(
         outcome = { status: 'rejected', reason: 'invalid-range' };
         return state;
       }
+      if (mode === 'drop') {
+        const reason = target ? getMaterialDropError(project, assetId, target) : 'invalid-target';
+        if (reason) {
+          outcome = { status: 'rejected', reason };
+          return state;
+        }
+      }
       const end = project.clips.reduce(
         (time, clip) => Math.max(time, clip.startTime + clip.duration),
         0
@@ -38,10 +53,11 @@ export function createMaterialPlacementAction(
       const result = buildMaterialPlacement(
         project,
         asset,
-        mode === 'append' ? end : state.currentTime,
-        mode === 'overlay' ? 'overlay' : 'append',
+        mode === 'append' ? end : (target?.startTime ?? state.currentTime),
+        mode === 'overlay' || mode === 'drop' ? mode : 'append',
         range,
-        state.selectedTrackId
+        target?.trackId ?? state.selectedTrackId,
+        target?.timelineLaneId
       );
       const existingIds = new Set(project.clips.map(({ id }) => id));
       const addedClips = result.project.clips.filter(({ id }) => !existingIds.has(id));

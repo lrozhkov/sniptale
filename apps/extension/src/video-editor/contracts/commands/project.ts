@@ -23,6 +23,7 @@ import type {
 import type {
   VideoEditorMaterialPlacementResult,
   VideoEditorMaterialSourceRange,
+  VideoEditorMaterialTarget,
 } from '../insertion';
 
 export interface VideoEditorProjectActions
@@ -48,6 +49,7 @@ export interface VideoEditorProjectActions
   upsertAssets: (assets: readonly VideoProjectAsset[]) => void;
   /** Removes unreferenced materials from the project while preserving history and source media. */
   removeUnusedAssets: (assetIds?: readonly string[]) => void;
+  /** Appends after all montage clips, using the selected compatible track or default. */
   appendMaterial: (
     assetId: string,
     range?: VideoEditorMaterialSourceRange,
@@ -59,9 +61,16 @@ export interface VideoEditorProjectActions
     range?: VideoEditorMaterialSourceRange,
     telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
+  /** Places at the playhead on fresh tracks, preserving existing clips. */
   overlayMaterial: (
     assetId: string,
     range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
+  ) => VideoEditorMaterialPlacementResult;
+  /** Places a complete material at an admitted exact destination in one history step. */
+  placeMaterial: (
+    assetId: string,
+    target: VideoEditorMaterialTarget,
     telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
   addAssetClip: (

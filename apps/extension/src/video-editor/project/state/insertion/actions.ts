@@ -22,6 +22,7 @@ export function createVideoEditorProjectInsertionActions(
 ): Pick<
   VideoEditorProjectState,
   | 'addAssetClip'
+  | 'placeMaterial'
   | 'appendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'
@@ -32,6 +33,8 @@ export function createVideoEditorProjectInsertionActions(
   | 'addShapeOverlay'
 > {
   return {
+    placeMaterial: (assetId, target, telemetry) =>
+      createMaterialPlacementAction(set, 'drop', target)(assetId, undefined, telemetry),
     appendMaterial: createMaterialPlacementAction(set, 'append'),
     insertMaterial: createMaterialPlacementAction(set, 'insert'),
     overlayMaterial: createMaterialPlacementAction(set, 'overlay'),

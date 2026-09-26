@@ -40,6 +40,7 @@ type VideoEditorProjectActionKeys =
   | 'upsertAssets'
   | 'removeUnusedAssets'
   | 'addAssetClip'
+  | 'placeMaterial'
   | 'appendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'

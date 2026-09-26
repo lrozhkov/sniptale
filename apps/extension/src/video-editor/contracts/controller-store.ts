@@ -38,6 +38,7 @@ type TimelineTrackAction =
   | 'clearUtilityLane';
 
 type TimelineClipAction =
+  | 'placeMaterial'
   | 'appendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'
