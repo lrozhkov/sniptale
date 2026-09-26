@@ -68,6 +68,62 @@ import { FrameProjection } from './projection';
 
 afterEach(() => document.body.replaceChildren());
 
+it('opens numbering settings from the selected frame while its main toolbar is visible', () => {
+  const host = document.createElement('div');
+  const controlsRoot = document.createElement('div');
+  const sceneRoot = document.createElement('div');
+  document.body.append(host, controlsRoot, sceneRoot);
+  const root = createRoot(host);
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      id: 'selected-numbered-frame',
+      x: 100,
+      y: 100,
+      width: 240,
+      height: 160,
+      stepBadge: { ...createDefaultFrameStepBadge(), enabled: true },
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({ frame: snapshot, label: 'Frame', ordering: 0 });
+  const onOpenSettings = vi.fn();
+
+  act(() =>
+    root.render(
+      <FrameProjection
+        coordinateSpace={identityFrameAnnotationCoordinateSpace}
+        controlsRoot={controlsRoot}
+        interactive
+        object={object}
+        sceneRoot={sceneRoot}
+        selected
+        scale={1}
+        snapshot={snapshot}
+        settingsAnchor={null}
+        settingsMenu={null}
+        onCommand={vi.fn()}
+        onDraftCommit={vi.fn()}
+        onCloseSettings={vi.fn()}
+        onOpenSettings={onOpenSettings}
+        onMoveStart={vi.fn()}
+        onResizeStart={vi.fn()}
+        onSnapshotChange={vi.fn()}
+        onSnapshotPreview={vi.fn()}
+        onStepBadgeReorder={vi.fn()}
+      />
+    )
+  );
+
+  expect(controlsRoot.querySelector('.sniptale-action-toolbar')).not.toBeNull();
+  const settingsButton = document.querySelector<HTMLButtonElement>(
+    '[data-ui="inline-step-settings"]'
+  );
+  expect(settingsButton).not.toBeNull();
+  act(() => settingsButton?.click());
+  expect(onOpenSettings).toHaveBeenCalledWith('step', settingsButton);
+  act(() => root.unmount());
+});
+
 it('enables numbering and opens its shared settings menu in one interaction', () => {
   const host = document.createElement('div');
   const controlsRoot = document.createElement('div');

@@ -38,9 +38,18 @@ vi.mock(
     FrameCalloutInteractiveSurface: (props: {
       editing: { layout: { floatingToolbarRect: unknown } };
       isEditing: boolean;
+      onSettingsClick: () => void;
+      settingsAnchorRef: { current: HTMLButtonElement | null };
+      showSettingsHandle: boolean;
     }) => {
       mocks.surfaceProps(props);
-      return null;
+      return props.showSettingsHandle && !props.isEditing ? (
+        <button
+          data-ui="callout-settings-handle"
+          ref={props.settingsAnchorRef}
+          onClick={props.onSettingsClick}
+        />
+      ) : null;
     },
   })
 );
@@ -57,6 +66,56 @@ import { EditorFrameCallout } from './callout-projection';
 afterEach(() => {
   document.body.replaceChildren();
   vi.clearAllMocks();
+});
+
+it('opens comment settings from a selected frame with the main toolbar visible', () => {
+  const snapshot = createFrameAnnotationSnapshot(
+    {
+      callout: {
+        ...createDefaultFrameCallout(),
+        content: { bodyHtml: 'Existing comment', titleText: '' },
+      },
+      height: 120,
+      id: 'selected-comment-frame',
+      width: 200,
+      x: 20,
+      y: 30,
+    },
+    0
+  );
+  const object = createFrameAnnotationProxy({ frame: snapshot, label: 'Frame', ordering: 0 });
+  const host = document.createElement('div');
+  const scene = document.createElement('div');
+  document.body.append(host, scene);
+  const root = createRoot(host);
+  const onSettingsOpen = vi.fn();
+
+  act(() =>
+    root.render(
+      <EditorFrameCallout
+        calloutIndex={0}
+        coordinateSpace={identityFrameAnnotationCoordinateSpace}
+        controlsPortalTarget={null}
+        object={object}
+        portalTarget={scene}
+        selected
+        snapshot={snapshot}
+        isSettingsOpen={false}
+        onDraftCommit={vi.fn()}
+        onSnapshotChange={vi.fn()}
+        onSnapshotPreview={vi.fn()}
+        onSettingsOpen={onSettingsOpen}
+      />
+    )
+  );
+
+  const settingsButton = host.querySelector<HTMLButtonElement>(
+    '[data-ui="callout-settings-handle"]'
+  );
+  expect(settingsButton).not.toBeNull();
+  act(() => settingsButton?.click());
+  expect(onSettingsOpen).toHaveBeenCalledWith(settingsButton);
+  act(() => root.unmount());
 });
 
 it('previews an inline badge edit and commits its editing transaction on finish', () => {
@@ -101,7 +160,9 @@ it('previews an inline badge edit and commits its editing transaction on finish'
   const surface = mocks.surfaceProps.mock.lastCall?.[0] as {
     editing: { events: { finish: () => void } };
     onBadgeTextChange: (text: string) => void;
+    showSettingsHandle: boolean;
   };
+  expect(surface.showSettingsHandle).toBe(true);
   act(() => surface.onBadgeTextChange('Edited tag'));
   expect(onSnapshotPreview).toHaveBeenCalledOnce();
   act(() => surface.editing.events.finish());

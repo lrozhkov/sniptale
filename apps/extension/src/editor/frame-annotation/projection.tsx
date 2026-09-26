@@ -278,7 +278,7 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       }}
       settings={settings}
       settingsAnchorRef={anchorRef}
-      showSettingsHandle={!props.selected || props.settingsMenu === 'step'}
+      showSettingsHandle
       surfacePortalTarget={props.sceneRoot}
       {...(props.snapshot.borderSettings?.fillPaint
         ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }

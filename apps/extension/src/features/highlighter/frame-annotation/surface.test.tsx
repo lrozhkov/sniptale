@@ -459,11 +459,23 @@ it('preserves every floating-toolbar command and optional action branch', async 
         effectMode="border"
         onCommand={onCommand}
         stepBadgeEnabled={false}
-        trailingSlot={<span data-testid="trailing-slot" />}
+        trailingSlot={
+          <FrameAnnotationToolbarAddCalloutButton
+            title="Add another comment"
+            onClick={vi.fn()}
+            onMouseDown={vi.fn()}
+          />
+        }
       />
     )
   );
-  expect(host.querySelector('[data-testid="trailing-slot"]')).not.toBeNull();
+  const toolbarButtons = [
+    ...host.querySelectorAll<HTMLButtonElement>('.sniptale-action-toolbar button'),
+  ];
+  const calloutIndex = toolbarButtons.findIndex((item) => item.title === labels.get('callout'));
+  expect(toolbarButtons[calloutIndex + 1]?.title).toBe('Add another comment');
+  const deleteIndex = toolbarButtons.findIndex((item) => item.title === labels.get('delete'));
+  expect(toolbarButtons[deleteIndex + 1]?.title).toBe(labels.get('close'));
   host
     .querySelector('.sniptale-glass-toolbar')
     ?.dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }));

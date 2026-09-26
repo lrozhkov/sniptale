@@ -137,7 +137,7 @@ export function EditorFrameCallout(props: {
         )}
         settings={settings}
         settingsAnchorRef={settingsAnchorRef}
-        showSettingsHandle={!props.selected || props.isSettingsOpen}
+        showSettingsHandle
         zIndex={props.snapshot.ordering + 1}
       />
     </>
