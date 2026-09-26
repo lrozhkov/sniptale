@@ -1,6 +1,8 @@
 import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
 import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Play, Pause } from 'lucide-react';
+import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { describeCatalogDocument } from '../../../features/video/project/effect-bundle/catalog/query';
 import type {
@@ -75,7 +77,7 @@ export function AnnotationSourcePreview(
         expanded
         progress={time / duration}
       />
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <EditorIconButton
           title={translate(
             playing
@@ -89,10 +91,10 @@ export function AnnotationSourcePreview(
         >
           {playing ? <Pause size={16} /> : <Play size={16} />}
         </EditorIconButton>
-        <input
-          className="min-w-0 flex-1"
-          type="range"
+        <ProductRange
+          className="order-first w-full"
           aria-label={translate('videoEditor.effectsLibrary.previewPosition')}
+          aria-valuetext={`${time.toFixed(1)} / ${duration.toFixed(1)}`}
           min={0}
           max={duration}
           step={0.01}
@@ -127,22 +129,22 @@ export function AnnotationSourcePreview(
           }}
         />
       </label>
-      <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
-        <button
-          className="rounded-[4px] px-2 py-1 text-xs hover:bg-[var(--sniptale-color-surface-hover)]"
+      <div className="grid grid-cols-1 gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
+        <ContentToolbarButton
+          className="!h-auto !min-h-10 !w-full !px-3 !py-2 text-xs whitespace-normal"
           disabled={props.disabled}
           onClick={() => apply(props.currentTime)}
         >
           {translate('videoEditor.effectsLibrary.applyToScene')}
-        </button>
+        </ContentToolbarButton>
         {props.appendTime !== undefined && (
-          <button
-            className="rounded-[4px] px-2 py-1 text-xs hover:bg-[var(--sniptale-color-surface-hover)]"
+          <ContentToolbarButton
+            className="!h-auto !min-h-10 !w-full !px-3 !py-2 text-xs whitespace-normal"
             disabled={props.disabled}
             onClick={() => apply(props.appendTime!)}
           >
             {translate('videoEditor.app.materialsAppend')}
-          </button>
+          </ContentToolbarButton>
         )}
       </div>
     </section>

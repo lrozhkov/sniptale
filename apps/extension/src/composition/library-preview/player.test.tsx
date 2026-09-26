@@ -276,3 +276,82 @@ it.each(['image', 'video'] as const)(
     expect(container.querySelector('[role="alert"]')).toBeNull();
   }
 );
+
+it('adjusts volume, preserves it across mute and recovers from zero volume', () => {
+  const volume = control('videoEditor.sidebar.mediaPreviewVolume');
+  const change = (value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        volume,
+        value
+      );
+      volume.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  change('0.35');
+  expect(video.volume).toBe(0.35);
+  act(() => control('videoEditor.sidebar.mediaPreviewMute').click());
+  expect(video.muted).toBe(true);
+  expect(video.volume).toBe(0.35);
+  act(() => control('videoEditor.sidebar.mediaPreviewUnmute').click());
+  expect(video.volume).toBe(0.35);
+  change('0');
+  act(() => control('videoEditor.sidebar.mediaPreviewUnmute').click());
+  expect(video.volume).toBe(1);
+  expect(video.muted).toBe(false);
+  act(() => control('videoEditor.sidebar.mediaPreviewMute').click());
+  change('0.5');
+  expect(video.muted).toBe(false);
+  expect(video.volume).toBe(0.5);
+  expect(volume.getAttribute('aria-valuetext')).toBe('50%');
+});
+
+it('offers numeric seek only with a custom frame-selection timeline', () => {
+  expect(container.querySelector('input[type=number]')).toBeNull();
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer
+        src="blob:preview"
+        filename="Recording"
+        renderTimeline={() => <div>Frames</div>}
+      >
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const position = control('videoEditor.app.sourcePosition');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      position,
+      '1.25'
+    );
+    position.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(video.currentTime).toBe(1.25);
+});
+
+it('provides image zoom and fit without playback or volume controls', () => {
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:image" filename="Image" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  expect(control('videoEditor.sidebar.mediaPreviewVolume')).toBeNull();
+  expect(control('videoEditor.sidebar.mediaPreviewSeek')).toBeNull();
+  const zoom = control('videoEditor.sidebar.mediaPreviewZoomLabel');
+  expect(zoom.disabled).toBe(true);
+  act(() => container.querySelector('img')!.dispatchEvent(new Event('load')));
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoom, '2');
+    zoom.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const fit = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'videoEditor.sidebar.mediaPreviewFit'
+  )!;
+  act(() => fit.click());
+  expect(
+    container.querySelector<HTMLElement>('[data-ui="library-media-picture"]')!.style.width
+  ).toBe('100%');
+  expect(fit.disabled).toBe(true);
+});

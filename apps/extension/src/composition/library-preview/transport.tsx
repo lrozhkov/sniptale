@@ -1,6 +1,6 @@
 import type { useLibraryViewport } from './viewport';
 import type { RefObject, ReactNode } from 'react';
-import { Pause, Play, Volume2, VolumeX, X, Maximize2, Search } from 'lucide-react';
+import { Pause, Play, Volume2, VolumeX, Minimize2, Maximize2, Search } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange, ProductInput } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
@@ -22,11 +22,13 @@ export function LibraryMediaTransport(props: {
     media.paused ? 'videoEditor.timeline.play' : 'videoEditor.timeline.pause'
   );
   const muteLabel = translate(
-    media.muted ? 'videoEditor.sidebar.mediaPreviewUnmute' : 'videoEditor.sidebar.mediaPreviewMute'
+    media.muted || media.volume === 0
+      ? 'videoEditor.sidebar.mediaPreviewUnmute'
+      : 'videoEditor.sidebar.mediaPreviewMute'
   );
   return (
     <div
-      className="flex min-w-0 shrink-0 flex-wrap items-center justify-center gap-2"
+      className="flex min-w-0 shrink-0 flex-wrap items-center justify-start gap-2"
       data-ui="library-media-transport"
     >
       {!props.image ? (
@@ -50,8 +52,20 @@ export function LibraryMediaTransport(props: {
             disabled={!ready}
             onClick={toggleMute}
           >
-            {media.muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            {media.muted || media.volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </ContentToolbarButton>
+          <label className="flex w-28 items-center gap-2">
+            <ProductRange
+              min={0}
+              max={1}
+              step={0.05}
+              value={media.muted ? 0 : media.volume}
+              disabled={!ready}
+              aria-label={translate('videoEditor.sidebar.mediaPreviewVolume')}
+              aria-valuetext={`${Math.round((media.muted ? 0 : media.volume) * 100)}%`}
+              onChange={(event) => props.playback.setVolume(event.currentTarget.valueAsNumber)}
+            />
+          </label>
         </>
       ) : (
         <span className="flex-1" />
@@ -65,9 +79,12 @@ export function LibraryMediaTransport(props: {
           aria-label={translate('videoEditor.stage.exitFullscreen')}
           dataUi="library-media-fullscreen-close"
         >
-          <X size={16} aria-hidden="true" />
+          <Minimize2 size={16} aria-hidden="true" />
         </ContentToolbarButton>
       ) : null}
+      <p className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate('videoEditor.sidebar.mediaPreviewZoomHint')}
+      </p>
     </div>
   );
 }
@@ -91,21 +108,27 @@ function LibrarySeek({
           value={media.time}
           disabled={!ready || media.duration === null}
           aria-label={translate('videoEditor.sidebar.mediaPreviewSeek')}
+          aria-valuetext={formatDuration(media.time)}
           onChange={(event) => seek(event.currentTarget.valueAsNumber)}
         />
       )}
-      <ProductInput
-        type="number"
-        style={{ width: '5rem', flex: '0 0 5rem' }}
-        className="w-20 !min-h-7 !h-7 text-xs tabular-nums"
-        min={0}
-        max={media.duration ?? 0}
-        step={0.01}
-        value={Number(media.time.toFixed(2))}
-        disabled={!ready || media.duration === null}
-        aria-label={translate('videoEditor.app.sourcePosition')}
-        onChange={(event) => seek(event.currentTarget.valueAsNumber)}
-      />
+      {timeline ? (
+        <label className="flex items-center gap-2 text-xs">
+          {translate('videoEditor.app.sourcePosition')}
+          <ProductInput
+            type="number"
+            style={{ width: '5rem', flex: '0 0 5rem' }}
+            className="w-20 !min-h-7 !h-7 text-xs tabular-nums"
+            min={0}
+            max={media.duration ?? 0}
+            step={0.01}
+            value={Number(media.time.toFixed(2))}
+            disabled={!ready || media.duration === null}
+            aria-label={translate('videoEditor.app.sourcePosition')}
+            onChange={(event) => seek(event.currentTarget.valueAsNumber)}
+          />
+        </label>
+      ) : null}
     </>
   );
 }
@@ -133,10 +156,11 @@ export function LibraryViewControls({
           <Maximize2 size={16} />
         </ContentToolbarButton>
       ) : null}
-      <label className="flex w-32 shrink-0 items-center gap-1.5 text-[11px] tabular-nums">
+      <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums">
+        <span>{translate('videoEditor.sidebar.mediaPreviewZoomLabel')}</span>
         <Search size={14} aria-hidden />
         <ProductRange
-          className="min-w-0 flex-1"
+          className="!w-24"
           min={1}
           max={2}
           step={0.1}
@@ -145,8 +169,15 @@ export function LibraryViewControls({
           aria-label={translate('videoEditor.sidebar.mediaPreviewZoomLabel')}
           onChange={(event) => setZoom(Number(event.currentTarget.value))}
         />
-        <span className="w-8 text-right">{Math.round(zoom * 100)}%</span>
+        <span className="w-8 text-right">{zoom.toFixed(1)}×</span>
       </label>
+      <ContentToolbarButton
+        className="!w-auto !px-3 text-xs"
+        disabled={!ready || zoom === 1}
+        onClick={() => setZoom(1)}
+      >
+        {translate('videoEditor.sidebar.mediaPreviewFit')}
+      </ContentToolbarButton>
     </>
   );
 }

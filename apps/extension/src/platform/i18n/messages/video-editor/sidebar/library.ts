@@ -250,8 +250,20 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Select an item in the list to preview it.',
   },
   mediaPreviewZoomLabel: {
-    ru: 'Масштаб превью',
-    en: 'Preview zoom',
+    ru: 'Увеличение от вписанного',
+    en: 'Zoom from fit',
+  },
+  mediaPreviewVolume: {
+    ru: 'Громкость предпросмотра',
+    en: 'Preview volume',
+  },
+  mediaPreviewFit: {
+    ru: 'Вписать',
+    en: 'Fit',
+  },
+  mediaPreviewZoomHint: {
+    ru: '1× — целиком в окне. Увеличьте и перетаскивайте изображение для просмотра деталей.',
+    en: '1× fits the whole image. Zoom in and drag the picture to inspect details.',
   },
   mediaPreviewUnavailable: {
     ru: 'Файл видео отсутствует. Выберите другой материал.',

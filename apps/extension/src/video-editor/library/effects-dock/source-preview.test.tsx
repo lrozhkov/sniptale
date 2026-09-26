@@ -112,6 +112,8 @@ it('previews without editing the project and applies the chosen time, track and 
   expect(host.querySelector('output')!.dataset['progress']).toBe(paused);
   change(host.querySelector<HTMLInputElement>('input[type=range]')!, '0.8');
   expect(host.querySelector('output')!.dataset['progress']).toBe('0.8');
+  expect(host.querySelector('input[type=range]')!.getAttribute('aria-valuetext')).toBe('0.8 / 1.0');
+  expect(button('videoEditor.effectsLibrary.previewPlay')).toBeDefined();
   act(() => button('videoEditor.effectsLibrary.previewPlay').click());
   act(() => vi.advanceTimersByTime(500));
   expect(host.querySelector('output')!.dataset['progress']).toBe('1');
