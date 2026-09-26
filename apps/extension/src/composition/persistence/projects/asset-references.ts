@@ -211,7 +211,7 @@ export async function syncProjectAssetMirrorLifecycles(args: {
           media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt),
           args.now
         )
-      : createLibraryLifecycle('temporary', args.now);
+      : { ...media.lifecycle, ...createLibraryLifecycle('temporary', args.now) };
     await args.mediaLibraryStore.put({ ...media, lifecycle });
   }
 }

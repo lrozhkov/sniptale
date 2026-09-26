@@ -1,12 +1,6 @@
-import {
-  addMediaLibraryEntryTagsSafely,
-  deleteMediaLibraryAssetsBatchSafely,
-} from '../../../workflows/media-hub/store';
+import { addMediaLibraryEntryTagsSafely } from '../../../workflows/media-hub/store';
 import { translate } from '../../../platform/i18n';
-import {
-  deleteScenarioProjectRecord,
-  updateScenarioProjectRecordMetadata,
-} from '../../../composition/persistence/scenario/store/public';
+import { updateScenarioProjectRecordMetadata } from '../../../composition/persistence/scenario/store/public';
 import type { GallerySelectionController } from './controller-types';
 import {
   isGalleryMediaItem,
@@ -15,7 +9,12 @@ import {
   isGalleryVideoProjectItem,
   type GalleryItem,
 } from '../items';
-import { deletePersistedVideoProject } from '../../../workflows/media-hub/video-projects';
+import {
+  moveLibraryItemsToTrash,
+  restoreLibraryTrashItems,
+  permanentlyDeleteTrashItem,
+} from '../../../workflows/media-hub/trash';
+import type { LibraryLifecycleTarget } from '../../../composition/persistence/library-lifecycle';
 import { type GalleryBusyAction, openGalleryConfirmDialog } from './shared';
 import {
   listMediaAssetProjectUsage,
@@ -30,6 +29,26 @@ function splitSelectableTargets(targets: GalleryItem[]) {
   };
 }
 
+function trashTarget(item: GalleryItem): LibraryLifecycleTarget {
+  if (isGalleryScenarioItem(item)) return { kind: 'scenario-project', id: item.entityId };
+  if (isGalleryVideoProjectItem(item)) return { kind: 'video-project', id: item.entityId };
+  return { kind: 'media', id: item.entityId ?? item.id };
+}
+
+async function finishTrashAction(controller: GallerySelectionController) {
+  controller.actions.selection.setSelectedIds(new Set());
+  controller.actions.preview.setPreview({ inspectorCollapsed: false, item: null, url: null });
+  await controller.actions.storage.refresh();
+}
+
+export function createRestoreTrashAction(controller: GallerySelectionController) {
+  return (targets: GalleryItem[], withBusy: GalleryBusyAction) =>
+    withBusy(async () => {
+      await restoreLibraryTrashItems(targets.filter(isGallerySelectableItem).map(trashTarget));
+      await finishTrashAction(controller);
+    });
+}
+
 export function createDeleteManyAction(controller: GallerySelectionController) {
   return async (targets: GalleryItem[], withBusy: GalleryBusyAction) => {
     const selectableTargets = targets.filter(isGallerySelectableItem);
@@ -37,7 +56,25 @@ export function createDeleteManyAction(controller: GallerySelectionController) {
       return;
     }
 
-    const { media, scenarios, videoProjects } = splitSelectableTargets(selectableTargets);
+    if (selectableTargets.every((item) => item.lifecycle?.trashedAt === undefined)) {
+      openGalleryConfirmDialog(controller, {
+        title: translate('gallery.app.moveToTrash'),
+        message: translate('gallery.app.moveToTrashConfirm'),
+        confirmText: translate('gallery.app.moveToTrash'),
+        onConfirm: () =>
+          withBusy(async () => {
+            await moveLibraryItemsToTrash(selectableTargets.map(trashTarget));
+            await finishTrashAction(controller);
+          }),
+      });
+      return;
+    }
+    const trashItems = selectableTargets.filter((item) => item.lifecycle?.trashedAt !== undefined);
+    const { media, scenarios, videoProjects } = splitSelectableTargets(trashItems);
+    const removedProjectKeys = new Set([
+      ...scenarios.map((item) => `scenario:${item.entityId}`),
+      ...videoProjects.map((item) => `video:${item.entityId}`),
+    ]);
     let expectedUsageById = new Map<string, readonly MediaAssetProjectUsage[]>();
     let usageLoaded = false;
     await withBusy(async () => {
@@ -45,7 +82,10 @@ export function createDeleteManyAction(controller: GallerySelectionController) {
         await Promise.all(
           media.map(async (item) => {
             const id = item.entityId ?? item.id;
-            return [id, await listMediaAssetProjectUsage(id)] as const;
+            const remainingUsage = (await listMediaAssetProjectUsage(id)).filter(
+              (usage) => !removedProjectKeys.has(`${usage.kind}:${usage.id}`)
+            );
+            return [id, remainingUsage] as const;
           })
         )
       );
@@ -82,25 +122,22 @@ export function createDeleteManyAction(controller: GallerySelectionController) {
           ].join(' ')
         : '';
     openGalleryConfirmDialog(controller, {
-      title: translate('gallery.app.deleteConfirmTitle'),
-      message: `${translate('gallery.app.deleteSelectedConfirm')} ${warning}`.trim(),
+      title: translate('gallery.app.permanentDelete'),
+      confirmText: translate('gallery.app.permanentDelete'),
+      message: `${translate('gallery.app.permanentDeleteConfirm')} ${warning}`.trim(),
       onConfirm: async () => {
         await withBusy(async () => {
-          if (media.length > 0)
-            await deleteMediaLibraryAssetsBatchSafely(
-              media.map((item) => item.entityId ?? item.id),
-              expectedUsageById
-            );
-          for (const item of scenarios) await deleteScenarioProjectRecord(item.entityId);
-          for (const item of videoProjects) await deletePersistedVideoProject(item.entityId);
-
-          controller.actions.selection.setSelectedIds(new Set());
-          controller.actions.preview.setPreview({
-            inspectorCollapsed: false,
-            item: null,
-            url: null,
-          });
-          await controller.actions.storage.refresh();
+          try {
+            // Remove only confirmed project roots first, then revalidate remaining media usage.
+            for (const item of [...scenarios, ...videoProjects, ...media]) {
+              await permanentlyDeleteTrashItem(
+                { target: trashTarget(item), trashedAt: item.lifecycle!.trashedAt! },
+                expectedUsageById.get(item.entityId ?? item.id)
+              );
+            }
+          } finally {
+            await finishTrashAction(controller);
+          }
         });
       },
     });

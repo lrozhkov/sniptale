@@ -75,6 +75,7 @@ function buildGalleryFilterViewState(filters: GalleryFiltersState) {
     savedViewsLoaded: filters.state.savedViewsLoaded,
     search: filters.state.search,
     scope: filters.state.scope,
+    trashMode: filters.state.trashMode,
     sortMode: filters.state.sortMode,
   };
 }
@@ -144,6 +145,7 @@ function buildGalleryAppActions(args: {
       setFacetFilter: args.filters.actions.setFacetFilter,
       setSearch: args.filters.actions.setSearch,
       setScope: args.filters.actions.setScope,
+      setTrashMode: args.filters.actions.setTrashMode,
       setSortMode: args.filters.actions.setSortMode,
       updateSavedView: args.filters.actions.updateSavedView,
     },

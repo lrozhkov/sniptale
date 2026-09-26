@@ -73,7 +73,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 2,
+    schemaVersion: 3,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -94,7 +94,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_ASSETS_STORE, dataClass: 'durable-authority' },
@@ -104,7 +104,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 2,
+    schemaVersion: 3,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_ASSETS_STORE, dataClass: 'durable-authority' },
@@ -221,6 +221,31 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         )
       )
         throw new Error('Scenario tour stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 2, to: 3 },
+      { domainId: 'scenarioProjects', from: 2, to: 3 },
+      { domainId: 'videoProjects', from: 1, to: 2 },
+    ],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 3,
+    toDatabaseVersion: 4,
+    risk: 'additive',
+    stores: [MEDIA_LIBRARY_STORE, SCENARIO_PROJECTS_STORE, VIDEO_PROJECTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![MEDIA_LIBRARY_STORE, SCENARIO_PROJECTS_STORE, VIDEO_PROJECTS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Library trash stores are unavailable.');
       return undefined;
     },
   },

@@ -139,6 +139,7 @@ function createDb() {
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
       objectStore: vi.fn((storeName: string) => ({
+        getAll: dbMocks.getAllMock,
         delete: storeName === 'thumbnails' ? dbMocks.objectStoreDeleteMock : dbMocks.txDeleteMock,
         put: dbMocks.txPutMock,
       })),

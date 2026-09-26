@@ -71,6 +71,7 @@ function createProbeProps(
         setFacetFilter: vi.fn(),
         setSearch: vi.fn(),
         setScope: vi.fn(),
+        setTrashMode: vi.fn(),
         setSelectedIds: vi.fn(),
         setSelectionTagDraft: vi.fn(),
         setSortMode: vi.fn(),
@@ -95,6 +96,7 @@ function createProbeProps(
         savedViewsLoaded: true,
         search: 'capture',
         scope: 'library',
+        trashMode: false,
         selectedIds: new Set(['asset-1']),
         selectionTagDraft: '',
         sortMode: 'newest',
@@ -193,4 +195,36 @@ it('passes non-healthy storage pressure through unchanged and handles missing st
 
   renderProbe(undefined);
   expect(selectorMocks.getActiveStorageBarClass).toHaveBeenLastCalledWith(undefined);
+});
+
+it('partitions trash before normal facets, counts, selection and search; trash ignores library filters', () => {
+  const props = createProbeProps('healthy');
+  const trashed = {
+    ...item,
+    id: 'trashed',
+    tags: ['trash-only'],
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1, trashedAt: 2 },
+  };
+  props.library.items = [item, trashed];
+  props.filters.state.selectedIds = new Set(['asset-1', 'trashed']);
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.allItems).toEqual([item]);
+  expect(latestValue?.selectedItems).toEqual([item]);
+  expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([item]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ items: [item] })
+  );
+  props.filters.state.trashMode = true;
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.allItems).toEqual([trashed]);
+  expect(latestValue?.selectedItems).toEqual([trashed]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      items: [trashed],
+      search: '',
+      scope: 'all',
+      folderFilter: 'all',
+      activeTags: [],
+    })
+  );
 });

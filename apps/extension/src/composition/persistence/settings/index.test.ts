@@ -107,6 +107,8 @@ const TEMPORARY_STORAGE_POLICY = {
   defaultDestination: 'temporary' as const,
   draftRetentionDays: 30,
   videoDraftRetentionDays: 7,
+  trashCleanupEnabled: false,
+  trashRetentionDays: 30,
 };
 const LIBRARY_STORAGE_POLICY = {
   ...TEMPORARY_STORAGE_POLICY,
@@ -427,7 +429,28 @@ describe('settings', () => {
     await expect(loadSettings()).resolves.toMatchObject({
       defaultViewportPresetId: null,
       imageFormat: 'png',
+      localStoragePolicy: { trashCleanupEnabled: false, trashRetentionDays: 30 },
     });
+  });
+
+  it('preserves the explicit trash cleanup choice independently of draft cleanup on load', async () => {
+    browserStorageSyncGetMock.mockResolvedValueOnce({
+      sniptale_settings: {
+        localStoragePolicy: {
+          cleanupEnabled: false,
+          trashCleanupEnabled: true,
+          trashRetentionDays: 7,
+        },
+      },
+    });
+    await expect(loadSettings()).resolves.toMatchObject({
+      localStoragePolicy: {
+        cleanupEnabled: false,
+        trashCleanupEnabled: true,
+        trashRetentionDays: 7,
+      },
+    });
+    expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
   });
 
   it('drops an excessive or non-finite full-page policy from storage without repairing it', async () => {

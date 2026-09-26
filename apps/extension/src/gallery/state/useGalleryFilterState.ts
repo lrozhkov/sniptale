@@ -78,6 +78,7 @@ export function useGalleryFilterState() {
   const filterPreferencesRef = useRef(filterPreferences);
   const [sortMode, setSortMode] = useState<SortMode>('newest');
   const [search, setSearch] = useState('');
+  const [trashMode, setTrashMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionTagDraft, setSelectionTagDraft] = useState('');
   const updateFilterPreferences = useCallback(
@@ -134,6 +135,11 @@ export function useGalleryFilterState() {
           }));
         }
       },
+      setTrashMode: (value: boolean) => {
+        setTrashMode(value);
+        setSelectedIds(new Set());
+        setSearch('');
+      },
       setSearch,
       setScope,
       setSelectedIds,
@@ -146,6 +152,7 @@ export function useGalleryFilterState() {
       facetFilters: filterPreferences.facetFilters,
       folderFilter: filterPreferences.folderFilter,
       search,
+      trashMode,
       scope: filterPreferences.scope,
       selectedIds,
       selectionTagDraft,

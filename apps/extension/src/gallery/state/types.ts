@@ -68,6 +68,7 @@ interface GalleryPreviewDraftState {
 }
 
 interface GalleryAppFilterState {
+  trashMode?: boolean;
   activeSavedView: GallerySavedView | null;
   folderFilter: FolderFilter;
   sortMode: SortMode;
@@ -141,6 +142,7 @@ interface GalleryAppStorageActions {
 }
 
 interface GalleryAppFilterActions {
+  setTrashMode?: (value: boolean) => void;
   createSavedView: (name: string) => Promise<GallerySavedView>;
   deleteSavedView: (id: string) => Promise<void>;
   moveSavedView: (id: string, direction: 'down' | 'up') => Promise<void>;

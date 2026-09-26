@@ -6,6 +6,8 @@ export interface LibraryLifecycle {
   storageClass: LibraryStorageClass;
   updatedAt: number;
   savedAt: number | null;
+  /** Admission time in Trash; absence means the aggregate is active. */
+  trashedAt?: number;
 }
 
 export type LibraryLifecycleScope = LibraryStorageClass | 'all';

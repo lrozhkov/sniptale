@@ -33,6 +33,20 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   },
   ordinaryRetention: { ru: 'Изображения и проекты', en: 'Images and projects' },
   videoRetention: { ru: 'Исходные видеозаписи', en: 'Source video recordings' },
+  trashTitle: { ru: 'Корзина', en: 'Trash' },
+  trashCleanupEnabled: {
+    ru: 'Автоматически очищать корзину',
+    en: 'Automatically clean up trash',
+  },
+  trashCleanupDescription: {
+    ru: 'Материалы удаляются безвозвратно по истечении выбранного срока с момента перемещения в корзину при следующем открытии или обновлении библиотеки. Медиа, используемые в проектах, сохраняются.',
+    en: 'Items are permanently deleted after the selected time since moving to trash, when you next open or refresh the Library. Media used by projects is retained.',
+  },
+  trashCleanupDisabled: {
+    ru: 'Автоочистка выключена: материалы хранятся в корзине бессрочно, пока вы не удалите их вручную.',
+    en: 'Automatic cleanup is off: trash is kept indefinitely until you permanently delete it manually.',
+  },
+  trashRetention: { ru: 'Срок хранения в корзине', en: 'Trash retention period' },
   daySuffix: { ru: 'дн.', en: 'days' },
   usageTitle: { ru: 'Использование хранилища', en: 'Storage usage' },
   totalUsage: { ru: 'Всего занято', en: 'Total used' },

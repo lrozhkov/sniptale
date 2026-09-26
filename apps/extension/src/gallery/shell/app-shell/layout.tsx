@@ -1,4 +1,5 @@
 import type { Ref } from 'react';
+import { translate } from '../../../platform/i18n';
 import { GalleryHeader } from '../../library/main-content/header';
 import { GalleryMainContent } from '../../library/main-content';
 import { GalleryOverlays } from './overlays';
@@ -50,6 +51,13 @@ function GallerySidebarSection(props: GalleryAppLayoutProps) {
 
   return (
     <GallerySidebar
+      trashMode={Boolean(state.filters.trashMode)}
+      busy={state.storage.isBusy}
+      selectedCount={state.selection.selectedItems.length}
+      {...(props.onTrashModeChange ? { onTrashModeChange: props.onTrashModeChange } : {})}
+      {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
+      onDeleteTrash={() => props.onDeleteMany(state.selection.selectedItems)}
+      onEmptyTrash={() => props.onDeleteMany(state.derived.allItems)}
       activeSavedView={state.filters.activeSavedView}
       activeTags={state.filters.activeTags}
       allTags={state.derived.allTags}
@@ -83,6 +91,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 
   return (
     <GalleryMainContent
+      trashMode={Boolean(state.filters.trashMode)}
       allTags={state.derived.allTags}
       banner={state.storage.banner}
       filteredItems={state.derived.filteredItems}
@@ -136,40 +145,44 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
         />
       ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
-        <GalleryHeader
-          activeStorageBarClass={props.state.derived.activeStorageBarClass}
-          allTags={props.state.derived.allTags}
-          folderFilter={props.state.filters.folderFilter}
-          isBusy={props.state.storage.isBusy}
-          importTriggerRef={props.importTriggerRef}
-          mediaImportTriggerRef={props.mediaImportTriggerRef}
-          {...(props.webSnapshotImportTriggerRef
-            ? { webSnapshotImportTriggerRef: props.webSnapshotImportTriggerRef }
-            : {})}
-          onApplySelectionTag={props.onApplySelectionTag}
-          onClearSelection={props.onClearSelection}
-          onDeleteMany={props.onDeleteMany}
-          onDeleteAll={() => props.onDeleteMany(props.state.derived.allItems)}
-          onExportBackup={props.onExportBackup}
-          onSearchChange={props.onSearchChange}
-          onImportBackupClick={props.onImportBackupClick}
-          onImportMediaClick={props.onImportMediaClick}
-          {...(props.onImportWebSnapshotClick
-            ? { onImportWebSnapshotClick: props.onImportWebSnapshotClick }
-            : {})}
-          onSelectionTagDraftChange={props.onSelectionTagDraftChange}
-          onSelectionBackup={props.onSelectionBackup}
-          onSelectionZip={props.onSelectionZip}
-          onSortModeChange={props.onSortModeChange}
-          onViewModeChange={props.onViewModeChange}
-          search={props.state.filters.search}
-          selectedItems={props.state.selection.selectedItems}
-          selectedSize={props.state.selection.selectedSize}
-          selectionTagDraft={props.state.selection.selectionTagDraft}
-          sortMode={props.state.filters.sortMode}
-          storageInfo={props.state.storage.storageInfo}
-          viewMode={props.viewMode}
-        />
+        {props.state.filters.trashMode ? (
+          <h1 className="shrink-0 text-xl font-semibold">{translate('gallery.app.trashTitle')}</h1>
+        ) : (
+          <GalleryHeader
+            activeStorageBarClass={props.state.derived.activeStorageBarClass}
+            allTags={props.state.derived.allTags}
+            folderFilter={props.state.filters.folderFilter}
+            isBusy={props.state.storage.isBusy}
+            importTriggerRef={props.importTriggerRef}
+            mediaImportTriggerRef={props.mediaImportTriggerRef}
+            {...(props.webSnapshotImportTriggerRef
+              ? { webSnapshotImportTriggerRef: props.webSnapshotImportTriggerRef }
+              : {})}
+            onApplySelectionTag={props.onApplySelectionTag}
+            onClearSelection={props.onClearSelection}
+            onDeleteMany={props.onDeleteMany}
+            onDeleteAll={() => props.onDeleteMany(props.state.derived.allItems)}
+            onExportBackup={props.onExportBackup}
+            onSearchChange={props.onSearchChange}
+            onImportBackupClick={props.onImportBackupClick}
+            onImportMediaClick={props.onImportMediaClick}
+            {...(props.onImportWebSnapshotClick
+              ? { onImportWebSnapshotClick: props.onImportWebSnapshotClick }
+              : {})}
+            onSelectionTagDraftChange={props.onSelectionTagDraftChange}
+            onSelectionBackup={props.onSelectionBackup}
+            onSelectionZip={props.onSelectionZip}
+            onSortModeChange={props.onSortModeChange}
+            onViewModeChange={props.onViewModeChange}
+            search={props.state.filters.search}
+            selectedItems={props.state.selection.selectedItems}
+            selectedSize={props.state.selection.selectedSize}
+            selectionTagDraft={props.state.selection.selectionTagDraft}
+            sortMode={props.state.filters.sortMode}
+            storageInfo={props.state.storage.storageInfo}
+            viewMode={props.viewMode}
+          />
+        )}
         <div className="flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden">
           <GallerySidebarSection {...props} />
           <GalleryMainSection {...props} />

@@ -85,7 +85,10 @@ function buildGalleryPreviewHandlers(
     onPreviewDownloadOriginal: actions.preview.downloadOriginal,
     onPreviewCopy: actions.preview.copy,
     onPreviewEdit: actions.preview.openInEditor,
-    onRecordingGroupOpen: actions.preview.openInEditor,
+    onRecordingGroupOpen: (item: GalleryItem) => {
+      if (controller.state.filters.trashMode) controller.actions.selection.toggleSelection(item.id);
+      else void actions.preview.openInEditor(item);
+    },
     onPreviewOpenSnapshotScreenshot: actions.preview.openSnapshotScreenshotInEditor,
     onPreviewRestoreOriginal: actions.preview.restoreOriginal,
     onPreviewSaveCopy: actions.preview.saveCopy,
@@ -104,7 +107,9 @@ function buildGalleryPreviewHandlers(
       await controller.actions.storage.refresh();
     },
     onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) =>
-      openPreview(controller, item, options),
+      controller.state.filters.trashMode
+        ? controller.actions.selection.toggleSelection(item.id)
+        : openPreview(controller, item, options),
     onPreviewNavigate: (item: GalleryItem) => {
       void actions.preview.navigate(item);
     },
@@ -139,6 +144,12 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
   const { actions, controller } = props;
 
   return {
+    onTrashModeChange: (value: boolean) => {
+      controller.actions.preview.setPreview({ inspectorCollapsed: false, item: null, url: null });
+      controller.actions.filters.setTrashMode?.(value);
+    },
+    onRestoreTrash: () =>
+      void actions.selection.restoreTrash?.(controller.state.selection.selectedItems),
     gridViewportRef: controller.refs.gridViewportRef,
     importInputRef: controller.refs.importInputRef,
     importTriggerRef: controller.refs.importTriggerRef,

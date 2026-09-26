@@ -1,3 +1,5 @@
+import { loadSettings } from '../../composition/persistence/settings';
+import { cleanupLibraryTrash } from '../../workflows/media-hub/trash';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
@@ -124,6 +126,7 @@ function areLifecyclesEqual(left: GalleryItem['lifecycle'], right: GalleryItem['
     left === right ||
     (left !== undefined &&
       right !== undefined &&
+      left.trashedAt === right.trashedAt &&
       left.savedAt === right.savedAt &&
       left.storageClass === right.storageClass &&
       left.updatedAt === right.updatedAt)
@@ -294,6 +297,13 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
     args.setIsLoading(true);
   }
   try {
+    const settings = await loadSettings().catch(() => null);
+    if (settings) {
+      const maintenance = await cleanupLibraryTrash(settings.localStoragePolicy).catch(() => ({
+        failedCount: 1,
+      }));
+      if (maintenance.failedCount > 0) args.onBanner(translate('gallery.app.trashCleanupFailed'));
+    }
     const { estimate, nextItems } = await loadGalleryLibrarySnapshot();
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
       return;

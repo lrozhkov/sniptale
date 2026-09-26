@@ -244,3 +244,53 @@ it('loads, updates, and cleans storage through the hook owner', async () => {
   act(() => root.unmount());
   container.remove();
 });
+
+it('keeps trash cleanup independent and disables its age control until enabled', () => {
+  const state = {
+    busy: false,
+    policy: {
+      cleanupEnabled: false,
+      defaultDestination: 'temporary' as const,
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+      trashCleanupEnabled: false,
+      trashRetentionDays: 30,
+    },
+    runCleanup: vi.fn(),
+    updatePolicy: vi.fn(),
+    usage: null,
+  };
+  mocks.state.mockReturnValue(state);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => root.render(<SectionHarness />));
+  const control = (label: string) =>
+    Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.getAttribute('aria-label') === label
+    );
+  const trashToggle = () => control(translate('settings.storageDrafts.trashCleanupEnabled'));
+  const trashAge = () => control(translate('settings.storageDrafts.trashRetention'));
+  expect(trashToggle()?.getAttribute('aria-checked')).toBe('false');
+  expect(trashAge()?.disabled).toBe(true);
+  expect(container.textContent).toContain(translate('settings.storageDrafts.trashCleanupDisabled'));
+  act(() => trashToggle()?.click());
+  expect(state.updatePolicy).toHaveBeenCalledWith({ trashCleanupEnabled: true });
+
+  state.policy.trashCleanupEnabled = true;
+  act(() => root.render(<SectionHarness />));
+  expect(trashAge()?.disabled).toBe(false);
+  expect(control(translate('settings.storageDrafts.ordinaryRetention'))?.disabled).toBe(true);
+  act(() => trashAge()?.click());
+  const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+    (button) => button.textContent === `7 ${translate('settings.storageDrafts.daySuffix')}`
+  );
+  act(() => option?.click());
+  expect(state.updatePolicy).toHaveBeenCalledWith({ trashRetentionDays: 7 });
+  state.busy = true;
+  act(() => root.render(<SectionHarness />));
+  expect(trashToggle()?.disabled).toBe(true);
+  expect(trashAge()?.disabled).toBe(true);
+  act(() => root.unmount());
+  container.remove();
+});

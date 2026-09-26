@@ -18,6 +18,7 @@ vi.mock('../assets', async (importOriginal) => ({
   recoverStandaloneAssetPublications: mocks.recoverStandalone,
 }));
 
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { publishRecordingAssetJournal } from './asset-publication';
 import type { AssetReadyJournal } from '../assets';
 
@@ -173,7 +174,8 @@ function completionOutbox(completion: {
 function createTransaction(
   writes: Array<[string, 'add' | 'delete' | 'put', unknown]>,
   done: Promise<unknown>,
-  stateManagerValue?: unknown
+  stateManagerValue?: unknown,
+  mediaValue?: unknown
 ) {
   return {
     done,
@@ -188,7 +190,9 @@ function createTransaction(
               ? previous
               : name === 'state_manager'
                 ? stateManagerValue
-                : undefined
+                : name === 'media_library'
+                  ? mediaValue
+                  : undefined
           ),
         index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
         put: vi.fn(async (value: unknown) => writes.push([name, 'put', value])),
@@ -196,3 +200,26 @@ function createTransaction(
     },
   };
 }
+
+it('preserves Trash admission when a ready recording journal is replayed after a restart', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const media = {
+    ...buildRecordingMediaEntry(entry),
+    lifecycle: {
+      storageClass: 'temporary',
+      savedAt: null,
+      updatedAt: 1,
+      trashedAt: 100,
+    },
+  };
+  const transaction = createTransaction(writes, Promise.resolve(), undefined, media);
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  await publishRecordingAssetJournal(journal());
+  expect(writes).toContainEqual([
+    'media_library',
+    'put',
+    expect.objectContaining({ lifecycle: media.lifecycle }),
+  ]);
+});

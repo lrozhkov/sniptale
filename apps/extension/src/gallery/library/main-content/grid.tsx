@@ -7,6 +7,7 @@ import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
 function renderGalleryGridContent(
   props: Pick<
     GalleryMainContentProps,
+    | 'trashMode'
     | 'filteredItems'
     | 'filteredScenarioProjects'
     | 'folderFilter'
@@ -36,7 +37,13 @@ function renderGalleryGridContent(
   }
 
   if (props.filteredItems.length === 0) {
-    return <GalleryEmptyState folderFilter={props.folderFilter} />;
+    return props.trashMode ? (
+      <p role="status" className="p-4 text-sm">
+        {translate('gallery.app.trashEmpty')}
+      </p>
+    ) : (
+      <GalleryEmptyState folderFilter={props.folderFilter} />
+    );
   }
 
   return props.viewMode === 'list' ? (
@@ -49,6 +56,7 @@ function renderGalleryGridContent(
 export function GalleryGrid(
   props: Pick<
     GalleryMainContentProps,
+    | 'trashMode'
     | 'filteredItems'
     | 'filteredScenarioProjects'
     | 'folderFilter'

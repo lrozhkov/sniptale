@@ -1,4 +1,5 @@
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import {
   ASSET_OWNERS_STORE,
@@ -115,7 +116,13 @@ export async function publishRecordingAssetJournal(journal: AssetReadyJournal): 
         role: RECORDING_ASSET_ROLE,
       });
       await recordingStore.put(entry);
-      await tx.objectStore(MEDIA_LIBRARY_STORE).put(buildRecordingMediaEntry(entry));
+      const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const media = buildRecordingMediaEntry(entry);
+      const currentMedia = parseMediaLibraryEntry(await mediaStore.get(media.id));
+      await mediaStore.put({
+        ...media,
+        ...(currentMedia?.lifecycle ? { lifecycle: currentMedia.lifecycle } : {}),
+      });
     }
     if (payload.completion) {
       const outboxStore = tx.objectStore(STATE_MANAGER_STORE);

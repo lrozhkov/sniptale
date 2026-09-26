@@ -1,6 +1,30 @@
 import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
+  trashTitle: { ru: 'Корзина', en: 'Trash' },
+  returnToLibrary: { ru: 'Вернуться в библиотеку', en: 'Return to library' },
+  trashDescription: {
+    ru: 'Выберите материалы для восстановления или окончательного удаления. По умолчанию корзина хранится без ограничения срока. Автоочистка включается в настройках хранения.',
+    en: 'Select items to restore or permanently delete. Trash is kept indefinitely by default. Automatic cleanup can be enabled in storage settings.',
+  },
+  trashSelectAll: { ru: 'Выбрать всё', en: 'Select all' },
+  restoreTrash: { ru: 'Восстановить выбранное', en: 'Restore selected' },
+  permanentDelete: { ru: 'Удалить навсегда', en: 'Delete permanently' },
+  emptyTrash: { ru: 'Очистить корзину', en: 'Empty trash' },
+  moveToTrash: { ru: 'Переместить в корзину', en: 'Move to trash' },
+  moveToTrashConfirm: {
+    ru: 'Переместить выбранные материалы в корзину? Их можно будет восстановить.',
+    en: 'Move the selected items to trash? You can restore them later.',
+  },
+  permanentDeleteConfirm: {
+    ru: 'Удалить выбранные материалы из корзины навсегда? Восстановить их будет невозможно.',
+    en: 'Permanently delete the selected items from trash? This cannot be undone.',
+  },
+  trashEmpty: { ru: 'Корзина пуста', en: 'Trash is empty' },
+  trashCleanupFailed: {
+    ru: 'Не удалось завершить автоочистку корзины. Оставшиеся материалы сохранены; повторите обновление.',
+    en: 'Automatic trash cleanup could not finish. Remaining items are retained; refresh to retry.',
+  },
   title: {
     ru: 'Библиотека',
     en: 'Library',

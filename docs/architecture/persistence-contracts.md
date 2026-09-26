@@ -23,3 +23,13 @@ Do not repair or reset on read. Gallery may offer retry for blocked or insuffici
 ## Change proof
 
 For a database or domain version change, update the registry, retained source fixture, target fixture, and contiguous descriptor. Prove deterministic output, interruption and rerun, quota handling, backup or refusal, and affected runtime and UI behavior.
+
+## Gallery trash
+
+Gallery deletion sets `LibraryLifecycle.trashedAt` on the media or project root. It retains the original storage class, aggregate graph, workspaces and immutable asset bytes. Trash is authoritative IndexedDB state; ordinary browsing, counts, tags and facets exclude it. Raw persistence enumeration and project dependency resolution continue to see retained roots. Draft cleanup excludes trash at selection and transaction time, including linked media.
+
+The lifecycle owner serializes move, restore and permanent deletion with a cross-runtime lock. A permanent deletion is bound to the observed trash timestamp and rechecks it under that lock; a concurrent restore invalidates the stale deletion. Restore clears the marker and restarts temporary retention timing. Metadata edits and publication recovery preserve the authoritative marker.
+
+Trash cleanup is independently disabled by default. When enabled in storage settings, items expire after the selected number of days since moving to trash (1, 3, 7, 14, 30, 60, 90, 180 or 365; initial choice 30). The explicit Gallery refresh workflow checks expiry on opening and refreshing Gallery. No browser wakeup schedule is implied. Referenced media remains retained; cleanup failures retain remaining items and show retry feedback. Manual permanent deletion and emptying trash require confirmation and the existing project dependency checks. Privacy erasure still removes trash along with all local media.
+
+Trash-driven video-project deletion preserves independently published export media, including active/restored exports and exports with a newer trash timestamp. Each export is purged through its own media root. Empty Trash deletes confirmed project roots before their selected source media; dependencies outside the confirmed batch still block primary-source deletion, and the media owner revalidates remaining references before mutation.

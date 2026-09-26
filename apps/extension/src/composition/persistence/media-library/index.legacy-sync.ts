@@ -17,6 +17,7 @@ import {
 import { listAllProjectExports, listProjectAssets } from '../projects/index';
 import { listRecordings } from '../recordings/index';
 import type { MediaLibraryEntry } from './contracts';
+import { parseMediaLibraryEntry } from './read-guards';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { backfillScenarioLibraryAssets } from '../scenario/library-publication';
 
@@ -44,18 +45,20 @@ function shouldDeleteStaleManagedEntry(entry: MediaLibraryEntry, desiredIds: Set
 export async function syncLegacyMediaLibrary(): Promise<void> {
   await backfillScenarioLibraryAssets();
   await runWithIndexedDbMutation(async (db) => {
-    const [recordings, projectExports, projectAssets, currentEntries] = await Promise.all([
+    const [recordings, projectExports, projectAssets] = await Promise.all([
       listRecordings(),
       listAllProjectExports(),
       listProjectAssets(),
-      db.getAll(MEDIA_LIBRARY_STORE) as Promise<MediaLibraryEntry[]>,
     ]);
-    const currentMap = new Map(currentEntries.map((entry) => [entry.id, entry]));
     const desiredManagedIds = new Set<string>();
     const tx = db.transaction(
       [MEDIA_LIBRARY_STORE, THUMBNAILS_STORE, VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
       'readwrite'
     );
+    const currentEntries = (await tx.objectStore(MEDIA_LIBRARY_STORE).getAll())
+      .map(parseMediaLibraryEntry)
+      .filter((entry): entry is MediaLibraryEntry => entry !== null);
+    const currentMap = new Map(currentEntries.map((entry) => [entry.id, entry]));
     const mediaStore: LegacyMediaStore = {
       put: (value) => tx.objectStore(MEDIA_LIBRARY_STORE).put(value),
       async delete(key) {

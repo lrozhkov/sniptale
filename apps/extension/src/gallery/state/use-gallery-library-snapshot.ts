@@ -67,7 +67,8 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
       thumbnailIds: new Set(thumbnailIds),
       videoProjects,
     }).map((item) => {
-      if (item.lifecycle?.storageClass !== 'temporary') return item;
+      if (item.lifecycle?.storageClass !== 'temporary' || item.lifecycle.trashedAt !== undefined)
+        return item;
       const retention = getDraftRetentionMs(
         policy,
         (isGalleryMediaItem(item) && item.source.kind === 'recording') ||

@@ -139,14 +139,16 @@ export async function updateMediaLibraryEntry(
   >
 ): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
-    const existing = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
+    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const existing = parseMediaLibraryEntry(await store.get(assetId));
 
     if (!existing) {
       throw new Error(`Asset ${assetId} не найден.`);
     }
 
     const updatedAt = Date.now();
-    await db.put(MEDIA_LIBRARY_STORE, {
+    await store.put({
       ...existing,
       ...patch,
       ...(patch.sourceUrl === undefined
@@ -158,6 +160,7 @@ export async function updateMediaLibraryEntry(
       updatedAt,
       tags: patch.tags ?? existing.tags,
     });
+    await tx.done;
   });
 }
 
@@ -166,7 +169,9 @@ export async function addMediaLibraryEntryTags(
   tagsToAdd: string[]
 ): Promise<MediaLibraryEntry> {
   return runWithIndexedDbMutation(async (db) => {
-    const existing = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
+    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const existing = parseMediaLibraryEntry(await store.get(assetId));
 
     if (!existing) {
       throw new Error(`Asset ${assetId} не найден.`);
@@ -174,6 +179,7 @@ export async function addMediaLibraryEntryTags(
 
     const nextTags = Array.from(new Set([...existing.tags, ...tagsToAdd]));
     if (nextTags.length === existing.tags.length) {
+      await tx.done;
       return existing;
     }
 
@@ -183,7 +189,8 @@ export async function addMediaLibraryEntryTags(
       tags: nextTags,
       updatedAt,
     };
-    await db.put(MEDIA_LIBRARY_STORE, nextEntry);
+    await store.put(nextEntry);
+    await tx.done;
     return nextEntry;
   });
 }

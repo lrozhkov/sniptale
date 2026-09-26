@@ -10,6 +10,13 @@ import type {
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface GallerySidebarProps {
+  trashMode?: boolean;
+  busy?: boolean;
+  selectedCount?: number;
+  onTrashModeChange?: (value: boolean) => void;
+  onRestoreTrash?: () => void;
+  onDeleteTrash?: () => void;
+  onEmptyTrash?: () => void;
   activeSavedView?: GallerySavedView | null;
   activeTags: string[];
   allTags: string[];

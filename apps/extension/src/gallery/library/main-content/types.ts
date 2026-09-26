@@ -10,6 +10,7 @@ import type {
 import type { GalleryItem } from '../items';
 
 export interface GalleryMainContentProps {
+  trashMode?: boolean;
   allTags?: string[];
   banner: string | null;
   children?: ReactNode;

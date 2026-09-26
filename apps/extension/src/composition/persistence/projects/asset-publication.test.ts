@@ -1,3 +1,4 @@
+import { createMediaLibraryEntry } from './index.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -175,7 +176,8 @@ function createJournal(domain: string, payload: unknown): AssetReadyJournal {
 function createTransaction(
   writes: Array<[string, 'delete' | 'put', unknown]>,
   done: Promise<unknown>,
-  previous?: unknown
+  previous?: unknown,
+  mediaValue?: unknown
 ) {
   return {
     done,
@@ -185,7 +187,11 @@ function createTransaction(
         get: vi
           .fn()
           .mockResolvedValue(
-            name === 'project_assets' || name === 'project_exports' ? previous : undefined
+            name === 'project_assets' || name === 'project_exports'
+              ? previous
+              : name === 'media_library'
+                ? mediaValue
+                : undefined
           ),
         index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
         put: vi.fn(async (value: unknown) => writes.push([name, 'put', value])),
@@ -193,3 +199,35 @@ function createTransaction(
     },
   };
 }
+
+it('preserves Trash admission when a ready project asset journal is replayed', async () => {
+  const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+  const media = createMediaLibraryEntry({
+    lifecycle: {
+      storageClass: 'temporary',
+      savedAt: null,
+      updatedAt: 1,
+      trashedAt: 100,
+    },
+  });
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({
+      transaction: () => createTransaction(writes, Promise.resolve(), undefined, media),
+    })
+  );
+  const entry = {
+    assetId: ref.assetId,
+    createdAt: 2,
+    id: 'asset-1',
+    mimeType: ref.mimeType,
+    size: ref.size,
+  };
+  await publishProjectAssetJournal(
+    createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, { entry, filename: 'clip.webm' })
+  );
+  expect(writes).toContainEqual([
+    'media_library',
+    'put',
+    expect.objectContaining({ lifecycle: media.lifecycle }),
+  ]);
+});

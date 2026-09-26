@@ -33,7 +33,11 @@ import {
   resetPreviewChanges,
 } from './preview';
 import { createNavigatePreviewAction } from './preview-navigation';
-import { createApplySelectionTagAction, createDeleteManyAction } from './selection';
+import {
+  createApplySelectionTagAction,
+  createDeleteManyAction,
+  createRestoreTrashAction,
+} from './selection';
 import { createSelectionBackupAction, createSelectionZipAction } from './selection-export';
 import { createBusyActionRunner } from './shared';
 import { openSnapshotScreenshotInEditor } from './snapshot-screenshot';
@@ -121,6 +125,7 @@ function buildGalleryAppActionsResult(args: {
     selection: {
       applyTag: (tag?: string) => args.handleApplySelectionTag(tag),
       deleteMany: args.deleteMany,
+      restoreTrash: (targets) => createRestoreTrashAction(controller)(targets, withBusy),
       downloadBackup: args.handleSelectionBackup,
       downloadZip: args.handleSelectionZip,
     },

@@ -449,3 +449,75 @@ it('retains a temporary project in the library with its next revisioned workspac
     })
   );
 });
+
+it.each([
+  { parentSaved: false, mirrorSaved: false, sibling: 'temporary', saved: false },
+  { parentSaved: false, mirrorSaved: false, sibling: 'library', saved: true },
+  { parentSaved: true, mirrorSaved: false, sibling: 'temporary', saved: true },
+  { parentSaved: false, mirrorSaved: true, sibling: 'temporary', saved: true },
+])(
+  'preserves independent Trash admission through project save and shared-media lifecycle synchronization: %j',
+  async ({ parentSaved, mirrorSaved, sibling, saved }) => {
+    const { saveVideoProject } = await import('./index');
+    const lifecycle = (library: boolean) => ({
+      storageClass: library ? ('library' as const) : ('temporary' as const),
+      savedAt: library ? 100 : null,
+      updatedAt: 100,
+    });
+    const project = createVideoProject({ assets: [createProjectOwnedVideoAsset('asset-1')] });
+    const existing = createVideoProjectEntry(project, { lifecycle: lifecycle(parentSaved) });
+    const media = createMediaLibraryEntry({
+      id: 'project-asset:asset-1',
+      lifecycle: { ...lifecycle(mirrorSaved), trashedAt: 500 },
+    });
+    projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+      id === project.id ? existing : id === media.id ? media : undefined
+    );
+    projectsDbMocks.txGetAllMock.mockResolvedValue([
+      existing,
+      createVideoProjectEntry(
+        { id: 'sibling', assets: project.assets },
+        {
+          lifecycle: lifecycle(sibling === 'library'),
+        }
+      ),
+    ]);
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+
+    await saveVideoProject(project);
+
+    expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: media.id,
+        source: media.source,
+        lifecycle: {
+          storageClass: saved ? 'library' : 'temporary',
+          savedAt: saved ? (mirrorSaved ? 100 : 1000) : null,
+          updatedAt: mirrorSaved ? 100 : 1000,
+          trashedAt: 500,
+        },
+      })
+    );
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  }
+);
+
+it('does not manufacture a missing media mirror while saving a project with a retained source', async () => {
+  const { saveVideoProject } = await import('./index');
+  const project = createVideoProject({ assets: [createProjectOwnedVideoAsset('asset-1')] });
+  const existing = createVideoProjectEntry(project, {
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 100 },
+  });
+  projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+    id === project.id ? existing : undefined
+  );
+  projectsDbMocks.txGetAllMock.mockResolvedValue([existing]);
+
+  await saveVideoProject(project);
+
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledTimes(1);
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({ id: project.id })
+  );
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+});

@@ -90,7 +90,11 @@ export function useGalleryStorageWorkflow({
 
         return {
           ...previous,
-          item: previewItem ? (items.find((item) => item.id === previewItem.id) ?? null) : null,
+          item: previewItem
+            ? (items.find(
+                (item) => item.id === previewItem.id && item.lifecycle?.trashedAt === undefined
+              ) ?? null)
+            : null,
           url: null,
         };
       });

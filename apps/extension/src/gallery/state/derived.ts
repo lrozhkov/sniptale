@@ -155,8 +155,38 @@ export function useGalleryDerivedState(props: {
   viewMode: GalleryViewMode;
   viewport: GalleryViewportState;
 }) {
-  const { filters, library, viewport, viewMode } = props;
-  const filterState = useGalleryFilterDerivedState({ filters, library });
+  const { filters, viewport, viewMode } = props;
+  const modeItems = useMemo(
+    () =>
+      props.library.items.filter(
+        (item) =>
+          Boolean(item.lifecycle?.trashedAt !== undefined) === Boolean(filters.state.trashMode)
+      ),
+    [props.library.items, filters.state.trashMode]
+  );
+  const library = { ...props.library, items: modeItems };
+  const modeFilters = filters.state.trashMode
+    ? {
+        ...filters,
+        state: {
+          ...filters.state,
+          activeTags: [],
+          facetFilters: {
+            created: [],
+            duration: [],
+            format: [],
+            resolution: [],
+            size: [],
+            source: [],
+            updated: [],
+          },
+          folderFilter: 'all' as const,
+          scope: 'all' as const,
+          search: '',
+        },
+      }
+    : filters;
+  const filterState = useGalleryFilterDerivedState({ filters: modeFilters, library });
   const selectionState = useGallerySelectionDerivedState({
     items: library.items,
     selectedIds: filters.state.selectedIds,

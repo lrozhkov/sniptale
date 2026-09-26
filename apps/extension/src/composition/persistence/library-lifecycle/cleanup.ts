@@ -108,7 +108,8 @@ export async function cleanupDrafts(args: {
   const includeUnexpired = Boolean(args.includeUnexpired);
   for (const entry of videoProjects) {
     const lifecycle = entry.lifecycle;
-    if (!lifecycle || lifecycle.storageClass !== 'temporary') continue;
+    if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')
+      continue;
     const retention =
       resolveVideoProjectRetentionKind(entry.project) === 'video'
         ? videoRetention
@@ -130,7 +131,8 @@ export async function cleanupDrafts(args: {
 
   for (const entry of media) {
     const lifecycle = entry.lifecycle;
-    if (!lifecycle || lifecycle.storageClass !== 'temporary') continue;
+    if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')
+      continue;
     if (referencedMediaIds.has(entry.id)) continue;
     if (entry.source.kind === 'recording' && referencedRecordingIds.has(entry.source.recordingId)) {
       continue;
@@ -144,7 +146,8 @@ export async function cleanupDrafts(args: {
 
   for (const entry of scenarioProjects) {
     const lifecycle = entry.lifecycle;
-    if (!lifecycle || lifecycle.storageClass !== 'temporary') continue;
+    if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')
+      continue;
     if (!includeUnexpired && !isExpired(lifecycle.updatedAt, ordinaryRetention, now)) continue;
     if (await deleteExpiredScenarioProject(entry.id, now, ordinaryRetention, includeUnexpired)) {
       deletedIds.push(`scenario:${entry.id}`);
@@ -182,6 +185,7 @@ async function deleteExpiredScenarioProject(
     if (
       !current ||
       current.lifecycle?.storageClass !== 'temporary' ||
+      current.lifecycle.trashedAt !== undefined ||
       (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, now))
     ) {
       await tx.done;
@@ -420,6 +424,7 @@ async function cleanupVideoProjectRecordings(args: {
     const recording = parseRecordingEntry(await args.recordingStore.get(recordingId));
     if (
       recording?.lifecycle?.storageClass === 'temporary' &&
+      recording.lifecycle.trashedAt === undefined &&
       (args.includeUnexpired ||
         isExpired(recording.lifecycle.updatedAt, args.videoRetention, args.now))
     ) {
@@ -467,6 +472,7 @@ async function deleteExpiredMedia(
     if (
       !current ||
       current.lifecycle?.storageClass !== 'temporary' ||
+      current.lifecycle.trashedAt !== undefined ||
       (!includeUnexpired && !isExpired(current.lifecycle.updatedAt, retention, now))
     ) {
       await tx.done;
@@ -587,6 +593,7 @@ async function deleteExpiredVideoProjectGraph(args: {
     if (
       !current ||
       current.lifecycle?.storageClass !== 'temporary' ||
+      current.lifecycle.trashedAt !== undefined ||
       (!args.includeUnexpired &&
         !isExpired(current.lifecycle.updatedAt, args.parentRetention, args.now))
     ) {
@@ -698,7 +705,8 @@ function shouldProtectVideoProjectMedia(
     videoRetention: number | null;
   }
 ): boolean {
-  if (media.lifecycle?.storageClass !== 'temporary') return true;
+  if (media.lifecycle?.storageClass !== 'temporary' || media.lifecycle.trashedAt !== undefined)
+    return true;
   if (context.includeUnexpired) return false;
   const retention =
     media.source.kind === 'recording' ? context.videoRetention : context.ordinaryRetention;

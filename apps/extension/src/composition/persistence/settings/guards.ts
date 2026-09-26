@@ -188,6 +188,8 @@ function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<Local
   const cleanupEnabled = value['cleanupEnabled'];
   const draftRetentionDays = value['draftRetentionDays'];
   const videoDraftRetentionDays = value['videoDraftRetentionDays'];
+  const trashCleanupEnabled = value['trashCleanupEnabled'];
+  const trashRetentionDays = value['trashRetentionDays'];
   return {
     defaultDestination:
       defaultDestination === 'temporary' || defaultDestination === 'library'
@@ -200,6 +202,13 @@ function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<Local
       isNumber(draftRetentionDays) && retentionDays.has(draftRetentionDays)
         ? draftRetentionDays
         : DEFAULT_LOCAL_STORAGE_POLICY.draftRetentionDays,
+    trashCleanupEnabled: isBoolean(trashCleanupEnabled)
+      ? trashCleanupEnabled
+      : DEFAULT_LOCAL_STORAGE_POLICY.trashCleanupEnabled,
+    trashRetentionDays:
+      isNumber(trashRetentionDays) && retentionDays.has(trashRetentionDays)
+        ? trashRetentionDays
+        : DEFAULT_LOCAL_STORAGE_POLICY.trashRetentionDays,
     videoDraftRetentionDays:
       isNumber(videoDraftRetentionDays) && retentionDays.has(videoDraftRetentionDays)
         ? videoDraftRetentionDays

@@ -18,6 +18,8 @@ import type { MediaFileImportConflictStrategy } from '../../library/import-types
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface GalleryAppLayoutProps {
+  onTrashModeChange?: (value: boolean) => void;
+  onRestoreTrash?: () => void;
   gridViewportRef: RefObject<HTMLDivElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
   importTriggerRef: RefObject<HTMLButtonElement | null>;

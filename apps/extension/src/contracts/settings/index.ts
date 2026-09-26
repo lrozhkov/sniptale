@@ -65,6 +65,10 @@ export interface LocalStoragePolicy {
   defaultDestination: LocalStorageDestination;
   draftRetentionDays: number;
   videoDraftRetentionDays: number;
+  /** Missing legacy values disable automatic permanent deletion from trash. */
+  trashCleanupEnabled?: boolean;
+  /** Days since trash admission; normalized settings default to 30. */
+  trashRetentionDays?: number;
 }
 
 import type { FilenameRules } from '../../features/file-naming/rules';

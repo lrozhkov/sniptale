@@ -1,3 +1,4 @@
+import { translate } from '../../../platform/i18n';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -99,4 +100,38 @@ it('composes folder and tag sections inside the shared shell', () => {
   );
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
+});
+
+it('offers trash navigation and replaces library filters with recoverable actions', () => {
+  const props = {
+    ...createProps(),
+    onTrashModeChange: vi.fn(),
+    onRestoreTrash: vi.fn(),
+    onDeleteTrash: vi.fn(),
+    onEmptyTrash: vi.fn(),
+    selectedCount: 1,
+  };
+  const button = (key: Parameters<typeof translate>[0]) =>
+    Array.from(container!.querySelectorAll('button')).find((element) =>
+      element.textContent?.includes(translate(key))
+    )!;
+  act(() => root?.render(<GallerySidebar {...props} />));
+  expect(button('gallery.app.trashTitle').querySelector('svg.lucide-trash2')).not.toBeNull();
+  act(() => button('gallery.app.trashTitle').click());
+  expect(props.onTrashModeChange).toHaveBeenCalledWith(true);
+  act(() => root?.render(<GallerySidebar {...props} trashMode />));
+  expect(container?.querySelector('[data-ui="test.folder-list"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
+  act(() => button('gallery.app.restoreTrash').click());
+  act(() => button('gallery.app.permanentDelete').click());
+  act(() => button('gallery.app.emptyTrash').click());
+  act(() => button('gallery.app.returnToLibrary').click());
+  expect(props.onRestoreTrash).toHaveBeenCalledOnce();
+  expect(props.onDeleteTrash).toHaveBeenCalledOnce();
+  expect(props.onEmptyTrash).toHaveBeenCalledOnce();
+  expect(props.onTrashModeChange).toHaveBeenLastCalledWith(false);
+  act(() => root?.render(<GallerySidebar {...props} trashMode busy />));
+  expect(
+    Array.from(container!.querySelectorAll('button')).every((element) => element.disabled)
+  ).toBe(true);
 });

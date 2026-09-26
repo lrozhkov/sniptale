@@ -239,6 +239,12 @@ function normalizeLocalStoragePolicy(parsedValue: Partial<Settings>): LocalStora
     draftRetentionDays:
       parsedValue.localStoragePolicy?.draftRetentionDays ??
       DEFAULT_LOCAL_STORAGE_POLICY.draftRetentionDays,
+    trashCleanupEnabled:
+      parsedValue.localStoragePolicy?.trashCleanupEnabled ??
+      DEFAULT_LOCAL_STORAGE_POLICY.trashCleanupEnabled,
+    trashRetentionDays:
+      parsedValue.localStoragePolicy?.trashRetentionDays ??
+      DEFAULT_LOCAL_STORAGE_POLICY.trashRetentionDays,
     videoDraftRetentionDays:
       parsedValue.localStoragePolicy?.videoDraftRetentionDays ??
       DEFAULT_LOCAL_STORAGE_POLICY.videoDraftRetentionDays,

@@ -65,3 +65,5 @@ Extended page evidence is opt-in. Store its DOM projection as plain text, never 
 - Apply the sanitizer again at the final persistence or export sink.
 
 The registry-driven `verify-secret-storage`, `verify-sensitive-retention`, `verify-fetch-ownership`, and `verify-diagnostic-sanitization` controls enforce owner admission. Change the matching registry and this policy together when a security decision changes.
+
+Gallery trash retains the existing local media and project graphs after a reversible delete gesture. It introduces no additional storage backend, network transfer or diagnostic payload. Retention is indefinite by default; an independent opt-in age policy permits permanent cleanup during Gallery maintenance. Automatic cleanup must not detach project references. Manual permanent deletion requires confirmation; privacy erasure includes retained trash through the existing stores and asset owners.

@@ -69,3 +69,15 @@ it('aborts authoritative deletion when derived preview deletion fails', async ()
   expect(mocks.deleteVideoProject).not.toHaveBeenCalled();
   expect(mocks.publishMediaHubLibraryChanged).not.toHaveBeenCalled();
 });
+
+it('preserves independently published exports when purging only their trashed parent', async () => {
+  mocks.listProjectExports.mockResolvedValue([
+    { id: 'restored-export', projectId: 'project-1' },
+    { id: 'recent-trash-export', projectId: 'project-1' },
+  ]);
+  await deletePersistedVideoProject('project-1', { preserveExports: true });
+  expect(mocks.deleteVideoProject).toHaveBeenCalledWith('project-1');
+  expect(mocks.deleteProjectExport).not.toHaveBeenCalled();
+  expect(mocks.deleteMediaThumbnail).not.toHaveBeenCalledWith('export:restored-export');
+  expect(mocks.deleteMediaThumbnail).not.toHaveBeenCalledWith('export:recent-trash-export');
+});

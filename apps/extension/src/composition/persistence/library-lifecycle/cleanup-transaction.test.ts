@@ -421,3 +421,49 @@ it('commits expired linked and standalone draft cleanup through current transact
     expect.objectContaining({ assetIds: [scenarioAsset.assetId], status: 'pending' })
   );
 });
+
+it('preserves trashed roots even when explicitly clearing every draft', async () => {
+  const lifecycle = { ...createLibraryLifecycle('temporary', 1), trashedAt: 2 };
+  persistenceMocks.listMediaLibrary.mockResolvedValue([{ id: 'image-1', lifecycle }]);
+  persistenceMocks.listVideoProjectEntries.mockResolvedValue([
+    { ...createVideoProjectEntryWithMediaClip(), lifecycle },
+  ]);
+  persistenceMocks.listScenarioProjectEntries.mockResolvedValue([{ id: 'scenario-1', lifecycle }]);
+  await expect(
+    cleanupDrafts({
+      policy: DEFAULT_LOCAL_STORAGE_POLICY,
+      includeUnexpired: true,
+      now: 1_000_000,
+    })
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+  expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
+});
+
+it('rechecks a draft project trashed after the candidate snapshot before deleting its graph', async () => {
+  const entry = {
+    ...createVideoProjectEntryWithMediaClip(),
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  persistenceMocks.listVideoProjectEntries.mockResolvedValue([entry]);
+  const remove = vi.fn();
+  persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (operation) =>
+    operation({
+      transaction: () => ({
+        done: Promise.resolve(),
+        objectStore: () => ({
+          get: async () => ({ ...entry, lifecycle: { ...entry.lifecycle, trashedAt: 2 } }),
+          delete: remove,
+        }),
+      }),
+    })
+  );
+  await expect(
+    cleanupDrafts({
+      policy: DEFAULT_LOCAL_STORAGE_POLICY,
+      includeUnexpired: true,
+      now: 1_000_000,
+    })
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(remove).not.toHaveBeenCalled();
+});

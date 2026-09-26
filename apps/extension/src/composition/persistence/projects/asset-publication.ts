@@ -19,6 +19,7 @@ import {
   buildProjectAssetMediaEntry,
   buildProjectExportMediaEntry,
 } from '../media-library/entry-mapping';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import type { StoredProjectAssetEntry, StoredProjectExportEntry } from './contracts';
 import { parseProjectAssetEntry, parseProjectExportEntry } from './read-guards';
@@ -112,6 +113,9 @@ async function publishProjectMediaAsset(args: {
             originalFilename: args.filename ?? args.entry.id,
           }
         : buildProjectExportMediaEntry(args.entry as StoredProjectExportEntry);
+    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const currentMedia = parseMediaLibraryEntry(await mediaStore.get(mediaEntry.id));
+    if (currentMedia?.lifecycle) mediaEntry.lifecycle = currentMedia.lifecycle;
     await tx.objectStore(MEDIA_LIBRARY_STORE).put(mediaEntry);
     if (physicalDelete.assetIds.length > 0) {
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);

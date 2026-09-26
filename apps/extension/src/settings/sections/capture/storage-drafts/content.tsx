@@ -50,6 +50,7 @@ export function StorageDraftsContent(props: StorageDraftsContentProps) {
     <div className={`${settingsCompactWorkbenchClassName} space-y-6`}>
       <NewItemsSection {...props} />
       <RetentionSection {...props} />
+      <TrashRetentionSection {...props} />
     </div>
   );
 }
@@ -121,6 +122,40 @@ function RetentionSection(
           onChange={(value) => props.updatePolicy({ videoDraftRetentionDays: value })}
         />
       </div>
+    </section>
+  );
+}
+
+function TrashRetentionSection(
+  props: Pick<StorageDraftsContentProps, 'busy' | 'policy' | 'updatePolicy'>
+) {
+  const enabled = props.policy.trashCleanupEnabled ?? false;
+  return (
+    <section className={sectionClassName}>
+      <SectionLabel>{translate('settings.storageDrafts.trashTitle')}</SectionLabel>
+      <SettingsControlRow
+        label={translate('settings.storageDrafts.trashCleanupEnabled')}
+        description={translate('settings.storageDrafts.trashCleanupDescription')}
+        valueClassName="flex justify-start sm:justify-end"
+      >
+        <SettingsSwitch
+          aria-label={translate('settings.storageDrafts.trashCleanupEnabled')}
+          checked={enabled}
+          disabled={props.busy}
+          onClick={() => props.updatePolicy({ trashCleanupEnabled: !enabled })}
+        />
+      </SettingsControlRow>
+      {!enabled ? (
+        <p className="pb-2 text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('settings.storageDrafts.trashCleanupDisabled')}
+        </p>
+      ) : null}
+      <RetentionRow
+        disabled={props.busy || !enabled}
+        label={translate('settings.storageDrafts.trashRetention')}
+        value={props.policy.trashRetentionDays ?? 30}
+        onChange={(value) => props.updatePolicy({ trashRetentionDays: value })}
+      />
     </section>
   );
 }

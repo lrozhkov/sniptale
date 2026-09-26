@@ -35,6 +35,13 @@ beforeEach(() => {
   dbMocks.initDBMock.mockResolvedValue({
     get: dbMocks.getMock,
     put: dbMocks.putMock,
+    transaction: () => ({
+      done: Promise.resolve(),
+      objectStore: () => ({
+        get: dbMocks.getMock,
+        put: (entry: unknown) => dbMocks.putMock('media_library', entry),
+      }),
+    }),
   });
 });
 

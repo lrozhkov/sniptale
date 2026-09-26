@@ -2,12 +2,14 @@ import type { LocalStoragePolicy, NormalizedSettings } from '../../../contracts/
 
 export const LOCAL_STORAGE_RETENTION_DAY_OPTIONS = [1, 3, 7, 14, 30, 60, 90, 180, 365] as const;
 
-export const DEFAULT_LOCAL_STORAGE_POLICY: LocalStoragePolicy = {
+export const DEFAULT_LOCAL_STORAGE_POLICY = {
   cleanupEnabled: true,
   defaultDestination: 'temporary',
   draftRetentionDays: 30,
   videoDraftRetentionDays: 7,
-};
+  trashCleanupEnabled: false,
+  trashRetentionDays: 30,
+} satisfies LocalStoragePolicy;
 
 export function resolveInitialStorageClass(
   settings: Pick<NormalizedSettings, 'localStoragePolicy'>

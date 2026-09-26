@@ -156,7 +156,7 @@ function registerUpdateMediaLibraryEntryTests() {
       sourceTitle: 'Before',
       lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
     });
-    dbMocks.getMock.mockResolvedValue(existingEntry);
+    dbMocks.objectStoreGetMock.mockResolvedValue(existingEntry);
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(999);
 
     try {
@@ -169,7 +169,6 @@ function registerUpdateMediaLibraryEntryTests() {
     }
 
     expect(dbMocks.putMock).toHaveBeenCalledWith(
-      'media_library',
       expect.objectContaining({
         filename: 'renamed.png',
         sourceTitle: 'After',
@@ -259,4 +258,17 @@ describe('media-library-db.library mutations', () => {
   registerUpdateMediaLibraryEntryTests();
   registerDeleteMediaLibraryAssetTests();
   registerDeleteMediaLibraryAssetFailureTests();
+});
+
+it('refuses permanent deletion while an image workspace publication still owns pending bytes', async () => {
+  dbMocks.listReadyJournalsMock.mockResolvedValueOnce([
+    { domain: 'image-workspace', payload: { aggregateId: 'pending-image' } },
+  ]);
+  await expect(deleteMediaLibraryAsset('pending-image')).rejects.toMatchObject({
+    assetId: 'pending-image',
+    stage: 'linked-source-cleanup',
+    cause: expect.objectContaining({ message: 'Image workspace publication is pending.' }),
+  });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
 });

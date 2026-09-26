@@ -169,7 +169,11 @@ it.each([
   expect(deletes).not.toHaveBeenCalled();
 });
 
-async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now: number }) {
+async function runExpiredVideoProjectCleanup(args: {
+  mediaUpdatedAt: number;
+  now: number;
+  trashedAt?: number;
+}) {
   const project = {
     ...createVideoProjectEntryWithMediaClip(),
     lifecycle: createLibraryLifecycle('temporary', 1),
@@ -181,7 +185,10 @@ async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now
     height: 1080,
     id: 'project-asset:project-asset-1',
     kind: 'video' as const,
-    lifecycle: createLibraryLifecycle('temporary', args.mediaUpdatedAt),
+    lifecycle: {
+      ...createLibraryLifecycle('temporary', args.mediaUpdatedAt),
+      ...(args.trashedAt === undefined ? {} : { trashedAt: args.trashedAt }),
+    },
     mimeType: 'video/webm',
     originalFilename: 'project-asset.webm',
     size: 5,
@@ -312,4 +319,15 @@ it('removes recording telemetry and the project thumbnail with an expired record
   expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
   expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
   expect(deletes).toHaveBeenCalledWith('thumbnails', `video-project:${project.id}`);
+});
+
+it('retains independently trashed media when its draft video project expires', async () => {
+  const { deletes, media, project } = await runExpiredVideoProjectCleanup({
+    mediaUpdatedAt: 1,
+    now: 40 * day,
+    trashedAt: 2,
+  });
+  expect(deletes).toHaveBeenCalledWith('video_projects', project.id);
+  expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
+  expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
 });
