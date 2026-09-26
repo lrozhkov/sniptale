@@ -20,7 +20,7 @@ export function handleSelectionModeClick(
     return;
   }
 
-  const target = resolveSelectionModePointerTarget(event, iframe);
+  const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
     return;
   }

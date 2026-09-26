@@ -29,6 +29,7 @@ async function runCountdownCapture(
 ): Promise<void> {
   if (type === 'selection') {
     await runSelectionScreenshot(args.runtime, {
+      freezeSelection: true,
       contentIntentSource,
       runToken,
       showSuccessToast,

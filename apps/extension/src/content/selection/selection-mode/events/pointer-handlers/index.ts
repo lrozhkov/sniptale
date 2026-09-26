@@ -58,7 +58,7 @@ export function handleSelectionModeMouseDown(
     return;
   }
 
-  const target = resolveSelectionModePointerTarget(event, iframe);
+  const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
     return;
   }
@@ -184,7 +184,7 @@ export function handleSelectionModeMouseMove(
     return;
   }
 
-  const target = resolveSelectionModePointerTarget(event, iframe);
+  const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
     options.hideHoverFrame();
     return;

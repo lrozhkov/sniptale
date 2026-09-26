@@ -10,6 +10,7 @@ type SaveDialogState = {
 };
 
 export type ScreenshotSuccessFeedbackOptions = {
+  freezeSelection?: boolean;
   contentIntentSource?: ContentPrivilegedActionIntentSource | undefined;
   runToken?: number | undefined;
   showSuccessToast?: boolean;

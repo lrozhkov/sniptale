@@ -1,3 +1,4 @@
+import type { FrozenSelectionFrame } from '../frozen';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import { createSelectionModeDom } from '../ui/container';
@@ -5,6 +6,7 @@ import type { ResizeDirection, SelectionModeDom } from '../ui/dom-types';
 import type { Point, Selection, SelectionState } from '../types';
 
 export interface SelectionModeSession {
+  frozenFrame?: FrozenSelectionFrame | null;
   aspectRatio: number | null;
   cleanupEventListeners: (() => void) | null;
   cleanupScrollListeners: (() => void) | null;
@@ -36,6 +38,7 @@ export interface SelectionModeSession {
  */
 export function createSelectionModeSession(): SelectionModeSession {
   return {
+    frozenFrame: null,
     aspectRatio: null,
     cleanupEventListeners: null,
     cleanupScrollListeners: null,
@@ -68,6 +71,7 @@ export function createSelectionModeSession(): SelectionModeSession {
  */
 export function resetSelectionModeSession(session: SelectionModeSession): void {
   Object.assign(session, {
+    frozenFrame: null,
     aspectRatio: null,
     cleanupEventListeners: null,
     cleanupScrollListeners: null,

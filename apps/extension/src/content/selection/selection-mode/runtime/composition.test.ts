@@ -232,3 +232,42 @@ describe('selection-mode runtime composition', () => {
     expect(mocks.isSelectionModeActiveApi).toHaveBeenCalledWith(scenario.session.isActive);
   });
 });
+
+it('mounts the frozen frame and disposes viewport invalidation with the session listeners', async () => {
+  const scenario = createScenario();
+  const container = document.createElement('div');
+  const assertViewport = vi.fn();
+  const cleanupListeners = vi.fn();
+  scenario.session.dom.overlayContainer = container;
+  scenario.session.frozenFrame = {
+    dataUrl: 'data:image/png;base64,frame',
+    geometry: {
+      width: 1200,
+      height: 800,
+      scale: 1,
+      getRect: vi.fn(),
+      targetAt: vi.fn(),
+      assertViewport,
+    },
+  };
+  mocks.setupRuntimeListeners.mockImplementationOnce(() => {
+    scenario.session.cleanupEventListeners = cleanupListeners;
+  });
+  mocks.enableSelectionModeApi.mockImplementationOnce(async (args) => {
+    args.createOverlayContainer();
+    args.setupEventListeners();
+    return { x: 0, y: 0, width: 10, height: 10 };
+  });
+  await scenario.runtime.enableSelectionMode({ frozenFrame: scenario.session.frozenFrame });
+  expect(container.querySelector('.sniptale-selection-frozen-frame')).not.toBeNull();
+  expect(container.querySelector('img')).toBeNull();
+  assertViewport.mockImplementation(() => {
+    throw new Error('viewport changed');
+  });
+  window.dispatchEvent(new Event('resize'));
+  expect(scenario.events.cancelSelection).toHaveBeenCalledOnce();
+  scenario.session.cleanupEventListeners?.();
+  expect(cleanupListeners).toHaveBeenCalledOnce();
+  window.dispatchEvent(new Event('resize'));
+  expect(scenario.events.cancelSelection).toHaveBeenCalledOnce();
+});

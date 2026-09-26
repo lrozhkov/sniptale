@@ -121,11 +121,12 @@ function useCancelCountdownOnUnmount(
     return () => {
       if (hasActiveCountdownSession(session)) {
         handleCancelCountdown?.();
+        disableSelectionModeIfLoaded();
       }
     };
   }, [handleCancelCountdownRef, session]);
 }
 
 function hasActiveCountdownSession(session: ScreenshotControllerSession) {
-  return Boolean(session.countdownTimeout || session.countdownLock);
+  return Boolean(session.countdownTimeout || session.countdownLock || session.runActive);
 }

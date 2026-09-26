@@ -1,3 +1,4 @@
+import type { FrozenSelectionFrame } from '../frozen';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
 import { getAbsolutePosition } from '../../../platform/frame';
 import { logSelectionModeRuntime } from '../diag';
@@ -7,6 +8,7 @@ import type { SelectionRect } from './types';
 import { getSelectionHoverFrameStyle } from './style';
 
 type SelectionModeHoverSession = {
+  readonly frozenFrame?: FrozenSelectionFrame | null;
   readonly currentState: SelectionState;
   readonly dom: SelectionModeDom | null;
   readonly isActive: boolean;
@@ -91,7 +93,10 @@ export function createSelectionModeHoverFrameHandlers(session: SelectionModeHove
         logMissingHoverDom('showHoverFrame', session, element);
         return;
       }
-      showHoverFrame(dom, getAbsolutePosition(element));
+      showHoverFrame(
+        dom,
+        session.frozenFrame?.geometry.getRect(element) ?? getAbsolutePosition(element)
+      );
     },
   };
 }

@@ -325,3 +325,12 @@ it('does not capture when temporary sizing fails', async () => {
   expect(runViewportScreenshotMock).not.toHaveBeenCalled();
   expect(showScreenshotErrorMock).toHaveBeenCalled();
 });
+
+it('freezes area selection only when invoked by the elapsed countdown', async () => {
+  const args = createArgs();
+  await executeCountdownScreenshot('selection', args, 1);
+  expect(runSelectionScreenshotMock).toHaveBeenCalledWith(
+    args.runtime,
+    expect.objectContaining({ freezeSelection: true, runToken: 1 })
+  );
+});

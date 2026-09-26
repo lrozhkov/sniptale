@@ -7,6 +7,7 @@ import { createSelectionModeSession, resetSelectionModeSession } from '.';
 describe('selection-mode session authority', () => {
   it('creates every field with the canonical idle defaults', () => {
     expect(createSelectionModeSession()).toEqual({
+      frozenFrame: null,
       aspectRatio: null,
       captureAction: 'download_default',
       cleanupEventListeners: null,
@@ -67,6 +68,7 @@ describe('selection-mode session authority', () => {
 
     expect(session).toBe(identity);
     expect(session).toEqual({
+      frozenFrame: null,
       aspectRatio: null,
       captureAction: 'download_default',
       cleanupEventListeners: null,
