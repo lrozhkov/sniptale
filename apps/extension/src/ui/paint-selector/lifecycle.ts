@@ -129,21 +129,27 @@ export function usePaintSelectorLifecycle(options: {
 
 export function resolvePaintSelectorLayerStyle(
   baseStyle: CSSProperties,
-  anchor: HTMLElement | null,
-  layout: 'solid' | 'gradient'
+  anchor: HTMLElement | null
 ): CSSProperties {
-  const preferredWidth = layout === 'solid' ? 328 : 600;
+  const preferredWidth = 328;
   const layerWidth =
     typeof window === 'undefined'
       ? preferredWidth
       : Math.min(preferredWidth, window.innerWidth - 16);
   const rect = anchor?.getBoundingClientRect();
+  const top = typeof baseStyle.top === 'number' ? baseStyle.top : 8;
+  const availableHeight =
+    typeof window === 'undefined'
+      ? 680
+      : baseStyle.transform === 'translateY(-100%)'
+        ? top - 8
+        : window.innerHeight - top - 8;
   return {
     ...baseStyle,
     ...(rect && typeof window !== 'undefined'
       ? { left: Math.min(Math.max(8, rect.right - layerWidth), window.innerWidth - layerWidth - 8) }
       : {}),
     width: layerWidth,
-    maxHeight: 'min(680px, calc(100vh - 16px))',
+    maxHeight: Math.max(0, Math.min(680, availableHeight)),
   };
 }

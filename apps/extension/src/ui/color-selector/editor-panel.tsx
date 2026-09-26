@@ -36,7 +36,10 @@ export function ColorEditorPanel(props: ColorEditorPanelProps) {
   const rgbInputs = useRgbInputs(color.resolvedColor, handleChannelColorChange);
   const hslInputs = useHslInputs(color.resolvedColor, handleChannelColorChange);
   return (
-    <div className="space-y-3" data-ui="shared.ui.color-selector.editor-panel">
+    <div
+      className="@container/picker space-y-1.5 [--sniptale-compact-control-height:28px]"
+      data-ui="shared.ui.color-selector.editor-panel"
+    >
       <ColorPlane
         getColorFromPlanePoint={getColorFromPlanePoint}
         hue={color.hue}

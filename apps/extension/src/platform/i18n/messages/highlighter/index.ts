@@ -74,6 +74,7 @@ export const highlighterMessages = defineMessageSource({
     midpointAfter: { ru: 'Средняя точка после', en: 'Midpoint after' },
     gradientStop: { ru: 'Точка градиента', en: 'Gradient stop' },
     gradientStops: { ru: 'Цветовые точки', en: 'Color stops' },
+    addStop: { ru: 'Добавить точку', en: 'Add stop' },
     addStopHint: { ru: 'Нажмите на шкалу, чтобы добавить', en: 'Click the rail to add' },
     removeStop: { ru: 'Удалить цветовую точку', en: 'Remove color stop' },
     repeat: { ru: 'Повторять', en: 'Repeat' },

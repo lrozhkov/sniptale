@@ -27,7 +27,7 @@ type ColorSelectorPickerPopoverProps = {
 export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProps) {
   return (
     <div className={PANEL_CLASS_NAME} data-ui="shared.ui.color-selector.picker">
-      <div className="space-y-3">
+      <div className="space-y-1.5">
         <ColorEditorPanel {...props} />
         <PickerFooter onApply={props.onApply} onCancel={props.onCancel} />
       </div>

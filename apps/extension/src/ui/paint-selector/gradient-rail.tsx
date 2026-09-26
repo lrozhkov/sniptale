@@ -10,7 +10,7 @@ import {
 import { translate } from '../../platform/i18n';
 
 const RAIL_CLASS_NAME = [
-  'relative h-14 cursor-crosshair overflow-visible rounded-[12px] border-2',
+  'relative h-7 cursor-crosshair overflow-visible rounded-[var(--sniptale-radius-sm)] border-2',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
   'shadow-[inset_0_1px_2px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_10%,transparent)]',
 ].join(' ');

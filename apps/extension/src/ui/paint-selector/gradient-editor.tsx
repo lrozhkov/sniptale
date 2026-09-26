@@ -1,4 +1,6 @@
 import {
+  addGradientStop,
+  MAX_GRADIENT_STOPS,
   distributeGradientStops,
   removeGradientStop,
   reverseGradient,
@@ -7,7 +9,8 @@ import {
   type PaintInterpolationSpace,
   type PaintStopIdFactory,
 } from '@sniptale/foundation/paint';
-import { AlignHorizontalDistributeCenter, ArrowLeftRight, Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { AlignHorizontalDistributeCenter, ArrowLeftRight, Plus, Trash2 } from 'lucide-react';
 import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import { GradientRail } from './gradient-rail';
 import { translate } from '../../platform/i18n';
@@ -25,11 +28,7 @@ const withRadius = (gradient: Gradient, axis: 'x' | 'y', value: number): Gradien
     : gradient;
 const withStartAngle = (gradient: Gradient, startAngle: number): Gradient =>
   gradient.type === 'conic' ? { ...gradient, startAngle } : gradient;
-const SECTION_CLASS_NAME = [
-  'rounded-[10px] border p-2.5',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_54%,transparent)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_62%,transparent)]',
-].join(' ');
+const SECTION_CLASS_NAME = 'min-w-0';
 
 interface GradientControlsProps {
   gradient: Gradient;
@@ -46,7 +45,11 @@ function GradientNumericField(props: {
 }) {
   return (
     <NumericValueField
-      className={`${props.className ?? 'w-full'} border-[color:var(--sniptale-color-border-soft)] bg-transparent`}
+      className={[
+        props.className ?? 'w-full',
+        'h-7! min-w-0 rounded-[var(--sniptale-radius-sm)]!',
+        'border-[color:var(--sniptale-color-border-soft)] bg-transparent',
+      ].join(' ')}
       label={props.label}
       max={props.max}
       min={props.min}
@@ -62,8 +65,10 @@ function GradientPrimaryControls({
   selected,
   onChange,
   onSelectStop,
+  createId,
 }: GradientControlsProps & {
   selected: Gradient['stops'][number];
+  createId: PaintStopIdFactory;
   onSelectStop: (id: string) => void;
 }) {
   const removeSelected = () => {
@@ -73,10 +78,10 @@ function GradientPrimaryControls({
     if (nextSelected) onSelectStop(nextSelected.id);
   };
   return (
-    <div className={`${SECTION_CLASS_NAME} grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2`}>
-      <label className="min-w-0 text-[11px]">
+    <div className={`${SECTION_CLASS_NAME} flex items-center gap-2`}>
+      <label className="flex min-w-0 flex-1 items-center gap-2 text-xs">
         {translate('highlighter.paintPicker.position')}
-        <div className="mt-1">
+        <div className="min-w-0 flex-1">
           <GradientNumericField
             label={translate('highlighter.paintPicker.position')}
             min={0}
@@ -94,6 +99,27 @@ function GradientPrimaryControls({
       </label>
       <div className="flex items-center gap-1">
         <ProductGlassIconButton
+          className="h-7! w-7!"
+          aria-label={translate('highlighter.paintPicker.addStop')}
+          disabled={gradient.stops.length >= MAX_GRADIENT_STOPS}
+          title={translate('highlighter.paintPicker.addStop')}
+          onClick={() => {
+            const neighbor = gradient.stops.find((stop) => stop.position > selected.position);
+            const position = neighbor
+              ? (selected.position + neighbor.position) / 2
+              : selected.position / 2;
+            const next = addGradientStop(gradient, position, createId);
+            const added = next.stops.find(
+              (stop) => !gradient.stops.some((old) => old.id === stop.id)
+            );
+            onChange(next);
+            if (added) onSelectStop(added.id);
+          }}
+        >
+          <Plus aria-hidden="true" size={14} />
+        </ProductGlassIconButton>
+        <ProductGlassIconButton
+          className="h-7! w-7!"
           aria-label={translate('highlighter.paintPicker.reverse')}
           onClick={() => onChange(reverseGradient(gradient))}
           title={translate('highlighter.paintPicker.reverse')}
@@ -101,6 +127,7 @@ function GradientPrimaryControls({
           <ArrowLeftRight aria-hidden="true" size={14} />
         </ProductGlassIconButton>
         <ProductGlassIconButton
+          className="h-7! w-7!"
           aria-label={translate('highlighter.paintPicker.distribute')}
           onClick={() => onChange(distributeGradientStops(gradient))}
           title={translate('highlighter.paintPicker.distribute')}
@@ -108,6 +135,7 @@ function GradientPrimaryControls({
           <AlignHorizontalDistributeCenter aria-hidden="true" size={14} />
         </ProductGlassIconButton>
         <ProductGlassIconButton
+          className="h-7! w-7!"
           aria-label={translate('highlighter.paintPicker.removeStop')}
           disabled={gradient.stops.length <= 2}
           onClick={removeSelected}
@@ -124,7 +152,7 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
   if (gradient.type === 'linear') {
     return (
       <div className={SECTION_CLASS_NAME}>
-        <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.25rem] items-center gap-3 text-[11px]">
+        <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_6.25rem] items-center gap-2 text-xs">
           {translate('highlighter.paintPicker.angle')}
           <GradientNumericField
             className="!w-[6.25rem] min-w-0"
@@ -138,7 +166,7 @@ function GradientGeometryControls({ gradient, onChange }: GradientControlsProps)
   }
 
   return (
-    <div className={[`${SECTION_CLASS_NAME} grid grid-cols-2 gap-2 text-[11px]`].join(' ')}>
+    <div className={`${SECTION_CLASS_NAME} grid grid-cols-2 gap-1.5 text-xs`}>
       {(['x', 'y'] as const).map((axis) => (
         <label key={axis}>
           {translate(
@@ -199,11 +227,13 @@ function GradientAdvancedControls({
   onChange,
 }: GradientControlsProps & { selected: Gradient['stops'][number] }) {
   return (
-    <details className={`${SECTION_CLASS_NAME} text-xs`}>
-      <summary className="cursor-pointer font-semibold">
+    <details
+      className={`${SECTION_CLASS_NAME} border-t border-[var(--sniptale-color-border-soft)] pt-1 text-xs`}
+    >
+      <summary className="cursor-pointer py-1 font-semibold">
         {translate('highlighter.paintPicker.advanced')}
       </summary>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-1 grid grid-cols-2 gap-1.5">
         <label>
           {translate('highlighter.paintPicker.interpolation')}
           <CompactSelect
@@ -285,6 +315,7 @@ function GradientAdvancedControls({
 }
 
 export function GradientEditor(props: {
+  colorEditor: ReactNode;
   createId: PaintStopIdFactory;
   gradient: Gradient;
   selectedStopId: string | null;
@@ -296,19 +327,13 @@ export function GradientEditor(props: {
     props.gradient.stops.find((stop) => stop.id === props.selectedStopId) ??
     props.gradient.stops[0]!;
   return (
-    <div className="min-w-0 space-y-3">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between gap-2 text-[11px]">
-          <span className="font-semibold">
-            {translate('highlighter.paintPicker.gradientStops')}
-          </span>
-          <span className="text-[var(--sniptale-color-text-muted)]">
-            {translate('highlighter.paintPicker.addStopHint')}
-          </span>
-        </div>
+    <div className="min-w-0 space-y-1.5">
+      <div>
         <GradientRail {...props} onSelect={props.onSelectStop} />
       </div>
+      {props.colorEditor}
       <GradientPrimaryControls
+        createId={props.createId}
         gradient={props.gradient}
         selected={selected}
         onChange={props.onChange}

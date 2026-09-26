@@ -1,10 +1,11 @@
+import { ChevronsUpDown } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { NumericValueField } from '../compact-inspector-controls/numeric';
 import { CompactInput } from '../compact-inspector-controls/primitives';
 
 const TEXT_ACTION_CLASS_NAME = [
-  'inline-flex h-9 items-center justify-center rounded-[10px] border-none px-3',
+  'inline-flex h-7 cursor-pointer items-center justify-center rounded-[var(--sniptale-radius-sm)] border-none px-3',
   'text-xs font-medium text-[color:var(--sniptale-color-text-secondary)] transition',
   'bg-transparent shadow-none outline-none',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
@@ -12,18 +13,6 @@ const TEXT_ACTION_CLASS_NAME = [
   'active:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_88%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
   'focus-visible:text-[color:var(--sniptale-color-text-primary)] focus-visible:outline-none',
-  'focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_18%,transparent)]',
-].join(' ');
-
-const MODE_LABEL_CLASS_NAME =
-  'text-center text-[12px] font-semibold uppercase text-[var(--sniptale-color-text-secondary)]';
-const MODE_SWITCH_OVERLAY_CLASS_NAME = [
-  'absolute inset-0 z-10 rounded-[8px] border-none bg-transparent outline-none transition',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_56%,transparent)]',
-  'active:translate-y-px',
-  'active:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
-  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_56%,transparent)]',
-  'focus-visible:outline-none',
   'focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_18%,transparent)]',
 ].join(' ');
 
@@ -55,7 +44,7 @@ function PickerInputField(props: {
       spellCheck={props.spellCheck}
       value={props.value}
       onChange={(event) => props.onChange(event.target.value)}
-      className="h-8 px-2 text-xs"
+      className="h-7! rounded-[var(--sniptale-radius-sm)]! px-2! text-xs!"
     />
   );
 }
@@ -71,7 +60,10 @@ export function PickerNumericInputField(props: {
   const numericValue = Number(props.value);
   return (
     <NumericValueField
-      className="w-full border-[color:var(--sniptale-color-border-soft)] bg-transparent"
+      className={[
+        'h-7! w-full min-w-0 rounded-[var(--sniptale-radius-sm)]! px-1.5',
+        'border-[color:var(--sniptale-color-border-soft)] bg-transparent',
+      ].join(' ')}
       label={props.ariaLabel}
       max={props.max}
       min={props.min}
@@ -83,31 +75,20 @@ export function PickerNumericInputField(props: {
   );
 }
 
-export function PickerModeLabelRow(props: {
-  mode: ColorSelectorFormatMode;
-  onCycle: () => void;
-  labels: readonly string[];
-}) {
+export function PickerModeLabelRow(props: { mode: ColorSelectorFormatMode; onCycle: () => void }) {
   return (
-    <div className="relative" data-ui="shared.ui.color-selector.mode-label-row">
+    <div data-ui="shared.ui.color-selector.mode-label-row">
       <button
         type="button"
         aria-label={getFormatLabel(props.mode)}
         title={getFormatLabel(props.mode)}
         data-ui="shared.ui.color-selector.mode-cycle"
         onClick={props.onCycle}
-        className={MODE_SWITCH_OVERLAY_CLASS_NAME}
-      />
-      <div className="relative grid min-h-5 grid-cols-3 items-center gap-2 rounded-[8px] px-1 py-0.5">
-        {props.labels.map((label) => (
-          <span
-            key={label}
-            className={`${MODE_LABEL_CLASS_NAME} ${props.labels.length === 1 ? 'col-span-3' : ''}`}
-          >
-            {label}
-          </span>
-        ))}
-      </div>
+        className={`${TEXT_ACTION_CLASS_NAME} gap-0.5 px-1!`}
+      >
+        <span className="text-[12px] font-semibold uppercase">{getFormatLabel(props.mode)}</span>
+        <ChevronsUpDown aria-hidden="true" size={12} />
+      </button>
     </div>
   );
 }
@@ -119,12 +100,8 @@ export function PickerManualColorField(props: {
   value: string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <PickerModeLabelRow
-        mode={props.mode}
-        onCycle={props.onCycle}
-        labels={[translate('shared.ui.colorSelectorHex')]}
-      />
+    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-1">
+      <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerInputField
         ariaLabel={translate('shared.ui.colorSelectorHex')}
         type="text"

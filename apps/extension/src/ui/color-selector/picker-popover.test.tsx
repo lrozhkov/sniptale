@@ -226,7 +226,7 @@ it('renders the eyedropper as an icon-only square action', () => {
   renderPopover();
 
   expect(getButton('shared.ui.colorSelectorEyedropper')?.textContent).toBe('');
-  expect(getButton('shared.ui.colorSelectorEyedropper')?.className).toContain('h-9 w-9');
+  expect(getButton('shared.ui.colorSelectorEyedropper')?.className).toContain('h-7 w-7');
 });
 
 it('keeps invalid and transparent manual input local to the field', async () => {

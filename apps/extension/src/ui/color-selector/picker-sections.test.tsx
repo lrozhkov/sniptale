@@ -68,7 +68,9 @@ it('renders the toolbar and wires hue plus eyedropper handlers', () => {
   expect(markup).toContain('height="18"');
   expect(markup).toContain('aria-label="shared.ui.colorSelectorTransparent"');
   expect(markup).toContain('data-ui="shared.ui.color-selector.eyedropper"');
-  expect(markup).toContain('h-9 w-9');
+  expect(markup).toContain('cursor-pointer');
+  expect(markup).toContain('disabled:cursor-not-allowed');
+  expect(markup).toContain('h-7 w-7');
   expect(markup).toContain('active:translate-y-px');
 });
 
@@ -88,7 +90,7 @@ it('omits the eyedropper when the runtime does not support it', () => {
   ).not.toContain('shared.ui.colorSelectorEyedropper');
 });
 
-it('renders a clickable label-row overlay for the hex field without duplicate button text', () => {
+it('renders the format switch beside the compact hex field', () => {
   const onCycle = vi.fn();
   const field = PickerManualColorField({
     mode: 'hex',
@@ -100,12 +102,11 @@ it('renders a clickable label-row overlay for the hex field without duplicate bu
 
   expect(markup).toContain('data-ui="shared.ui.color-selector.mode-cycle"');
   expect(markup).toContain('shared.ui.colorSelectorHex');
-  expect(markup).toContain('grid min-h-5 grid-cols-3');
-  expect(markup).toContain('col-span-3');
-  expect(markup).toContain('text-center');
+  expect(markup).toContain('grid-cols-[3.5rem_minmax(0,1fr)]');
+  expect(markup).toContain('lucide-chevrons-up-down');
   expect(markup).toContain('hover:bg-');
   expect(markup).toContain('text-[var(--sniptale-color-text-primary)]');
-  expect(markup).toContain('h-8 px-2 text-xs');
+  expect(markup).toContain('h-7! rounded-[var(--sniptale-radius-sm)]!');
 });
 
 it('renders the manual hex field and rgb fields with wired handlers', () => {
