@@ -42,6 +42,15 @@ const MATERIAL_ACTION_CLASS_NAME = [
   '!rounded-[var(--sniptale-radius-sm)] [&_svg]:shrink-0',
 ].join(' ');
 
+const MATERIAL_ROW_ICON_ACTION_CLASS_NAME = [
+  '!border !border-solid !border-transparent !bg-transparent',
+  '!text-[var(--sniptale-color-text-secondary)]',
+  'hover:!border-[var(--sniptale-color-border-strong)] hover:!bg-transparent',
+  'hover:!text-[var(--sniptale-color-text-primary)]',
+  'focus-visible:!border-[var(--sniptale-color-border-accent-strong)]',
+  'focus-visible:!bg-transparent focus-visible:!text-[var(--sniptale-color-text-primary)]',
+].join(' ');
+
 const MATERIAL_IMPORT_OPTIONS = [
   { kind: 'video', icon: Film, labelKey: 'videoEditor.app.materialsVideo' },
   { kind: 'image', icon: Image, labelKey: 'videoEditor.app.materialsImage' },
@@ -335,12 +344,12 @@ function MaterialRow(props: {
       </div>
       <MaterialName {...props} />
       {props.uses.some((use) => use.kind !== 'analysis') && (
-        <div className="relative size-8 shrink-0">
+        <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
             menuAnchorRef={rowRef}
             dataUi="video-editor.materials.show-use"
             containerClassName="!w-8"
-            className="!size-8 !p-0 [&>span]:hidden [&>svg]:hidden"
+            className={`${MATERIAL_ROW_ICON_ACTION_CLASS_NAME} !size-8 !p-0 [&>span]:hidden [&>svg]:hidden`}
             title={translate('videoEditor.sidebar.materialsShowUses')}
             appearance="plain"
             controlSize="sm"
@@ -374,7 +383,9 @@ function MaterialRow(props: {
           <span
             className={[
               'pointer-events-none absolute inset-0 flex items-center justify-center',
-              'text-[var(--sniptale-color-text-muted)]',
+              'text-[var(--sniptale-color-text-secondary)] transition-colors',
+              'group-hover/show-use:text-[var(--sniptale-color-text-primary)]',
+              'group-focus-within/show-use:text-[var(--sniptale-color-text-primary)]',
             ].join(' ')}
           >
             <LocateFixed size={15} aria-hidden="true" />
@@ -634,10 +645,9 @@ function MaterialName(props: {
         compact
         tone="secondary"
         disabled={props.disabled}
-        className={[
-          '!size-8 !min-h-8 shrink-0 !p-0 opacity-0',
-          'group-hover/material:opacity-100 group-focus-within/material:opacity-100',
-        ].join(' ')}
+        className={[MATERIAL_ROW_ICON_ACTION_CLASS_NAME, '!size-8 !min-h-8 shrink-0 !p-0'].join(
+          ' '
+        )}
         aria-label={`${translate('videoEditor.app.materialsRename')}: ${props.asset.name}`}
         title={translate('videoEditor.app.materialsRename')}
         onClick={() => {

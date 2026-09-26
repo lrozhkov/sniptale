@@ -76,6 +76,40 @@ it('opens the selected source without editing the timeline or filling the list w
   expect(container.textContent).not.toContain(translate('videoEditor.app.materialsAppend'));
 });
 
+it('uses the same quiet, outlined hover and keyboard-focus treatment for material actions', () => {
+  const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
+  project.clips = [createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 0)];
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        onRename={vi.fn()}
+        onShowUse={vi.fn()}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        project={project}
+        selectedAssetId={null}
+        onSelect={onSelect}
+        onImport={onImport}
+      />
+    )
+  );
+  const rename = container.querySelector<HTMLButtonElement>('[data-material-rename]')!;
+  const showUse = container.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.materials.show-use"] button'
+  )!;
+  expect(rename).not.toBeNull();
+  expect(showUse).not.toBeNull();
+  for (const button of [rename, showUse]) {
+    expect(button.className).toContain('!bg-transparent');
+    expect(button.className).toContain('hover:!bg-transparent');
+    expect(button.className).toContain('hover:!border-[var(--sniptale-color-border-strong)]');
+    expect(button.className).toContain(
+      'focus-visible:!border-[var(--sniptale-color-border-accent-strong)]'
+    );
+    expect(button.className).not.toContain('opacity-0');
+  }
+});
+
 it('includes library recordings alongside local video in the Video category', async () => {
   const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
   document.body.append(container);

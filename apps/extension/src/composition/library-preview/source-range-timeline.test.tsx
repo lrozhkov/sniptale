@@ -100,6 +100,22 @@ it('holds a trimmed edge at the source boundary and can move it back during the 
   pointer('pointerup', 250);
   expect(commit).toHaveBeenCalledExactlyOnceWith({ start: 1, end: 2.5 });
 });
+it('keeps the resize cursor through an edge drag and restores the lane cursor on release', () => {
+  const edge = host.querySelector<HTMLElement>('[data-source-edge="end"]')!;
+  expect(edge.className).toContain('cursor-ew-resize');
+  expect(plane.style.cursor).toBe('');
+  pointer('pointerdown', 300, edge);
+  expect(captured).toBe(true);
+  expect(plane.style.cursor).toBe('ew-resize');
+  pointer('pointermove', 250);
+  expect(plane.style.cursor).toBe('ew-resize');
+  pointer('pointerup', 250);
+  expect(plane.style.cursor).toBe('');
+  expect(edge.className).toContain('cursor-ew-resize');
+  pointer('pointerdown', 250, edge);
+  pointer('pointercancel', 250);
+  expect(plane.style.cursor).toBe('');
+});
 it.each(['escape', 'pointercancel', 'lostpointercapture'])(
   'restores the cursor and marks on %s',
   (kind) => {
