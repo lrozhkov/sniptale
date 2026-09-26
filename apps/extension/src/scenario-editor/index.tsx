@@ -1,6 +1,5 @@
 import { GuideLayoutAssistance } from './page-shell/layout-assistance';
 import { renderPageShell } from '../ui/page-bootstrap';
-import { usePageLocaleMetadata } from '../platform/i18n';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
@@ -9,7 +8,6 @@ import '@sniptale/ui/styles/overlays';
 import { ScenarioEditorPage } from './page-shell/ScenarioEditorPage';
 
 function ScenarioEditorApp() {
-  usePageLocaleMetadata('scenario.editor.documentTitle');
   return (
     <GuideLayoutAssistance>
       <ScenarioEditorPage />

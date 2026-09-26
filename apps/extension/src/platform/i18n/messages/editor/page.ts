@@ -1,9 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const editorPageMessages = defineMessageSource({
+  renameImage: { ru: 'Имя файла', en: 'File name' },
   documentTitle: {
-    ru: 'Sniptale — Редактор изображений',
-    en: 'Sniptale — Image editor',
+    ru: 'Редактор изображений',
+    en: 'Image editor',
   },
   loadingInspector: {
     ru: 'Загрузка инспектора',

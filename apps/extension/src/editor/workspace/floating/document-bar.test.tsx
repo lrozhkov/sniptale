@@ -83,6 +83,7 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
     button.getAttribute('data-ui')
   );
   expect(actionIds).toEqual([
+    'editor.floating.document-bar.title',
     'editor.floating.document-bar.autosave-trigger',
     'editor.floating.document-bar.promote-button',
     'editor.floating.document-bar.save-button',

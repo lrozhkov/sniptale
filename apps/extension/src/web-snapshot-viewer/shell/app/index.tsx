@@ -40,7 +40,7 @@ function getDocumentTitle(loaded: LoadedWebSnapshotPackage | null, locale: AppLo
     return translate('webSnapshotViewer.app.documentTitleFallback', locale);
   }
 
-  return `${sourceTitle} - ${translate('webSnapshotViewer.app.documentTitleSuffix', locale)}`;
+  return `${sourceTitle} · ${translate('webSnapshotViewer.app.documentTitleSuffix', locale)}`;
 }
 
 function getViewerErrorMessage(error: ViewerError, locale: AppLocale): string {

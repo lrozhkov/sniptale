@@ -70,9 +70,7 @@ describe('Web Snapshot i18n naming', () => {
     expect(translate('shared.mediaHub.saveWebSnapshotAction', 'ru')).toBe(
       'сохранение Веб-снимка в Библиотеку'
     );
-    expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe(
-      'Sniptale Web Snapshot'
-    );
+    expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe('Web Snapshot');
     expect(translate('gallery.preview.kindWebSnapshot', 'en')).toBe('Web Snapshot');
     expect(translate('gallery.preview.folderWebSnapshot', 'en')).toBe('Web Snapshots');
   });

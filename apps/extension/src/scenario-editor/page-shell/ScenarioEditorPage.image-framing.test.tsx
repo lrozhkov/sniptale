@@ -457,3 +457,14 @@ it('opens standalone tour export and returns to the selected slide', async () =>
   expect(container.querySelector('.tour-export')).toBeNull();
   expect(container.querySelector('.tour-slide-list')?.textContent).toContain('Export slide');
 });
+
+it('uses the project name in the tab and distinguishes reader preview', async () => {
+  await render();
+  expect(document.title).toBe('Local guide');
+  await editField('.guide-project-name input', 'Renamed guide');
+  expect(document.title).toBe('Renamed guide');
+  await click('Export');
+  expect(document.title).toBe('Renamed guide · Просмотр');
+  await click('Back to editing');
+  expect(document.title).toBe('Renamed guide');
+});

@@ -1,13 +1,10 @@
 import { defineMessageSource } from '../source';
-import {
-  sharedWebSnapshotProductNameMessage,
-  sharedWebSnapshotSingularNameMessage,
-} from '../shared/web-snapshot';
+import { sharedWebSnapshotSingularNameMessage } from '../shared/web-snapshot';
 
 export const webSnapshotViewerMessages = defineMessageSource({
   app: {
-    documentTitleFallback: sharedWebSnapshotProductNameMessage,
-    documentTitleSuffix: sharedWebSnapshotProductNameMessage,
+    documentTitleFallback: sharedWebSnapshotSingularNameMessage,
+    documentTitleSuffix: sharedWebSnapshotSingularNameMessage,
     frameTitle: sharedWebSnapshotSingularNameMessage,
     modeLabel: {
       ru: 'Режим просмотра веб-снимка',

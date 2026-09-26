@@ -1,6 +1,6 @@
 import { defineMessageSource } from '../source';
 
-export const sharedWebSnapshotProductNameMessage = {
+const sharedWebSnapshotProductNameMessage = {
   ru: 'Sniptale Веб-снимок',
   en: 'Sniptale Web Snapshot',
 } as const;

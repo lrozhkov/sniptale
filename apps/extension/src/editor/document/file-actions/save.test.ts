@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { useEditorStore } from '../../state/useEditorStore';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -61,6 +62,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  useEditorStore.getState().setPageTitle('');
   window.history.replaceState({}, '', '/editor?assetId=asset-1&session=session-1');
   mockLoadSettings.mockResolvedValue({
     defaultImagePresetId: 'preset-default',
@@ -211,3 +213,16 @@ it.each(['/editor', '/editor?embed=scenario'])(
     expect(mockSendRuntimeMessage).not.toHaveBeenCalled();
   }
 );
+
+it('supplies the current image title to configured filename rules while retaining explicit names', async () => {
+  useEditorStore.getState().setPageTitle('Renamed image');
+  mockLoadSettings.mockResolvedValue({ filenameRules: { template: '{title}' } });
+  await editorFileSave.saveEditorRenderedImage(controller);
+  expect(mockSendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ filename: 'Renamed image_edited.webp' })
+  );
+  await editorFileSave.saveEditorRenderedImage(controller, { filename: 'Explicit.webp' });
+  expect(mockSendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ filename: 'Explicit.webp' })
+  );
+});

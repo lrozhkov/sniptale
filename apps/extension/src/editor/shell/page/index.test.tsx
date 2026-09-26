@@ -112,11 +112,15 @@ function dispatchMalformedEditorBootstrapEvent(eventName: string): void {
 
 function createEditorStoreState(
   overrides: Partial<
-    Record<'imageData' | 'hydrateDefaults' | 'hydrateWorkspaceDefaults' | 'setPageTitle', unknown>
+    Record<
+      'imageData' | 'pageTitle' | 'hydrateDefaults' | 'hydrateWorkspaceDefaults' | 'setPageTitle',
+      unknown
+    >
   > = {}
 ) {
   return {
     imageData: 'data:image/png;base64,1',
+    pageTitle: 'Image name',
     hydrateDefaults: vi.fn(),
     hydrateWorkspaceDefaults: vi.fn(),
     setPageTitle: vi.fn(),
@@ -172,7 +176,7 @@ async function verifiesImageOwnedPageShell() {
 
   const pageRoot = container?.querySelector('[data-ui="editor.page.root"]');
 
-  expect(useAppLocaleMock).toHaveBeenCalled();
+  expect(useAppLocaleMock).toHaveBeenCalledWith('editor.page.documentTitle', 'Image name');
   expect(createEditorPageServicesMock).toHaveBeenCalledTimes(1);
   expect(loadEditorPageDefaultsMock).toHaveBeenCalledWith(
     state.hydrateDefaults,

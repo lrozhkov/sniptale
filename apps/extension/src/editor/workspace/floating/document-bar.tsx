@@ -1,5 +1,5 @@
 import { Images, LoaderCircle } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -17,6 +17,7 @@ import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-li
 import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
 import { DocumentSaveError } from './document-save-conflict';
 import { DocumentAutosaveStatus } from './document-autosave-status';
+import { EditorDocumentTitleEditor } from './document-title';
 import { EditorAnchoredAlert } from './anchored-feedback';
 export type { EditorFloatingDocumentController } from './document-bar-types';
 
@@ -322,6 +323,8 @@ function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
   standalone: boolean;
+  onEdit: () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const storage = useDocumentStorageClass(
     props.documentState.sessionId,
@@ -332,9 +335,22 @@ function EditorFloatingDocumentSummary(props: {
   return (
     <>
       <div className={DOCUMENT_TITLE_CLASS_NAME}>
-        <div className="truncate text-sm font-semibold leading-snug text-[var(--sniptale-color-text-primary)]">
+        <button
+          ref={props.triggerRef}
+          data-ui="editor.floating.document-bar.title"
+          type="button"
+          disabled={!props.hasImage}
+          onClick={props.onEdit}
+          title={resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
+          className={[
+            'truncate rounded text-left text-sm font-semibold leading-snug',
+            'text-[var(--sniptale-color-text-primary)] hover:underline focus-visible:outline',
+            'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+            'disabled:no-underline',
+          ].join(' ')}
+        >
           {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
-        </div>
+        </button>
         {props.hasImage && props.standalone ? (
           <div className={DOCUMENT_STATUS_CLASS_NAME}>
             <span
@@ -424,18 +440,30 @@ export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps)
   return (
     <div data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar dataUi="editor.floating.document-bar.surface">
-        {standalone && (
-          <EditorFloatingDocumentSummary
-            documentState={documentState}
-            hasImage={props.hasImage}
-            standalone={standalone}
-          />
-        )}
-        <EditorFloatingDocumentQuickActions
-          documentController={props.documentController}
+        <EditorDocumentTitleEditor
           hasImage={props.hasImage}
-          onBeforeSelectionAwareAction={props.onBeforeSelectionAwareAction}
-        />
+          title={documentState.pageTitle}
+          aggregateId={documentState.sessionId}
+        >
+          {(onEdit, triggerRef) => (
+            <>
+              {standalone && (
+                <EditorFloatingDocumentSummary
+                  documentState={documentState}
+                  hasImage={props.hasImage}
+                  standalone={standalone}
+                  onEdit={onEdit}
+                  triggerRef={triggerRef}
+                />
+              )}
+              <EditorFloatingDocumentQuickActions
+                documentController={props.documentController}
+                hasImage={props.hasImage}
+                onBeforeSelectionAwareAction={props.onBeforeSelectionAwareAction}
+              />
+            </>
+          )}
+        </EditorDocumentTitleEditor>
       </FloatingChromeToolbar>
     </div>
   );

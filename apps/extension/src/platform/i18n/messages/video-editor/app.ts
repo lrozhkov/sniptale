@@ -125,8 +125,8 @@ export const videoEditorAppMessages = defineMessageSource({
   materialsOverlay: { ru: 'Наложить в текущий момент', en: 'Overlay at playhead' },
   materialsEmpty: { ru: 'В проекте пока нет материалов.', en: 'No materials in this project yet.' },
   documentTitle: {
-    ru: 'Sniptale — Видео-редактор',
-    en: 'Sniptale — Video editor',
+    ru: 'Видеоредактор',
+    en: 'Video editor',
   },
   recordingNotFoundPrefix: {
     ru: 'Запись "',

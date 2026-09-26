@@ -1,4 +1,5 @@
-import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
+import { createFilenameSession, createOutputFilename } from '../../../workflows/file-naming/index';
+import { useEditorStore } from '../../state/useEditorStore';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SavePreset } from '../../../contracts/settings';
 import {
@@ -36,7 +37,18 @@ async function executeSave(
   settings: Awaited<ReturnType<typeof loadSettings>>,
   imageFormat: Awaited<ReturnType<typeof loadEditorExportSettings>>['imageFormat']
 ): Promise<void> {
-  const filename = options.filename ?? (await generateFilename('edited', imageFormat, settings));
+  const filename =
+    options.filename ??
+    (await createOutputFilename(
+      {
+        category: 'images',
+        type: 'screenshot',
+        extension: imageFormat,
+        suffix: 'edited',
+        title: useEditorStore.getState().pageTitle,
+      },
+      await createFilenameSession(undefined, async () => settings)
+    ));
   const presetId =
     options.presetId ??
     (options.actionType === 'download_default'

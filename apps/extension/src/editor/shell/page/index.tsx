@@ -107,6 +107,7 @@ function useEditorPageStoreSelection() {
   return useEditorStore(
     useShallow((state) => ({
       imageData: state.imageData,
+      pageTitle: state.pageTitle,
       hydrateDefaults: state.hydrateDefaults,
       hydrateWorkspaceDefaults: state.hydrateWorkspaceDefaults,
       setPageTitle: state.setPageTitle,
@@ -124,7 +125,6 @@ function useEditorPageServiceDisposal(services: EditorPageServices) {
 }
 
 export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterLayout }) => {
-  usePageLocaleMetadata('editor.page.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const embedMode = readEditorEmbedMode(window.location.search);
   const servicesRef = useRef<EditorPageServices | null>(null);
@@ -133,8 +133,9 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   }
   const services = servicesRef.current;
 
-  const { imageData, hydrateDefaults, hydrateWorkspaceDefaults, setPageTitle } =
+  const { imageData, pageTitle, hydrateDefaults, hydrateWorkspaceDefaults, setPageTitle } =
     useEditorPageStoreSelection();
+  usePageLocaleMetadata('editor.page.documentTitle', imageData ? pageTitle : null);
   const hasImage = Boolean(imageData);
   const hasImageRef = useRef(hasImage);
   hasImageRef.current = hasImage;

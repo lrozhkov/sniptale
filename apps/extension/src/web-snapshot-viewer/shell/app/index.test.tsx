@@ -155,7 +155,7 @@ beforeEach(() => {
   mocks.printWebSnapshotImageProjection.mockResolvedValue(undefined);
   mocks.browserTabsCreate.mockResolvedValue({});
   document.documentElement.lang = 'en';
-  document.title = 'Sniptale Web Snapshot';
+  document.title = 'Web Snapshot';
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -267,7 +267,7 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
     root?.render(<WebSnapshotViewerApp />);
   });
 
-  expect(document.title).toBe('Page title - Sniptale Web Snapshot');
+  expect(document.title).toBe('Page title · Web Snapshot');
   expect(container?.textContent).toContain('Page title');
   expect(container?.textContent).toContain('https://example.com/page');
   expect(container?.querySelector('[data-testid="snapshot-metadata"]')?.textContent).toContain(
@@ -305,7 +305,7 @@ it('collapses the whole toolbar and restores it from a compact overlay control',
 
   expect(container?.textContent).not.toContain('Page title');
   expect(container?.textContent).not.toContain('https://example.com/page');
-  expect(document.title).toBe('Page title - Sniptale Web Snapshot');
+  expect(document.title).toBe('Page title · Web Snapshot');
   expect(container?.querySelector('header')).toBeNull();
   expect(
     container?.querySelector(`[aria-label="${translate('webSnapshotViewer.app.modeLabel', 'en')}"]`)
@@ -609,7 +609,7 @@ it('sets document title from source title plus localized suffix', async () => {
     root?.render(<WebSnapshotViewerApp />);
   });
 
-  expect(document.title).toBe('Example - Sniptale Web Snapshot');
+  expect(document.title).toBe('Example · Web Snapshot');
   expect(document.documentElement.lang).toBe('en');
 });
 
@@ -631,9 +631,9 @@ it('uses localized fallback for missing source titles and keeps source URL visib
     root?.render(<WebSnapshotViewerApp />);
   });
 
-  expect(document.title).toBe('Sniptale Веб-снимок');
+  expect(document.title).toBe('Веб-снимок');
   expect(document.documentElement.lang).toBe('ru');
-  expect(container?.textContent).toContain('Sniptale Веб-снимок');
+  expect(container?.textContent).toContain('Веб-снимок');
   expect(container?.textContent).toContain('https://example.com/page');
   await loadSnapshotIframe();
   expect(container?.querySelector('iframe')?.getAttribute('title')).toBe('Веб-снимок');
@@ -657,15 +657,11 @@ it('sets Russian document title from source title plus localized product suffix'
     root?.render(<WebSnapshotViewerApp />);
   });
 
-  expect(document.title).toBe('Пример - Sniptale Веб-снимок');
+  expect(document.title).toBe('Пример · Веб-снимок');
 });
 
 it('resolves the viewer title messages from shared Web Snapshot naming', () => {
-  expect(translate('webSnapshotViewer.app.documentTitleFallback', 'ru')).toBe(
-    'Sniptale Веб-снимок'
-  );
-  expect(translate('webSnapshotViewer.app.documentTitleSuffix', 'ru')).toBe('Sniptale Веб-снимок');
-  expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe(
-    'Sniptale Web Snapshot'
-  );
+  expect(translate('webSnapshotViewer.app.documentTitleFallback', 'ru')).toBe('Веб-снимок');
+  expect(translate('webSnapshotViewer.app.documentTitleSuffix', 'ru')).toBe('Веб-снимок');
+  expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe('Web Snapshot');
 });

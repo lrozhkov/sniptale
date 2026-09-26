@@ -424,9 +424,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Создайте инструкцию и добавьте первый шаг.',
     en: 'Create a guide and add its first step.',
   },
+  previewTitle: { ru: 'Просмотр', en: 'Preview' },
   documentTitle: {
-    ru: 'Sniptale — Редактор сценариев',
-    en: 'Sniptale — Scenario editor',
+    ru: 'Редактор сценариев',
+    en: 'Scenario editor',
   },
   exportDocumentLabel: { ru: 'Документ экспорта сценария', en: 'Scenario export document' },
   title: {

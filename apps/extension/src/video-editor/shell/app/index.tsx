@@ -14,7 +14,6 @@ import { VideoEditorStatusScreen } from '../status-screen';
 
 /** Boots the single editor composition owner around a stable shell-gate child. */
 export const App: React.FC = () => {
-  usePageLocaleMetadata('videoEditor.app.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   return (
     <WorkspacePreferencesProvider>
@@ -33,6 +32,10 @@ export function VideoEditorShellGate(props: {
   setCommandPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }): React.JSX.Element {
   const shell = useVideoEditorShellController();
+  usePageLocaleMetadata(
+    'videoEditor.app.documentTitle',
+    shell.isReady && !shell.error ? shell.project?.name : null
+  );
   if (!shell.isReady) {
     return <VideoEditorStatusScreen mode="loading" />;
   }

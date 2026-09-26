@@ -20,7 +20,7 @@ import { GuidePageHeader } from './header';
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
-import { createTranslator, useAppLocale } from '../../platform/i18n';
+import { createTranslator, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import { GuideImageEditor, TourImageEditor, useGuideImageEditorMode } from './image-editor';
 import { GuideDocument, type GuideFocusRequest } from './guide-document';
@@ -37,6 +37,11 @@ export function ScenarioEditorPage() {
   const imageEditor = useGuideImageEditorMode(state.images);
   const { project, status, editingLocked: disabled } = state;
   const reader = useGuideReaderMode(state.sealEdit);
+  usePageLocaleMetadata(
+    'scenario.editor.documentTitle',
+    project?.name,
+    reader.active ? 'scenario.editor.previewTitle' : undefined
+  );
   const commandsDisabled = disabled || state.mutationPending;
   const importDisabled = commandsDisabled || status === 'conflict';
   const imports = guideImageImportCommands(state.commitChange);
