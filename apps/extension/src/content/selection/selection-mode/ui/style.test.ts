@@ -32,7 +32,9 @@ describe('selection-mode ui style helpers', () => {
   it('renders drag-frame css without a viewport-sized spread shadow', () => {
     const cssText = getSelectionDragFrameStyle(createSelectionVisual());
 
-    expect(cssText).toContain('border: 3px dashed #2563ebbf');
+    expect(cssText).toContain('outline: 3px dashed #2563ebbf');
+    expect(cssText).toContain('outline-offset: 0');
+    expect(cssText).toContain('border: none');
     expect(cssText).toContain('background: #22c55e40');
     expect(cssText).not.toContain('9999px');
     expect(cssText).toContain('outline-offset: 2px;');
@@ -75,7 +77,7 @@ describe('selection-mode ui style helpers', () => {
     expect(cssText.lastIndexOf('box-shadow: 0 0 4px red;')).toBeGreaterThan(
       cssText.indexOf('box-shadow: color-mix')
     );
-    expect(cssText.indexOf('border: 3px dashed')).toBeGreaterThan(
+    expect(cssText.indexOf('outline: 3px dashed')).toBeGreaterThan(
       cssText.indexOf('background-image: linear-gradient(red, blue);')
     );
   });

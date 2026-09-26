@@ -28,10 +28,11 @@ function getSelectionFrameCss(visual: ResolvedBorderPresetVisual): string {
 
   return `
     background: ${visual.fillCss};
-    outline: none;
     ${frameShadow ? `box-shadow: ${frameShadow};` : ''}
     ${customCss}
-    border: ${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor};
+    border: none;
+    outline: ${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor};
+    outline-offset: 0;
     border-radius: ${visual.radius}px;
     clip-path: none;
   `;
