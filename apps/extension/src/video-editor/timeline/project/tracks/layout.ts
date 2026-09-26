@@ -83,7 +83,7 @@ export function buildTimelineTrackLayoutModel(params: {
     const fxInstanceIds = fxInstances.map((instance) => instance.id);
     const fxRows = packTimelineFxRows(fxInstances);
     const fxCollapsed = params.collapsedFxByTrackId?.[track.id] ?? false;
-    const fxHeight = fxInstanceIds.length ? (fxCollapsed ? 20 : fxRows.length * 24) : 0;
+    const fxHeight = fxInstanceIds.length ? (fxCollapsed ? 24 : fxRows.length * 24) : 0;
     const rowHeight = clipRowHeight + fxHeight;
     const layout = {
       fxInstanceIds,
@@ -119,7 +119,7 @@ export function buildTimelineTrackLayoutModel(params: {
         fxInstanceIds: globalIds,
         fxRows: globalRows,
         fxCollapsed: collapsed,
-        fxHeight: collapsed ? 20 : globalRows.length * 24,
+        fxHeight: collapsed ? 24 : globalRows.length * 24,
         clipRowHeight: 0,
         top,
       }

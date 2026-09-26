@@ -30,6 +30,7 @@ function createInsertionActions(): VideoEditorTimelineController['actions']['ins
 
 function createHeaderController(): VideoEditorHeaderController {
   return {
+    sceneSelected: false,
     grid: { magnetEnabled: true, onToggleMagnet: noop() },
     inspectorMode: 'selection',
     leftSidebarCollapsed: false,

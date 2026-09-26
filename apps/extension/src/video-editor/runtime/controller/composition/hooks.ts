@@ -199,7 +199,10 @@ export function useVideoEditorHeaderController() {
     saveState,
   }));
   const openExportDialog = useVideoEditorExportPort((port) => port.openExportDialog);
-  const selectScene = useVideoEditorClipSelectionPort((port) => port.selectScene);
+  const sceneSelection = useVideoEditorClipSelectionPort(({ selectScene, selection }) => ({
+    selectScene,
+    selection,
+  }));
   const libraries = useVideoEditorLibrariesContext();
   const dialogs = useWorkspaceDialogsContext();
   const layout = useWorkspaceLayoutContext();
@@ -215,7 +218,7 @@ export function useVideoEditorHeaderController() {
     {
       libraries,
       saveStateMeta,
-      store: { renameProject: lifecycle.renameProject, openExportDialog, selectScene },
+      store: { renameProject: lifecycle.renameProject, openExportDialog, ...sceneSelection },
       workspace,
     },
     lifecycle.project

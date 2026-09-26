@@ -199,8 +199,8 @@ it.each([true, false])(
     act(() => workspaceState!.openTrackAudioRecordingDialog(target));
     const store = {
       selection: effectSelected
-        ? { kind: 'effect-instance', effectInstanceId: 'region-fx' }
-        : { kind: 'scene' },
+        ? { kind: 'effect-instance' as const, effectInstanceId: 'region-fx' }
+        : { kind: 'scene' as const },
       selectClip: vi.fn(),
       selectScene: vi.fn(),
       currentTime: 20,
@@ -262,7 +262,12 @@ it('reveals a collapsed inspector for the explicit Scene command', () => {
   const header = createWorkspaceHeaderController(
     {
       workspace: workspaceState!,
-      store: { selectScene, openExportDialog: vi.fn(), renameProject: vi.fn() },
+      store: {
+        selectScene,
+        selection: { kind: 'scene' },
+        openExportDialog: vi.fn(),
+        renameProject: vi.fn(),
+      },
       libraries: { projectExports: [] },
       saveStateMeta: {} as never,
     },

@@ -4,6 +4,7 @@ import type { SaveStateMeta, VideoEditorLibrariesState } from '../../app-model/t
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
+import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type {
   AnnotationEditingPort,
   EffectEditingPort,
@@ -17,7 +18,7 @@ import type {
 
 type HeaderStore = Pick<ExportPort, 'openExportDialog'> &
   Pick<ProjectLifecyclePort, 'renameProject'> &
-  Pick<ClipSelectionPort, 'selectScene'>;
+  Pick<ClipSelectionPort, 'selectScene' | 'selection'>;
 
 interface CreateWorkspaceHeaderArgs {
   libraries: Pick<VideoEditorLibrariesState, 'projectExports'>;
@@ -73,6 +74,7 @@ export function createWorkspaceHeaderController(
   project: NonNullable<ProjectLifecyclePort['project']>
 ) {
   return {
+    sceneSelected: args.store.selection.kind === VideoEditorSelectionKind.SCENE,
     grid: createHeaderGridController(args.workspace),
     inspectorMode: args.workspace.inspector.mode,
     libraryPanelOpen: args.workspace.libraryPanelOpen,

@@ -6,6 +6,7 @@ import type { VideoProjectSourceKind } from '../../../../features/video/project/
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 
 export interface VideoEditorHeaderController {
+  sceneSelected: boolean;
   grid: {
     magnetEnabled: boolean;
     onToggleMagnet: VideoEditorWorkspaceState['grid']['toggleMagnet'];

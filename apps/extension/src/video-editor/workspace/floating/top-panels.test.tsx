@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceHeaderActions } from './top-panels';
 import { VideoEditorLibraryNavigation, VideoEditorWorkspaceHeader } from './index';
 const actions = vi.hoisted(() => ({
+  sceneSelected: false,
   onSelectScene: vi.fn(),
   onAutosaveChange: vi.fn(),
   projectName: 'Demo',
@@ -53,6 +54,40 @@ it('offers Scene and only the hidden inspector opener, without legacy tool butto
     expect(host.querySelectorAll('button')).toHaveLength(1);
     expect(host.querySelector('[data-ui="autosave-control"]')).toBeNull();
   } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('marks Scene active only while its inspector is open and clears it for another selection', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const render = (inspectorOpen: boolean) =>
+    act(() =>
+      root.render(
+        <VideoEditorWorkspaceHeaderActions
+          inspectorOpen={inspectorOpen}
+          onOpenInspector={vi.fn()}
+        />
+      )
+    );
+  try {
+    actions.sceneSelected = true;
+    render(true);
+    const button = () =>
+      host.querySelector<HTMLButtonElement>('[data-ui="video-editor.viewer.scene"]')!;
+    expect(button().getAttribute('aria-pressed')).toBe('true');
+    expect(button().getAttribute('data-active')).toBe('true');
+    expect(button().className).toContain('sniptale-glass-toolbar-button--active');
+    render(false);
+    expect(button().getAttribute('aria-pressed')).toBe('false');
+    actions.sceneSelected = false;
+    render(true);
+    expect(button().getAttribute('aria-pressed')).toBe('false');
+    expect(button().getAttribute('data-active')).toBeNull();
+  } finally {
+    actions.sceneSelected = false;
     act(() => root.unmount());
     vi.unstubAllGlobals();
   }
