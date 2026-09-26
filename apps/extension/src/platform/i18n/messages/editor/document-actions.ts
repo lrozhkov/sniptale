@@ -9,6 +9,10 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'В библиотеке',
     en: 'In library',
   },
+  autosaveConflict: {
+    ru: 'Проект изменён в другой вкладке. Сохранение заблокировано. Загрузите актуальную версию, чтобы продолжить; текущие правки будут заменены.',
+    en: 'This project changed in another tab. Saving is blocked. Reload the latest version to continue; your current edits will be replaced.',
+  },
   autosaveTitle: {
     ru: 'Автосохранение',
     en: 'Autosave',

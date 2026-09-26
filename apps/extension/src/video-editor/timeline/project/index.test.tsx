@@ -15,6 +15,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 // The composition boundary supplies unrelated workspace commands; timeline composition stays real.
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorAutosaveController: () => ({ enabled: true, onChange: vi.fn() }),
   useVideoEditorHistoryController: () => ({
     canUndo: false,
     canRedo: false,
@@ -22,6 +23,7 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
     onRedo: vi.fn(),
   }),
   useVideoEditorHeaderController: () => ({
+    saveStateMeta: { state: 'saved' },
     grid: { magnetEnabled: false, onToggleMagnet: vi.fn() },
     onOpenExportDialog: vi.fn(),
   }),

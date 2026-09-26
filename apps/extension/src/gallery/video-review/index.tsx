@@ -630,6 +630,13 @@ function ReviewEditor({
               length={snapshot.snapshot.workspace.history.length}
               onHistory={state.moveHistory}
               onAddNote={() => state.add()}
+              autosave={{
+                enabled: snapshot.autosaveEnabled,
+                error: snapshot.error,
+                dirty: snapshot.dirty,
+                saving: snapshot.pending > 0,
+                onChange: state.session.setAutosaveEnabled,
+              }}
             />
           }
           editing={editing}

@@ -64,6 +64,7 @@ type TourImageEditCommand = {
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
   const enterResourceSession = useGuideResourceSession();
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
   const [status, setStatus] = useState<GuidePageStatus>('loading');
   const [actionError, setActionError] = useState<GuideActionError | null>(null);
   const saved = useRef<GuideProject | null>(null);
@@ -130,6 +131,7 @@ export function useGuidePageState() {
     );
   const { save } = useGuideAutosave({
     project,
+    enabled: autosaveEnabled,
     dirty: status === 'dirty',
     conflict: status === 'conflict',
     protectUnsaved: status === 'dirty' || status === 'failed' || status === 'conflict',
@@ -179,6 +181,8 @@ export function useGuidePageState() {
   });
 
   return {
+    autosaveEnabled,
+    setAutosaveEnabled,
     commitChange,
     saveTemplate,
     editingLocked: status === 'loading' || (status === 'saving' && !autosaving.current),

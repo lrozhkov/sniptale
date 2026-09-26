@@ -287,3 +287,16 @@ it('repairs group membership and anchor after selected clips disappear', () => {
   store.getState().deleteClip('b');
   expect(store.getState().selection).toEqual({ kind: 'clip', clipId: 'c' });
 });
+
+it('keeps autosave preference out of project revisions and undo history', () => {
+  const store = createTimelineStore();
+  const project = createEmptyVideoProject('Autosave preference');
+  store.getState().setProject(project);
+  const before = store.getState();
+  store.getState().setAutosaveEnabled(false);
+  expect(store.getState().autosaveEnabled).toBe(false);
+  expect(store.getState().project).toBe(before.project);
+  expect(store.getState().projectHistory).toBe(before.projectHistory);
+  store.getState().setAutosaveEnabled(true);
+  expect(store.getState().autosaveEnabled).toBe(true);
+});

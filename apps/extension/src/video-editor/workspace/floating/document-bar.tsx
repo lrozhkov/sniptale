@@ -55,6 +55,15 @@ function VideoEditorProjectTitle({
 function VideoEditorSaveStateBadge({
   saveStateMeta,
 }: Pick<VideoEditorDocumentBarProps['header'], 'saveStateMeta'>) {
+  if (saveStateMeta.state === 'conflict')
+    return (
+      <span role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+        {translate('editor.documentActions.autosaveConflict')}
+        <button type="button" className="ml-2 underline" onClick={() => window.location.reload()}>
+          {translate('editor.documentActions.reloadLatest')}
+        </button>
+      </span>
+    );
   if (saveStateMeta.state !== 'error') return null;
   return (
     <span role="alert">

@@ -16,6 +16,7 @@ it('leaves native disclosure activation to summary and retains transport Space e
         <details>
           <summary>Settings</summary>Fields
         </details>
+        <input type="checkbox" role="switch" aria-checked={false} />
         <button>Action</button>
       </>
     );
@@ -35,6 +36,7 @@ it('leaves native disclosure activation to summary and retains transport Space e
       return event;
     };
     expect(dispatch(host.querySelector('summary')!).defaultPrevented).toBe(false);
+    expect(dispatch(host.querySelector('[role=switch]')!).defaultPrevented).toBe(false);
     expect(toggle).not.toHaveBeenCalled();
     expect(dispatch(host.querySelector('button')!).defaultPrevented).toBe(true);
     expect(toggle).toHaveBeenCalledOnce();

@@ -1,3 +1,4 @@
+import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
@@ -151,6 +152,13 @@ export function ReviewHistoryControls(props: {
   length: number;
   onHistory(direction: 'undo' | 'redo'): void;
   onAddNote?(): void;
+  autosave?: {
+    enabled: boolean;
+    error: string | null;
+    dirty: boolean;
+    saving: boolean;
+    onChange(enabled: boolean): void;
+  };
 }) {
   return (
     <>
@@ -185,6 +193,39 @@ export function ReviewHistoryControls(props: {
           {direction === 'undo' ? <Undo2 size={16} /> : <Redo2 size={16} />}
         </ReviewButton>
       ))}
+      {props.autosave && <ReviewAutosaveControl {...props.autosave} />}
     </>
+  );
+}
+
+function ReviewAutosaveControl(props: {
+  enabled: boolean;
+  error: string | null;
+  dirty: boolean;
+  saving: boolean;
+  onChange(enabled: boolean): void;
+}) {
+  let state: 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' = 'saved';
+  if (props.dirty) state = 'dirty';
+  if (props.saving) state = 'saving';
+  if (props.error) state = props.error === 'conflict' ? 'conflict' : 'error';
+  return (
+    <AutosaveControl
+      enabled={props.enabled}
+      onChange={props.onChange}
+      state={state}
+      labels={{
+        title: translate('editor.documentActions.autosaveTitle'),
+        on: translate('editor.documentActions.autosaveOnDescription'),
+        off: translate('editor.documentActions.autosaveOffDescription'),
+        paused: translate('editor.documentActions.autosaveOffStatus'),
+        dirty: translate('common.states.dirty'),
+        saving: translate('common.states.saving'),
+        saved: translate('common.states.saved'),
+        error: translate('editor.documentActions.saveErrorTitle'),
+        conflict: translate('editor.documentActions.autosaveConflict'),
+        close: translate('common.actions.close'),
+      }}
+    />
   );
 }

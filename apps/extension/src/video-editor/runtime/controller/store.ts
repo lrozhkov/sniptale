@@ -202,6 +202,8 @@ function selectProjectLifecyclePort(state: VideoEditorState): ProjectLifecyclePo
     project: state.project,
     recordingId: state.recordingId,
     renameProject: state.renameProject,
+    autosaveEnabled: state.autosaveEnabled,
+    setAutosaveEnabled: state.setAutosaveEnabled,
     saveState: state.saveState,
     setError: state.setError,
     setProject: state.setProject,

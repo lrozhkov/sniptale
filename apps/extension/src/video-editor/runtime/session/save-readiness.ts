@@ -23,7 +23,7 @@ export async function waitForVideoEditorSave(projectId: string): Promise<void> {
     throw new Error('The open video project changed.');
   }
   if (current.saveState === 'saved') return;
-  if (current.saveState === 'error') {
+  if (current.saveState === 'error' || current.saveState === 'conflict') {
     throw new Error('The video project has unsaved changes.');
   }
 
@@ -33,7 +33,11 @@ export async function waitForVideoEditorSave(projectId: string): Promise<void> {
       reject(new Error('The video project did not finish saving.'));
     }, SAVE_SETTLE_TIMEOUT_MS);
     const listener = (state: SaveReadinessSnapshot) => {
-      if (state.projectId !== projectId || state.saveState === 'error') {
+      if (
+        state.projectId !== projectId ||
+        state.saveState === 'error' ||
+        state.saveState === 'conflict'
+      ) {
         globalThis.clearTimeout(timeout);
         unsubscribe();
         reject(new Error('The video project could not be saved.'));

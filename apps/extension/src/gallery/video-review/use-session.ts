@@ -45,7 +45,21 @@ export function useLoadedReview(aggregateId: string) {
 
 /** React view of the serialized workflow snapshot. */
 export function useReviewSnapshot(session: Session) {
-  return useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
+  const snapshot = useSyncExternalStore(
+    session.subscribe,
+    session.getSnapshot,
+    session.getSnapshot
+  );
+  useEffect(() => {
+    const protect = (event: BeforeUnloadEvent) => {
+      if (!session.getSnapshot().dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protect);
+    return () => window.removeEventListener('beforeunload', protect);
+  }, [session]);
+  return snapshot;
 }
 
 /** Coalesces field recovery without making typing into document-history operations. */

@@ -6,6 +6,7 @@ type SaveStatus = 'dirty' | 'saving' | 'saved' | 'failed' | 'conflict';
 type AutosaveInput = {
   project: GuideProject | null;
   dirty: boolean;
+  enabled?: boolean;
   conflict: boolean;
   protectUnsaved: boolean;
   saved: { current: GuideProject | null };
@@ -63,10 +64,10 @@ export function useGuideAutosave(input: AutosaveInput) {
   const request = useRef(save);
   request.current = save;
   useEffect(() => {
-    if (!input.dirty || !input.project) return;
+    if (!input.dirty || !input.project || input.enabled === false) return;
     const timer = window.setTimeout(() => void request.current(), 350);
     return () => window.clearTimeout(timer);
-  }, [input.project, input.dirty]);
+  }, [input.project, input.dirty, input.enabled]);
   useEffect(() => {
     const protect = (event: BeforeUnloadEvent) => {
       const state = latest.current;
@@ -75,7 +76,7 @@ export function useGuideAutosave(input: AutosaveInput) {
       if (!state.protectUnsaved && !state.autosaving.current) return;
       event.preventDefault();
       event.returnValue = '';
-      if (state.dirty) void request.current();
+      if (state.dirty && state.enabled !== false) void request.current();
     };
     window.addEventListener('beforeunload', protect);
     return () => window.removeEventListener('beforeunload', protect);

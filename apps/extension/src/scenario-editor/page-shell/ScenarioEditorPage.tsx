@@ -284,6 +284,8 @@ function ScenarioHeader({
   const commandsDisabled = disabled || state.mutationPending;
   return (
     <GuidePageHeader
+      autosaveEnabled={state.autosaveEnabled}
+      onAutosaveChange={state.setAutosaveEnabled}
       images={state.images}
       {...(!tourMode
         ? {

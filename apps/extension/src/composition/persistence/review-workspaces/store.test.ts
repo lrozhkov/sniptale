@@ -725,3 +725,67 @@ it('preserves voiceover records and temporarily suppresses recordings intersecte
     { timelineStart: 10, duration: 1 },
   ]);
 });
+
+it('atomically resumes a buffer and rejects a second tab at the old workspace revision', async () => {
+  const { saveVideoWorkspaceSnapshot } = await import('./store');
+  const opened = await openVideoWorkspace(id, source);
+  const args = {
+    aggregateId: id,
+    expectedRevision: 1,
+    expectedDraftRevision: null,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    workspace: { ...opened.workspace, history: [operation], cursor: 1 },
+    draft: null,
+  };
+  const saved = await saveVideoWorkspaceSnapshot(args);
+  expect(saved.workspace.history).toEqual([operation]);
+  expect(saved.workspace.revision).toBe(2);
+  await expect(saveVideoWorkspaceSnapshot(args)).rejects.toMatchObject({ code: 'conflict' });
+  expect(await readVideoWorkspace(id)).toEqual(saved);
+});
+
+it('rejects a competing draft-only writer without replacing its text', async () => {
+  const { saveVideoWorkspaceSnapshot } = await import('./store');
+  const opened = await openVideoWorkspace(id, source);
+  const draft = await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedRevision: 1,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    expectedDraftRevision: null,
+    annotation,
+    before: null,
+  });
+  await expect(
+    saveVideoWorkspaceSnapshot({
+      aggregateId: id,
+      expectedRevision: 1,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      expectedDraftRevision: null,
+      workspace: opened.workspace,
+      draft: null,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  expect(await readVideoWorkspace(id)).toEqual(draft);
+});
+
+it('rejects malformed buffered snapshots and rolls back storage failures', async () => {
+  const { saveVideoWorkspaceSnapshot } = await import('./store');
+  const opened = await openVideoWorkspace(id, source);
+  const args = {
+    aggregateId: id,
+    expectedRevision: 1,
+    expectedDraftRevision: null,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    workspace: opened.workspace,
+    draft: null,
+  };
+  await expect(saveVideoWorkspaceSnapshot({ ...args, workspace: {} })).rejects.toMatchObject({
+    code: 'invalid',
+  });
+  await expect(saveVideoWorkspaceSnapshot({ ...args, draft: {} })).rejects.toMatchObject({
+    code: 'invalid',
+  });
+  harness.failure = true;
+  await expect(saveVideoWorkspaceSnapshot(args)).rejects.toThrow('No space');
+  expect(await readVideoWorkspace(id)).toEqual(opened);
+});

@@ -62,6 +62,7 @@ function setup() {
     }),
     readVideoWorkspace: vi.fn(async () => structuredClone(snapshot)),
     moveVideoWorkspaceHistory: vi.fn(async () => structuredClone(snapshot)),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
     saveVideoWorkspaceAdvanced: vi.fn(async () => structuredClone(snapshot)),
   } satisfies Parameters<typeof createVideoReviewSession>[1];
   const session = createVideoReviewSession(snapshot, deps);

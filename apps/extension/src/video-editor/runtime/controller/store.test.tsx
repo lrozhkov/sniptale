@@ -68,6 +68,8 @@ const expectedKeys = {
     'undoProject',
   ],
   lifecycle: [
+    'autosaveEnabled',
+    'setAutosaveEnabled',
     'error',
     'isReady',
     'project',

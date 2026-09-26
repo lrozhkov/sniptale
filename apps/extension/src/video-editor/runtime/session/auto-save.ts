@@ -20,8 +20,24 @@ export function useVideoEditorAutoSave(
   recordingId: string | null,
   setSaveState: VideoEditorSessionActions['setSaveState'],
   refreshProjects: VideoEditorLibrariesState['refreshProjects'],
-  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision']
+  syncProjectRevision?: VideoEditorSessionActions['syncProjectRevision'],
+  enabled = true
 ): void {
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const savedProjectRef = useRef<VideoProject | null>(null);
+  const conflictRef = useRef(false);
+  const latestProjectRef = useRef(project);
+  latestProjectRef.current = project;
+  useEffect(() => {
+    const protect = (event: BeforeUnloadEvent) => {
+      if (!latestProjectRef.current || latestProjectRef.current === savedProjectRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protect);
+    return () => window.removeEventListener('beforeunload', protect);
+  }, []);
   const retryGeneration = useVideoEditorSaveRetryGeneration();
   const saveGenerationRef = useRef(0);
   const revisionSyncRef = useRef<{ id: string; revision: number } | null>(null);
@@ -35,6 +51,9 @@ export function useVideoEditorAutoSave(
       return;
     }
     return scheduleVideoEditorAutoSave({
+      enabledRef,
+      savedProjectRef,
+      conflictRef,
       persistedProjectIdRef,
       persistedRevisionRef,
       initialProjectUpdatedAtRef,
@@ -47,10 +66,21 @@ export function useVideoEditorAutoSave(
       setSaveState,
       ...(syncProjectRevision ? { syncProjectRevision } : {}),
     });
-  }, [project, recordingId, refreshProjects, retryGeneration, setSaveState, syncProjectRevision]);
+  }, [
+    project,
+    recordingId,
+    refreshProjects,
+    retryGeneration,
+    setSaveState,
+    syncProjectRevision,
+    enabled,
+  ]);
 }
 
 function scheduleVideoEditorAutoSave(args: {
+  enabledRef: MutableRefObject<boolean>;
+  savedProjectRef: MutableRefObject<VideoProject | null>;
+  conflictRef: MutableRefObject<boolean>;
   initialProjectUpdatedAtRef: MutableRefObject<number | null>;
   persistedProjectIdRef: MutableRefObject<string | null>;
   persistedRevisionRef: MutableRefObject<number | null | undefined>;
@@ -70,16 +100,31 @@ function scheduleVideoEditorAutoSave(args: {
     args.persistedRevisionRef
   );
   if (projectChanged) {
+    args.conflictRef.current = false;
+    args.savedProjectRef.current = args.project;
     setPublishedSaveState(args, 'saved');
     return () => undefined;
   }
+  if (args.conflictRef.current) {
+    setPublishedSaveState(args, 'conflict');
+    return () => undefined;
+  }
   if (consumeAutosaveRevisionSync(args.project, args.revisionSyncRef)) {
+    args.savedProjectRef.current = args.project;
+    setPublishedSaveState(args, 'saved');
+    return () => undefined;
+  }
+  if (args.project === args.savedProjectRef.current) {
     setPublishedSaveState(args, 'saved');
     return () => undefined;
   }
   const saveGeneration = args.saveGenerationRef.current + 1;
   args.saveGenerationRef.current = saveGeneration;
   setPublishedSaveState(args, 'dirty');
+  if (!args.enabledRef.current)
+    return () => {
+      args.saveGenerationRef.current += 1;
+    };
   const timer = window.setTimeout(() => {
     runScheduledVideoProjectSave(args, saveGeneration);
   }, 350);
@@ -102,7 +147,13 @@ function runScheduledVideoProjectSave(
       replaceVideoEditorUrl(args.project.id, args.recordingId);
       void args.refreshProjects();
     })
-    .catch((saveError) => {
+    .catch((saveError: unknown) => {
+      if (args.persistedProjectIdRef.current !== args.project.id) return;
+      if (saveError instanceof Error && saveError.name === 'StaleVideoProjectSaveError') {
+        args.conflictRef.current = true;
+        setPublishedSaveState(args, 'conflict');
+        return;
+      }
       if (args.saveGenerationRef.current !== saveGeneration) {
         return;
       }
@@ -118,6 +169,12 @@ function queueVideoProjectSave(
   const savePromise = args.saveQueueRef.current
     .catch(() => undefined)
     .then(async () => {
+      if (!args.enabledRef.current) return args.project;
+      if (args.conflictRef.current) {
+        const error = new Error('Video project changed in another editor');
+        error.name = 'StaleVideoProjectSaveError';
+        throw error;
+      }
       if (args.saveGenerationRef.current === saveGeneration) {
         setPublishedSaveState(args, 'saving');
       }
@@ -128,11 +185,13 @@ function queueVideoProjectSave(
               args.initialProjectUpdatedAtRef.current
             )
           : args.persistedRevisionRef.current;
+      if (!args.enabledRef.current) return args.project;
       const saved = await commitVideoProjectWorkspaceMutation(args.project, {
         expectedWorkspaceRevision,
       });
       if (args.persistedProjectIdRef.current === saved.project.id) {
         args.persistedRevisionRef.current = saved.workspaceRevision;
+        args.savedProjectRef.current = args.project;
       }
       syncSavedProjectRevision({
         project: args.project,

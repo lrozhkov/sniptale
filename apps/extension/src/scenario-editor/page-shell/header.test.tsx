@@ -30,6 +30,7 @@ async function draw(
     representationControls?: ReactNode;
   } = {}
 ) {
+  const autosave = vi.fn();
   const appearance = vi.fn();
   const duplicate = vi.fn();
   const remove = vi.fn();
@@ -40,6 +41,8 @@ async function draw(
     root.render(
       <GuidePageHeader
         project={project}
+        autosaveEnabled
+        onAutosaveChange={autosave}
         status="failed"
         commandsDisabled={options.commandsDisabled ?? false}
         contextControls={options.contextControls}
@@ -62,7 +65,7 @@ async function draw(
       />
     )
   );
-  return { appearance, duplicate, remove, reload };
+  return { appearance, duplicate, remove, reload, autosave };
 }
 
 function headerButton(name: string) {
@@ -136,4 +139,13 @@ it('reports appearance selection from the inspector scope without owning another
   expect(button().getAttribute('aria-pressed')).toBe('true');
   await draw({ appearanceActive: false });
   expect(button().getAttribute('aria-pressed')).toBe('false');
+});
+
+it('places autosave between history and menu and forwards the switch', async () => {
+  const { autosave } = await draw();
+  const anchor = host.querySelector('[data-ui="autosave-control"]')!;
+  expect(anchor.previousElementSibling?.className).toContain('guide-history-controls');
+  await act(async () => anchor.querySelector<HTMLButtonElement>('button')!.click());
+  await act(async () => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
+  expect(autosave).toHaveBeenCalledWith(false);
 });

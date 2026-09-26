@@ -67,3 +67,31 @@ it('does not publish a completed write after the page owner changes generation',
   expect(input.saved.current?.name).toBe('Guide');
   expect(input.busy.current).toBe(false);
 });
+
+it('cancels queued autosave, protects paused edits on unload and resumes the latest value', async () => {
+  save.mockImplementation(async (project) => ({ ...project, updatedAt: 2 }));
+  act(() => root.render(<Harness />));
+  input = { ...input, enabled: false };
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(500));
+  const unload = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(unload);
+  expect(unload.defaultPrevented).toBe(true);
+  expect(save).not.toHaveBeenCalled();
+  input = { ...input, project: { ...input.project!, name: 'Latest paused edit' }, enabled: true };
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(350));
+  expect(save).toHaveBeenCalledWith(input.project, {
+    baseUpdatedAt: input.saved.current!.updatedAt === 2 ? 1 : input.saved.current!.updatedAt,
+  });
+  expect(input.onPublish).toHaveBeenCalled();
+});
+
+it('does not retry a duplicate-tab conflict by toggling autosave', async () => {
+  input = { ...input, conflict: true, enabled: false };
+  act(() => root.render(<Harness />));
+  input = { ...input, enabled: true };
+  act(() => root.render(<Harness />));
+  await act(async () => vi.advanceTimersByTimeAsync(500));
+  expect(save).not.toHaveBeenCalled();
+});

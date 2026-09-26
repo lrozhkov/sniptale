@@ -185,6 +185,13 @@ export function useVideoEditorLayoutController() {
   return createWorkspaceLayoutController(workspace);
 }
 
+export function useVideoEditorAutosaveController() {
+  return useVideoEditorProjectLifecyclePort(({ autosaveEnabled, setAutosaveEnabled }) => ({
+    enabled: autosaveEnabled,
+    onChange: setAutosaveEnabled,
+  }));
+}
+
 export function useVideoEditorHeaderController() {
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, renameProject, saveState }) => ({
     project,

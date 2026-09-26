@@ -1,3 +1,4 @@
+import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { GuideSnapButton } from './layout-assistance';
 import { GuideVoiceField } from './voice-field';
 import { useLayoutEffect, useRef, type ReactNode, type Ref, type ComponentProps } from 'react';
@@ -30,6 +31,8 @@ type GuidePageHeaderProps = {
   previewDisabled: boolean;
   disabled: boolean;
   feedback?: ReactNode;
+  autosaveEnabled?: boolean;
+  onAutosaveChange?: (enabled: boolean) => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -60,6 +63,8 @@ export function GuidePageHeader({
   previewDisabled,
   disabled,
   feedback,
+  autosaveEnabled = true,
+  onAutosaveChange,
   canUndo,
   canRedo,
   onUndo,
@@ -157,6 +162,12 @@ export function GuidePageHeader({
                   <Redo2 size={16} aria-hidden="true" />
                 </ContentToolbarButton>
               </div>
+              <GuideAutosaveStatus
+                enabled={autosaveEnabled}
+                onChange={onAutosaveChange}
+                status={status}
+                t={t}
+              />
               <GuideProjectActions
                 project={project}
                 disabled={commandsDisabled}
@@ -197,4 +208,37 @@ function useHeaderFit() {
     return () => observer?.disconnect();
   });
   return ref;
+}
+
+function guideAutosaveState(status: GuidePageHeaderProps['status']) {
+  if (status === 'conflict' || status === 'saving' || status === 'dirty') return status;
+  return status === 'failed' ? 'error' : 'saved';
+}
+
+function GuideAutosaveStatus(props: {
+  enabled: boolean;
+  onChange: ((enabled: boolean) => void) | undefined;
+  status: GuidePageHeaderProps['status'];
+  t: Translate;
+}) {
+  if (!props.onChange) return null;
+  return (
+    <AutosaveControl
+      enabled={props.enabled}
+      onChange={props.onChange}
+      state={guideAutosaveState(props.status)}
+      labels={{
+        title: props.t('editor.documentActions.autosaveTitle'),
+        on: props.t('editor.documentActions.autosaveOnDescription'),
+        off: props.t('editor.documentActions.autosaveOffDescription'),
+        paused: props.t('editor.documentActions.autosaveOffStatus'),
+        dirty: props.t('common.states.dirty'),
+        saving: props.t('common.states.saving'),
+        saved: props.t('common.states.saved'),
+        error: props.t('editor.documentActions.saveErrorTitle'),
+        conflict: props.t('editor.documentActions.autosaveConflict'),
+        close: props.t('common.actions.close'),
+      }}
+    />
+  );
 }

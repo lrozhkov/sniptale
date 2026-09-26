@@ -6,12 +6,14 @@ import { VideoEditorWorkspaceHeaderActions } from './top-panels';
 import { VideoEditorLibraryNavigation, VideoEditorWorkspaceHeader } from './index';
 const actions = vi.hoisted(() => ({
   onSelectScene: vi.fn(),
+  onAutosaveChange: vi.fn(),
   projectName: 'Demo',
   saveStateMeta: { state: 'saved' },
 }));
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
   useVideoEditorHeaderController: () => actions,
+  useVideoEditorAutosaveController: () => ({ enabled: true, onChange: actions.onAutosaveChange }),
   useVideoEditorHistoryController: () => ({ error: null }),
 }));
 it('offers Scene and only the hidden inspector opener, without legacy tool buttons', () => {
@@ -49,6 +51,7 @@ it('offers Scene and only the hidden inspector opener, without legacy tool butto
     );
     expect(host.querySelector('[data-ui="video-editor.viewer.open-inspector"]')).toBeNull();
     expect(host.querySelectorAll('button')).toHaveLength(1);
+    expect(host.querySelector('[data-ui="autosave-control"]')).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

@@ -329,3 +329,47 @@ export async function saveVideoWorkspaceDraft(args: {
     return { ...snapshot, draft };
   });
 }
+
+/** Atomically saves a paused editor buffer, rejecting both document and draft-only competitors. */
+export async function saveVideoWorkspaceSnapshot(args: {
+  aggregateId: string;
+  expectedRevision: number;
+  expectedDraftRevision: number | null;
+  expectedSourceAssetId: string;
+  workspace: unknown;
+  draft: unknown;
+}): Promise<VideoWorkspaceSnapshot> {
+  return mutate(args.aggregateId, async (tx) => {
+    const current = await requireSnapshot(
+      tx,
+      args.aggregateId,
+      args.expectedRevision,
+      args.expectedSourceAssetId
+    );
+    if ((current.draft?.revision ?? null) !== args.expectedDraftRevision)
+      throw new VideoWorkspaceError('conflict');
+    const workspace = parseVideoWorkspace(args.workspace);
+    if (
+      !workspace ||
+      workspace.aggregateId !== args.aggregateId ||
+      workspace.sourceAssetId !== current.workspace.sourceAssetId ||
+      JSON.stringify(workspace.source) !== JSON.stringify(current.workspace.source)
+    )
+      throw new VideoWorkspaceError('invalid');
+    const parsedDraft =
+      args.draft === null ? null : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+    if (args.draft !== null && (!parsedDraft || parsedDraft.aggregateId !== args.aggregateId))
+      throw new VideoWorkspaceError('invalid');
+    const next = await putWorkspace(tx, {
+      ...workspace,
+      revision: current.workspace.revision,
+      createdAt: current.workspace.createdAt,
+    });
+    const draft = parsedDraft
+      ? { ...parsedDraft, revision: (current.draft?.revision ?? 0) + 1, updatedAt: Date.now() }
+      : null;
+    if (draft) await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).put(draft);
+    else await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
+    return { workspace: next, draft };
+  });
+}

@@ -1,8 +1,10 @@
+import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { ProjectMenu } from './project-menu';
 import { Redo2, Undo2, Magnet } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import {
+  useVideoEditorAutosaveController,
   useVideoEditorHistoryController,
   useVideoEditorHeaderController,
 } from '../../../runtime/controller/composition/hooks';
@@ -140,6 +142,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         >
           <Redo2 aria-hidden="true" />
         </ContentToolbarButton>
+        <TimelineAutosaveControl />
         <ToolbarSeparator />
         <ProjectTimelineToolbarTrailingActions
           {...createToolbarTrailingControlsProps(controlsProps)}
@@ -170,6 +173,32 @@ function ToolbarSeparator() {
     <span
       aria-hidden="true"
       className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
+    />
+  );
+}
+
+function TimelineAutosaveControl() {
+  const autosave = useVideoEditorAutosaveController();
+  const header = useVideoEditorHeaderController();
+  if (!header) return null;
+  return (
+    <AutosaveControl
+      {...autosave}
+      state={
+        header.saveStateMeta.state === 'idle' ? 'dirty' : (header.saveStateMeta.state ?? 'saved')
+      }
+      labels={{
+        title: translate('editor.documentActions.autosaveTitle'),
+        on: translate('editor.documentActions.autosaveOnDescription'),
+        off: translate('editor.documentActions.autosaveOffDescription'),
+        paused: translate('editor.documentActions.autosaveOffStatus'),
+        dirty: translate('common.states.dirty'),
+        saving: translate('common.states.saving'),
+        saved: translate('common.states.saved'),
+        error: translate('editor.documentActions.saveErrorTitle'),
+        conflict: translate('editor.documentActions.autosaveConflict'),
+        close: translate('common.actions.close'),
+      }}
     />
   );
 }

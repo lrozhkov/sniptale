@@ -14,6 +14,7 @@ const history = vi.hoisted(() => ({
   canRedo: false,
   onUndo: vi.fn(),
   onRedo: vi.fn(),
+  onAutosaveChange: vi.fn(),
 }));
 vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../runtime/controller/composition/hooks')>()),
@@ -22,8 +23,10 @@ vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) 
     onDialogVisibilityChange: vi.fn(),
   }),
   useVideoEditorHistoryController: () => history,
+  useVideoEditorAutosaveController: () => ({ enabled: true, onChange: history.onAutosaveChange }),
   useVideoEditorHeaderController: () => ({
     projectName: 'Project',
+    saveStateMeta: { state: 'saved' },
     grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
     onOpenExportDialog: vi.fn(),
   }),
@@ -222,4 +225,13 @@ it('holds editing actions disabled during playback and preparation, retaining na
     container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.undo"]')!
       .disabled
   ).toBe(false);
+});
+
+it('places autosave directly after redo and binds its switch', () => {
+  renderToolbar();
+  const redo = container!.querySelector('[data-ui="video-editor.timeline.toolbar.redo"]')!;
+  expect(redo.nextElementSibling?.getAttribute('data-ui')).toBe('autosave-control');
+  act(() => redo.nextElementSibling!.querySelector<HTMLButtonElement>('button')!.click());
+  act(() => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
+  expect(history.onAutosaveChange).toHaveBeenCalledWith(false);
 });

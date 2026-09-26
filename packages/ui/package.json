@@ -6,6 +6,7 @@
   "author": "Lev Rozhkov",
   "type": "module",
   "exports": {
+    "./autosave-control": "./src/autosave-control/index.tsx",
     "./annotatable-image-surface": "./src/annotatable-image-surface/index.tsx",
     "./audio-amplitude-bars": "./src/audio-amplitude-bars/index.tsx",
     "./branding": "./src/branding/index.ts",

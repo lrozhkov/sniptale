@@ -39,6 +39,7 @@ function setup() {
     draft: null,
   });
   const deps = {
+    saveVideoWorkspaceSnapshot: vi.fn(async () => build()),
     saveVideoWorkspaceDraft: vi.fn(async () => build()),
     commitVideoWorkspace: vi.fn(async (args: { operation: unknown }) => {
       const operation = parseReviewOperation(args.operation, 4);

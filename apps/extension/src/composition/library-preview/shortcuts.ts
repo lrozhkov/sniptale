@@ -27,7 +27,8 @@ function registerPlaybackSpaceShortcut(togglePlayback: () => void): () => void {
   const restoreFocusPaint = () =>
     document.documentElement.removeAttribute('data-video-editor-focus');
   const onKeyDown = (event: KeyboardEvent) => {
-    const nativeDisclosure = event.target instanceof Element && event.target.closest('summary');
+    const nativeDisclosure =
+      event.target instanceof Element && event.target.closest('summary, [role="switch"]');
     if (event.code !== 'Space' || isEditableTarget(event.target) || nativeDisclosure) {
       restoreFocusPaint();
       return;

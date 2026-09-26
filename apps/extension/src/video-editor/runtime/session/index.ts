@@ -1,3 +1,4 @@
+import { useVideoEditorProjectLifecyclePort } from '../controller/store';
 import { useEffectClipPreviews } from './effect-thumbnails';
 import { useCallback, useMemo, useState } from 'react';
 import { useVideoEditorAssetUrls } from './asset-urls';
@@ -64,7 +65,9 @@ function useVideoEditorRuntimeProjectEffects(
   params: UseVideoEditorRuntimeParams,
   applyLoadedProject: ApplyLoadedProject
 ) {
+  const autosaveEnabled = useVideoEditorProjectLifecyclePort((port) => port.autosaveEnabled);
   useVideoEditorRuntimeEffects({
+    autosaveEnabled,
     project: params.project,
     recordingId: params.recordingId,
     getActiveExportJobId: params.exportState.getActiveJobId,
