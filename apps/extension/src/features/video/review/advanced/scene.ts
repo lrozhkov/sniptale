@@ -256,3 +256,35 @@ export function evaluateQuickEditCameraAtTime(
     sample.progress
   );
 }
+
+/** Shared camera bounds: following backgrounds and rounded video edges move together. */
+export function computeQuickEditSceneCamera(
+  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect },
+  background: QuickEditBackgroundSettings
+) {
+  const follows = background.enabled && background.zoomBehavior === 'follow-video';
+  const scale = follows ? layout.videoTransform.width / layout.videoRect.width : 1;
+  return {
+    scale,
+    x: follows ? layout.videoTransform.x - scale * layout.videoRect.x : 0,
+    y: follows ? layout.videoTransform.y - scale * layout.videoRect.y : 0,
+    videoClip: follows ? layout.videoTransform : layout.videoRect,
+  };
+}
+
+/** Visible video crop in normalized source coordinates, shared by Area paint and hit-testing. */
+export function computeQuickEditVisibleSourceRect(
+  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect },
+  background: QuickEditBackgroundSettings,
+  output: { width: number; height: number }
+): QuickEditRect {
+  const clip = computeQuickEditSceneCamera(layout, background).videoClip;
+  const left = Math.max(0, clip.x);
+  const top = Math.max(0, clip.y);
+  return {
+    x: (left - layout.videoTransform.x) / layout.videoTransform.width,
+    y: (top - layout.videoTransform.y) / layout.videoTransform.height,
+    width: (Math.min(output.width, clip.x + clip.width) - left) / layout.videoTransform.width,
+    height: (Math.min(output.height, clip.y + clip.height) - top) / layout.videoTransform.height,
+  };
+}

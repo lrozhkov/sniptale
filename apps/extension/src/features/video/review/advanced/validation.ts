@@ -176,18 +176,23 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
 
 function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | null {
   if (!isRecord(value)) return null;
-  if (value['enabled'] === false) return { enabled: false };
+  const behavior = value['zoomBehavior'];
+  if (behavior !== undefined && behavior !== 'fixed' && behavior !== 'follow-video') return null;
+  const motion: Pick<QuickEditBackgroundSettings, 'zoomBehavior'> = behavior
+    ? { zoomBehavior: behavior }
+    : {};
+  if (value['enabled'] === false) return { enabled: false, ...motion };
   if (value['enabled'] !== true) return null;
   const layout = parseBackgroundLayout(value['layout']);
   if (!layout) return null;
   if (value['type'] === 'solid') {
     const color = typeof value['color'] === 'string' ? normalizePaintColor(value['color']) : null;
-    return color ? { enabled: true, type: 'solid', color, layout } : null;
+    return color ? { enabled: true, type: 'solid', color, layout, ...motion } : null;
   }
   if (value['type'] === 'gradient') {
     const paint = parsePaint({ kind: 'gradient', gradient: value['gradient'] });
     if (!paint || paint.kind !== 'gradient') return null;
-    return { enabled: true, type: 'gradient', gradient: paint.gradient, layout };
+    return { enabled: true, type: 'gradient', gradient: paint.gradient, layout, ...motion };
   }
   if (value['type'] === 'image') {
     return identity(value['assetId']) &&
@@ -196,6 +201,7 @@ function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | 
           enabled: true,
           type: 'image',
           assetId: value['assetId'],
+          ...motion,
           imageFit: value['imageFit'],
           layout,
         }

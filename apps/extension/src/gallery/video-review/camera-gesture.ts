@@ -15,6 +15,8 @@ const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 type CameraGestureProps = {
   camera: QuickEditCameraTransform;
   videoRect: QuickEditRect;
+  /** Actual Area footprint in normalized source coordinates, when the scene supplies it. */
+  visibleArea?: QuickEditRect;
   output: { width: number; height: number };
   view: 'area' | 'result';
   disabled?: boolean | undefined;
@@ -173,10 +175,18 @@ function captureCameraPointer(
     centerY: Math.max(limit, Math.min(1 - limit, props.camera.centerY)),
   };
   const point = cameraPointerPoint(event, bounds, props.output, props.videoRect);
+  const area = props.visibleArea ?? {
+    x: visible.centerX - limit,
+    y: visible.centerY - limit,
+    width: limit * 2,
+    height: limit * 2,
+  };
   const place =
     !result &&
-    (Math.abs(point.centerX - visible.centerX) > limit ||
-      Math.abs(point.centerY - visible.centerY) > limit);
+    (point.centerX < area.x ||
+      point.centerX > area.x + area.width ||
+      point.centerY < area.y ||
+      point.centerY > area.y + area.height);
   return {
     id: event.pointerId,
     x: event.clientX,

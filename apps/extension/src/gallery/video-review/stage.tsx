@@ -14,6 +14,7 @@ import type {
 } from '../../features/video/review/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSceneCamera,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import type {
@@ -85,6 +86,10 @@ export function ReviewStage(props: {
   const host = useRef<HTMLDivElement>(null);
   const { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight } =
     useReviewStageGeometry(props, host);
+  const motion =
+    sceneLayout && props.scene
+      ? computeQuickEditSceneCamera(sceneLayout, props.scene.background)
+      : { x: 0, y: 0, scale: 1 };
   const plane = useReviewDrawingPlane({
     drawing: props.drawing,
     content,
@@ -113,27 +118,32 @@ export function ReviewStage(props: {
           height: size.height,
           cursor: props.drawing ? 'crosshair' : 'default',
           touchAction: props.drawing ? 'none' : 'auto',
-          ...(backgroundPaint && props.scene?.background.enabled
-            ? {
-                background: backgroundPaint,
-              }
-            : {}),
         }}
         onPointerDown={plane.onPointerDown}
         onPointerMove={plane.onPointerMove}
         onPointerUp={plane.onPointerUp}
         onPointerCancel={plane.onPointerCancel}
       >
-        {props.backgroundImageUrl &&
-        props.scene?.background.enabled &&
-        props.scene.background.type === 'image' ? (
-          <img
-            src={props.backgroundImageUrl}
-            alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full"
-            style={{ objectFit: props.scene.background.imageFit }}
-          />
-        ) : null}
+        <div
+          data-ui="gallery.videoReview.backgroundPlane"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: backgroundPaint ?? undefined,
+            transformOrigin: '0 0',
+            transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.scale})`,
+          }}
+        >
+          {props.backgroundImageUrl &&
+          props.scene?.background.enabled &&
+          props.scene.background.type === 'image' ? (
+            <img
+              src={props.backgroundImageUrl}
+              alt=""
+              className="pointer-events-none absolute inset-0 h-full w-full"
+              style={{ objectFit: props.scene.background.imageFit }}
+            />
+          ) : null}
+        </div>
         <ReviewSceneVideo
           url={props.url}
           video={props.video}
@@ -206,10 +216,15 @@ function ReviewSceneVideo(props: {
   onError(): void;
 }) {
   const clip = props.scene?.background.enabled ? props.scene.background.layout : null;
+  const motion =
+    props.layout && props.scene
+      ? computeQuickEditSceneCamera(props.layout, props.scene.background)
+      : null;
+  const videoClip = motion?.videoClip ?? props.layout?.videoRect;
   const translation = props.layout
     ? {
-        x: props.layout.videoTransform.x - props.layout.videoRect.x,
-        y: props.layout.videoTransform.y - props.layout.videoRect.y,
+        x: props.layout.videoTransform.x - (videoClip?.x ?? 0),
+        y: props.layout.videoTransform.y - (videoClip?.y ?? 0),
       }
     : { x: 0, y: 0 };
   const scale = props.scene?.camera.scale ?? 1;
@@ -218,12 +233,14 @@ function ReviewSceneVideo(props: {
     <div
       style={{
         position: 'absolute',
-        left: props.layout?.videoRect.x ?? 0,
-        top: props.layout?.videoRect.y ?? 0,
-        width: props.layout?.videoRect.width ?? undefined,
-        height: props.layout?.videoRect.height ?? undefined,
+        left: videoClip?.x ?? 0,
+        top: videoClip?.y ?? 0,
+        width: videoClip?.width ?? undefined,
+        height: videoClip?.height ?? undefined,
         overflow: 'hidden',
-        borderRadius: clip ? clip.cornerRadius * props.previewScale : undefined,
+        borderRadius: clip
+          ? clip.cornerRadius * props.previewScale * (motion?.scale ?? 1)
+          : undefined,
       }}
     >
       <video
@@ -267,11 +284,7 @@ function ReviewSceneVideo(props: {
       {props.projected ? (
         <ReviewRegionOverlay
           drawing={props.drawing}
-          offset={
-            props.layout
-              ? { x: props.layout.videoRect.x, y: props.layout.videoRect.y }
-              : { x: 0, y: 0 }
-          }
+          offset={props.layout ? { x: videoClip?.x ?? 0, y: videoClip?.y ?? 0 } : { x: 0, y: 0 }}
           projected={props.projected}
         />
       ) : null}

@@ -29,6 +29,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSceneCamera,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
 import {
@@ -594,6 +595,12 @@ export function drawReviewSceneFrame(
   const { canvas, layout, background, image, sample, comments, sourceTime } = args;
   context.fillStyle = '#000000';
   context.fillRect(0, 0, canvas.width, canvas.height);
+  const motion = computeQuickEditSceneCamera(layout, background);
+  if (motion.scale !== 1) {
+    context.save();
+    context.translate(motion.x, motion.y);
+    context.scale(motion.scale, motion.scale);
+  }
   if (background.enabled) {
     if (background.type === 'solid') {
       context.fillStyle = background.color;
@@ -604,24 +611,21 @@ export function drawReviewSceneFrame(
       drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
     }
   }
+  if (motion.scale !== 1) context.restore();
   context.save();
   context.beginPath();
+  const videoClip = motion.videoClip;
   const clip = background.enabled ? background.layout : null;
   if (clip && clip.cornerRadius > 0) {
     context.roundRect(
-      layout.videoRect.x,
-      layout.videoRect.y,
-      layout.videoRect.width,
-      layout.videoRect.height,
-      Math.min(clip.cornerRadius, Math.min(layout.videoRect.width, layout.videoRect.height) / 2)
+      videoClip.x,
+      videoClip.y,
+      videoClip.width,
+      videoClip.height,
+      Math.min(clip.cornerRadius * motion.scale, Math.min(videoClip.width, videoClip.height) / 2)
     );
   } else {
-    context.rect(
-      layout.videoRect.x,
-      layout.videoRect.y,
-      layout.videoRect.width,
-      layout.videoRect.height
-    );
+    context.rect(videoClip.x, videoClip.y, videoClip.width, videoClip.height);
   }
   context.clip();
   sample.draw(

@@ -75,7 +75,10 @@ export interface QuickEditBackgroundLayout {
   cornerRadius: number;
 }
 
-export type QuickEditBackgroundSettings =
+export type QuickEditBackgroundSettings = {
+  /** Absent on legacy workspaces means a stationary background. */
+  zoomBehavior?: 'fixed' | 'follow-video';
+} & (
   | { enabled: false }
   | {
       enabled: true;
@@ -95,7 +98,8 @@ export type QuickEditBackgroundSettings =
       assetId: string;
       imageFit: 'cover' | 'contain';
       layout: QuickEditBackgroundLayout;
-    };
+    }
+);
 
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
 export interface QuickEditVoiceoverAnchor {

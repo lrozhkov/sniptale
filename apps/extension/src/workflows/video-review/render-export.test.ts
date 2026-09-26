@@ -1,3 +1,4 @@
+import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
@@ -109,6 +110,8 @@ const realCreateImageBitmap = globalThis.createImageBitmap;
 
 function contextFixture() {
   return {
+    translate: vi.fn(),
+    scale: vi.fn(),
     fillStyle: '',
     globalAlpha: 1,
     font: '',
@@ -708,3 +711,55 @@ it('scales spotlight blur with export resolution, preserving the scene effect', 
     expect.objectContaining({ blur: 8 })
   );
 });
+
+it.each(['fixed', 'follow-video'] as const)(
+  'exports %s image motion with a matching rounded video boundary',
+  (zoomBehavior) => {
+    const context = contextFixture();
+    const canvas = { width: 800, height: 450 };
+    const image = { width: 800, height: 450 } as ImageBitmap;
+    const background = {
+      enabled: true as const,
+      type: 'image' as const,
+      assetId: 'image',
+      imageFit: 'cover' as const,
+      zoomBehavior,
+      layout: { padding: 40, cornerRadius: 20 },
+    };
+    for (const scale of [1, 1.5, 2]) {
+      vi.clearAllMocks();
+      const layout = computeQuickEditSceneLayout({
+        output: canvas,
+        canvas,
+        source: canvas,
+        background,
+        camera: { scale, centerX: 0.5, centerY: 0.5 },
+      });
+      const draw = vi.fn();
+      drawReviewSceneFrame(context, { canvas, layout, background, image, sample: { draw } });
+      const follows = zoomBehavior === 'follow-video';
+      const clip = follows ? layout.videoTransform : layout.videoRect;
+      expect(context.roundRect).toHaveBeenCalledWith(
+        clip.x,
+        clip.y,
+        clip.width,
+        clip.height,
+        20 * (follows ? scale : 1)
+      );
+      expect(draw).toHaveBeenCalledWith(
+        context,
+        layout.videoTransform.x,
+        layout.videoTransform.y,
+        layout.videoTransform.width,
+        layout.videoTransform.height
+      );
+      if (follows && scale > 1) {
+        expect(context.translate).toHaveBeenCalledWith((1 - scale) * 400, (1 - scale) * 225);
+        expect(context.scale).toHaveBeenCalledWith(scale, scale);
+        expect(vi.mocked(context.restore).mock.invocationCallOrder[0]).toBeLessThan(
+          draw.mock.invocationCallOrder[0]!
+        );
+      } else expect(context.scale).not.toHaveBeenCalled();
+    }
+  }
+);

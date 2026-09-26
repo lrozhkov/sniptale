@@ -10,6 +10,8 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSceneCamera,
+  computeQuickEditVisibleSourceRect,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
@@ -29,6 +31,8 @@ const PREVIEW_WIDTH_PX = 480;
  * Escape and pointer cancel roll the interaction back to its captured origin.
  */
 function ZoomPreviewCanvas(props: {
+  background: QuickEditBackgroundSettings;
+  imageUrl: string | null | undefined;
   camera: QuickEditZoomRegion['transform'];
   disabled?: boolean | undefined;
   frame: ZoomPreviewFrame | null;
@@ -43,6 +47,7 @@ function ZoomPreviewCanvas(props: {
   const { camera, handlers } = useReviewCameraGesture({
     ...props,
     videoRect: props.layout.videoRect,
+    visibleArea: computeQuickEditVisibleSourceRect(props.layout, props.background, props.output),
     onCommit: props.onCenter,
   });
   const layout = useMemo(
@@ -58,6 +63,7 @@ function ZoomPreviewCanvas(props: {
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
     paintZoomPreview(context, {
+      background: props.background,
       accent:
         getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() || '#4f7cff',
       camera,
@@ -68,21 +74,46 @@ function ZoomPreviewCanvas(props: {
       view,
       width: canvas.width,
     });
-  }, [layout, props.frame, view, camera, props.cornerRadius]);
+  }, [layout, props.frame, view, camera, props.cornerRadius, props.background]);
 
+  const motion = computeQuickEditSceneCamera(layout, props.background);
+  const offsetX = (motion.x / props.output.width) * 100;
+  const offsetY = (motion.y / props.output.height) * 100;
   return (
-    <canvas
-      ref={canvasRef}
-      aria-label={translate('gallery.videoReview.zoomPreview')}
-      tabIndex={props.disabled ? -1 : 0}
-      width={props.output.width}
-      height={props.output.height}
-      style={{ touchAction: 'none' }}
-      className="relative block w-full rounded-[var(--sniptale-radius-sm)] border
+    <>
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: previewBackgroundPaint(props.background),
+          transformOrigin: '0 0',
+          transform:
+            view === 'result'
+              ? `translate(${offsetX}%, ${offsetY}%) scale(${motion.scale})`
+              : undefined,
+        }}
+      >
+        {props.imageUrl && props.background.enabled && props.background.type === 'image' ? (
+          <img
+            src={props.imageUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full"
+            style={{ objectFit: props.background.imageFit }}
+          />
+        ) : null}
+      </div>
+      <canvas
+        ref={canvasRef}
+        aria-label={translate('gallery.videoReview.zoomPreview')}
+        tabIndex={props.disabled ? -1 : 0}
+        width={props.output.width}
+        height={props.output.height}
+        style={{ touchAction: 'none' }}
+        className="relative block w-full rounded-[var(--sniptale-radius-sm)] border
         border-[var(--sniptale-color-border-soft)] outline-none
         focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]"
-      {...handlers}
-    />
+        {...handlers}
+      />
+    </>
   );
 }
 
@@ -171,9 +202,9 @@ export function ReviewZoomPreview(props: {
           props.onInteract
         )}
         className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
-        style={{ background: previewBackgroundPaint(background) }}
+        style={{ background: region.spotlight ? previewBackgroundPaint(background) : '#000000' }}
       >
-        {image.url && background.enabled && background.type === 'image' ? (
+        {region.spotlight && image.url && background.enabled && background.type === 'image' ? (
           <img
             src={image.url}
             alt=""
@@ -197,6 +228,8 @@ export function ReviewZoomPreview(props: {
           />
         ) : (
           <ZoomPreviewCanvas
+            background={props.background}
+            imageUrl={image.url}
             key={region.id}
             cornerRadius={cornerRadius}
             camera={region.transform}

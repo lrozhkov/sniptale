@@ -1,3 +1,4 @@
+import { replayReviewHistory } from '../document';
 import { describe, expect, it } from 'vitest';
 import type { Gradient } from '@sniptale/foundation/paint';
 import { createQuickEditAdvancedState } from './defaults';
@@ -425,4 +426,69 @@ it('preserves spotlight settings through advanced content parsing and rejects ma
   const malformed = structuredClone(state);
   malformed.zoom.regions[0]!.spotlight!.area.width = 2;
   expect(loadQuickEditAdvancedState(malformed)).toBeNull();
+});
+
+it.each(['fixed', 'follow-video'] as const)(
+  'round trips %s background motion through workspace and history codecs',
+  (zoomBehavior) => {
+    for (const background of [
+      { enabled: false as const },
+      advanced().background,
+      {
+        enabled: true as const,
+        type: 'gradient' as const,
+        gradient,
+        layout: { padding: 40, cornerRadius: 12 },
+      },
+      {
+        enabled: true as const,
+        type: 'image' as const,
+        assetId: 'image',
+        imageFit: 'cover' as const,
+        layout: { padding: 40, cornerRadius: 12 },
+      },
+    ]) {
+      const state = { ...advanced(), background: { ...background, zoomBehavior } };
+      const parsed = loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)));
+      expect(parsed?.background).toEqual(state.background);
+      expect(loadQuickEditAdvancedState(parsed)).toEqual(parsed);
+      const { ui: _ui, ...content } = state;
+      expect(
+        loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))?.background
+      ).toEqual(state.background);
+    }
+  }
+);
+
+it('preserves absent legacy motion and rejects malformed modes', () => {
+  expect(loadQuickEditAdvancedState(advanced())?.background.zoomBehavior).toBeUndefined();
+  for (const zoomBehavior of ['other', null, 1, {}, true]) {
+    const state = { ...advanced(), background: { ...advanced().background, zoomBehavior } };
+    expect(loadQuickEditAdvancedState(state)).toBeNull();
+    const { ui: _ui, ...content } = state;
+    expect(loadQuickEditAdvancedContentState(content)).toBeNull();
+  }
+});
+
+it('restores the chosen background motion through undo, redo and parsed history content', () => {
+  const { ui: _ui, ...before } = advanced();
+  const after = loadQuickEditAdvancedContentState({
+    ...before,
+    background: { ...before.background, zoomBehavior: 'follow-video' },
+  });
+  expect(after).not.toBeNull();
+  if (!after) throw new Error('Expected valid advanced content');
+  const history = [
+    { id: 'background-mode', at: 1, target: 'advancedContent' as const, before, after },
+  ];
+  const source = { width: 800, height: 450, duration: 4, mimeType: 'video/webm', size: 1 };
+  expect(
+    replayReviewHistory(history, 1, source, before).advancedContent.background.zoomBehavior
+  ).toBe('follow-video');
+  expect(replayReviewHistory(history, 0, source, before).advancedContent.background).toEqual(
+    before.background
+  );
+  expect(replayReviewHistory(history, 1, source, before).advancedContent.background).toEqual(
+    after.background
+  );
 });

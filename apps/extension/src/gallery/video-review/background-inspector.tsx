@@ -1,3 +1,5 @@
+import { SelectField } from '../../ui/compact-inspector-controls';
+import { reviewSelectFieldClassName } from './controls';
 import { ReviewNumberRow } from './number-row';
 import { useRef } from 'react';
 import { translate } from '../../platform/i18n';
@@ -17,10 +19,6 @@ const kinds = [
   { key: 'gradient', label: 'gallery.videoReview.backgroundGradient' },
 ] as const;
 
-function backgroundLayout(background: QuickEditBackgroundSettings): QuickEditBackgroundLayout {
-  return background.enabled ? background.layout : { padding: 0, cornerRadius: 0 };
-}
-
 function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
   if (!background.enabled) return createSolidPaint('#000000ff');
   if (background.type === 'solid') return createSolidPaint(background.color);
@@ -38,18 +36,7 @@ export function ReviewBackgroundInspector(props: {
   const { presets } = useGradientPresetCatalog('highlighter-frame-fill');
   const { background, onChange } = props;
   const paint = backgroundPaint(background);
-  const layoutField = (key: keyof QuickEditBackgroundLayout, label: string) => (
-    <ReviewNumberRow
-      label={label}
-      unit="px"
-      min={0}
-      max={4096}
-      scrubMax={key === 'padding' ? 200 : 100}
-      step={1}
-      value={background.enabled ? background.layout[key] : 0}
-      onChange={(value) => onChange({ layout: { ...backgroundLayout(background), [key]: value } })}
-    />
-  );
+
   return (
     <div data-ui="gallery.videoReview.backgroundInspector" className="min-w-0 space-y-2">
       <div
@@ -165,11 +152,52 @@ export function ReviewBackgroundInspector(props: {
         />
       ) : null}
       {background.enabled ? (
-        <div className="space-y-2">
-          {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
-          {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
-        </div>
+        <ReviewBackgroundLayoutControls background={background} onChange={onChange} />
       ) : null}
+    </div>
+  );
+}
+
+/** Frame geometry and camera participation, independent of the selected paint kind. */
+function ReviewBackgroundLayoutControls({
+  background,
+  onChange,
+}: {
+  background: Extract<QuickEditBackgroundSettings, { enabled: true }>;
+  onChange(patch: QuickEditBackgroundPatch): void;
+}) {
+  const layoutField = (key: keyof QuickEditBackgroundLayout, label: string) => (
+    <ReviewNumberRow
+      label={label}
+      unit="px"
+      min={0}
+      max={4096}
+      scrubMax={key === 'padding' ? 200 : 100}
+      step={1}
+      value={background.layout[key]}
+      onChange={(value) => onChange({ layout: { ...background.layout, [key]: value } })}
+    />
+  );
+  return (
+    <div className="space-y-2">
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.backgroundZoom')}
+        value={background.zoomBehavior ?? 'fixed'}
+        options={[
+          { value: 'fixed', label: translate('gallery.videoReview.backgroundZoomFixed') },
+          {
+            value: 'follow-video',
+            label: translate('gallery.videoReview.backgroundZoomFollow'),
+          },
+        ]}
+        onChange={(zoomBehavior) => {
+          if (zoomBehavior === 'fixed' || zoomBehavior === 'follow-video')
+            onChange({ zoomBehavior });
+        }}
+      />
+      {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
+      {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
     </div>
   );
 }

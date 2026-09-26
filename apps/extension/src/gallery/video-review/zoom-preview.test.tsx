@@ -225,3 +225,43 @@ it('synchronizes framing gestures to the displayed source frame, not unrelated k
   );
   expect(onInteract).not.toHaveBeenCalled();
 });
+
+it('drags anywhere inside the following-background Area footprint without click-to-place', async () => {
+  const onChange = vi.fn();
+  const onPreview = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewZoomPreview
+        region={region()}
+        background={{
+          enabled: true,
+          type: 'solid',
+          color: '#000000ff',
+          zoomBehavior: 'follow-video',
+          layout: { padding: 100, cornerRadius: 20 },
+        }}
+        source={{ width: 800, height: 800 }}
+        sourceTime={3}
+        loadFrame={async () => frame}
+        onChange={onChange}
+        onPreview={onPreview}
+      />
+    )
+  );
+  const canvas = host.querySelector('canvas')!;
+  vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 480));
+  Object.assign(canvas, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  // Fitted video is x=60..420; x=132 is source x=.20, inside the drawn .167..833 area.
+  await pointer(canvas, 'pointerdown', 132, 240);
+  expect(onPreview).toHaveBeenLastCalledWith({ centerX: 0.5, centerY: 0.5 });
+  await pointer(canvas, 'pointerup', 132, 240);
+  expect(onChange).not.toHaveBeenCalled();
+  await pointer(canvas, 'pointerdown', 132, 240);
+  await pointer(canvas, 'pointermove', 168, 240);
+  await pointer(canvas, 'pointerup', 168, 240);
+  expect(onChange).toHaveBeenLastCalledWith({ centerX: 0.6, centerY: 0.5 });
+});

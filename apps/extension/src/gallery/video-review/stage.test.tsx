@@ -107,8 +107,10 @@ it('paints the scene background and crops the video to the content rect', async 
       camera: identity,
     },
   });
-  const stageNode = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
-  expect(stageNode.style.background).toBe('rgb(17, 34, 51)');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.backgroundPlane"]')!.style
+      .background
+  ).toBe('rgb(17, 34, 51)');
   const clip = stage.video.parentElement!;
   expect(Number.parseFloat(clip.style.left)).toBe(178);
   expect(clip.style.top).toBe('100px');
@@ -357,7 +359,10 @@ it('restores the source raster after gradient and image scene backgrounds', () =
     },
   });
   const stage = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.stage"]')!;
-  expect(stage.style.background).toContain('linear-gradient');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.backgroundPlane"]')!.style
+      .background
+  ).toContain('linear-gradient');
   const imageScene = {
     camera: identity,
     background: {
@@ -370,7 +375,10 @@ it('restores the source raster after gradient and image scene backgrounds', () =
   };
   renderStage({ scene: imageScene, backgroundImageUrl: 'blob:background' });
   expect(host.querySelector('img')?.style.objectFit).toBe('cover');
-  expect(stage.style.background).toBe('rgb(0, 0, 0)');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.backgroundPlane"]')!.style
+      .background
+  ).toBe('rgb(0, 0, 0)');
   const result = renderStage({ scene: { camera: identity, background: disabled } });
   expect(host.querySelector('img')).toBeNull();
   expect(result.video.parentElement!.style.borderRadius).toBe('');
@@ -407,3 +415,40 @@ it('keeps note-region bounds aligned to the fitted raster when drawing and leavi
   renderStage({ scene });
   expect(host.querySelector('[aria-label="gallery.videoReview.selectedRegion"]')).toBeNull();
 });
+
+it.each(['fixed', 'follow-video'] as const)(
+  'keeps %s background and rounded frame aligned during zoom',
+  (zoomBehavior) => {
+    const background: QuickEditBackgroundSettings = {
+      enabled: true,
+      type: 'image',
+      assetId: 'image',
+      imageFit: 'contain',
+      zoomBehavior,
+      layout: { padding: 0, cornerRadius: 12 },
+    };
+    for (const scale of [1, 1.25, 2, 1.25, 1]) {
+      const { video } = renderStage({
+        scene: { background, camera: { ...identity, scale } },
+        backgroundImageUrl: 'blob:image',
+      });
+      const clip = video.parentElement!;
+      const follows = zoomBehavior === 'follow-video';
+      expect(clip.style.width).toBe(`${800 * (follows ? scale : 1)}px`);
+      expect(clip.style.borderRadius).toBe(`${30 * (follows ? scale : 1)}px`);
+      expect(video.style.transform).toContain(
+        follows
+          ? 'translate3d(0px, 0px, 0)'
+          : `translate3d(${-(scale - 1) * 400}px, ${-(scale - 1) * 225}px, 0)`
+      );
+      const plane = host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.backgroundPlane"]'
+      )!;
+      expect(plane.style.transform).toBe(
+        follows
+          ? `translate3d(${-(scale - 1) * 400}px, ${-(scale - 1) * 225}px, 0) scale(${scale})`
+          : 'translate3d(0px, 0px, 0) scale(1)'
+      );
+    }
+  }
+);
