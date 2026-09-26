@@ -113,6 +113,10 @@ export const popupCommonMessages = defineMessageSource({
     ru: 'На этой странице часть функций недоступна',
     en: 'Some features are unavailable on this page',
   },
+  extensionTabModeUnavailable: {
+    ru: 'Режим вкладки недоступен на странице расширения',
+    en: 'Tab mode is unavailable on extension pages',
+  },
   stalePageRuntimeHint: {
     ru: 'Страница использует устаревшую версию расширения. Обновите страницу и повторите действие.',
     en: 'This page is using an outdated extension runtime. Refresh the page and try again.',

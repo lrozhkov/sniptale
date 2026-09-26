@@ -191,6 +191,21 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
   expect(container.querySelector('[data-testid="menu-footer"]')).not.toBeNull();
 });
 
+it('renders page tools as disabled when the active tab cannot run them', async () => {
+  mocks.activeTabCapabilities.screenshotMode.reason = 'Page unavailable';
+  const { MenuRoute } = await import('./route');
+  act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
+
+  const buttons = [
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.drawing"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.highlighter"]'),
+  ];
+  expect(buttons.every((button) => button?.disabled)).toBe(true);
+  expect(buttons.every((button) => button?.className.includes('disabled:opacity-50'))).toBe(true);
+  act(() => buttons.forEach((button) => button?.click()));
+  expect(mocks.openScreenshotMode).not.toHaveBeenCalled();
+});
+
 it('runs the secondary capture scenarios in their displayed order', async () => {
   const { MenuRoute } = await import('./route');
   act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));

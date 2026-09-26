@@ -105,6 +105,7 @@ const WORKSPACE_BUTTON_CLASS_NAME = [
   'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-primary)]',
   'transition-colors hover:border-[var(--sniptale-color-border-accent-soft)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
+  'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
