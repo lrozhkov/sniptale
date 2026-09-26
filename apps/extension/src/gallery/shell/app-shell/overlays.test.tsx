@@ -374,3 +374,15 @@ it('builds bounded previous and next navigation from the filtered media list', (
   expect(props.onPreviewNavigate).toHaveBeenNthCalledWith(1, items[0]);
   expect(props.onPreviewNavigate).toHaveBeenNthCalledWith(2, items[2]);
 });
+
+it('preserves confirmed async results through preview callbacks', async () => {
+  const props = createOpenOverlayProps();
+  props.onPreviewCopy = vi.fn().mockResolvedValue(true);
+  props.onPreviewDownload = vi.fn().mockResolvedValue(false);
+  act(() => {
+    root?.render(<GalleryOverlays {...props} />);
+  });
+  const preview = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
+  await expect(preview.onCopy()).resolves.toBe(true);
+  await expect(preview.onDownload()).resolves.toBe(false);
+});

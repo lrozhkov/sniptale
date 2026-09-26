@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
 import { translate } from '../../../platform/i18n';
-import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
-import {
-  isGalleryMediaItem,
-  isGalleryScenarioExportItem,
-  isGalleryScenarioItem,
-  isGalleryVideoProjectItem,
-} from '../items';
+import { PreviewSourceField } from './source-field';
+import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
 import type { PreviewPanelProps } from './types';
 import { PreviewMedia } from './media';
 import {
@@ -94,42 +89,6 @@ function PreviewFilenameField(
           text-[var(--sniptale-color-text-primary)] outline-none transition
           focus:border-[var(--sniptale-color-border-accent-strong)] read-only:cursor-default"
       />
-    </div>
-  );
-}
-
-function PreviewSourceField(props: Pick<PreviewPanelProps, 'item'>) {
-  const sourceValue =
-    props.item.sourceUrl ??
-    (isGalleryScenarioExportItem(props.item) ? props.item.project.name : null);
-  const safeSourceHref = createSafeExternalHref(props.item.sourceUrl);
-
-  return (
-    <div>
-      <label
-        className="mb-2 block text-xs font-semibold uppercase
-          tracking-[0.12em] text-[var(--sniptale-color-text-muted-strong)]"
-      >
-        {translate('gallery.preview.source')}
-      </label>
-      <div
-        className="rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-          bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-xs
-          text-[var(--sniptale-color-text-secondary)]"
-      >
-        {safeSourceHref ? (
-          <a
-            href={safeSourceHref}
-            className="break-all text-[var(--sniptale-color-info)] hover:opacity-80"
-            target="_blank"
-            rel="noreferrer"
-          >
-            {props.item.sourceUrl}
-          </a>
-        ) : (
-          (sourceValue ?? translate('gallery.preview.sourceMissing'))
-        )}
-      </div>
     </div>
   );
 }

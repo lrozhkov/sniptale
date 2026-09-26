@@ -1,13 +1,11 @@
 import { translate } from '../../../platform/i18n';
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import {
   ArrowUpRight,
   Clapperboard,
   Film,
   Copy,
+  Check,
   Download,
   FileDown,
   Images,
@@ -20,7 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, isGalleryScenarioExportItem, isGalleryScenarioItem } from '../items';
 import { GalleryTagInput } from '../tags/input';
@@ -60,23 +58,13 @@ const PREVIEW_TAG_CLASS_NAME = [
   'disabled:cursor-default',
 ].join(' ');
 
-const previewPrimaryActionButtonClassName = [
-  'w-full !justify-start !rounded-[8px] !px-3',
-  getControlPrimaryButtonClassName(),
-].join(' ');
-
-const previewPromotionActionButtonClassName = [
-  'w-full !justify-center !rounded-[8px]',
-  getControlPrimaryButtonClassName(),
-].join(' ');
-
 const previewActionButtonClassName = [
-  'w-full !justify-start !rounded-[6px] !px-2.5 text-left',
+  'w-full !justify-start !rounded-[8px] !px-3 text-left',
   getControlSecondaryButtonClassName({ density: 'compact' }),
 ].join(' ');
 
 const previewDangerActionButtonClassName = [
-  'w-full !justify-start !rounded-[6px] !px-2.5 text-left',
+  'w-full !justify-start !rounded-[8px] !px-3 text-left',
   getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
 ].join(' ');
 
@@ -95,13 +83,59 @@ function PreviewMetadataCard(props: { label: string; value: string }) {
   );
 }
 
-function PreviewActionButton(props: { children: string; icon: LucideIcon; onClick: () => void }) {
-  const Icon = props.icon;
+function PreviewActionButton(props: {
+  children: string;
+  icon: LucideIcon;
+  onClick: () => void | Promise<boolean | void>;
+  success?: string;
+}) {
+  const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (status !== 'success') return;
+    const timer = window.setTimeout(() => setStatus('idle'), 2000);
+    return () => window.clearTimeout(timer);
+  }, [status]);
+  const Icon = status === 'success' ? Check : props.icon;
   return (
-    <button type="button" onClick={props.onClick} className={previewActionButtonClassName}>
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-      {props.children}
-    </button>
+    <div>
+      <button
+        type="button"
+        disabled={status === 'pending'}
+        aria-label={props.children}
+        aria-busy={status === 'pending'}
+        onClick={async () => {
+          if (pending.current) return;
+          pending.current = true;
+          setStatus('pending');
+          try {
+            const completed = await props.onClick();
+            if (mounted.current)
+              setStatus(props.success ? (completed === true ? 'success' : 'error') : 'idle');
+          } catch {
+            if (mounted.current) setStatus('error');
+          } finally {
+            pending.current = false;
+          }
+        }}
+        className={previewActionButtonClassName}
+      >
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span role="status">{status === 'success' ? props.success : props.children}</span>
+      </button>
+      {status === 'error' ? (
+        <p role="alert" className="px-3 text-xs">
+          {translate('gallery.preview.actionRetry')}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -109,7 +143,7 @@ function PreviewActionGroup(props: { children: ReactNode; label: string }) {
   return (
     <div>
       <div className={previewActionGroupLabelClassName}>{props.label}</div>
-      <div className="space-y-0.5">{props.children}</div>
+      <div className="space-y-1">{props.children}</div>
     </div>
   );
 }
@@ -157,18 +191,18 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
           label={translate('gallery.preview.type')}
           value={item.mimeType || '—'}
         />
-        <PreviewMetadataCard
-          label={translate('gallery.preview.resolution')}
-          value={item.width && item.height ? `${item.width}×${item.height}` : '—'}
-        />
-        <PreviewMetadataCard
-          label={translate('gallery.preview.duration')}
-          value={
-            item.duration
-              ? `${item.duration.toFixed(1)} ${translate('gallery.preview.durationSuffix')}`
-              : '—'
-          }
-        />
+        {item.width && item.height ? (
+          <PreviewMetadataCard
+            label={translate('gallery.preview.resolution')}
+            value={`${item.width}×${item.height}`}
+          />
+        ) : null}
+        {item.duration !== null ? (
+          <PreviewMetadataCard
+            label={translate('gallery.preview.duration')}
+            value={`${item.duration.toFixed(1)} ${translate('gallery.preview.durationSuffix')}`}
+          />
+        ) : null}
         {item.recordingGroupView ? (
           <PreviewMetadataCard
             label={translate('gallery.preview.recordingTrack')}
@@ -407,39 +441,43 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     (hasEditedImageContent && Boolean(props.onRestoreOriginal));
 
   return (
-    <section aria-labelledby="preview-actions-heading">
+    <section key={item.id} aria-labelledby="preview-actions-heading">
       <div id="preview-actions-heading" className={previewActionGroupLabelClassName}>
         {translate('gallery.preview.actions')}
       </div>
       <div className="space-y-3">
-        {props.onReview ? (
-          <button
-            type="button"
-            data-ui="gallery.videoReview.enter"
-            onClick={props.onReview}
-            className={previewPrimaryActionButtonClassName}
-          >
-            <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
-            {translate('gallery.videoReview.enter')}
-          </button>
-        ) : null}
-        {canOpenPrimaryAction ? (
-          <button type="button" onClick={onEdit} className={previewPrimaryActionButtonClassName}>
-            {canOpenVideo ? (
-              <Film className="h-4 w-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-            )}
-            {translate(
-              canOpenVideo
-                ? 'gallery.videoReview.openVideoEditor'
-                : canOpenWebSnapshot
-                  ? 'gallery.preview.openSnapshot'
-                  : canOpenRecordingGroup
-                    ? 'gallery.preview.openRecordingGroup'
-                    : 'gallery.preview.openInEditor'
-            )}
-          </button>
+        {props.onReview || canOpenPrimaryAction ? (
+          <div className="space-y-1">
+            {props.onReview ? (
+              <button
+                type="button"
+                data-ui="gallery.videoReview.enter"
+                onClick={props.onReview}
+                className={previewActionButtonClassName}
+              >
+                <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {translate('gallery.videoReview.enter')}
+              </button>
+            ) : null}
+            {canOpenPrimaryAction ? (
+              <button type="button" onClick={onEdit} className={previewActionButtonClassName}>
+                {canOpenVideo ? (
+                  <Film className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                {translate(
+                  canOpenVideo
+                    ? 'gallery.videoReview.openVideoEditor'
+                    : canOpenWebSnapshot
+                      ? 'gallery.preview.openSnapshot'
+                      : canOpenRecordingGroup
+                        ? 'gallery.preview.openRecordingGroup'
+                        : 'gallery.preview.openInEditor'
+                )}
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {hasFileActions ? (
           <PreviewActionGroup label={translate('gallery.preview.fileActions')}>
@@ -452,25 +490,38 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
               </PreviewActionButton>
             ) : null}
             {canDownload ? (
-              <PreviewActionButton icon={Download} onClick={() => void onDownload()}>
+              <PreviewActionButton
+                icon={Download}
+                onClick={onDownload}
+                success={translate('gallery.preview.downloadStarted')}
+              >
                 {translate('gallery.preview.download')}
               </PreviewActionButton>
             ) : null}
             {hasEditedImageContent && props.onDownloadOriginal ? (
               <PreviewActionButton
                 icon={FileDown}
-                onClick={() => void props.onDownloadOriginal?.()}
+                onClick={() => props.onDownloadOriginal?.()}
+                success={translate('gallery.preview.downloadStarted')}
               >
                 {translate('gallery.preview.downloadOriginal')}
               </PreviewActionButton>
             ) : null}
             {canCopy ? (
-              <PreviewActionButton icon={Copy} onClick={() => void onCopy()}>
+              <PreviewActionButton
+                icon={Copy}
+                onClick={onCopy}
+                success={translate('gallery.preview.copied')}
+              >
                 {translate('gallery.preview.copy')}
               </PreviewActionButton>
             ) : null}
             {canUseImageAggregateActions && props.onSaveCopy ? (
-              <PreviewActionButton icon={Save} onClick={() => void props.onSaveCopy?.()}>
+              <PreviewActionButton
+                icon={Save}
+                onClick={() => props.onSaveCopy?.()}
+                success={translate('gallery.preview.copySaved')}
+              >
                 {translate('gallery.preview.saveCopy')}
               </PreviewActionButton>
             ) : null}
@@ -515,7 +566,7 @@ export function PreviewPromotionAction(props: Pick<PreviewPanelProps, 'item' | '
   return (
     <div className="mt-3">
       <PromotionAction
-        className={previewPromotionActionButtonClassName}
+        className={previewActionButtonClassName}
         onPromote={props.onPromote}
         visible
       />

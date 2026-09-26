@@ -5,6 +5,33 @@ import {
 } from '../shared/web-snapshot';
 
 export const galleryPreviewMessages = defineMessageSource({
+  actionRetry: {
+    ru: 'Действие не выполнено. Повторите попытку.',
+    en: 'Action did not complete. Try again.',
+  },
+  copied: { ru: 'Скопировано', en: 'Copied' },
+  downloadStarted: { ru: 'Скачивание начато', en: 'Download started' },
+  copySaved: { ru: 'Копия сохранена', en: 'Copy saved' },
+  origin: { ru: 'Происхождение', en: 'Origin' },
+  capturedImage: { ru: 'Снимок экрана', en: 'Screen capture' },
+  recordedMedia: { ru: 'Запись', en: 'Recording' },
+  projectMedia: { ru: 'Материал проекта', en: 'Project media' },
+  savedMedia: { ru: 'Сохранённый материал', en: 'Saved media' },
+  exportedMedia: { ru: 'Экспорт проекта', en: 'Project export' },
+  captureMethod: { ru: 'Способ записи', en: 'Capture method' },
+  captureTab: { ru: 'Вкладка', en: 'Tab' },
+  captureTabCrop: { ru: 'Область вкладки', en: 'Tab area' },
+  captureWindow: { ru: 'Окно', en: 'Window' },
+  captureScreen: { ru: 'Экран', en: 'Screen' },
+  captureDisplay: { ru: 'Экран или окно', en: 'Screen or window' },
+  captureCamera: { ru: 'Камера', en: 'Camera' },
+  recordedActions: { ru: 'Записанные действия', en: 'Recorded actions' },
+  cursorHistory: { ru: 'Движения указателя', en: 'Pointer movements' },
+  available: { ru: 'Сохранены', en: 'Saved' },
+  notRecorded: { ru: 'Нет сохранённых данных', en: 'No saved data' },
+  sourceLoading: { ru: 'Загрузка сведений о записи…', en: 'Loading recording details…' },
+  sourceUnavailable: { ru: 'Сведения о записи недоступны', en: 'Recording details unavailable' },
+  retrySource: { ru: 'Повторить загрузку', en: 'Retry loading' },
   folderAll: {
     ru: 'Все медиа',
     en: 'All media',

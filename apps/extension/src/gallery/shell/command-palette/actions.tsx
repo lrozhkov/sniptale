@@ -231,7 +231,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(Download),
       disabled: !previewItem,
       disabledReason: !previewItem ? disabledReason : undefined,
-      onSelect: () => actions.preview.download(),
+      onSelect: async () => {
+        await actions.preview.download();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-download-original',
@@ -240,7 +242,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(Download),
       disabled: !hasEditedImageContent,
       disabledReason: !hasEditedImageContent ? disabledReason : undefined,
-      onSelect: () => actions.preview.downloadOriginal(),
+      onSelect: async () => {
+        await actions.preview.downloadOriginal();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-copy',
@@ -249,7 +253,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(Image),
       disabled: !previewItem,
       disabledReason: !previewItem ? disabledReason : undefined,
-      onSelect: () => actions.preview.copy(),
+      onSelect: async () => {
+        await actions.preview.copy();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-save-copy',
@@ -258,7 +264,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(FileStack),
       disabled: !imageAggregate,
       disabledReason: !imageAggregate ? disabledReason : undefined,
-      onSelect: () => actions.preview.saveCopy(),
+      onSelect: async () => {
+        await actions.preview.saveCopy();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-restore-original',

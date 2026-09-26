@@ -370,3 +370,88 @@ it('disables promotion while the storage mutation is pending', async () => {
   expect(button?.hasAttribute('disabled')).toBe(false);
   await act(async () => root.unmount());
 });
+
+it('keeps navigation and file commands neutral with matching geometry', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  await act(async () => root.render(<PreviewActions {...createProps()} />));
+  const commands = [...container.querySelectorAll('button')].filter(
+    (button) => button.textContent !== 'common.actions.delete'
+  );
+  expect(commands.length).toBeGreaterThan(1);
+  for (const command of commands) {
+    expect(command.className).not.toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
+    expect(command.className).toContain('!px-3');
+  }
+  await act(async () => root.unmount());
+});
+
+it('confirms copy only after success, blocks repeats and clears feedback on selection changes', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  let finish: (value: boolean) => void = () => undefined;
+  const onCopy = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const props = { ...createProps(), onCopy };
+  await act(async () => root.render(<PreviewActions {...props} />));
+  const copyButton = () =>
+    [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'gallery.preview.copy'
+    )!;
+  await act(async () => {
+    copyButton().click();
+    copyButton().click();
+  });
+  expect(onCopy).toHaveBeenCalledTimes(1);
+  expect(copyButton().disabled).toBe(true);
+  expect(copyButton().getAttribute('aria-label')).toBe('gallery.preview.copy');
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => finish(true));
+  expect(container.textContent).toContain('gallery.preview.copied');
+  await act(async () =>
+    root.render(<PreviewActions {...props} item={{ ...props.item, id: 'next' }} />)
+  );
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => copyButton().click());
+  await act(async () => finish(false));
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'gallery.preview.actionRetry'
+  );
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => copyButton().click());
+  await act(async () =>
+    root.render(<PreviewActions {...props} item={{ ...props.item, id: 'third' }} />)
+  );
+  await act(async () => finish(true));
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => root.unmount());
+});
+
+it('expires successful feedback and reports rejected actions', async () => {
+  vi.useFakeTimers();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    const props = {
+      ...createProps(),
+      onCopy: vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error('failed')),
+    };
+    await act(async () => root.render(<PreviewActions {...props} />));
+    const button = [...container.querySelectorAll('button')].find(
+      (entry) => entry.textContent === 'gallery.preview.copy'
+    )!;
+    await act(async () => button.click());
+    expect(button.textContent).toBe('gallery.preview.copied');
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(button.textContent).toBe('gallery.preview.copy');
+    await act(async () => button.click());
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    vi.useRealTimers();
+  }
+});

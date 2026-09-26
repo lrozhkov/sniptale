@@ -29,15 +29,15 @@ export interface UseGalleryAppActionsResult {
   };
   preview: {
     close: () => Promise<void>;
-    copy: () => void;
-    download: () => void;
-    downloadOriginal: () => void;
+    copy: () => Promise<boolean>;
+    download: () => Promise<boolean>;
+    downloadOriginal: () => Promise<boolean>;
     navigate: (target: GalleryItem) => Promise<void>;
     openInEditor: (item: GalleryItem) => void;
     openSnapshotScreenshotInEditor: () => void;
     resetChanges: () => void;
     restoreOriginal: () => void;
-    saveCopy: () => void;
+    saveCopy: () => Promise<boolean>;
     saveMetadata: () => Promise<void>;
   };
   selection: {

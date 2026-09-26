@@ -154,7 +154,7 @@ async function verifyPreviewDownloadAndCopyFlows() {
 
   await downloadPreviewItem(controller, runBusy);
   await flushMicrotasks();
-  await copyPreviewItem(controller, runBusy);
+  expect(await copyPreviewItem(controller, runBusy)).toBe(true);
   await flushMicrotasks();
 
   expect(anchorClickSpy).toHaveBeenCalledTimes(1);
@@ -194,7 +194,7 @@ async function verifyPreviewErrorBannerFlow() {
 
   await downloadPreviewItem(controller, createRunBusy(setBanner));
   await flushMicrotasks();
-  await copyPreviewItem(controller, createRunBusy(setBanner));
+  expect(await copyPreviewItem(controller, createRunBusy(setBanner))).toBe(false);
   await flushMicrotasks();
 
   expect(setBanner).toHaveBeenNthCalledWith(1, expect.stringContaining('broken.png'));

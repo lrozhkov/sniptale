@@ -71,12 +71,13 @@ async function withPreviewItemBlob(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction,
   effect: (item: GalleryItem, blob: Blob) => Promise<void> | void
-): Promise<void> {
+): Promise<boolean> {
   const previewItem = controller.state.preview.session.item;
   if (!previewItem || !isGalleryMediaItem(previewItem)) {
-    return;
+    return false;
   }
 
+  let completed = false;
   await withBusy(async () => {
     const assetId = previewItem.entityId ?? previewItem.id;
     const blob =
@@ -88,13 +89,15 @@ async function withPreviewItemBlob(
     }
 
     await effect(previewItem, blob);
+    completed = true;
   });
+  return completed;
 }
 
 export function downloadPreviewItem(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction
-): Promise<void> {
+): Promise<boolean> {
   return withPreviewItemBlob(controller, withBusy, (item, blob) => {
     downloadBlob(blob, item.filename);
   });
@@ -115,17 +118,20 @@ function getEditedPreviewImageAggregate(controller: GalleryPreviewController) {
   return item?.imageContentState === 'edited' ? item : null;
 }
 
-export function downloadOriginalPreviewItem(
+export async function downloadOriginalPreviewItem(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction
-): Promise<void> {
+): Promise<boolean> {
   const item = getEditedPreviewImageAggregate(controller);
-  if (!item) return Promise.resolve();
-  return withBusy(async () => {
+  if (!item) return false;
+  let completed = false;
+  await withBusy(async () => {
     const blob = await getMediaAssetBlob(item.entityId ?? item.id);
     if (!blob) throw createMissingBlobError(item.originalFilename ?? item.filename);
     downloadBlob(blob, item.originalFilename ?? item.filename);
+    completed = true;
   });
+  return completed;
 }
 
 export function createRestoreOriginalAction(
@@ -169,27 +175,30 @@ export function createSaveImageCopyAction(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction
 ) {
-  return () => {
+  return async () => {
     const item = getPreviewImageAggregate(controller);
-    if (!item) return Promise.resolve();
-    return withBusy(async () => {
+    if (!item) return false;
+    let completed = false;
+    await withBusy(async () => {
       await copyImageAggregate({
         aggregateId: item.entityId ?? item.id,
         expectedWorkspaceRevision: item.workspaceRevision ?? 0,
         targetAggregateId: createSecureRandomUuid(),
       });
       await controller.actions.storage.refresh();
+      completed = true;
     });
+    return completed;
   };
 }
 
 export function copyPreviewItem(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction
-): Promise<void> {
+): Promise<boolean> {
   const previewItem = controller.state.preview.session.item;
   if (!previewItem || !isGalleryMediaItem(previewItem) || !isImageKind(previewItem.kind)) {
-    return Promise.resolve();
+    return Promise.resolve(false);
   }
 
   return withPreviewItemBlob(controller, withBusy, (_item, blob) => copyImageBlob(blob));
