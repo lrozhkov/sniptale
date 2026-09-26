@@ -136,7 +136,9 @@ it('routes play seek and close actions through the fullscreen transport controls
     );
   });
 
-  const buttons = container?.querySelectorAll('button') ?? [];
+  const buttons =
+    container?.querySelectorAll('[data-ui="video-editor.preview.fullscreen-transport-action"]') ??
+    [];
   const range = container?.querySelector('input[type="range"]') as HTMLInputElement;
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
@@ -192,7 +194,7 @@ it('shows the active loop range and constrains seek bounds in fullscreen transpo
 it('pans a zoomed fullscreen viewport with captured pointer and releases on cancellation', () => {
   function PanHarness() {
     const ref = React.useRef<HTMLDivElement>(null);
-    const pan = useFullscreenPreviewPan(ref, 2, true);
+    const pan = useFullscreenPreviewPan(ref, true, true);
     return <div ref={ref} {...pan.handlers} data-dragging={pan.dragging} />;
   }
   act(() => root?.render(<PanHarness />));
@@ -219,4 +221,21 @@ it('pans a zoomed fullscreen viewport with captured pointer and releases on canc
   expect(viewport.dataset['dragging']).toBe('false');
   send('pointermove', 0, 0);
   expect(viewport.scrollLeft).toBe(130);
+});
+
+it('disables seeking for an empty project and exposes fit as the selected zoom', () => {
+  act(() =>
+    root?.render(
+      <PreviewStageFullscreenTransport
+        currentTime={0}
+        duration={0}
+        isPlaying={false}
+        playbackRange={null}
+        onSeek={vi.fn()}
+        onTogglePlay={vi.fn()}
+      />
+    )
+  );
+  expect(container?.querySelector<HTMLInputElement>('input[type="range"]')?.disabled).toBe(true);
+  expect(container?.textContent).toContain('videoEditor.stage.previewZoomFit');
 });

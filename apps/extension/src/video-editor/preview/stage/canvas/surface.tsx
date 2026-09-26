@@ -1,5 +1,4 @@
 import { PreviewFrameRateProvider } from '../frame-rate';
-import { resolvePreviewStageSizeStyle } from '../sizing/zoom';
 import { PreviewStageCanvas } from './';
 import { usePreviewStageFullscreen } from './fullscreen';
 import { PreviewStageFrame } from './layout';
@@ -48,11 +47,7 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
         >
           <PreviewStageCanvas
             {...params}
-            stageSizeStyle={
-              isFullscreen
-                ? resolvePreviewStageSizeStyle(params.project, 'fit')
-                : params.stageSizeStyle
-            }
+            stageSizeStyle={params.stageSizeStyle}
             mode={isFullscreen ? 'player' : 'editor'}
           />
           {params.effectRuntimeFeedback.failed ? (

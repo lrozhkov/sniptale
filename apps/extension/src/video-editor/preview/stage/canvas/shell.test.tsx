@@ -95,9 +95,10 @@ describe('preview-stage/shell', () => {
   });
 });
 
-it('keeps the canvas mounted and the footer outside the zoom viewport, with local zoom reset on exit', async () => {
+it('preserves canvas, seek position and shared zoom across fullscreen transitions', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
+  document.body.appendChild(host);
   const root = createRoot(host);
   const onPreviewZoomChange = vi.fn();
   const render = (isFullscreen: boolean) =>
@@ -123,20 +124,23 @@ it('keeps the canvas mounted and the footer outside the zoom viewport, with loca
     expect(host.querySelector('canvas')).toBe(canvas);
     const footer = host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]');
     expect(footer?.closest('[data-ui="video.preview.viewport"]')).toBeNull();
-    const zoom = host.querySelector<HTMLInputElement>('input[max="2"]')!;
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
-    act(() => {
-      setter.call(zoom, '1.5');
-      zoom.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-    expect(footer?.textContent).toContain('150%');
-    expect(onPreviewZoomChange).not.toHaveBeenCalled();
+    expect(footer?.textContent).toContain('75%');
+    const fitButton = Array.from(footer?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+      (button) => button.textContent?.includes('videoEditor.stage.previewZoomFit')
+    );
+    expect(fitButton).toBeDefined();
+    await act(() => fitButton?.click());
+    expect(onPreviewZoomChange).toHaveBeenCalledExactlyOnceWith('fit');
+    expect(footer?.querySelector('input[type="range"]')?.getAttribute('value')).toBe('1');
     await render(false);
+    expect(
+      host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]')?.textContent
+    ).toContain('75%');
     await render(true);
-    expect(host.querySelector<HTMLInputElement>('input[max="2"]')?.value).toBe('1');
     expect(host.querySelector('canvas')).toBe(canvas);
   } finally {
     await act(() => root.unmount());
+    host.remove();
     vi.unstubAllGlobals();
   }
 });

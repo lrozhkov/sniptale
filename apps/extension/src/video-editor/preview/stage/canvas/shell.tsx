@@ -220,10 +220,6 @@ type StageShellMainPaneProps = Pick<
 >;
 
 function StageShellMainPane(props: StageShellMainPaneProps) {
-  const [fullscreenZoom, setFullscreenZoom] = React.useState(1);
-  React.useEffect(() => {
-    if (!props.isFullscreen) setFullscreenZoom(1);
-  }, [props.isFullscreen]);
   return (
     <div
       className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${props.isFullscreen ? 'gap-2 p-3' : ''}`}
@@ -244,7 +240,6 @@ function StageShellMainPane(props: StageShellMainPaneProps) {
           <PreviewStageContent
             previewZoom={props.previewZoom ?? 'fit'}
             fullscreen={props.isFullscreen}
-            fullscreenZoom={fullscreenZoom}
           >
             {props.children}
           </PreviewStageContent>
@@ -255,11 +250,7 @@ function StageShellMainPane(props: StageShellMainPaneProps) {
           </div>
         ) : null}
       </div>
-      <StageShellFullscreenTransport
-        {...props}
-        zoom={fullscreenZoom}
-        onZoomChange={setFullscreenZoom}
-      />
+      <StageShellFullscreenTransport {...props} />
     </div>
   );
 }
@@ -268,12 +259,11 @@ function PreviewStageContent(props: {
   children: React.ReactNode;
   previewZoom: VideoEditorPreviewZoom;
   fullscreen: boolean;
-  fullscreenZoom: number;
 }) {
-  const fit = props.fullscreen || props.previewZoom === 'fit';
+  const fit = props.previewZoom === 'fit';
   const viewportRef = React.useRef<HTMLDivElement | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
-  const pan = useFullscreenPreviewPan(viewportRef, props.fullscreenZoom, props.fullscreen);
+  const pan = useFullscreenPreviewPan(viewportRef, !fit, props.fullscreen);
   return (
     <div
       className={
@@ -285,11 +275,11 @@ function PreviewStageContent(props: {
       <div
         ref={viewportRef}
         {...pan.handlers}
-        style={{ touchAction: props.fullscreen && props.fullscreenZoom > 1 ? 'none' : undefined }}
+        style={{ touchAction: props.fullscreen && !fit ? 'none' : undefined }}
         className={[
           'h-full w-full [container-type:size]',
           props.fullscreen || !fit ? 'overflow-auto' : 'overflow-hidden',
-          props.fullscreen && props.fullscreenZoom > 1
+          props.fullscreen && !fit
             ? pan.dragging
               ? '!cursor-grabbing [&_*]:!cursor-grabbing'
               : '!cursor-grab [&_*]:!cursor-grab'
@@ -299,21 +289,8 @@ function PreviewStageContent(props: {
       >
         <div
           ref={contentRef}
-          style={
-            props.fullscreen
-              ? {
-                  width: `${props.fullscreenZoom * 100}%`,
-                  height: `${props.fullscreenZoom * 100}%`,
-                  containerType: 'size',
-                }
-              : undefined
-          }
           className={
-            props.fullscreen
-              ? 'relative flex items-center justify-center'
-              : fit
-                ? 'flex h-full w-full items-center justify-center'
-                : 'flex min-h-full min-w-full'
+            fit ? 'flex h-full w-full items-center justify-center' : 'flex min-h-full min-w-full'
           }
         >
           {props.children}
@@ -324,13 +301,11 @@ function PreviewStageContent(props: {
   );
 }
 
-function StageShellFullscreenTransport(
-  props: PreviewStageShellLayoutProps & { zoom: number; onZoomChange: (zoom: number) => void }
-) {
-  return props.isFullscreen ? (
+function StageShellFullscreenTransport(props: PreviewStageShellLayoutProps) {
+  return !props.alternateView?.active ? (
     <PreviewStageFullscreenTransport
-      zoom={props.zoom}
-      onZoomChange={props.onZoomChange}
+      zoom={props.previewZoom ?? 'fit'}
+      onZoomChange={props.onPreviewZoomChange}
       isPreparing={
         props.previewStatus?.phase === 'preparing-frame-cache' ||
         props.previewStatus?.phase === 'preparing-video-cache'
@@ -339,7 +314,7 @@ function StageShellFullscreenTransport(
       duration={props.duration}
       isPlaying={props.isPlaying}
       playbackRange={props.playbackRange}
-      onClose={props.onCloseFullscreen ?? (() => undefined)}
+      onClose={props.isFullscreen ? props.onCloseFullscreen : undefined}
       onSeek={props.onSeek ?? (() => undefined)}
       onTogglePlay={props.onTogglePlay ?? (() => undefined)}
     />
