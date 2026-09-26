@@ -1,3 +1,4 @@
+import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
@@ -63,6 +64,7 @@ export type ToolbarViewportSelection = {
 export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
 
 export interface ToolbarCaptureActionsProps {
+  windowSize?: ScreenshotWindowSizeControls;
   screenshotMode: boolean;
   canClearPagePreparation?: boolean;
   onClearPagePreparation?: () => void;
@@ -125,6 +127,7 @@ export interface ToolbarFutureFrameStepBadgeActions {
 }
 
 export interface ToolbarProps {
+  windowSize?: ScreenshotWindowSizeControls;
   captureAction?: CaptureActionType;
   onCaptureActionChange?: (action: CaptureActionType) => void;
   onToggleScreenshotMode: (enabled: boolean) => void;

@@ -8,6 +8,7 @@ import {
   getScreenshotSurfaceCapabilityToken,
   getScreenshotSurfaceLeaseGeneration,
   nextScreenshotSurfaceOperationGeneration,
+  setScreenshotSurfaceBinding,
 } from '../../viewport-selector/capability';
 import type { ToolbarViewportSelection } from '../types';
 import { getViewportPresetErrorMessage } from '../../../../features/viewport-presets/error-message';
@@ -31,19 +32,28 @@ async function sendToolbarSurfaceMutation(viewport: ToolbarViewportSelection) {
   if (viewport === null) {
     const leaseGeneration = getScreenshotSurfaceLeaseGeneration();
     if (leaseGeneration === null) return { success: true as const };
-    return getContentRuntimeServices().messaging.sendRuntimeMessage({
+    const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
       type: MessageType.RELEASE_VIEWPORT_PRESET,
       leaseGeneration,
       operationGeneration,
       surfaceCapabilityToken,
     });
+    if (response?.success) setScreenshotSurfaceBinding({ token: surfaceCapabilityToken });
+    return response;
   }
-  return getContentRuntimeServices().messaging.sendRuntimeMessage({
+  const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
     type: MessageType.APPLY_VIEWPORT_PRESET,
     operationGeneration,
     presetId: viewport.presetId!,
     surfaceCapabilityToken,
   });
+  if (response?.success) {
+    setScreenshotSurfaceBinding({
+      token: surfaceCapabilityToken,
+      leaseGeneration: operationGeneration,
+    });
+  }
+  return response;
 }
 
 export async function handleToolbarViewportChange(
@@ -62,7 +72,7 @@ export async function handleToolbarViewportChange(
     if (mutateViewport) {
       await mutateViewport(viewport);
       setCurrentViewport(viewport ? { width: viewport.width, height: viewport.height } : null);
-      return;
+      return true;
     }
     if (viewport && !viewport.presetId) throw new Error('Size preset ID is missing');
     if (!getScreenshotSurfaceCapabilityToken()) {
@@ -75,14 +85,14 @@ export async function handleToolbarViewportChange(
     }
 
     if (response?.success) {
-      await refreshToolbarViewportStatus(setCurrentViewport);
-      return;
+      await refreshToolbarViewportStatus(setCurrentViewport).catch(() => undefined);
+      return true;
     }
 
     if (response?.error === 'surface-busy') {
       setCurrentViewport(null);
       showToast(translate('content.toolbar.viewportConflictError'), 'error', 5000);
-      return;
+      return false;
     }
 
     const errorMessage = getViewportPresetErrorMessage(response?.error);
@@ -112,4 +122,5 @@ export async function handleToolbarViewportChange(
       await refreshToolbarViewportStatus(setCurrentViewport).catch(() => undefined);
     }
   }
+  return false;
 }

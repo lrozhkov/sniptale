@@ -1,3 +1,4 @@
+import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { MutableRefObject } from 'react';
 
 import type { CaptureActionType, QuickActionOverlay } from '../../../contracts/settings';
@@ -47,6 +48,9 @@ type ScreenshotEditingModeControls = {
 };
 
 export interface ScreenshotControllerParams {
+  prepareWindowSize?: (
+    intent?: ContentPrivilegedActionIntentSource
+  ) => Promise<() => Promise<void>>;
   captureAdapter?: ScreenshotCaptureAdapter;
   capturePersistence: ScreenshotControllerCapturePersistenceBridge;
   captureActionRef: MutableRefObject<CaptureActionType>;

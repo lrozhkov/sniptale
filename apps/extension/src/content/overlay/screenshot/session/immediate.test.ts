@@ -225,3 +225,33 @@ describe('screenshot-controller-action-immediate', () => {
     expectFailedQuickActionReleasesItsSurface
   );
 });
+
+it.each(['visible', 'full', 'selection'] as const)(
+  'restores temporary size after %s success or cancellation/failure',
+  async (type) => {
+    const restore = vi.fn().mockResolvedValue(undefined);
+    const prepareWindowSize = vi.fn().mockResolvedValue(restore);
+    const args = createArgs({ params: createParams({ prepareWindowSize }) });
+    const capture = type === 'selection' ? runSelectionScreenshotMock : runViewportScreenshotMock;
+    capture.mockImplementationOnce(async () => {
+      expect(prepareWindowSize).toHaveBeenCalledOnce();
+      expect(restore).not.toHaveBeenCalled();
+    });
+    await runImmediateScreenshot(type, args, 1);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(restore.mock.invocationCallOrder[0]).toBeLessThan(
+      restoreVisibleUiStateMock.mock.invocationCallOrder[0]!
+    );
+    capture.mockRejectedValueOnce(new Error('cancelled'));
+    await runImmediateScreenshot(type, args, 1);
+    expect(restore).toHaveBeenCalledTimes(2);
+  }
+);
+it('does not capture when temporary sizing fails', async () => {
+  const args = createArgs({
+    params: createParams({ prepareWindowSize: vi.fn().mockRejectedValue(new Error('resize')) }),
+  });
+  await runImmediateScreenshot('visible', args, 1);
+  expect(runViewportScreenshotMock).not.toHaveBeenCalled();
+  expect(showScreenshotErrorMock).toHaveBeenCalled();
+});

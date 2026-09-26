@@ -1,3 +1,4 @@
+import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
 import { useImperativeHandle, forwardRef } from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import type { ContentToolbarDisplayMode, ViewportPreset } from '../../../contracts/settings';
@@ -11,6 +12,7 @@ import { useViewportSelectorMenu } from './menu';
 import { useViewportSelectorPresets } from './presets';
 
 interface ViewportSelectorProps {
+  windowSize?: ScreenshotWindowSizeControls;
   compactMenus?: boolean;
   currentViewport: { width: number; height: number } | null;
   displayMode?: ContentToolbarDisplayMode;
@@ -54,6 +56,7 @@ function createViewportSelectorHandle(
 }
 
 function renderViewportSelectorMenu(props: {
+  windowSize?: ScreenshotWindowSizeControls;
   compactMenus: boolean;
   currentViewport: { width: number; height: number } | null;
   menuPlacement: ProductToolbarMenuPlacement;
@@ -72,6 +75,7 @@ function renderViewportSelectorMenu(props: {
   return (
     <div ref={props.menuRef as React.RefObject<HTMLDivElement>}>
       <ViewportSelectorMenu
+        {...(props.windowSize ? { windowSize: props.windowSize } : {})}
         compactMenus={props.compactMenus}
         currentViewport={props.currentViewport}
         menuPlacement={props.menuPlacement}
@@ -90,7 +94,7 @@ function useViewportSelectorRuntime(props: ViewportSelectorProps): {
   availabilityById: ReturnType<typeof useViewportSelectorPresets>['availabilityById'];
 } & ViewportSelectorMenuState {
   const menuState = useViewportSelectorMenu({
-    disabled: props.disabled ?? false,
+    disabled: (props.disabled ?? false) || (props.windowSize?.busy ?? false),
     onViewportChange: props.onViewportChange,
     ...(props.onMenuStateChange === undefined
       ? {}
@@ -144,7 +148,7 @@ export const ViewportSelector = forwardRef<ViewportSelectorRef, ViewportSelector
       wrapperRef,
     } = useViewportSelectorRuntime(props);
     const compactMenus = props.compactMenus ?? false;
-    const disabled = props.disabled ?? false;
+    const disabled = (props.disabled ?? false) || (props.windowSize?.busy ?? false);
     const displayMode = props.displayMode ?? 'horizontal';
     const menuPosition = props.menuPosition ?? 'down';
     const menuStyle = resolveViewportSelectorMenuStyle({
@@ -168,6 +172,7 @@ export const ViewportSelector = forwardRef<ViewportSelectorRef, ViewportSelector
           onToggle={handleToggleMenu}
         />
         {renderViewportSelectorMenu({
+          ...(props.windowSize ? { windowSize: props.windowSize } : {}),
           compactMenus,
           currentViewport: props.currentViewport,
           menuPlacement,

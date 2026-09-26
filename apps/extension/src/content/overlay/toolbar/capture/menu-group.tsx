@@ -78,6 +78,7 @@ export function ToolbarCaptureMenuGroup(
       displayMode={captureProps.displayMode}
       viewportWrapperRef={menus.viewportWrapperRef}
       viewportSelectorRef={menus.viewportSelectorRef}
+      {...(captureProps.windowSize ? { windowSize: captureProps.windowSize } : {})}
       currentViewport={captureProps.currentViewport}
       onViewportChange={captureProps.onViewportChange}
       isLoading={captureProps.isLoading}

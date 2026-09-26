@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   displayInfo: vi.fn(),
   getWindow: vi.fn(),
   updateWindow: vi.fn(),
+  subscribeBoundsChanged: vi.fn((_listener: (window: chrome.windows.Window) => void) => vi.fn()),
 }));
 
 vi.mock('@sniptale/platform/browser/displays', () => ({
@@ -11,7 +12,11 @@ vi.mock('@sniptale/platform/browser/displays', () => ({
 }));
 
 vi.mock('@sniptale/platform/browser/windows', () => ({
-  browserWindows: { get: mocks.getWindow, update: mocks.updateWindow },
+  browserWindows: {
+    get: mocks.getWindow,
+    update: mocks.updateWindow,
+    subscribeBoundsChanged: mocks.subscribeBoundsChanged,
+  },
 }));
 
 import { applyPreparedWindowSize, prepareWindowSize, restoreWindowSnapshot } from './window';
@@ -127,4 +132,79 @@ describe('capture-surface browser window operations', () => {
     });
     expect(mocks.updateWindow).toHaveBeenNthCalledWith(3, 3, { state: 'maximized' });
   });
+});
+
+it('waits for late bounds transitions to settle before completing restoration', async () => {
+  vi.useFakeTimers();
+  try {
+    let onBoundsChanged: ((window: chrome.windows.Window) => void) | undefined;
+    const unsubscribe = vi.fn();
+    mocks.subscribeBoundsChanged.mockImplementationOnce((listener) => {
+      onBoundsChanged = listener;
+      return unsubscribe;
+    });
+    const completed = vi.fn();
+    const restoration = restoreWindowSnapshot(3, prior).then(completed);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(completed).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(150);
+    onBoundsChanged?.({
+      id: 3,
+      ...prior,
+      type: 'normal',
+      focused: true,
+      alwaysOnTop: false,
+      incognito: false,
+    });
+    await vi.advanceTimersByTimeAsync(150);
+    expect(completed).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(150);
+    await restoration;
+    expect(completed).toHaveBeenCalledOnce();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('bounds events from other windows do not postpone restoration', async () => {
+  vi.useFakeTimers();
+  try {
+    let listener: ((window: chrome.windows.Window) => void) | undefined;
+    mocks.subscribeBoundsChanged.mockImplementationOnce((callback) => {
+      listener = callback;
+      return vi.fn();
+    });
+    const completed = vi.fn();
+    const restoration = restoreWindowSnapshot(3, prior).then(completed);
+    await vi.advanceTimersByTimeAsync(200);
+    listener?.({
+      id: 9,
+      ...prior,
+      type: 'normal',
+      focused: true,
+      alwaysOnTop: false,
+      incognito: false,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await restoration;
+    expect(completed).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('bounds a failed restoration and removes its native listener', async () => {
+  vi.useFakeTimers();
+  try {
+    const unsubscribe = vi.fn();
+    mocks.subscribeBoundsChanged.mockReturnValueOnce(unsubscribe);
+    mocks.getWindow.mockResolvedValue({ id: 3, ...prior, width: 100 });
+    const failure = expect(restoreWindowSnapshot(3, prior)).rejects.toThrow('restore-impossible');
+    await vi.advanceTimersByTimeAsync(2000);
+    await failure;
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });

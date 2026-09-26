@@ -1,3 +1,5 @@
+import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
+import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 import { Fragment, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Scaling } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -5,8 +7,6 @@ import {
   ProductToolbarMenu,
   ProductToolbarMenuDivider,
   ProductToolbarMenuDetail,
-  ProductToolbarMenuGroupCopy,
-  ProductToolbarMenuGroupLabel,
   ProductToolbarMenuItem,
   ProductToolbarMenuItemCopy,
   ProductToolbarMenuItemMeta,
@@ -119,6 +119,7 @@ function ViewportMenuItem(props: {
 }
 
 function ViewportPresetMenuItem(props: {
+  busy: boolean;
   availability?: ViewportPresetAvailabilityPayload;
   currentViewport: CurrentViewport;
   detailId: string;
@@ -128,6 +129,7 @@ function ViewportPresetMenuItem(props: {
 }) {
   const locale = useAppLocale();
   const unavailable =
+    props.busy ||
     !props.preset.enabled ||
     props.availability === undefined ||
     props.availability.status === 'unavailable';
@@ -147,27 +149,20 @@ function ViewportPresetMenuItem(props: {
 }
 
 function PresetGroup(props: {
+  busy: boolean;
   availabilityById: ReadonlyMap<string, ViewportPresetAvailabilityPayload>;
   currentViewport: CurrentViewport;
   detailId: string;
-  label: string;
   onSelectPreset: (preset: ViewportPreset, event: MouseEvent<HTMLButtonElement>) => void;
   onHighlightDetail: (detail: string | null) => void;
   presets: ViewportPreset[];
-  showHint: boolean;
-  target: ViewportPreset['target'];
 }) {
   if (props.presets.length === 0) return null;
   return (
     <>
-      <ProductToolbarMenuGroupLabel>
-        <ProductToolbarMenuGroupCopy
-          label={props.label}
-          {...(props.showHint ? { hint: translate(`viewportPresets.hints.${props.target}`) } : {})}
-        />
-      </ProductToolbarMenuGroupLabel>
       {props.presets.map((preset) => (
         <ViewportPresetMenuItem
+          busy={props.busy}
           key={preset.id}
           {...(props.availabilityById.get(preset.id) === undefined
             ? {}
@@ -184,6 +179,7 @@ function PresetGroup(props: {
 }
 
 export function ViewportSelectorMenu(props: {
+  windowSize?: ScreenshotWindowSizeControls;
   availabilityById: ReadonlyMap<string, ViewportPresetAvailabilityPayload>;
   compactMenus: boolean;
   currentViewport: CurrentViewport;
@@ -214,28 +210,58 @@ export function ViewportSelectorMenu(props: {
         <ProductToolbarMenuDetail id={detailId}>{visibleDetail}</ProductToolbarMenuDetail>
       ) : null}
       <ViewportMenuItem
+        ariaDisabled={props.windowSize?.busy ?? false}
         label={translate('content.toolbar.viewportNativeLabel')}
         onHighlight={() => setHighlightedDetail(null)}
         onActivate={props.onSelectNative}
         selected={props.currentViewport === null}
       />
-      {props.presets.length > 0 ? <ProductToolbarMenuDivider /> : null}
       {presetGroups.map((group, index) => (
         <Fragment key={group.target}>
           {index > 0 ? <ProductToolbarMenuDivider /> : null}
           <PresetGroup
+            busy={props.windowSize?.busy ?? false}
             availabilityById={props.availabilityById}
             currentViewport={props.currentViewport}
-            label={translate(`viewportPresets.groups.${group.target}`)}
             detailId={detailId}
             onHighlightDetail={setHighlightedDetail}
             onSelectPreset={props.onSelectPreset}
             presets={group.presets}
-            showHint={!props.compactMenus}
-            target={group.target}
           />
         </Fragment>
       ))}
+      {props.windowSize ? (
+        <>
+          <ProductToolbarMenuDivider />
+          {([true, false] as const).map((onlyDuringCapture) => (
+            <ProductToolbarMenuItem
+              key={String(onlyDuringCapture)}
+              disabled={props.windowSize!.busy}
+              selected={props.windowSize!.onlyDuringCapture === onlyDuringCapture}
+              onMouseDown={stopMenuEvent}
+              onClick={(event) => {
+                stopMenuEvent(event);
+                void props.windowSize!.setOnlyDuringCapture(
+                  onlyDuringCapture,
+                  props.currentViewport,
+                  createTrustedContentActionIntentSource(event.nativeEvent)
+                );
+              }}
+            >
+              <ProductToolbarMenuItemCopy
+                label={translate(
+                  onlyDuringCapture
+                    ? 'content.toolbar.viewportDuringCapture'
+                    : 'content.toolbar.viewportContinuously'
+                )}
+              />
+              {props.windowSize!.onlyDuringCapture === onlyDuringCapture ? (
+                <PopoverCheckIcon />
+              ) : null}
+            </ProductToolbarMenuItem>
+          ))}
+        </>
+      ) : null}
     </ProductToolbarMenu>
   );
 }

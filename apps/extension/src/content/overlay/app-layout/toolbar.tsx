@@ -260,6 +260,7 @@ function renderToolbarShell(args: {
         onToggleNavigationLock={modeController.handleToggleNavigationLock}
         timerDelay={args.toolbar.timerDelay}
         onTimerDelayChange={args.toolbar.setTimerDelay}
+        {...(args.toolbar.windowSize ? { windowSize: args.toolbar.windowSize } : {})}
         currentViewport={args.toolbar.currentViewport}
         onViewportChange={args.toolbar.setCurrentViewport}
         {...(args.toolbar.mutateViewport === undefined

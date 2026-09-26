@@ -127,7 +127,10 @@ function createCaptureActionProps(args: {
     },
     timerDelay: args.toolbarProps.timerDelay,
     onTimerDelayChange: args.toolbarProps.onTimerDelayChange,
-    currentViewport: args.viewModel.derivedState.currentViewport,
+    ...(args.toolbarProps.windowSize ? { windowSize: args.toolbarProps.windowSize } : {}),
+    currentViewport: args.toolbarProps.windowSize?.onlyDuringCapture
+      ? args.toolbarProps.windowSize.selection
+      : args.viewModel.derivedState.currentViewport,
     onViewportChange: args.onViewportChange,
     toolbarMenuState: args.viewModel.toolbarMenuState,
     onTakeScreenshot: args.toolbarProps.onTakeScreenshot,

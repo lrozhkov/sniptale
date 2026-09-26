@@ -61,6 +61,7 @@ function createToolbarLayoutSection(
     autoBlurController: viewModel.autoBlurController,
     captureAction: viewModel.modeState.captureAction,
     currentViewport: viewModel.modeState.currentViewport,
+    windowSize: viewModel.screenshotController.windowSize,
     drawingController: viewModel.drawingController,
     frameCount: viewModel.frameManager.frames.length,
     futureFrameStyle: viewModel.frameManager.getFutureFrameStyle(),

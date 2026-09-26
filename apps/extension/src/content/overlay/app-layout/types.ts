@@ -1,3 +1,4 @@
+import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
 import type { CaptureActionType } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ScreenshotStartContext } from '../screenshot/types';
@@ -88,6 +89,7 @@ export type ContentAppLayoutToolbarProps = {
   aiController: ContentAppAiController;
   autoBlurController: AutoBlurController;
   captureAction: CaptureActionType;
+  windowSize?: ScreenshotWindowSizeControls;
   currentViewport: { width: number; height: number } | null;
   drawingController?: ContentDrawingController;
   frameCount: number;

@@ -20,19 +20,27 @@ export async function runImmediateScreenshot(
 ) {
   hideAllToasts();
 
+  let restoreWindowSize: (() => Promise<void>) | undefined;
   try {
-    if (type === 'selection') {
-      if (contentIntentSource) {
-        await runSelectionScreenshot(args.runtime, { contentIntentSource, runToken });
+    if (!args.params.quickActionOverlayRef.current && !args.runtime.captureAdapter) {
+      restoreWindowSize = await args.params.prepareWindowSize?.(contentIntentSource);
+    }
+    try {
+      if (type === 'selection') {
+        if (contentIntentSource) {
+          await runSelectionScreenshot(args.runtime, { contentIntentSource, runToken });
+        } else {
+          await runSelectionScreenshot(args.runtime, { runToken });
+        }
       } else {
-        await runSelectionScreenshot(args.runtime, { runToken });
+        if (contentIntentSource) {
+          await runViewportScreenshot(type, args.runtime, { contentIntentSource, runToken });
+        } else {
+          await runViewportScreenshot(type, args.runtime, { runToken });
+        }
       }
-    } else {
-      if (contentIntentSource) {
-        await runViewportScreenshot(type, args.runtime, { contentIntentSource, runToken });
-      } else {
-        await runViewportScreenshot(type, args.runtime, { runToken });
-      }
+    } finally {
+      await restoreWindowSize?.();
     }
 
     if (shouldExitAfterQuickActionCapture(args.params.quickActionOverlayRef)) {

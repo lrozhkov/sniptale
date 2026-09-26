@@ -1,3 +1,4 @@
+import { useScreenshotWindowSize, type ScreenshotWindowSizeControls } from './window-size';
 import { useEffect, useRef, useState } from 'react';
 
 import { createHandleCancelCountdown } from './session/cancel';
@@ -11,6 +12,7 @@ import { disableSelectionModeIfLoaded } from '../../selection/selection-mode/laz
 import { setUIHidden } from '../../selection/locker';
 
 interface UseScreenshotControllerResult {
+  windowSize: ScreenshotWindowSizeControls;
   countdown: number | null;
   handleCancelCountdown: () => void;
   handleTakeScreenshot: (
@@ -75,6 +77,7 @@ function resetInvalidatedCountdownState(
 export function useScreenshotController(
   params: UseScreenshotControllerParams
 ): UseScreenshotControllerResult {
+  const windowSize = useScreenshotWindowSize();
   const [countdown, setCountdown] = useState<number | null>(null);
   const [session] = useState(() => createScreenshotControllerSession(params.navigationLockEnabled));
   const handleCancelCountdownRef = useRef<(() => void) | null>(null);
@@ -84,7 +87,7 @@ export function useScreenshotController(
   });
 
   const actionArgs = {
-    params,
+    params: { ...params, prepareWindowSize: windowSize.prepare },
     runtime,
     session,
     setCountdown,
@@ -96,6 +99,7 @@ export function useScreenshotController(
   useCancelCountdownOnUnmount(session, handleCancelCountdownRef);
 
   return {
+    windowSize: windowSize.controls,
     countdown,
     handleCancelCountdown,
     handleTakeScreenshot,

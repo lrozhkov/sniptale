@@ -106,8 +106,17 @@ export async function executeCountdownScreenshot(
     args.params.quickActionOverlayRef
   );
 
+  let restoreWindowSize: (() => Promise<void>) | undefined;
   try {
-    await runCountdownCapture(type, args, runToken, contentIntentSource, !shouldCloseQuickAction);
+    if (!args.params.quickActionOverlayRef.current && !args.runtime.captureAdapter) {
+      restoreWindowSize = await args.params.prepareWindowSize?.(contentIntentSource);
+    }
+    try {
+      await runCountdownCapture(type, args, runToken, contentIntentSource, !shouldCloseQuickAction);
+    } finally {
+      await restoreWindowSize?.();
+    }
+
     if (!isCurrentScreenshotRun(args.runtime, runToken)) {
       return;
     }

@@ -94,18 +94,32 @@ export async function applyPreparedWindowSize(
 }
 
 export async function restoreWindowSnapshot(windowId: number, snapshot: WindowSnapshot) {
-  await browserWindows.update(windowId, { state: 'normal' });
-  await browserWindows.update(windowId, {
-    left: snapshot.left,
-    top: snapshot.top,
-    width: snapshot.width,
-    height: snapshot.height,
+  let lastBoundsChange = Date.now();
+  const unsubscribe = browserWindows.subscribeBoundsChanged((window) => {
+    if (window.id === windowId) lastBoundsChange = Date.now();
   });
-  if (snapshot.state !== 'normal') {
-    await browserWindows.update(windowId, { state: snapshot.state });
-  }
-  const restored = await getWindowSnapshot(windowId);
-  if (!windowSnapshotsEqual(restored, snapshot)) {
+  try {
+    await browserWindows.update(windowId, { state: 'normal' });
+    await browserWindows.update(windowId, {
+      left: snapshot.left,
+      top: snapshot.top,
+      width: snapshot.width,
+      height: snapshot.height,
+    });
+    if (snapshot.state !== 'normal') {
+      await browserWindows.update(windowId, { state: snapshot.state });
+    }
+    // Native window transitions can emit bounds changes after update() resolves.
+    lastBoundsChange = Date.now();
+    const deadline = lastBoundsChange + 2000;
+    while (Date.now() < deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      if (Date.now() - lastBoundsChange < 250) continue;
+      const restored = await getWindowSnapshot(windowId);
+      if (windowSnapshotsEqual(restored, snapshot)) return;
+    }
     throw new Error('restore-impossible');
+  } finally {
+    unsubscribe();
   }
 }

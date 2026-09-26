@@ -213,6 +213,14 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'Размер окна',
     en: 'Window size',
   },
+  viewportDuringCapture: {
+    en: 'Only during capture',
+    ru: 'Только во время снимка',
+  },
+  viewportContinuously: {
+    en: 'Keep size while tools are open',
+    ru: 'Постоянно, пока открыты инструменты',
+  },
   viewportNativeLabel: {
     ru: 'Текущий размер',
     en: 'Current size',
