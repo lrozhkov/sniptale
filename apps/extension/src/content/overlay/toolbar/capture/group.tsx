@@ -38,11 +38,17 @@ export function ToolbarCaptureActionGroup(
           onSelectCaptureAction={onSelectCaptureAction}
         />
       </ContentToolbarGroup>
-      {captureProps.screenshotMode ? (
+      {captureProps.screenshotMode || captureProps.canClearPagePreparation ? (
         <>
           <ContentToolbarDivider dataUi="content.toolbar.history-divider-before" />
           <ContentToolbarGroup dataUi="content.toolbar.history-group">
-            <ToolbarHistoryControls screenshotMode={captureProps.screenshotMode} />
+            <ToolbarHistoryControls
+              screenshotMode={captureProps.screenshotMode}
+              canClearPagePreparation={captureProps.canClearPagePreparation ?? false}
+              {...(captureProps.onClearPagePreparation === undefined
+                ? {}
+                : { onClearPagePreparation: captureProps.onClearPagePreparation })}
+            />
           </ContentToolbarGroup>
           <ContentToolbarDivider dataUi="content.toolbar.history-divider-after" />
         </>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Redo2, Undo2 } from 'lucide-react';
+import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { normalizeHotkeyKey } from '../../../../features/keyboard-shortcuts/hotkeys';
@@ -135,7 +135,11 @@ function HistoryButton(props: { action: 'undo' | 'redo'; canRun: boolean }) {
   );
 }
 
-export function ToolbarHistoryControls(props: { screenshotMode: boolean }) {
+export function ToolbarHistoryControls(props: {
+  screenshotMode: boolean;
+  canClearPagePreparation?: boolean;
+  onClearPagePreparation?: () => void;
+}) {
   const historyState = usePagePreparationHistoryState();
   const frameEditing = useFrameEditingState();
   const canUndo = historyState.canUndo && !historyState.hasOpenTransactions && !frameEditing;
@@ -147,15 +151,24 @@ export function ToolbarHistoryControls(props: { screenshotMode: boolean }) {
     screenshotMode: props.screenshotMode,
   });
 
-  if (!props.screenshotMode) {
-    return null;
-  }
-
   return (
     <>
       <HistoryButton action="undo" canRun={canUndo} />
       <HistoryButton action="redo" canRun={canRedo} />
-      <ToolbarLocalSaveControl />
+      <ContentToolbarButton
+        type="button"
+        dataUi="content.toolbar.reset-all-button"
+        title={translate('content.toolbar.clearPagePreparation')}
+        aria-label={translate('content.toolbar.clearPagePreparation')}
+        disabled={
+          !props.canClearPagePreparation || historyState.hasOpenTransactions || frameEditing
+        }
+        tone="danger"
+        onClick={props.onClearPagePreparation}
+      >
+        <RotateCcw size={18} strokeWidth={2} />
+      </ContentToolbarButton>
+      {props.screenshotMode ? <ToolbarLocalSaveControl /> : null}
     </>
   );
 }

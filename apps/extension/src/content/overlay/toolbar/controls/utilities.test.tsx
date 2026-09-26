@@ -17,7 +17,6 @@ let root: Root | null = null;
 
 function createProps() {
   return {
-    framesCount: 1,
     futureFrameStyle: {
       blurSettings: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
       borderSettings: DEFAULT_BORDER_PRESET,
@@ -40,7 +39,6 @@ function createProps() {
     },
     compactMenus: false,
     displayMode: 'horizontal' as const,
-    onClearHighlights: vi.fn(),
     onFutureFrameEffectModeChange: vi.fn(),
     sidebarVisible: false,
     screenshotMode: false,
@@ -123,7 +121,7 @@ describe('ToolbarUtilityButtons', () => {
     });
 
     expect(props.autoBlur.onOpenSettings).toHaveBeenCalledTimes(1);
-    expect(props.onClearHighlights).not.toHaveBeenCalled();
+    expect(container?.querySelector('[data-ui="content.toolbar.clear-frames-button"]')).toBeNull();
   });
 
   it('shows only sensitive-data blur beside Cursor while pin or scenario allows it', async () => {

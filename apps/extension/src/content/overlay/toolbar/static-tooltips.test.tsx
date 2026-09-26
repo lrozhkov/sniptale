@@ -94,28 +94,6 @@ async function renderViewportButton(currentViewport: { width: number; height: nu
   );
 }
 
-async function renderUtilityButtons() {
-  const { ToolbarUtilityButtons } = await import('./controls/utilities');
-
-  await renderNode(
-    <ToolbarUtilityButtons
-      screenshotMode={true}
-      isCursorMode={false}
-      highlighterMode={true}
-      isLoading={false}
-      framesCount={1}
-      navigationLockEnabled={false}
-      lockDisabled={false}
-      toggleNavigationLock={() => undefined}
-      onClearHighlights={() => undefined}
-      toolbarMenuState={createClosedToolbarMenuState()}
-      compactMenus={false}
-      displayMode="horizontal"
-      sidebarVisible={false}
-    />
-  );
-}
-
 async function renderCaptureButtons() {
   const { ToolbarCaptureButtons } = await import('./capture/options');
 
@@ -129,12 +107,6 @@ async function renderCaptureButtons() {
       toolbarMenuState={createClosedToolbarMenuState()}
     />
   );
-}
-
-function expectClearHighlightsTooltip() {
-  expect(
-    document.querySelector('[data-ui="content.toolbar.clear-frames-button"]')?.getAttribute('title')
-  ).toBe('Очистить все рамки');
 }
 
 describe('toolbar static tooltips', () => {
@@ -164,11 +136,6 @@ describe('toolbar static tooltips', () => {
     expect(document.querySelector('button')?.getAttribute('data-tooltip')).toBeNull();
     expect(document.querySelector('button')?.getAttribute('data-active')).toBe('true');
   }, 15000);
-
-  it('keeps clear-highlights tooltip static in annotation mode', async () => {
-    await renderUtilityButtons();
-    expectClearHighlightsTooltip();
-  });
 
   it('uses native titles for screenshot buttons without exposing Design Review export', async () => {
     await renderCaptureButtons();

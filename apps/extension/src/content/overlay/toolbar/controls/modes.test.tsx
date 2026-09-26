@@ -18,11 +18,9 @@ let root: Root | null = null;
 
 function ModeButtonsHarness(params: {
   aiPickMode?: boolean;
-  canClearPagePreparation?: boolean;
   designReviewMode?: boolean;
   drawingMode?: boolean;
   onDisableAiPickMode?: () => void;
-  onClearPagePreparation?: () => void;
   onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
   onToggleDesignReview?: () => void;
   onToggleDrawing?: () => void;
@@ -37,7 +35,6 @@ function ModeButtonsHarness(params: {
   const props: ToolbarModeButtonsProps = {
     isCursorMode: true,
     aiPickMode: params.aiPickMode ?? false,
-    canClearPagePreparation: params.canClearPagePreparation ?? false,
     designReviewMode: params.designReviewMode ?? false,
     drawingMode: params.drawingMode ?? false,
     videoRecordingMode: params.videoRecordingMode ?? false,
@@ -51,7 +48,6 @@ function ModeButtonsHarness(params: {
     toolbarMenuState,
     onEnableCursorMode: vi.fn(),
     onDisableAiPickMode: params.onDisableAiPickMode ?? vi.fn(),
-    onClearPagePreparation: params.onClearPagePreparation ?? vi.fn(),
     onSelectPageEditingMode: params.onSelectPageEditingMode ?? vi.fn(),
     onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
     onToggleDrawing: params.onToggleDrawing ?? vi.fn(),
@@ -66,11 +62,9 @@ function ModeButtonsHarness(params: {
 function renderModeButtons(
   params: {
     aiPickMode?: boolean;
-    canClearPagePreparation?: boolean;
     designReviewMode?: boolean;
     drawingMode?: boolean;
     onDisableAiPickMode?: () => void;
-    onClearPagePreparation?: () => void;
     onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
     onToggleDesignReview?: () => void;
     onToggleDrawing?: () => void;
@@ -174,27 +168,11 @@ it('restores Drawing when it is selected after deactivating Video Recording', as
   expect(onToggleDrawing).toHaveBeenCalledOnce();
 });
 
-it('shows the clear-all action in Navigation and routes it to the reset owner', () => {
-  const onClearPagePreparation = vi.fn();
-  renderModeButtons({ canClearPagePreparation: true, onClearPagePreparation });
-
-  const clearButton = document.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
-  );
-  expect(clearButton?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
-  expect(clearButton?.querySelector('svg')?.classList.contains('lucide-brush-cleaning')).toBe(true);
-
-  act(() => clearButton?.click());
-  expect(onClearPagePreparation).toHaveBeenCalledOnce();
-});
-
-it('disables the clear-all action while page preparation history is empty', () => {
+it('keeps Navigation free of duplicate reset actions', () => {
   renderModeButtons();
   expect(
-    document.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
-    )?.disabled
-  ).toBe(true);
+    document.querySelector('[data-ui="content.toolbar.navigation.clear-page-preparation"]')
+  ).toBeNull();
 });
 
 afterEach(() => {

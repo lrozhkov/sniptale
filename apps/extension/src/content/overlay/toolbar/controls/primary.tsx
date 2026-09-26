@@ -31,10 +31,6 @@ export function ToolbarPrimaryControls(props: {
     pinToTabLocked: toolbarProps.pinToTabLocked ?? false,
     onPinToTabChange: toolbarProps.onPinToTabChange ?? (() => undefined),
     onHide: toolbarProps.onHide,
-    ...(toolbarProps.onClearPagePreparation === undefined
-      ? {}
-      : { onClearPagePreparation: toolbarProps.onClearPagePreparation }),
-    canClearPagePreparation: toolbarProps.canClearPagePreparation ?? false,
     ...(typeof viewModel.pendingInteractionMode === 'undefined'
       ? {}
       : { pendingMode: viewModel.pendingInteractionMode }),

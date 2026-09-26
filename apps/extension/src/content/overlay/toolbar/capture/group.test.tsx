@@ -48,7 +48,7 @@ function createClosedToolbarMenuState(): ToolbarMenuState {
   };
 }
 
-function renderGroup(screenshotMode = true) {
+function renderGroup(screenshotMode = true, canClearPagePreparation = false) {
   if (!container) {
     container = document.createElement('div');
     document.body.append(container);
@@ -59,6 +59,7 @@ function renderGroup(screenshotMode = true) {
     root?.render(
       <ToolbarCaptureActionGroup
         screenshotMode={screenshotMode}
+        canClearPagePreparation={canClearPagePreparation}
         isLoading={false}
         captureAction="download_default"
         compactMenus={false}
@@ -125,5 +126,10 @@ describe('ToolbarCaptureActionGroup', () => {
     ).toContain('sniptale-capture-leading-divider');
     expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).toBeNull();
     expect(container?.querySelector('[data-ui="test.settings-menu"]')).not.toBeNull();
+  });
+
+  it('shows reset beside history when existing changes can be cleared outside screenshot mode', () => {
+    renderGroup(false, true);
+    expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).not.toBeNull();
   });
 });

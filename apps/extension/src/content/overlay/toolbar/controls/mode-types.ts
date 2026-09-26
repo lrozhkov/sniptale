@@ -42,6 +42,4 @@ export interface ToolbarModeButtonsProps {
     contentIntentSource?: ContentPrivilegedActionIntentSource
   ) => void;
   onHide?: () => void;
-  onClearPagePreparation?: () => void;
-  canClearPagePreparation?: boolean;
 }

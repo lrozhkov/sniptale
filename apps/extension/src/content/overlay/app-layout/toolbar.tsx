@@ -20,6 +20,7 @@ import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
+import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -206,6 +207,7 @@ function renderToolbarShell(args: {
   const { modeController, modes } = args.toolbar;
   const autoBlur = createToolbarAutoBlurProps(args.toolbar.autoBlurController);
   const handleHideToolbar = () => {
+    useFrameUIStore.getState().dismissFrameUi();
     args.toolbar.setPinnedToolbarVisible(false);
   };
   const handleToggleVideoRecordingMode = createVideoRecordingModeToggleHandler(args.toolbar);
@@ -253,7 +255,7 @@ function renderToolbarShell(args: {
         onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
         onClearPagePreparation={() => clearPagePreparation(args.toolbar, modeController)}
-        canClearPagePreparation={args.canClearPagePreparation}
+        canClearPagePreparation={args.canClearPagePreparation || args.toolbar.frameCount > 0}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}
         timerDelay={args.toolbar.timerDelay}

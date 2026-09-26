@@ -239,13 +239,9 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Добавляйте рамки, маски, размытие и комментарии',
     en: 'Add frames, masks, blur, and comments',
   },
-  clearFrames: {
-    ru: 'Очистить все рамки',
-    en: 'Clear all frames',
-  },
   clearPagePreparation: {
-    ru: 'Очистить все изменения',
-    en: 'Clear all changes',
+    ru: 'Сбросить всё',
+    en: 'Reset all',
   },
   autoBlur: {
     ru: 'Размытие данных',

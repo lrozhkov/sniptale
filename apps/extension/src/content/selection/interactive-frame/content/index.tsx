@@ -107,6 +107,7 @@ function getInteractiveFramePopoverProps(props: InteractiveFrameContentProps) {
     setTempFrame: props.setTempFrame,
     ...(props.stageCalloutFrame ? { stageCalloutFrame: props.stageCalloutFrame } : {}),
     closePopover: props.closePopover,
+    clearSelection: props.clearSelection,
     ...(props.handleEffectModeSelect === undefined
       ? {}
       : { handleEffectModeSelect: props.handleEffectModeSelect }),

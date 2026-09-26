@@ -64,6 +64,8 @@ export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
 
 export interface ToolbarCaptureActionsProps {
   screenshotMode: boolean;
+  canClearPagePreparation?: boolean;
+  onClearPagePreparation?: () => void;
   isLoading: boolean;
   captureAction: CaptureActionType;
   compactMenus: boolean;

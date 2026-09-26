@@ -18,7 +18,13 @@ let historyState = { canRedo: false, canUndo: false, revision: 0 };
 let openTransactions = false;
 let listener: (() => void) | null = null;
 
-function renderComponent(screenshotMode = true) {
+function renderComponent(
+  screenshotMode = true,
+  reset: { canClearPagePreparation: boolean; onClearPagePreparation: () => void } = {
+    canClearPagePreparation: false,
+    onClearPagePreparation: () => undefined,
+  }
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.append(container);
@@ -26,7 +32,7 @@ function renderComponent(screenshotMode = true) {
   }
 
   act(() => {
-    root?.render(<ToolbarHistoryControls screenshotMode={screenshotMode} />);
+    root?.render(<ToolbarHistoryControls screenshotMode={screenshotMode} {...reset} />);
   });
 }
 
@@ -147,7 +153,7 @@ function verifyDisabledPreparationMode() {
     new KeyboardEvent('keydown', { bubbles: true, code: 'KeyZ', ctrlKey: true, key: 'я' })
   );
 
-  expect(container?.textContent).toBe('');
+  expect(container?.querySelector('[data-ui="content.toolbar.reset-all-button"]')).not.toBeNull();
   expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
 }
 
@@ -239,10 +245,24 @@ describe('ToolbarHistoryControls', () => {
     'does not intercept hotkeys inside editable targets or during inline edit sessions',
     verifyEditableTargetBypass
   );
-  it(
-    'does not render or bind hotkeys when page preparation mode is off',
-    verifyDisabledPreparationMode
-  );
+  it('does not bind hotkeys when page preparation mode is off', verifyDisabledPreparationMode);
+  it('places reset beside undo and redo and runs it outside screenshot mode', () => {
+    const onClearPagePreparation = vi.fn();
+    renderComponent(false, { canClearPagePreparation: true, onClearPagePreparation });
+
+    const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    expect(buttons.map((button) => button.dataset['ui'])).toEqual([
+      'content.toolbar.history-undo-button',
+      'content.toolbar.history-redo-button',
+      'content.toolbar.reset-all-button',
+    ]);
+    const reset = buttons[2];
+    expect(reset?.querySelector('svg')?.classList.contains('lucide-rotate-ccw')).toBe(true);
+    expect(reset?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
+    act(() => reset?.click());
+    expect(onClearPagePreparation).toHaveBeenCalledOnce();
+    expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+  });
   it('refreshes button state from the subscribed history store', verifySubscribedStateRefresh);
   it(
     'keeps undo and redo disabled until a document-mode transaction closes',

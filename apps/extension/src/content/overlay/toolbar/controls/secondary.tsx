@@ -74,11 +74,9 @@ function createUtilityButtonsProps(args: {
     isCursorMode: args.interactionMode === 'cursor',
     highlighterMode: args.interactionMode === 'highlighter',
     isLoading: args.viewModel.derivedState.isLoading,
-    framesCount: args.toolbarProps.framesCount ?? 0,
     navigationLockEnabled: args.viewModel.derivedState.navigationLockEnabled,
     lockDisabled: args.viewModel.derivedState.lockDisabled,
     toggleNavigationLock: args.viewModel.derivedState.toggleNavigationLock,
-    onClearHighlights: args.toolbarProps.onClearHighlights,
     toolbarMenuState: args.viewModel.toolbarMenuState,
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
@@ -120,6 +118,10 @@ function createCaptureActionProps(args: {
     onPinToTabChange: args.toolbarProps.onPinToTabChange ?? (() => undefined),
     onCaptureActionChange: args.viewModel.capture.setAction,
     onClose: args.toolbarProps.onHide,
+    ...(args.toolbarProps.onClearPagePreparation === undefined
+      ? {}
+      : { onClearPagePreparation: args.toolbarProps.onClearPagePreparation }),
+    canClearPagePreparation: args.toolbarProps.canClearPagePreparation ?? false,
     onDisableScreenshotMode: (activationEvent?: Event) => {
       void args.viewModel.toggleMode('screenshot', activationEvent);
     },

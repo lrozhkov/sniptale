@@ -168,7 +168,7 @@ function createFrameUIVisibilityActions(set: FrameStoreSet, get: FrameStoreGet) 
         state.activePopover.kind === kind &&
         state.activePopover.calloutIndex === calloutIndex
       ) {
-        set({ activePopover: null });
+        set({ selectedFrameId: null, toolbarAnchorOffset: null, activePopover: null });
         return;
       }
       createOpenPopoverAction(set, get)(frameId, kind, calloutIndex);

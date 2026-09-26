@@ -1,7 +1,6 @@
 import React, { useRef } from 'react';
 import {
   Bot,
-  BrushCleaning,
   Check,
   MessageSquarePlus,
   MousePointerClick,
@@ -429,19 +428,6 @@ function NavigationToolbarActions(props: ToolbarModeButtonsProps) {
   const pinned = props.pinToTab === true || props.pinToTabLocked === true;
   return (
     <>
-      <ContentToolbarButton
-        type="button"
-        dataUi="content.toolbar.navigation.clear-page-preparation"
-        tone="danger"
-        disabled={props.canClearPagePreparation !== true}
-        title={translate('content.toolbar.clearPagePreparation')}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onClearPagePreparation?.();
-        }}
-      >
-        <BrushCleaning size={18} strokeWidth={2} />
-      </ContentToolbarButton>
       <ContentToolbarButton
         type="button"
         active={pinned}

@@ -12,6 +12,7 @@ import { createContentDrawingController } from '../../drawing/controller';
 import { createRecordingDrawingOwner } from '../toolbar/video-recording/drawing-session';
 import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/session/state';
 import type { ToolbarVideoRecordingProps } from '../toolbar/types';
+import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
 
 const {
   clearAllPagePreparationChangesMock,
@@ -45,6 +46,7 @@ vi.mock('./sidebar-lazy', () => ({
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({
+    debug: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
   }),
@@ -263,6 +265,8 @@ async function verifiesToolbarUsesModeStateCaptureAction() {
 async function verifiesHidePersistsCollapsedPinnedToolbarState() {
   const props = createProps();
   await renderShell(props);
+  useFrameUIStore.getState().selectFrame('frame-1');
+  useFrameUIStore.getState().togglePopover('frame-1', 'frame-settings');
 
   const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
     onHide: () => void;
@@ -271,6 +275,8 @@ async function verifiesHidePersistsCollapsedPinnedToolbarState() {
 
   expect(props.toolbar.modeController.handleHideToolbar).not.toHaveBeenCalled();
   expect(props.toolbar.setPinnedToolbarVisible).toHaveBeenCalledWith(false);
+  expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
+  expect(useFrameUIStore.getState().activePopover).toBeNull();
 }
 
 async function verifiesToolbarForwardsQuickEditDocumentMode() {
@@ -306,7 +312,7 @@ async function verifiesToolbarForwardsFutureFrameStyleSession() {
   );
 }
 
-async function verifiesNavigationClearUsesSharedResetOwner() {
+async function verifiesToolbarResetUsesSharedOwner() {
   const props = createProps();
   const drawingController = createContentDrawingController(
     createDrawingSession({ onDocumentCommit: () => true })
@@ -316,8 +322,10 @@ async function verifiesNavigationClearUsesSharedResetOwner() {
   await renderShell(props);
 
   const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    canClearPagePreparation: boolean;
     onClearPagePreparation: () => void;
   };
+  expect(lastToolbarProps.canClearPagePreparation).toBe(true);
   lastToolbarProps.onClearPagePreparation();
 
   expect(finalizeInteraction).toHaveBeenCalledOnce();
@@ -467,8 +475,8 @@ describe('ContentToolbarShell', () => {
     verifiesToolbarForwardsFutureFrameStyleSession
   );
   it(
-    'routes Navigation clear through the shared page-preparation reset owner',
-    verifiesNavigationClearUsesSharedResetOwner
+    'routes reset through the shared page-preparation owner when frames exist',
+    verifiesToolbarResetUsesSharedOwner
   );
   it(
     'keeps the toolbar visible while switching transactionally into video recording mode',
