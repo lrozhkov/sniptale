@@ -53,6 +53,7 @@ const mocks = vi.hoisted(() => {
     exportState: { dialogOpen: false, error: null, isRunning: false },
     failExport: action,
     failExportCancellation: action,
+    openExportDialog: fn(),
     startExport: action,
     updateExportStatus: action,
   };
@@ -218,6 +219,7 @@ beforeEach(() => {
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
   mocks.runtimeHook.mockClear();
+  mocks.exportPort.openExportDialog.mockClear();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -292,6 +294,38 @@ it('admits montage shortcuts only when the montage viewer is active and no overl
   mocks.exportPort.exportState.dialogOpen = false;
   act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+});
+
+it('binds export only to the ready montage workspace outside blocking layers and source viewing', () => {
+  const render = (commandPaletteOpen = false) =>
+    root.render(<VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen} />);
+  const exportKey = () => {
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      code: 'KeyM',
+      ctrlKey: true,
+    });
+    act(() => window.dispatchEvent(event));
+    return event;
+  };
+  act(() => render());
+  expect(exportKey().defaultPrevented).toBe(false);
+  mocks.lifecycle.project = createEmptyVideoProject('Export shortcut');
+  act(() => render());
+  expect(exportKey().defaultPrevented).toBe(true);
+  expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(1);
+  mocks.workspace.preview.sourceViewerActive = true;
+  act(() => render());
+  expect(exportKey().defaultPrevented).toBe(false);
+  mocks.workspace.preview.sourceViewerActive = false;
+  act(() => render(true));
+  expect(exportKey().defaultPrevented).toBe(false);
+  act(() => render());
+  mocks.exportPort.exportState.dialogOpen = true;
+  act(() => render());
+  expect(exportKey().defaultPrevented).toBe(false);
+  expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(1);
 });
 
 it('keeps inspector time on the live playback port across seeks', () => {

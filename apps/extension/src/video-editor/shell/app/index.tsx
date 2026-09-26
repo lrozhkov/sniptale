@@ -11,10 +11,12 @@ import { VideoEditorCompositionProvider } from '../../runtime/controller/composi
 import { VideoEditorWorkspace } from '../../workspace/surface';
 import { VideoEditorCommandPalette } from '../command-palette';
 import { VideoEditorStatusScreen } from '../status-screen';
+import { useVideoEditorWheelZoomGuard } from './wheel-zoom';
 
 /** Boots the single editor composition owner around a stable shell-gate child. */
 export const App: React.FC = () => {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  useVideoEditorWheelZoomGuard();
   return (
     <WorkspacePreferencesProvider>
       <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>

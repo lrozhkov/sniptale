@@ -51,13 +51,31 @@ it('retains precise time across rounded scroll acknowledgements and wheel events
     expect(navigation.projection.startTime).toBeCloseTo(1 / 240, 10);
     act(() => node.dispatchEvent(new WheelEvent('wheel', { deltaY: -192, cancelable: true })));
     expect(navigation.projection.startTime).toBe(0);
-    for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
-      const zoom = new WheelEvent('wheel', { deltaY: 96, cancelable: true, ...modifier });
-      act(() => node.dispatchEvent(zoom));
-      expect(zoom.defaultPrevented).toBe(false);
-      expect(navigation.projection.startTime).toBe(0);
-    }
     Object.defineProperty(node, 'scrollHeight', { configurable: true, value: 400 });
+    const controlled = new WheelEvent('wheel', {
+      deltaY: 96,
+      ctrlKey: true,
+      cancelable: true,
+    });
+    act(() => node.dispatchEvent(controlled));
+    expect(controlled.defaultPrevented).toBe(true);
+    expect(navigation.projection.startTime).toBeCloseTo(1 / 240, 10);
+    act(() => navigation.navigateTo(0));
+    const mixedAxes = new WheelEvent('wheel', {
+      deltaX: 32,
+      deltaY: 96,
+      ctrlKey: true,
+      cancelable: true,
+    });
+    act(() => node.dispatchEvent(mixedAxes));
+    expect(mixedAxes.defaultPrevented).toBe(true);
+    expect(node.scrollTop).toBe(0);
+    expect(navigation.projection.startTime).toBeCloseTo(1 / 240, 10);
+    const meta = new WheelEvent('wheel', { deltaY: 96, metaKey: true, cancelable: true });
+    act(() => node.dispatchEvent(meta));
+    expect(meta.defaultPrevented).toBe(false);
+    expect(navigation.projection.startTime).toBeCloseTo(1 / 240, 10);
+    act(() => navigation.navigateTo(0));
     const shifted = new WheelEvent('wheel', { deltaY: 96, shiftKey: true, cancelable: true });
     act(() => node.dispatchEvent(shifted));
     expect(shifted.defaultPrevented).toBe(true);

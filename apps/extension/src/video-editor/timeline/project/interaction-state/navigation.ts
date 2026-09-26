@@ -61,14 +61,16 @@ export function useTimelineNavigation(params: {
       navigateTo(next);
     };
     const onWheel = (event: WheelEvent) => {
-      if (event.ctrlKey || event.metaKey) return;
+      if (event.metaKey) return;
       const view = projectionRef.current;
       const horizontalOnly = node.scrollHeight <= node.clientHeight && view.maxStartTime > 0;
-      const delta = event.deltaX || (event.shiftKey || horizontalOnly ? event.deltaY : 0);
+      const delta = event.ctrlKey
+        ? event.deltaY || event.deltaX
+        : event.deltaX || (event.shiftKey || horizontalOnly ? event.deltaY : 0);
       if (!delta) return;
       event.preventDefault();
       const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? view.viewportWidth : 1;
-      if (event.deltaX && !event.shiftKey) node.scrollTop += event.deltaY * unit;
+      if (event.deltaX && !event.shiftKey && !event.ctrlKey) node.scrollTop += event.deltaY * unit;
       navigateTo(readStartTime() + (delta * unit) / view.pixelsPerSecond);
     };
     node.addEventListener('scroll', onScroll);
