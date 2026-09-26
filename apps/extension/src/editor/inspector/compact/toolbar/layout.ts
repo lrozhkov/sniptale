@@ -12,6 +12,7 @@ export function updateCompactPopoverLayout(
   }
 
   const rect = trigger.getBoundingClientRect();
+  const toolbar = trigger.closest('.sniptale-toolbar-root')?.getBoundingClientRect();
   const width = 336;
   const height = collapsedPopoverRef.current.offsetHeight || 280;
   const maxLeft = window.innerWidth - width - 12;
@@ -19,7 +20,7 @@ export function updateCompactPopoverLayout(
 
   setCollapsedPopoverStyle({
     position: 'fixed',
-    left: Math.max(12, Math.min(rect.right + 12, maxLeft)),
+    left: Math.max(12, Math.min(Math.max(rect.right, toolbar?.right ?? rect.right) + 12, maxLeft)),
     top: Math.max(12, Math.min(rect.top, maxTop)),
     width,
     zIndex: 90,

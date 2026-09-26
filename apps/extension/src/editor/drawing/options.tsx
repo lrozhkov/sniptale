@@ -263,7 +263,7 @@ export function EditorDrawingOptions(props: {
     <div
       ref={panelRef}
       data-ui="editor.drawing.options"
-      className="flex flex-row items-center gap-2 overflow-x-auto p-2"
+      className="flex flex-row items-center gap-2 overflow-x-auto px-2 py-0.5"
     >
       <ToolOptions common={common} settings={values} tool={props.tool} update={update} />
       {selected ? (

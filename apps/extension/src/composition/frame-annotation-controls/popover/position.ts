@@ -39,12 +39,19 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
   const anchor = args.anchorEl.getBoundingClientRect();
   const uiScale = readContentUiScaleCompensation(args.anchorEl);
   const margin = MARGIN * uiScale;
-  const gap = GAP * uiScale;
+  // A runtime may align settings to its full toolbar edge without changing content defaults.
+  const configuredGap = Number.parseFloat(
+    getComputedStyle(args.anchorEl).getPropertyValue('--sniptale-settings-popover-gap')
+  );
+  const hasToolbarGap = Number.isFinite(configuredGap) && configuredGap >= 0;
+  const gap = (hasToolbarGap ? configuredGap : GAP) * uiScale;
   const width = Math.min(args.width * uiScale, window.innerWidth - margin * 2);
   const measuredHeight = args.popoverRef.current?.offsetHeight;
   const height = (measuredHeight && measuredHeight > 0 ? measuredHeight : args.height) * uiScale;
   const mainToolbar = args.anchorEl.closest<HTMLElement>(
-    '.sniptale-toolbar, .sniptale-glass-toolbar'
+    hasToolbarGap
+      ? '.sniptale-toolbar, .sniptale-glass-toolbar, .sniptale-toolbar-root'
+      : '.sniptale-toolbar, .sniptale-glass-toolbar'
   );
   if (mainToolbar) {
     return resolveMainToolbarPosition({
@@ -52,6 +59,7 @@ export function useFrameAnnotationSettingsPopoverPosition(args: {
       displayMode: mainToolbar.dataset['displayMode'] === 'vertical' ? 'vertical' : 'horizontal',
       height,
       gap,
+      toolbarGap: hasToolbarGap ? gap : 0,
       margin,
       toolbar: mainToolbar.getBoundingClientRect(),
       width,
@@ -71,6 +79,7 @@ function resolveMainToolbarPosition(input: {
   displayMode: 'horizontal' | 'vertical';
   height: number;
   gap: number;
+  toolbarGap: number;
   margin: number;
   toolbar: DOMRect;
   width: number;
@@ -88,18 +97,21 @@ function resolveMainToolbarPosition(input: {
   const candidates = {
     down: {
       left: horizontalLeft,
-      top: Math.max(input.toolbar.bottom, input.anchor.bottom + input.gap),
+      top: Math.max(input.toolbar.bottom + input.toolbarGap, input.anchor.bottom + input.gap),
     },
     up: {
       left: horizontalLeft,
-      top: Math.min(input.toolbar.top, input.anchor.top - input.gap) - input.height,
+      top:
+        Math.min(input.toolbar.top - input.toolbarGap, input.anchor.top - input.gap) - input.height,
     },
     right: {
-      left: Math.max(input.toolbar.right, input.anchor.right + input.gap),
+      left: Math.max(input.toolbar.right + input.toolbarGap, input.anchor.right + input.gap),
       top: verticalTop,
     },
     left: {
-      left: Math.min(input.toolbar.left, input.anchor.left - input.gap) - input.width,
+      left:
+        Math.min(input.toolbar.left - input.toolbarGap, input.anchor.left - input.gap) -
+        input.width,
       top: verticalTop,
     },
   };

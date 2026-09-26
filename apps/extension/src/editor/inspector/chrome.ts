@@ -1,7 +1,4 @@
-import {
-  getControlPrimaryButtonClassName,
-  getControlSecondaryButtonClassName,
-} from '@sniptale/ui/control-language';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 
 export const INSPECTOR_SECTION_SURFACE_CLASS_NAME =
   'space-y-2.5 rounded-[14px] bg-transparent px-0 py-0';
@@ -24,8 +21,17 @@ export const INSPECTOR_INLINE_BUTTON_CLASS_NAME =
   'hover:text-[color:var(--sniptale-color-text-primary)]';
 
 export const INSPECTOR_PRIMARY_BUTTON_CLASS_NAME = [
-  getControlPrimaryButtonClassName(),
-  'w-full disabled:opacity-50',
+  'inline-flex h-10 w-full items-center justify-center gap-2 px-3',
+  'rounded-[var(--sniptale-radius-sm)] border border-[color:var(--sniptale-color-border-soft)]',
+  'bg-transparent text-[12px] font-medium text-[color:var(--sniptale-color-text-secondary)]',
+  'outline-none transition-colors enabled:cursor-pointer',
+  'enabled:hover:bg-[color:var(--sniptale-color-surface-hover)]',
+  'enabled:hover:border-[color:var(--sniptale-color-border-strong)]',
+  'enabled:hover:text-[color:var(--sniptale-color-text-primary-strong)]',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+  'focus-visible:!outline-[color:var(--sniptale-color-text-primary)]',
+  'enabled:active:bg-[color:var(--sniptale-color-surface-input)] enabled:active:translate-y-px',
+  'disabled:cursor-not-allowed disabled:opacity-50',
 ].join(' ');
 
 export const INSPECTOR_SECONDARY_BUTTON_CLASS_NAME = [

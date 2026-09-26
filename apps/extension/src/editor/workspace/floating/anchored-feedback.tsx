@@ -4,22 +4,16 @@ import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useFloatingPositionRefresh } from './position-refresh';
 
-function useAnchoredPopoverPosition(
-  anchorEl: HTMLElement | null,
-  width: number,
-  clearToolbar = false
-): CSSProperties {
+function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number): CSSProperties {
   useFloatingPositionRefresh(anchorEl);
   if (!anchorEl) {
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }
   const margin = 12;
-  const gap = clearToolbar ? 12 : 8;
+  const gap = 12;
   const resolvedWidth = Math.min(width, window.innerWidth - margin * 2);
   const anchor = anchorEl.getBoundingClientRect();
-  const toolbarBottom = clearToolbar
-    ? anchorEl.closest('.sniptale-toolbar-root')?.getBoundingClientRect().bottom
-    : undefined;
+  const toolbarBottom = anchorEl.closest('.sniptale-toolbar-root')?.getBoundingClientRect().bottom;
   const left = Math.max(
     margin,
     Math.min(
@@ -105,7 +99,7 @@ export function EditorAnchoredConfirmPopover(props: {
   const popoverRef = useRef<HTMLDivElement>(null);
   const pendingRef = useRef(false);
   const [pending, setPending] = useState(false);
-  const style = useAnchoredPopoverPosition(props.anchorEl, 320, true);
+  const style = useAnchoredPopoverPosition(props.anchorEl, 320);
   useAnchoredDialogLifecycle({
     anchorEl: props.anchorEl,
     initialFocusSelector: '[data-confirm-action="true"]',
@@ -128,7 +122,7 @@ export function EditorAnchoredConfirmPopover(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !w-[320px]"
+      className="sniptale-content-popover--compact !rounded-none !w-[320px]"
       dataUi={props.dataUi}
       isOpen
       popoverRef={popoverRef}
@@ -173,7 +167,7 @@ export function EditorAnchoredAlert(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !w-[min(300px,calc(100vw-24px))]"
+      className="sniptale-content-popover--compact !rounded-none !w-[min(300px,calc(100vw-24px))]"
       dataUi={props.dataUi}
       isOpen
       style={useAnchoredPopoverPosition(props.anchorEl, 300)}

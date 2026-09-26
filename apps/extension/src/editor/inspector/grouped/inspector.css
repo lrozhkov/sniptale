@@ -1,5 +1,9 @@
 @layer theme, base, components, utilities;
 
+[data-ui='editor.page.root'] {
+  --sniptale-settings-popover-gap: 12px;
+}
+
 [data-ui='editor.inspector.content'] {
   container: inspector-surface / inline-size;
 }

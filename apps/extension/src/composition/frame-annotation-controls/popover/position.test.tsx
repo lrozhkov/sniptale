@@ -167,3 +167,41 @@ it('enables the shared header drag contract for element-owned editor menus', () 
   });
   act(() => root.unmount());
 });
+
+it.each([
+  { toolbarTop: 80, expectedTop: 142 },
+  { toolbarTop: 708, expectedTop: 396 },
+])(
+  'honors the editor toolbar gap at $toolbarTop including flipped placement',
+  ({ toolbarTop, expectedTop }) => {
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 768 });
+    const toolbar = document.createElement('div');
+    toolbar.className = 'sniptale-toolbar-root';
+    const anchor = document.createElement('button');
+    anchor.style.setProperty('--sniptale-settings-popover-gap', '12px');
+    toolbar.append(anchor);
+    document.body.append(toolbar);
+    vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(
+      createRect({ left: 50, top: toolbarTop, width: 500, height: 50 })
+    );
+    vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(
+      createRect({ left: 100, top: toolbarTop + 7, width: 36, height: 36 })
+    );
+    let style: CSSProperties | null = null;
+    const popoverRef = { current: null };
+    function Harness() {
+      style = useFrameAnnotationSettingsPopoverPosition({
+        anchorEl: anchor,
+        height: 300,
+        isOpen: true,
+        popoverRef,
+        width: 360,
+      });
+      return null;
+    }
+    const root = createRoot(document.createElement('div'));
+    act(() => root.render(<Harness />));
+    expect(style).toMatchObject({ left: 100, top: expectedTop, width: 360 });
+    act(() => root.unmount());
+  }
+);

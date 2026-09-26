@@ -138,7 +138,7 @@ export function DocumentSaveError(props: DocumentSaveErrorProps) {
         popoverRef={layerRef}
         dataUi="editor.floating.document-bar.save-error"
         className={[
-          'sniptale-content-popover--compact !w-[min(340px,calc(100vw-24px))]',
+          'sniptale-content-popover--compact !rounded-none !w-[min(340px,calc(100vw-24px))]',
           '!bg-[var(--sniptale-color-surface-panel)] backdrop-blur-[12px]',
         ].join(' ')}
         style={position.style}
