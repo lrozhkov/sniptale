@@ -1,7 +1,11 @@
 import { expect, it } from 'vitest';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import type { GalleryItem } from '../library/items';
-import { createScenarioExportItem } from '../library/test-support/items';
+import {
+  createScenarioExportItem,
+  createScenarioItem,
+  createVideoProjectItem,
+} from '../library/test-support/items';
 import {
   collapseGalleryRecordingGroups,
   getActiveStorageBarClass,
@@ -126,7 +130,8 @@ it('counts gallery items by folder families and returns sorted unique tags', () 
     audio: 0,
     screenshot: 2,
     recording: 3,
-    export: 1,
+    export: 0,
+    'video-project': 0,
     'web-snapshot': 1,
     scenario: 0,
   });
@@ -154,13 +159,13 @@ it('classifies saved exports by their media family instead of a separate visible
   expect(
     getFilteredIds({
       activeTags: [],
-      folderFilter: 'scenario',
+      folderFilter: 'export',
       items: [scenarioExport],
       search: '',
       sortMode: 'newest',
     })
   ).toEqual(['scenario-export:export-1']);
-  expect(getGalleryCounts([scenarioExport])).toMatchObject({ scenario: 1 });
+  expect(getGalleryCounts([scenarioExport])).toMatchObject({ scenario: 0, export: 1 });
 });
 
 it('does not double-count mixed scenario items in folder totals', () => {
@@ -200,6 +205,7 @@ it('does not double-count mixed scenario items in folder totals', () => {
     screenshot: 1,
     recording: 0,
     export: 0,
+    'video-project': 0,
     'web-snapshot': 0,
     scenario: 1,
   });
@@ -578,4 +584,29 @@ it('counts audio separately and filters out images and videos from Audio', () =>
   expect(
     getFilteredIds({ activeTags: [], folderFilter: 'audio', items, search: '', sortMode: 'newest' })
   ).toEqual(['audio']);
+});
+
+it('keeps project folders disjoint from ready materials and counts the same results', () => {
+  const video = createVideoProjectItem();
+  const scenario = createScenarioItem();
+  const exported = createScenarioExportItem();
+  const recording = createItem({ id: 'recording', kind: 'recording' });
+  const items = [video, scenario, exported, recording];
+  for (const [folderFilter, expected] of [
+    ['video-project', [video.id]],
+    ['scenario', [scenario.id]],
+    ['export', [exported.id]],
+    ['recording', [recording.id]],
+    ['all', items.map((item) => item.id)],
+  ] as const) {
+    const filtered = getFilteredGalleryItems({
+      items,
+      folderFilter,
+      activeTags: [],
+      search: '',
+      sortMode: 'newest',
+    });
+    expect(filtered.map((item) => item.id).sort()).toEqual([...expected].sort());
+    expect(getGalleryCounts(items)[folderFilter]).toBe(expected.length);
+  }
 });

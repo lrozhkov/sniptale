@@ -184,7 +184,7 @@ function matchesGalleryFolderFilter(
   }
 
   if (folderFilter === 'scenario') {
-    return kind === 'scenario' || kind === 'scenario-export';
+    return kind === 'scenario';
   }
 
   return FOLDER_FILTER_KIND_MAP[folderFilter].includes(kind);
@@ -202,17 +202,14 @@ export function getGalleryCounts(
     export: 0,
     'web-snapshot': 0,
     scenario: 0,
+    'video-project': 0,
   };
 
   for (const item of items) {
     next.all += 1;
 
-    if (item.kind === 'scenario' || item.kind === 'scenario-export') {
-      next.scenario += 1;
-      if (item.kind === 'scenario') {
-        continue;
-      }
-    }
+    if (item.kind === 'scenario') next.scenario += 1;
+    if (item.kind === 'video-project') next['video-project'] = (next['video-project'] ?? 0) + 1;
 
     if (FOLDER_FILTER_KIND_MAP.screenshot.includes(item.kind)) {
       next.screenshot += 1;

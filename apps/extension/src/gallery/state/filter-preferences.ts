@@ -13,6 +13,7 @@ const FOLDERS = new Set<string>([
   'export',
   'web-snapshot',
   'scenario',
+  'video-project',
 ]);
 const SCOPES = new Set<string>(['all', 'library', 'temporary']);
 const FACET_IDS = [

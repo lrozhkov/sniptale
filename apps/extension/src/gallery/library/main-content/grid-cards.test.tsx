@@ -719,3 +719,47 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   act(() => openButton?.click());
   expect(onRecordingGroupOpen).toHaveBeenCalledWith(item);
 });
+
+it.each(['compact-grid', 'large-grid', 'list'] as const)(
+  'exposes project names, content and direct editor actions in %s',
+  (viewMode) => {
+    const video = createVideoProjectItem();
+    const scenario = createScenarioItem();
+    const items = [video, scenario];
+    const onProjectOpen = vi.fn();
+    act(() =>
+      root?.render(
+        viewMode === 'list' ? (
+          <GalleryMediaList
+            filteredItems={items}
+            onPreviewOpen={vi.fn()}
+            onProjectOpen={onProjectOpen}
+            onToggleSelection={vi.fn()}
+            selectedIds={new Set()}
+          />
+        ) : (
+          <GalleryGridCanvas
+            filteredItems={items}
+            visibleItems={items}
+            gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 1 }}
+            gridWidth={800}
+            onPreviewOpen={vi.fn()}
+            onProjectOpen={onProjectOpen}
+            onToggleSelection={vi.fn()}
+            selectedIds={new Set()}
+            viewMode={viewMode}
+          />
+        )
+      )
+    );
+    const actions = [...container!.querySelectorAll('button')].filter(
+      (button) => button.textContent === translate('gallery.preview.openInEditor')
+    );
+    expect(actions).toHaveLength(2);
+    act(() => actions.forEach((button) => button.click()));
+    expect(onProjectOpen.mock.calls).toEqual([[video], [scenario]]);
+    expect(container!.textContent).toContain(video.filename);
+    expect(container!.textContent).toContain(scenario.filename);
+    expect(container!.textContent).toContain(translate('gallery.preview.clips'));
+  }
+);

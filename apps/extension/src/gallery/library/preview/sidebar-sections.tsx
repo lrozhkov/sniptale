@@ -1,3 +1,5 @@
+import { canOpenGalleryProject } from '../items/types';
+import { getGalleryProjectSummary } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import {
@@ -231,10 +233,14 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
         label={translate('gallery.preview.type')}
         value={getGalleryItemKindLabel(item.kind)}
       />
-      <PreviewMetadataCard
-        label={translate('gallery.preview.size')}
-        value={item.size > 0 ? formatBytes(item.size, 2) : '—'}
-      />
+      {getGalleryProjectSummary(item) ? (
+        <p className="px-3 py-2">{getGalleryProjectSummary(item)}</p>
+      ) : (
+        <PreviewMetadataCard
+          label={translate('gallery.preview.size')}
+          value={item.size > 0 ? formatBytes(item.size, 2) : '—'}
+        />
+      )}
       <PreviewMetadataCard
         label={translate('gallery.app.createdLabel')}
         value={formatDate(item.createdAt)}
@@ -425,7 +431,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     item.recordingGroupView?.projectId !== undefined;
   const canOpenVideo = isGalleryMediaItem(item) && item.source.kind === 'recording';
   const canOpenPrimaryAction =
-    isGalleryScenarioItem(item) ||
+    canOpenGalleryProject(item) ||
     canCopy ||
     canOpenWebSnapshot ||
     canOpenRecordingGroup ||

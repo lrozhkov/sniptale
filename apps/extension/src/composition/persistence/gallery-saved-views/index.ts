@@ -30,6 +30,8 @@ const FOLDERS = new Set<GallerySavedViewFolder>([
   'recording',
   'audio',
   'scenario',
+  'video-project',
+  'export',
   'screenshot',
   'web-snapshot',
 ]);

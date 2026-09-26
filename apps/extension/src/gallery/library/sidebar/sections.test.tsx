@@ -75,7 +75,8 @@ it('renders folder actions, highlights the active folder, and forwards selection
   );
   expect(activeButton?.className).not.toContain('accent');
   expect(container?.textContent).toContain('7');
-  expect(findButton(translate('gallery.preview.folderExport'))).toBeUndefined();
+  expect(findButton(translate('gallery.preview.folderExport'))).toBeDefined();
+  expect(findButton(translate('gallery.preview.folderVideoProject'))).toBeDefined();
   expect(translate('gallery.preview.folderWebSnapshot')).toBe('Веб-снимки');
   expect(container?.textContent).toContain('Веб-снимки');
 

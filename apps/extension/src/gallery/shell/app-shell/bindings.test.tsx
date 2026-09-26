@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createController, createMediaItem } from '../../library/actions/test-support/index';
+import {
+  createController,
+  createMediaItem,
+  createVideoProjectItem,
+} from '../../library/actions/test-support/index';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import type { GalleryViewMode } from '../../state/types';
 import { createLocalBackupSummary } from './backup-export.test-support';
@@ -50,6 +54,7 @@ type TestLayoutProps = {
   onPreviewDelete: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
+  onProjectOpen: (item: unknown) => void;
   onPreviewNavigate: (item: unknown) => void;
   onPreviewPromote: (item: unknown) => Promise<void>;
   onPreviewResetChanges: () => void;
@@ -325,4 +330,15 @@ it('promotes each supported gallery owner and refreshes the active scope', async
   });
   expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(4);
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(4);
+});
+
+it('opens active projects but preserves the Trash navigation restriction', () => {
+  const { actions, controller, layoutProps } = renderBindings();
+  const item = createVideoProjectItem();
+  layoutProps.onProjectOpen(item);
+  expect(actions.preview.openInEditor).toHaveBeenCalledWith(item);
+  vi.mocked(actions.preview.openInEditor).mockClear();
+  controller.state.filters.trashMode = true;
+  layoutProps.onProjectOpen(item);
+  expect(actions.preview.openInEditor).not.toHaveBeenCalled();
 });

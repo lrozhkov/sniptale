@@ -12,6 +12,8 @@ export type GallerySavedViewFolder =
   | 'audio'
   | 'recording'
   | 'scenario'
+  | 'video-project'
+  | 'export'
   | 'screenshot'
   | 'web-snapshot';
 export type GallerySavedViewScope = LibraryFilterScope;

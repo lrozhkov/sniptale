@@ -21,6 +21,7 @@ const GALLERY_FOLDERS = new Set<FolderFilter>([
   'export',
   'web-snapshot',
   'scenario',
+  'video-project',
 ]);
 
 const EMPTY_FACET_FILTERS: GalleryFacetFilters = {

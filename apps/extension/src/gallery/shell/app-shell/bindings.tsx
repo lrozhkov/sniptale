@@ -85,6 +85,10 @@ function buildGalleryPreviewHandlers(
     onPreviewDownloadOriginal: actions.preview.downloadOriginal,
     onPreviewCopy: actions.preview.copy,
     onPreviewEdit: actions.preview.openInEditor,
+    onProjectOpen: (item: GalleryItem) => {
+      if (controller.state.filters.trashMode) return;
+      actions.preview.openInEditor(item);
+    },
     onRecordingGroupOpen: (item: GalleryItem) => {
       if (controller.state.filters.trashMode) controller.actions.selection.toggleSelection(item.id);
       else void actions.preview.openInEditor(item);

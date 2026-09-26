@@ -657,3 +657,14 @@ it('keeps native-size video scrolling keys inside the player without navigating 
   );
   expect(onNext).toHaveBeenCalledOnce();
 });
+
+it('keeps the project editor action available with the inspector collapsed', () => {
+  const props = createProps({ item: createVideoProjectItem(), inspectorCollapsed: true });
+  renderNode(<PreviewMedia {...props} />);
+  const open = [...container!.querySelectorAll('button')].find(
+    (button) => button.textContent === 'gallery.preview.openInEditor'
+  );
+  expect(open).toBeDefined();
+  act(() => open?.click());
+  expect(props.onEdit).toHaveBeenCalledOnce();
+});

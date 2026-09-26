@@ -132,3 +132,10 @@ export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem
     type: 'media',
   };
 }
+
+/** Project availability is shared by gallery cards, details and editor actions. */
+export function canOpenGalleryProject(item: GalleryItem): boolean {
+  if (item.lifecycle?.trashedAt !== undefined) return false;
+  if (item.type === 'scenario') return item.project.availability === 'available';
+  return item.type === 'video-project' && item.unavailableReason === null;
+}

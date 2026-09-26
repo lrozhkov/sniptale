@@ -230,6 +230,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             ${props.inspectorCollapsed ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_360px]'}`}
         >
           <PreviewMedia
+            onEdit={props.onEdit}
             item={item}
             previewUrl={previewUrl}
             inspectorCollapsed={props.inspectorCollapsed}

@@ -248,3 +248,16 @@ it('persists and parses Audio saved views', async () => {
   await expect(listGallerySavedViews()).resolves.toEqual([created]);
   expect(parsePortableGallerySavedViews([created])).toEqual([created]);
 });
+
+it.each(['video-project', 'export'] as const)(
+  'round-trips a saved filter under %s',
+  async (folderFilter) => {
+    const created = await createGallerySavedView({
+      filters,
+      folderFilter,
+      name: 'Editing',
+    });
+    await expect(listGallerySavedViews()).resolves.toEqual([created]);
+    expect(parsePortableGallerySavedViews([created])).toEqual([created]);
+  }
+);

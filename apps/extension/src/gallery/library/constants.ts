@@ -3,11 +3,13 @@ import type { FolderFilter, GalleryViewMode } from './types';
 
 export const SIDEBAR_FOLDERS: FolderFilter[] = [
   'all',
+  'video-project',
+  'scenario',
   'screenshot',
   'recording',
   'audio',
   'web-snapshot',
-  'scenario',
+  'export',
 ];
 
 export const FOLDER_FILTER_KIND_MAP: Record<
@@ -16,8 +18,9 @@ export const FOLDER_FILTER_KIND_MAP: Record<
 > = {
   audio: ['audio'],
   screenshot: ['screenshot', 'image'],
-  recording: ['recording', 'video', 'video-project', 'export'],
-  export: ['export', 'scenario-export'],
+  recording: ['recording', 'video', 'export'],
+  'video-project': ['video-project'],
+  export: ['scenario-export'],
   'web-snapshot': ['web-archive'],
 };
 

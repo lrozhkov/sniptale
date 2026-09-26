@@ -1,3 +1,4 @@
+import { GalleryProjectDetails } from '../ui/project-presentation';
 import { getGalleryGridCardLayout, GRID_GAP } from '../constants';
 import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../items';
 import {
@@ -47,6 +48,7 @@ type GalleryPreviewOpenHandler = (
 type GalleryGridCardProps = {
   item: GalleryItem;
   onPreviewOpen: GalleryPreviewOpenHandler;
+  onProjectOpen?: (item: GalleryItem) => void;
   onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
   selected: boolean;
   style?: { height?: string; left?: string; top?: string; width?: string };
@@ -160,7 +162,17 @@ function GalleryGridCardMedia(
         aria-label={props.item.filename}
         title={props.item.filename}
       />
-      <MediaThumb item={props.item} fit={props.viewMode === 'large-grid' ? 'contain' : 'cover'} />
+      <MediaThumb
+        showProjectHint={!isList}
+        item={props.item}
+        fit={
+          props.viewMode === 'large-grid' ||
+          props.item.type === 'scenario' ||
+          props.item.type === 'video-project'
+            ? 'contain'
+            : 'cover'
+        }
+      />
       {!isList && isGalleryPreviewUpdating(props.item) ? (
         <div
           className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center
@@ -319,13 +331,21 @@ function GalleryGridCard(props: GalleryGridCardProps) {
             selected={props.selected}
             viewMode={props.viewMode}
           />
-          <GalleryGridDetails
-            compact={props.viewMode === 'compact-grid'}
-            item={props.item}
-            onPreviewOpen={props.onPreviewOpen}
-          />
+          {props.item.type !== 'scenario' && props.item.type !== 'video-project' ? (
+            <GalleryGridDetails
+              compact={props.viewMode === 'compact-grid'}
+              item={props.item}
+              onPreviewOpen={props.onPreviewOpen}
+            />
+          ) : null}
         </>
       )}
+      <GalleryProjectDetails
+        item={props.item}
+        viewMode={props.viewMode}
+        onPreviewOpen={props.onPreviewOpen}
+        {...(props.onProjectOpen ? { onOpen: props.onProjectOpen } : {})}
+      />
     </article>
   );
 }
@@ -544,7 +564,12 @@ function GalleryRecordingGroupGridCard(props: {
 export function GalleryMediaList(
   props: Pick<
     GalleryMainContentProps,
-    'filteredItems' | 'onPreviewOpen' | 'onRecordingGroupOpen' | 'onToggleSelection' | 'selectedIds'
+    | 'filteredItems'
+    | 'onPreviewOpen'
+    | 'onRecordingGroupOpen'
+    | 'onProjectOpen'
+    | 'onToggleSelection'
+    | 'selectedIds'
   >
 ) {
   const units = buildGalleryListUnits(props.filteredItems);
@@ -596,6 +621,7 @@ export function GalleryMediaList(
               key={unit.item.id}
               item={unit.item}
               onPreviewOpen={props.onPreviewOpen}
+              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
               onToggleSelection={props.onToggleSelection}
               selected={props.selectedIds.has(unit.item.id)}
               viewMode="list"
@@ -651,6 +677,7 @@ export function GalleryMediaList(
                 key={item.id}
                 item={item}
                 onPreviewOpen={props.onPreviewOpen}
+                {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
                 onToggleSelection={props.onToggleSelection}
                 selected={props.selectedIds.has(item.id)}
                 viewMode="list"
@@ -701,6 +728,7 @@ export function GalleryGridCanvas(
     | 'gridWidth'
     | 'onPreviewOpen'
     | 'onRecordingGroupOpen'
+    | 'onProjectOpen'
     | 'onToggleSelection'
     | 'selectedIds'
     | 'viewMode'
@@ -754,6 +782,7 @@ export function GalleryGridCanvas(
             key={item.id}
             item={item}
             onPreviewOpen={onPreviewOpen}
+            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
             onToggleSelection={onToggleSelection}
             selected={selectedIds.has(item.id)}
             style={style}

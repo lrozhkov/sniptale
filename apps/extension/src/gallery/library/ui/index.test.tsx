@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { createVideoProjectItem } from '../test-support/items';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -275,3 +276,27 @@ function createMediaThumbItem(
     type: 'media',
   };
 }
+
+it('refreshes a project thumbnail when its saved presentation revision changes', async () => {
+  getAggregatePresentationMock.mockResolvedValue({
+    thumbnailBlob: new Blob(['first']),
+    updatedAt: 1,
+  });
+  const item = {
+    ...createVideoProjectItem(),
+    hasThumbnail: true,
+    presentationRevision: 1,
+    workspaceRevision: 1,
+  };
+  renderItemThumb(item);
+  await flushEffects();
+  getAggregatePresentationMock.mockResolvedValue({
+    thumbnailBlob: new Blob(['second']),
+    updatedAt: 2,
+  });
+  renderItemThumb({ ...item, presentationRevision: 2, workspaceRevision: 2 });
+  await flushEffects();
+  expect(getAggregatePresentationMock).toHaveBeenCalledTimes(2);
+  expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:thumb');
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+});

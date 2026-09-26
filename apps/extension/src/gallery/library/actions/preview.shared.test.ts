@@ -355,3 +355,13 @@ it('opens a recording in a new video project even when it belongs to a saved gro
   expect(openVideoEditorPageMock).toHaveBeenCalledWith(null, 'rec-new');
   expect(openVideoEditorPageMock).not.toHaveBeenCalledWith('old-project', null);
 });
+
+it.each(['unsupported', 'invalid'] as const)(
+  'does not navigate an %s scenario to the editor',
+  (availability) => {
+    const item = createScenarioItem();
+    item.project.availability = availability;
+    openInEditor(item);
+    expect(openScenarioEditorPageMock).not.toHaveBeenCalled();
+  }
+);

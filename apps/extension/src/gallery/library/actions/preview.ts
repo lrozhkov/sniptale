@@ -1,3 +1,4 @@
+import { canOpenGalleryProject } from '../items/types';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
@@ -37,6 +38,7 @@ type PreviewMediaMetadataPatch = Partial<Pick<MediaLibraryEntry, 'filename' | 't
 
 export function openInEditor(item: GalleryItem) {
   if (isGalleryScenarioItem(item)) {
+    if (!canOpenGalleryProject(item)) return;
     void openScenarioEditorPage(item.entityId);
     return;
   }

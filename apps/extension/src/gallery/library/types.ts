@@ -12,10 +12,15 @@ export type FolderFilter =
   | 'recording'
   | 'export'
   | 'web-snapshot'
+  | 'video-project'
   | 'scenario';
 
-export type GalleryFolderCounts = Record<Exclude<FolderFilter, 'web-snapshot'>, number> & {
+export type GalleryFolderCounts = Record<
+  Exclude<FolderFilter, 'web-snapshot' | 'video-project'>,
+  number
+> & {
   'web-snapshot'?: number;
+  'video-project'?: number;
 };
 
 export type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size-desc';

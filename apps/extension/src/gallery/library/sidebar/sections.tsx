@@ -69,6 +69,15 @@ export function GalleryFolderList({
 
         return (
           <Fragment key={folder}>
+            {folder === 'video-project' || folder === 'screenshot' ? (
+              <div className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
+                {translate(
+                  folder === 'video-project'
+                    ? 'gallery.preview.projectsHeading'
+                    : 'gallery.preview.materialsHeading'
+                )}
+              </div>
+            ) : null}
             <button
               type="button"
               aria-pressed={active}

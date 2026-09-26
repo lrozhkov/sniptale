@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createMediaItem,
+  createVideoProjectItem,
   createScenarioExportItem,
   createScenarioItem,
 } from '../actions/test-support';
@@ -454,4 +455,19 @@ it('expires successful feedback and reports rejected actions', async () => {
     await act(async () => root.unmount());
     vi.useRealTimers();
   }
+});
+
+it('opens an available video project from detail actions', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const props = { ...createProps(), item: createVideoProjectItem() };
+  await act(async () => root.render(<PreviewActions {...props} />));
+  const open = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'gallery.preview.openInEditor'
+  );
+  expect(open).toBeDefined();
+  await act(async () => open?.click());
+  expect(props.onEdit).toHaveBeenCalledOnce();
+  await act(async () => root.unmount());
 });

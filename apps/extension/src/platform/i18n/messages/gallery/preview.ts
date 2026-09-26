@@ -5,6 +5,21 @@ import {
 } from '../shared/web-snapshot';
 
 export const galleryPreviewMessages = defineMessageSource({
+  projectsHeading: { ru: 'Проекты', en: 'Projects' },
+  materialsHeading: { ru: 'Готовые материалы', en: 'Ready materials' },
+  folderVideoProject: { ru: 'Видеопроекты', en: 'Video projects' },
+  restoreProjectFirst: {
+    ru: 'Восстановите проект из корзины для редактирования',
+    en: 'Restore this project from Trash to edit it',
+  },
+  editableProject: { ru: 'Можно продолжить редактирование', en: 'Ready to continue editing' },
+  clips: { ru: 'Клипы', en: 'Clips' },
+  tracks: { ru: 'Дорожки', en: 'Tracks' },
+  projectPreviewMissing: { ru: 'Превью ещё не сохранено', en: 'No saved preview yet' },
+  projectUnavailable: {
+    ru: 'Проект недоступен для редактирования',
+    en: 'Project unavailable for editing',
+  },
   actionRetry: {
     ru: 'Действие не выполнено. Повторите попытку.',
     en: 'Action did not complete. Try again.',
@@ -33,28 +48,28 @@ export const galleryPreviewMessages = defineMessageSource({
   sourceUnavailable: { ru: 'Сведения о записи недоступны', en: 'Recording details unavailable' },
   retrySource: { ru: 'Повторить загрузку', en: 'Retry loading' },
   folderAll: {
-    ru: 'Все медиа',
-    en: 'All media',
+    ru: 'Все материалы',
+    en: 'All materials',
   },
   folderScreenshot: {
     ru: 'Скриншоты',
     en: 'Screenshots',
   },
   folderRecording: {
-    ru: 'Видеозаписи',
-    en: 'Recordings',
+    ru: 'Видео и записи',
+    en: 'Videos and recordings',
   },
   folderExport: {
-    ru: 'Экспорты',
-    en: 'Exports',
+    ru: 'Руководства и туры',
+    en: 'Guides and tours',
   },
   folderWebSnapshot: {
     ru: sharedWebSnapshotPluralNameMessage.ru,
     en: sharedWebSnapshotPluralNameMessage.en,
   },
   folderScenario: {
-    ru: 'Сценарии',
-    en: 'Scenarios',
+    ru: 'Проекты сценариев',
+    en: 'Scenario projects',
   },
   kindAudio: {
     ru: 'Аудио',

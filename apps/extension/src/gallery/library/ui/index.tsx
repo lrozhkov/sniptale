@@ -32,6 +32,7 @@ export const FOLDER_LABELS: Record<FolderFilter, string> = {
   export: translate('gallery.preview.folderExport'),
   'web-snapshot': translate('gallery.preview.folderWebSnapshot'),
   scenario: translate('gallery.preview.folderScenario'),
+  'video-project': translate('gallery.preview.folderVideoProject'),
 };
 
 export function getGalleryFolderIcon(folder: FolderFilter) {
@@ -162,7 +163,7 @@ function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => 
 
 function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
   if (item.type === 'video-project') {
-    return `${item.id}:${item.hasThumbnail}:${item.thumbnailSourceMediaId ?? ''}`;
+    return `${item.id}:${item.hasThumbnail}:${item.presentationRevision ?? ''}:${item.workspaceRevision ?? ''}`;
   }
   if (item.type === 'scenario' || item.type === 'scenario-export') {
     return `${item.id}:${item.hasThumbnail}:${item.project.updatedAt}`;
@@ -173,6 +174,7 @@ function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
 type MediaThumbProps = {
   assetId?: string;
   fit?: 'contain' | 'cover';
+  showProjectHint?: boolean;
   item?: GalleryItem;
   kind?: GalleryItemKind;
 };
@@ -210,8 +212,6 @@ export function MediaThumb(props: MediaThumbProps) {
     return loadThumbUrl(itemRef.current, setThumbUrl);
   }, [thumbnailIdentity]);
 
-  const Icon = getKindIcon(item.kind);
-
   if (thumbUrl) {
     return (
       <img
@@ -225,6 +225,13 @@ export function MediaThumb(props: MediaThumbProps) {
     );
   }
 
+  return <MediaThumbFallback item={item} showProjectHint={props.showProjectHint ?? true} />;
+}
+
+function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean }) {
+  const { item } = props;
+  const Icon = getKindIcon(item.kind);
+  const isProject = item.type === 'scenario' || item.type === 'video-project';
   return (
     <div
       className={[
@@ -233,7 +240,15 @@ export function MediaThumb(props: MediaThumbProps) {
         GALLERY_THUMB_FALLBACK_SURFACE_CLASS_NAME,
       ].join(' ')}
     >
-      <Icon className="h-10 w-10 opacity-80" />
+      <div className="max-w-full space-y-1 px-2 text-center">
+        <Icon
+          className={isProject ? 'mx-auto h-6 w-6 opacity-80' : 'h-10 w-10 opacity-80'}
+          aria-hidden="true"
+        />
+        {props.showProjectHint && isProject ? (
+          <p className="text-xs">{translate('gallery.preview.projectPreviewMissing')}</p>
+        ) : null}
+      </div>
     </div>
   );
 }

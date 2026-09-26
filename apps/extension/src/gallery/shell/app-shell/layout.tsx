@@ -114,6 +114,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       onClearSelection={props.onClearSelection}
       onDeleteMany={props.onDeleteMany}
       onPreviewOpen={props.onPreviewOpen}
+      {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
       {...(props.onRecordingGroupOpen ? { onRecordingGroupOpen: props.onRecordingGroupOpen } : {})}
       onSearchChange={props.onSearchChange}
       onScopeChange={props.onScopeChange ?? (() => undefined)}

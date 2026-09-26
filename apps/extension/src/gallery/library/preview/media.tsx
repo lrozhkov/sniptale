@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useRef, type ReactNode, type RefObject } from 'react';
+import { GalleryProjectOpenAction } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import {
   isGalleryMediaItem,
@@ -283,7 +284,7 @@ function PreviewMediaContent(
   }
 
   if (isGalleryVideoProjectItem(props.item)) {
-    return <MediaThumb item={props.item} />;
+    return <MediaThumb item={props.item} fit="contain" />;
   }
 
   return null;
@@ -292,7 +293,13 @@ function PreviewMediaContent(
 export function PreviewMedia(
   props: Pick<
     PreviewPanelProps,
-    'inspectorCollapsed' | 'item' | 'navigation' | 'onClose' | 'onInspectorToggle' | 'previewUrl'
+    | 'inspectorCollapsed'
+    | 'item'
+    | 'navigation'
+    | 'onClose'
+    | 'onInspectorToggle'
+    | 'previewUrl'
+    | 'onEdit'
   >
 ) {
   const transitionFrame = usePreviewMediaTransition({
@@ -322,6 +329,9 @@ export function PreviewMedia(
           var(--sniptale-color-surface-canvas)_100%
         )]"
     >
+      <div className="absolute bottom-4 left-4 z-20">
+        <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
+      </div>
       <PreviewMediaControls
         inspectorCollapsed={props.inspectorCollapsed}
         isImagePreview={isImagePreview}

@@ -95,6 +95,7 @@ export interface GalleryAppLayoutProps {
   onClearSelection: () => void;
   onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;
+  onProjectOpen?: (item: GalleryItem) => void;
   onRecordingGroupOpen?: (item: GalleryItem) => void;
   onPreviewNavigate: (item: GalleryItem) => void;
   onScenarioPreviewOpen?: (projectId: string) => void;

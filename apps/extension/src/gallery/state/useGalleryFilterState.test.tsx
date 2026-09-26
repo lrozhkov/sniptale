@@ -307,68 +307,78 @@ it('resets saved-view filters when a plain category is selected', async () => {
   });
 });
 
-it('creates, updates, and deletes an active saved view through the authoritative owner', async () => {
-  const view = {
-    createdAt: 1,
-    filters: {
-      activeTags: [],
-      facetFilters: {
-        created: [],
-        duration: [],
-        format: ['png'],
-        resolution: [],
-        size: [],
-        source: [],
-        updated: [],
+it.each(['screenshot', 'video-project', 'export'] as const)(
+  'saves, reloads, updates and deletes a view in %s',
+  async (folderFilter) => {
+    const view = {
+      createdAt: 1,
+      filters: {
+        activeTags: [],
+        facetFilters: {
+          created: [],
+          duration: [],
+          format: ['png'],
+          resolution: [],
+          size: [],
+          source: [],
+          updated: [],
+        },
+        scope: 'all' as const,
       },
-      scope: 'all' as const,
-    },
-    folderFilter: 'screenshot' as const,
-    id: 'view-1',
-    name: 'PNG',
-    updatedAt: 1,
-  };
-  savedViewMocks.create.mockResolvedValue(view);
-  savedViewMocks.update.mockResolvedValue({
-    ...view,
-    filters: { ...view.filters, activeTags: ['approved'] },
-    updatedAt: 2,
-  });
-  renderHook();
-  await vi.waitFor(() => expect(latestValue?.state.savedViewsLoaded).toBe(true));
-  act(() => {
-    latestValue?.actions.setFolderFilter('screenshot');
-    latestValue?.actions.setFacetFilter('format', ['png']);
-  });
+      folderFilter,
+      id: 'view-1',
+      name: 'PNG',
+      updatedAt: 1,
+    };
+    savedViewMocks.create.mockResolvedValue(view);
+    savedViewMocks.update.mockResolvedValue({
+      ...view,
+      filters: { ...view.filters, activeTags: ['approved'] },
+      updatedAt: 2,
+    });
+    renderHook();
+    await vi.waitFor(() => expect(latestValue?.state.savedViewsLoaded).toBe(true));
+    act(() => {
+      latestValue?.actions.setFolderFilter(folderFilter);
+      latestValue?.actions.setFacetFilter('format', ['png']);
+    });
 
-  await act(async () => {
-    await latestValue?.actions.createSavedView('PNG');
-  });
-  expect(savedViewMocks.create).toHaveBeenCalledWith(
-    expect.objectContaining({ folderFilter: 'screenshot', name: 'PNG' })
-  );
-  expect(latestValue?.state.activeSavedView?.id).toBe('view-1');
+    await act(async () => {
+      await latestValue?.actions.createSavedView('PNG');
+    });
+    expect(savedViewMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({ folderFilter, name: 'PNG' })
+    );
+    expect(latestValue?.state.activeSavedView?.id).toBe('view-1');
+    savedViewMocks.list.mockResolvedValue([view]);
+    act(() => root?.unmount());
+    root = createRoot(container!);
+    renderHook();
+    await vi.waitFor(() => expect(latestValue?.state.savedViewsLoaded).toBe(true));
+    expect(latestValue?.state.activeSavedView?.id).toBe('view-1');
+    expect(latestValue?.state.folderFilter).toBe(folderFilter);
 
-  act(() => latestValue?.actions.setActiveTags(['approved']));
-  await act(async () => {
-    await latestValue?.actions.updateSavedView();
-  });
-  expect(latestValue?.state.isSavedViewDirty).toBe(false);
+    act(() => latestValue?.actions.setActiveTags(['approved']));
+    await act(async () => {
+      await latestValue?.actions.updateSavedView();
+    });
+    expect(latestValue?.state.isSavedViewDirty).toBe(false);
 
-  savedViewMocks.move.mockResolvedValue([view]);
-  await act(async () => {
-    await latestValue?.actions.moveSavedView('view-1', 'up');
-  });
-  expect(savedViewMocks.move).toHaveBeenCalledWith('view-1', 'up');
+    savedViewMocks.move.mockResolvedValue([view]);
+    await act(async () => {
+      await latestValue?.actions.moveSavedView('view-1', 'up');
+    });
+    expect(savedViewMocks.move).toHaveBeenCalledWith('view-1', 'up');
 
-  await act(async () => {
-    await latestValue?.actions.deleteSavedView('view-1');
-  });
-  expect(savedViewMocks.delete).toHaveBeenCalledWith('view-1');
-  expect(latestValue?.state.activeSavedView).toBeNull();
-  expect(latestValue?.state.folderFilter).toBe('screenshot');
-  expect(latestValue?.state.facetFilters.format).toEqual([]);
-});
+    await act(async () => {
+      await latestValue?.actions.deleteSavedView('view-1');
+    });
+    expect(savedViewMocks.delete).toHaveBeenCalledWith('view-1');
+    expect(latestValue?.state.activeSavedView).toBeNull();
+    expect(latestValue?.state.folderFilter).toBe(folderFilter);
+    expect(latestValue?.state.facetFilters.format).toEqual([]);
+  }
+);
 
 it('surfaces a saved-view load failure without overwriting the current filters', async () => {
   savedViewMocks.list.mockRejectedValueOnce(new Error('storage unavailable'));
@@ -450,13 +460,16 @@ it('clears a stale active saved-view identity after loading the authoritative li
   );
 });
 
-it('opens Audio from the URL and restores it after navigation preferences are saved', async () => {
-  window.history.replaceState(null, '', '/?folder=audio');
-  const value = renderHook();
-  expect(value.state.folderFilter).toBe('audio');
-  await act(async () => value.actions.setFolderFilter('audio'));
-  act(() => root?.unmount());
-  window.history.replaceState(null, '', '/');
-  root = createRoot(container!);
-  expect(renderHook().state.folderFilter).toBe('audio');
-});
+it.each(['audio', 'video-project', 'export'] as const)(
+  'opens %s from the URL and restores its navigation preferences',
+  async (folder) => {
+    window.history.replaceState(null, '', `/?folder=${folder}`);
+    const value = renderHook();
+    expect(value.state.folderFilter).toBe(folder);
+    await act(async () => value.actions.setFolderFilter(folder));
+    act(() => root?.unmount());
+    window.history.replaceState(null, '', '/');
+    root = createRoot(container!);
+    expect(renderHook().state.folderFilter).toBe(folder);
+  }
+);

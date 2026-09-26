@@ -7,7 +7,6 @@ import {
   updateGallerySavedView,
   type GallerySavedView,
   type GallerySavedViewFilterSnapshot,
-  type GallerySavedViewFolder,
 } from '../../composition/persistence/gallery-saved-views';
 import type { GalleryFilterPreferences } from './filter-preferences';
 import type { GalleryFacetFilters } from './types';
@@ -141,14 +140,13 @@ export function useGallerySavedViewState(args: {
     actions: {
       createSavedView: async (name: string) => {
         const folder = args.filterPreferencesRef.current.folderFilter;
-        if (folder === 'export') throw new Error('This Gallery category cannot own saved views.');
         const view = await createGallerySavedView({
           filters: {
             activeTags: args.filterPreferencesRef.current.activeTags,
             facetFilters: args.filterPreferencesRef.current.facetFilters,
             scope: args.filterPreferencesRef.current.scope,
           },
-          folderFilter: folder as GallerySavedViewFolder,
+          folderFilter: folder,
           name,
         });
         savedViewCollection.setViews((current) => [...current, view]);

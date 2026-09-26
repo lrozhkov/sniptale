@@ -35,6 +35,7 @@ export interface GalleryMainContentProps {
   onClearSelection: () => void;
   onDeleteMany: (items: GalleryItem[]) => void;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;
+  onProjectOpen?: (item: GalleryItem) => void;
   onRecordingGroupOpen?: (item: GalleryItem) => void;
   onScenarioPreviewOpen?: (projectId: string) => void;
   onSearchChange: Dispatch<SetStateAction<string>>;
