@@ -222,6 +222,8 @@ it('renders media previews for image, video, audio, and empty states', () => {
 
   expect(imageMarkup).toContain('<img');
   expect(imageMarkup).toContain('data-ui="preview.media.scrollable"');
+  expect(imageMarkup).toContain('data-ui="gallery.preview.zoomSlider"');
+  expect(imageMarkup).toContain('gallery.preview.lockZoom');
   expect(imageMarkup).not.toContain('rounded-[16px]');
   expect(imageMarkup).toContain('max-h-none max-w-none');
   expect(imageMarkup).not.toContain('max-h-full max-w-full shrink-0 select-none object-contain');
@@ -237,6 +239,40 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(emptyMarkup).not.toContain('<img');
   expect(emptyMarkup).not.toContain('<video');
   expect(emptyMarkup).not.toContain('<audio');
+});
+
+it('changes image zoom through the slider and preserves it when the lock is enabled', () => {
+  const firstItem = createItem({ id: 'first' });
+  renderNode(<PreviewMedia {...createProps({ item: firstItem, previewUrl: 'blob:first' })} />);
+
+  const slider = container?.querySelector<HTMLInputElement>(
+    '[data-ui="gallery.preview.zoomSlider"]'
+  );
+  expect(slider?.type).toBe('range');
+  expect(slider?.getAttribute('aria-label')).toBe('gallery.preview.zoomSlider');
+  expect(slider?.className).toContain('accent-[var(--sniptale-color-text-muted-strong)]');
+  expect(container?.querySelector('button[aria-label="gallery.preview.lockZoom"]')).not.toBeNull();
+
+  if (!slider) throw new Error('Expected zoom slider');
+  setInputValue(slider, '1.5');
+  expect(slider.valueAsNumber).toBe(1.5);
+  expect(container?.textContent).toContain('150%');
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('button[aria-label="gallery.preview.lockZoom"]')
+      ?.click();
+  });
+  expect(
+    container?.querySelector('button[aria-label="gallery.preview.unlockZoom"]')
+  ).not.toBeNull();
+
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: createItem({ id: 'second' }), previewUrl: 'blob:second' })}
+    />
+  );
+  expect(container?.textContent).toContain('150%');
 });
 
 it('keeps adjacent navigation in the fixed toolbar and exposes video readiness', () => {

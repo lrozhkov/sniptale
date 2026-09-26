@@ -125,6 +125,18 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Сбросить масштаб',
     en: 'Reset zoom',
   },
+  lockZoom: {
+    ru: 'Зафиксировать масштаб',
+    en: 'Lock zoom',
+  },
+  unlockZoom: {
+    ru: 'Снять фиксацию масштаба',
+    en: 'Unlock zoom',
+  },
+  zoomSlider: {
+    ru: 'Масштаб изображения',
+    en: 'Image zoom',
+  },
   previous: {
     ru: 'Предыдущее',
     en: 'Previous',

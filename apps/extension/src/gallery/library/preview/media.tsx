@@ -1,6 +1,8 @@
 import {
   ChevronLeft,
   ChevronRight,
+  LockKeyhole,
+  LockKeyholeOpen,
   Minus,
   PanelRightClose,
   PanelRightOpen,
@@ -29,11 +31,13 @@ function PreviewFloatingControl(props: {
   children: ReactNode;
   disabled?: boolean;
   onClick: () => void;
+  pressed?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={props.ariaLabel}
+      aria-pressed={props.pressed}
       title={props.ariaLabel}
       disabled={props.disabled}
       onClick={props.onClick}
@@ -43,6 +47,8 @@ function PreviewFloatingControl(props: {
         text-[var(--sniptale-color-text-primary)] shadow-sm transition
         hover:border-[var(--sniptale-color-border-strong)]
         hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]
+        aria-pressed:border-[var(--sniptale-color-border-strong)]
+        aria-pressed:bg-[var(--sniptale-color-surface-panel)]
         disabled:cursor-not-allowed disabled:opacity-40"
     >
       {props.children}
@@ -74,40 +80,73 @@ function PreviewInspectorControls(
 }
 
 function PreviewZoomControls(props: {
-  canZoomIn: boolean;
-  canZoomOut: boolean;
-  resetZoom: () => void;
-  zoom: number;
-  zoomIn: () => void;
-  zoomOut: () => void;
+  controls: ReturnType<typeof usePreviewImageZoom>['controls'];
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <PreviewFloatingControl
-        ariaLabel={translate('gallery.preview.zoomOut')}
-        disabled={!props.canZoomOut}
-        onClick={props.zoomOut}
-      >
-        <Minus className="h-4 w-4" />
-      </PreviewFloatingControl>
-      <button
-        type="button"
-        onClick={props.resetZoom}
-        title={translate('gallery.preview.resetZoom')}
-        className="h-9 min-w-14 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+    <div className="group relative">
+      <div className="flex items-center gap-1.5">
+        <PreviewFloatingControl
+          ariaLabel={translate('gallery.preview.zoomOut')}
+          disabled={!props.controls.canZoomOut}
+          onClick={props.controls.zoomOut}
+        >
+          <Minus className="h-4 w-4" />
+        </PreviewFloatingControl>
+        <button
+          type="button"
+          onClick={props.controls.resetZoom}
+          title={translate('gallery.preview.resetZoom')}
+          className="h-9 min-w-14 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
           bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]
           px-3 py-2 text-xs font-semibold text-[var(--sniptale-color-text-primary)] shadow-sm
           transition hover:border-[var(--sniptale-color-border-strong)]"
+        >
+          {Math.round(props.controls.zoom * 100)}%
+        </button>
+        <PreviewFloatingControl
+          ariaLabel={translate('gallery.preview.zoomIn')}
+          disabled={!props.controls.canZoomIn}
+          onClick={props.controls.zoomIn}
+        >
+          <Plus className="h-4 w-4" />
+        </PreviewFloatingControl>
+        <PreviewFloatingControl
+          ariaLabel={translate(
+            props.controls.zoomLocked ? 'gallery.preview.unlockZoom' : 'gallery.preview.lockZoom'
+          )}
+          onClick={props.controls.toggleZoomLock}
+          pressed={props.controls.zoomLocked}
+        >
+          {props.controls.zoomLocked ? (
+            <LockKeyhole className="h-4 w-4" />
+          ) : (
+            <LockKeyholeOpen className="h-4 w-4" />
+          )}
+        </PreviewFloatingControl>
+      </div>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-full pt-1 opacity-0 transition-opacity
+        group-hover:pointer-events-auto group-hover:opacity-100
+        group-focus-within:pointer-events-auto group-focus-within:opacity-100
+        [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
       >
-        {Math.round(props.zoom * 100)}%
-      </button>
-      <PreviewFloatingControl
-        ariaLabel={translate('gallery.preview.zoomIn')}
-        disabled={!props.canZoomIn}
-        onClick={props.zoomIn}
-      >
-        <Plus className="h-4 w-4" />
-      </PreviewFloatingControl>
+        <div
+          className="rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+          bg-[var(--sniptale-color-surface-panel)] px-2 py-1 shadow-sm"
+        >
+          <input
+            data-ui="gallery.preview.zoomSlider"
+            type="range"
+            aria-label={translate('gallery.preview.zoomSlider')}
+            min={props.controls.minimumZoom}
+            max={props.controls.maximumZoom}
+            step="any"
+            value={props.controls.zoom}
+            onChange={(event) => props.controls.setZoom(event.currentTarget.valueAsNumber)}
+            className="block h-5 w-full cursor-pointer accent-[var(--sniptale-color-text-muted-strong)]"
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -161,16 +200,7 @@ function PreviewMediaControls(
         <PreviewNavigationControls navigation={props.navigation} />
       </div>
       <div className="pointer-events-auto flex items-center gap-1.5">
-        {props.isImagePreview ? (
-          <PreviewZoomControls
-            canZoomIn={props.imageZoom.controls.canZoomIn}
-            canZoomOut={props.imageZoom.controls.canZoomOut}
-            zoom={props.imageZoom.controls.zoom}
-            zoomIn={props.imageZoom.controls.zoomIn}
-            zoomOut={props.imageZoom.controls.zoomOut}
-            resetZoom={props.imageZoom.controls.resetZoom}
-          />
-        ) : null}
+        {props.isImagePreview ? <PreviewZoomControls controls={props.imageZoom.controls} /> : null}
         <PreviewInspectorControls {...props} />
       </div>
     </div>

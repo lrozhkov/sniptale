@@ -41,6 +41,7 @@ function createImageLoadEvent(width: number, height: number) {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestValue: ReturnType<typeof usePreviewImageZoom> | null = null;
+let renderSamples: Array<{ key: string | null; zoom: number; width: string | undefined }> = [];
 
 function HookProbe(props: {
   enabled: boolean;
@@ -48,6 +49,11 @@ function HookProbe(props: {
   resetKey: string | null;
 }) {
   latestValue = usePreviewImageZoom(props.enabled, props.resetKey, props.naturalSize ?? null);
+  renderSamples.push({
+    key: props.resetKey,
+    zoom: latestValue.controls.zoom,
+    width: latestValue.image.style?.width,
+  });
   return <div ref={latestValue.viewport.containerRef} data-ui="preview.zoom.container" />;
 }
 
@@ -101,6 +107,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   latestValue = null;
+  renderSamples = [];
 });
 
 afterEach(() => {
@@ -111,6 +118,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   latestValue = null;
+  renderSamples = [];
   resizeObserverState.callback = null;
   vi.unstubAllGlobals();
 });
@@ -186,6 +194,42 @@ it('applies preloaded geometry before the next image becomes visible', () => {
   expect(latestValue?.image.ready).toBe(true);
   expect(latestValue?.image.style).toEqual({ height: '432px', width: '768px' });
   expect(latestValue?.controls.zoom).toBe(0.48);
+});
+
+it('switches between different image proportions at fit scale without an intermediate stale zoom', () => {
+  renderHook({ enabled: true, resetKey: 'wide', naturalSize: { width: 1600, height: 900 } });
+  setContainerSize(800, 600);
+  act(() => triggerResize());
+  act(() => latestValue?.controls.zoomIn());
+  expect(latestValue?.controls.zoom).toBe(0.75);
+
+  renderSamples = [];
+  renderHook({ enabled: true, resetKey: 'tall', naturalSize: { width: 400, height: 1600 } });
+  expect(latestValue?.controls.zoom).toBe(0.325);
+  expect(latestValue?.image.style).toEqual({ width: '130px', height: '520px' });
+  expect(latestValue?.controls.canZoomOut).toBe(false);
+  expect(
+    renderSamples.filter((sample) => sample.key === 'tall' && sample.width === '300px')
+  ).toEqual([]);
+});
+
+it('holds the chosen image scale across different sizes and returns to fit when unlocked', () => {
+  renderHook({ enabled: true, resetKey: 'wide', naturalSize: { width: 1600, height: 900 } });
+  setContainerSize(800, 600);
+  act(() => triggerResize());
+  act(() => latestValue?.controls.setZoom(1.5));
+  act(() => latestValue?.controls.toggleZoomLock());
+
+  renderHook({ enabled: true, resetKey: 'small', naturalSize: { width: 320, height: 240 } });
+  expect(latestValue?.controls.zoomLocked).toBe(true);
+  expect(latestValue?.controls.zoom).toBe(1.5);
+  expect(latestValue?.image.style).toEqual({ width: '480px', height: '360px' });
+
+  act(() => latestValue?.controls.setZoom(1.75));
+  renderHook({ enabled: true, resetKey: 'tall', naturalSize: { width: 400, height: 1600 } });
+  expect(latestValue?.controls.zoom).toBe(1.75);
+  act(() => latestValue?.controls.toggleZoomLock());
+  expect(latestValue?.controls.zoom).toBe(0.325);
 });
 
 it('lets a 1899 × 16843 full-page capture zoom beyond native size to 200%', () => {

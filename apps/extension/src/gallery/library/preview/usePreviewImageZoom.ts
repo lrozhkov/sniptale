@@ -38,6 +38,32 @@ function calculatePreviewImageMaximumScale(naturalSize: PreviewSize | null): num
   return 4;
 }
 
+function resolvePreviewImageScale(input: {
+  fitScale: number;
+  maximumScale: number;
+  requestedScale: { key: string | null; value: number } | null;
+  resetKey: string | null;
+  zoomLocked: boolean;
+}) {
+  const savedScale =
+    input.zoomLocked || input.requestedScale?.key === input.resetKey
+      ? input.requestedScale?.value
+      : null;
+  const minimumScale = input.zoomLocked
+    ? Math.min(input.fitScale, savedScale ?? input.fitScale, 0.01)
+    : input.fitScale;
+  const maximumScale = Math.max(
+    input.fitScale,
+    input.maximumScale,
+    input.zoomLocked ? (savedScale ?? 0) : 0
+  );
+  return {
+    maximumScale,
+    minimumScale,
+    scale: Math.min(maximumScale, Math.max(minimumScale, savedScale ?? input.fitScale)),
+  };
+}
+
 interface PreviewViewportAnchor {
   localX: number;
   localY: number;
@@ -285,11 +311,20 @@ export function usePreviewImageZoom(
     resetKey,
     preparedNaturalSize
   );
-  const [requestedScale, setRequestedScale] = useState<number | null>(null);
+  const [requestedScale, setRequestedScale] = useState<{
+    key: string | null;
+    value: number;
+  } | null>(null);
+  const [zoomLocked, setZoomLocked] = useState(false);
   const pendingViewportAnchorRef = useRef<PreviewViewportAnchor | null>(null);
   const fitScale = calculatePreviewImageFitScale(naturalSize, baseSize);
-  const maximumScale = Math.max(fitScale, calculatePreviewImageMaximumScale(naturalSize));
-  const scale = Math.min(maximumScale, Math.max(fitScale, requestedScale ?? fitScale));
+  const { maximumScale, minimumScale, scale } = resolvePreviewImageScale({
+    fitScale,
+    maximumScale: calculatePreviewImageMaximumScale(naturalSize),
+    requestedScale,
+    resetKey,
+    zoomLocked,
+  });
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
   const zoomFromFit = fitScale > 0 ? scale / fitScale : 1;
@@ -299,10 +334,6 @@ export function usePreviewImageZoom(
     : baseSize
       ? { height: baseSize.height * zoomFromFit, width: baseSize.width * zoomFromFit }
       : null;
-
-  useEffect(() => {
-    setRequestedScale(null);
-  }, [enabled, resetKey]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
@@ -323,7 +354,7 @@ export function usePreviewImageZoom(
 
   const requestScale = useCallback(
     (nextScale: number, pointer?: { clientX: number; clientY: number }) => {
-      const normalizedScale = Math.min(maximumScale, Math.max(fitScale, nextScale));
+      const normalizedScale = Math.min(maximumScale, Math.max(minimumScale, nextScale));
       if (Math.abs(normalizedScale - scaleRef.current) <= PREVIEW_IMAGE_SCALE_EPSILON) {
         return;
       }
@@ -332,20 +363,30 @@ export function usePreviewImageZoom(
       pendingViewportAnchorRef.current = container
         ? capturePreviewViewportAnchor(container, pointer)
         : null;
-      setRequestedScale(
-        Math.abs(normalizedScale - fitScale) <= PREVIEW_IMAGE_SCALE_EPSILON ? null : normalizedScale
-      );
+      setRequestedScale({ key: resetKey, value: normalizedScale });
       scaleRef.current = normalizedScale;
     },
-    [containerRef, fitScale, maximumScale]
+    [containerRef, maximumScale, minimumScale, resetKey]
   );
 
   const updateZoom = useCallback(
     (direction: -1 | 1) => {
-      requestScale(findPreviewImageScaleStep(scaleRef.current, direction, fitScale, maximumScale));
+      requestScale(
+        findPreviewImageScaleStep(scaleRef.current, direction, minimumScale, maximumScale)
+      );
     },
-    [fitScale, maximumScale, requestScale]
+    [minimumScale, maximumScale, requestScale]
   );
+
+  const toggleZoomLock = useCallback(() => {
+    if (zoomLocked) {
+      setZoomLocked(false);
+      setRequestedScale(null);
+    } else {
+      setRequestedScale({ key: resetKey, value: scaleRef.current });
+      setZoomLocked(true);
+    }
+  }, [resetKey, zoomLocked]);
 
   usePreviewWheelZoom({ containerRef, enabled, requestScale, scaleRef });
   const imagePan = usePreviewImagePan({ enabled, isZoomedFromFit, resetKey });
@@ -353,10 +394,15 @@ export function usePreviewImageZoom(
   return {
     controls: {
       canZoomIn: scale < maximumScale - PREVIEW_IMAGE_SCALE_EPSILON,
-      canZoomOut: isZoomedFromFit,
+      canZoomOut: scale > minimumScale + PREVIEW_IMAGE_SCALE_EPSILON,
       isZoomedFromFit,
       resetZoom: () => requestScale(fitScale),
+      setZoom: (nextScale: number) => requestScale(nextScale),
+      minimumZoom: minimumScale,
+      maximumZoom: maximumScale,
+      toggleZoomLock,
       zoom: scale,
+      zoomLocked,
       zoomIn: () => updateZoom(1),
       zoomOut: () => updateZoom(-1),
     },
