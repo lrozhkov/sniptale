@@ -4,6 +4,7 @@ import { listScenarioPreviewSteps } from '../../../composition/persistence/scena
 import type { ScenarioPreviewStep } from '../../../features/scenario/contracts/types/project';
 import { isGalleryScenarioExportItem, isGalleryScenarioItem, type GalleryItem } from '../items';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
+import { ScenarioViewingActions } from './scenario-viewing-actions';
 
 function ScenarioPreviewSurface(props: { children: ReactNode }) {
   return <div className="grid w-full max-w-6xl gap-4">{props.children}</div>;
@@ -33,6 +34,7 @@ function ScenarioPreviewStepsGrid(props: {
   exportMode: boolean;
   recentSteps: ScenarioPreviewStep[];
   title: string;
+  projectId: string;
 }) {
   return (
     <ScenarioPreviewSurface>
@@ -46,6 +48,7 @@ function ScenarioPreviewStepsGrid(props: {
           {props.title}
         </div>
       </div>
+      <ScenarioViewingActions projectId={props.projectId} exportMode={props.exportMode} />
       {props.recentSteps.length === 0 ? (
         <ScenarioPreviewEmptyState exportMode={props.exportMode} />
       ) : (
@@ -107,6 +110,11 @@ export function PreviewScenarioStage(props: { item: GalleryItem }) {
       exportMode={isGalleryScenarioExportItem(props.item)}
       recentSteps={recentSteps}
       title={props.item.filename}
+      projectId={
+        isGalleryScenarioItem(props.item) || isGalleryScenarioExportItem(props.item)
+          ? props.item.project.id
+          : ''
+      }
     />
   );
 }

@@ -71,6 +71,18 @@ function fixture() {
   };
 }
 beforeEach(() => vi.resetAllMocks());
+it('uses the supplied read-only media authority without invoking export persistence', async () => {
+  const args = fixture();
+  const readAsset = vi.fn(
+    async (id: string) => new Blob([id], { type: id === 'image' ? 'image/png' : 'audio/wav' })
+  );
+  const artifact = await prepareTourHtml({ ...args, readAsset });
+  expect(artifact.blob.size).toBeGreaterThan(0);
+  expect(readAsset.mock.calls.map(([id]) => id)).toEqual(['image', 'audio']);
+  expect(io.asset).not.toHaveBeenCalled();
+  expect(io.sink).not.toHaveBeenCalled();
+  expect(io.record).not.toHaveBeenCalled();
+});
 it('prepares unique media, sanitized shared pixels, object audio, and no capture metadata', async () => {
   const args = fixture();
   const artifact = await prepareTourHtml(args);

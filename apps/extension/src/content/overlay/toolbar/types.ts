@@ -1,4 +1,3 @@
-import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
@@ -60,6 +59,22 @@ export type ToolbarViewportSelection = {
   width: number;
   height: number;
 } | null;
+
+/** Disposable size selection for one mounted screenshot controller. */
+export interface ScreenshotWindowSizeControls {
+  onlyDuringCapture: boolean;
+  busy: boolean;
+  selection: ToolbarViewportSelection;
+  select: (
+    selection: ToolbarViewportSelection,
+    intent?: ContentPrivilegedActionIntentSource | null | undefined
+  ) => Promise<void>;
+  setOnlyDuringCapture: (
+    value: boolean,
+    current: ToolbarViewportSelection,
+    intent?: ContentPrivilegedActionIntentSource | null | undefined
+  ) => Promise<void>;
+}
 
 export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
 

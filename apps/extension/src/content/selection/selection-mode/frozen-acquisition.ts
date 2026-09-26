@@ -1,6 +1,7 @@
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { getAbsolutePosition, getIframeDocument } from '../../platform/frame';
-import { captureFrozenSelectionGeometry, type FrozenSelectionFrame } from './frozen';
+import { captureFrozenSelectionGeometry } from './frozen';
+import type { FrozenSelectionFrame } from './types';
 
 function geometrySignature(element: Element): string {
   const style = element.ownerDocument.defaultView?.getComputedStyle(element);

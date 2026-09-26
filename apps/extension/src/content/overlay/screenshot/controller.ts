@@ -1,4 +1,5 @@
-import { useScreenshotWindowSize, type ScreenshotWindowSizeControls } from './window-size';
+import { useScreenshotWindowSize } from './window-size';
+import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import { useEffect, useRef, useState } from 'react';
 
 import { createHandleCancelCountdown } from './session/cancel';

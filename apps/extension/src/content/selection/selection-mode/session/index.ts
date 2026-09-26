@@ -1,4 +1,4 @@
-import type { FrozenSelectionFrame } from '../frozen';
+import type { FrozenSelectionFrame } from '../types';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import { createSelectionModeDom } from '../ui/container';

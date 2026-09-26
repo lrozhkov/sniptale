@@ -6,19 +6,6 @@ import { handleToolbarViewportChange } from '../toolbar/shell/viewport-change';
 
 type Intent = ContentPrivilegedActionIntentSource | null | undefined;
 
-/** Disposable size selection for one mounted screenshot controller. */
-export interface ScreenshotWindowSizeControls {
-  onlyDuringCapture: boolean;
-  busy: boolean;
-  selection: ToolbarViewportSelection;
-  select: (selection: ToolbarViewportSelection, intent?: Intent) => Promise<void>;
-  setOnlyDuringCapture: (
-    value: boolean,
-    current: ToolbarViewportSelection,
-    intent?: Intent
-  ) => Promise<void>;
-}
-
 export function useScreenshotWindowSize() {
   const [selection, setSelection] = useState<ToolbarViewportSelection>(null);
   const [onlyDuringCapture, setOnlyDuringCapture] = useState(false);

@@ -17,7 +17,7 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (origina
   saveScenarioExportRecord: io.record,
 }));
 vi.mock('../html-document', () => ({ buildGuideHtml: io.render }));
-import { exportGuideHtml, measureGuideHtml } from './html-export';
+import { exportGuideHtml, measureGuideHtml, prepareGuideHtml } from './html-export';
 
 function setup() {
   const chunks: Uint8Array[] = [];
@@ -75,6 +75,15 @@ function setup() {
   return { chunks, order, close, abort, png, controller, args };
 }
 beforeEach(() => vi.resetAllMocks());
+it('prepares identical resolved bytes without opening a file or recording export history', async () => {
+  const s = setup();
+  const blob = await prepareGuideHtml({ ...s.args, readAsset: io.asset });
+  expect(io.sink).not.toHaveBeenCalled();
+  expect(io.record).not.toHaveBeenCalled();
+  expect(await blob.text()).not.toContain('SNIPTALE_ASSET_');
+  await exportGuideHtml(s.args);
+  expect(await blob.text()).toBe(s.chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''));
+});
 it('streams exact bytes and records export only after file commit', async () => {
   const s = setup();
   expect(await exportGuideHtml(s.args)).toBe('saved');

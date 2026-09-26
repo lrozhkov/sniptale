@@ -1,6 +1,6 @@
 # Scenario viewing from Library
 
-This document records the selected design before implementation. The Library action and guide sandbox integration described below are not implemented by this decision. Runtime isolation policy remains owned by [runtime contexts](runtime-contexts.md), [manifest permissions](../security/manifest-permissions.md) and [data handling](../security/data-handling.md).
+This document owns the implemented Library opening and refresh semantics, following the design recorded before implementation. Runtime isolation policy remains owned by [runtime contexts](runtime-contexts.md), [manifest permissions](../security/manifest-permissions.md) and [data handling](../security/data-handling.md).
 
 ## Decision
 
@@ -8,19 +8,19 @@ Open the latest committed scenario project as a full-page HTML presentation in a
 
 Generate a disposable HTML artifact on opening. Keep its bytes fixed for that viewing session. Regenerate from the latest committed project only on explicit refresh or reopening. Do not create an export-history entry, change the project, request a file picker, or retain a durable HTML copy just to view a scenario.
 
-## Existing evidence
+## Source evidence
 
 Paths below are relative to `apps/extension/src/` unless linked otherwise.
 
 | Concern | Existing owner and consequence |
 | --- | --- |
-| Library preview | `gallery/library/preview/scenario-stage.tsx` reads recent project steps for both project and export items. It does not display exported bytes. |
+| Library preview | `gallery/library/preview/scenario-stage.tsx` reads recent project steps for both project and export items. Its thumbnails remain an orientation aid alongside the full-page opening actions; they do not display exported bytes. |
 | Project | `composition/persistence/scenario/contracts.ts` stores a `GuideProject`, owner-issued `workspaceRevision`, timestamps, lifecycle and optional saved-version history. The project includes guide items, style, print and HTML image settings, plus an independently authored optional `tour`. |
 | Media | The same contracts reference media assets; immutable bytes belong to the asset persistence owners. Project JSON and a thumbnail alone are insufficient to prepare the complete HTML. |
 | Export history | `composition/persistence/scenario/store/project-records/exports.ts` stores ID, project ID, format, filename, timestamp and size. It stores no HTML bytes, file handle, source revision, guide/tour discriminator, content digest or complete export settings. Saved project history is not an export snapshot. |
 | Guide HTML | `scenario-editor/page-shell/html-document.tsx` embeds styles, fonts and a hash-authorized viewer script. `page-shell/runtime/html-export.ts` replaces raster placeholders while streaming to a file sink. The intermediate HTML string is not a finished file. |
 | Tour HTML | `scenario-editor/page-shell/runtime/tour-html.ts` prepares a detached Blob including image/audio assets and baked privacy redactions; preview and download share those exact bytes. Missing media, incomplete slides and exceeded budgets reject preparation. |
-| Sandbox | `tour-preview-sandbox/index.ts` accepts one bounded HTML Blob using parent source, origin and per-mount nonce validation, then owns the child Blob URL. Its current protocol is tour-named and capped at 192 MiB. |
+| Sandbox | `tour-preview-sandbox/index.ts` accepts one bounded HTML Blob using parent source, origin and per-mount nonce validation, then owns the child Blob URL. Its protocol is tour-named, validates guide/tour mode, reports bounded readiness/failure and is capped at 192 MiB. |
 
 ## Viewer alternatives
 
@@ -47,14 +47,14 @@ Bind one preparation to a detached committed project and its media references. R
 ## User flow and ownership
 
 1. Show “Open guide” on a readable guide project and “Play tour” when a tour exists. A project can expose both actions. Keep “Edit” separate and keep thumbnails as list orientation only.
-2. Navigate through `platform/navigation/extension-pages/scenario-editor.ts` using a proposed validated `view=guide|tour` parameter alongside `projectId`. Missing view retains the existing editor route; an unsupported view must fail explicitly. Gallery sends identity and mode, not HTML or media bytes in the URL.
+2. Navigate through `platform/navigation/extension-pages/scenario-editor.ts` using a validated `view=guide|tour` parameter alongside `projectId`. Missing view retains the existing editor route; an unsupported view must fail explicitly. Gallery sends identity and mode, not HTML or media bytes in the URL.
 3. Branch into a read-only host before mounting editor mutation, autosave, recording or AI controllers. The host owns persistence admission/read, preparation, progress, cancellation, refresh, retry and the sandbox mount. Gallery never imports sibling `scenario-editor` implementations.
 4. Present a full-width document with compact project title, representation, “saved version” context, refresh and edit controls. Start preparation without an export dialog. Keep loading, empty, unavailable and failure states accessible; failure offers retry or edit. Preserve Library selection in its original tab.
 5. Keep the selected guide reading options disposable, initially using the existing flow/top defaults and persisted image-export settings. Bind theme and locale to each prepared artifact. For tours, use the existing export defaults, preserve animations, transitions, hotspots and narration, and start audio through player interaction when browser autoplay policy requires it. Missing or incomplete tours offer editing; viewing must not generate or mutate a tour.
 
-Keep guide document composition, raster materialization and tour preparation under the scenario runtime. Add an abortable, bounded guide Blob preparation path that reuses the same raster writer as export; do not copy the placeholder replacement algorithm or bypass image privacy processing. Keep saving and export-history side effects outside preparation. When adding download from a viewer, save its prepared bytes rather than regenerating a different document.
+Keep guide document composition, raster materialization and tour preparation under the scenario runtime. The abortable, bounded guide Blob preparation path reuses the same raster writer as export; do not copy the placeholder replacement algorithm or bypass image privacy processing. Keep saving and export-history side effects outside preparation. When adding download from a viewer, save its prepared bytes rather than regenerating a different document.
 
-The sandbox remains the unprivileged execution owner. Generalize its tour-named transport only when adding the second consumer, with explicit guide/tour mode validation. That future change needs its own preflight and public-contract inventory; this decision makes no source move or import-contract change.
+The sandbox remains the unprivileged execution owner. Its existing tour-named transport now validates an explicit guide/tour mode; both the editor export preview and the Library viewer use the same receiver. No runtime or public import path is moved.
 
 ## Isolation requirements for implementation
 
@@ -62,13 +62,13 @@ Accept only artifacts produced by the trusted local guide/tour pipeline from par
 
 Retain the two sandbox layers without `allow-same-origin`, top navigation, forms, downloads or extension API access. Preserve source/origin/nonce binding and one accepted artifact per mount. A replacement artifact gets a fresh mount and nonce. Release the Blob URL on teardown and cancel parent preparation when its host closes. Add bounded readiness/failure feedback so a missing or rejected frame cannot remain a blank successful preview; any child status message must be parsed and bound to the current frame and nonce, with no privileged command authority.
 
-Retain the standalone document's hash-based script CSP and deny network fetches, remote frames and external resources. Do not weaken the extension-page CSP or the effect sandbox. The shared manifest sandbox policy currently omits `font-src`, while guide HTML embeds data fonts; prove the effective nested CSP and admit only the necessary local font source if Chromium blocks those fonts. Update the manifest policy owner and artifact proof if that change is required. Sandbox reuse for guides is therefore a selected implementation approach, not a claim of verified visual parity today.
+Retain the standalone document's hash-based script CSP and deny network fetches, remote frames and external resources. Do not weaken the extension-page CSP or the effect sandbox. Built-extension proof reproduced blocked guide fonts under the prior shared manifest policy. The policy now admits only `font-src data:` for embedded guide fonts, with the exact release-artifact expectation updated. The effect sandbox retains its restrictive head policy.
 
 Tour URL actions currently use a new tab with `noopener noreferrer`; the sandbox permits popups and popup escape for that behavior. Preserve only parser-validated supported URLs reached through an explicit user action. Treat opening an external destination as deliberate navigation, distinct from automatic network access by the HTML. Prove that content cannot request parent storage, editor mutations, downloads or privileged browser actions through messages.
 
 ## Implementation acceptance and proof
 
-The next implementation must provide both Library actions and route-level proof that viewing performs no project writes or export-history writes. Exercise guides with navigation, text, images, fonts and image zoom, and tours with slide navigation, timed animation, hotspots, baked redactions and narration. Verify the guide Blob contains resolved raster bytes and matches the export producer's content.
+Both Library actions require route-level proof that viewing performs no project writes or export-history writes. Exercise guides with navigation, text, images, fonts and image zoom, and tours with slide navigation, timed animation, hotspots, baked redactions and narration. Verify the guide Blob contains resolved raster bytes and matches the export producer's content.
 
 Run built-extension browser proof for both modes: effective CSP, extension API/storage isolation, script execution, denied remote requests, rejected forged/replayed/oversized messages, user-initiated external links and frame teardown. Existing unit tests and source inspection do not substitute for this proof. Preserve the effect-sandbox artifact checks when touching shared sandbox policy.
 

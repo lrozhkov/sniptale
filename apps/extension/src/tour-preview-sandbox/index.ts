@@ -10,13 +10,21 @@ if (/^[a-f0-9-]{36}$/i.test(nonce)) {
     const message = readTourPreviewMessage(event.data, nonce);
     if (!message) return;
     accepted = true;
-    url = URL.createObjectURL(message.blob);
-    const frame = document.createElement('iframe');
-    frame.title = document.title;
-    frame.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');
-    frame.allow = 'autoplay';
-    frame.src = url;
-    document.body.append(frame);
+    const report = (status: 'ready' | 'failed') =>
+      parent.postMessage({ kind: 'scenario-preview-status', nonce, status }, expectedOrigin);
+    try {
+      url = URL.createObjectURL(message.blob);
+      const frame = document.createElement('iframe');
+      frame.title = document.title;
+      frame.setAttribute('sandbox', 'allow-scripts allow-popups allow-popups-to-escape-sandbox');
+      frame.allow = 'autoplay';
+      frame.addEventListener('load', () => report('ready'), { once: true });
+      frame.addEventListener('error', () => report('failed'), { once: true });
+      frame.src = url;
+      document.body.append(frame);
+    } catch {
+      report('failed');
+    }
   });
 }
 window.addEventListener('pagehide', () => {

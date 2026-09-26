@@ -1,4 +1,4 @@
-import type { FrozenSelectionFrame } from '../../frozen';
+import type { FrozenSelectionFrame } from '../../types';
 import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 import { getContentEventTargetElement } from '../../../../platform/dom-host';
 import { resolveIframeEventTarget } from '../../../../platform/frame';

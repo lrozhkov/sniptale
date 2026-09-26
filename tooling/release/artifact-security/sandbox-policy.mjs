@@ -1,6 +1,6 @@
 export const EXPECTED_SANDBOX_CSP =
   "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox; default-src 'none'; " +
-  "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; " +
+  "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; font-src data:; " +
   "media-src data:; connect-src 'none'; worker-src blob:; child-src blob:; object-src 'none';";
 export const EXPECTED_EFFECT_SANDBOX_CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; " +

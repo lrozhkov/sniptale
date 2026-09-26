@@ -1,4 +1,4 @@
-import type { FrozenSelectionFrame } from '../frozen';
+import type { FrozenSelectionFrame } from '../types';
 import type { ResolvedBorderPresetVisual } from '../../../../features/highlighter/style';
 import { getAbsolutePosition } from '../../../platform/frame';
 import { logSelectionModeRuntime } from '../diag';

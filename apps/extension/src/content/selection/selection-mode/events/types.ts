@@ -1,4 +1,4 @@
-import type { FrozenSelectionFrame } from '../frozen';
+import type { FrozenSelectionFrame } from '../types';
 import type { ResizeDirection } from '../ui';
 
 export interface SelectionModeInteractionState {

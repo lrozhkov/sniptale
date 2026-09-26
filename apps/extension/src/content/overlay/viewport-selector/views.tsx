@@ -1,4 +1,4 @@
-import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
+import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import { createTrustedContentActionIntentSource } from '../../application/privileged-action-intent';
 import { Fragment, useState, type CSSProperties, type MouseEvent } from 'react';
 import { Scaling } from 'lucide-react';

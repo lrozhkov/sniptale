@@ -1,8 +1,6 @@
 import { acquireFrozenSelectionFrame } from '../../../selection/selection-mode/frozen-acquisition';
-import {
-  prepareFrozenSelectionFrame,
-  type FrozenSelectionFrame,
-} from '../../../selection/selection-mode/frozen';
+import { prepareFrozenSelectionFrame } from '../../../selection/selection-mode/frozen';
+import type { FrozenSelectionFrame } from '../../../selection/selection-mode/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import type { CaptureResponse } from '../../../../contracts/messaging/contracts/response-types';

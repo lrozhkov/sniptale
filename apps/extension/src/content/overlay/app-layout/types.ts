@@ -1,4 +1,4 @@
-import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
+import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import type { CaptureActionType } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ScreenshotStartContext } from '../screenshot/types';

@@ -33,6 +33,7 @@ export async function prepareTourHtml(args: {
   labels: TourPlayerLabels;
   signal: AbortSignal;
   onProgress?: (done: number, total: number) => void;
+  readAsset?: (id: string) => Promise<Blob | undefined>;
 }): Promise<PreparedTourHtml> {
   const parsed = parseTourDocument(args.project.tour);
   if (parsed.status !== 'ok' || !parsed.document.slides.length) throw new Error('Invalid tour');
@@ -59,7 +60,7 @@ export async function prepareTourHtml(args: {
   args.onProgress?.(0, roles.size);
   for (const [id, kind] of roles) {
     args.signal.throwIfAborted();
-    const source = await getScenarioAssetBlob(id);
+    const source = await (args.readAsset ?? getScenarioAssetBlob)(id);
     args.signal.throwIfAborted();
     if (!source?.size) throw new Error('Missing tour media');
     inputSize += source.size;

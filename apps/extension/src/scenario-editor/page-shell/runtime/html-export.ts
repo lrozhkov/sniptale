@@ -5,6 +5,33 @@ import { saveScenarioExportRecord } from '../../../composition/persistence/scena
 import { measureHtmlImages, prepareHtmlImage, type HtmlRaster } from './html-images';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../../platform/i18n';
+import { SCENARIO_PREVIEW_MAX_BYTES } from '../../../features/scenario/tour-player/preview-contract';
+
+/** Materializes the same streamed guide as download, without any file or history effects. */
+export async function prepareGuideHtml(args: {
+  project: GuideProject;
+  t: Translate;
+  theme: 'light' | 'dark';
+  signal: AbortSignal;
+  readAsset: (id: string) => Promise<Blob | undefined>;
+}): Promise<Blob> {
+  args.signal.throwIfAborted();
+  const { buildGuideHtml } = await import('../html-document');
+  const media = await measureHtmlImages(args.project, args.signal, args.readAsset);
+  const document = await buildGuideHtml(args.project, args.t, args.theme, media);
+  const chunks: Blob[] = [];
+  let bytes = 0;
+  const writable = new WritableStream<Uint8Array>({
+    write(chunk) {
+      bytes += chunk.byteLength;
+      if (bytes > SCENARIO_PREVIEW_MAX_BYTES) throw new Error('Guide preview budget exceeded');
+      chunks.push(new Blob([new Uint8Array(chunk)]));
+    },
+  });
+  await writeGuideHtml({ writable }, document, args.signal, args.readAsset);
+  args.signal.throwIfAborted();
+  return new Blob(chunks, { type: 'text/html;charset=utf-8' });
+}
 
 /** Native file commit precedes advisory export history; raster bytes are streamed in bounded slices. */
 export async function exportGuideHtml(args: {
@@ -48,9 +75,10 @@ export async function exportGuideHtml(args: {
 }
 
 async function writeGuideHtml(
-  sink: ExportSink,
+  sink: Pick<ExportSink, 'writable'>,
   document: { html: string; rasters: HtmlRaster[] },
-  signal: AbortSignal
+  signal: AbortSignal,
+  readAsset?: (id: string) => Promise<Blob | undefined>
 ) {
   const writer = sink.writable.getWriter();
   const encoder = new TextEncoder();
@@ -69,7 +97,12 @@ async function writeGuideHtml(
       await write(document.html.slice(offset, match.index));
       const raster = document.rasters[Number(match[1])];
       if (!raster) throw new Error('Unknown export image.');
-      const { blob, mime } = await prepareHtmlImage(raster.block, raster.settings, signal);
+      const { blob, mime } = await prepareHtmlImage(
+        raster.block,
+        raster.settings,
+        signal,
+        readAsset
+      );
       await write(`href="data:${mime};base64,`);
       // Multiples of three avoid padding between independently encoded chunks.
       for (let start = 0; start < blob.size; start += 96 * 1024) {

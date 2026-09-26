@@ -29,9 +29,10 @@ export interface HtmlRaster {
 export async function prepareHtmlImage(
   block: GuideImageBlock,
   settings: GuideHtmlImageSettings,
-  signal: AbortSignal
+  signal: AbortSignal,
+  readAsset = getScenarioAssetBlob
 ) {
-  const source = await getScenarioAssetBlob(block.assetId);
+  const source = await readAsset(block.assetId);
   signal.throwIfAborted();
   if (!source) throw new Error('Missing export image.');
   await assertImportableProjectImage(source);
@@ -75,7 +76,11 @@ export async function prepareHtmlImage(
 }
 
 /** Measurement keeps metadata only; payloads are prepared again when the file is streamed. */
-export async function measureHtmlImages(project: GuideProject, signal: AbortSignal) {
+export async function measureHtmlImages(
+  project: GuideProject,
+  signal: AbortSignal,
+  readAsset = getScenarioAssetBlob
+) {
   const rasters: HtmlRaster[] = [];
   const indices = new Map<string, number>();
   const blocks = new Map<string, number>();
@@ -85,7 +90,7 @@ export async function measureHtmlImages(project: GuideProject, signal: AbortSign
     let index = indices.get(key);
     if (index === undefined) {
       index = rasters.length;
-      const { blob, ...metadata } = await prepareHtmlImage(block, settings, signal);
+      const { blob, ...metadata } = await prepareHtmlImage(block, settings, signal, readAsset);
       void blob;
       rasters.push({ block, settings, ...metadata });
       indices.set(key, index);

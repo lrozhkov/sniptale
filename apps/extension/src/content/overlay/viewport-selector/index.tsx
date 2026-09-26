@@ -1,4 +1,4 @@
-import type { ScreenshotWindowSizeControls } from '../screenshot/window-size';
+import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import { useImperativeHandle, forwardRef } from 'react';
 import { useAppLocale } from '../../../platform/i18n';
 import type { ContentToolbarDisplayMode, ViewportPreset } from '../../../contracts/settings';

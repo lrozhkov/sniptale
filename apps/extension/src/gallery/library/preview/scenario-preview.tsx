@@ -10,6 +10,7 @@ import type {
 } from '../../../features/scenario/contracts/types/project';
 import { formatDate } from '../ui';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
+import { ScenarioViewingActions } from './scenario-viewing-actions';
 
 interface GalleryScenarioPreviewPanelProps {
   project: ScenarioProjectSummary;
@@ -171,6 +172,7 @@ function ScenarioPreviewSidebar(props: {
           value={formatDate(props.project.createdAt)}
         />
         <ScenarioPreviewEditorButton projectId={props.project.id} disabled={!props.canEdit} />
+        {props.canEdit && <ScenarioViewingActions projectId={props.project.id} />}
       </div>
     </aside>
   );

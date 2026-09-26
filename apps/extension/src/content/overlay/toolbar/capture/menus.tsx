@@ -1,4 +1,4 @@
-import type { ScreenshotWindowSizeControls } from '../../screenshot/window-size';
+import type { ScreenshotWindowSizeControls } from '../types';
 import React from 'react';
 
 import { ViewportSelector, type ViewportSelectorRef } from '../../viewport-selector';

@@ -1,25 +1,9 @@
 import { getFrozenHitSamplingBoxes } from './frozen-hit-shapes';
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { getAbsolutePosition, getIframeDocument } from '../../platform/frame';
-import type { Selection } from './types';
+import type { FrozenSelectionFrame, FrozenSelectionGeometry, Selection } from './types';
 
 type HitRegion = Selection & { element: HTMLElement };
-
-/** Disposable viewport geometry captured before the selection UI changes page hover state. */
-interface FrozenSelectionGeometry {
-  width: number;
-  height: number;
-  scale: number;
-  getRect: (element: HTMLElement) => Selection;
-  targetAt: (x: number, y: number) => HTMLElement | null;
-  assertViewport: () => void;
-}
-
-/** One raster and its geometry belong to the same selection session. */
-export interface FrozenSelectionFrame {
-  dataUrl: string;
-  geometry: FrozenSelectionGeometry;
-}
 
 function contains(rect: Selection, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
