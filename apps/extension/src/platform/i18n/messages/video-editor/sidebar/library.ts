@@ -170,12 +170,12 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Back to timeline',
   },
   librarySearchPlaceholder: {
-    ru: 'Найти видео или скриншот',
-    en: 'Find a video or screenshot',
+    ru: 'Поиск',
+    en: 'Search',
   },
   librarySearchDescription: {
-    ru: 'Поиск видео и скриншотов в библиотеке.',
-    en: 'Search videos and screenshots in the library.',
+    ru: 'Поиск материалов в библиотеке.',
+    en: 'Search library media.',
   },
   libraryRecentProjectsTitle: {
     ru: 'Недавние проекты',
@@ -246,16 +246,44 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'The preview action failed. Please try again.',
   },
   libraryMediaPreviewEmpty: {
-    ru: 'Выберите запись в списке, чтобы увидеть превью и параметры.',
-    en: 'Select a recording to preview it and inspect its settings.',
+    ru: 'Выберите материал в списке для предпросмотра.',
+    en: 'Select an item in the list to preview it.',
   },
   mediaPreviewZoomLabel: {
     ru: 'Масштаб превью',
     en: 'Preview zoom',
   },
   mediaPreviewUnavailable: {
-    ru: 'Видео недоступно для предпросмотра',
-    en: 'Video preview is unavailable',
+    ru: 'Файл видео отсутствует. Выберите другой материал.',
+    en: 'The video file is missing. Choose another item.',
+  },
+  mediaPreviewImageMissing: {
+    ru: 'Файл изображения отсутствует. Выберите другой материал.',
+    en: 'The image file is missing. Choose another item.',
+  },
+  mediaPreviewAudioMissing: {
+    ru: 'Файл аудио отсутствует. Выберите другой материал.',
+    en: 'The audio file is missing. Choose another item.',
+  },
+  mediaPreviewImageNotReady: {
+    ru: 'Предпросмотр текущей версии изображения не сохранён. Откройте изображение в редакторе и сохраните его.',
+    en: 'The current image preview has not been saved. Open the image in the editor and save it.',
+  },
+  mediaPreviewReadFailed: {
+    ru: 'Не удалось прочитать материал. Откройте библиотеку повторно.',
+    en: 'Could not read the media. Reopen the library to retry.',
+  },
+  mediaPreviewImageDecodeFailed: {
+    ru: 'Не удалось показать изображение. Проверьте, открывается ли исходный файл.',
+    en: 'Could not display the image. Check that the source file opens.',
+  },
+  mediaPreviewVideoDecodeFailed: {
+    ru: 'Не удалось воспроизвести видео. Проверьте формат и целостность исходного файла.',
+    en: 'Could not play the video. Check the format and integrity of the source file.',
+  },
+  mediaPreviewAudioDecodeFailed: {
+    ru: 'Не удалось воспроизвести аудио. Проверьте формат и целостность исходного файла.',
+    en: 'Could not play the audio. Check the format and integrity of the source file.',
   },
   mediaPreviewTypeLabel: {
     ru: 'Тип',

@@ -649,3 +649,51 @@ async function verifyMediaImports() {
   expect(videoAsset.type).toBe(VideoProjectAssetType.VIDEO);
   expect(audioAsset.type).toBe(VideoProjectAssetType.AUDIO);
 }
+
+it('imports an original screenshot when no derived presentation has been generated', async () => {
+  const { ensureLibraryMediaAssets } = await import('./assets');
+  const file = createPngFile();
+  getMediaLibraryEntryMock.mockResolvedValue({
+    id: 'original',
+    kind: 'screenshot',
+    filename: file.name,
+    source: { kind: 'screenshot' },
+    workspaceRevision: 0,
+    imageContentState: 'original',
+  });
+  getAggregatePresentationMock.mockResolvedValue(undefined);
+  getMediaAssetBlobMock.mockResolvedValue(file);
+  const [asset] = await ensureLibraryMediaAssets(createEmptyVideoProject(), 'original');
+  expect(asset?.type).toBe(VideoProjectAssetType.IMAGE);
+  expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+});
+
+it('imports a microphone recording as audio without acquiring a video or webcam asset', async () => {
+  const { ensureLibraryMediaAssets } = await import('./assets');
+  const file = createMp3File();
+  getMediaLibraryEntryMock.mockResolvedValue({
+    id: 'microphone',
+    kind: 'audio',
+    filename: file.name,
+    source: { kind: 'recording', recordingId: 'mic-1' },
+  });
+  getMediaAssetBlobMock.mockResolvedValue(file);
+  getRecordingMock.mockImplementation(async (id: string) =>
+    id === 'mic-1' ? { file, filename: file.name } : undefined
+  );
+  const project = createEmptyVideoProject();
+  const [asset] = await ensureLibraryMediaAssets(project, 'microphone');
+  expect(asset).toMatchObject({
+    type: VideoProjectAssetType.AUDIO,
+    metadata: { hasAudio: true },
+    source: { kind: 'project-asset', originMediaId: 'microphone' },
+  });
+  expect(loadAudioMetadataMock).toHaveBeenCalledWith(expect.any(File));
+  expect(loadVideoMetadataMock).not.toHaveBeenCalled();
+  expect(getRecordingMock).not.toHaveBeenCalled();
+  expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+  if (!asset) throw new Error('Missing microphone asset');
+  project.assets.push(asset);
+  expect(await ensureLibraryMediaAssets(project, 'microphone')).toEqual([asset]);
+  expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+});

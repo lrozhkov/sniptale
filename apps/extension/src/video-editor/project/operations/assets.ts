@@ -134,7 +134,7 @@ export async function ensureLibraryMediaAssets(
   const entry = await getMediaLibraryEntry(mediaId);
   if (!entry) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
   const assetType = getLibraryImportType(entry);
-  if (entry.source.kind === 'recording') {
+  if (entry.source.kind === 'recording' && assetType !== VideoProjectAssetType.AUDIO) {
     return ensureRecordingAssets(project, entry.source.recordingId);
   }
   if (
@@ -195,7 +195,11 @@ async function readLibraryImportBlob(
   entry: MediaLibraryEntry,
   assetType: ImportableProjectAssetType
 ): Promise<Blob | undefined> {
-  if (assetType !== VideoProjectAssetType.IMAGE) return getMediaAssetBlob(entry.id);
+  if (
+    assetType !== VideoProjectAssetType.IMAGE ||
+    ((entry.workspaceRevision ?? 0) === 0 && entry.imageContentState !== 'edited')
+  )
+    return getMediaAssetBlob(entry.id);
   const presentation = await getAggregatePresentation({ id: entry.id, kind: 'image' });
   return presentation?.presentationRevision === (entry.workspaceRevision ?? 0)
     ? presentation.previewBlob

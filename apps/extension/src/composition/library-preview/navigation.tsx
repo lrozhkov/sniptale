@@ -1,16 +1,27 @@
 import { useState } from 'react';
-import { Film, Image, Library } from 'lucide-react';
+import { Film, Image, Library, Music } from 'lucide-react';
 import { translate, type Translate } from '../../platform/i18n';
 import type { GallerySavedView } from '../persistence/gallery-saved-views';
+type Category = 'all' | 'video' | 'image';
 type LibraryNavigationProps = {
-  category: 'all' | 'video' | 'image';
   presetId: string | null;
   savedViews: GallerySavedView[];
-  onCategoryChange(category: 'all' | 'video' | 'image'): void;
-  onPresetChange(id: string, category: 'all' | 'video' | 'image'): void;
   label?: string;
   t?: Translate;
-};
+} & (
+  | {
+      includeAudio: true;
+      category: Category | 'audio';
+      onCategoryChange(category: Category | 'audio'): void;
+      onPresetChange(id: string, category: Category | 'audio'): void;
+    }
+  | {
+      includeAudio?: false;
+      category: Category;
+      onCategoryChange(category: Category): void;
+      onPresetChange(id: string, category: Category): void;
+    }
+);
 /** Shared library categories keep saved filters beneath their matching media type. */
 export function LibraryNavigation(props: LibraryNavigationProps) {
   return (
@@ -21,6 +32,7 @@ export function LibraryNavigation(props: LibraryNavigationProps) {
       {(['all', 'image', 'video'] as const).map((category) => (
         <LibraryCategory key={category} {...props} categoryKey={category} />
       ))}
+      {props.includeAudio && <LibraryCategory {...props} categoryKey="audio" />}
     </nav>
   );
 }
@@ -32,35 +44,34 @@ function libraryNavigationClass(active: boolean): string {
   ].join(' ');
 }
 
-function LibraryCategory(
-  props: LibraryNavigationProps & { categoryKey: 'all' | 'video' | 'image' }
-) {
+const categories = {
+  all: { Icon: Library, folder: 'all', labelKey: 'gallery.preview.folderAll' },
+  video: { Icon: Film, folder: 'recording', labelKey: 'videoEditor.app.materialsVideo' },
+  image: { Icon: Image, folder: 'screenshot', labelKey: 'scenario.editor.guideLibraryImages' },
+  audio: { Icon: Music, folder: 'audio', labelKey: 'videoEditor.app.materialsAudio' },
+} as const;
+
+function LibraryCategory(props: LibraryNavigationProps & { categoryKey: Category | 'audio' }) {
   const t = props.t ?? translate;
   const [visibleCount, setVisibleCount] = useState(5);
   const category = props.categoryKey;
-  const Icon = category === 'all' ? Library : category === 'video' ? Film : Image;
-  const views = props.savedViews.filter(
-    (view) =>
-      view.folderFilter ===
-      (category === 'all' ? 'all' : category === 'video' ? 'recording' : 'screenshot')
-  );
+  const { Icon, folder, labelKey } = categories[category];
+  const views = props.savedViews.filter((view) => view.folderFilter === folder);
   const active = props.category === category;
   return (
     <div>
       <button
         type="button"
         aria-pressed={active && props.presetId === null}
-        onClick={() => props.onCategoryChange(category)}
+        onClick={() => {
+          if (category === 'audio') {
+            if (props.includeAudio) props.onCategoryChange('audio');
+          } else props.onCategoryChange(category);
+        }}
         className={libraryNavigationClass(active && props.presetId === null)}
       >
         <Icon size={16} aria-hidden />
-        {t(
-          category === 'all'
-            ? 'gallery.preview.folderAll'
-            : category === 'video'
-              ? 'videoEditor.app.materialsVideo'
-              : 'scenario.editor.guideLibraryImages'
-        )}
+        {t(labelKey)}
       </button>
       <div className="space-y-0.5 pl-7" data-ui={`library-filters-${category}`}>
         {views.slice(0, visibleCount).map((view) => (
@@ -69,7 +80,11 @@ function LibraryCategory(
             type="button"
             title={view.name}
             aria-pressed={active && props.presetId === view.id}
-            onClick={() => props.onPresetChange(view.id, category)}
+            onClick={() => {
+              if (category === 'audio') {
+                if (props.includeAudio) props.onPresetChange(view.id, 'audio');
+              } else props.onPresetChange(view.id, category);
+            }}
             className={`${libraryNavigationClass(active && props.presetId === view.id)} !h-8 !px-2 !text-xs`}
           >
             <span className="truncate">{view.name}</span>

@@ -247,3 +247,32 @@ it('leaves Space available to native actions when previewing an image', () => {
   expect(space(action).defaultPrevented).toBe(false);
   expect(nativeKey).toHaveBeenCalledOnce();
 });
+
+it.each(['image', 'video'] as const)(
+  'reports a %s decoding failure separately from playback actions',
+  (kind) => {
+    act(() =>
+      root.render(
+        <LibraryMediaPlayer src={`blob:${kind}`} filename="Selected" kind={kind}>
+          <span>Loading</span>
+        </LibraryMediaPlayer>
+      )
+    );
+    act(() =>
+      container.querySelector(kind === 'image' ? 'img' : 'video')!.dispatchEvent(new Event('error'))
+    );
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      kind === 'image'
+        ? 'videoEditor.sidebar.mediaPreviewImageDecodeFailed'
+        : 'videoEditor.sidebar.mediaPreviewVideoDecodeFailed'
+    );
+    act(() =>
+      root.render(
+        <LibraryMediaPlayer src="blob:next" filename="Next" kind={kind}>
+          <span>Loading</span>
+        </LibraryMediaPlayer>
+      )
+    );
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  }
+);

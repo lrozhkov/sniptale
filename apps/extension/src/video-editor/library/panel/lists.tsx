@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { LibraryMediaAdd } from './media-add';
-import { Film, Image } from 'lucide-react';
+import { Film, Image, Music } from 'lucide-react';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 import { translate } from '../../../platform/i18n';
 import { formatDuration, formatSize } from '../../chrome/display';
@@ -18,7 +18,11 @@ export function LibraryMediaSection(props: {
   const selected = props.items.find(({ id }) => id === selectedId) ?? props.items[0] ?? null;
   return (
     <div
-      className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(240px,0.65fr)_minmax(0,1.35fr)] gap-4"
+      className={[
+        'grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3',
+        'grid-rows-[minmax(120px,0.7fr)_minmax(0,1.3fr)]',
+        'md:grid-cols-[minmax(240px,0.4fr)_minmax(0,1fr)] md:grid-rows-1',
+      ].join(' ')}
       data-ui="video-editor.library.media-tab"
     >
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
@@ -31,7 +35,7 @@ export function LibraryMediaSection(props: {
           ) : (
             props.items.map((item) => {
               const isImage = item.kind === 'image' || item.kind === 'screenshot';
-              const Icon = isImage ? Image : Film;
+              const Icon = isImage ? Image : item.kind === 'audio' ? Music : Film;
               const thumbnail = props.thumbnails[item.id]?.url;
               return (
                 <div key={item.id} className="group/library-card relative">
@@ -49,7 +53,7 @@ export function LibraryMediaSection(props: {
                   >
                     <span
                       className={[
-                        'flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md',
+                        'flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md',
                         'bg-[var(--sniptale-color-surface-panel)]',
                       ].join(' ')}
                     >
@@ -59,7 +63,7 @@ export function LibraryMediaSection(props: {
                         <Icon size={22} aria-hidden />
                       )}
                     </span>
-                    <span className="min-w-0">
+                    <span className="min-w-0 flex-1">
                       <span
                         className="block truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]"
                         title={item.filename}

@@ -177,3 +177,82 @@ it('shows insertion failure, allows retry and reports success only after complet
   expect(button.textContent).toContain('videoEditor.sidebar.libraryAddedMaterials');
   expect(add).toHaveBeenLastCalledWith(recording.id);
 });
+
+it('previews an original stored image also used by a scenario without requiring a derived presentation', async () => {
+  getAggregatePresentation.mockResolvedValue(undefined);
+  getMediaAssetBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+  await act(async () =>
+    root.render(
+      <MediaPreviewPane
+        item={{
+          ...recording,
+          kind: 'image',
+          mimeType: 'image/png',
+          workspaceRevision: 0,
+          imageContentState: 'original',
+          source: { kind: 'stored-asset', assetId: 'shared-with-scenario' },
+        }}
+        onAddMedia={vi.fn()}
+      />
+    )
+  );
+  expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:recording-preview');
+  expect(container.querySelector('video')).toBeNull();
+});
+
+it('identifies a missing current edited image preview without falling back to source bytes', async () => {
+  getAggregatePresentation.mockResolvedValue({
+    presentationRevision: 1,
+    previewBlob: new Blob(['old']),
+  });
+  await act(async () =>
+    root.render(
+      <MediaPreviewPane
+        item={{
+          ...recording,
+          kind: 'image',
+          mimeType: 'image/png',
+          workspaceRevision: 2,
+          imageContentState: 'edited',
+        }}
+        onAddMedia={vi.fn()}
+      />
+    )
+  );
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'mediaPreviewImageNotReady'
+  );
+  expect(getMediaAssetBlob).not.toHaveBeenCalled();
+});
+
+it('distinguishes storage read failure from missing media', async () => {
+  getMediaAssetBlob.mockRejectedValue(new Error('Storage unavailable'));
+  await act(async () => root.render(<MediaPreviewPane item={recording} onAddMedia={vi.fn()} />));
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'mediaPreviewReadFailed'
+  );
+});
+
+it('uses an audio player and reports audio decoding failure', async () => {
+  getMediaAssetBlob.mockResolvedValue(new Blob(['audio'], { type: 'audio/mpeg' }));
+  await act(async () =>
+    root.render(
+      <MediaPreviewPane
+        item={{
+          ...recording,
+          kind: 'audio',
+          mimeType: 'audio/mpeg',
+          filename: 'Voice.mp3',
+        }}
+        onAddMedia={vi.fn()}
+      />
+    )
+  );
+  expect(container.querySelector('video')).toBeNull();
+  const audio = container.querySelector('audio');
+  expect(audio?.getAttribute('src')).toBe('blob:recording-preview');
+  await act(async () => audio?.dispatchEvent(new Event('error')));
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'mediaPreviewAudioDecodeFailed'
+  );
+});

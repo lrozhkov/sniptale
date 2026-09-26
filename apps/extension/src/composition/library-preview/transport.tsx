@@ -26,7 +26,7 @@ export function LibraryMediaTransport(props: {
   );
   return (
     <div
-      className="flex min-w-0 shrink-0 flex-wrap items-center gap-2"
+      className="flex min-w-0 shrink-0 flex-wrap items-center justify-center gap-2"
       data-ui="library-media-transport"
     >
       {!props.image ? (

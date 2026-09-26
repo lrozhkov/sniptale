@@ -220,5 +220,22 @@ it('keeps all-media filters only in all media and includes both supported kinds'
   const list = container.querySelector('[data-ui="recordings-scroll"]')!.textContent;
   expect(list).toContain('recording');
   expect(list).toContain('screenshot');
-  expect(list).not.toContain('audio');
+  expect(list).toContain('audio');
+});
+
+it('offers audio and imports the selected audio through the material owner', async () => {
+  const onAddMedia = vi.fn().mockResolvedValue(undefined);
+  render({ onAddMedia });
+  const audio = Array.from(container.querySelectorAll<HTMLButtonElement>('nav button')).find(
+    (b) => b.textContent === 'videoEditor.app.materialsAudio'
+  );
+  expect(audio).toBeDefined();
+  act(() => audio!.click());
+  const list = container.querySelector('[data-ui="recordings-scroll"]')!;
+  expect(list.textContent).toContain('audio');
+  expect(list.textContent).not.toContain('recording');
+  await act(async () =>
+    list.querySelector<HTMLButtonElement>('[data-ui="video-editor.library.add-material"]')!.click()
+  );
+  expect(onAddMedia).toHaveBeenCalledWith('audio');
 });

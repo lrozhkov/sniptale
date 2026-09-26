@@ -7,10 +7,10 @@ import { LibraryMediaSection } from './lists';
 import type { LibraryThumbnailViewState } from './thumbnails/types';
 
 type LibraryPanelContentProps = VideoEditorLibraryPanelBodyProps & {
-  category: 'all' | 'video' | 'image';
+  category: 'all' | 'video' | 'image' | 'audio';
   presetId: string | null;
-  onPresetChange: (id: string, category: 'all' | 'video' | 'image') => void;
-  onCategoryChange: (category: 'all' | 'video' | 'image') => void;
+  onPresetChange: (id: string, category: 'all' | 'video' | 'image' | 'audio') => void;
+  onCategoryChange: (category: 'all' | 'video' | 'image' | 'audio') => void;
   onQueryChange: (query: string) => void;
   query: string;
   thumbnails: Record<string, LibraryThumbnailViewState>;
@@ -20,11 +20,17 @@ export function LibraryPanelDrawerContent(props: LibraryPanelContentProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <main
-        className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4"
+        className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row"
         data-ui="video-editor.library.tab-body"
       >
-        <div className="w-44 shrink-0 min-h-0 overflow-auto">
+        <div
+          className={[
+            'max-h-32 shrink-0 overflow-auto lg:max-h-none lg:w-36',
+            '[&_nav]:flex [&_nav]:flex-wrap lg:[&_nav]:block',
+          ].join(' ')}
+        >
           <LibraryNavigation
+            includeAudio
             category={props.category}
             presetId={props.presetId}
             savedViews={props.savedViews}

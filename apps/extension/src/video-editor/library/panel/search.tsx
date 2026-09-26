@@ -6,7 +6,7 @@ export function LibraryPanelSearch(props: {
   query: string;
 }) {
   return (
-    <div className="[&_input:focus]:placeholder:text-transparent">
+    <div className="[&_input:focus]:placeholder:text-transparent [&>label]:rounded-md">
       <label htmlFor="video-editor-library-search" className="sr-only">
         {translate('videoEditor.sidebar.librarySearchPlaceholder')}
       </label>

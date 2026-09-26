@@ -24,6 +24,8 @@ export function LibraryMediaPlayer(props: PlayerProps) {
   const { failed, setFailed } = playback;
   const state = useLibraryViewport(props.src, setFailed);
   const { frame, fullscreen, viewport, pan, zoom, fullscreenButton, exitFullscreen } = state;
+  const [decodeFailed, setDecodeFailed] = useState(false);
+  useEffect(() => setDecodeFailed(false), [props.src]);
   const [imageReady, setImageReady] = useState(false);
   useEffect(() => setImageReady(false), [props.src]);
   const ready = props.kind === 'image' ? imageReady : playback.ready;
@@ -44,7 +46,7 @@ export function LibraryMediaPlayer(props: PlayerProps) {
           cursor: zoom > 1 ? (pan.dragging ? 'grabbing' : 'grab') : undefined,
           touchAction: zoom > 1 ? 'none' : undefined,
         }}
-        className="min-h-0 flex-1 overflow-auto rounded-lg bg-black"
+        className="min-h-0 flex-1 overflow-auto rounded-lg bg-[var(--sniptale-color-surface-panel)]"
         data-ui="library-media-viewport"
       >
         <LibraryMediaPicture
@@ -52,9 +54,21 @@ export function LibraryMediaPlayer(props: PlayerProps) {
           playback={playback}
           zoom={zoom}
           onImageReady={() => setImageReady(true)}
+          onDecodeFailed={() => {
+            setDecodeFailed(true);
+            setImageReady(false);
+          }}
         />
       </div>
-      {failed ? (
+      {decodeFailed ? (
+        <p role="alert" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate(
+            props.kind === 'image'
+              ? 'videoEditor.sidebar.mediaPreviewImageDecodeFailed'
+              : 'videoEditor.sidebar.mediaPreviewVideoDecodeFailed'
+          )}
+        </p>
+      ) : failed ? (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.sidebar.mediaPreviewActionFailed')}
         </p>
@@ -77,9 +91,10 @@ function LibraryMediaPicture(
     playback: ReturnType<typeof useLibraryPlayback>;
     zoom: number;
     onImageReady(): void;
+    onDecodeFailed(): void;
   }
 ) {
-  const { video, sync, loadMetadata, setFailed } = props.playback;
+  const { video, sync, loadMetadata } = props.playback;
   if (!props.src) return props.children;
   return (
     <div
@@ -94,7 +109,7 @@ function LibraryMediaPicture(
           draggable={false}
           className="block h-full w-full object-contain"
           onLoad={props.onImageReady}
-          onError={() => setFailed(true)}
+          onError={props.onDecodeFailed}
         />
       ) : (
         <video
@@ -118,7 +133,7 @@ function LibraryMediaPicture(
           onVolumeChange={sync}
           onError={() => {
             sync();
-            setFailed(true);
+            props.onDecodeFailed();
           }}
         />
       )}
