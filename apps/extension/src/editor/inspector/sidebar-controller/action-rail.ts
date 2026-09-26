@@ -1,4 +1,5 @@
-import { SESSION_EXPORT_FILENAME } from '@sniptale/ui/branding';
+import { createOutputFilename } from '../../../workflows/file-naming/index';
+import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import {
   createRuntimeMessagingTransport,
@@ -7,7 +8,6 @@ import {
 import { loadEditorExportSettings } from '../../persistence/export-settings';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { generateFilename } from '@sniptale/foundation/utils/filename';
 import {
   assertEditorSessionFileCanBeRead,
   parseImportedEditorDocument,
@@ -31,14 +31,19 @@ function createEditorInspectorActionClient(
   };
 }
 
-function triggerSessionExport(document: EditorDocument) {
+async function triggerSessionExport(document: EditorDocument) {
+  const filename = await createOutputFilename({
+    category: 'resources',
+    type: 'editor-session',
+    extension: 'json',
+  });
   const blob = new Blob([JSON.stringify(document, null, 2)], {
     type: 'application/json',
   });
   const url = URL.createObjectURL(blob);
   const link = window.document.createElement('a');
   link.href = url;
-  link.download = SESSION_EXPORT_FILENAME;
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -55,7 +60,7 @@ async function saveRenderedEditorImage(
     format: exportSettings.imageFormat,
     quality: exportSettings.imageQuality,
   });
-  const filename = generateFilename('edited', exportSettings.imageFormat);
+  const filename = await generateFilename('edited', exportSettings.imageFormat, settings);
 
   await client.sendRuntimeMessage({
     type: MessageType.EXECUTE_SAVE,
@@ -106,7 +111,7 @@ export function createEditorActionRailHandlers(
     },
 
     exportSession() {
-      triggerSessionExport(controller.exportDocument());
+      return triggerSessionExport(controller.exportDocument());
     },
 
     async saveRenderedImage() {

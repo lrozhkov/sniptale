@@ -1,3 +1,4 @@
+import { filenameRulesMessages } from './filename-rules';
 import { defineMessageSource } from '../source';
 import { settingsAiProvidersMessages } from './ai-providers/index';
 import { settingsAppearanceMessages } from './appearance';
@@ -15,6 +16,7 @@ import { settingsStorageDraftsMessages } from './storage-drafts';
 import { settingsTransferMessages } from './transfer';
 
 export const settingsMessages = defineMessageSource({
+  filenameRules: filenameRulesMessages,
   collection: settingsCollectionMessages,
   appearance: settingsAppearanceMessages,
   navigation: settingsNavigationMessages,

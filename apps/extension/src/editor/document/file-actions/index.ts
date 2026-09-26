@@ -1,4 +1,4 @@
-import { SESSION_EXPORT_FILENAME } from '@sniptale/ui/branding';
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import { waitForEditorDocumentCanvas } from './canvas-ready';
 import { readFileAsDataUrl, readFileAsText } from './file-reader';
 import { assertEditorSessionFileCanBeRead, parseImportedEditorDocument } from './import-session';
@@ -128,13 +128,20 @@ export async function importEditorSessionFromFile(
   setImageData(document.sourceImageData);
 }
 
-export function exportEditorSession(controller: ExportEditorSessionController): void {
+export async function exportEditorSession(
+  controller: ExportEditorSessionController
+): Promise<void> {
   const sessionDocument = controller.exportDocument();
+  const filename = await createOutputFilename({
+    category: 'resources',
+    type: 'editor-session',
+    extension: 'json',
+  });
   const blob = new Blob([JSON.stringify(sessionDocument, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = window.document.createElement('a');
   link.href = url;
-  link.download = SESSION_EXPORT_FILENAME;
+  link.download = filename;
   link.click();
   window.setTimeout(() => {
     URL.revokeObjectURL(url);

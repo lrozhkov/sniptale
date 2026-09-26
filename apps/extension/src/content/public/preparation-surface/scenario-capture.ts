@@ -1,8 +1,8 @@
+import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { CaptureResponse } from '../../../contracts/messaging/contracts/response-types';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
-import { buildScreenshotFilename as generateFilename } from '@sniptale/foundation/utils/screenshot-filename';
 import { saveScenarioCaptureStep } from '../../../content/overlay/scenario/runtime/transport/steps';
 import type { ScenarioAutoClickCaptureTransport, ScreenshotCaptureAdapter } from './types';
 
@@ -13,7 +13,7 @@ export function createPreparationScenarioAutoClickCaptureTransport(
     const dataUrl = await captureAdapter.captureViewport('visible');
     const response = await saveScenarioCaptureStep({
       dataUrl,
-      filename: generateFilename(payload.captureSurface),
+      filename: await generateFilename(payload.captureSurface),
       scenarioCapture: payload,
     });
 

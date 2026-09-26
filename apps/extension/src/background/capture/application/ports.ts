@@ -12,7 +12,11 @@ export type CapturePersistenceSettings = Pick<
 >;
 
 export type StartCapturePorts = {
-  generateFilename(mode: CaptureModeLabel, imageFormat: Settings['imageFormat']): string;
+  generateFilename(
+    mode: CaptureModeLabel,
+    imageFormat: Settings['imageFormat'],
+    settings?: Settings
+  ): string | Promise<string>;
   loadSettings(): Promise<Settings>;
   persistScenarioCaptureFromBackground(args: {
     dataUrl: string;
@@ -48,7 +52,11 @@ export type DownloadCapturePorts = {
     filename: string,
     captureJobId?: string | undefined
   ): Promise<void>;
-  generateFilename(mode: CaptureModeLabel, imageFormat: Settings['imageFormat']): string;
+  generateFilename(
+    mode: CaptureModeLabel,
+    imageFormat: Settings['imageFormat'],
+    settings?: Settings
+  ): string | Promise<string>;
   loadSettings(): Promise<Settings>;
 };
 

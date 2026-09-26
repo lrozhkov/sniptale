@@ -1,3 +1,4 @@
+import { FilenameRulesSettings } from './filename-rules';
 import { useSavePresetsSection } from './state/controller';
 import { SavePresetsSectionContent } from './surface/content';
 import { translate } from '../../../../platform/i18n';
@@ -35,6 +36,7 @@ export function SavePresetsSection(props: {
           {...(editingPreset === undefined ? {} : { editingPreset })}
         />
       ) : null}
+      {view === 'settings' ? <FilenameRulesSettings /> : null}
       {view === 'settings' || view === 'storage' ? <StorageDraftsSection view={view} /> : null}
     </div>
   );

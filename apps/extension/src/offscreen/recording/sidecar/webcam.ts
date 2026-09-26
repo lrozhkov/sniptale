@@ -1,3 +1,5 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
+import { type FilenameSession } from '../../../workflows/file-naming/index';
 import {
   buildWebcamRecordingId,
   WEBCAM_RECORDING_FILENAME_SUFFIX,
@@ -10,12 +12,12 @@ import type { RecordingSidecarRecorder } from './types';
 import { buildVideoMediaRecorderOptions } from '../../../platform/media-utils/video-recording';
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import { createRecordingArtifactSession } from '../encoding/artifact-session';
-import { buildSidecarFilename } from '../finalizer';
 import { resolveVideoRecordingArtifact } from '../../../platform/media-utils/video-recording';
 import { acquireCameraSource, type CameraSourceLease } from '../camera-source/session';
 import { closeAllCameraSourcePeers } from '../camera-source/peer';
 
 async function createWebcamMediaRecorder(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   source: CameraSourceLease;
@@ -38,7 +40,15 @@ async function createWebcamMediaRecorder(params: {
     const artifactSession = await createRecordingArtifactSession({
       artifactId: recordingId,
       coordinator: params.coordinator,
-      filename: buildSidecarFilename(WEBCAM_RECORDING_FILENAME_SUFFIX, artifact.mimeType),
+      filename: await createOutputFilename(
+        {
+          category: 'recordings',
+          type: 'recording',
+          extension: artifact.extension,
+          suffix: WEBCAM_RECORDING_FILENAME_SUFFIX,
+        },
+        params.filenameSession
+      ),
       mimeType: artifact.mimeType,
       recorderOptions,
       stream: params.source.stream,
@@ -65,6 +75,7 @@ async function createWebcamMediaRecorder(params: {
 }
 
 export async function createWebcamSidecarRecorder(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
@@ -83,6 +94,7 @@ export async function createWebcamSidecarRecorder(params: {
   const source = await acquireCameraSource(params.settings);
 
   return createWebcamMediaRecorder({
+    ...(params.filenameSession ? { filenameSession: params.filenameSession } : {}),
     baseRecordingId: params.baseRecordingId,
     coordinator: params.coordinator,
     settings: params.settings,

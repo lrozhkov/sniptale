@@ -107,6 +107,7 @@ export const settingsTransferMessages = defineMessageSource({
     accessCaptureAssets: message('Ресурсы снимков', 'Capture assets'),
   },
   fields: {
+    filenameRules: message('Имена файлов', 'File names'),
     preferences: message('Пользовательские пресеты и предпочтения', 'User presets and preferences'),
     theme: message('Тема', 'Theme'),
     locale: message('Язык', 'Language'),

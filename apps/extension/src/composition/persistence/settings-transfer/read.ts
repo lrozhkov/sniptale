@@ -127,6 +127,7 @@ export async function readSettingsTransferSnapshot(
     }),
     'capture.after-capture': payload({ action: settings.captureAction }),
     'capture.saving': payload({
+      filenameRules: settings.filenameRules ?? { template: '' },
       templates: settings.presets ?? [],
       defaultImagePresetId: settings.defaultImagePresetId ?? null,
       defaultVideoPresetId: settings.defaultVideoPresetId ?? null,

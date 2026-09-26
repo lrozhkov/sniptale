@@ -1,3 +1,4 @@
+import { createOutputFilename, type FilenameSession } from '../../../workflows/file-naming/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
@@ -10,7 +11,7 @@ import {
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { recordingContext } from '../context';
-import { buildRecordingFilename, finalizeRecording } from '../finalizer';
+import { finalizeRecording } from '../finalizer';
 import {
   getActiveSidecarVideoProfiles,
   getActiveSidecarWebcamSettings,
@@ -131,6 +132,7 @@ function resolveAvcCodecString(width: number, height: number, frameRate: number)
 }
 
 export async function finalizeRecordingBootstrap(params: {
+  filenameSession?: FilenameSession;
   resolvedRecordingId: string;
   settings: VideoRecordingSettings;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
@@ -179,7 +181,15 @@ export async function finalizeRecordingBootstrap(params: {
     artifactId: params.resolvedRecordingId,
     coordinator: stagingCoordinator,
     encoding: encoderConfig,
-    filename: buildRecordingFilename(mimeType),
+    filename: await createOutputFilename(
+      {
+        category: 'recordings',
+        type: 'recording',
+        extension: encoderConfig.container,
+        title: params.sourceContext?.title ?? undefined,
+      },
+      params.filenameSession
+    ),
     frameTransform: params.encoderFrameTransform ?? undefined,
     ...(params.onVideoFrameGeometry ? { onVideoFrameGeometry: params.onVideoFrameGeometry } : {}),
     mimeType,

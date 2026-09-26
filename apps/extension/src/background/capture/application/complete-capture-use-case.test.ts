@@ -45,7 +45,11 @@ describe('complete capture use case', () => {
       ports
     );
 
-    expect(ports.generateFilename).toHaveBeenCalledWith('full', 'jpeg');
+    expect(ports.generateFilename).toHaveBeenCalledWith(
+      'full',
+      'jpeg',
+      expect.objectContaining({ imageFormat: 'jpeg' })
+    );
     expect(ports.downloadImageInServiceWorker).toHaveBeenCalledWith(
       'data:image/jpeg;base64,full',
       'full.jpeg',

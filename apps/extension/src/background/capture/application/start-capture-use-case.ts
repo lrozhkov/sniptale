@@ -1,7 +1,7 @@
+import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
 import type { CaptureActionType, Settings } from '../../../contracts/settings';
 import { loadSettings } from '../../../composition/persistence/settings';
-import { generateFilename } from '@sniptale/foundation/utils/filename';
 import { saveScreenshotToMediaHubFromDataUrl } from '../../media-hub/assets';
 import type { ScenarioSessionService } from '../../scenario/session-service/index';
 import { persistScenarioCaptureFromBackground } from './scenario-capture-persistence';
@@ -42,7 +42,7 @@ export async function runStartCaptureUseCase(
 ): Promise<PreparedCaptureAction & { payload: CaptureDeliveryPayload }> {
   const settings = await ports.loadSettings();
   const captureAction = args.actionType ?? settings.captureAction;
-  const filename = ports.generateFilename(args.captureTarget, settings.imageFormat);
+  const filename = await ports.generateFilename(args.captureTarget, settings.imageFormat, settings);
   const payload = await createCaptureDeliveryPromise(args.capture(), {
     captureAction,
     filename,

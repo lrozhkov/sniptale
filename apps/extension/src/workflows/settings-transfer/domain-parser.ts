@@ -295,8 +295,10 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
     case 'capture.after-capture':
       return { captureAction: value['action'] };
     case 'capture.saving':
+      if (value['filenameRules'] === null) failSettingsTransferDomain(domainId);
       return {
         presets: value['templates'],
+        filenameRules: value['filenameRules'],
         defaultImagePresetId: value['defaultImagePresetId'],
         defaultVideoPresetId: value['defaultVideoPresetId'],
         defaultExportPresetId: value['defaultExportPresetId'],
@@ -343,6 +345,7 @@ function coreSettingsTransferData(
     case 'capture.saving':
       return {
         ...(source['templates'] === undefined ? {} : { templates: parsed.presets }),
+        ...(source['filenameRules'] === undefined ? {} : { filenameRules: parsed.filenameRules }),
         ...(source['defaultImagePresetId'] === undefined
           ? {}
           : { defaultImagePresetId: parsed.defaultImagePresetId }),

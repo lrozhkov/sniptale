@@ -92,16 +92,16 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
     'editor.floating.document-bar.close-file-button',
   ]);
 
-  act(() => getButton('editor.floating.document-bar.save-to-folder-button').click());
+  await act(async () => getButton('editor.floating.document-bar.save-to-folder-button').click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   expect(container?.textContent).toContain('capture.png');
-  expect(document.querySelector<HTMLInputElement>('#save-dialog-filename')?.value).toBe(
-    'capture.webp'
+  expect(document.querySelector<HTMLInputElement>('#save-dialog-filename')?.value).toMatch(
+    /^Sniptale_edited_.*\.webp$/
   );
   expect(
     getButton('editor.floating.document-bar.save-to-folder-button').getAttribute('aria-expanded')
   ).toBe('true');
-  act(() => getButton('editor.floating.document-bar.save-to-folder-button').click());
+  await act(async () => getButton('editor.floating.document-bar.save-to-folder-button').click());
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(
     getButton('editor.floating.document-bar.save-to-folder-button').getAttribute('aria-expanded')

@@ -1,4 +1,4 @@
-import { generateFilename } from '@sniptale/foundation/utils/filename';
+import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { DesktopScreenshotSelection } from '@sniptale/runtime-contracts/capture/action';
@@ -251,7 +251,7 @@ export async function runDesktopQuickAction(args: {
     await cancelOffscreenFrame(preparation.requestId);
     const createdJobId = await createRenderedCaptureJob(args.tabId);
     jobId = createdJobId;
-    const filename = generateFilename('desktop', args.context.imageFormat);
+    const filename = await generateFilename('desktop', args.context.imageFormat);
     const assetId = await saveScreenshotToMediaHubFromDataUrl(
       selection.dataUrl,
       filename,

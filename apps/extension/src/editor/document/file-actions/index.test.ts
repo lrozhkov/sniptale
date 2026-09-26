@@ -165,7 +165,7 @@ describe('insertEditorImageFromFile', () => {
 });
 
 describe('exportEditorSession', () => {
-  it('downloads the exported session document as JSON and revokes the URL asynchronously', () => {
+  it('downloads the exported session document as JSON and revokes the URL asynchronously', async () => {
     const originalCreateElement = document.createElement.bind(document);
     const clickMock = vi.fn();
     const createObjectUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:session');
@@ -186,7 +186,7 @@ describe('exportEditorSession', () => {
     });
     vi.useFakeTimers();
 
-    editorFileActions.exportEditorSession(controller);
+    await editorFileActions.exportEditorSession(controller);
 
     expect(createObjectUrlSpy).toHaveBeenCalledOnce();
     expect(clickMock).toHaveBeenCalledOnce();
@@ -264,3 +264,58 @@ it('posts an apply message to the scenario host in embed mode', async () => {
   );
   expect(mockSendRuntimeMessage).not.toHaveBeenCalled();
 });
+
+it('reimports the generated session filename without changing the document contract', async () => {
+  const session = { ...createEditorDocument(), version: 2 as const };
+  controller.exportDocument.mockReturnValue(session);
+  mockLoadSettings.mockResolvedValueOnce({ filenameRules: { template: 'Session_{type}' } });
+  const link = document.createElement('a');
+  vi.spyOn(link, 'click').mockImplementation(() => {});
+  vi.spyOn(document, 'createElement').mockReturnValue(link);
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:session-roundtrip');
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+  await editorFileActions.exportEditorSession(controller);
+  expect(link.download).toBe('Session_editor-session.json');
+  const setImageData = vi.fn();
+  await editorFileActions.importEditorSessionFromFile(
+    controller,
+    new File([JSON.stringify(session)], link.download, { type: 'application/json' }),
+    setImageData
+  );
+  expect(controller.loadDocument).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceImageData: session.sourceImageData })
+  );
+  expect(setImageData).toHaveBeenCalledWith(session.sourceImageData);
+});
+
+it('ignores cancelled session selection', async () => {
+  await editorFileActions.importEditorSessionFromFile(controller, undefined, vi.fn());
+  expect(controller.loadDocument).not.toHaveBeenCalled();
+});
+
+it.each(['read', 'canvas', 'load'] as const)(
+  'does not apply stale session results after %s',
+  async (phase) => {
+    const { beginEditorDocumentOpenOperation } = await import('./operation');
+    const reader = await import('./file-reader');
+    const session = { ...createEditorDocument(), version: 2 as const };
+    const cancel = () => {
+      beginEditorDocumentOpenOperation(controller);
+    };
+    if (phase === 'read')
+      vi.spyOn(reader, 'readFileAsText').mockImplementationOnce(async () => {
+        cancel();
+        return JSON.stringify(session);
+      });
+    if (phase === 'canvas')
+      waitForEditorDocumentCanvasMock.mockImplementationOnce(async () => cancel());
+    if (phase === 'load') controller.loadDocument.mockImplementationOnce(async () => cancel());
+    const setImageData = vi.fn();
+    await editorFileActions.importEditorSessionFromFile(
+      controller,
+      new File([JSON.stringify(session)], 'Session.json', { type: 'application/json' }),
+      setImageData
+    );
+    expect(setImageData).not.toHaveBeenCalled();
+  }
+);

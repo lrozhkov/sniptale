@@ -1,3 +1,4 @@
+import { parseFilenameRules } from '../../../features/file-naming/rules';
 import { parseStoredHighlighterSettings } from '../highlighter/guards';
 import { resolveLoadedHighlighterSettings } from '../highlighter/resolved';
 import { serializeHighlighterSettings } from '../highlighter/mutation-write';
@@ -207,6 +208,11 @@ function applySettingsWrites(context: WriteBuildContext): void {
     nextSettings.captureAction = afterCapture['action'] as NormalizedSettings['captureAction'];
   const saving = data('capture.saving');
   if (saving) {
+    if (saving['filenameRules'] !== undefined) {
+      const rules = parseFilenameRules(saving['filenameRules']);
+      if (!rules) throw new Error('Imported filename rules are invalid');
+      nextSettings.filenameRules = rules;
+    }
     if (saving['templates'] !== undefined)
       nextSettings.presets = saving['templates'] as NonNullable<NormalizedSettings['presets']>;
     for (const key of [

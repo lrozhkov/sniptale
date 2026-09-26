@@ -1,4 +1,4 @@
-import { getMoscowFilenameTimestamp } from '@sniptale/foundation/utils/export-timestamp';
+import { createOutputFilename } from '../../../../workflows/file-naming/index';
 import {
   PAGE_COLLECTION_ARCHIVE_MIME_TYPE,
   PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
@@ -91,7 +91,11 @@ export async function downloadCollectedPagePackages(args: {
   const prepared = await preparePages(args.jobId, args.packages, args.signal);
   if (prepared.length === 0) throw new Error('No valid Page Packages were staged.');
   if (prepared.length === 1 && args.requestedPageCount === 1) {
-    const filename = `page-package_${getMoscowFilenameTimestamp()}.zip`;
+    const filename = await createOutputFilename({
+      category: 'documents',
+      type: 'page-package',
+      extension: 'zip',
+    });
     const page = prepared[0]!;
     const file = await readAssetFile(
       page.reference,
@@ -153,7 +157,11 @@ export async function downloadCollectedPagePackages(args: {
     },
   });
   const collection = output.preparedAsset();
-  const filename = `page-collection_${getMoscowFilenameTimestamp()}.zip`;
+  const filename = await createOutputFilename({
+    category: 'documents',
+    type: 'page-collection',
+    extension: 'zip',
+  });
   await downloadPagePackageReference({
     filename,
     jobId: args.jobId,

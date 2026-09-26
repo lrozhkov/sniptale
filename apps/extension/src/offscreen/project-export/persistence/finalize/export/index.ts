@@ -1,4 +1,8 @@
 import {
+  createOutputFilename,
+  createFilenameSession,
+} from '../../../../../workflows/file-naming/index';
+import {
   deleteProjectExportSafely,
   saveProjectExportSafely,
 } from '../../../../../workflows/media-hub/store';
@@ -6,7 +10,6 @@ import { type VideoProjectExportSettings } from '../../../../../features/video/p
 import { type VideoProject } from '../../../../../features/video/project/types/model';
 import { buildProjectExportEntry } from '../../entry';
 import { getExportFormatDescriptor } from '../../format';
-import { buildExportFilename } from './filename';
 import { buildSubtitleSidecarFiles } from './subtitle-sidecar';
 import { downloadProjectExport, downloadExportSidecar } from './runtime/index';
 import { notifyProjectExportCompleted } from './runtime/notify';
@@ -86,15 +89,17 @@ export async function finalizeExport(
 ): Promise<void> {
   assertFinalizationNotCancelled(options);
   const descriptor = getExportFormatDescriptor(settings.format);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const filename = buildExportFilename({
-    extension: descriptor.extension,
-    projectName: project.name || 'project-export',
-    timestamp,
-  });
-  const subtitleSidecarFiles = buildSubtitleSidecarFiles(project, settings, filename);
   const exportId = crypto.randomUUID();
-
+  const filename = await createOutputFilename(
+    {
+      category: 'recordings',
+      type: 'video-export',
+      title: project.name,
+      extension: descriptor.extension,
+    },
+    await createFilenameSession(exportId)
+  );
+  const subtitleSidecarFiles = buildSubtitleSidecarFiles(project, settings, filename);
   await saveProjectExportAndAcceptCompletion({
     blob,
     exportId,

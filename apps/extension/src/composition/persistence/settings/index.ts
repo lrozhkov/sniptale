@@ -33,6 +33,8 @@ import {
   parsePagePackageCaptureTimingPolicy,
 } from '@sniptale/runtime-contracts/page-package';
 
+import { parseFilenameRules } from '../../../features/file-naming/rules';
+
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
 let settingsMutationQueue = Promise.resolve<NormalizedSettings | null>(null);
@@ -147,6 +149,9 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
  * against the latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
+  if (settings.filenameRules != null && !parseFilenameRules(settings.filenameRules)) {
+    throw new Error('Filename rules are invalid');
+  }
   if (
     settings.exportResourceLimits !== undefined &&
     !parseExportResourceLimits(settings.exportResourceLimits)

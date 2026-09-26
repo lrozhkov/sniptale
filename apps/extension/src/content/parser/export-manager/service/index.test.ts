@@ -251,11 +251,11 @@ describe('export-manager service ownership isolation', () => {
 
     expect(firstResult).toMatchObject({
       success: true,
-      filename: 'preview-a.zip',
+      filename: expect.stringMatching(/^Sniptale_page_.*\.zip$/),
     });
     expect(secondResult).toMatchObject({
       success: true,
-      filename: 'preview-b.zip',
+      filename: expect.stringMatching(/^Sniptale_page_.*\.zip$/),
     });
     expect(firstProgress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'done' }));
     expect(secondProgress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'done' }));
@@ -318,7 +318,7 @@ describe('export-manager browser annotations delivery', () => {
 
     expect(result).toMatchObject({
       errors: [],
-      filename: 'browser-annotations.md',
+      filename: expect.stringMatching(/^Sniptale_browser-annotations_.*\.md$/),
       success: true,
     });
     expect(result.blob?.type).toBe('text/markdown;charset=utf-8');

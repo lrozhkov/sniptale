@@ -1,3 +1,4 @@
+import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { SavePreset } from '../../../contracts/settings';
 import {
@@ -9,7 +10,6 @@ import { translate } from '../../../platform/i18n';
 import { sendRuntimeMessage } from '../../../platform/runtime-messaging';
 import { loadEditorExportSettings } from '../../persistence/export-settings';
 import { loadSettings } from '../../../composition/persistence/settings';
-import { generateFilename } from '@sniptale/foundation/utils/filename';
 import type { EditorRenderedImageOptions } from '../model/render-options';
 import type { EditorRenderedImagePort } from './ports';
 import { assertBackgroundResponse, EditorStoragePromptError } from './save-errors';
@@ -36,7 +36,7 @@ async function executeSave(
   settings: Awaited<ReturnType<typeof loadSettings>>,
   imageFormat: Awaited<ReturnType<typeof loadEditorExportSettings>>['imageFormat']
 ): Promise<void> {
-  const filename = options.filename ?? generateFilename('edited', imageFormat);
+  const filename = options.filename ?? (await generateFilename('edited', imageFormat, settings));
   const presetId =
     options.presetId ??
     (options.actionType === 'download_default'

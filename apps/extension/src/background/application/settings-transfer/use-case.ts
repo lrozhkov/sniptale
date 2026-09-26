@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import { initDB } from '../../../composition/persistence/infrastructure/indexed-db/core';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import type {
@@ -44,7 +45,11 @@ export async function executeSettingsTransferOperation(message: SettingsTransfer
         tree,
       });
       return {
-        filename: createFilename(message.exportKind),
+        filename: await createOutputFilename({
+          category: 'resources',
+          type: `settings-${message.exportKind}`,
+          extension: 'sniptale-settings.json',
+        }),
         fileText: built.fileText,
       };
     }
@@ -161,10 +166,6 @@ function readAppVersion(): string {
   } catch {
     return '0.0.0';
   }
-}
-
-function createFilename(kind: 'backup' | 'selective'): string {
-  return `sniptale-settings-${kind}-${new Date().toISOString().slice(0, 10)}.sniptale-settings.json`;
 }
 
 export class SettingsTransferStalePlanError extends Error {}

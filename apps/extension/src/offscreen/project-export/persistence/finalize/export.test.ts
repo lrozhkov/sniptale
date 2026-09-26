@@ -194,7 +194,7 @@ it('finalizes exports by downloading, persisting, and notifying completion', asy
       id: 'export-uuid',
       projectId: 'project-1',
       blob,
-      filename: 'Demo_Project-2026-03-22T10-11-12.mp4',
+      filename: 'Sniptale_video-export_2026-03-22_13-11-12-345.mp4',
       format: VideoExportFormat.MP4,
     })
   );
@@ -210,7 +210,7 @@ it('finalizes exports by downloading, persisting, and notifying completion', asy
   expect(sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
     type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
     exportId: 'export-uuid',
-    filename: 'Demo_Project-2026-03-22T10-11-12.mp4',
+    filename: 'Sniptale_video-export_2026-03-22_13-11-12-345.mp4',
   });
   expect(markTerminalMock).toHaveBeenCalledWith('job-1', 'completed');
 });
@@ -226,7 +226,7 @@ it('falls back to the default export base name when the project is unnamed', asy
 
   expect(saveProjectExportSafely).toHaveBeenCalledWith(
     expect.objectContaining({
-      filename: 'project-export-2026-03-22T10-11-12.mp4',
+      filename: 'Sniptale_video-export_2026-03-22_13-11-12-345.mp4',
       projectId: 'project-1',
     })
   );
@@ -263,7 +263,42 @@ it('downloads subtitle sidecars after persisting the completed export entry', as
   expect(sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'DOWNLOAD_RECORDING_SIDECAR',
     content: expect.stringContaining('1\n00:00:01,000 -->'),
-    filename: 'Demo_Project-2026-03-22T10-11-12.srt',
+    filename: 'Sniptale_video-export_2026-03-22_13-11-12-345.srt',
     mimeType: 'application/x-subrip',
   });
+});
+
+it('uses a category rule consistently for the export and its subtitle sidecar', async () => {
+  const storage = await import('../../../../composition/persistence/settings');
+  const read = vi.spyOn(storage, 'loadSettings').mockResolvedValue({
+    ...storage.createDefaultSettings(),
+    filenameRules: { template: 'general', recordings: 'Custom_{type}' },
+  });
+  try {
+    mockRandomUuids('custom-export');
+    await finalizeExport(
+      'job-custom',
+      createSubtitleExportProject(),
+      createExportSettings({ subtitleSidecarFormats: [VideoSubtitleSidecarFormat.SRT] }),
+      new Blob(['video'])
+    );
+    await flushSidecarDownloadRequest();
+    expect(sendRuntimeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'DOWNLOAD_RECORDING_SIDECAR',
+        filename: 'Custom_video-export.srt',
+      })
+    );
+    expect(saveProjectExportSafely).toHaveBeenCalledWith(
+      expect.objectContaining({ filename: 'Custom_video-export.mp4' })
+    );
+    expect(sendRuntimeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
+        filename: 'Custom_video-export.mp4',
+      })
+    );
+  } finally {
+    read.mockRestore();
+  }
 });

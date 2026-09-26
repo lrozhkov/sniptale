@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../workflows/file-naming/index';
 import { useEffect, useRef, useState } from 'react';
 import { exportEffectInstance } from '../../features/video/project/effect-instance/export';
 import type { VideoProject } from '../../features/video/project/types';
@@ -28,12 +29,20 @@ export function useEffectInstanceExport(project: VideoProject, instanceId: strin
       setError(null);
       try {
         const artifact = await exportEffectInstance(project, instanceId);
+        const filename = await createOutputFilename({
+          category: 'resources',
+          type: 'effect',
+          title: project.name,
+          extension: artifact.filename.endsWith('.sniptale-effect.json')
+            ? 'sniptale-effect.json'
+            : 'zip',
+        });
         if (!owner.active) return;
         if (owner.url) URL.revokeObjectURL(owner.url);
         owner.url = URL.createObjectURL(artifact.blob);
         const link = document.createElement('a');
         link.href = owner.url;
-        link.download = artifact.filename;
+        link.download = filename;
         link.click();
       } catch {
         if (owner.active) setError(translate('videoEditor.effectsLibrary.exportFailed'));

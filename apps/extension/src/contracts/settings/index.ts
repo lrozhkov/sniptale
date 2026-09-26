@@ -67,7 +67,11 @@ export interface LocalStoragePolicy {
   videoDraftRetentionDays: number;
 }
 
+import type { FilenameRules } from '../../features/file-naming/rules';
+
 export interface Settings {
+  /** Undefined selects defaults; null records an unusable stored rule and selects strict fallback. */
+  filenameRules?: FilenameRules | null;
   captureAction: CaptureActionType;
   contentToolbar?: ContentToolbarPreferences;
   contextMenu: ContextMenuSettings;

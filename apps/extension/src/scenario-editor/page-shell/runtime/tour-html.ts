@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourMask } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
@@ -13,10 +14,7 @@ import {
   getScenarioAssetBlob,
   saveScenarioExportRecord,
 } from '../../../composition/persistence/scenario/store/public';
-import {
-  createDirectFileSink,
-  sanitizeArchivePathSegment,
-} from '../../../composition/archive-transfer';
+import { createDirectFileSink } from '../../../composition/archive-transfer';
 import { prepareTourRaster, type TourHtmlImageOptions } from './tour-html-images';
 
 /** A detached artifact is the only input to both preview and save. */
@@ -91,7 +89,12 @@ export async function prepareTourHtml(args: {
   });
   return {
     blob,
-    filename: `${sanitizeArchivePathSegment(args.project.name)}.html`,
+    filename: await createOutputFilename({
+      category: 'documents',
+      type: 'tour',
+      title: args.project.name,
+      extension: 'html',
+    }),
     projectId: args.project.id,
     mediaCount: assets.length,
   };

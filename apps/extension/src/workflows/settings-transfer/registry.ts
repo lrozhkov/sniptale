@@ -116,6 +116,7 @@ export const SETTINGS_TRANSFER_REGISTRY = [
   ...domain('capture.saving', [
     field('capture.saving', 'templates', { kind: 'collection', dynamicItems: true }),
     field('capture.saving', 'defaults'),
+    field('capture.saving', 'filenameRules'),
   ]),
   ...domain('capture.retention', [field('capture.retention', 'policy')]),
   ...domain('styles.borders', [

@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../workflows/file-naming';
 import { Check, ClipboardCopy, Download, ArrowLeft, FolderInput, Save, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -24,14 +25,6 @@ const COPY_FEEDBACK_BUTTON_CLASS_NAME = [
   QUICK_ACTION_BUTTON_CLASS_NAME,
   'data-[copy-status=saved]:scale-105 data-[copy-status=saved]:text-[var(--sniptale-color-success)]',
 ].join(' ');
-const RASTER_FILENAME_EXTENSION = /\.(?:avif|bmp|gif|jpe?g|png|webp)$/i;
-
-function resolveDefaultExportFilename(pageTitle: string, imageFormat: string): string {
-  const title = pageTitle.trim() || 'edited';
-  const basename = title.replace(RASTER_FILENAME_EXTENSION, '');
-  return `${basename}.${imageFormat}`;
-}
-
 function runDocumentBarAction(label: string, action: () => Promise<void> | void) {
   return fireAndReportEditorAction(`floating-document-bar:${label}`, action);
 }
@@ -71,7 +64,8 @@ export function EditorFloatingDocumentQuickActions({
   const saveToFolderButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const standalone = embed.mode !== 'scenario';
-  const defaultFilename = resolveDefaultExportFilename(pageTitle, actionState.imageFormat);
+  const [defaultFilename, setDefaultFilename] = useState('');
+  const preparingFilename = useRef(false);
 
   return (
     <>
@@ -101,7 +95,29 @@ export function EditorFloatingDocumentQuickActions({
           aria-expanded={saveDialogOpen}
           aria-haspopup="dialog"
           className={QUICK_ACTION_BUTTON_CLASS_NAME}
-          onClick={() => setSaveDialogOpen((open) => !open)}
+          onClick={() =>
+            runDocumentBarAction('prepare-save-name', async () => {
+              if (saveDialogOpen) {
+                setSaveDialogOpen(false);
+                return;
+              }
+              if (preparingFilename.current) return;
+              preparingFilename.current = true;
+              try {
+                setDefaultFilename(
+                  await createOutputFilename({
+                    category: 'images',
+                    type: 'edited',
+                    title: pageTitle,
+                    extension: actionState.imageFormat,
+                  })
+                );
+                setSaveDialogOpen(true);
+              } finally {
+                preparingFilename.current = false;
+              }
+            })
+          }
           dataUi="editor.floating.document-bar.save-to-folder-button"
         >
           <FolderInput size={18} strokeWidth={2} />

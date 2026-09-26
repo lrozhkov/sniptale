@@ -53,6 +53,11 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  transferable(
+    'capture/saving/filename-rules.tsx',
+    ['updateSettings'],
+    ['capture.saving.filenameRules']
+  ),
   excluded(
     'styles/scenario-layouts/controller.ts',
     ['saveScenarioStepTemplate', 'deleteScenarioProjectRecord'],

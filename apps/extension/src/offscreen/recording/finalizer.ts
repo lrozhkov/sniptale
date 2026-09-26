@@ -40,11 +40,6 @@ function buildTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
 }
 
-export function buildRecordingFilename(mimeType: string): string {
-  const { extension } = resolveVideoRecordingArtifact(mimeType);
-  return `${RECORDING_EXPORT_FILENAME_PREFIX}-${buildTimestamp()}.${extension}`;
-}
-
 export function buildSidecarFilename(filenameSuffix: string, mimeType: string): string {
   const { extension } = resolveVideoRecordingArtifact(mimeType);
   return `${RECORDING_EXPORT_FILENAME_PREFIX}-${buildTimestamp()}-${filenameSuffix}.${extension}`;

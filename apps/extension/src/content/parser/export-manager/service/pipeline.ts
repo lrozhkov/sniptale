@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../../workflows/file-naming/index';
 import type {
   ExportData,
   ExportOptions,
@@ -100,7 +101,12 @@ export async function runExportManagerPipeline(
   finishExportSuccess(state, packageResult.fileCandidatesCount, warnings);
   return {
     blob: archiveBlob,
-    filename: `${packageResult.pagePackage.archiveBaseName}.zip`,
+    filename: await createOutputFilename({
+      category: 'documents',
+      type: 'page',
+      title: packageResult.pagePackage.archiveBaseName,
+      extension: 'zip',
+    }),
     stats: packageResult.stats,
   };
 }

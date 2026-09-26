@@ -101,13 +101,13 @@ it('publishes a new prepared asset once and returns a separate downloadable file
   expect(exported.receipt).toMatchObject({
     revision: 2,
     resultDuration: 4,
-    filename: 'clip-edited.webm',
+    filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.webm$/),
   });
   expect(deps.writeReviewPackets).toHaveBeenCalledWith(expect.objectContaining({ file: original }));
   expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledOnce();
   expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledWith([
     expect.objectContaining({
-      filename: 'clip-edited.webm',
+      filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.webm$/),
       preparedAsset: expect.objectContaining({
         ref: expect.objectContaining({ assetId: 'output' }),
       }),
@@ -147,7 +147,9 @@ it('downloads only the selected kept fragment without mutating history or publis
     { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
     deps
   );
-  expect(exported.receipt.filename).toBe('clip-fragment-0.000-2.000.webm');
+  expect(exported.receipt.filename).toMatch(
+    /^Sniptale_video-review_.*_fragment-0\.000-2\.000\.webm$/
+  );
   expect(deps.writeReviewPackets).toHaveBeenCalledWith(
     expect.objectContaining({ edits: [expect.objectContaining({ kind: 'cut', start: 2, end: 6 })] })
   );
@@ -278,7 +280,10 @@ it('routes visual changes to the full frame renderer and stages the encoded resu
     expect.objectContaining({ fragmentOffset: 0 })
   );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
-  expect(exported.receipt).toMatchObject({ resultDuration: 4, filename: 'clip-edited.webm' });
+  expect(exported.receipt).toMatchObject({
+    resultDuration: 4,
+    filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.webm$/),
+  });
   expect(writer.abort).not.toHaveBeenCalled();
 });
 
@@ -505,7 +510,9 @@ it('plans exact advanced fragment cuts before selecting the frame renderer', asy
     { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
     deps
   );
-  expect(result.receipt.filename).toBe('clip-fragment-0.100-2.100.webm');
+  expect(result.receipt.filename).toMatch(
+    /^Sniptale_video-review_.*_fragment-0\.100-2\.100\.webm$/
+  );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
   expect(deps.writeReviewFrames).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -566,12 +573,12 @@ it('publishes the chosen container, resolution and matching filename for a conve
     frameRate: 30 as const,
   };
   const result = await exportReviewedVideo({ ...args, renderSettings }, deps);
-  expect(result.receipt.filename).toBe('clip-edited.mp4');
+  expect(result.receipt.filename).toMatch(/^Sniptale_video-review_.*_edited\.mp4$/);
   expect(deps.createSeekableAssetObjectWriter).toHaveBeenCalledWith({ mimeType: 'video/mp4' });
   expect(deps.writeReviewFrames).toHaveBeenCalledWith(expect.objectContaining({ renderSettings }));
   expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledWith([
     expect.objectContaining({
-      filename: 'clip-edited.mp4',
+      filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.mp4$/),
       mediaMetadata: { kind: 'video', width: 1280, height: 720, duration: 4 },
     }),
   ]);

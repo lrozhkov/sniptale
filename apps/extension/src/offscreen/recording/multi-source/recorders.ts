@@ -1,3 +1,5 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
+import { type FilenameSession } from '../../../workflows/file-naming/index';
 import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
 import {
   buildMicrophoneAudioConstraints,
@@ -49,6 +51,7 @@ function buildRecorderConfig(
 }
 
 async function createMediaRecorderSource(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   label: string | null;
@@ -65,9 +68,16 @@ async function createMediaRecorderSource(params: {
   const artifact = hasVideo
     ? resolveVideoRecordingArtifact(recorderOptions.mimeType)
     : { extension: 'webm' as const, mimeType: recorderOptions.mimeType };
-  const filename = hasVideo
-    ? buildSourceFilename(params.sourceIndex, artifact.mimeType)
-    : buildMicrophoneFilename(artifact.extension);
+  const filename = await createOutputFilename(
+    {
+      category: 'recordings',
+      type: 'recording',
+      extension: artifact.extension,
+      index: params.sourceIndex + 1,
+      suffix: hasVideo ? getFilenameSuffix(params.sourceIndex) : 'microphone',
+    },
+    params.filenameSession
+  );
   const artifactSession = await createRecordingArtifactSession({
     artifactId: recordingId,
     coordinator: params.coordinator,
@@ -100,6 +110,7 @@ export function stopRecorderStreams(recorders: Array<MultiSourceRecorder | null>
 }
 
 async function createRecorder(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   label: string | null;
@@ -125,6 +136,7 @@ async function createRecorder(params: {
 }
 
 export async function createSourceRecorders(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;
@@ -136,6 +148,7 @@ export async function createSourceRecorders(params: {
     for (const [sourceIndex, source] of params.sources.entries()) {
       recorders.push(
         await createRecorder({
+          ...(params.filenameSession ? { filenameSession: params.filenameSession } : {}),
           baseRecordingId: params.baseRecordingId,
           coordinator: params.coordinator,
           label: source.label,
@@ -195,7 +208,8 @@ function createGainProcessedMicrophoneStream(params: {
 export async function createMicrophoneRecorder(
   recordingId: string,
   settings: VideoRecordingSettings,
-  coordinator: RecordingStagingCoordinator
+  coordinator: RecordingStagingCoordinator,
+  filenameSession?: FilenameSession
 ): Promise<MultiSourceRecorder | null> {
   if (!settings.microphoneEnabled) {
     return null;
@@ -213,6 +227,7 @@ export async function createMicrophoneRecorder(
   }
   try {
     return await createMediaRecorderSource({
+      ...(filenameSession ? { filenameSession } : {}),
       baseRecordingId: recordingId,
       coordinator,
       label: null,

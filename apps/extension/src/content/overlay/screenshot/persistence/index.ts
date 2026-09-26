@@ -1,3 +1,4 @@
+import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
   RuntimeMessageType,
@@ -7,7 +8,6 @@ import type { CaptureActionType } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { loadSettings } from '../../../../composition/persistence/settings';
-import { buildScreenshotFilename as generateFilename } from '@sniptale/foundation/utils/screenshot-filename';
 import { copyImageToClipboard } from '../../clipboard-image';
 import {
   attachContentActionIntent,
@@ -204,7 +204,7 @@ export async function persistSelectionCapture({
 }: PersistSelectionCaptureParams): Promise<PersistenceResult> {
   const settings = await loadSettings();
   assertFresh(assertFreshness);
-  const filename = generateFilename(mode);
+  const filename = await generateFilename(mode);
   const saveResponse = await sendRuntimeMessageWithFreshness({
     assertFresh: assertFreshness,
     contentIntentSource,
@@ -284,7 +284,7 @@ export async function persistBackgroundCapture({
   }
 
   if (response.action === 'ask_preset' && response.dataUrl) {
-    const filename = generateFilename(mode);
+    const filename = await generateFilename(mode);
 
     if (sessionActivePresetId) {
       await executePresetSave({

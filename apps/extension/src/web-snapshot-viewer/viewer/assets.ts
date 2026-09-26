@@ -1,3 +1,4 @@
+import { getMediaLibraryEntry } from '../../composition/persistence/media-library/index.library';
 import type JSZip from 'jszip';
 import {
   isWebSnapshotManifest,
@@ -350,6 +351,7 @@ export async function loadWebSnapshotPackage(
     throw new Error('Web snapshot was not found.');
   }
 
+  const mediaEntry = await getMediaLibraryEntry(snapshotId);
   assertCompressedViewerPackageSize(record.packageFile);
   const zip = await loadVerifiedZip(record.packageFile, {
     assertPath: assertSafeArchivePath,
@@ -418,7 +420,7 @@ export async function loadWebSnapshotPackage(
     const archiveUrl = URL.createObjectURL(record.packageFile);
     objectUrls.push(archiveUrl);
     return {
-      archiveFilename: createViewerArchiveFilename(record.manifest),
+      archiveFilename: mediaEntry?.filename ?? createViewerArchiveFilename(record.manifest),
       archiveSize: record.packageFile.size,
       archiveUrl,
       assets,

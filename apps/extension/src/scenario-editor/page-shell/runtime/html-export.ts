@@ -1,9 +1,6 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import type { GuideReadingOptions } from '../reader-pages';
-import {
-  createDirectFileSink,
-  sanitizeArchivePathSegment,
-  type ExportSink,
-} from '../../../composition/archive-transfer';
+import { createDirectFileSink, type ExportSink } from '../../../composition/archive-transfer';
 import { saveScenarioExportRecord } from '../../../composition/persistence/scenario/store/public';
 import { measureHtmlImages, prepareHtmlImage, type HtmlRaster } from './html-images';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -17,7 +14,12 @@ export async function exportGuideHtml(args: {
   theme: 'light' | 'dark';
   signal: AbortSignal;
 }): Promise<'saved' | 'history-failed'> {
-  const filename = `${sanitizeArchivePathSegment(args.project.name)}.html`;
+  const filename = await createOutputFilename({
+    category: 'documents',
+    type: 'guide',
+    title: args.project.name,
+    extension: 'html',
+  });
   const sink = await createDirectFileSink({
     filename,
     extension: '.html',

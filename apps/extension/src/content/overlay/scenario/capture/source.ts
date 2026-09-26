@@ -1,3 +1,4 @@
+import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
 import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { ScenarioRuntimeCapturePayload } from '../../../../contracts/messaging/contracts/types';
@@ -14,7 +15,6 @@ import {
   DEFAULT_BORDER_PRESET,
   getLoadedHighlighterSettingsSnapshot,
 } from '../../../../composition/persistence/highlighter';
-import { buildScreenshotFilename as generateFilename } from '@sniptale/foundation/utils/screenshot-filename';
 import {
   buildScenarioPageDescriptor,
   buildScenarioTargetDescriptor,
@@ -220,7 +220,7 @@ async function saveScenarioSelectionCapture(params: {
 
   const response = await saveScenarioCaptureStep({
     dataUrl: params.dataUrl,
-    filename: generateFilename(params.captureSurface),
+    filename: await generateFilename(params.captureSurface),
     scenarioCapture: payload,
   });
 

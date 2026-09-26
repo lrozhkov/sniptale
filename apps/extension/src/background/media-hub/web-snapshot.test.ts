@@ -67,7 +67,7 @@ it('persists a verified Page Package through the existing media-hub authority', 
   expect(mocks.ensureHeadroom).toHaveBeenCalledOnce();
   expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
     expect.objectContaining({
-      filename: 'Example_Page.sniptale-page-package.zip',
+      filename: expect.stringMatching(/^Sniptale_web-snapshot_.*\.sniptale-page-package\.zip$/),
       id: 'asset-1',
       packageBlob: input.packageBlob,
       sourceTitle: 'Example Page',
@@ -125,7 +125,9 @@ it('uses a safe fallback filename when Page Package provenance is absent', async
     await createPayload({ source: { faviconUrl: null, title: null, url: null } })
   );
   expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-    expect.objectContaining({ filename: 'web-snapshot.sniptale-page-package.zip' }),
+    expect.objectContaining({
+      filename: expect.stringMatching(/^Sniptale_web-snapshot_.*\.sniptale-page-package\.zip$/),
+    }),
     expect.any(Function)
   );
 });
@@ -144,4 +146,18 @@ it('rejects an invalid payload manifest and non-PNG retained screenshot', async 
     'screenshot is invalid'
   );
   expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
+});
+
+it('does not publish a generated filename when storage headroom fails', async () => {
+  mocks.ensureHeadroom.mockRejectedValueOnce(new Error('quota unavailable'));
+  await expect(saveWebSnapshotToMediaHub(await createPayload())).rejects.toThrow(
+    'quota unavailable'
+  );
+  expect(mocks.saveWebSnapshot).not.toHaveBeenCalled();
+});
+it('reports a non-Error persistence failure without publishing success', async () => {
+  mocks.saveWebSnapshot.mockRejectedValueOnce('storage disconnected');
+  await expect(saveWebSnapshotToMediaHub(await createPayload())).rejects.toThrow(
+    'storage disconnected'
+  );
 });

@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../workflows/file-naming/index';
 import type { ReviewExportReceipt } from '../../workflows/video-review/export-lifecycle';
 import { translate } from '../../platform/i18n';
 import { createVideoReviewReport } from '../../workflows/video-review/report';
@@ -33,6 +34,11 @@ export async function exportReviewReport(
   else
     downloadGalleryBlob(
       new Blob([report], { type: 'text/markdown;charset=utf-8' }),
-      `${resource.filename}.sniptale-video-review.md`
+      await createOutputFilename({
+        category: 'documents',
+        type: 'video-review',
+        title: resource.filename,
+        extension: 'sniptale-video-review.md',
+      })
     );
 }

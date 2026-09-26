@@ -24,6 +24,8 @@ import {
   type PagePackageCaptureTimingPolicy,
 } from '@sniptale/runtime-contracts/page-package';
 
+import { parseFilenameRules } from '../../../features/file-naming/rules';
+
 interface ParsedSettingsStorageValue {
   hasInvalidRoot: boolean;
   invalidFieldCount: number;
@@ -379,6 +381,11 @@ export function parseStoredSettings(value: unknown): ParsedSettingsStorageValue 
   }
 
   const scalarFields = parseScalarSettingsFields(value);
+  if (value['filenameRules'] !== undefined) {
+    const rules = parseFilenameRules(value['filenameRules']);
+    scalarFields.value.filenameRules = rules;
+    if (!rules && value['filenameRules'] !== null) scalarFields.invalidFieldCount += 1;
+  }
   const invalidFieldCount =
     scalarFields.invalidFieldCount + parseArraySettingsFields(value, scalarFields.value);
 

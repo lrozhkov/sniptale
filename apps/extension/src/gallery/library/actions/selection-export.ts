@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import {
   createArchivePathAllocator,
   createArchiveWriter,
@@ -22,7 +23,11 @@ export function createSelectionBackupAction(controller: GallerySelectionControll
 
     await withBusy(async () => {
       await exportMediaHubBackup(options, {
-        filename: `media-hub-selection-backup-${Date.now()}.zip`,
+        filename: await createOutputFilename({
+          category: 'archives',
+          type: 'media-hub-selection-backup',
+          extension: 'zip',
+        }),
       });
     });
   };
@@ -46,7 +51,11 @@ export function createSelectionZipAction(controller: GallerySelectionController)
       const sink = await createDirectFileSink({
         description: translate('gallery.app.selectionAssetsArchiveDescription'),
         extension: '.zip',
-        filename: `media-hub-assets-${Date.now()}.zip`,
+        filename: await createOutputFilename({
+          category: 'archives',
+          type: 'media-hub-assets',
+          extension: 'zip',
+        }),
         mimeType: 'application/zip',
       });
       const archive = createArchiveWriter(sink);

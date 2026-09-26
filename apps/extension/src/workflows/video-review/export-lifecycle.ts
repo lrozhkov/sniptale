@@ -1,7 +1,7 @@
+import { createOutputFilename } from '../file-naming/index';
 import { configuredReviewExportPlan } from './export-configuration';
 import { resolveReviewOutputProfile } from './render-settings';
 import type { ReviewRenderSettings } from './media-index';
-import { isSafeArchiveEntryLeafFilename } from '@sniptale/platform/data/zip-profile/entry-filenames';
 import {
   assertAssetWriteAdmission,
   createSeekableAssetObjectWriter,
@@ -207,10 +207,13 @@ export async function exportReviewedVideo(
   const suffix = fragment
     ? `fragment-${fragment.start.toFixed(3)}-${fragment.end.toFixed(3)}`
     : 'edited';
-  const candidate = `${original.filename.replace(/\.[^.]+$/, '')}-${suffix}.${outputProfile.format}`;
-  const filename = isSafeArchiveEntryLeafFilename(candidate)
-    ? candidate
-    : `video-edited.${outputProfile.format}`;
+  const filename = await createOutputFilename({
+    category: 'recordings',
+    type: 'video-review',
+    title: original.filename.replace(/\.[^.]+$/, ''),
+    extension: outputProfile.format,
+    suffix,
+  });
   await deps.assertAssetWriteAdmission(original.file.size + 1024 * 1024);
   signal.throwIfAborted();
   // Cold database admission reserves the exclusive transition gate; it must settle

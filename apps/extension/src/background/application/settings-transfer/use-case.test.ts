@@ -64,7 +64,7 @@ it('reads the export tree and builds a readable selective package', async () => 
     selectedNodeIds: ['capture.image.format'],
   });
   if (!('fileText' in packageResult)) throw new Error('Expected built package');
-  expect(packageResult.filename).toMatch(/^sniptale-settings-selective-\d{4}-\d{2}-\d{2}/u);
+  expect(packageResult.filename).toMatch(/^Sniptale_settings-selective_\d{4}-\d{2}-\d{2}/u);
   expect(JSON.parse(packageResult.fileText)).toMatchObject({
     format: 'sniptale-settings',
     exportKind: 'selective',

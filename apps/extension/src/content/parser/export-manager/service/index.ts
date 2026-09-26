@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../../workflows/file-naming/index';
 import { translate } from '../../../../platform/i18n';
 import type {
   ExportPagePackage,
@@ -100,6 +101,11 @@ function createExportContentRunner(
       if (hasOnlyBrowserAnnotations(options)) {
         const pagePackage = await prepareAnnotationsOnlyExport(state, deps);
         const result = createBrowserAnnotationsExportResult(pagePackage);
+        result.filename = await createOutputFilename({
+          category: 'documents',
+          type: 'browser-annotations',
+          extension: 'md',
+        });
         return { success: true, ...result, errors: warnings };
       }
       const result = await runExportManagerPipeline(state, options, warnings, {

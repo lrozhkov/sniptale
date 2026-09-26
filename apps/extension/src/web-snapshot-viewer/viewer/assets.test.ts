@@ -22,9 +22,14 @@ import type { WebSnapshotRecord } from '../../composition/persistence/web-snapsh
 const NativeURL = URL;
 
 const mocks = vi.hoisted(() => ({
+  getMediaLibraryEntry: vi.fn(),
   getWebSnapshotRecord: vi.fn(),
   getWebSnapshotScreenshotFile: vi.fn(),
   validateRetainedWebSnapshotScreenshot: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/media-library/index.library', () => ({
+  getMediaLibraryEntry: mocks.getMediaLibraryEntry,
 }));
 
 vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) => ({
@@ -259,6 +264,7 @@ function mockLargeViewerZip(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getMediaLibraryEntry.mockResolvedValue(null);
   mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
     new File(['png'], 'snapshot.png', { type: 'image/png' })
   );
@@ -623,4 +629,14 @@ it('keeps frame layout installation safe before attachment and cleans its own po
     frame.contentDocument!.querySelectorAll('[data-sniptale-viewer-layout-policy]')
   ).toHaveLength(0);
   frame.remove();
+});
+
+it('retains the saved archive filename when re-downloading a snapshot', async () => {
+  await stubWebSnapshotRecord({});
+  mocks.getMediaLibraryEntry.mockResolvedValue({
+    filename: 'My saved capture.sniptale-page-package.zip',
+  });
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  expect(mocks.getMediaLibraryEntry).toHaveBeenCalledWith('snapshot-1');
+  expect(loaded.archiveFilename).toBe('My saved capture.sniptale-page-package.zip');
 });

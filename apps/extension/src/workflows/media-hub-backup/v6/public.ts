@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../file-naming/index';
 import {
   createDirectFileSink,
   type ArchiveTransferProgress,
@@ -54,10 +55,6 @@ export interface MediaHubImportResultV6 {
   imported: number;
   operationId: string;
   skipped: number;
-}
-
-function defaultFilename() {
-  return `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
 }
 
 export async function inspectLocalMediaHubBackup(
@@ -134,7 +131,13 @@ export async function exportMediaHubBackup(
   const sink = await createDirectFileSink({
     description: translate('gallery.backupExportModal.archiveDescription'),
     extension: '.zip',
-    filename: runtime.filename ?? defaultFilename(),
+    filename:
+      runtime.filename ??
+      (await createOutputFilename({
+        category: 'archives',
+        type: 'media-hub-backup',
+        extension: 'zip',
+      })),
     mimeType: 'application/zip',
   });
   try {

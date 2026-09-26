@@ -1,3 +1,4 @@
+import { createFilenameSession, type FilenameSession } from '../../../workflows/file-naming/index';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingSidecarRecorder } from '../sidecar/types';
 import { pauseSessionRecorders, resumeSessionRecorders, setSessionMediaEnabled } from './controls';
@@ -87,10 +88,12 @@ async function orchestrateMultiSourceRecordingStart(params: {
     throw new Error('Multi-source recording requires at least two prepared sources.');
   }
 
+  const filenameSession = await createFilenameSession(params.recordingId);
   const coordinator = await createRecordingStagingCoordinator();
   let prepared: PreparedMultiSourceRecorders | null;
   try {
     prepared = await prepareMultiSourceRecorders({
+      filenameSession,
       baseRecordingId: params.recordingId,
       coordinator,
       sequence,
@@ -124,6 +127,7 @@ async function orchestrateMultiSourceRecordingStart(params: {
 }
 
 async function prepareMultiSourceRecorders(params: {
+  filenameSession: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   sequence: number;
@@ -135,6 +139,7 @@ async function prepareMultiSourceRecorders(params: {
   let webcamRecorder: RecordingSidecarRecorder | null = null;
   try {
     recorders = await createSourceRecorders({
+      filenameSession: params.filenameSession,
       baseRecordingId: params.baseRecordingId,
       coordinator: params.coordinator,
       settings: params.settings,
@@ -143,9 +148,11 @@ async function prepareMultiSourceRecorders(params: {
     audioRecorder = await createMicrophoneRecorder(
       params.baseRecordingId,
       params.settings,
-      params.coordinator
+      params.coordinator,
+      params.filenameSession
     );
     webcamRecorder = await createMultiSourceWebcamRecorder({
+      filenameSession: params.filenameSession,
       baseRecordingId: params.baseRecordingId,
       coordinator: params.coordinator,
       settings: params.settings,
