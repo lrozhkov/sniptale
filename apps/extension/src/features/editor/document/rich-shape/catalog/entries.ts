@@ -1,3 +1,4 @@
+import { SCREENSHOT_MARK_ENTRIES } from './entries-screenshot-marks';
 import { BLOCK_ARROW_SHAPE_ENTRIES } from './entries-arrows-equation';
 import { BASIC_EXTRA_SHAPE_ENTRIES } from './entries-basic-extra';
 import { EQUATION_SHAPE_ENTRIES } from './entries-equation';
@@ -11,6 +12,7 @@ import {
 export const PRIMARY_BUILT_IN_SHAPE_IDS = ['block-arrow', 'rectangle', 'oval'] as const;
 
 export const EDITOR_BUILT_IN_SHAPE_CATALOG = [
+  ...SCREENSHOT_MARK_ENTRIES,
   ...LINE_AND_BASIC_SHAPE_ENTRIES,
   ...BASIC_EXTRA_SHAPE_ENTRIES,
   ...BLOCK_ARROW_SHAPE_ENTRIES,

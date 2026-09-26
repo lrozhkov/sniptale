@@ -3,6 +3,8 @@ import type { EditorRichShapeFamily } from './families';
 
 export const EDITOR_BUILT_IN_SHAPE_CATEGORY = {
   PRIMARY: 'primary-shortcuts',
+  CURSORS: 'cursors',
+  STAMPS: 'stamps',
   LINES: 'lines-connectors',
   BASIC: 'basic-shapes',
   BLOCK_ARROWS: 'block-arrows',
