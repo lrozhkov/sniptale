@@ -119,7 +119,8 @@ export function useReviewEditorWiring(args: {
     deleteOriginalAudio: audio.removeOriginal,
     clearAnnotation: () => args.clearAnnotation(null),
   });
-  const moveHistory = async (direction: 'undo' | 'redo') => {
+  const moveHistory = async (direction: 'undo' | 'redo' | 'reset') => {
+    if (direction === 'reset') return resetReviewEditor(args, audio, canvasComments);
     await flushPendingContent();
     await args.session.history(direction);
   };
@@ -157,7 +158,7 @@ export function useReviewEditorWiring(args: {
     telemetry: args.telemetry ? args.actionsVisible : false,
     projected,
     flushPendingContent,
-    moveHistory: (direction: 'undo' | 'redo') => void args.run(() => moveHistory(direction)),
+    moveHistory: (direction: 'undo' | 'redo' | 'reset') => args.run(() => moveHistory(direction)),
     removeSelection,
     exporter: prepareReviewExporter(args.exporter, args.run, flushPendingContent),
   };
@@ -185,4 +186,22 @@ function useOriginalAudioToolLifecycle(
     setOriginalTool(false);
     setOriginalRangeSelected(false);
   }, [mode, selectionKind, setOriginalTool, setOriginalRangeSelected]);
+}
+
+/** Flush staged content before the atomic reset, then restore disposable editor tools. */
+async function resetReviewEditor(
+  args: Parameters<typeof useReviewEditorWiring>[0],
+  audio: ReturnType<typeof useReviewAudio>,
+  canvasComments: ReturnType<typeof useCanvasComments>
+) {
+  args.video.current?.pause();
+  await args.advancedState.flush();
+  await canvasComments.flushTexts();
+  await args.session.reset();
+  args.advancedState.reset();
+  selectReviewPointer(args, audio);
+  args.setActiveSelection({ kind: 'none' });
+  args.clearAnnotation(null);
+  args.setTimelineSelection({ kind: 'point', time: 0 });
+  args.seek(0, false);
 }

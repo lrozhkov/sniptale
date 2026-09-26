@@ -1,3 +1,4 @@
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import {
   parseVideoWorkspace,
@@ -7,6 +8,7 @@ import type { ReviewAnnotation, ReviewOperation } from '../../features/video/rev
 
 /** Page-local operations use the same canonical snapshot validation as durable recovery. */
 export type LocalReviewChange =
+  | { kind: 'reset' }
   | { kind: 'advanced'; advanced: unknown }
   | { kind: 'draft'; annotation: ReviewAnnotation | null; before: ReviewAnnotation | null }
   | { kind: 'commit'; operation: ReviewOperation; consumeDraft: boolean }
@@ -18,7 +20,15 @@ export function applyLocalReviewChange(
   change: LocalReviewChange
 ): VideoWorkspaceSnapshot {
   let { workspace, draft } = snapshot;
-  if (change.kind === 'advanced') {
+  if (change.kind === 'reset') {
+    workspace = {
+      ...workspace,
+      history: [],
+      cursor: 0,
+      advanced: { ...createQuickEditAdvancedState(), ui: workspace.advanced.ui },
+    };
+    draft = null;
+  } else if (change.kind === 'advanced') {
     const next = parseVideoWorkspace({ ...workspace, advanced: change.advanced });
     if (!next) throw new Error('Invalid review state');
     workspace = next;

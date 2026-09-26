@@ -85,7 +85,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     emit();
     const task = queue.then(async () => {
       try {
-        if (local && (!state.autosaveEnabled || state.dirty)) {
+        if (local && (!state.autosaveEnabled || (state.dirty && local.kind !== 'reset'))) {
           const snapshot = applyLocalReviewChange(state.snapshot, local);
           state = { ...state, snapshot, document: project(snapshot), dirty: true };
           if (!state.autosaveEnabled) return snapshot;
@@ -165,6 +165,23 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
           });
         },
         { kind: 'commit', operation: captured, consumeDraft }
+      );
+    },
+    /** Clears authored content atomically while preserving source identity and UI preferences. */
+    reset() {
+      return enqueue(
+        async () => {
+          const next = applyLocalReviewChange(state.snapshot, { kind: 'reset' });
+          return deps.saveVideoWorkspaceSnapshot({
+            aggregateId: durable.workspace.aggregateId,
+            expectedRevision: durable.workspace.revision,
+            expectedSourceAssetId: durable.workspace.sourceAssetId,
+            expectedDraftRevision: durable.draft?.revision ?? null,
+            workspace: next.workspace,
+            draft: next.draft,
+          });
+        },
+        { kind: 'reset' }
       );
     },
     history(direction: 'undo' | 'redo') {

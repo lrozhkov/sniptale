@@ -297,6 +297,12 @@ export const galleryVideoReviewMessages = defineMessageSource({
   regionTop: { ru: 'Сверху, %', en: 'Top, %' },
   regionWidth: { ru: 'Ширина, %', en: 'Width, %' },
   regionHeight: { ru: 'Высота, %', en: 'Height, %' },
+  resetOriginal: { ru: 'Сбросить к оригиналу', en: 'Reset to original' },
+  resetOriginalWarning: {
+    ru: 'Все правки, комментарии и история изменений будут удалены. Видео вернётся к оригиналу. Отменить сброс нельзя.',
+    en: 'All edits, comments and edit history will be removed. The video will return to the original. This reset cannot be undone.',
+  },
+  resetCancel: { ru: 'Отмена', en: 'Cancel' },
   undo: { ru: 'Отменить изменение', en: 'Undo change' },
   redo: { ru: 'Повторить изменение', en: 'Redo change' },
   interval: { ru: 'Интервал', en: 'Interval' },

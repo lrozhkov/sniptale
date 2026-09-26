@@ -1,3 +1,4 @@
+import { ReviewResetControl } from './reset-control';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
@@ -150,7 +151,7 @@ export function ReviewHistoryControls(props: {
   busy: boolean;
   cursor: number;
   length: number;
-  onHistory(direction: 'undo' | 'redo'): void;
+  onHistory(direction: 'undo' | 'redo' | 'reset'): void | Promise<unknown>;
   onAddNote?(): void;
   autosave?: {
     enabled: boolean;
@@ -193,6 +194,7 @@ export function ReviewHistoryControls(props: {
           {direction === 'undo' ? <Undo2 size={16} /> : <Redo2 size={16} />}
         </ReviewButton>
       ))}
+      <ReviewResetControl busy={props.busy} onReset={async () => props.onHistory('reset')} />
       {props.autosave && <ReviewAutosaveControl {...props.autosave} />}
     </>
   );

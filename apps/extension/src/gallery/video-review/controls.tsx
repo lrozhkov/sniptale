@@ -14,7 +14,9 @@ export function reviewTimelineItemTone(
   kind: 'neutral' | 'cut' | 'speed' | 'focus' = 'neutral'
 ): string {
   const border = selected
-    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
+    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)] ' +
+      '[--review-item-foreground:var(--sniptale-color-text-primary)] [--review-waveform-opacity:1] ' +
+      '[--review-label-weight:600]'
     : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
   const surface = {
     neutral: 'bg-[var(--sniptale-color-surface-hover)]',

@@ -178,8 +178,9 @@ export function ReviewAudioWaveform(props: {
       aria-hidden="true"
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
-      className="pointer-events-none absolute inset-0 h-full w-full text-[var(--sniptale-color-text-secondary)]"
-      style={{ opacity: props.muted ? 0.2 : 0.65 }}
+      className="pointer-events-none absolute inset-0 h-full w-full
+        text-[color:var(--review-item-foreground,var(--sniptale-color-text-secondary))]"
+      style={{ opacity: props.muted ? 0.2 : 'var(--review-waveform-opacity, 0.65)' }}
     >
       <path d={path} fill="none" stroke="currentColor" strokeWidth={100 / viewport.width} />
     </svg>
