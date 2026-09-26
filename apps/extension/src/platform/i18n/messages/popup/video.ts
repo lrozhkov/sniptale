@@ -265,6 +265,14 @@ export const popupVideoMessages = defineMessageSource({
     ru: 'Эта комбинация разрешения и частоты кадров слишком тяжёлая для записи выбранного размера.',
     en: 'This resolution and frame-rate combination is too demanding for the selected recording size.',
   },
+  cursorThemeLabel: {
+    ru: 'Заменять тему курсора',
+    en: 'Replace cursor theme',
+  },
+  cursorThemePending: {
+    ru: 'Замена курсора в записанном видео появится позже.',
+    en: 'Cursor replacement in recorded video is coming later.',
+  },
   countdownLabel: {
     ru: 'Отсчёт',
     en: 'Countdown',

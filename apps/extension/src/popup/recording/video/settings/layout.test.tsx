@@ -81,7 +81,7 @@ describe('video settings layout', () => {
     );
   });
 
-  it('renders and applies the full countdown option range', () => {
+  it.each([3, 5, 10])('offers only supported countdowns and applies %s seconds', (seconds) => {
     const onSettingsChange = vi.fn();
     renderGrid({
       onSettingsChange,
@@ -90,10 +90,37 @@ describe('video settings layout', () => {
 
     expect(container.textContent).toContain('popup.video.countdownManyOption:3');
     clickButtonContaining('popup.video.countdownLabel');
-    clickButtonContaining('popup.video.countdownManyOption:2');
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map((option) => option.textContent)
+    ).toEqual([
+      'popup.video.countdownManyOption:3',
+      'popup.video.countdownManyOption:5',
+      'popup.video.countdownManyOption:10',
+    ]);
+    const option = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="option"]')
+    ).find((candidate) => candidate.textContent === `popup.video.countdownManyOption:${seconds}`);
+    act(() => option?.click());
 
-    expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: 2 });
+    expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: seconds });
   });
+
+  it.each(Object.values(CaptureMode))(
+    'reserves the cursor checkbox after countdown for %s',
+    (captureMode) => {
+      const onSettingsChange = vi.fn();
+      renderGrid({ captureMode, onSettingsChange });
+      const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
+      expect(checkbox?.disabled).toBe(true);
+      expect(checkbox?.checked).toBe(false);
+      expect(checkbox?.closest('label')?.textContent).toContain('popup.video.cursorThemePending');
+      expect(container.textContent.indexOf('popup.video.countdownLabel')).toBeLessThan(
+        container.textContent.indexOf('popup.video.cursorThemeLabel')
+      );
+      act(() => checkbox?.click());
+      expect(onSettingsChange).not.toHaveBeenCalled();
+    }
+  );
 
   it('covers immediate countdown and screen source-count states', () => {
     const onSettingsChange = vi.fn();

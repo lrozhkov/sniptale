@@ -1,3 +1,4 @@
+import { InlineCurtainSelect } from '../../../../ui/popup-shell/inline-curtain/select';
 import { getCurrentLocale, translate } from '../../../../platform/i18n/popup';
 import {
   CaptureMode,
@@ -58,17 +59,25 @@ export function VideoSettingsGrid({
         settings={settings}
         onSettingsChange={onSettingsChange}
       />
-      <CounterCard
+      <InlineCurtainSelect
+        ariaLabel={translate('popup.video.countdownLabel')}
         label={translate('popup.video.countdownLabel')}
         description={translate('popup.video.countdownDescription')}
-        value={settings.countdownSeconds}
-        min={0}
-        max={10}
-        suffix={translate('popup.video.secondsSuffix')}
-        formatValue={formatCountdownOption}
-        formatSelectedValue={formatCountdownOption}
-        onChange={(value) => onSettingsChange({ countdownSeconds: value })}
+        value={String(settings.countdownSeconds)}
+        options={[3, 5, 10].map((value) => ({
+          value: String(value),
+          label: formatCountdownOption(value),
+        }))}
+        selectedLabel={formatCountdownOption(settings.countdownSeconds)}
+        onChange={(value) => onSettingsChange({ countdownSeconds: Number(value) })}
       />
+      <label className="mt-2 mr-1 flex items-start gap-2 px-3 py-2 text-[var(--sniptale-color-text-secondary)]">
+        <input type="checkbox" disabled checked={false} className="mt-1 shrink-0" />
+        <span>
+          <span className="block text-sm">{translate('popup.video.cursorThemeLabel')}</span>
+          <span className="block text-xs">{translate('popup.video.cursorThemePending')}</span>
+        </span>
+      </label>
       {showSourceCount ? (
         <CounterCard
           label={translate('popup.video.sourceCountLabel')}
