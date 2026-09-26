@@ -1,5 +1,5 @@
 import { useImageDimensions } from './image-dimensions';
-import { useGuideLayoutAssistance } from './layout-assistance';
+import { useGuideImageBounds } from './layout-assistance';
 import { GuideResourceTrigger } from './resource-drawer';
 import { Check, Crop, Pencil, Magnet } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -186,18 +186,14 @@ export function GuideImageSurface(props: ImageProps) {
   const { block, url, disabled, editing, onEditingChange, t } = props;
   const trigger = useRef<HTMLButtonElement>(null);
   const dimensions = useImageDimensions(editing ? url : undefined);
-  const { cropBounds, setCropBounds } = useGuideLayoutAssistance();
+  const { cropBounds, setCropBounds } = useGuideImageBounds(block);
   const constrain = useCallback(
     (next: GuideImageBlock) =>
       cropBounds && dimensions ? constrainGuideImage(next, dimensions) : next,
     [cropBounds, dimensions]
   );
-  const gesture = useImageGesture(
-    { ...props, disabled: disabled || !url },
-    editing,
-    constrain,
-    cropBounds
-  );
+  const interaction = { ...props, disabled: disabled || !url || (cropBounds && !dimensions) };
+  const gesture = useImageGesture(interaction, editing, constrain, cropBounds);
   const close = () => {
     gesture.finish(false);
     onEditingChange(false);
@@ -272,7 +268,7 @@ export function GuideImageSurface(props: ImageProps) {
           {editing ? <Check size={16} aria-hidden="true" /> : <Crop size={16} aria-hidden="true" />}
         </ContentToolbarButton>
       </div>
-      <GuideImageViewport {...props} editing={editing} gesture={gesture} constrain={constrain} />
+      <GuideImageViewport {...interaction} gesture={gesture} constrain={constrain} />
       {block.caption && <figcaption>{block.caption}</figcaption>}
     </figure>
   );

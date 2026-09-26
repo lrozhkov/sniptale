@@ -50,6 +50,8 @@ async function choose(label: string) {
 }
 it('changes each tone as one operation while retaining identity, width and literal text', async () => {
   await render();
+  expect(host.querySelector('button')?.className).toContain('sniptale-btn-utility');
+  expect(host.querySelector('button')?.className).not.toContain('sniptale-toggle');
   expect(host.querySelector('b')).toBeNull();
   expect(host.querySelector('textarea')?.value).toBe('<b>literal</b>');
   for (const [label, tone] of [

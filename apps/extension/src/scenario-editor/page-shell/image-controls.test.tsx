@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageControls } from './image-controls';
+import { GuideLayoutAssistance, useGuideImageBounds } from './layout-assistance';
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -128,6 +129,52 @@ it('keeps geometry disabled after a decode failure or while edits are locked', a
   await click('Zoom 100%');
   await click('Center image');
   expect(change).not.toHaveBeenCalled();
+});
+
+it('holds inspector geometry when bounds are on until the current image decodes', async () => {
+  function BoundedControls() {
+    const { setCropBounds } = useGuideImageBounds(block);
+    return (
+      <>
+        <button onClick={() => setCropBounds(true)}>Bounds on</button>
+        <GuideImageControls
+          block={block}
+          url="blob:image"
+          disabled={false}
+          onChange={change}
+          onClose={close}
+          t={createTranslator('en')}
+        />
+      </>
+    );
+  }
+  await act(async () =>
+    root.render(
+      <GuideLayoutAssistance>
+        <BoundedControls />
+      </GuideLayoutAssistance>
+    )
+  );
+  await click('Bounds on');
+  expect(host.querySelector<HTMLFieldSetElement>('.guide-image-controls fieldset')?.disabled).toBe(
+    true
+  );
+  const caption = host.querySelector<HTMLInputElement>('.guide-image-description input')!;
+  expect(caption.matches(':disabled')).toBe(false);
+  const htmlToggle = host.querySelector<HTMLButtonElement>('.guide-html-switch button')!;
+  expect(htmlToggle.matches(':disabled')).toBe(false);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      caption,
+      'Still editable'
+    );
+    caption.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(change.mock.calls.at(-1)?.[0].caption).toBe('Still editable');
+  await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
+  expect(host.querySelector<HTMLFieldSetElement>('.guide-image-controls fieldset')?.disabled).toBe(
+    false
+  );
 });
 
 it('lets numeric Escape cancel the draft before inspector dismissal', async () => {

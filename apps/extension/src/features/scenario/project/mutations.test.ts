@@ -112,13 +112,18 @@ it('adds optional blocks and supports image block copy, move and removal', () =>
   expect(new Set(step.blocks.map((block) => block.id)).size).toBe(3);
 });
 
-it('creates empty optional steps and unnumbered sections', () => {
+it('creates editable steps and unnumbered sections', () => {
   const project = applyGuideStructureOperation(createGuideProject('Empty'), {
     kind: 'add-section',
   });
   const next = applyGuideStructureOperation(project, { kind: 'add-step' });
   expect(next.items[0]).toMatchObject({ kind: 'section', title: '' });
-  expect(next.items[1]).toMatchObject({ kind: 'step', title: '', showNumber: true, blocks: [] });
+  expect(next.items[1]).toMatchObject({
+    kind: 'step',
+    title: '',
+    showNumber: true,
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('') }],
+  });
 });
 
 it('rejects missing targets, invalid boundaries and crossing a section while preserving input', () => {

@@ -546,7 +546,12 @@ function useGuideNavigation(
   };
   const { project } = state;
   const operate = (operation: GuideStructureOperation) => {
-    const next = state.operate(operation);
+    const selected = project?.items.find((item) => item.id === state.selectedId);
+    const requested =
+      operation.kind === 'add-step' && selected?.kind === 'step'
+        ? { ...operation, layout: operation.layout ?? selected.layout }
+        : operation;
+    const next = state.operate(requested);
     if (!next) return;
     const placement = operation.kind === 'transfer-block' || operation.kind === 'place-block';
     const { target, addedItem, addedBlock } = resolveOperationFocus(
@@ -565,7 +570,12 @@ function useGuideNavigation(
         ...(placement
           ? { preserveFocus: true }
           : addedItem
-            ? { field: true }
+            ? {
+                field: true,
+                ...(addedItem.kind === 'step' && addedItem.blocks[0]?.kind === 'text'
+                  ? { blockId: addedItem.blocks[0].id }
+                  : {}),
+              }
             : addedBlock
               ? { blockId: addedBlock.id }
               : {}),

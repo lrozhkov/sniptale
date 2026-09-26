@@ -6,10 +6,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageSurface } from './image-surface';
-vi.mock('./image-dimensions', () => {
-  const dimensions = { width: 800, height: 600 };
-  return { useImageDimensions: () => dimensions };
-});
+const decoded = vi.hoisted(() => ({
+  value: { width: 800, height: 600 } as { width: number; height: number } | null,
+}));
+vi.mock('./image-dimensions', () => ({ useImageDimensions: () => decoded.value }));
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -26,6 +26,7 @@ const originalHas = HTMLElement.prototype.hasPointerCapture;
 const originalRelease = HTMLElement.prototype.releasePointerCapture;
 beforeEach(() => {
   vi.clearAllMocks();
+  decoded.value = { width: 800, height: 600 };
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   HTMLElement.prototype.setPointerCapture = vi.fn();
   HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
@@ -293,4 +294,49 @@ it('crop magnet prevents blank edges for pan and keyboard while disabling restor
   change.mockClear();
   await click('Keep image inside frame');
   expect(change.mock.calls[0]?.[0].contentTransform).toEqual({ x: 0, y: 0, scale: 1 });
+});
+
+it('scopes the pressed state to the current image and reapplies bounds after switching back', async () => {
+  await render(false, { ...block, frame: { width: 400, height: 400 } });
+  await click('Frame and image');
+  await click('Keep image inside frame');
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Keep image inside frame"]')!;
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(4 / 3);
+  await render(false, { ...block, id: 'other', assetId: 'other-asset' });
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  await click('Keep image inside frame');
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  await click('Keep image inside frame');
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+});
+
+it('holds image geometry while bounds are enabled and dimensions are loading', async () => {
+  await render();
+  await click('Frame and image');
+  await click('Keep image inside frame');
+  decoded.value = null;
+  await render();
+  const element = frame();
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 400, -300);
+  await pointer(element, 'pointerup', 400, -300);
+  expect(change).not.toHaveBeenCalled();
+  expect(host.querySelector('img')?.style.translate).toBe('0% 0%');
+});
+
+it('commits a constrained extreme resize with the fit shown in preview', async () => {
+  await render();
+  await click('Frame and image');
+  await click('Keep image inside frame');
+  frame();
+  const resize = host.querySelector('.guide-image-resize')!;
+  await pointer(resize, 'pointerdown', 0, 0);
+  await pointer(resize, 'pointermove', -399.5, 0);
+  expect(host.querySelector('img')?.style.objectFit).toBe('cover');
+  await pointer(resize, 'pointerup', -399.5, 0);
+  expect(change.mock.calls.at(-1)?.[0]).toMatchObject({
+    fit: 'cover',
+    frame: { width: 1, height: 600 },
+  });
 });

@@ -7,7 +7,7 @@ import { MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'luci
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useImageDimensions } from './image-dimensions';
-import { useGuideLayoutAssistance } from './layout-assistance';
+import { useGuideImageBounds } from './layout-assistance';
 import {
   GUIDE_LIMITS,
   type GuideImageBlock,
@@ -36,7 +36,8 @@ export function GuideImageControls({
   t: Translate;
 }) {
   const dimensions = useImageDimensions(url);
-  const { cropBounds } = useGuideLayoutAssistance();
+  const { cropBounds } = useGuideImageBounds(block);
+  const geometryDisabled = disabled || (cropBounds && !dimensions);
   const constrain = (next: GuideImageBlock) =>
     cropBounds && dimensions ? constrainGuideImage(next, dimensions) : next;
   const geometry = (
@@ -64,21 +65,23 @@ export function GuideImageControls({
           title={t('scenario.editor.guideFramingGroup')}
         >
           <p>{t('scenario.editor.guideImageGestureHint')}</p>
-          <SegmentedSwitch
-            activeId={block.fit}
-            ariaLabel={t('scenario.editor.guideImageFit')}
-            options={[
-              { id: 'contain', label: t('scenario.editor.guideImageContain') },
-              { id: 'cover', label: t('scenario.editor.guideImageCover') },
-            ]}
-            onChange={(fit) => geometry({ kind: 'fit', fit })}
-          />
+          <fieldset className="contents" disabled={geometryDisabled}>
+            <SegmentedSwitch
+              activeId={block.fit}
+              ariaLabel={t('scenario.editor.guideImageFit')}
+              options={[
+                { id: 'contain', label: t('scenario.editor.guideImageContain') },
+                { id: 'cover', label: t('scenario.editor.guideImageCover') },
+              ]}
+              onChange={(fit) => geometry({ kind: 'fit', fit })}
+            />
+          </fieldset>
           <GuideInspectorNumber
             label={t('scenario.editor.guideImageZoom')}
             min={10}
             max={10000}
             step={10}
-            disabled={disabled}
+            disabled={geometryDisabled}
             value={Math.round(block.contentTransform.scale * 100)}
             onChange={(value) =>
               geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
@@ -94,7 +97,7 @@ export function GuideImageControls({
               )}
               min={1}
               max={GUIDE_LIMITS.maxDimension}
-              disabled={disabled}
+              disabled={geometryDisabled}
               value={Math.round(block.frame[dimension])}
               onChange={(value) =>
                 geometry(
@@ -131,21 +134,21 @@ export function GuideImageControls({
         <div className="guide-image-reset-actions">
           <ContentToolbarButton
             title={t('scenario.editor.guideImageResetZoom')}
-            disabled={disabled}
+            disabled={geometryDisabled}
             onClick={() => geometry({ kind: 'zoom', scale: 1 })}
           >
             <Maximize2 size={16} aria-hidden="true" />
           </ContentToolbarButton>
           <ContentToolbarButton
             title={t('scenario.editor.guideImageCenter')}
-            disabled={disabled}
+            disabled={geometryDisabled}
             onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
           >
             <Focus size={16} aria-hidden="true" />
           </ContentToolbarButton>
           <ContentToolbarButton
             title={t('scenario.editor.guideImageReset')}
-            disabled={disabled || !dimensions}
+            disabled={geometryDisabled || !dimensions}
             onClick={() => {
               if (dimensions) geometry({ kind: 'reset', ...dimensions });
             }}

@@ -38,6 +38,7 @@ export function GuideNoteBlock({
       <GuideActionMenu
         label={t('scenario.editor.guideNoteType')}
         icon={<Icon size={16} aria-hidden="true" />}
+        tone="utility"
         disabled={disabled}
         items={guideNoteTypes.map((type) => ({
           label: t(type.key),
