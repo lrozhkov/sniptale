@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { GalleryThumbnails, Paintbrush, TvMinimalPlay, Upload } from 'lucide-react';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
@@ -43,7 +43,6 @@ export function PopupApp() {
   const route = usePopupRouteController();
   const Route = route.Route;
   const [locale, setLocale] = useState<AppLocale>(readInitialLocale);
-  const palette = useRouteFirstPalette();
   const extensionWarning = useExtensionPageWarning();
   usePopupStartupReconciliation(setLocale);
 
@@ -82,49 +81,8 @@ export function PopupApp() {
           <PopupRouteSkeleton />
         )}
       </main>
-      {palette.open && palette.Component ? (
-        <palette.Component
-          page={route.page}
-          onClose={() => palette.setOpen(false)}
-          onNavigate={(target) => void route.navigate(target)}
-        />
-      ) : null}
     </div>
   );
-}
-
-type PaletteComponent = ComponentType<{
-  page: PopupPage | null;
-  onClose: () => void;
-  onNavigate: (page: PopupPage) => void;
-}>;
-
-function useRouteFirstPalette() {
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [Palette, setPalette] = useState<PaletteComponent | null>(null);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        !event.defaultPrevented &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'k'
-      ) {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-        if (!Palette) {
-          void import('../command-palette/route-first').then((module) =>
-            setPalette(() => module.RouteFirstPopupCommandPalette)
-          );
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [Palette]);
-  return { Component: Palette, open: paletteOpen, setOpen: setPaletteOpen };
 }
 
 function PopupNavigation({

@@ -92,29 +92,30 @@ const MENU_SURFACE_CLASS_NAME = [
 ].join(' ');
 
 const CAPTURE_BUTTON_CLASS_NAME = [
-  'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[14px] border',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_70%,transparent)]',
+  'flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[12px] border-0',
+  'bg-[var(--sniptale-color-surface-input)]',
   'px-1.5 py-2.5 text-center transition-colors',
-  'hover:border-[var(--sniptale-color-border-accent-soft)]',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 
 const WORKSPACE_BUTTON_CLASS_NAME = [
-  'group flex min-h-12 items-center gap-2.5 rounded-[12px] border px-3 text-left text-xs font-medium',
-  'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-primary)]',
-  'transition-colors hover:border-[var(--sniptale-color-border-accent-soft)]',
+  'flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-2 rounded-[12px] border-0',
+  'bg-[var(--sniptale-color-surface-input)] px-1.5 py-2 text-center text-[10px] font-medium',
+  'text-[var(--sniptale-color-text-primary)] transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'disabled:cursor-not-allowed disabled:opacity-50',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'group grid min-h-[58px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
-  'gap-1.5 rounded-[12px] border border-transparent bg-transparent px-1.5 py-1.5',
+  'grid min-h-[58px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
+  'gap-1.5 rounded-[12px] border-0 bg-transparent px-1.5 py-1.5',
   'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
-  'hover:border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)] disabled:cursor-not-allowed disabled:opacity-45',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 const SECTION_HEADING_CLASS_NAME = [
   'mb-2 text-[10px] font-semibold uppercase tracking-[0.08em]',
@@ -124,12 +125,6 @@ const CAPTURE_LABEL_CLASS_NAME = [
   'whitespace-nowrap text-[9px] font-semibold leading-none',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
-const HOVER_LIFT_CLASS_NAME = [
-  'transition-transform duration-200 ease-out',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-  'group-disabled:translate-y-0 motion-reduce:transition-none',
-].join(' ');
-
 function getCaptureActions(): MenuAction[] {
   return [
     {
@@ -276,10 +271,8 @@ function MenuCaptureActions(props: {
           title={props.disabledReason ?? hint}
           onClick={() => void props.onCapture(`download:${mode}`, mode)}
         >
-          <Icon
-            className={`h-7 w-7 text-[var(--sniptale-color-accent)] ${HOVER_LIFT_CLASS_NAME}`}
-          />
-          <span className={`${CAPTURE_LABEL_CLASS_NAME} ${HOVER_LIFT_CLASS_NAME}`}>
+          <Icon className="h-7 w-7 text-[var(--sniptale-color-accent)]" />
+          <span className={CAPTURE_LABEL_CLASS_NAME}>
             {props.pendingAction === `download:${mode}`
               ? translate('popup.home.capturePendingLabel')
               : label}
@@ -344,12 +337,8 @@ function MenuQuickScenarios(props: {
           title={scenario.title}
           onClick={scenario.onClick}
         >
-          <Icon className={`h-[18px] w-[18px] ${HOVER_LIFT_CLASS_NAME}`} />
-          <span
-            className={`min-h-5 text-[9px] font-medium leading-[10px] ${HOVER_LIFT_CLASS_NAME}`}
-          >
-            {label}
-          </span>
+          <Icon className="h-[18px] w-[18px]" />
+          <span className="min-h-5 text-[9px] font-medium leading-[10px]">{label}</span>
         </button>
       ))}
     </div>
@@ -364,7 +353,7 @@ function MenuWorkspace({
   onOpenToolbar(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
         <button
           key={labelKey}
@@ -372,10 +361,8 @@ function MenuWorkspace({
           className={WORKSPACE_BUTTON_CLASS_NAME}
           onClick={onClick}
         >
-          <Icon
-            className={`h-4 w-4 text-[var(--sniptale-color-text-secondary)] ${HOVER_LIFT_CLASS_NAME}`}
-          />
-          <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
+          <Icon className="h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]" />
+          <span>{translate(labelKey)}</span>
         </button>
       ))}
       {pageToolActions.map(({ icon: Icon, labelKey, hintKey, mode }) => (
@@ -417,8 +404,8 @@ function MenuToolbarButton({
       disabled={Boolean(disabledReason)}
       onClick={() => void onOpen(mode)}
     >
-      <Icon className={`h-4 w-4 text-[var(--sniptale-color-accent)] ${HOVER_LIFT_CLASS_NAME}`} />
-      <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
+      <Icon className="h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]" />
+      <span>{translate(labelKey)}</span>
     </button>
   );
 }

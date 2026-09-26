@@ -49,6 +49,14 @@ it('opens the toolbar directly or with each supported working mode selected', ()
   expect(buttons[4]?.querySelector('svg')?.getAttribute('class')).toContain('lucide-swatch-book');
   expect(buttons[5]?.title).toBe('content.toolbar.videoRecordingEnable');
   expect(buttons.every((button) => button.className.includes('shrink-0'))).toBe(true);
+  expect(buttons.every((button) => button.className.includes('border-0'))).toBe(true);
+  expect(
+    buttons.every((button) =>
+      [...button.querySelectorAll('svg, span')].every(
+        (content) => !content.getAttribute('class')?.includes('group-hover:-translate-y-px')
+      )
+    )
+  ).toBe(true);
   expect(container.querySelector('[data-ui="popup.tools.actions"]')?.className).toContain('pb-1');
 });
 

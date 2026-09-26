@@ -7,12 +7,6 @@ import {
 } from '../../../platform/i18n/popup';
 
 const logger = createLogger({ namespace: 'shared:ui:popup-footer-language' });
-const LANGUAGE_CONTENT_CLASS_NAME = [
-  'transition-transform duration-200 ease-out',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-  'motion-reduce:transition-none',
-].join(' ');
-
 function getNextLocale(locale: AppLocale): AppLocale {
   return locale === 'ru' ? 'en' : 'ru';
 }
@@ -30,10 +24,11 @@ export function PopupFooterLanguageToggle() {
       type="button"
       aria-label={translate('popup.common.footerLanguageToggleAria')}
       className={[
-        'group inline-flex h-7 min-w-7 items-center justify-center rounded-full border-none px-1',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_88%,transparent)]',
-        'text-[9px] font-semibold uppercase text-[var(--sniptale-color-accent)]',
-        'transition-colors hover:text-[var(--sniptale-color-text-primary)]',
+        'inline-flex h-7 min-w-7 items-center justify-center rounded-full border-none px-1',
+        'bg-transparent text-[9px] font-semibold uppercase',
+        'text-[var(--sniptale-color-text-secondary)] transition-colors',
+        'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
       ].join(' ')}
       data-locale-preference={locale}
       onClick={() => {
@@ -43,7 +38,7 @@ export function PopupFooterLanguageToggle() {
       }}
       title={`${getLocaleName(locale)} → ${getLocaleName(nextLocale)}`}
     >
-      <span className={LANGUAGE_CONTENT_CLASS_NAME}>{locale}</span>
+      <span>{locale}</span>
     </button>
   );
 }

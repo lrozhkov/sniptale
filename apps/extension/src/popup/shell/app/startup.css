@@ -259,11 +259,16 @@ body {
 .popup-react-shell__tabs button:hover,
 .popup-react-shell__tabs button:focus-visible {
   color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
+  background: var(--sniptale-color-surface-hover, var(--popup-initial-panel));
 }
 
-.popup-react-shell__tabs button:hover svg,
-.popup-react-shell__tabs button:focus-visible svg {
-  transform: translateY(-1px) scale(1.06);
+.popup-react-shell__tabs button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent, var(--popup-initial-accent));
+  outline-offset: 1px;
+}
+
+.popup-react-shell__tabs button:active {
+  background: var(--sniptale-color-surface-hover, var(--popup-initial-panel));
 }
 
 .popup-react-shell__tabs button[data-page='menu'] {

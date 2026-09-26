@@ -152,7 +152,6 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/popup/shell/app/index.test.tsx',
       'apps/extension/src/popup/shell/startup/resource.test.tsx',
-      'apps/extension/src/popup/shell/command-palette/route-first.test.tsx',
       'apps/extension/src/popup/shell/export/footer/primary-action.test.tsx',
       'apps/extension/src/popup/recording/video/footer/active-controls.test.tsx',
       'apps/extension/src/popup/recording/video/footer/actions.test.tsx',

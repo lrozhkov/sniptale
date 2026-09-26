@@ -60,9 +60,6 @@ vi.mock(
     savePopupLastPage: mocks.saveLastPage,
   })
 );
-vi.mock('../command-palette/route-first', () => ({
-  RouteFirstPopupCommandPalette: () => <div data-testid="route-first-palette" />,
-}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -181,16 +178,17 @@ it('keeps current content until a cold navigation commits and only then persists
   await vi.waitFor(() => expect(mocks.saveLastPage).toHaveBeenCalledWith('video'));
 });
 
-it('loads the command palette only after the actual hotkey', async () => {
+it('does not open a command palette from the popup shortcut', async () => {
   mocks.coordinator.mockReturnValue(new Promise(() => undefined));
   const { PopupApp } = await import('./index');
   act(() => root.render(<PopupApp />));
-  expect(container.querySelector('[data-testid="route-first-palette"]')).toBeNull();
+  expect(container.querySelector('[data-ui="popup.command-palette"]')).toBeNull();
   await act(async () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-    await vi.dynamicImportSettled();
+    const shortcut = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, cancelable: true });
+    window.dispatchEvent(shortcut);
+    expect(shortcut.defaultPrevented).toBe(false);
   });
-  expect(container.querySelector('[data-testid="route-first-palette"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="popup.command-palette"]')).toBeNull();
 });
 
 it('keeps the committed route when a cold target fails to load', async () => {

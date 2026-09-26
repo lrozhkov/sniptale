@@ -202,6 +202,90 @@ test('popup quick action dispatches a typed runtime message', async ({ page, hos
   });
 });
 
+test('popup center menu icon stays centered through hover, press, and focus', async ({
+  page,
+  hostOrigin,
+}) => {
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    storage: { sniptale_popup_startup: QUICK_ACTIONS_STARTUP },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  const button = page.locator('[data-ui="popup.app.tabs"] button[data-page="menu"]');
+  const icon = button.locator('svg');
+  const centerOffset = async () => {
+    const buttonBox = await button.boundingBox();
+    const iconBox = await icon.boundingBox();
+    if (!buttonBox || !iconBox) throw new Error('Menu button geometry is unavailable');
+    return {
+      x: iconBox.x + iconBox.width / 2 - (buttonBox.x + buttonBox.width / 2),
+      y: iconBox.y + iconBox.height / 2 - (buttonBox.y + buttonBox.height / 2),
+    };
+  };
+  const expectCentered = async () => {
+    const offset = await centerOffset();
+    expect(Math.abs(offset.x)).toBeLessThan(0.6);
+    expect(Math.abs(offset.y)).toBeLessThan(0.6);
+  };
+
+  await expectCentered();
+  await button.hover();
+  await icon.evaluate(async (element) => {
+    await Promise.all(element.getAnimations().map((animation) => animation.finished));
+  });
+  await expectCentered();
+  await page.mouse.down();
+  await expectCentered();
+  await page.mouse.up();
+  await page.mouse.move(0, 0);
+  await button.focus();
+  await expectCentered();
+});
+
+test('popup menu and tools use stable tiles without clipping the footer', async ({
+  page,
+  hostOrigin,
+}) => {
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+    storage: { sniptale_popup_startup: QUICK_ACTIONS_STARTUP },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  await page.locator('[data-ui="popup.app.tabs"] button[data-page="menu"]').click();
+
+  const menu = page.locator('[data-ui="popup.menu.route"]');
+  const workspace = page.locator('[data-ui="popup.menu.workspace"]');
+  const footer = menu.locator('footer');
+  await expect(workspace).toBeVisible();
+  await expect(footer).toBeVisible();
+  const workspaceBox = await workspace.boundingBox();
+  const footerBox = await footer.boundingBox();
+  if (!workspaceBox || !footerBox) throw new Error('Menu layout geometry is unavailable');
+  expect(workspaceBox.y + workspaceBox.height).toBeLessThan(footerBox.y);
+
+  const imageEditor = workspace.getByRole('button', { name: POPUP_IMAGE_EDITOR_LABEL });
+  const before = await imageEditor.boundingBox();
+  const restingBackground = await imageEditor.evaluate(
+    (element) => getComputedStyle(element).backgroundColor
+  );
+  await imageEditor.hover();
+  const after = await imageEditor.boundingBox();
+  expect(after).toEqual(before);
+  await expect
+    .poll(() => imageEditor.evaluate((element) => getComputedStyle(element).backgroundColor))
+    .not.toBe(restingBackground);
+
+  await page.locator('[data-ui="popup.app.tabs"] button[data-page="tools"]').click();
+  const tool = page.locator('[data-ui="popup.home.tools.drawing"]');
+  await expect(tool).toBeVisible();
+  const toolBefore = await tool.boundingBox();
+  await tool.hover();
+  expect(await tool.boundingBox()).toEqual(toolBefore);
+});
+
 test('popup page access choice hides page actions and unlocks after activation', async ({
   page,
   hostOrigin,

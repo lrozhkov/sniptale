@@ -177,7 +177,11 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.highlighter"]'),
   ];
   expect(toolButtons.every((button) => button !== null)).toBe(true);
-  expect(toolButtons.every((button) => button?.className.includes('min-h-12'))).toBe(true);
+  expect(toolButtons.every((button) => button?.className.includes('min-h-[72px]'))).toBe(true);
+  expect(container.querySelector('[data-ui="popup.menu.workspace"] .grid')?.className).toContain(
+    'grid-cols-3'
+  );
+  expect(toolButtons.every((button) => button?.className.includes('border-0'))).toBe(true);
   expect(
     toolButtons.every((button) =>
       button?.className.includes('hover:bg-[var(--sniptale-color-surface-hover)]')
@@ -185,7 +189,9 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
   ).toBe(true);
   expect(
     toolButtons.every((button) =>
-      button?.className.includes('hover:border-[var(--sniptale-color-border-accent-soft)]')
+      [...(button?.querySelectorAll('svg, span') ?? [])].every(
+        (content) => !content.getAttribute('class')?.includes('group-hover:-translate-y-px')
+      )
     )
   ).toBe(true);
   expect(container.querySelector('[data-testid="menu-footer"]')).not.toBeNull();
