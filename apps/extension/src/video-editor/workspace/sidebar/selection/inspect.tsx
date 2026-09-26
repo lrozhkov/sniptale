@@ -1,3 +1,4 @@
+import { EffectPresetEditingProvider } from './effect-instance/editing';
 import { InspectorDisclosurePreferences } from '../../../../composition/inspector-disclosures/state';
 import { InspectFxPanel } from './inspection/fx';
 import '../../../../ui/compact-inspector-controls/inspector-surface.css';
@@ -41,7 +42,9 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
           className="sniptale-inspector-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
         >
           <div className={PANEL_STACK_CLASS_NAME}>
-            <SelectionBody {...props} />
+            <EffectPresetEditingProvider key={JSON.stringify(props.selection)}>
+              <SelectionBody {...props} />
+            </EffectPresetEditingProvider>
           </div>
         </div>
       </InspectorSelectionFamilyContext.Provider>

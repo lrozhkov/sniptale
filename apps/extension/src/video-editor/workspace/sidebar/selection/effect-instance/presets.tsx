@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEffectPresetCatalog } from './preset-catalog';
 import {
   applyEffectV1ControlPresetValues,
@@ -10,7 +10,7 @@ import {
   collectEffectVisualValues,
   type EffectPresetPreferences,
 } from '../../../../../features/video/project/effect-bundle/catalog/presets';
-import { getCurrentLocale, translate } from '../../../../../platform/i18n';
+import { type getCurrentLocale, translate, useAppLocale } from '../../../../../platform/i18n';
 import { SelectInput } from '../shared/controls';
 import { InspectorActionButton } from '../shared/actions';
 
@@ -19,6 +19,7 @@ export function EffectVisualPresets(props: {
   sourceSha256: string;
   catalogPackId?: string | undefined;
   controls: Readonly<Record<string, number | string>>;
+  matchingControls?: Readonly<Record<string, number | string>>;
   disabled: boolean;
   onChange(controls: Record<string, number | string>): void;
 }) {
@@ -29,9 +30,17 @@ export function EffectVisualPresets(props: {
     error,
     save: persist,
   } = useEffectPresetCatalog(props.document.id, props.sourceSha256, props.catalogPackId);
+  const locale = useAppLocale();
   const [preferred, setPreferred] = useState<string | null>(null);
-  const options = resolveVisualPresetOptions(props.document, preferences);
-  const selected = resolveSelectedPreset(options, props.controls, preferred);
+  const options = useMemo(
+    () => resolveVisualPresetOptions(props.document, preferences, locale),
+    [props.document, preferences, locale]
+  );
+  const matchingControls = props.matchingControls ?? props.controls;
+  const selected = useMemo(
+    () => resolveSelectedPreset(options, matchingControls, preferred),
+    [options, matchingControls, preferred]
+  );
   const defaultValue = preferences.defaultPreset
     ? `${preferences.defaultPreset.kind}:${preferences.defaultPreset.id}`
     : 'template';
@@ -71,6 +80,14 @@ export function EffectVisualPresets(props: {
             );
         }}
       />
+      <PresetLibraryActions
+        preferences={preferences}
+        values={values}
+        selected={selected}
+        available={Boolean(catalog) && !props.disabled}
+        busy={busy}
+        onSave={save}
+      />
       {catalog && (
         <SelectInput
           label={translate('videoEditor.effectsLibrary.defaultPreset')}
@@ -79,7 +96,7 @@ export function EffectVisualPresets(props: {
               ? `${preferences.defaultPreset.kind}:${preferences.defaultPreset.id}`
               : 'template'
           }
-          disabled={busy}
+          disabled={props.disabled || busy}
           options={[
             { value: 'template', label: translate('videoEditor.effectsLibrary.templateDefault') },
             ...(defaultUnavailable && !options.some((option) => option.value === defaultValue)
@@ -111,14 +128,6 @@ export function EffectVisualPresets(props: {
           {translate('videoEditor.effectsLibrary.updateFailed')}
         </p>
       )}
-      <PresetLibraryActions
-        preferences={preferences}
-        values={values}
-        selected={selected}
-        available={Boolean(catalog)}
-        busy={busy}
-        onSave={save}
-      />
     </div>
   );
 }
@@ -140,6 +149,12 @@ function PresetLibraryActions({
 }) {
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState('');
+  const trigger = useRef<HTMLDivElement>(null);
+  const wasNaming = useRef(false);
+  useEffect(() => {
+    if (wasNaming.current && !naming) trigger.current?.querySelector('button')?.focus();
+    wasNaming.current = naming;
+  }, [naming]);
   const save = async (next: EffectPresetPreferences) => {
     if (await onSave(next)) {
       setNaming(false);
@@ -148,13 +163,19 @@ function PresetLibraryActions({
   };
   return (
     <>
-      {' '}
       {naming ? (
         <form
           className="video-inspector-preset-form"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              if (!busy) setNaming(false);
+            }
+          }}
           onSubmit={(event) => {
             event.preventDefault();
-            if (!name.trim()) return;
+            if (busy || !name.trim()) return;
             void save({
               ...preferences,
               presets: [
@@ -167,6 +188,7 @@ function PresetLibraryActions({
           <input
             autoFocus
             maxLength={120}
+            disabled={busy}
             value={name}
             aria-label={translate('videoEditor.effectsLibrary.presetName')}
             onChange={(event) => setName(event.target.value)}
@@ -175,15 +197,17 @@ function PresetLibraryActions({
               'border-[var(--sniptale-color-border-soft)]',
             ].join(' ')}
           />
-          <InspectorActionButton disabled={busy || !name.trim()} type="submit">
-            {translate('common.actions.save')}
-          </InspectorActionButton>
-          <InspectorActionButton type="button" disabled={busy} onClick={() => setNaming(false)}>
-            {translate('common.actions.cancel')}
-          </InspectorActionButton>
+          <div className="video-inspector-preset-confirmation">
+            <InspectorActionButton tone="primary" disabled={busy || !name.trim()} type="submit">
+              {translate('common.actions.save')}
+            </InspectorActionButton>
+            <InspectorActionButton type="button" disabled={busy} onClick={() => setNaming(false)}>
+              {translate('common.actions.cancel')}
+            </InspectorActionButton>
+          </div>
         </form>
       ) : (
-        <div data-ui="video-editor.inspector.actions">
+        <div ref={trigger} className="video-inspector-preset-actions">
           <InspectorActionButton
             disabled={
               !available || busy || !Object.keys(values).length || preferences.presets.length >= 16
@@ -195,6 +219,7 @@ function PresetLibraryActions({
           {selected.startsWith('user:') && (
             <InspectorActionButton
               tone="danger"
+              className="video-inspector-preset-delete"
               disabled={busy}
               onClick={() => {
                 const id = selected.slice(5);
@@ -218,12 +243,13 @@ function PresetLibraryActions({
 
 function resolveVisualPresetOptions(
   document: EffectV1Document,
-  preferences: EffectPresetPreferences
+  preferences: EffectPresetPreferences,
+  locale: ReturnType<typeof getCurrentLocale>
 ) {
   const options = [
     ...(document.controlPresets ?? []).map((preset) => ({
       value: `builtin:${preset.id}`,
-      label: resolveEffectLocaleText(preset.label, getCurrentLocale()),
+      label: resolveEffectLocaleText(preset.label, locale),
       values: preset.values,
       disabled: false,
     })),

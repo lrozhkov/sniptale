@@ -7,6 +7,8 @@ import {
   type EffectPresetPreferences,
 } from '../../../../../features/video/project/effect-bundle/catalog/presets';
 
+const EMPTY_PREFERENCES: EffectPresetPreferences = { presets: [] };
+
 export function useEffectPresetCatalog(
   documentId: string,
   sourceSha256: string,
@@ -38,7 +40,7 @@ export function useEffectPresetCatalog(
     };
   }, [documentId, sourceSha256, catalogPackId]);
   const entry = catalog?.documents.find((doc) => doc.id === documentId);
-  const preferences = entry?.presetPreferences ?? { presets: [] };
+  const preferences = entry?.presetPreferences ?? EMPTY_PREFERENCES;
   const save = async (next: EffectPresetPreferences) => {
     if (!catalog || busy) return;
     setBusy(true);

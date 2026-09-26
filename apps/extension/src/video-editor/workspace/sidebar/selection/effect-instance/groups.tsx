@@ -1,3 +1,4 @@
+import { useEffectPresetEditing, useEffectPresetMatchingControls } from './editing';
 import { readEffectPresentationDocument } from '../../../../../features/video/project/effect-bundle/presentation-document';
 import type { InspectorGroupDefinition } from '../grouped-inspector/types';
 import { EffectVisualPresets } from './presets';
@@ -140,6 +141,7 @@ type EffectInstanceCardProps = EffectInstanceGroupActions & {
 
 function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
   const { instance } = props;
+  const matchingControls = useEffectPresetMatchingControls(instance.id, instance.controls);
   const snapshot = props.project.effectSnapshots?.find(({ id }) => id === instance.snapshotId);
   const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
   return (
@@ -170,6 +172,7 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
           sourceSha256={snapshot.sha256}
           catalogPackId={instance.catalogPackId}
           controls={instance.controls}
+          matchingControls={matchingControls}
           disabled={props.disabled ?? false}
           onChange={(controls) => props.onUpdateEffectInstance(instance.id, { controls })}
         />
@@ -268,6 +271,7 @@ function EffectInstanceControls(
   const renderControl = (control: ControlDefinition) => (
     <EffectControl
       control={control}
+      controls={props.instance.controls}
       documentId={document.id}
       disabled={props.disabled ?? false}
       instanceId={props.instance.id}
@@ -405,11 +409,13 @@ function EffectInstanceActions(props: EffectInstanceCardProps): React.JSX.Elemen
 function EffectControl(props: {
   documentId: string;
   control: ControlDefinition;
+  controls: Readonly<Record<string, number | string>>;
   disabled: boolean;
   instanceId: string;
   onUpdate(instanceId: string, patch: VideoProjectEffectInstancePatch): void;
   value: number | string;
 }): React.JSX.Element {
+  const editing = useEffectPresetEditing(props.instanceId, props.controls);
   const label = readLocaleText(props.control.label) || props.control.id;
   const update = (value: number | string) =>
     props.onUpdate(props.instanceId, { controls: { [props.control.id]: value } });
@@ -431,6 +437,8 @@ function EffectControl(props: {
         label={label}
         value={typeof props.value === 'number' ? props.value : props.control.defaultValue}
         onChange={update}
+        onPreview={editing.begin}
+        onCommit={editing.finish}
         {...(props.control.min === undefined ? {} : { min: props.control.min })}
         {...(props.control.max === undefined ? {} : { max: props.control.max })}
         {...(props.control.step === undefined ? {} : { step: props.control.step })}

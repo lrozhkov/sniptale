@@ -75,7 +75,7 @@
   padding-block: 8px 4px;
 }
 .video-inspector-preset-form > input {
-  flex: 1 0 100%;
+  flex: 1 1 120px;
   min-height: 32px;
   font-weight: 500;
 }
@@ -172,4 +172,21 @@
   background: transparent;
   color: var(--sniptale-color-danger);
   border-color: color-mix(in srgb, var(--sniptale-color-danger) 28%, transparent);
+}
+
+.video-inspector-preset-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+[data-ui='video-editor.inspector.content'] .video-inspector-preset-delete {
+  width: auto;
+  margin-inline-start: auto;
+}
+
+.video-inspector-preset-confirmation {
+  display: flex;
+  flex: none;
+  gap: 8px;
 }
