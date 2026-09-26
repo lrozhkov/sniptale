@@ -1,6 +1,7 @@
-import type { FabricObject } from 'fabric';
+import { Textbox, type FabricObject } from 'fabric';
 import {
   createDrawingId,
+  DRAWING_TEXT_VERTICAL_PADDING,
   type DrawingTextObject,
   type DrawingToolDefaults,
 } from '../../../../features/drawing/public';
@@ -11,7 +12,7 @@ import { synchronizeEditorDrawingObjectFromFabric } from '../../../drawing/objec
 import type { SourceState } from '../../../document/model/source-state';
 import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../technical-data';
 import { buildTechnicalDataText } from './content';
-import { clampTechnicalDataTextPosition } from './positioning';
+import { clampTechnicalDataTextPosition, getTechnicalDataTextInset } from './positioning';
 import { getTechnicalDataTextWidth } from './sizing';
 
 export function createTechnicalDataTextObject(options: {
@@ -33,13 +34,19 @@ export function createTechnicalDataTextObject(options: {
     sourceTitle: options.sourceTitle,
     sourceUrl: options.sourceUrl,
   });
-  const drawing: DrawingTextObject = {
+  const inset = getTechnicalDataTextInset(options.source);
+  const availableWidth = Math.max(1, options.source.displayWidth - inset * 2);
+  const availableHeight = Math.max(1, options.source.displayHeight - inset * 2);
+  let drawing: DrawingTextObject = {
     id: createDrawingId(),
     kind: 'text',
     bounds: {
-      x: options.source.left + 20,
-      y: options.source.top + 20,
-      width: getTechnicalDataTextWidth(technicalDataText, layout, options.textSettings),
+      x: options.source.left + inset,
+      y: options.source.top + inset,
+      width: Math.min(
+        getTechnicalDataTextWidth(technicalDataText, layout, options.textSettings),
+        availableWidth
+      ),
       height: 1,
     },
     text: technicalDataText,
@@ -48,8 +55,22 @@ export function createTechnicalDataTextObject(options: {
     fontFamily: options.textSettings.fontFamily,
     fontSize: options.textSettings.fontSize,
   };
-  const text = createEditorDrawingFabricObject(drawing, options.nextLabelIndex);
+  let text = createEditorDrawingFabricObject(drawing, options.nextLabelIndex);
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (text instanceof Textbox) {
+      text.set({
+        height: Math.max(text.height, text.calcTextHeight() + DRAWING_TEXT_VERTICAL_PADDING * 2),
+      });
+    }
+    const width = text.getScaledWidth();
+    const height = text.getScaledHeight();
+    if (width <= availableWidth && height <= availableHeight) break;
+    const fit = Math.min(availableWidth / width, availableHeight / height) * 0.98;
+    drawing = { ...drawing, fontSize: drawing.fontSize * fit };
+    text = createEditorDrawingFabricObject(drawing, options.nextLabelIndex);
+  }
   clampTechnicalDataTextPosition(text, options.source);
+  text.setCoords();
   synchronizeEditorDrawingObjectFromFabric(text);
   options.prepareObject(text);
   return text;

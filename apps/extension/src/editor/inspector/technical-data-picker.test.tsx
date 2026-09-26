@@ -40,7 +40,11 @@ it('offers layout only for multiple fields and inserts them in canonical order',
     (button) => button.textContent === 'editor.compact.technicalDataLayoutRow'
   );
   expect(layout).toBeTruthy();
+  expect(layout?.getAttribute('aria-pressed')).toBe('false');
+  expect(layout?.parentElement?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   act(() => layout?.click());
+  expect(layout?.getAttribute('aria-pressed')).toBe('true');
+  expect(layout?.className).toContain('bg-[var(--sniptale-color-surface-panel)]');
   expect(container.querySelector('[aria-label="editor.compact.technicalDataPreview"]')).toBeNull();
 
   const insert = Array.from(container.querySelectorAll('button')).find(

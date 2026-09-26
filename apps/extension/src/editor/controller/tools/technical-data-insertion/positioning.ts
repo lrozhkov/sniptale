@@ -21,7 +21,7 @@ function getObjectDimension(
 }
 
 export function clampTechnicalDataTextPosition(text: FabricObject, source: SourceState): void {
-  const inset = 20;
+  const inset = getTechnicalDataTextInset(source);
   const textWidth = getObjectDimension(text, 'width', 360);
   const textHeight = getObjectDimension(text, 'height', 120);
   const minLeft = source.left + inset;
@@ -34,4 +34,8 @@ export function clampTechnicalDataTextPosition(text: FabricObject, source: Sourc
     left: Math.min(Math.max(baseLeft, minLeft), maxLeft),
     top: Math.min(Math.max(baseTop, minTop), maxTop),
   });
+}
+
+export function getTechnicalDataTextInset(source: SourceState): number {
+  return Math.min(20, source.displayWidth / 4, source.displayHeight / 4);
 }
