@@ -9,6 +9,7 @@
     "docs/architecture/platform-patterns-and-tradeoffs.md",
     "docs/architecture/repository-overview.md",
     "docs/architecture/runtime-contexts.md",
+    "docs/architecture/scenario-library-viewing.md",
     "docs/architecture/shared-topology.md",
     "docs/architecture/storage-state-authority.md",
     "docs/architecture/video-editor-layering.md",

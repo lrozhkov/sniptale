@@ -30,6 +30,7 @@ This index lists current active documents and their authority.
 - [Repository overview](architecture/repository-overview.md) is the canonical source map.
 - [Code organization](architecture/code-organization.md) owns source placement, dependencies, and public surfaces.
 - [Runtime contexts](architecture/runtime-contexts.md) documents machine-owned runtime entrypoints and owns coordination boundaries.
+- [Scenario viewing from Library](architecture/scenario-library-viewing.md) records the pre-implementation viewer, content-source and opening-flow decision for guides and tours.
 - [Shared topology](architecture/shared-topology.md) owns package and app-core residency.
 - [Storage state authority](architecture/storage-state-authority.md) owns state classes and mutation rules.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
