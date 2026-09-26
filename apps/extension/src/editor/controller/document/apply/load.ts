@@ -1,3 +1,6 @@
+import { normalizeEditorImageSettings } from '../../../../features/editor/document/constants';
+import { applyImageSettings, readImageSettingsFromObject } from '../../../objects/image-style';
+import { getSourceObject } from '../layers';
 import type { Canvas } from 'fabric';
 import { createRichShapeObject } from '../../../objects/rich-shape';
 import { logEditorSourceTrace } from '../../core/debug';
@@ -53,6 +56,16 @@ export async function loadPreparedDocumentOnCanvas(
     source: options.prepared.source,
     prepareObject: options.prepareObject,
   });
+  const sourceObject = getSourceObject(options.canvas);
+  if (sourceObject) {
+    applyImageSettings(
+      sourceObject,
+      readImageSettingsFromObject(
+        sourceObject,
+        normalizeEditorImageSettings(options.prepared.normalizedDocument.frame.sourceImage)
+      )
+    );
+  }
   restoreCanonicalEditorDrawingObjects({
     canvas: options.canvas,
     prepareObject: options.prepareObject,

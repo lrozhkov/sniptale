@@ -17,10 +17,10 @@ export {
 
 export const DEFAULT_EDITOR_FRAME_SETTINGS: EditorFrameSettings = {
   browserMode: false,
-  paddingTop: 128,
-  paddingRight: 128,
-  paddingBottom: 128,
-  paddingLeft: 128,
+  paddingTop: 32,
+  paddingRight: 32,
+  paddingBottom: 32,
+  paddingLeft: 32,
   backgroundMode: 'gradient',
   backgroundBlurAmount: 0,
   backgroundColor: 'transparent',

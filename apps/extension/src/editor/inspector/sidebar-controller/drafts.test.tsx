@@ -80,7 +80,7 @@ it('keeps frame drafts aligned with authoritative defaults without suggested pad
   });
 
   expect(hook.getValue()?.frameDraft).toEqual(DEFAULT_EDITOR_FRAME_SETTINGS);
-  expect(hook.getValue()?.frameDraft.paddingTop).toBe(128);
+  expect(hook.getValue()?.frameDraft.paddingTop).toBe(32);
 });
 
 it('seeds the scene draft from the opened document instead of a background template', () => {

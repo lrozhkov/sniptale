@@ -1,3 +1,9 @@
+// @vitest-environment jsdom
+import { FabricImage } from 'fabric';
+import {
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+  DEFAULT_EDITOR_IMAGE_SETTINGS,
+} from '../../../../features/editor/document/constants';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -273,3 +279,35 @@ describe('document apply load owner', () => {
     expect(loaded.objects[0]?.left).toBe(1);
   });
 });
+
+it.each([undefined, 3])(
+  'restores source styling using saved object metadata before frame fallback (%s)',
+  async (savedWidth) => {
+    const image = new FabricImage(document.createElement('img'), { width: 200, height: 100 });
+    image.sniptaleType = 'source-image';
+    image.sniptaleRole = 'source';
+    if (savedWidth !== undefined) image.sniptaleImageStrokeWidth = savedWidth;
+    const prepared = prepareAppliedDocument({
+      ...createMockDocument(),
+      canvasJson: '{"objects":[]}',
+      frame: {
+        ...DEFAULT_EDITOR_FRAME_SETTINGS,
+        sourceImage: { ...DEFAULT_EDITOR_IMAGE_SETTINGS, strokeWidth: 8, shadow: 45 },
+      },
+    });
+    await loadPreparedDocumentOnCanvas({
+      canvas: createFabricCanvasFixture({
+        add: vi.fn(),
+        getObjects: () => [image],
+        loadFromJSON: vi.fn(async () => undefined),
+      }),
+      prepared,
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: async () => undefined,
+      zoomLevel: 1,
+    });
+    expect(image.sniptaleImageStrokeWidth).toBe(savedWidth ?? 8);
+    expect(image.shadow?.color).toContain('0.45');
+    expect(image.objectCaching).toBe(false);
+  }
+);

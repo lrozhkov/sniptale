@@ -1,4 +1,5 @@
 import type React from 'react';
+import { translate } from '../../../../platform/i18n';
 
 import type { EditorFrameSettings } from '../../../../features/editor/document/types';
 import { EditorInspectorFrameBackgroundImageActions } from './image-actions';
@@ -28,6 +29,13 @@ export function EditorInspectorFrameBackgroundImageEditor(
 
   return (
     <div className="space-y-3">
+      {frameDraft.backgroundImageData ? (
+        <img
+          src={frameDraft.backgroundImageData}
+          alt={translate('editor.compact.frameBackgroundModeImage')}
+          className="h-28 w-full rounded-lg border border-[var(--sniptale-color-border-soft)] object-contain"
+        />
+      ) : null}
       <EditorInspectorFrameBackgroundImageActions
         hasImage={Boolean(frameDraft.backgroundImageData)}
         onClearBackgroundImage={onClearBackgroundImage}

@@ -199,46 +199,24 @@ afterEach(async () => {
   root = null;
 });
 
-function expectPanelSectionOrder() {
-  const panel = container?.querySelector("[data-ui='editor.inspector.sections']");
-  expect(
-    Array.from(panel?.children ?? []).map(
-      (element) => element.getAttribute('data-section') ?? element.getAttribute('data-ui')
-    )
-  ).toEqual(['background', 'placement', 'source-image']);
-}
-
 function expectFramePanelSections() {
-  expect(container?.querySelector('[data-testid="preset-header"]')).toBeNull();
-  expect(container?.querySelector('[data-testid="placement-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="mode-buttons"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="frame-preview"]')).toBeNull();
+  expect(container?.querySelectorAll('nav button')).toHaveLength(3);
   expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="background-blur-section"]')).toBeNull();
-  expect(container?.querySelector('[data-testid="padding-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="source-image-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="padding-section"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="source-image-section"]')).toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
-  expectPanelSectionOrder();
 }
 
-function expectDisclosureGroups() {
-  const disclosures = Array.from(
-    container?.querySelectorAll("[data-ui='editor.inspector.disclosure']") ?? []
+async function selectSection(index: number) {
+  await act(async () =>
+    container?.querySelectorAll<HTMLButtonElement>('nav button')[index]?.click()
   );
-  expect(disclosures).toHaveLength(1);
-  expect(
-    container?.querySelector('[data-testid="padding-section"]')?.closest('details')
-  ).toBeNull();
-  expect(
-    container?.querySelector('[data-testid="background-fill-section"]')?.closest('details')
-  ).toBeNull();
 }
 
 async function clickFramePanelActions() {
   await act(async () => {
     clickPanelButton('[data-testid="mode-buttons"] button');
-    clickPanelButton('[data-testid="placement-section"] button');
-    clickPanelButton('[data-testid="padding-section"] button');
+
     container
       ?.querySelector('[data-testid="apply-button"]')
       ?.querySelector('[data-testid="apply-frame"]')
@@ -260,8 +238,16 @@ it('wires the inspector scene panel sections and actions', async () => {
   await renderUi(<EditorInspectorFramePanel {...props} />);
 
   expectFramePanelSections();
-  expectDisclosureGroups();
   await clickFramePanelActions();
+  await selectSection(1);
+  await act(async () => {
+    clickPanelButton('[data-testid="placement-section"] button');
+    clickPanelButton('[data-testid="padding-section"] button');
+  });
+  expect(container?.querySelector('[data-testid="background-fill-section"]')).toBeNull();
+  await selectSection(2);
+  expect(container?.querySelector('[data-testid="source-image-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
 
   expect(previewSection).toHaveBeenCalled();
   expect(paddingSection).toHaveBeenCalled();

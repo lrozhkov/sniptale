@@ -95,10 +95,10 @@ function registerEditorFrameDefaultTests() {
         backgroundMode: 'gradient',
         browserTitle: '',
         layoutMode: 'expand-canvas',
-        paddingBottom: 128,
-        paddingLeft: 128,
-        paddingRight: 128,
-        paddingTop: 128,
+        paddingBottom: 32,
+        paddingLeft: 32,
+        paddingRight: 32,
+        paddingTop: 32,
         sourceImage: DEFAULT_EDITOR_IMAGE_SETTINGS,
       })
     );

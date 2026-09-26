@@ -1,157 +1,72 @@
 // @vitest-environment jsdom
-
-import type React from 'react';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-
-vi.mock('@sniptale/ui/product-glass-controls', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/ui/product-glass-controls')>()),
-  ProductGlassLinkedPaddingFields: (props: {
-    padding: { top: number; right: number; bottom: number; left: number };
-    onChange: (padding: { top: number; right: number; bottom: number; left: number }) => void;
-    renderValueField: (props: {
-      compact: boolean;
-      label: string;
-      onChange: (value: number) => void;
-      side: 'top';
-      value: number;
-    }) => React.ReactNode;
-  }) => (
-    <>
-      {props.renderValueField({
-        compact: true,
-        label: 'Top',
-        onChange: vi.fn(),
-        side: 'top',
-        value: props.padding.top,
-      })}
-      {props.renderValueField({
-        compact: false,
-        label: 'Top',
-        onChange: vi.fn(),
-        side: 'top',
-        value: props.padding.top,
-      })}
-      <button
-        type="button"
-        data-testid="linked-padding"
-        onClick={() => props.onChange({ top: 24, right: 24, bottom: 24, left: 24 })}
-      >
-        {Object.values(props.padding).join('/')}
-      </button>
-    </>
-  ),
-}));
-
-vi.mock('./shared', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./shared')>()),
-  PanelSection: (props: { label: string; value?: string; children: React.ReactNode }) => (
-    <section data-testid="panel-section">
-      <span>{props.label}</span>
-      {props.value ? <span>{props.value}</span> : null}
-      {props.children}
-    </section>
-  ),
-}));
-
+import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
 import { FramePaddingSection } from './padding';
 
-const FRAME = {
-  backgroundColor: '#fff',
-  backgroundGradientAngle: 45,
-  backgroundGradientFrom: '#111111',
-  backgroundGradientTo: '#222222',
-  backgroundImageData: null,
-  backgroundImageFit: 'cover',
-  backgroundMode: 'gradient',
-  browserMode: false,
-  browserTitle: '',
-  browserUrl: '',
-  layoutMode: 'expand-canvas',
-  paddingBottom: 12,
-  paddingLeft: 12,
-  paddingRight: 12,
-  paddingTop: 12,
-} as const;
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-async function renderUi(element: React.ReactNode) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  await act(async () => {
-    root?.render(element);
-  });
+let container: HTMLDivElement;
+let root: Root;
+let current = DEFAULT_EDITOR_FRAME_SETTINGS;
+function Harness() {
+  const [frame, setFrame] = useState(DEFAULT_EDITOR_FRAME_SETTINGS);
+  current = frame;
+  return <FramePaddingSection frameDraft={frame} setFrameDraft={setFrame} />;
 }
-
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root.render(<Harness />));
 });
-
 afterEach(async () => {
-  await act(async () => {
-    root?.unmount();
-  });
-  container?.remove();
-  container = null;
-  root = null;
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
 });
-
-it('renders padding controls without repeating the summary and forwards numeric input updates', async () => {
-  const setFrameDraft = vi.fn((value) =>
-    typeof value === 'function' ? value(FRAME as never) : value
-  );
-
-  await renderUi(
-    <FramePaddingSection
-      frameDraft={FRAME as never}
-      framePaddingSummary="12 / 12 / 12 / 12"
-      setFrameDraft={setFrameDraft}
-    />
-  );
-
-  expect(container?.querySelector('[data-testid="panel-section"]')?.textContent).not.toContain(
-    '12 / 12 / 12 / 12'
-  );
-
+async function enterValue(value: string) {
+  const field = container.querySelector<HTMLInputElement>('input[type="text"]')!;
   await act(async () => {
-    (
-      container?.querySelector('[data-testid="linked-padding"]') as HTMLButtonElement | undefined
-    )?.click();
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
   });
-
-  expect(setFrameDraft).toHaveBeenCalledTimes(1);
-  expect((setFrameDraft.mock.calls[0]![0] as (frame: typeof FRAME) => typeof FRAME)(FRAME)).toEqual(
-    {
-      ...FRAME,
-      paddingBottom: 24,
-      paddingLeft: 24,
-      paddingRight: 24,
-      paddingTop: 24,
-    }
+  await act(async () =>
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   );
+}
+it('keeps a full-width slider and supports manual padding above its common range', async () => {
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  expect(range.max).toBe('256');
+  expect(range.value).toBe('32');
+  await enterValue('1024');
+  expect(current).toMatchObject({
+    paddingTop: 1024,
+    paddingRight: 1024,
+    paddingBottom: 1024,
+    paddingLeft: 1024,
+  });
+  expect(range.value).toBe('256');
+  await enterValue('-10');
+  expect(current.paddingTop).toBe(0);
+  await enterValue('9000');
+  expect(current.paddingTop).toBe(4096);
+  await enterValue('invalid');
+  expect(current.paddingTop).toBe(4096);
 });
-
-it('maps frame padding to the shared linked-padding control', async () => {
-  const setFrameDraft = vi.fn((value) =>
-    typeof value === 'function' ? value(FRAME as never) : value
-  );
-
-  await renderUi(
-    <FramePaddingSection
-      frameDraft={FRAME as never}
-      framePaddingSummary="12 / 12 / 12 / 12"
-      setFrameDraft={setFrameDraft}
-    />
-  );
-
-  expect(container?.querySelector('[data-testid="linked-padding"]')?.textContent).toBe(
-    '12/12/12/12'
-  );
+it('offers four independently editable sides without short inline sliders', async () => {
+  for (const name of ['all', 'vertical', 'horizontal']) {
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(`[data-padding-link="${name}"]`)?.click()
+    );
+  }
+  expect(container.querySelectorAll('input[type="range"]')).toHaveLength(4);
+  await enterValue('75');
+  expect(current).toMatchObject({
+    paddingTop: 75,
+    paddingRight: 32,
+    paddingBottom: 32,
+    paddingLeft: 32,
+  });
 });

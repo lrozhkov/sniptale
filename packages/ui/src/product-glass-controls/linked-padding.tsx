@@ -31,6 +31,8 @@ function arePaddingValuesEqual(
 }
 
 export interface ProductGlassLinkedPaddingFieldsProps {
+  /** Stack labels above full-width controls in narrow inspectors. */
+  fieldLayout?: 'inline' | 'stacked';
   labels: Record<PaddingSide, string> & {
     padding: string;
     link: string;
@@ -95,7 +97,11 @@ function ExpandedAxisGroup(props: {
       <div className="grid gap-0.5">
         {visibleSides.map((side) => (
           <div
-            className="grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2"
+            className={
+              props.shared.fieldLayout === 'stacked'
+                ? 'grid min-w-0 grid-cols-1 gap-1'
+                : 'grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2'
+            }
             key={side}
           >
             <span className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">

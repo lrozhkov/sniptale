@@ -6,7 +6,7 @@ import {
   ProductGlassLinkedPaddingFields,
   type ProductGlassLinkedPaddingValue,
 } from '@sniptale/ui/product-glass-controls';
-import { NumericRow } from '../../chrome/ui';
+import { CompactRange, NumericRow } from '../../chrome/ui';
 import { PanelSection } from './shared';
 
 function selectFramePadding(frame: EditorFrameSettings): ProductGlassLinkedPaddingValue {
@@ -37,6 +37,14 @@ export function FramePaddingFields(props: {
 }) {
   return (
     <ProductGlassLinkedPaddingFields
+      fieldLayout="stacked"
+      renderUniformField={({ onChange, value }) => (
+        <PaddingValue
+          label={translate('highlighter.editor.paddingLabel')}
+          value={value}
+          onChange={onChange}
+        />
+      )}
       labels={{
         padding: translate('highlighter.editor.paddingLabel'),
         top: translate('highlighter.editor.paddingTop'),
@@ -50,20 +58,35 @@ export function FramePaddingFields(props: {
       onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
       renderValueField={({ label, onChange, side, value }) => (
         <div className="min-w-0" data-padding-side={side}>
-          <NumericRow
-            labelVisible={false}
-            scrub={{ min: 0, max: 512, step: 4 }}
-            label={label}
-            max={512}
-            min={0}
-            onCommitValue={onChange}
-            onPreviewValue={onChange}
-            unit="px"
-            value={value}
-          />
+          <PaddingValue label={label} value={value} onChange={onChange} />
         </div>
       )}
     />
+  );
+}
+
+function PaddingValue(props: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <div className="grid min-w-0 gap-1">
+      <NumericRow
+        labelVisible={false}
+        label={props.label}
+        max={4096}
+        min={0}
+        onCommitValue={props.onChange}
+        onPreviewValue={props.onChange}
+        unit="px"
+        value={props.value}
+      />
+      <CompactRange
+        aria-label={props.label}
+        min={0}
+        max={256}
+        step={1}
+        value={Math.min(256, props.value)}
+        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
+      />
+    </div>
   );
 }
 

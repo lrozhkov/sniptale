@@ -62,7 +62,7 @@ it('renders binary header toggles as compact option rows', () => {
 });
 
 it('exports stable primary and secondary button class names', () => {
-  expect(primaryPanelButtonClassName).toContain('rounded-[12px]');
+  expect(primaryPanelButtonClassName).toContain('rounded-[var(--sniptale-radius-sm)]');
   expect(primaryPanelButtonClassName).toContain('disabled:opacity-50');
   expect(secondaryPanelButtonClassName).toContain('border-none');
   expect(secondaryPanelButtonClassName).toContain(

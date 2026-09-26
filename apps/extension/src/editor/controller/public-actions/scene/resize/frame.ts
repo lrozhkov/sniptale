@@ -1,3 +1,6 @@
+import { normalizeEditorImageSettings } from '../../../../../features/editor/document/constants';
+import { applyImageSettings } from '../../../../objects/image-style';
+import { getSourceObject } from '../../../document/layers';
 import {
   shouldFitSourceToContent,
   shouldPreserveCanvasForBrowserFrame,
@@ -22,6 +25,13 @@ export function applyEditorFrameSceneSettings(options: FrameSceneSettingsOptions
     });
   }
 
+  const sourceObject = getSourceObject(canvas);
+  const currentStyle = normalizeEditorImageSettings(options.store.getFrame().sourceImage);
+  const nextStyle = normalizeEditorImageSettings(frame.sourceImage);
+  const styleChanged = Object.entries(nextStyle).some(
+    ([key, value]) => Reflect.get(currentStyle, key) !== value
+  );
+  if (sourceObject && styleChanged) applyImageSettings(sourceObject, nextStyle);
   options.store.updateFrame(frame);
   finalizeSceneResizeMutation(options);
 }

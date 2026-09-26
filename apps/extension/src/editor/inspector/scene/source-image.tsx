@@ -35,9 +35,10 @@ function SourceImageRangeControl(props: {
   step?: number;
   value: number;
   valueText: string;
+  fractionalPercent?: boolean;
   onChange: (value: number) => void;
 }) {
-  const percent = props.valueText.endsWith('%');
+  const percent = props.fractionalPercent ?? false;
   const min = props.min ?? 0;
   const value = percent ? Math.round(props.value * 100) : props.value;
   const step = percent ? Math.round((props.step ?? 0.05) * 100) : props.step;
@@ -88,6 +89,7 @@ export function EditorInspectorFrameSourceImageFields(
         step={0.05}
         value={settings.opacity}
         valueText={getPercentValue(settings.opacity)}
+        fractionalPercent
         onChange={(opacity) => patchSourceImage(props, { opacity })}
       />
       <SourceImageRangeSection
@@ -232,6 +234,7 @@ function SourceImageBorderColor(args: {
         step={0.05}
         value={settings.strokeOpacity}
         valueText={getPercentValue(settings.strokeOpacity)}
+        fractionalPercent
         onChange={(strokeOpacity) => patchSourceImage(props, { strokeOpacity })}
       />
     </>

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_FRAME_SETTINGS,
+  DEFAULT_EDITOR_IMAGE_SETTINGS,
 } from '../../../features/editor/document/constants';
 import type {
   BrowserFrameState,
@@ -208,3 +209,60 @@ describe('browser frame minimum-size edge cases', () => {
     expect(layout.source).toEqual({ left: 0, top: 0, width: 1, height: 1 });
   });
 });
+
+const frameCombinations = (['expand-canvas', 'fit-image'] as const).flatMap((layoutMode) =>
+  (['resize', 'keep-size'] as const).flatMap((canvasMode) =>
+    (['push-down', 'fit-content'] as const).flatMap((contentMode) =>
+      (['color', 'gradient', 'image'] as const).map((backgroundMode) => ({
+        layoutMode,
+        canvasMode,
+        contentMode,
+        backgroundMode,
+      }))
+    )
+  )
+);
+
+it.each(frameCombinations)(
+  'keeps scene geometry independent of fill: $layoutMode/$canvasMode/$contentMode/$backgroundMode',
+  ({ layoutMode, canvasMode, contentMode, backgroundMode }) => {
+    const frame = createFrame({ layoutMode, backgroundMode });
+    const browserFrame = createBrowserFrame({ canvasMode, contentMode });
+    const preserveCanvasSize = shouldPreserveCanvasForBrowserFrame(frame, browserFrame, true);
+    const fitSourceToContent = shouldFitSourceToContent(frame, browserFrame, true);
+    const input = {
+      frame,
+      browserFrame,
+      hasBrowserFrame: true,
+      source: { width: 200, height: 100 },
+      canvas: { width: 500, height: 400 },
+      preserveCanvasSize,
+      fitSourceToContent,
+    };
+    const layout = resolveEditorSceneLayout(input);
+    expect(layout.canvas).toEqual(
+      preserveCanvasSize ? { width: 500, height: 400 } : { width: 260, height: 226 }
+    );
+    expect(layout.source.top).toBe(frame.paddingTop + BROWSER_HEADER_HEIGHT);
+    expect(layout.header?.top).toBe(frame.paddingTop);
+    expect(layout.header?.width).toBe(layout.source.width);
+    expect(layout.source.width / layout.source.height).toBeCloseTo(2);
+    const restored = resolveEditorSceneLayout({
+      ...input,
+      frame: { ...frame },
+      browserFrame: { ...browserFrame },
+    });
+    expect(restored).toEqual(layout);
+    expect(
+      resolveEditorSceneLayout({
+        ...input,
+        frame: {
+          ...frame,
+          backgroundMode: 'color',
+          backgroundBlurAmount: 20,
+          sourceImage: { ...DEFAULT_EDITOR_IMAGE_SETTINGS, strokeWidth: 12, shadow: 80 },
+        },
+      })
+    ).toEqual(layout);
+  }
+);

@@ -160,3 +160,20 @@ it('reconciles link controls when the authoritative padding changes externally',
   );
   expect(container.querySelector('[data-ui="shared.linked-padding-expanded"]')).toBeNull();
 });
+
+it('offers stacked full-width fields without changing inline consumers', async () => {
+  await act(async () =>
+    root.render(
+      <ProductGlassLinkedPaddingFields
+        fieldLayout="stacked"
+        labels={labels}
+        padding={{ top: 1, right: 2, bottom: 3, left: 4 }}
+        onChange={vi.fn()}
+        renderValueField={({ label }) => <input aria-label={label} />}
+      />
+    )
+  );
+  const fields = container.querySelectorAll('[data-padding-axis] input');
+  expect(fields).toHaveLength(4);
+  for (const field of fields) expect(field.parentElement?.className).toContain('grid-cols-1');
+});

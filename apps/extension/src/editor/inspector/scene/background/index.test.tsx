@@ -267,3 +267,29 @@ it('offers image acquisition before fit controls, then reveals fit after picking
   );
   expect(container?.querySelector('[data-testid="select-field"]')).not.toBeNull();
 });
+
+it('previews the selected background resource and removes its preview when cleared', async () => {
+  const props = {
+    applyFramePatch: vi.fn(),
+    frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
+    frameDraft: {
+      ...FRAME,
+      backgroundMode: 'image' as const,
+      backgroundImageData: 'data:image/png;base64,selected',
+    },
+    onClearBackgroundImage: vi.fn(),
+    onPickBackgroundImage: vi.fn(),
+  };
+  await renderUi(<EditorInspectorFrameBackgroundImageEditor {...props} />);
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe(
+    props.frameDraft.backgroundImageData
+  );
+  expect(container?.querySelector('img')?.getAttribute('alt')).toBeTruthy();
+  await renderUi(
+    <EditorInspectorFrameBackgroundImageEditor
+      {...props}
+      frameDraft={{ ...props.frameDraft, backgroundImageData: null }}
+    />
+  );
+  expect(container?.querySelector('img')).toBeNull();
+});

@@ -1,8 +1,8 @@
 import { translate } from '../../../platform/i18n';
 import {
-  INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
-  INSPECTOR_SECONDARY_BUTTON_CLASS_NAME,
-} from '../chrome';
+  getControlPrimaryButtonClassName,
+  getControlSecondaryButtonClassName,
+} from '@sniptale/ui/control-language';
 
 export function FrameApplyButton(props: { onApplyFrame: () => void; onCancelFrame?: () => void }) {
   return (
@@ -14,7 +14,7 @@ export function FrameApplyButton(props: { onApplyFrame: () => void; onCancelFram
     >
       {props.onCancelFrame ? (
         <button
-          className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
+          className={getControlSecondaryButtonClassName()}
           onClick={props.onCancelFrame}
           type="button"
         >
@@ -22,7 +22,7 @@ export function FrameApplyButton(props: { onApplyFrame: () => void; onCancelFram
         </button>
       ) : null}
       <button
-        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
+        className={getControlPrimaryButtonClassName()}
         onClick={props.onApplyFrame}
         type="button"
       >
