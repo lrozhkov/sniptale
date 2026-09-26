@@ -77,6 +77,9 @@ export function createEffectInstanceGroup(
 export function createEffectInstanceGroups(
   args: Parameters<typeof createEffectInstanceGroup>[0]
 ): InspectorGroupDefinition<string>[] {
+  if (!args.instanceId || args.target.kind !== 'scene') {
+    return [createEffectInstanceGroup(args)];
+  }
   const groups: InspectorGroupDefinition<string>[] = [
     createEffectInstanceGroup({ ...args, separateParameters: true }),
   ];
@@ -144,20 +147,8 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
   const matchingControls = useEffectPresetMatchingControls(instance.id, instance.controls);
   const snapshot = props.project.effectSnapshots?.find(({ id }) => id === instance.snapshotId);
   const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
-  return (
-    <section
-      className="space-y-3 border-b border-[var(--sniptale-color-border-soft)] pb-3 last:border-b-0"
-      data-effect-instance={instance.id}
-    >
-      {!props.hideTitle ? (
-        <div>
-          <p className="break-words text-[13px] font-semibold">
-            {validation?.document
-              ? readLocaleText(validation.document.label)
-              : translate('videoEditor.effectsLibrary.unavailableEffect')}
-          </p>
-        </div>
-      ) : null}
+  const content = (
+    <>
       <ToggleField
         checked={instance.enabled}
         disabled={props.disabled ?? false}
@@ -179,6 +170,37 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
       )}
       <EffectInstanceControls {...props} validation={validation} />
       <EffectInstanceActions {...props} />
+    </>
+  );
+  if (props.hideTitle && instance.target.kind === 'scene') {
+    return (
+      <section className="space-y-3" data-effect-instance={instance.id}>
+        {content}
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-3" data-effect-instance={instance.id}>
+      <InspectorDetails
+        initiallyOpen
+        preferenceId={`effect-instance:${instance.target.kind}:${snapshot?.documentId ?? 'unavailable'}:${(
+          props.project.effectInstances ?? []
+        )
+          .filter(
+            (item) =>
+              sameTarget(item.target, instance.target) &&
+              props.project.effectSnapshots?.find((snapshot) => snapshot.id === item.snapshotId)
+                ?.documentId === snapshot?.documentId
+          )
+          .findIndex((item) => item.id === instance.id)}`}
+        label={
+          validation?.document
+            ? readLocaleText(validation.document.label)
+            : translate('videoEditor.effectsLibrary.unavailableEffect')
+        }
+      >
+        {content}
+      </InspectorDetails>
     </section>
   );
 }

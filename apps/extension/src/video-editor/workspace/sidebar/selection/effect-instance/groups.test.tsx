@@ -309,3 +309,67 @@ it('renders promoted advanced controls without a duplicate disclosure', async ()
   expect(advanced.querySelector('details')).toBeNull();
   expect(advanced.querySelector('input,button')).not.toBeNull();
 });
+
+it('keeps target-effect parameters out of global navigation and disclosures independent', async () => {
+  const { InspectorDisclosurePreferences } =
+    await import('../../../../../composition/inspector-disclosures/state');
+  const { createInspectorDisclosureStore } =
+    await import('../../../../../composition/persistence/inspector-disclosures/store');
+  const project = createEmptyVideoProject('Nested effects');
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-video-blur.sniptale-effect.json',
+    'utf8'
+  );
+  project.effectSnapshots = [
+    {
+      id: 'blur',
+      documentId: 'sniptale-video-blur',
+      kind: 'targetEffect',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(source).length,
+      schemaVersion: 'sniptale.effect.v1',
+      sha256: '0'.repeat(64),
+      source,
+    },
+  ];
+  project.effectInstances = ['first', 'second'].map((id) => ({
+    id,
+    kind: 'targetEffect',
+    snapshotId: 'blur',
+    enabled: true,
+    controls: {},
+    duration: 2,
+    playbackRate: 1,
+    startTime: 0,
+    target: { kind: 'track', trackId: project.tracks[0]!.id },
+  }));
+  const groups = createEffectInstanceGroups({
+    project,
+    target: { kind: 'track', trackId: project.tracks[0]!.id },
+    onDeleteEffectInstance: vi.fn(),
+    onDuplicateEffectInstance: vi.fn(() => null),
+    onMoveEffectInstance: vi.fn(),
+    onUpdateEffectInstance: vi.fn(),
+  });
+  expect(groups.map((group) => group.id)).toEqual(['effect-v1']);
+  await act(async () =>
+    root.render(
+      <InspectorDisclosurePreferences scope="video:track" store={createInspectorDisclosureStore()}>
+        {groups[0]!.content}
+      </InspectorDisclosurePreferences>
+    )
+  );
+  const disclosures = container.querySelectorAll('details');
+  expect(disclosures).toHaveLength(2);
+  expect(disclosures[0]!.open).toBe(true);
+  expect(disclosures[1]!.open).toBe(true);
+  await act(async () => {
+    disclosures[0]!.open = false;
+    disclosures[0]!.dispatchEvent(new Event('toggle'));
+  });
+  expect(disclosures[0]!.open).toBe(false);
+  expect(disclosures[1]!.open).toBe(true);
+  expect(disclosures[1]!.querySelector('input')).not.toBeNull();
+  expect(disclosures[1]!.textContent).toContain('Радиус размытия');
+});
