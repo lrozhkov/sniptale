@@ -68,7 +68,12 @@ it('renders folder actions, highlights the active folder, and forwards selection
   );
 
   const activeButton = findButton(translate('gallery.preview.folderRecording'));
-  expect(activeButton?.className).toContain('shadow-sm');
+  expect(container?.firstElementChild?.className).toContain('shrink-0');
+  expect(activeButton?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(activeButton?.className).toContain(
+    'focus-visible:ring-[var(--sniptale-color-text-primary)]'
+  );
+  expect(activeButton?.className).not.toContain('accent');
   expect(container?.textContent).toContain('7');
   expect(findButton(translate('gallery.preview.folderExport'))).toBeUndefined();
   expect(translate('gallery.preview.folderWebSnapshot')).toBe('Веб-снимки');
@@ -137,6 +142,12 @@ it('renders saved views under their category without icons or counters and reque
   );
 
   const viewButton = findButton('PNG review');
+  expect(viewButton?.parentElement?.className).toContain(
+    'bg-[var(--sniptale-color-surface-hover)]'
+  );
+  expect(viewButton?.className).toContain(
+    'focus-visible:ring-[var(--sniptale-color-text-primary)]'
+  );
   expect(viewButton?.querySelector('svg')).toBeNull();
   expect(viewButton?.className).toContain('h-full w-full');
   expect(viewButton?.parentElement?.querySelector('div')?.className).toContain('opacity-0');
@@ -256,6 +267,10 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   );
 
   const initialSummaries = Array.from(container?.querySelectorAll('summary') ?? []);
+  expect(container?.firstElementChild?.className).toContain('shrink-0');
+  expect(initialSummaries[0]?.className).toContain(
+    'focus-visible:ring-[var(--sniptale-color-text-primary)]'
+  );
   expect(initialSummaries[0]?.textContent).toContain(`${translate('gallery.app.facetSelected')} 2`);
   expect(initialSummaries[1]?.textContent).toContain('beta');
   expect(initialSummaries[1]?.textContent).not.toContain(
@@ -263,6 +278,12 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   );
 
   const labels = Array.from(container?.querySelectorAll('label') ?? []);
+  const selectedLabel = labels.find((label) => label.textContent?.includes('beta'));
+  expect(selectedLabel?.className).toContain(
+    'focus-within:ring-[var(--sniptale-color-text-primary)]'
+  );
+  expect(selectedLabel?.className).toContain('hover:bg-[var(--sniptale-color-surface-hover)]');
+  expect(selectedLabel?.querySelector('[aria-hidden="true"]')?.className).not.toContain('accent');
   click(labels.find((label) => label.textContent?.includes('alpha')));
   click(labels.find((label) => label.textContent?.includes('Сохранённые')));
   click(container?.querySelectorAll('summary')[2]);
@@ -472,6 +493,7 @@ it('hides reset and update actions while the active saved view matches its basel
 });
 
 it('shows search and scrolling only for facet lists with more than ten values', () => {
+  const onActiveTagsChange = vi.fn();
   const options = Array.from({ length: 11 }, (_, index) => ({
     count: 1,
     label: `tag-${index}`,
@@ -496,7 +518,7 @@ it('shows search and scrolling only for facet lists with more than ten values', 
       filteredItemCount={11}
       folderFilter="all"
       scope="all"
-      onActiveTagsChange={vi.fn()}
+      onActiveTagsChange={onActiveTagsChange}
       onFacetFilterChange={vi.fn()}
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
@@ -523,6 +545,12 @@ it('shows search and scrolling only for facet lists with more than ten values', 
 
   expect(searchInput.value).toBe('');
   expect(container?.querySelectorAll('input[type="checkbox"]')).toHaveLength(11);
+  click(
+    Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+      label.textContent?.includes('tag-10')
+    )
+  );
+  expect(onActiveTagsChange).toHaveBeenCalledWith(['tag-10']);
 });
 
 it('shows result selection for a non-default section without a redundant filter reset', () => {
@@ -669,7 +697,7 @@ it('shows the Audio count and selects its section', () => {
   );
   const button = findButton(translate('gallery.preview.kindAudio'));
   expect(button?.textContent).toContain('2');
-  expect(button?.className).toContain('shadow-sm');
+  expect(button?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   click(button);
   expect(onFolderFilterChange).toHaveBeenCalledWith('audio');
 });

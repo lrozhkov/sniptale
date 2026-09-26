@@ -532,6 +532,8 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   expect(listRow?.children).toHaveLength(8);
   expect(listHeader?.style.gridTemplateColumns).toContain('minmax(220px, 2fr)');
   expect(listHeader?.className).toContain('z-10');
+  expect(listHeader?.className).toContain('h-12');
+  expect(listHeader?.className).toContain('bg-[var(--sniptale-color-surface-muted)]');
   const columnHeaders = Array.from(
     container?.querySelectorAll<HTMLElement>('[role="columnheader"]') ?? []
   );

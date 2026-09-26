@@ -555,22 +555,22 @@ export function GalleryMediaList(
         data-ui="gallery.list.header"
         style={GALLERY_LIST_LAYOUT_STYLE}
         className={cx(
-          'sticky top-0 z-10 grid items-center gap-3',
+          'sticky top-0 z-10 grid h-12 items-center gap-3 px-3',
           'border-b border-[var(--sniptale-color-border-strong)]',
-          'bg-[var(--sniptale-color-surface-panel)] px-3 pb-2 pt-1',
-          'text-[11px] font-semibold uppercase tracking-wide',
-          'text-[var(--sniptale-color-text-muted)]'
+          'bg-[var(--sniptale-color-surface-muted)]',
+          'text-[11px] font-semibold uppercase tracking-[0.06em]',
+          'text-[var(--sniptale-color-text-secondary)]'
         )}
         role="row"
       >
         <span className="min-w-0" role="columnheader">
           <span className="sr-only">{translate('gallery.app.listColumnSelection')}</span>
         </span>
-        <span className="min-w-0 truncate text-center" role="columnheader">
+        <span className="min-w-0 truncate text-center leading-tight" role="columnheader">
           {translate('gallery.app.listColumnType')}
         </span>
         <span className="flex min-w-0 items-center justify-center" role="columnheader">
-          <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          <ImageIcon className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">{translate('gallery.app.listColumnPreview')}</span>
         </span>
         <span className="min-w-0 truncate" role="columnheader">

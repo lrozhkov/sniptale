@@ -31,16 +31,21 @@ export function GallerySavedViewRows(
             className={cx(
               'group relative h-8 rounded-[7px] text-xs transition-colors',
               active
-                ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-text-primary)]'
-                : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-canvas)]'
+                ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary-strong)]'
+                : [
+                    'text-[var(--sniptale-color-text-secondary)]',
+                    'hover:bg-[var(--sniptale-color-surface-hover)]',
+                    'hover:text-[var(--sniptale-color-text-primary)]',
+                  ].join(' ')
             )}
           >
             <button
               type="button"
+              aria-pressed={active}
               onClick={() => props.onSavedViewSelect?.(view.id)}
               className="flex h-full w-full min-w-0 items-center truncate rounded-[7px] px-2
                 pr-[78px] text-left font-medium outline-none
-                focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
+                focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-text-primary)]"
               title={view.name}
             >
               <span className="truncate">{view.name}</span>
@@ -80,9 +85,9 @@ export function GallerySavedViewRows(
           type="button"
           onClick={() => setVisibleCount((current) => current + 5)}
           className="flex h-8 w-full items-center rounded-[7px] px-2 text-left text-xs font-medium
-            text-[var(--sniptale-color-accent-emphasis)] transition-colors
-            hover:bg-[var(--sniptale-color-accent-soft)] focus-visible:outline-none
-            focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
+            text-[var(--sniptale-color-text-primary)] transition-colors
+            hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none
+            focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
         >
           {translate('gallery.app.savedViewShowMore')}
         </button>
@@ -115,7 +120,7 @@ function SavedViewRowAction(props: {
         'text-[var(--sniptale-color-text-muted)] transition-colors',
         'hover:bg-[var(--sniptale-color-surface-panel)] hover:text-[var(--sniptale-color-text-primary)]',
         'focus-visible:outline-none focus-visible:ring-2',
-        'focus-visible:ring-[var(--sniptale-color-border-accent-strong)] disabled:opacity-35',
+        'focus-visible:ring-[var(--sniptale-color-text-primary)] disabled:opacity-35',
         props.danger &&
           'hover:bg-[var(--sniptale-color-danger-soft)] hover:text-[var(--sniptale-color-danger)]'
       )}

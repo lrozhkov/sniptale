@@ -94,6 +94,9 @@ it('composes folder and tag sections inside the shared shell', () => {
   expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
     'overscroll-contain'
   );
+  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
+    '[overflow-anchor:none]'
+  );
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
 });

@@ -8,7 +8,7 @@ import { GalleryFacetFilters, GalleryFolderList } from './sections';
 
 const gallerySidebarPanelClassName = [
   [
-    'overflow-y-auto overscroll-contain rounded-[var(--sniptale-radius-lg)] border',
+    'overflow-y-auto overscroll-contain [overflow-anchor:none] rounded-[var(--sniptale-radius-lg)] border',
     'border-[var(--sniptale-color-border-soft)] p-3 shadow-sm',
   ].join(' '),
   [
