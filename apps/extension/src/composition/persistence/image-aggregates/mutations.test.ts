@@ -253,6 +253,38 @@ it('commits a workspace with integer CAS while preserving the immutable original
   );
 });
 
+it('saves scenario Library image edits without replacing the stored source', async () => {
+  const media = {
+    ...root(0),
+    id: 'scenario-asset:material',
+    blob: undefined,
+    source: { kind: 'stored-asset' as const, assetId: 'immutable-scenario-source' },
+  };
+  const puts = installTransaction({ media });
+  const document = createEditorDocumentFixture();
+  await expect(
+    commitImageWorkspace({ aggregateId: media.id, document, expectedRevision: 0 })
+  ).resolves.toMatchObject({ revision: 1 });
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document: { ...document, canvasJson: '{"objects":[{"x":1}]}' },
+      expectedRevision: 1,
+    })
+  ).resolves.toMatchObject({ revision: 2 });
+  expect(puts.media).toHaveBeenLastCalledWith({
+    ...media,
+    imageContentState: 'edited',
+    updatedAt: 10,
+    workspaceRevision: 2,
+    lifecycle: { ...media.lifecycle, updatedAt: 10 },
+  });
+  await expect(
+    commitImageWorkspace({ aggregateId: media.id, document, expectedRevision: 1 })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  expect(puts.media).toHaveBeenCalledTimes(2);
+});
+
 it('creates a missing revision-zero aggregate and rejects non-initial missing roots', async () => {
   const document = createEditorDocumentFixture();
   const puts = installTransaction({ sourceId: 'new-image' });
@@ -281,63 +313,69 @@ it('creates a missing revision-zero aggregate and rejects non-initial missing ro
   ).rejects.toMatchObject({ aggregateId: 'missing-image', name: 'ImageAggregateNotFoundError' });
 });
 
-it('rejects occupied aggregate IDs before creating or attaching image authority', async () => {
-  const document = createEditorDocumentFixture();
-  const recordingRoot = {
-    ...root(0),
-    id: 'occupied-recording',
-    kind: 'recording' as const,
-    source: { kind: 'recording' as const, recordingId: 'recording-1' },
-  };
-  const recordingPuts = installTransaction({ media: recordingRoot });
-  await expect(
-    commitImageWorkspace({
-      aggregateId: recordingRoot.id,
-      document,
-      expectedRevision: 0,
-    })
-  ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
-  expect(recordingPuts.media).not.toHaveBeenCalled();
-  expect(recordingPuts.workspace).not.toHaveBeenCalled();
+it.each(['recording', 'stored-asset'] as const)(
+  'rejects occupied non-image aggregate IDs with %s source',
+  async (sourceKind) => {
+    const document = createEditorDocumentFixture();
+    const recordingRoot = {
+      ...root(0),
+      id: 'occupied-recording',
+      kind: 'recording' as const,
+      source:
+        sourceKind === 'recording'
+          ? { kind: sourceKind, recordingId: 'recording-1' }
+          : { kind: sourceKind, assetId: 'scenario-audio' },
+    };
+    const recordingPuts = installTransaction({ media: recordingRoot });
+    await expect(
+      commitImageWorkspace({
+        aggregateId: recordingRoot.id,
+        document,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
+    expect(recordingPuts.media).not.toHaveBeenCalled();
+    expect(recordingPuts.workspace).not.toHaveBeenCalled();
 
-  const malformedPuts = installTransaction({
-    media: { id: 'malformed-root' },
-  });
-  await expect(
-    commitImageWorkspace({
-      aggregateId: 'malformed-root',
-      document,
-      expectedRevision: 0,
-    })
-  ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
-  expect(malformedPuts.media).not.toHaveBeenCalled();
+    const malformedPuts = installTransaction({
+      media: { id: 'malformed-root' },
+    });
+    await expect(
+      commitImageWorkspace({
+        aggregateId: 'malformed-root',
+        document,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
+    expect(malformedPuts.media).not.toHaveBeenCalled();
 
-  const workspacePuts = installTransaction({
-    sourceId: 'workspace-only',
-    workspace: { aggregateId: 'workspace-only' },
-  });
-  await expect(
-    commitImageWorkspace({
-      aggregateId: 'workspace-only',
-      document,
-      expectedRevision: 0,
-    })
-  ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
-  expect(workspacePuts.media).not.toHaveBeenCalled();
+    const workspacePuts = installTransaction({
+      sourceId: 'workspace-only',
+      workspace: { aggregateId: 'workspace-only' },
+    });
+    await expect(
+      commitImageWorkspace({
+        aggregateId: 'workspace-only',
+        document,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
+    expect(workspacePuts.media).not.toHaveBeenCalled();
 
-  const presentationPuts = installTransaction({
-    presentation: { aggregateId: 'presentation-only' },
-    sourceId: 'presentation-only',
-  });
-  await expect(
-    commitImageWorkspace({
-      aggregateId: 'presentation-only',
-      document,
-      expectedRevision: 0,
-    })
-  ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
-  expect(presentationPuts.media).not.toHaveBeenCalled();
-});
+    const presentationPuts = installTransaction({
+      presentation: { aggregateId: 'presentation-only' },
+      sourceId: 'presentation-only',
+    });
+    await expect(
+      commitImageWorkspace({
+        aggregateId: 'presentation-only',
+        document,
+        expectedRevision: 0,
+      })
+    ).rejects.toMatchObject({ name: 'ImageAggregateCollisionError' });
+    expect(presentationPuts.media).not.toHaveBeenCalled();
+  }
+);
 
 it('rejects a malformed occupied workspace instead of overwriting it', async () => {
   const media = root(0);

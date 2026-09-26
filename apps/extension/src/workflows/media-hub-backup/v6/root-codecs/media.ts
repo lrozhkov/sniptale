@@ -49,7 +49,11 @@ export interface PortableAggregatePresentation {
 }
 
 export interface PortableMediaMetadata {
-  entry: Omit<MediaLibraryEntry, 'blob'>;
+  entry: Omit<MediaLibraryEntry, 'blob' | 'source'> & {
+    source:
+      | Exclude<MediaLibraryEntry['source'], { kind: 'stored-asset' }>
+      | { kind: 'stored-asset' };
+  };
   originalObjectId: string;
   projectAsset?: Omit<StoredProjectAssetEntry, 'assetId'>;
   projectExport?: Omit<StoredProjectExportEntry, 'assetId'>;

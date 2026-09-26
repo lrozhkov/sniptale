@@ -60,7 +60,8 @@ function parseImageContentState(
   workspaceRevision: number
 ): ImageContentState | null | undefined {
   const isEditableImage =
-    (kind === 'image' || kind === 'screenshot') && source.kind === 'screenshot';
+    (kind === 'image' || kind === 'screenshot') &&
+    (source.kind === 'screenshot' || source.kind === 'stored-asset');
   if (!isEditableImage) return value === undefined ? undefined : null;
   if (value === undefined) return workspaceRevision === 0 ? 'original' : 'edited';
   return value === 'edited' || value === 'original' ? value : null;

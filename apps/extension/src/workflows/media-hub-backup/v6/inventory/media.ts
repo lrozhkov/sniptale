@@ -453,7 +453,8 @@ async function buildMediaRoot(args: {
   const collector = createMediaObjectCollector(args.rootIndex, args.paths);
   const source = await buildMediaSource({ collector, db: args.db, entry, options: args.options });
   const isImageAggregate =
-    entry.source.kind === 'screenshot' && (entry.kind === 'image' || entry.kind === 'screenshot');
+    (entry.source.kind === 'screenshot' || entry.source.kind === 'stored-asset') &&
+    (entry.kind === 'image' || entry.kind === 'screenshot');
   const thumbnail = await buildThumbnail({ collector, db: args.db, entry, isImageAggregate });
   const workspace = await buildWorkspace({
     collector,
@@ -480,10 +481,13 @@ async function buildMediaRoot(args: {
         }
       : entryWithoutBlob;
   const metadata: PortableMediaMetadata = {
-    entry: projectMediaEntryPrivacy(
-      { ...portableEntry, size: collector.sizeOf(source.originalObjectId) },
-      args.options
-    ),
+    entry: {
+      ...projectMediaEntryPrivacy(
+        { ...portableEntry, size: collector.sizeOf(source.originalObjectId) },
+        args.options
+      ),
+      source: entry.source.kind === 'stored-asset' ? { kind: 'stored-asset' } : entry.source,
+    },
     originalObjectId: source.originalObjectId,
     ...(presentation ? { presentation } : {}),
     ...(source.recording ? { recording: source.recording } : {}),

@@ -717,7 +717,10 @@ function retainedMediaAssetIds(args: {
 }): string[] {
   if (!args.imported) return [];
   return [
-    ...(args.prepared.recording || args.prepared.projectAsset || args.prepared.projectExport
+    ...(args.prepared.media.source.kind === 'stored-asset' ||
+    args.prepared.recording ||
+    args.prepared.projectAsset ||
+    args.prepared.projectExport
       ? [args.prepared.original.ref.assetId]
       : []),
     ...(args.prepared.snapshot && args.metadata.webSnapshot

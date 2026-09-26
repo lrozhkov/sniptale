@@ -149,14 +149,17 @@ it('does not route source cleanup from malformed media records', async () => {
   expect(mocks.txDelete).not.toHaveBeenCalled();
 });
 
-it('normalizes legacy editable image content state and rejects invalid state', () => {
+it.each<MediaLibraryEntry['source']>([
+  { kind: 'screenshot' },
+  { kind: 'stored-asset', assetId: 'scenario-source' },
+])('normalizes editable image content state and rejects invalid state for $kind', (source) => {
   const image = createMediaEntry({
     blob: new Blob(['image'], { type: 'image/png' }),
     height: 100,
     id: 'image-1',
     kind: 'image',
     mimeType: 'image/png',
-    source: { kind: 'screenshot' },
+    source,
     width: 100,
   });
 

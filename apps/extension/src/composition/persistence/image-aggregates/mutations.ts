@@ -173,8 +173,8 @@ async function persistImageAggregateRootIfMissing(args: {
 function isEditableImageAggregateRoot(entry: MediaLibraryEntry): boolean {
   return (
     (entry.kind === 'image' || entry.kind === 'screenshot') &&
-    entry.source.kind === 'screenshot' &&
-    entry.blob instanceof Blob
+    ((entry.source.kind === 'screenshot' && entry.blob instanceof Blob) ||
+      entry.source.kind === 'stored-asset')
   );
 }
 
