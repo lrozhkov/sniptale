@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { ArrowDownLeft } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   DRAWING_ARROW_WIDTHS,
   DRAWING_MARKER_WIDTHS,
@@ -147,6 +149,8 @@ function ShapeOptions(props: {
 
 function ArrowOptions(props: {
   settings: DrawingToolDefaults['arrow'];
+  drawFromTip: boolean;
+  onDirectionChange: (value: boolean) => void;
   common: DrawingColorContext;
   update: DrawingSettingsUpdate;
 }) {
@@ -171,11 +175,26 @@ function ArrowOptions(props: {
         dynamic={props.settings.dynamicWidth}
         onChange={(patch) => props.update('arrow', patch)}
       />
+      <DrawingOptionsDivider vertical={false} />
+      <ContentToolbarButton
+        type="button"
+        active={props.drawFromTip}
+        aria-label={translate('editor.compact.arrowDrawFromTip')}
+        aria-pressed={props.drawFromTip}
+        title={translate('editor.compact.arrowDrawFromTip')}
+        dataUi="editor.drawing.options.arrow.from-tip"
+        className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
+        onClick={() => props.onDirectionChange(!props.drawFromTip)}
+      >
+        <ArrowDownLeft aria-hidden size={16} />
+      </ContentToolbarButton>
     </>
   );
 }
 
 function ToolOptions(props: {
+  arrowDrawFromTip: boolean;
+  onDirectionChange: (value: boolean) => void;
   common: DrawingColorContext;
   settings: DrawingToolDefaults;
   tool: DrawingOptionsTool;
@@ -204,7 +223,13 @@ function ToolOptions(props: {
       );
     case 'arrow':
       return (
-        <ArrowOptions common={props.common} settings={props.settings.arrow} update={props.update} />
+        <ArrowOptions
+          common={props.common}
+          drawFromTip={props.arrowDrawFromTip}
+          onDirectionChange={props.onDirectionChange}
+          settings={props.settings.arrow}
+          update={props.update}
+        />
       );
     case 'text':
       return (
@@ -224,6 +249,7 @@ function ToolOptions(props: {
 }
 
 export function EditorDrawingOptions(props: {
+  onDirectionChange: () => void;
   onApplyToSelection: () => void;
   onClearSelection: () => void;
   onDeleteSelection: () => void;
@@ -265,7 +291,17 @@ export function EditorDrawingOptions(props: {
       data-ui="editor.drawing.options"
       className="flex flex-row items-center gap-2 overflow-x-auto px-2 py-0.5"
     >
-      <ToolOptions common={common} settings={values} tool={props.tool} update={update} />
+      <ToolOptions
+        arrowDrawFromTip={toolSettings.arrow.drawFromTip}
+        common={common}
+        onDirectionChange={(drawFromTip) => {
+          useEditorStore.getState().updateDrawingToolSettings('arrow', { drawFromTip });
+          props.onDirectionChange();
+        }}
+        settings={values}
+        tool={props.tool}
+        update={update}
+      />
       {selected ? (
         <>
           {props.tool === 'blur' || props.tool === 'selection' ? null : (

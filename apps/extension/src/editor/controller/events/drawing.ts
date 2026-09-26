@@ -143,6 +143,15 @@ function startDrawing(
   );
   if (!drawing || drawing.kind === 'blur') return false;
   addDrawingDraft(bindings, drawing, point, pointerId);
+  if (drawing.kind === 'arrow') {
+    const session = bindings.getDrawSession();
+    if (session) {
+      bindings.setDrawSession({
+        ...session,
+        arrowDrawFromTip: useEditorStore.getState().toolSettings.arrow.drawFromTip,
+      });
+    }
+  }
   return true;
 }
 
@@ -216,7 +225,7 @@ export function createEditorDrawingEventHandlers(
       textTargetCandidate = null;
       if (startDrawing(bindings, canvas, event)) {
         canvas.skipTargetFind = true;
-        canvas.setCursor('crosshair');
+        canvas.setCursor(canvas.defaultCursor);
       }
     },
     handleMouseMove: (event) => {

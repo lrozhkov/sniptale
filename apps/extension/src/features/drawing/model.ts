@@ -133,6 +133,7 @@ export interface DrawingToolDefaults {
   readonly arrow: {
     readonly color: string;
     readonly design: DrawingArrowDesign;
+    readonly drawFromTip: boolean;
     readonly dynamicWidth: boolean;
     readonly width: number;
   };
@@ -198,7 +199,7 @@ export function createDefaultDrawingToolDefaults(
     pencil: { color: red, width: 4 },
     marker: { color: yellow, opacity: 0.3, width: 28 },
     shape: { color: red, fillColor: null, kind: 'rectangle', width: 4 },
-    arrow: { color: red, design: 'standard', dynamicWidth: true, width: 18 },
+    arrow: { color: red, design: 'standard', drawFromTip: false, dynamicWidth: true, width: 18 },
     text: { color: dark, backgroundColor: null, fontFamily: 'handwritten', fontSize: 24 },
   };
 }

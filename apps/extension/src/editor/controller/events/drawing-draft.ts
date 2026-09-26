@@ -204,6 +204,10 @@ export function updateEditorDrawingDraft(
           ),
         }
       : updateCreatedDrawingObject({
+          arrowFreeAngle: drawing.kind === 'arrow',
+          ...(session.arrowDrawFromTip === undefined
+            ? {}
+            : { arrowFromTip: session.arrowDrawFromTip }),
           modifiers,
           object: drawing,
           point,

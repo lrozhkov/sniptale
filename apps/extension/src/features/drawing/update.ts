@@ -25,6 +25,8 @@ export function resolveDrawingLinearPoint(args: {
 }
 
 export function updateCreatedDrawingObject(args: {
+  arrowFreeAngle?: boolean;
+  arrowFromTip?: boolean;
   modifiers: DrawingPointerModifiers;
   object: DrawingObject;
   point: DrawingPoint;
@@ -45,7 +47,13 @@ export function updateCreatedDrawingObject(args: {
     };
   }
   if (object.kind === 'arrow') {
-    return { ...object, end: resolveDrawingLinearPoint({ modifiers, point, start }) };
+    const endpoint =
+      args.arrowFreeAngle && !modifiers.shiftKey
+        ? point
+        : resolveDrawingLinearPoint({ modifiers, point, start });
+    return args.arrowFromTip
+      ? { ...object, start: endpoint, end: start }
+      : { ...object, end: endpoint };
   }
   if ('bounds' in object) {
     let end = point;

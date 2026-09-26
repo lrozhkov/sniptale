@@ -15,7 +15,13 @@ function applyDrawingSettings(object: FabricObject, settings: EditorToolSettings
   } else if (drawing.kind === 'marker') {
     nextDrawing = { ...drawing, ...settings.marker };
   } else if (drawing.kind === 'arrow') {
-    nextDrawing = { ...drawing, ...settings.arrow };
+    nextDrawing = {
+      ...drawing,
+      color: settings.arrow.color,
+      design: settings.arrow.design,
+      dynamicWidth: settings.arrow.dynamicWidth,
+      width: settings.arrow.width,
+    };
   } else if (drawing.kind === 'text') {
     nextDrawing = { ...drawing, ...settings.text };
   } else {

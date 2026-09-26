@@ -1,5 +1,5 @@
 import { FabricObject } from 'fabric';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { applyDrawingSelectionChrome, createDrawingRotationControl } from './chrome';
 
 it('applies the content drawing selection chrome', () => {
@@ -15,6 +15,19 @@ it('applies the content drawing selection chrome', () => {
 
 it('uses the canonical rotation cursor', () => {
   expect(createDrawingRotationControl().cursorStyle).toBe('grab');
+});
+
+it('shows grabbing on rotation press and leaves locked rotation unavailable', () => {
+  const cursor = vi.fn();
+  const object = new FabricObject();
+  object.canvas = { setCursor: cursor } as never;
+  const control = createDrawingRotationControl();
+  control.mouseDownHandler?.({} as never, { target: object } as never, 0, 0);
+  expect(cursor).toHaveBeenCalledWith('grabbing');
+  object.lockRotation = true;
+  cursor.mockClear();
+  control.mouseDownHandler?.({} as never, { target: object } as never, 0, 0);
+  expect(cursor).not.toHaveBeenCalled();
 });
 
 it('keeps the rotation handle clear of the corner handle at 400% zoom', () => {

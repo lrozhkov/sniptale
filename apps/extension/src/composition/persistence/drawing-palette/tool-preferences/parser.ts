@@ -68,6 +68,7 @@ function parseDefaults(value: unknown): DrawingToolDefaults | null {
     !isRecord(arrow) ||
     !isColor(arrow['color']) ||
     !isStringOption(arrow['design'], ARROW_DESIGNS) ||
+    !(arrow['drawFromTip'] === undefined || typeof arrow['drawFromTip'] === 'boolean') ||
     typeof arrow['dynamicWidth'] !== 'boolean' ||
     !isNumberOption(arrow['width'], DRAWING_ARROW_WIDTHS) ||
     !isRecord(text) ||
@@ -94,6 +95,7 @@ function parseDefaults(value: unknown): DrawingToolDefaults | null {
     arrow: {
       color: arrow['color'],
       design: arrow['design'],
+      drawFromTip: arrow['drawFromTip'] ?? false,
       dynamicWidth: arrow['dynamicWidth'],
       width: arrow['width'],
     },

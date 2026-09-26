@@ -16,6 +16,7 @@ vi.mock('../../state/useEditorStore', () => ({
   useEditorStore: {
     getState: () => ({
       setActiveTool: mocks.setActiveToolMock,
+      toolSettings: { arrow: { drawFromTip: false } },
     }),
   },
 }));
@@ -189,6 +190,7 @@ function runDelegationSuite() {
     expect(mocks.applyEditorToolModeMock).toHaveBeenCalledWith({
       canvas: expect.anything(),
       activeTool: 'text',
+      arrowDrawFromTip: false,
       enabled: true,
       hasCropGuide: true,
       clearCropSelection,

@@ -1,5 +1,9 @@
 import { expect, it } from 'vitest';
-import { createDefaultDrawingToolDefaults, DEFAULT_DRAWING_COLORS } from './model';
+import {
+  createDefaultDrawingToolDefaults,
+  DEFAULT_DRAWING_COLORS,
+  resolveDrawingTextFontFamily,
+} from './model';
 
 it('resolves drawing defaults from full, short, and empty palettes', () => {
   expect(DEFAULT_DRAWING_COLORS).toHaveLength(10);
@@ -41,4 +45,12 @@ it('resolves drawing defaults from full, short, and empty palettes', () => {
     arrow: { color: DEFAULT_DRAWING_COLORS[4] },
     text: { color: DEFAULT_DRAWING_COLORS[5] },
   });
+});
+
+it('resolves every selectable drawing font and the default family', () => {
+  expect(resolveDrawingTextFontFamily()).toContain('system-ui');
+  expect(resolveDrawingTextFontFamily('sans')).toContain('system-ui');
+  expect(resolveDrawingTextFontFamily('serif')).toContain('Georgia');
+  expect(resolveDrawingTextFontFamily('mono')).toContain('ui-monospace');
+  expect(resolveDrawingTextFontFamily('handwritten')).toContain('Sniptale Handwritten');
 });

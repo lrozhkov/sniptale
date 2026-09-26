@@ -215,6 +215,7 @@ export function EditorFloatingToolPropertiesRail({
       >
         {drawingOptionsTool ? (
           <EditorDrawingOptions
+            onDirectionChange={() => controller.applyToolMode()}
             onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
             onClearSelection={() => controller.clearSelection()}
             onDeleteSelection={() => controller.deleteSelection()}

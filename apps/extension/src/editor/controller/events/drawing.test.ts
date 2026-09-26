@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   state: {
     canvasCropMode: 'crop',
     toolSettings: {
+      arrow: { drawFromTip: false },
       text: {
         backgroundColor: null,
         color: '#111111',
@@ -92,6 +93,7 @@ function createCanvas() {
     _currentTransform: null as null | Record<string, unknown>,
     add: vi.fn(),
     discardActiveObject: vi.fn(),
+    defaultCursor: 'tool-cursor',
     endCurrentTransform: vi.fn(),
     getActiveObjects: vi.fn<() => unknown[]>(() => []),
     getScenePoint: vi.fn(
@@ -161,6 +163,7 @@ function fabricPointerEvent(pointerId: number): { e: MouseEvent } {
 
 function resetDrawingMocks() {
   vi.clearAllMocks();
+  mocks.state.toolSettings.arrow.drawFromTip = false;
   mocks.state.canvasCropMode = 'crop';
   mocks.cropDown.mockReturnValue(false);
   mocks.isTextTarget.mockReturnValue(false);
@@ -171,6 +174,25 @@ function resetDrawingMocks() {
 
 describe('shared drawing event orchestration', () => {
   beforeEach(resetDrawingMocks);
+
+  it('keeps the arrow gesture mode captured at pointer down and preserves its tool cursor', () => {
+    mocks.state.toolSettings.arrow.drawFromTip = true;
+    const arrow = { id: 'arrow-1', kind: 'arrow', start: { x: 10, y: 20 }, end: { x: 10, y: 20 } };
+    mocks.createDrawing.mockReturnValue(arrow);
+    mocks.readDrawing.mockReturnValue(arrow);
+    mocks.updateDrawing.mockReturnValue(arrow);
+    const { bindings, canvas, handlers } = createBindings('arrow');
+    handlers.handleMouseDown(pointerEvent() as never);
+    expect(bindings.setDrawSession).toHaveBeenCalledWith(
+      expect.objectContaining({ arrowDrawFromTip: true })
+    );
+    expect(canvas.setCursor).toHaveBeenCalledWith('tool-cursor');
+    mocks.state.toolSettings.arrow.drawFromTip = false;
+    handlers.handleMouseMove(pointerEvent({ point: { x: 40, y: 35 } }) as never);
+    expect(mocks.updateDrawing).toHaveBeenCalledWith(
+      expect.objectContaining({ arrowFreeAngle: true, arrowFromTip: true })
+    );
+  });
 
   it('routes drawing starts and ignores non-drawing pointer paths', () => {
     const ignored = createBindings('select');

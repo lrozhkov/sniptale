@@ -4,6 +4,7 @@ import type { EditorTool } from '../../../../features/editor/document/types';
 import { isStickyAnnotationTool } from './classification';
 import { clearCropGuideIfNeeded } from './crop-guide';
 import { setCanvasObjectInteractivity } from './interactivity';
+import { resolveEditorToolCursor } from './cursors';
 
 function applyDisabledToolMode(
   canvas: Canvas,
@@ -22,6 +23,7 @@ function applyDisabledToolMode(
 function applyDefaultToolMode(
   canvas: Canvas,
   activeTool: EditorTool,
+  arrowDrawFromTip: boolean,
   hasCropGuide: boolean,
   clearCropSelection: () => void
 ): void {
@@ -39,8 +41,7 @@ function applyDefaultToolMode(
   canvas.isDrawingMode = false;
   canvas.selection = activeTool === 'select';
   canvas.skipTargetFind = activeTool === 'select' || activeTool === 'crop' ? false : !isStickyTool;
-  canvas.defaultCursor =
-    activeTool === 'text' ? 'text' : activeTool === 'select' ? 'default' : 'crosshair';
+  canvas.defaultCursor = resolveEditorToolCursor(activeTool, arrowDrawFromTip);
 
   clearCropGuideIfNeeded(activeTool, hasCropGuide, clearCropSelection);
 }
@@ -48,6 +49,7 @@ function applyDefaultToolMode(
 export function applyEditorToolMode(options: {
   canvas: Canvas | null;
   activeTool: EditorTool;
+  arrowDrawFromTip?: boolean;
   enabled?: boolean;
   hasCropGuide: boolean;
   clearCropSelection: () => void;
@@ -62,5 +64,11 @@ export function applyEditorToolMode(options: {
     return;
   }
 
-  applyDefaultToolMode(canvas, activeTool, hasCropGuide, clearCropSelection);
+  applyDefaultToolMode(
+    canvas,
+    activeTool,
+    options.arrowDrawFromTip ?? false,
+    hasCropGuide,
+    clearCropSelection
+  );
 }

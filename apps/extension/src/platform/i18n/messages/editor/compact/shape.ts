@@ -142,6 +142,10 @@ export const editorCompactShapeMessages = defineMessageSource({
     ru: 'Толщина стрелки',
     en: 'Arrow width',
   },
+  arrowDrawFromTip: {
+    ru: 'Рисовать от наконечника',
+    en: 'Draw from arrowhead',
+  },
   trajectory: {
     ru: 'Траектория',
     en: 'Path',

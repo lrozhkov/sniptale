@@ -91,6 +91,7 @@ function resolveMovedArrow(
 ): DrawingArrow {
   if (endpoint === 'end') {
     return updateCreatedDrawingObject({
+      arrowFreeAngle: true,
       modifiers: { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
       object: drawing,
       point,
@@ -100,6 +101,7 @@ function resolveMovedArrow(
   }
   const reversed: DrawingArrow = { ...drawing, start: drawing.end, end: drawing.start };
   const updated = updateCreatedDrawingObject({
+    arrowFreeAngle: true,
     modifiers: { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
     object: reversed,
     point,
@@ -131,6 +133,10 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
   return new Control({
     actionName: 'modifyDrawingArrow',
     cursorStyle: 'grab',
+    mouseDownHandler: (_event, transform) => {
+      transform.target.canvas?.setCursor('grabbing');
+      return true;
+    },
     sizeX: 20,
     sizeY: 20,
     touchSizeX: 28,
@@ -143,6 +149,7 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
     },
     actionHandler: (event, transform, x, y) => {
       const object = transform.target;
+      object.canvas?.setCursor('grabbing');
       const drawing = readEditorDrawingObject(object);
       if (!(object instanceof Path) || drawing?.kind !== 'arrow') return false;
       const next = resolveMovedArrow(

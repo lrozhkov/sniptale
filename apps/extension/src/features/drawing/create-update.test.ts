@@ -101,4 +101,49 @@ describe('shared drawing creation', () => {
       })
     ).toMatchObject({ end: start });
   });
+
+  it('keeps an arrow free near horizontal unless Shift is held', () => {
+    const arrow = createDrawingObject('arrow', start, 10, defaults)!;
+    const point = { x: 200, y: 84 };
+    expect(
+      updateCreatedDrawingObject({
+        arrowFreeAngle: true,
+        modifiers: { ctrlKey: false, shiftKey: false },
+        object: arrow,
+        point,
+        start,
+        timestamp: 20,
+      })
+    ).toMatchObject({ end: point });
+    expect(
+      updateCreatedDrawingObject({
+        arrowFreeAngle: true,
+        modifiers: { ctrlKey: false, shiftKey: true },
+        object: arrow,
+        point,
+        start,
+        timestamp: 20,
+      })
+    ).not.toMatchObject({ end: point });
+  });
+
+  it('anchors the arrowhead at pointer down when drawing from its tip', () => {
+    const arrow = createDrawingObject('arrow', start, 10, {
+      ...defaults,
+      arrow: { ...defaults.arrow, drawFromTip: true },
+    })!;
+    const point = { x: 184, y: 115 };
+    expect(arrow).not.toHaveProperty('drawFromTip');
+    expect(
+      updateCreatedDrawingObject({
+        arrowFreeAngle: true,
+        arrowFromTip: true,
+        modifiers: { ctrlKey: false, shiftKey: false },
+        object: arrow,
+        point,
+        start,
+        timestamp: 20,
+      })
+    ).toMatchObject({ start: point, end: start });
+  });
 });

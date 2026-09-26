@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
@@ -30,11 +34,13 @@ vi.mock('../../ui/drawing-tools/options', () => ({
 }));
 
 const storeState = {
+  updateDrawingToolSettings: vi.fn(),
   selectionToolSettings: {},
   toolSettings: {
     arrow: {
       color: '#333333',
       design: 'standard' as const,
+      drawFromTip: false,
       dynamicWidth: false,
       width: 12,
     },
@@ -52,7 +58,7 @@ vi.mock('../state/useEditorStore', () => ({
 
 vi.mock('../../composition/persistence/drawing-palette', () => ({
   createDefaultDrawingPaletteState: () => ({ colors: ['#111111', '#ffffff'] }),
-  loadDrawingPaletteState: vi.fn(),
+  loadDrawingPaletteState: vi.fn(async () => ({ colors: ['#111111', '#ffffff'] })),
   subscribeToDrawingPaletteState: vi.fn(() => vi.fn()),
 }));
 
@@ -62,6 +68,7 @@ it('renders editor tool settings as a horizontal toolbar like content drawing mo
   const markup = renderToStaticMarkup(
     <EditorDrawingOptions
       onApplyToSelection={vi.fn()}
+      onDirectionChange={vi.fn()}
       onClearSelection={vi.fn()}
       onDeleteSelection={vi.fn()}
       selectedType={null}
@@ -85,6 +92,7 @@ it.each([
   const markup = renderToStaticMarkup(
     <EditorDrawingOptions
       onApplyToSelection={vi.fn()}
+      onDirectionChange={vi.fn()}
       onClearSelection={vi.fn()}
       onDeleteSelection={vi.fn()}
       selectedType={null}
@@ -95,4 +103,51 @@ it.each([
   const positions = expectedOrder.map((dataUi) => markup.indexOf(`data-ui="${dataUi}"`));
   expect(positions.every((position) => position >= 0)).toBe(true);
   expect(positions).toEqual([...positions].sort((left, right) => left - right));
+});
+
+it('shows the arrow direction toggle and its pressed state beside arrow profiles', () => {
+  storeState.toolSettings.arrow.drawFromTip = true;
+  const markup = renderToStaticMarkup(
+    <EditorDrawingOptions
+      onApplyToSelection={vi.fn()}
+      onDirectionChange={vi.fn()}
+      onClearSelection={vi.fn()}
+      onDeleteSelection={vi.fn()}
+      selectedType={null}
+      tool="arrow"
+    />
+  );
+  expect(markup).toContain('data-ui="editor.drawing.options.arrow.from-tip"');
+  expect(markup).toContain('aria-pressed="true"');
+  storeState.toolSettings.arrow.drawFromTip = false;
+});
+
+it('updates the direction setting and refreshes the canvas mode on toggle', async () => {
+  storeState.toolSettings.arrow.drawFromTip = false;
+  storeState.updateDrawingToolSettings.mockClear();
+  const onDirectionChange = vi.fn();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(
+      <EditorDrawingOptions
+        onApplyToSelection={vi.fn()}
+        onDirectionChange={onDirectionChange}
+        onClearSelection={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        selectedType={null}
+        tool="arrow"
+      />
+    );
+  });
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.drawing.options.arrow.from-tip"]'
+  );
+  expect(button?.getAttribute('aria-pressed')).toBe('false');
+  await act(async () => button?.click());
+  expect(storeState.updateDrawingToolSettings).toHaveBeenCalledWith('arrow', {
+    drawFromTip: true,
+  });
+  expect(onDirectionChange).toHaveBeenCalledOnce();
+  await act(async () => root.unmount());
 });
