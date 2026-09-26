@@ -219,3 +219,137 @@ it('restores a persisted cover without starting a renderer and ignores catalog i
     vi.unstubAllGlobals();
   }
 });
+
+it('restores a catalog on each mount without entering a blocked renderer queue', async () => {
+  vi.stubGlobal('crypto', webcrypto);
+  vi.stubGlobal('Blob', NodeBlob);
+  const { createEffectPreviewSession } = await import('./effect-catalog-preview-session');
+  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const draw = vi.fn();
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: draw,
+    clearRect: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  const close = vi.fn();
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => ({ width: 320, height: 180, close }))
+  );
+  mocks.load.mockResolvedValue(new Blob(['cover'], { type: 'image/webp' }));
+  const enqueue = vi.fn();
+  try {
+    for (let mount = 0; mount < 2; mount++) {
+      const sessions = Array.from({ length: 12 }, (_, index) =>
+        createEffectPreviewSession({
+          target: document.createElement('canvas'),
+          queue: { enqueue },
+          key: `cover-${index}`,
+          readDocument: () => ({ catalog, entry: catalog.documents[0]! }),
+          readSource: () => null,
+        })
+      );
+      sessions.forEach((session) => session.render(0.5, true));
+      await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes((mount + 1) * 12));
+      sessions.forEach((session) => session.dispose());
+    }
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledTimes(24);
+  } finally {
+    context.mockRestore();
+    mocks.load.mockResolvedValue(null);
+    vi.unstubAllGlobals();
+  }
+});
+
+it.each(['missing', 'unavailable', 'corrupt'])(
+  'renders a replacement when the poster is %s',
+  async (failure) => {
+    const { createEffectPreviewSession } = await import('./effect-catalog-preview-session');
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('Blob', NodeBlob);
+    const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+    const entry = catalog.documents.find((document) => document.kind === 'standalone')!;
+    const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+      clearRect: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    mocks.load.mockReset();
+    if (failure === 'unavailable') mocks.load.mockRejectedValue(new Error('storage unavailable'));
+    else mocks.load.mockResolvedValue(failure === 'corrupt' ? new Blob(['invalid']) : null);
+    vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('decode failed')));
+    const close = vi.fn();
+    const renderFrame = vi.fn(async (command: EffectRuntimeRenderCommand) => ({
+      ...command,
+      kind: 'frame' as const,
+      bitmap: { width: 320, height: 180, close } as unknown as ImageBitmap,
+      acknowledged: {
+        documentId: command.documentRef.id,
+        assetSelectionId: command.assetSelectionRef.id,
+      },
+    }));
+    const enqueue = vi.fn(
+      (task: Parameters<import('./effect-catalog-preview-session').PreviewQueue['enqueue']>[0]) => {
+        void task(() => ({ renderFrame, dispose: vi.fn() }));
+      }
+    );
+    const target = document.createElement('canvas');
+    const session = createEffectPreviewSession({
+      target,
+      queue: { enqueue },
+      key: failure,
+      readDocument: () => ({ catalog, entry }),
+      readSource: () => null,
+    });
+    try {
+      session.render(0.5, true);
+      await vi.waitFor(() => expect(target.dataset['previewState']).toBe('ready'));
+      expect(enqueue).toHaveBeenCalledOnce();
+      expect(renderFrame).toHaveBeenCalledOnce();
+      expect(close).toHaveBeenCalledOnce();
+    } finally {
+      session.dispose();
+      context.mockRestore();
+      mocks.load.mockResolvedValue(null);
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it('releases a restored bitmap if the preview is disposed during decoding', async () => {
+  const { createEffectPreviewSession } = await import('./effect-catalog-preview-session');
+  const cover = new Blob(['cover']);
+  mocks.load.mockResolvedValue(cover);
+  let finish!: (bitmap: ImageBitmap) => void;
+  const decode = vi.fn(
+    () =>
+      new Promise<ImageBitmap>((resolve) => {
+        finish = resolve;
+      })
+  );
+  vi.stubGlobal('createImageBitmap', decode);
+  const enqueue = vi.fn();
+  const target = document.createElement('canvas');
+  const session = createEffectPreviewSession({
+    target,
+    queue: { enqueue },
+    key: 'disposed',
+    readDocument: () => {
+      throw new Error('Cached covers do not resolve documents');
+    },
+    readSource: () => null,
+  });
+  try {
+    session.render(0.5, true);
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledOnce());
+    session.dispose();
+    const close = vi.fn();
+    finish({ width: 320, height: 180, close } as unknown as ImageBitmap);
+    await vi.waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(target.dataset['previewState']).toBeUndefined();
+    expect(enqueue).not.toHaveBeenCalled();
+  } finally {
+    session.dispose();
+    mocks.load.mockResolvedValue(null);
+    vi.unstubAllGlobals();
+  }
+});

@@ -29,13 +29,23 @@ export function createEffectPreviewSession({
   let poster = true;
   let cover: Blob | null = null;
   const store = createEffectPosterStore();
+  const restoreCover = async (): Promise<ImageBitmap | null> => {
+    cover ??= await store.load(key).catch(() => null);
+    if (!cover) return null;
+    try {
+      return await createImageBitmap(cover);
+    } catch {
+      cover = null;
+      return null;
+    }
+  };
   const render = (progress: number, isPoster = false) => {
     desired = progress;
     poster = isPoster;
     revision++;
     if (pending) return;
     pending = true;
-    queue.enqueue(async (getExecutor) => {
+    void (async () => {
       if (!active) return;
       const captured = revision;
       const coverRequest = poster;
@@ -43,29 +53,36 @@ export function createEffectPreviewSession({
       const inputSource = coverRequest ? null : readSource();
       let bitmap: ImageBitmap | null = null;
       try {
-        if (coverRequest) {
-          cover ??= await store.load(key).catch(() => null);
-          if (cover) {
-            try {
-              bitmap = await createImageBitmap(cover);
-            } catch {
-              cover = null;
-            }
-          }
-        }
+        if (coverRequest) bitmap = await restoreCover();
         if (!active) return;
         if (!bitmap) {
           const token = coverRequest ? await store.begin().catch(() => null) : null;
           if (!active) return;
-          bitmap = await renderEffectCatalogPreview(
-            getExecutor(),
-            readDocument().catalog,
-            readDocument().entry,
-            frameProgress,
-            captured,
-            inputSource,
-            getCurrentLocale()
-          );
+          bitmap = await new Promise<ImageBitmap | null>((resolve, reject) => {
+            queue.enqueue(async (getExecutor) => {
+              if (!active) {
+                resolve(null);
+                return;
+              }
+              try {
+                const { catalog, entry } = readDocument();
+                resolve(
+                  await renderEffectCatalogPreview(
+                    getExecutor(),
+                    catalog,
+                    entry,
+                    frameProgress,
+                    captured,
+                    inputSource,
+                    getCurrentLocale()
+                  )
+                );
+              } catch (error) {
+                reject(error);
+              }
+            });
+          });
+          if (!bitmap) return;
           if (active && coverRequest && token) {
             try {
               const posterCanvas = new OffscreenCanvas(bitmap.width, bitmap.height);
@@ -96,7 +113,7 @@ export function createEffectPreviewSession({
         pending = false;
         if (active && captured !== revision) render(desired, poster);
       }
-    });
+    })();
   };
   return {
     render,
