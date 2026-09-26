@@ -1,11 +1,11 @@
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { INSPECTOR_SECONDARY_BUTTON_CLASS_NAME } from '../chrome';
+import { Contrast, Move, Sparkles } from 'lucide-react';
+import { SegmentedSelector, cx } from '../../chrome/ui';
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import { EmptyState, StatusRow } from '../../../ui/compact-inspector-controls';
-import { EditorInspectorGroupSection, EditorInspectorSelectInput } from '../grouped';
+import { EditorInspectorGroupSection } from '../grouped';
 import { LayerEffectsCatalog } from './catalog';
 import { LayerEffectsEditor } from './effect-editor';
 import { LayerEffectsHeader } from './header';
@@ -33,13 +33,22 @@ function LayerEffectsCategoryRow(props: {
   onOpenLayerEffects: EditorInspectorLayerEffectsProps['onOpenLayerEffects'];
 }) {
   return (
-    <EditorInspectorSelectInput
+    <SegmentedSelector
+      columns={3}
       ariaLabel={translate('editor.toolbar.layerEffectsTitle')}
       onChange={(category) =>
         props.onOpenLayerEffects(props.activeLayer.id, category, null, { focusViewport: false })
       }
       options={LAYER_EFFECT_CATEGORIES.map((category) => ({
         label: getLayerEffectCategoryLabel(category),
+        icon:
+          category === 'adjustments' ? (
+            <Contrast size={16} />
+          ) : category === 'transformations' ? (
+            <Move size={16} />
+          ) : (
+            <Sparkles size={16} />
+          ),
         value: category,
       }))}
       value={props.layerEffectsState.category}
@@ -55,7 +64,10 @@ function LayerEffectsLayerSection(
   return (
     <section
       aria-label={translateLayerEffects('editor.layerEffects.selectedLayer')}
-      className={EDITOR_INSPECTOR_SECTION_CLASS_NAME}
+      className={cx(
+        EDITOR_INSPECTOR_SECTION_CLASS_NAME,
+        'sticky top-0 z-10 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]'
+      )}
       data-section="layer"
       tabIndex={-1}
     >
@@ -78,11 +90,11 @@ function LayerEffectsEffectsSection(
   props: Pick<
     EditorInspectorLayerEffectsProps,
     'layerEffectsState' | 'onOpenLayerEffects' | 'setLayerEffectsState'
-  > & { activeLayer: EditorLayerItem }
+  > & { activeLayer: EditorLayerItem; editor: React.ReactNode }
 ) {
   const { category } = props.layerEffectsState;
 
-  if (!isLayerEffectSearchable(category) || props.layerEffectsState.activeEffectId) {
+  if (!isLayerEffectSearchable(category)) {
     return null;
   }
 
@@ -99,6 +111,7 @@ function LayerEffectsEffectsSection(
         setQuery={(query) => props.setLayerEffectsState((state) => ({ ...state, query }))}
       />
       <LayerEffectsCatalog
+        activeEffectEditor={props.editor}
         activeEffectId={props.layerEffectsState.activeEffectId}
         definitions={getLayerEffectDefinitions(category, props.layerEffectsState.query)}
         layerEffects={props.activeLayer.effects}
@@ -156,29 +169,23 @@ function LayerEffectsBody(
         layerEffectsState={props.layerEffectsState}
         onOpenLayerEffects={props.onOpenLayerEffects}
         setLayerEffectsState={props.setLayerEffectsState}
+        editor={
+          <LayerEffectsEditor
+            {...pickLayerEffectEditorControlProps(props)}
+            activeEffectId={props.layerEffectsState.activeEffectId}
+            layer={props.activeLayer}
+            layerEffectsState={props.layerEffectsState}
+          />
+        }
       />
-      {props.layerEffectsState.activeEffectId &&
-      isLayerEffectSearchable(props.layerEffectsState.category) ? (
-        <button
-          type="button"
-          data-ui="editor.effects.back"
-          className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
-          onClick={() =>
-            props.onOpenLayerEffects(props.activeLayer.id, props.layerEffectsState.category, null, {
-              focusViewport: false,
-            })
-          }
-        >
-          <ArrowLeft size={14} aria-hidden="true" />
-          {translateLayerEffects('editor.layerEffects.availableEffects')}
-        </button>
+      {props.layerEffectsState.category === 'transformations' ? (
+        <LayerEffectsEditor
+          {...pickLayerEffectEditorControlProps(props)}
+          activeEffectId={props.layerEffectsState.activeEffectId}
+          layer={props.activeLayer}
+          layerEffectsState={props.layerEffectsState}
+        />
       ) : null}
-      <LayerEffectsEditor
-        {...pickLayerEffectEditorControlProps(props)}
-        activeEffectId={props.layerEffectsState.activeEffectId}
-        layer={props.activeLayer}
-        layerEffectsState={props.layerEffectsState}
-      />
     </div>
   );
 }

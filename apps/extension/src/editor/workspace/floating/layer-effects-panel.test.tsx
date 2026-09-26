@@ -14,36 +14,15 @@ vi.mock('../../inspector/sidebar-expanded-content/helpers', async (importOrigina
   createEditorInspectorContentPanelProps: vi.fn(() => ({})),
 }));
 
-function createProps(collapsedLayers: boolean) {
-  return {
-    collapsedLayers,
-    documentController: {
-      setInspector: vi.fn(),
-    } as never,
-    hasImage: true,
-    inspectorMeta: {
-      title: 'Color correction',
-      subtitle: 'Layer effects',
-    },
-  };
-}
-
-it('renders layer effects beside expanded layers and closes through inspector routing', () => {
-  const props = createProps(false);
-  const markup = renderToStaticMarkup(<EditorFloatingLayerEffectsPanel {...props} />);
-
-  expect(markup).toContain('right-[calc(100%+0.75rem)]');
-  expect(markup).toContain('Color correction');
-  expect(markup).not.toContain('Layer effects');
-  expect(markup).toContain('text-[12px] font-medium');
-  expect(markup).toContain('data-inspector="layer-effects"');
-});
-
-it('renders the collapsed-layers placement above the corner toolbar', () => {
-  const markup = renderToStaticMarkup(<EditorFloatingLayerEffectsPanel {...createProps(true)} />);
-
-  expect(markup).toContain('bottom-[calc(4.5rem+var(--editor-floating-edge-bottom,0px))]');
-  expect(markup).toContain(
-    'w-[min(21rem,calc(100vw-1.5rem-var(--editor-floating-edge-right,0px)))]'
+it('renders an inline body with a layers return action and without duplicate title chrome', () => {
+  const markup = renderToStaticMarkup(
+    <EditorFloatingLayerEffectsPanel
+      documentController={{ setInspector: vi.fn() } as never}
+      hasImage
+    />
   );
+  expect(markup).not.toContain('absolute');
+  expect(markup).toContain('editor.floating.layer-effects-panel.back');
+  expect(markup).toContain('data-inspector="layer-effects"');
+  expect(markup).toContain('overflow-y-auto');
 });

@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
+import { LayerInsertImageControl } from './file-input';
 import { EditorIconButton } from '../../chrome/ui';
 import {
   canDeleteLayerSelection,
@@ -90,6 +91,7 @@ function LayerSelectionActionGroup(props: {
   actions: LayerSelectionAction[];
   className: string;
   dataUi: string;
+  children?: React.ReactNode;
 }) {
   return (
     <div data-ui={props.dataUi} className={props.className}>
@@ -105,6 +107,7 @@ function LayerSelectionActionGroup(props: {
           <action.icon size={14} strokeWidth={2} />
         </EditorIconButton>
       ))}
+      {props.children}
     </div>
   );
 }
@@ -124,7 +127,9 @@ export function LayerSelectionActions(props: {
           actions={reorderActions}
           className={actionGroupClassName}
           dataUi="editor.layers.selection-actions.reorder-group"
-        />
+        >
+          <LayerInsertImageControl />
+        </LayerSelectionActionGroup>
         <LayerSelectionActionGroup
           actions={massActions}
           className={massActionGroupClassName}

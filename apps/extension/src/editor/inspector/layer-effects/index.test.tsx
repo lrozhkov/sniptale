@@ -164,12 +164,14 @@ it('opens selected effect entries and updates an applied raster effect', () => {
   );
   const amountInput = queryNumericInput('editor.toolbar.layerEffectsAmount');
 
-  expect(brightnessButton).toBeUndefined();
+  expect(brightnessButton).toBeTruthy();
   expect(applyButton).toBeTruthy();
   expect(amountInput).toBeTruthy();
   expect(container?.querySelector('input[type="range"]')).not.toBeNull();
   expect(container?.textContent).toContain('editor.layerEffects.selectedLayer');
-  expect(container?.textContent).toContain('editor.layerEffects.availableEffects');
+  expect(
+    container?.querySelector('[aria-label="editor.layerEffects.availableEffects"]')
+  ).not.toBeNull();
   expect(applyButton?.className).toContain(INSPECTOR_PRIMARY_BUTTON_CLASS_NAME);
   expect(applyButton?.className).toContain('bg-transparent');
   expect(applyButton?.className).not.toContain('text-white');
@@ -262,7 +264,9 @@ it('renders compact transformation actions and forwards immediate actions plus r
   expect(applyButton?.className).toContain(INSPECTOR_PRIMARY_BUTTON_CLASS_NAME);
   expect(applyButton?.className).toContain('bg-transparent');
   expect(applyButton?.className).not.toContain('text-white');
-  expect(container?.textContent).toContain('editor.toolbar.layerEffectsTransformations');
+  expect(
+    container?.querySelector('button[aria-label="editor.toolbar.layerEffectsTransformations"]')
+  ).not.toBeNull();
   act(() => rotateLeftButton?.click());
   changeInput(inputs[0] as HTMLInputElement, '240');
   act(() => applyButton?.click());
@@ -294,19 +298,50 @@ it('sorts catalog entries with applied effects first inside compact lists', () =
 
   expect(catalogButtons[0]?.textContent).toContain('editor.layerEffects.blur');
   expect(container?.textContent).toContain('Layer 1');
-  expect(container?.textContent).toContain('editor.toolbar.layerEffectsFilters');
+  expect(
+    container?.querySelector('button[aria-label="editor.toolbar.layerEffectsFilters"]')
+  ).not.toBeNull();
 });
 
-it('keeps the selected effect form visible without a catalog above it and returns explicitly', () => {
+it('keeps the catalog and selected parameters together without another navigation level', () => {
   const props = renderPanel();
-  expect(container?.querySelector('[data-section="effects"]')).toBeNull();
+  expect(
+    container?.querySelector('[data-section="effects"] [data-section="effect"]')
+  ).not.toBeNull();
   expect(container?.querySelector('[data-section="effect"] details')).toBeNull();
-  const back = container?.querySelector<HTMLButtonElement>('[data-ui="editor.effects.back"]');
-  expect(back).not.toBeNull();
-  act(() => back?.click());
-  expect(props.onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'adjustments', null, {
+  expect(container?.querySelector('[data-ui="editor.effects.back"]')).toBeNull();
+  const contrast = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('editor.layerEffects.contrast')
+  );
+  act(() => contrast?.click());
+  expect(props.onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'adjustments', 'contrast', {
     focusViewport: false,
   });
+});
+
+it('switches categories directly and clears preview when the selected editor unmounts', () => {
+  const props = renderPanel();
+  const filters = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="editor.toolbar.layerEffectsFilters"]'
+  );
+  act(() => filters?.click());
+  expect(props.onOpenLayerEffects).toHaveBeenCalledWith('layer-1', 'filters', null, {
+    focusViewport: false,
+  });
+  vi.mocked(props.resetLayerEffectPreview).mockClear();
+  act(() =>
+    root?.render(
+      <EditorInspectorLayerEffectsPanel
+        {...props}
+        layerEffectsState={{
+          ...props.layerEffectsState,
+          category: 'filters',
+          activeEffectId: null,
+        }}
+      />
+    )
+  );
+  expect(props.resetLayerEffectPreview).toHaveBeenCalledWith('layer-1');
 });
 
 it('moves keyboard focus between the catalog and effect form on selection changes', () => {

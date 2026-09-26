@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { EditorInspectorLayersPanel } from '../../inspector/layers';
 import { EditorInspectorContent } from '../../inspector/content';
@@ -14,6 +20,8 @@ import {
   resolveEditorLayersPanelMode,
   type EditorLayersPanelMode,
 } from './layers-panel-navigation';
+
+import { EditorFloatingLayerEffectsPanel } from './layer-effects-panel';
 
 const LAYERS_PANEL_DEFAULT_HEIGHT = 320;
 const LAYERS_PANEL_MIN_HEIGHT = 248;
@@ -67,9 +75,9 @@ function clampLayersPanelHeight(value: number) {
   return Math.max(LAYERS_PANEL_MIN_HEIGHT, Math.min(getMaxLayersPanelHeight(), value));
 }
 
-function resolveLayersPanelHeight(heightRatio: number | null) {
+function resolveLayersPanelHeight(heightRatio: number | null, defaultHeight: number) {
   if (heightRatio === null) {
-    return clampLayersPanelHeight(LAYERS_PANEL_DEFAULT_HEIGHT);
+    return clampLayersPanelHeight(defaultHeight);
   }
 
   return clampLayersPanelHeight(getMaxLayersPanelHeight() * heightRatio);
@@ -81,21 +89,22 @@ function resolveLayersPanelHeightRatio(height: number) {
 }
 
 function useResizableLayersPanelHeight(args: {
+  defaultHeight: number;
   heightRatio: number | null;
   onHeightRatioChange: (heightRatio: number | null) => void;
 }) {
-  const { heightRatio, onHeightRatioChange } = args;
-  const [height, setHeight] = useState(() => resolveLayersPanelHeight(heightRatio));
+  const { heightRatio, onHeightRatioChange, defaultHeight } = args;
+  const [height, setHeight] = useState(() => resolveLayersPanelHeight(heightRatio, defaultHeight));
 
   useEffect(() => {
-    setHeight(resolveLayersPanelHeight(heightRatio));
-  }, [heightRatio]);
+    setHeight(resolveLayersPanelHeight(heightRatio, defaultHeight));
+  }, [heightRatio, defaultHeight]);
 
   useEffect(() => {
-    const handleResize = () => setHeight(resolveLayersPanelHeight(heightRatio));
+    const handleResize = () => setHeight(resolveLayersPanelHeight(heightRatio, defaultHeight));
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [heightRatio]);
+  }, [heightRatio, defaultHeight]);
 
   const startResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -184,6 +193,15 @@ function EditorFloatingLayersPanelBody(props: {
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
 }) {
+  if (props.documentController.inspector === 'layer-effects') {
+    return (
+      <EditorFloatingLayerEffectsPanel
+        documentController={props.documentController}
+        hasImage={props.hasImage}
+      />
+    );
+  }
+
   if (props.activeMode === 'layers') {
     const layersPanelProps = createEditorInspectorLayersPanelProps(props.documentController);
     return (
@@ -229,8 +247,23 @@ function EditorFloatingExpandedLayersPanel(props: {
   preferenceError: string | null;
   startResize: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previousInspector = useRef(props.documentController.inspector);
+  useEffect(() => {
+    if (
+      previousInspector.current === 'layer-effects' &&
+      props.documentController.inspector === 'tool'
+    ) {
+      panelRef.current
+        ?.querySelector<HTMLElement>('[data-ui="editor.floating.layers.mode.layers"]')
+        ?.focus();
+    }
+    previousInspector.current = props.documentController.inspector;
+  }, [props.documentController.inspector]);
+
   return (
     <FloatingChromePanel
+      ref={panelRef}
       dataUi="editor.floating.layers-panel"
       className={LAYERS_PANEL_CLASS_NAME}
       style={{ height: props.height }}
@@ -276,6 +309,8 @@ export function EditorFloatingLayersPanel({
   onHeightRatioChange: (heightRatio: number | null) => void;
 }) {
   const { height, startResize } = useResizableLayersPanelHeight({
+    defaultHeight:
+      documentController.inspector === 'layer-effects' ? 520 : LAYERS_PANEL_DEFAULT_HEIGHT,
     heightRatio,
     onHeightRatioChange,
   });
@@ -289,7 +324,7 @@ export function EditorFloatingLayersPanel({
     setInspector: documentController.setInspector,
   });
   const handleSelectMode = (mode: EditorLayersPanelMode) => {
-    if (mode === activeMode) return;
+    if (mode === activeMode && documentController.inspector !== 'layer-effects') return;
     if (mode === 'layers') {
       toolbarActions.activateTool('select');
       return;
@@ -314,7 +349,11 @@ export function EditorFloatingLayersPanel({
       documentController={documentController}
       hasImage={hasImage}
       height={height}
-      onCollapse={onCollapse}
+      onCollapse={() => {
+        if (documentController.inspector === 'layer-effects')
+          documentController.setInspector('tool');
+        onCollapse();
+      }}
       onSelectMode={handleSelectMode}
       preferenceError={preferenceError}
       startResize={startResize}

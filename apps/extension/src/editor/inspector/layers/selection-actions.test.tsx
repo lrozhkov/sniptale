@@ -109,8 +109,14 @@ describe('LayerSelectionActions layout', () => {
       'editor.layers.selection-actions.reorder-group',
       'editor.layers.selection-actions.mass-group',
     ]);
-    expect(groups[0]?.querySelectorAll('button')).toHaveLength(4);
+    expect(groups[0]?.querySelectorAll('button')).toHaveLength(5);
     expect(groups[1]?.querySelectorAll('button')).toHaveLength(3);
+    expect(groups[0]?.querySelector('button:last-child')?.getAttribute('title')).toBe(
+      'editor.toolbar.insertImage'
+    );
+    expect(groups[1]?.querySelector('button:first-child')?.getAttribute('title')).toBe(
+      'editor.toolbar.mergeLayers'
+    );
   });
 });
 
@@ -149,7 +155,12 @@ describe('LayerSelectionActions disabled states', () => {
   it('disables all actions when nothing is selected', () => {
     renderSelectionActions({ layers: [], selectedObjectCount: 0 });
 
-    expect(getButtons().every((button) => button.disabled)).toBe(true);
+    expect(
+      getButtons()
+        .filter((button) => button.title !== 'editor.toolbar.insertImage')
+        .every((button) => button.disabled)
+    ).toBe(true);
+    expect(getButton('editor.toolbar.insertImage').disabled).toBe(false);
   });
 
   it('enables reorder, duplicate, and delete for a regular single-layer selection', () => {

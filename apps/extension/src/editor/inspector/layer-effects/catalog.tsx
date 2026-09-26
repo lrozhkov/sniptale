@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { isEditorRasterEffectId } from '../../controller/layer-effects/registry';
 import { cx } from '../../chrome/ui';
 import { translateLayerEffectName, translateLayerEffects } from './helpers';
@@ -68,6 +69,7 @@ function LayerEffectsCatalogItem(props: {
 }
 
 export function LayerEffectsCatalog(props: {
+  activeEffectEditor?: ReactNode;
   activeEffectId: string | null;
   definitions: ReturnType<typeof getLayerEffectDefinitions>;
   layerId: string;
@@ -78,20 +80,22 @@ export function LayerEffectsCatalog(props: {
 
   return (
     <div
-      className="grid max-h-[220px] gap-1.5 overflow-y-auto pr-1"
+      className="grid gap-1.5"
       role="group"
       aria-label={translateLayerEffects('editor.layerEffects.availableEffects')}
     >
       {definitions.length > 0 ? (
         definitions.map((definition) => (
-          <LayerEffectsCatalogItem
-            key={definition.id}
-            activeEffectId={props.activeEffectId}
-            definition={definition}
-            layerEffects={props.layerEffects}
-            layerId={props.layerId}
-            onOpenLayerEffects={props.onOpenLayerEffects}
-          />
+          <div key={definition.id}>
+            <LayerEffectsCatalogItem
+              activeEffectId={props.activeEffectId}
+              definition={definition}
+              layerEffects={props.layerEffects}
+              layerId={props.layerId}
+              onOpenLayerEffects={props.onOpenLayerEffects}
+            />
+            {props.activeEffectId === definition.id ? props.activeEffectEditor : null}
+          </div>
         ))
       ) : (
         <p className="text-sm text-[color:var(--sniptale-color-text-secondary)]">

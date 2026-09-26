@@ -18,7 +18,6 @@ import {
   PANEL_ICON_CLASS_NAME,
   PANEL_ICON_SURFACE_CLASS_NAME,
 } from './shared';
-import { LayerInsertImageControl } from './file-input';
 import type { EditorLayerEffectsOpenHandler } from './types';
 import { useEditorStore } from '../../state/useEditorStore';
 
@@ -98,7 +97,6 @@ function EditorInspectorLayersHeaderActions(props: {
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <LayerInsertImageControl />
       <button
         type="button"
         title={translate('editor.toolbar.showOutsideCanvas')}

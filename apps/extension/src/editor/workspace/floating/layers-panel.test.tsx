@@ -139,7 +139,7 @@ it('restores the expanded layers panel from a relative viewport height', () => {
   expect(panel?.style.height).toBe('258px');
 });
 
-it('moves collapsed layers to the bottom-right toolbar with insert image action', () => {
+it('moves collapsed layers to the bottom-right toolbar without insert image action', () => {
   renderPanel({ collapsed: true });
 
   const toolbar = container?.querySelector<HTMLElement>(
@@ -148,7 +148,7 @@ it('moves collapsed layers to the bottom-right toolbar with insert image action'
   expect(toolbar).not.toBeNull();
   expect(toolbar?.parentElement?.className).toContain('pointer-events-auto');
   expect(toolbar?.querySelector('[role="toolbar"]')?.className).toContain('flex-row');
-  expect(container?.querySelector('[data-ui="mock.insert-image"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="mock.insert-image"]')).toBeNull();
   expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(6);
 });
 
@@ -228,4 +228,30 @@ it('renders preference save errors inline for collapsed layers controls', () => 
   expect(
     container?.querySelector('[data-ui="editor.floating.layers.preference-error"]')?.textContent
   ).toBe('Could not save collapsed state');
+});
+
+it('replaces the list with inline effects and returns through the layers navigation', () => {
+  renderPanel({ inspector: 'layer-effects' });
+  expect(
+    container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]')?.style.height
+  ).toBe('516px');
+  expect(container?.querySelector('[data-ui="mock.layers"]')).toBeNull();
+  expect(
+    container?.querySelector(
+      '[data-ui="editor.floating.layers-panel"] [data-ui="editor.floating.layer-effects-panel"]'
+    )
+  ).not.toBeNull();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layer-effects-panel.back"]')
+      ?.click()
+  );
+  expect(mocks.setInspector).toHaveBeenCalledWith('tool');
+  mocks.setInspector.mockClear();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.layers"]')
+      ?.click()
+  );
+  expect(mocks.setInspector).toHaveBeenCalledWith('tool');
 });

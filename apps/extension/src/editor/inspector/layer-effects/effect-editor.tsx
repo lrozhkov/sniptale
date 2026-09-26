@@ -136,9 +136,6 @@ function RasterEffectEditor(props: {
       data-section="effect"
       tabIndex={-1}
     >
-      <h3 className="mb-3 text-xs font-medium text-[color:var(--sniptale-color-text-primary)]">
-        {translateLayerEffectName(`editor.layerEffects.${props.draftEffect.id}`)}
-      </h3>
       <div className="space-y-4">
         <EditorRasterEffectForm draftEffect={props.draftEffect} onChange={props.onChange} />
         <RasterEffectActions

@@ -14,7 +14,7 @@ vi.mock('./row', () => ({
   LayerRow: ({ layer }: { layer: { id: string } }) => <div data-ui={`mock.layer.${layer.id}`} />,
 }));
 
-it('renders layer header collapse affordance and insert action', () => {
+it('renders layer header controls without insertion', () => {
   const onToggleAutoNavigateSelectedLayer = vi.fn();
   const markup = renderToStaticMarkup(
     <EditorInspectorLayersHeader
@@ -31,11 +31,8 @@ it('renders layer header collapse affordance and insert action', () => {
   expect(markup).toContain('editor.layers.auto-navigate');
   expect(markup).toContain('editor.toolbar.layerAutoNavigate');
   expect(markup).toContain('data-active="true"');
-  expect(markup).toContain('mock.insert');
+  expect(markup).not.toContain('mock.insert');
   expect(markup).toContain('editor.layers.show-outside-canvas');
-  expect(markup).toMatch(
-    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.show-outside-canvas"/
-  );
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('text-[12px] font-semibold uppercase');
   expect(markup).not.toContain(
@@ -73,7 +70,7 @@ it('renders layer rows or empty state with stable scroll classes', () => {
   expect(empty).toContain('editor.toolbar.noLayers');
 });
 
-it('places image insertion immediately before selected-layer navigation in the integrated header', () => {
+it('keeps insertion out of the integrated header', () => {
   const markup = renderToStaticMarkup(
     <EditorInspectorLayersHeader
       expanded
@@ -87,10 +84,7 @@ it('places image insertion immediately before selected-layer navigation in the i
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('editor.layers.auto-navigate');
   expect(markup).toContain('4 editor.toolbar.layerCountSuffix');
-  expect(markup).toMatch(
-    /data-ui="mock.insert"[^>]*><\/button><button[^>]*data-ui="editor.layers.show-outside-canvas"/
-  );
-  expect(markup.match(/data-ui="mock.insert"/g)).toHaveLength(1);
+  expect(markup).not.toContain('mock.insert');
   expect(markup).not.toContain('lucide-layers-3');
-  expect(markup.match(/<button/g)).toHaveLength(3);
+  expect(markup.match(/<button/g)).toHaveLength(2);
 });
