@@ -2,11 +2,25 @@ import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/messa
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { translate } from '../../../platform/i18n';
 import { getScreenshotModeCapability } from '../../../features/tab-capabilities/capabilities';
+import { getCaptureSurfaceService } from '../../capture-surface';
 import type { ModeState, ViewportState } from '../../routing-contracts/tab-mode-state';
 import {
   getScreenshotSurfaceCapabilityForDocument,
   getScreenshotSurfaceSession,
 } from '../../capture-surface/screenshot-session';
+
+export function getCurrentScreenshotViewport(tabId: number, viewportState: ViewportState) {
+  const viewport = viewportState.get(tabId) ?? null;
+  if (!viewport) return null;
+  const session = getScreenshotSurfaceSession(tabId);
+  if (!session || session.activeLeaseGeneration === null) return viewport;
+  const applied = getCaptureSurfaceService().getApplied(tabId);
+  return applied?.sessionId === session.sessionId &&
+    applied.generation === session.activeLeaseGeneration &&
+    applied.presetId === viewport.presetId
+    ? viewport
+    : null;
+}
 
 export function buildScreenshotModeStatusResponse(
   tabId: number,
@@ -45,7 +59,7 @@ export function buildScreenshotModeStatusResponse(
         ...sessionScope(),
         ...(pageZoom === undefined ? {} : { pageZoom }),
         tabId,
-        viewport: viewportState.get(tabId) || null,
+        viewport: getCurrentScreenshotViewport(tabId, viewportState),
         supported: capability.supported,
         unsupportedReason: capability.reason,
       });
@@ -56,7 +70,7 @@ export function buildScreenshotModeStatusResponse(
         ...documentScope,
         ...sessionScope(),
         tabId,
-        viewport: viewportState.get(tabId) || null,
+        viewport: getCurrentScreenshotViewport(tabId, viewportState),
         supported: false,
         unsupportedReason: translate('popup.common.noActiveTab'),
       });

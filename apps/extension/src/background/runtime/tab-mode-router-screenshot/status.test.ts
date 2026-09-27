@@ -3,12 +3,19 @@ import {
   beginScreenshotSurfaceSession,
   bindScreenshotSurfaceSession,
   getScreenshotSurfaceSession,
+  markScreenshotSurfaceApplied,
   resetScreenshotSurfaceSessionsForTests,
 } from '../../capture-surface/screenshot-session';
 
-const { browserTabsGetMock, browserTabsGetZoomMock } = vi.hoisted(() => ({
+const { browserTabsGetMock, browserTabsGetZoomMock, getAppliedMock } = vi.hoisted(() => ({
   browserTabsGetMock: vi.fn(),
   browserTabsGetZoomMock: vi.fn(),
+  getAppliedMock: vi.fn(),
+}));
+
+vi.mock('../../capture-surface', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../capture-surface')>()),
+  getCaptureSurfaceService: () => ({ getApplied: getAppliedMock }),
 }));
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
@@ -170,6 +177,28 @@ async function verifyBuildScreenshotModeStatusFallback() {
   });
 }
 
+async function verifyConflictedLeaseIsNotReportedAsApplied() {
+  const { buildScreenshotModeStatusResponse } = await import('./status');
+  browserTabsGetMock.mockResolvedValue({ id: 5, url: 'https://example.com' });
+  const session = beginScreenshotSurfaceSession(5);
+  bindScreenshotSurfaceSession({ documentId: 'content-document-5', tabId: 5 });
+  markScreenshotSurfaceApplied(5, session.generation);
+  getAppliedMock.mockReturnValue(null);
+  const sendResponse = vi.fn();
+
+  buildScreenshotModeStatusResponse(
+    5,
+    new Map([[5, true]]),
+    new Map([[5, { presetId: 'test:viewport', target: 'window', width: 1440, height: 900 }]]),
+    sendResponse,
+    'content-document-5'
+  );
+
+  await vi.waitFor(() =>
+    expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ viewport: null }))
+  );
+}
+
 describe('tab-mode-router-screenshot status responses', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -189,5 +218,9 @@ describe('tab-mode-router-screenshot status responses', () => {
   it(
     'falls back to an unsupported status response when tab lookup fails',
     verifyBuildScreenshotModeStatusFallback
+  );
+  it(
+    'does not project a screenshot preset after its lease becomes conflicted',
+    verifyConflictedLeaseIsNotReportedAsApplied
   );
 });

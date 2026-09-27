@@ -231,6 +231,17 @@ describe('window-only capture-surface application', () => {
     expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
   });
 
+  it('releases a conflicted screenshot owner without restoring user-changed bounds', async () => {
+    const service = new DefaultCaptureSurfaceService();
+    await service.apply(request());
+    mocks.getWindowSnapshot.mockResolvedValue({ ...applied, width: 1279 });
+
+    await expect(service.releaseTabOwners(7, ['screenshot'])).resolves.toBeUndefined();
+    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
+    expect(service.hasOwnerLease('screenshot')).toBe(false);
+  });
+
   it('rejects a second tab trying to own the same browser window', async () => {
     const service = new DefaultCaptureSurfaceService();
     await service.apply(request());
@@ -298,6 +309,24 @@ describe('window-only capture-surface application', () => {
     expect(service.getApplied(7)).toEqual(parent);
     expect(service.hasOwnerLease('screenshot')).toBe(true);
   });
+
+  it('abandons every suspended owner after a nested window is changed externally', async () => {
+    const service = new DefaultCaptureSurfaceService();
+    await service.apply(request());
+    mocks.prepareWindowSize.mockResolvedValueOnce({ expected: applied, prior: applied });
+    const child = await service.apply(
+      request({ generation: 1, owner: 'video', sessionId: 'recording-1' })
+    );
+    mocks.getWindowSnapshot.mockResolvedValue({ ...applied, width: 1279 });
+
+    await expect(service.release(child)).rejects.toMatchObject({ code: 'restore-conflict' });
+    await service.abandonConflicted(child);
+
+    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
+    expect(service.hasOwnerLease('video')).toBe(false);
+    expect(service.hasOwnerLease('screenshot')).toBe(false);
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
+  });
 });
 
 describe('window-only capture-surface lifecycle', () => {
@@ -310,10 +339,11 @@ describe('window-only capture-surface lifecycle', () => {
       }),
     ]);
     mocks.getWindowSnapshot.mockResolvedValue({ ...applied, width: 1000 });
-    await new DefaultCaptureSurfaceService().recover();
+    const service = new DefaultCaptureSurfaceService();
+    await service.recover();
     expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).toMatchObject({ phase: 'conflict' });
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).not.toHaveProperty('alignmentFrom');
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
+    expect(service.hasSessionLease('recovered-session')).toBe(false);
   });
   it.each([720, 719])(
     'recovers interruption on either side of raster alignment (%i)',
@@ -366,14 +396,25 @@ describe('window-only capture-surface lifecycle', () => {
     expect(other.getApplied(7)).not.toBeNull();
   });
 
-  it('fails closed while terminating a manually changed closed-tab window', async () => {
+  it('forgets a closed tab lease without changing manually adjusted window bounds', async () => {
     const service = new DefaultCaptureSurfaceService();
     await service.apply(request());
     mocks.getWindowSnapshot.mockResolvedValueOnce({ ...applied, left: applied.left + 1 });
 
-    await expect(service.terminateClosedTab(7, ['screenshot'])).rejects.toMatchObject({
-      code: 'restore-conflict',
-    });
+    await expect(service.terminateClosedTab(7, ['screenshot'])).resolves.toBeUndefined();
+    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
+    expect(service.hasOwnerLease('screenshot')).toBe(false);
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
+  });
+
+  it('clears conflicted owners during global cleanup without restoring moved windows', async () => {
+    const service = new DefaultCaptureSurfaceService();
+    await service.apply(request());
+    mocks.getWindowSnapshot.mockResolvedValue({ ...applied, left: applied.left + 1 });
+
+    await expect(service.releaseOwners(['screenshot'])).resolves.toBeUndefined();
+    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
+    expect(service.hasOwnerLease('screenshot')).toBe(false);
   });
 
   it('restores abandoned journal authority during startup recovery', async () => {

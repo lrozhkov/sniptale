@@ -1,13 +1,13 @@
 import { defineMessageSource } from '../../source';
 
 const VIEWPORT_CONFLICT_ERROR_RU = [
-  'Размер окна сейчас нельзя изменить: окно занято другой операцией.',
-  'Завершите текущий снимок или запись и повторите попытку.',
+  'Размер окна занят текущим снимком или записью.',
+  'Завершите операцию и выберите размер снова.',
 ].join(' ');
 
 const VIEWPORT_CONFLICT_ERROR_EN = [
-  'The window size cannot be changed while another operation controls this window.',
-  'Finish the current capture or recording and try again.',
+  'A capture or recording is using this window size.',
+  'Finish it, then select the size again.',
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({

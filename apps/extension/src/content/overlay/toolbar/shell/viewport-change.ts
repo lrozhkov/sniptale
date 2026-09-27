@@ -21,8 +21,23 @@ async function refreshToolbarViewportStatus(
   setCurrentViewport: (viewport: { width: number; height: number } | null) => void
 ) {
   const status = await refreshToolbarSurfaceSession();
-  setCurrentViewport(status?.success ? (status.viewport ?? null) : null);
+  if (status?.success) setCurrentViewport(status.viewport ?? null);
   return status;
+}
+
+function statusMatchesSelection(
+  status: Awaited<ReturnType<typeof refreshToolbarSurfaceSession>> | null,
+  viewport: ToolbarViewportSelection
+): boolean {
+  if (!status?.success) return false;
+  const actual = status.viewport ?? null;
+  if (viewport === null) return actual === null;
+  return (
+    actual !== null &&
+    actual.presetId === viewport.presetId &&
+    actual.width === viewport.width &&
+    actual.height === viewport.height
+  );
 }
 
 async function sendToolbarSurfaceMutation(viewport: ToolbarViewportSelection) {
@@ -85,12 +100,14 @@ export async function handleToolbarViewportChange(
     }
 
     if (response?.success) {
-      await refreshToolbarViewportStatus(setCurrentViewport).catch(() => undefined);
-      return true;
+      const status = await refreshToolbarViewportStatus(setCurrentViewport).catch(() => null);
+      if (statusMatchesSelection(status, viewport)) return true;
+      showToast(translate('viewportPresets.availability.verificationFailed'), 'error');
+      return false;
     }
 
     if (response?.error === 'surface-busy') {
-      setCurrentViewport(null);
+      await refreshToolbarViewportStatus(setCurrentViewport).catch(() => undefined);
       showToast(translate('content.toolbar.viewportConflictError'), 'error', 5000);
       return false;
     }

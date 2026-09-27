@@ -65,6 +65,13 @@ it('keeps timing and selection unchanged after a failed mode transition', async 
   expect(state.controls.onlyDuringCapture).toBe(false);
   expect(state.controls.busy).toBe(false);
 });
+it('keeps the selected continuous size unchanged after an unconfirmed mutation', async () => {
+  await act(async () => state.controls.select(preset));
+  mutate.mockResolvedValueOnce(false);
+  await act(async () => state.controls.select(null));
+  expect(state.controls.selection).toEqual(preset);
+  expect(state.controls.busy).toBe(false);
+});
 it('rejects overlapping captures and reports preparation and restoration failures', async () => {
   await act(async () => state.controls.setOnlyDuringCapture(true, preset));
   mutate.mockResolvedValueOnce(false);

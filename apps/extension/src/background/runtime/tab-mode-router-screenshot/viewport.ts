@@ -55,9 +55,8 @@ async function releaseRegularSurface(tabId: number, leaseGeneration: number): Pr
   const session = getScreenshotSurfaceSession(tabId);
   if (!session) return;
   const service = getCaptureSurfaceService();
-  while (true) {
-    const applied = service.getApplied(tabId);
-    if (!applied) return;
+  const applied = service.getApplied(tabId);
+  if (applied) {
     if (applied.sessionId !== session.sessionId) {
       throw new CaptureSurfaceError(
         'surface-busy',
@@ -67,8 +66,8 @@ async function releaseRegularSurface(tabId: number, leaseGeneration: number): Pr
     if (applied.generation !== leaseGeneration) {
       throw new CaptureSurfaceError('stale-generation');
     }
-    await service.release(applied);
   }
+  await service.releaseTabOwners(tabId, ['screenshot']);
 }
 
 async function applyRegularPreset(

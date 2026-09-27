@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   markReleased: vi.fn(),
   nextGeneration: vi.fn(),
   release: vi.fn(),
+  releaseTabOwners: vi.fn(),
   replace: vi.fn(),
   runOperation: vi.fn(async (_tabId: number, operation: () => Promise<void>) => operation()),
   sendTabMessage: vi.fn(),
@@ -38,6 +39,7 @@ vi.mock('../../capture-surface', async (importOriginal) => ({
     getAvailabilities: mocks.getAvailabilities,
     replace: mocks.replace,
     release: mocks.release,
+    releaseTabOwners: mocks.releaseTabOwners,
   }),
 }));
 vi.mock('../../capture-surface/screenshot-session', async (importOriginal) => ({
@@ -105,6 +107,7 @@ beforeEach(() => {
     width: 1280,
   });
   mocks.release.mockResolvedValue(undefined);
+  mocks.releaseTabOwners.mockResolvedValue(undefined);
   mocks.replace.mockResolvedValue({
     generation: 2,
     height: 720,
@@ -362,12 +365,37 @@ it('releases a regular window surface and clears projected state', async () => {
     regular.viewportState,
     regular.viewportOwnerState
   );
-  expect(mocks.release).toHaveBeenCalledOnce();
+  expect(mocks.releaseTabOwners).toHaveBeenCalledWith(7, ['screenshot']);
   expect(mocks.sendTabMessage).toHaveBeenCalledWith(7, {
     type: 'VIEWPORT_CHANGED',
     viewport: null,
   });
   expect(regular.viewportState.get(7)).toBeNull();
+});
+
+it('releases a conflicted screenshot lease even when it is no longer projected as applied', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'screenshot-session-1' });
+  mocks.getApplied.mockReturnValue(null);
+  const maps = stateMaps();
+  maps.viewportState.set(7, {
+    presetId: 'viewport-1',
+    target: 'window',
+    width: 1280,
+    height: 720,
+  });
+
+  await handleReleaseViewportPreset(
+    7,
+    3,
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState
+  );
+
+  expect(mocks.releaseTabOwners).toHaveBeenCalledWith(7, ['screenshot']);
+  expect(maps.viewportState.get(7)).toBeNull();
 });
 
 it('rejects Current size while the screenshot lease is suspended beneath video', async () => {
