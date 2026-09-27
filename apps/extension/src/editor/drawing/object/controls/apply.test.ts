@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { ActiveSelection, Canvas } from 'fabric';
+import { ActiveSelection, Canvas, Point } from 'fabric';
 import { expect, it } from 'vitest';
 import { createEditorDrawingFabricObject } from '../vector';
 import {
@@ -27,6 +27,44 @@ it('routes arrow drawings to endpoint controls without a bounding box', () => {
   expect(Object.keys(object.controls)).toEqual(['start', 'end']);
   expect(object.hasBorders).toBe(false);
   expect(object.lockRotation).toBe(true);
+});
+
+it('targets a diagonal arrow near its visible stroke without claiming empty bounding-box corners', () => {
+  const canvas = new Canvas(document.createElement('canvas'), { targetFindTolerance: 5 });
+  canvas.setDimensions({ width: 240, height: 220 });
+  canvas.upperCanvasEl.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: 240, height: 220 }) as DOMRect;
+  const arrow = createEditorDrawingFabricObject(
+    {
+      color: '#f97316',
+      dynamicWidth: false,
+      end: { x: 180, y: 160 },
+      id: 'arrow-diagonal',
+      kind: 'arrow',
+      start: { x: 40, y: 40 },
+      width: 12,
+    },
+    1
+  );
+  applyEditorDrawingInteractionControls(arrow);
+  canvas.add(arrow);
+  arrow.setCoords();
+  const origin = canvas.getScenePoint(new MouseEvent('mousemove', { clientX: 0, clientY: 0 }));
+  const targetAt = (x: number, y: number) =>
+    canvas.findTarget(new MouseEvent('mousemove', { clientX: x - origin.x, clientY: y - origin.y }))
+      .target;
+
+  expect(arrow.containsPoint(new Point(50, 150))).toBe(true);
+  expect(arrow.perPixelTargetFind).toBe(true);
+
+  expect(targetAt(110, 100)).toBe(arrow);
+  expect(targetAt(110, 108)).toBe(arrow);
+  expect(targetAt(50, 150)).toBeUndefined();
+
+  canvas.setActiveObject(arrow);
+  canvas.targetFindTolerance = 0;
+  expect(targetAt(40, 32)).toBe(arrow);
+  canvas.dispose();
 });
 
 it('applies drawing chrome without box controls to drawing multi-selection', () => {

@@ -23,6 +23,7 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
     preserveObjectStacking: true,
     selection: true,
     selectionKey: 'ctrlKey',
+    targetFindTolerance: 5,
     uniformScaling: false,
     uniScaleKey: 'shiftKey',
   });
