@@ -33,24 +33,8 @@ const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
 );
 
 const DOCUMENT_TITLE_CLASS_NAME = [
-  'flex min-w-[8rem] max-w-[18rem] max-[1799px]:max-w-[11rem] flex-col px-2.5',
+  'flex min-w-[8rem] max-w-[18rem] max-[1799px]:max-w-[11rem] items-center px-2.5',
   'max-[720px]:min-w-0 max-[720px]:max-w-[9.5rem]',
-].join(' ');
-
-const DOCUMENT_STATUS_CLASS_NAME = [
-  'mt-0.5 flex min-h-3 items-center gap-1.5 text-[11px] leading-none',
-  'text-[var(--sniptale-color-text-muted)]',
-].join(' ');
-
-const DOCUMENT_STORAGE_BADGE_CLASS_NAME = 'max-w-full truncate rounded px-1 py-0.5';
-
-const DOCUMENT_STORAGE_BADGE_LIBRARY_CLASS_NAME = 'text-[var(--sniptale-color-text-secondary)]';
-
-const DOCUMENT_STORAGE_BADGE_DRAFT_CLASS_NAME = [
-  'border',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_55%,var(--sniptale-color-border-soft)_45%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_12%,transparent)]',
-  'text-[var(--sniptale-color-warning)]',
 ].join(' ');
 
 const DOCUMENT_PROMOTION_BUTTON_CLASS_NAME = [
@@ -60,9 +44,7 @@ const DOCUMENT_PROMOTION_BUTTON_CLASS_NAME = [
 
 const DOCUMENT_PROMOTION_STATE_CLASS_NAME = {
   library: 'scale-90 opacity-0',
-  temporary:
-    'scale-100 opacity-100 !bg-[color:color-mix(in_srgb,var(--sniptale-color-warning)_12%,transparent)] ' +
-    '!text-[var(--sniptale-color-warning)]',
+  temporary: 'scale-100 opacity-100 !text-[var(--sniptale-color-warning)]',
 } as const;
 
 type InFlightDocumentOperation = {
@@ -376,7 +358,6 @@ function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
 function EditorFloatingDocumentSummary(props: {
   documentState: ReturnType<typeof useDocumentBarState>;
   hasImage: boolean;
-  standalone: boolean;
   onEdit: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -401,25 +382,6 @@ function EditorFloatingDocumentSummary(props: {
         >
           {resolveDocumentTitle(props.documentState.pageTitle, props.hasImage)}
         </button>
-        {props.hasImage && props.standalone ? (
-          <div className={DOCUMENT_STATUS_CLASS_NAME}>
-            <span
-              className={[
-                DOCUMENT_STORAGE_BADGE_CLASS_NAME,
-                storage.storageClass === 'library'
-                  ? DOCUMENT_STORAGE_BADGE_LIBRARY_CLASS_NAME
-                  : DOCUMENT_STORAGE_BADGE_DRAFT_CLASS_NAME,
-              ].join(' ')}
-              data-storage-class={storage.storageClass === 'library' ? 'library' : 'temporary'}
-            >
-              {translate(
-                storage.storageClass === 'library'
-                  ? 'editor.documentActions.inLibrary'
-                  : 'editor.documentActions.draft'
-              )}
-            </span>
-          </div>
-        ) : null}
       </div>
       {storage.promotionButtonVisible ? (
         <ContentToolbarButton
@@ -488,7 +450,6 @@ export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps)
                 <EditorFloatingDocumentSummary
                   documentState={documentState}
                   hasImage={props.hasImage}
-                  standalone={standalone}
                   onEdit={onEdit}
                   triggerRef={triggerRef}
                 />

@@ -18,17 +18,21 @@ import {
   unmountDocumentBar,
 } from './document-bar.test-support';
 
-it('renders a draft badge and compact autosave marker while routing quick actions', async () => {
+it('centers the document title without a storage badge and keeps the library icon unfilled', async () => {
   const controller = createController();
   renderDocumentBar(createProps({}, controller));
 
   expect(container?.textContent).toContain('Captured page');
   await act(async () => Promise.resolve());
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.draft'));
   expect(container?.textContent).not.toContain(translate('common.states.saved'));
-  expect(container?.querySelector('[data-storage-class="temporary"]')?.className).toContain(
-    'border'
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
+  expect(getButton('editor.floating.document-bar.title').parentElement?.className).toContain(
+    'items-center'
   );
+  const promote = getButton('editor.floating.document-bar.promote-button');
+  expect(promote.className).not.toContain('!bg-');
+  expect(promote.className).toContain('!text-[var(--sniptale-color-warning)]');
   expect(
     container?.querySelector('[data-ui="autosave-control"] button')?.getAttribute('aria-label')
   ).toContain(translate('common.states.saved'));
@@ -128,24 +132,25 @@ it('omits save-to-folder when no enabled preset is available', async () => {
   expect(getButton('editor.floating.document-bar.close-file-button')).not.toBeNull();
 });
 
-it('shows storage state separately and promotes a linked draft without changing its id', async () => {
+it('promotes a linked draft without showing a storage badge or changing its id', async () => {
   window.history.replaceState(null, '', '?assetId=asset-1');
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.title).toBe(translate('editor.documentActions.saveToLibrary'));
   expect(promote.textContent).toBe('');
   expect(promote.getAttribute('aria-label')).toBe(
     translate('editor.documentActions.saveToLibrary')
   );
-  expect(promote.previousElementSibling?.className).toContain('flex-col');
+  expect(promote.previousElementSibling?.className).toContain('items-center');
   await act(async () => promote.click());
 
   expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
-  expect(container?.querySelector('[data-storage-class="library"]')).not.toBeNull();
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
+  expect(promote.className).toContain('scale-90 opacity-0');
   window.history.replaceState(null, '', '/');
 });
 
@@ -159,12 +164,13 @@ it('keeps a failed promotion retryable and preserves the draft until success', a
   expect(document.querySelector('[role="alert"]')?.textContent).toContain(
     translate('editor.documentActions.saveToLibraryError')
   );
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   expect(getButton('editor.floating.document-bar.promote-button').disabled).toBe(false);
 
   await act(async () => getButton('editor.floating.document-bar.promote-button').click());
   expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(getButton('editor.floating.document-bar.promote-button').className).toContain(
+    'scale-90 opacity-0'
+  );
 });
 
 it('prevents duplicate promotion while the durable commit is pending', async () => {
@@ -193,7 +199,7 @@ it('prevents duplicate promotion while the durable commit is pending', async () 
     translate('editor.documentActions.savingToLibrary')
   );
   expect(getButton('editor.floating.document-bar.promote-button').textContent).toBe('');
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
   await act(async () => commit.resolve());
 });
 
@@ -262,7 +268,9 @@ it('preserves operation identity and cleanup isolation across an A to B to A swi
 
   await act(async () => firstCommit.resolve());
   await Promise.all([firstAggregateResult, duplicateFirstResult]);
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(getButton('editor.floating.document-bar.promote-button').className).toContain(
+    'scale-90 opacity-0'
+  );
 });
 
 it('keeps stale-copy actions disabled while promotion owns the aggregate lock', async () => {
@@ -304,7 +312,6 @@ it('ignores stale storage reads after the active document changes', async () => 
     })
   );
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
   ).toBeNull();
@@ -316,7 +323,10 @@ it('does not show the previous document library state while the next document lo
   });
   renderDocumentBar();
   await act(async () => Promise.resolve());
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
+  ).toBeNull();
 
   const nextRead = createDeferred<{
     lifecycle: { savedAt: null; storageClass: 'temporary'; updatedAt: number };
@@ -324,8 +334,9 @@ it('does not show the previous document library state while the next document lo
   mocks.getMediaLibraryEntry.mockImplementationOnce(() => nextRead.promise);
   storeState.value = { ...storeState.value, sessionId: 'asset-2' };
   rerenderDocumentBar();
-  expect(container?.textContent).not.toContain(translate('editor.documentActions.inLibrary'));
-  expect(container?.querySelector('[data-storage-class="temporary"]')).not.toBeNull();
+  expect(
+    container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
+  ).toBeNull();
 
   await act(async () =>
     nextRead.resolve({
@@ -340,7 +351,6 @@ it('keeps promotion available when library metadata cannot be read', async () =>
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
 });
 
@@ -408,7 +418,7 @@ it('does not rebind a stale conflict copy after an A to B to A activation change
   await act(async () => copy.resolve('image-copy'));
 
   expect(mocks.autosaveActivate).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
 });
 
 it('removes the file menu from the floating document bar', () => {
@@ -508,7 +518,7 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
     storeState.value = state;
     renderDocumentBar();
     await act(async () => Promise.resolve());
-    expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+    expect(container?.querySelector('[data-storage-class]')).toBeNull();
     const status = container?.querySelector('[data-ui="autosave-control"] button');
     expect(status?.getAttribute('aria-label')).toContain(expectedLabel);
     expect(status?.getAttribute('title')).toContain(expectedLabel);
