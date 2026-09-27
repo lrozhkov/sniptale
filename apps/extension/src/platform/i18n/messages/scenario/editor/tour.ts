@@ -1,4 +1,7 @@
 export const scenarioTourMessages = {
+  tourUseCentralStyle: { ru: 'Использовать стиль тура', en: 'Use tour style' },
+  tourEffectType: { ru: 'Тип выделения', en: 'Effect type' },
+
   tourHtmlAudioBlocked: {
     ru: 'Нажмите «Воспроизвести», чтобы включить звук.',
     en: 'Press Play to enable audio.',

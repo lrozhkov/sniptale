@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { parseTourDocument, tourDocumentSchema } from './tour-parser';
 import {
   getTourSlideObjects,
+  resolveTourMask,
+  resolveTourTextAppearance,
+  tourTextDefaults,
+  TOUR_MASK_DEFAULTS,
   TOUR_HINT_SURFACE,
   TOUR_LIMITS,
   type TourDocument,
@@ -500,4 +504,63 @@ describe('slide object order', () => {
       }).status
     ).toBe('invalid');
   });
+});
+
+it('roundtrips central defaults and inheritance while retaining legacy overrides', () => {
+  const value = document();
+  const slide = imageSlide();
+  value.slides[0] = slide;
+  value.style.hotspotAppearance = {
+    ...value.style.textAppearance,
+    surface: { ...TOUR_HINT_SURFACE, width: 400 },
+  };
+  value.style.maskDefaults = structuredClone(TOUR_MASK_DEFAULTS);
+  value.style.maskDefaults.blur.radius = 30;
+  slide.masks[0]!.inheritStyle = true;
+  const parsed = parseTourDocument(JSON.parse(JSON.stringify(value)));
+  expect(parsed).toEqual({ status: 'ok', document: value });
+  expect(resolveTourMask(slide.masks[0]!, value.style.maskDefaults).blurRadius).toBe(30);
+  const local = {
+    ...resolveTourMask(slide.masks[0]!, value.style.maskDefaults),
+    inheritStyle: false,
+  };
+  value.style.maskDefaults.blur.radius = 40;
+  expect(resolveTourMask(local, value.style.maskDefaults).blurRadius).toBe(30);
+  expect(
+    resolveTourMask({ ...local, inheritStyle: true }, value.style.maskDefaults).blurRadius
+  ).toBe(40);
+  expect(resolveTourMask(imageSlide().masks[0]!, value.style.maskDefaults)).toEqual(
+    imageSlide().masks[0]
+  );
+  const redaction = { ...local, kind: 'redact' as const, inheritStyle: true };
+  expect(resolveTourMask(redaction, value.style.maskDefaults)).toEqual(redaction);
+  const defaults = tourTextDefaults(value.style, 'hotspot');
+  expect(resolveTourTextAppearance('hotspot', null, defaults).surface?.width).toBe(400);
+  expect(
+    resolveTourTextAppearance('annotation', null, tourTextDefaults(value.style, 'annotation'))
+      .surface
+  ).toBeUndefined();
+  expect(
+    resolveTourTextAppearance('hotspot', { ...value.style.textAppearance }, defaults).surface?.width
+  ).toBe(400);
+});
+
+it('rejects malformed style defaults and inheritance flags without losing legacy admission', () => {
+  for (const patch of [
+    { maskDefaults: { ...TOUR_MASK_DEFAULTS, blur: { radius: 0 } } },
+    { maskDefaults: { ...TOUR_MASK_DEFAULTS, spotlight: { color: 'url(x)', opacity: 0.6 } } },
+    { hotspotAppearance: { presentation: 'unknown' } },
+  ])
+    expect(
+      parseTourDocument({ ...document(), style: { ...document().style, ...patch } }).status
+    ).toBe('invalid');
+  const value = document();
+  const slide = imageSlide();
+  expect(
+    parseTourDocument({
+      ...value,
+      slides: [{ ...slide, masks: [{ ...slide.masks[0], inheritStyle: 'true' }] }],
+    }).status
+  ).toBe('invalid');
+  expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
 });

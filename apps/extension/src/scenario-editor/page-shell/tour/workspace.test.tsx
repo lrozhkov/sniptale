@@ -382,7 +382,7 @@ it('shows object narration without slide narration in the selected-object drill-
   );
 });
 
-it('uses the header presentation switch and keeps narration in playback, objects flat', async () => {
+it('uses the header presentation switch and keeps grouped objects switchable with their own narration', async () => {
   await render();
   const panel = () => host.querySelector('#guide-inspector-panel')!;
   await click('Show all settings', panel());
@@ -394,8 +394,12 @@ it('uses the header presentation switch and keeps narration in playback, objects
   expect(panel().textContent).toContain('Slide narration');
   await click('Slide objects', panel());
   await click('Hotspot', panel());
+  expect(panel().querySelector('nav')).not.toBeNull();
+  expect(panel().querySelector('[title="Show all settings"]')).not.toBeNull();
+  await click('Show all settings', panel());
   expect(panel().querySelector('nav')).toBeNull();
-  expect(panel().querySelector('[title="Show all settings"]')).toBeNull();
+  await click('Show settings sections', panel());
+  expect(panel().querySelector('nav')).not.toBeNull();
   expect(panel().textContent).toContain('Object narration');
   expect(panel().textContent).not.toContain('Slide narration');
   await click('Back to slide settings', panel());
@@ -428,7 +432,9 @@ it('offers visual blur without overwriting highlight opacity or numeric canvas g
   if (slide.kind !== 'image') throw new Error('Expected image');
   expect(slide.masks[0]!.kind).toBe('blur');
   expect(slide.masks[0]!.opacity).toBe(0.3);
+  await click('Appearance', panel);
   expect(panel.querySelector('[aria-label="Blur radius"]')).not.toBeNull();
+  await click('Effect type', panel);
   await click('Blur', panel);
   await click('Highlight', document.body);
   const restored = current.tour!.slides[0]!;

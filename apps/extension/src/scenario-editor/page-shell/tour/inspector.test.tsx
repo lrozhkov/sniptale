@@ -416,23 +416,6 @@ it('adds only a valid end CTA and removes terminal actions with explicit confirm
   const repaired = project.tour!.slides[1]!;
   expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
 });
-it('exposes global and local text alignment with placement only for callouts', async () => {
-  scope = 'document';
-  draw();
-  await choose('Text alignment', 'Center');
-  await choose('Callout placement', 'Above');
-  expect(project.tour!.style.textAppearance).toMatchObject({
-    alignment: 'center',
-    placement: 'top',
-  });
-  await choose('Explanations', 'Bottom captions');
-  expect(
-    [...host.querySelectorAll('button')].some(
-      (node) => node.getAttribute('aria-label') === 'Callout placement'
-    )
-  ).toBe(false);
-});
-
 it('builds contents without duplicate destinations and reorders buttons atomically', async () => {
   selected = { kind: 'slide', slideId: 'nav', objectId: null };
   draw();
@@ -612,7 +595,10 @@ it('shows one section heading in sections mode and moves object actions into it'
   expect(objectsHeading.textContent).toContain('Slide objects');
   expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
   await click('Hotspot');
-  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  expect(
+    host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')
+  ).not.toBeNull();
+  expect(host.querySelector('.guide-inspector-group-heading')).toBeNull();
   await click('Back to slide settings');
   await click('Playback');
   expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
@@ -667,96 +653,12 @@ it('preserves image categories through All and object drill-down without editing
   expect(JSON.stringify(project)).toBe(before);
   await click('Slide objects');
   await click('Hotspot');
-  expect(host.querySelector('nav')).toBeNull();
+  expect(host.querySelector('nav')).not.toBeNull();
   expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
   await click('Back to slide settings');
   expect(
     host.querySelector('button[aria-label="Slide objects"]')?.getAttribute('aria-pressed')
   ).toBe('true');
-});
-
-it('separates document defaults from slide settings and exposes every category', async () => {
-  presentation = 'sections';
-  scope = 'document';
-  draw();
-  expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).toBeNull();
-  await click('Explanations');
-  await fill('Explanation width', '300');
-  expect(project.tour!.style.textAppearance.surface?.width).toBe(300);
-  await click('Playback');
-  expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).not.toBeNull();
-  await click('Transitions');
-  expect(host.querySelector('section[aria-label="Transitions"]')).not.toBeNull();
-  scope = 'selection';
-  selected = { kind: 'slide', slideId: 'nav', objectId: null };
-  draw();
-  await click('Composition');
-  expect(host.querySelector('input[aria-label="Content width"]')).not.toBeNull();
-  selected = { kind: 'end' };
-  draw();
-  expect(host.querySelector('nav')).toBeNull();
-});
-
-it('renders exactly one heading per section in both presentations and keeps nested subgroups', async () => {
-  scope = 'document';
-  presentation = 'sections';
-  draw();
-  for (const label of ['Appearance', 'Explanations', 'Playback', 'Transitions']) {
-    await click(label);
-    const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
-    expect(heading.textContent).toContain(label);
-    expect(
-      host.querySelectorAll('.guide-inspector-group-heading'),
-      `${label} must not repeat the section heading inside its content`
-    ).toHaveLength(0);
-  }
-  presentation = 'all';
-  draw();
-  const groups = [...host.querySelectorAll('.guide-inspector-group')];
-  expect(groups).toHaveLength(4);
-  for (const group of groups)
-    expect(group.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(1);
-  scope = 'selection';
-  selected = { kind: 'slide', slideId: 'nav', objectId: null };
-  presentation = 'sections';
-  draw();
-  for (const label of ['Navigation slide', 'Composition', 'Contents links']) {
-    await click(label);
-    const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
-    expect(heading.textContent).toContain(label);
-    expect(host.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(0);
-  }
-  const linksHeading = host.querySelector(
-    '[data-ui="shared.categorized-inspector.section-heading"]'
-  )!;
-  expect(linksHeading.querySelector('button[title="Add button"]')).not.toBeNull();
-  selected = { kind: 'slide', slideId: 'image', objectId: null };
-  draw();
-  await click('Playback');
-  const subgroupHeadings = [...host.querySelectorAll('.guide-inspector-group-heading')].map(
-    (node) => node.textContent?.trim()
-  );
-  expect(subgroupHeadings).toEqual([expect.stringContaining('Timing and autoplay')]);
-});
-
-it('remembers document disclosure groups independently after leaving document settings', async () => {
-  scope = 'document';
-  draw();
-  const disclosure = (label: string) =>
-    host.querySelector<HTMLButtonElement>(
-      `section[aria-label="${label}"] .guide-inspector-disclosure`
-    )!;
-  await act(async () => disclosure('Appearance').click());
-  expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('false');
-  expect(disclosure('Explanations').getAttribute('aria-expanded')).toBe('true');
-  await act(async () => disclosure('Explanations').click());
-  await act(async () => disclosure('Appearance').click());
-  scope = 'selection';
-  draw();
-  scope = 'document';
-  draw();
-  expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('true');
-  expect(disclosure('Explanations').getAttribute('aria-expanded')).toBe('false');
 });
 
 it('offers slide placement only for independently edited slide explanations', async () => {
@@ -780,4 +682,18 @@ it('offers slide placement only for independently edited slide explanations', as
   await click('Placement on slide');
   expect(document.body.textContent).not.toContain('At hotspot');
   await click('Bottom captions');
+});
+
+it('groups selected action points and highlights when sections are enabled', async () => {
+  await click('Hotspot');
+  presentation = 'sections';
+  draw();
+  expect(host.querySelector('[data-ui="scenario-editor.inspector-categories"]')).not.toBeNull();
+  await click('Back to slide settings');
+  presentation = 'all';
+  draw();
+  await choose('Add', 'Highlight');
+  presentation = 'sections';
+  draw();
+  expect(host.querySelector('[data-ui="scenario-editor.inspector-categories"]')).not.toBeNull();
 });

@@ -1,3 +1,7 @@
+import {
+  TOUR_HINT_SURFACE,
+  TOUR_MASK_DEFAULTS,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
@@ -551,4 +555,63 @@ it('streams the same shell through an abortable blob with embedded assets', asyn
       signal: new AbortController().signal,
     })
   ).rejects.toThrow('Empty tour media.');
+});
+
+it('renders independent inherited and local element styles in the standalone artifact', async () => {
+  const args = fixture();
+  args.tour.style.hotspotAppearance = {
+    presentation: 'callout',
+    alignment: 'start',
+    placement: 'auto',
+    surface: { ...TOUR_HINT_SURFACE, radius: 23 },
+  };
+  args.tour.style.textAppearance = {
+    presentation: 'caption-top',
+    alignment: 'center',
+    placement: 'auto',
+    surface: { ...TOUR_HINT_SURFACE, radius: 8 },
+  };
+  args.tour.style.maskDefaults = { ...TOUR_MASK_DEFAULTS, blur: { radius: 30 } };
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('image fixture');
+  slide.hotspots.push({
+    ...slide.hotspots[0]!,
+    id: 'local',
+    appearance: {
+      ...args.tour.style.hotspotAppearance,
+      surface: { ...TOUR_HINT_SURFACE, radius: 5 },
+    },
+  });
+  slide.annotations = [{ id: 'caption', text: 'Slide text', anchor: null, appearance: null }];
+  slide.masks = [
+    {
+      id: 'linked',
+      kind: 'blur',
+      rect: { x: 0, y: 0, width: 0.1, height: 0.1 },
+      color: '#111827',
+      opacity: 0.3,
+      inheritStyle: true,
+    },
+    {
+      id: 'local-mask',
+      kind: 'blur',
+      rect: { x: 0.2, y: 0, width: 0.1, height: 0.1 },
+      color: '#111827',
+      opacity: 0.3,
+      blurRadius: 7,
+    },
+  ];
+  const dom = open(await buildTourPlayerHtml(args));
+  const doc = dom.window.document;
+  const hint = doc.querySelector<HTMLElement>('[data-tour-hint]')!;
+  expect(hint.style.borderRadius).toBe('23px');
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(hint.style.borderRadius).toBe('5px');
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(hint.dataset['presentation']).toBe('caption-top');
+  expect(hint.style.borderRadius).toBe('0 0 8px 8px');
+  const effects = doc.querySelectorAll<HTMLElement>('.tour-mask-effect');
+  expect(effects[0]!.style.backdropFilter).toBe('blur(30px)');
+  expect(effects[1]!.style.backdropFilter).toBe('blur(7px)');
+  dom.close();
 });

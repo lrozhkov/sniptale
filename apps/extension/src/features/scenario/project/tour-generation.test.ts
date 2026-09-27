@@ -29,7 +29,7 @@ it('generates occurrences in selection order without copying media or changing s
   expect(new Set(result.tour.slides.map((slide) => slide.id)).size).toBe(2);
   expect(result.tour.slides[0]).toMatchObject({
     image: { assetId: 'asset', width: 1000 },
-    annotations: [{ text: 'Caption' }],
+    annotations: [{ text: 'Caption', appearance: null }],
   });
   expect(first).toEqual(original);
   expect(result.issues).toEqual([]);

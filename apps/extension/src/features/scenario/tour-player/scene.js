@@ -27,7 +27,7 @@ function scenePolicy(root, options) {
 /** Hint interaction wiring follows the mount policy; explanation order stays scene-owned. */
 function createSceneHints(root, input, policy, signal, getHints) {
   const scene = root.querySelector('[data-tour-scene]');
-  return createTourHints(root, input.tour.style.textAppearance, {
+  return createTourHints(root, input.tour.style, {
     signal,
     keyboardScope: policy.keyboardScope,
     hideVoice: policy.hideVoice,
@@ -99,6 +99,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
           authoring,
           signal,
           autoZoom: tour.playback.autoZoom,
+          maskDefaults: tour.style.maskDefaults,
         }
       );
       hints = slide.image ? slideExplanations(slide) : [];
@@ -141,7 +142,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
       tour = next.tour;
       media.clear();
       for (const asset of next.assets) media.set(asset.id, asset.src);
-      hintController.setDefaultAppearance(tour.style.textAppearance);
+      hintController.setDefaultAppearance(tour.style);
       applySceneStyle(root, stage, tour);
     },
     selectObject(id) {

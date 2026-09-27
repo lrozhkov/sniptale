@@ -1,5 +1,8 @@
 import { createTourCaption } from './caption.js';
-import { resolveTourTextAppearance } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  resolveTourTextAppearance,
+  tourTextDefaults,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { applyTourHintSurface, sizeTourHint, updateTourHintNavigation } from './hint-style.js';
 /** Measures bounded text pages for captions and primary navigation copy. */
 export function measureHintPages(hintText, fullText) {
@@ -38,7 +41,7 @@ export function measureHintPages(hintText, fullText) {
 
 export function createTourHints(
   root,
-  defaultAppearance,
+  defaultStyle,
   { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels }
 ) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
@@ -74,6 +77,10 @@ export function createTourHints(
     voice.dataset.tourNarration = current.id;
     activeHintId = current.id;
     hint.hidden = false;
+    const defaultAppearance = tourTextDefaults(
+      defaultStyle,
+      current.point ? 'hotspot' : 'annotation'
+    );
     const appearance = resolveTourTextAppearance(
       current.point ? 'hotspot' : 'annotation',
       current.appearance,
@@ -141,7 +148,7 @@ export function createTourHints(
   );
   return {
     setDefaultAppearance(value) {
-      defaultAppearance = value;
+      defaultStyle = value;
     },
     get activeIndex() {
       return activeHint;

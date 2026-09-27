@@ -100,6 +100,8 @@ export interface TourAnnotation {
 
 /** Spotlight is presentation; redact requires irreversible raster preparation at export. */
 export interface TourMask {
+  /** Absent preserves legacy local styling; true resolves central effect defaults. */
+  inheritStyle?: boolean | undefined;
   narration?: TourObjectNarration | null | undefined;
   id: string;
   rect: TourRect;
@@ -112,6 +114,38 @@ export interface TourMask {
   blurRadius?: number | undefined;
   color: string;
   opacity: number;
+}
+
+/** Central defaults are separate for effects with distinct visual semantics. */
+export interface TourMaskDefaults {
+  highlight: { paint: Paint; opacity: number };
+  spotlight: { color: string; opacity: number };
+  blur: { radius: number };
+}
+export const TOUR_MASK_DEFAULTS: TourMaskDefaults = {
+  highlight: { paint: { kind: 'solid', color: '#f97316' }, opacity: 0.3 },
+  spotlight: { color: '#111827', opacity: 0.6 },
+  blur: { radius: 12 },
+};
+
+/** Resolve without mutating authored objects, including legacy local masks and redactions. */
+export function resolveTourMask(mask: TourMask, defaults = TOUR_MASK_DEFAULTS): TourMask {
+  if (!mask.inheritStyle || mask.kind === 'redact') return mask;
+  return {
+    ...mask,
+    paint: defaults.highlight.paint,
+    opacity: defaults.highlight.opacity,
+    spotlightColor: defaults.spotlight.color,
+    spotlightOpacity: defaults.spotlight.opacity,
+    blurRadius: defaults.blur.radius,
+  };
+}
+
+/** Legacy documents retain their shared default until a separate category is edited. */
+export function tourTextDefaults(style: TourDocument['style'], kind: 'hotspot' | 'annotation') {
+  return kind === 'hotspot'
+    ? (style.hotspotAppearance ?? style.textAppearance)
+    : style.textAppearance;
 }
 
 /** Independent audio reference, with an explicit trim inside the decoded duration. */
@@ -253,7 +287,14 @@ export interface TourDocument {
   version: 1;
   id: string;
   stage: { aspect: '16:9' | '4:3' | '9:16'; background: string };
-  style: { accent: string; text: string; surface: string; textAppearance: TourTextAppearance };
+  style: {
+    accent: string;
+    text: string;
+    surface: string;
+    textAppearance: TourTextAppearance;
+    hotspotAppearance?: TourTextAppearance | undefined;
+    maskDefaults?: TourMaskDefaults | undefined;
+  };
   playback: { autoplay: boolean; loop: boolean; minimumHoldSeconds: number; autoZoom: boolean };
   transition: { kind: 'none' | 'fade' | 'slide'; durationMs: number; hotspotTravelMs: number };
   slides: TourSlide[];

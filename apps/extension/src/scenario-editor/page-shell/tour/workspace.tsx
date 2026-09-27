@@ -3,7 +3,10 @@ import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
 import { useState, type ReactNode } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  getTourSlideObjects,
+  type TourSlide,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import type {
   importScenarioImages,
   importScenarioNarration,
@@ -163,9 +166,16 @@ function TourSettingsPanel({
             state.selection?.kind === 'slide' ? state.selection.objectId : null,
             t
           );
+  const selectedObjectId = state.selection?.kind === 'slide' ? state.selection.objectId : null;
+  const selectedObject =
+    state.slide?.kind === 'image' && state.selection?.kind === 'slide'
+      ? getTourSlideObjects(state.slide).find((entry) => entry.object.id === selectedObjectId)
+      : undefined;
   const grouped =
     panels.rightScope === 'document' ||
-    (state.selection?.kind === 'slide' && !state.selection.objectId);
+    (state.selection?.kind === 'slide' && !state.selection.objectId) ||
+    selectedObject?.type === 'hotspot' ||
+    selectedObject?.type === 'mask';
   return (
     <FloatingChromePanel
       role="complementary"

@@ -2,7 +2,10 @@ import { renderTourCameraFrame } from './camera-frame.js';
 import { resolveTourCamera, resolveTourEditingCamera } from './camera.js';
 import { renderTourMask } from './image-mask.js';
 import { bindTourObjectDrag } from './authoring.js';
-import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  getTourSlideObjects,
+  resolveTourMask,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 
 function projectImagePoint(box, point) {
   return { x: box.x + point.x * box.width, y: box.y + point.y * box.height };
@@ -23,6 +26,7 @@ export function renderTourImage(
     authoring,
     signal,
     autoZoom,
+    maskDefaults,
   }
 ) {
   if (!slide.image) {
@@ -47,7 +51,12 @@ export function renderTourImage(
   plane.append(image);
   for (const mask of slide.masks)
     plane.append(
-      renderTourMask(mask, imageBox, slide.image.width, { element, labels, authoring, signal })
+      renderTourMask(resolveTourMask(mask, maskDefaults), imageBox, slide.image.width, {
+        element,
+        labels,
+        authoring,
+        signal,
+      })
     );
   const explanations = getTourSlideObjects(slide).flatMap((entry) =>
     entry.type === 'mask' ? [] : [entry.object.id]

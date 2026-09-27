@@ -2,6 +2,7 @@ import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   TOUR_LIMITS,
+  TOUR_HINT_SURFACE,
   resolveTourTextAppearance,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useEffect, useState } from 'react';
@@ -14,6 +15,7 @@ import type {
 import { GuideVoiceField } from '../voice-field';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { TourInspectorNumericRow } from './numeric-row';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { Translate } from '../../../platform/i18n';
 
@@ -105,6 +107,22 @@ export function TourTextPresentation({
   );
   return (
     <div className="tour-text-field">
+      {inherit && (
+        <label className="guide-number-toggle">
+          <ProductToggle
+            size="sm"
+            disabled={disabled}
+            aria-label={t('scenario.editor.tourUseCentralStyle')}
+            checked={value === null}
+            onClick={() =>
+              onChange(
+                value ? null : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE }
+              )
+            }
+          />
+          {t('scenario.editor.tourUseCentralStyle')}
+        </label>
+      )}
       <span>{presentationLabel}</span>
       <CompactSelect
         aria-label={presentationLabel}
@@ -130,7 +148,11 @@ export function TourTextPresentation({
             : []),
         ]}
         onChange={(presentation) =>
-          onChange(presentation === 'inherit' ? null : { ...effective, presentation })
+          onChange(
+            presentation === 'inherit'
+              ? null
+              : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE, presentation }
+          )
         }
       />
       {value && (
@@ -145,7 +167,9 @@ export function TourTextPresentation({
               { value: 'center', label: t('scenario.editor.tourAlignCenter') },
               { value: 'end', label: t('scenario.editor.tourAlignEnd') },
             ]}
-            onChange={(alignment) => onChange({ ...effective, alignment })}
+            onChange={(alignment) =>
+              onChange({ ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE, alignment })
+            }
           />
           {effective.presentation === 'callout' && (
             <>
@@ -161,7 +185,13 @@ export function TourTextPresentation({
                   { value: 'left', label: t('scenario.editor.tourPlacementLeft') },
                   { value: 'right', label: t('scenario.editor.tourPlacementRight') },
                 ]}
-                onChange={(placement) => onChange({ ...effective, placement })}
+                onChange={(placement) =>
+                  onChange({
+                    ...effective,
+                    surface: effective.surface ?? TOUR_HINT_SURFACE,
+                    placement,
+                  })
+                }
               />
             </>
           )}

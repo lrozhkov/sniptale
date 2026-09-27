@@ -127,6 +127,7 @@ export const tourObjectSchemas = {
       id,
       rect,
       kind: z.enum(['spotlight', 'highlight', 'blur', 'redact']),
+      inheritStyle: z.boolean().optional(),
       paint: tourPaintSchema.optional(),
       spotlightColor: color.optional(),
       spotlightOpacity: fraction.optional(),
@@ -204,7 +205,23 @@ export const tourDocumentSchema = z
       .optional(),
     id,
     stage: z.object({ aspect: z.enum(['16:9', '4:3', '9:16']), background: color }).strict(),
-    style: z.object({ accent: color, text: color, surface: color, textAppearance }).strict(),
+    style: z
+      .object({
+        accent: color,
+        text: color,
+        surface: color,
+        textAppearance,
+        hotspotAppearance: textAppearance.optional(),
+        maskDefaults: z
+          .object({
+            highlight: z.object({ paint: tourPaintSchema, opacity: fraction }).strict(),
+            spotlight: z.object({ color, opacity: fraction }).strict(),
+            blur: z.object({ radius: z.number().finite().min(1).max(80) }).strict(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
     playback: z
       .object({
         autoplay: z.boolean(),

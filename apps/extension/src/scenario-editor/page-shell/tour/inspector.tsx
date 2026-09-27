@@ -1,5 +1,5 @@
-import { DEFAULT_DRAWING_COLORS } from '../../../features/drawing/public';
-import { TourMaskSettings } from './mask-settings';
+import { TourDocumentSettings } from './document-settings';
+import { TourMaskSettings, TourMaskDefaultSettings } from './mask-settings';
 import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
 import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
@@ -28,14 +28,13 @@ import {
   LayoutPanelTop,
   List,
 } from 'lucide-react';
-import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup, InspectorCategorizedContent } from '../inspector';
 import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from '../inspector-actions';
 import { GuideActionMenu } from '../action-menu';
-import { TourTextField, TourTextPresentation } from './fields';
+import { TourTextField } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
 import { TourNavigationSettings, TourAddButtonControl } from './navigation-settings';
 import { TourEndSettings } from './end-settings';
@@ -167,9 +166,22 @@ function TourInspectorContent(props: InspectorProps) {
         content: <TourDocumentSettings {...documentSettings} section="appearance" />,
       },
       {
+        id: 'hotspots',
+        icon: Crosshair,
+        label: t('scenario.editor.tourHotspot'),
+        categorized: true,
+        content: <TourDocumentSettings {...documentSettings} section="hotspots" />,
+      },
+      {
+        id: 'masks',
+        icon: ScanLine,
+        label: t('scenario.editor.tourMask'),
+        content: <TourMaskDefaultSettings {...documentSettings} />,
+      },
+      {
         id: 'explanations',
         icon: MessageSquare,
-        label: t('scenario.editor.tourTextPresentation'),
+        label: t('scenario.editor.tourAnnotation'),
         categorized: true,
         content: <TourDocumentSettings {...documentSettings} section="explanations" />,
       },
@@ -212,6 +224,7 @@ function TourInspectorContent(props: InspectorProps) {
       />
     ) : (
       <TourImageSettings
+        presentation={props.presentation ?? 'all'}
         key={JSON.stringify([slide.id, objectId])}
         section={section}
         slide={slide}
@@ -267,6 +280,7 @@ function TourInspectorContent(props: InspectorProps) {
 }
 
 type ImageSettingsProps = {
+  presentation: 'all' | 'sections';
   section: string;
   slide: TourImageSlide;
   tour: TourDocument;
@@ -353,6 +367,7 @@ function TourImageSettings(props: ImageSettingsProps) {
 }
 
 function TourImageObjectSettings({
+  presentation,
   slide,
   tour,
   objectId,
@@ -369,6 +384,7 @@ function TourImageObjectSettings({
       <>
         {hotspot && (
           <TourHotspotSettings
+            presentation={presentation}
             value={hotspot}
             tour={tour}
             disabled={disabled}
@@ -399,6 +415,8 @@ function TourImageObjectSettings({
         )}
         {mask && (
           <TourMaskSettings
+            presentation={presentation}
+            defaults={tour.style.maskDefaults}
             value={mask}
             disabled={disabled}
             t={t}
@@ -603,6 +621,7 @@ function addTourImageObject(
               {
                 id,
                 kind: 'highlight',
+                inheritStyle: true,
                 rect: { x: 0.25, y: 0.25, width: 0.3, height: 0.2 },
                 color: '#f97316',
                 opacity: 0.3,
@@ -691,96 +710,5 @@ function TourImageObjectActions({
         </ScenarioInspectorActionButton>
       ))}
     </div>
-  );
-}
-
-function TourDocumentSettings({
-  section,
-  tour,
-  disabled,
-  onChange,
-  t,
-}: {
-  section: 'appearance' | 'explanations';
-  tour: TourDocument;
-  disabled: boolean;
-  onChange: (tour: TourDocument) => boolean;
-  t: Translate;
-}) {
-  return (
-    <GuideInspectorGroup
-      id={`document:${section}`}
-      icon={section === 'appearance' ? Palette : MessageSquare}
-      title={t(
-        section === 'appearance'
-          ? 'scenario.editor.appearance'
-          : 'scenario.editor.tourTextPresentation'
-      )}
-    >
-      {section === 'appearance' && (
-        <>
-          <div className="tour-text-field">
-            <span>{t('scenario.editor.tourAspect')}</span>
-            <CompactSelect
-              aria-label={t('scenario.editor.tourAspect')}
-              value={tour.stage.aspect}
-              disabled={disabled}
-              options={[
-                { value: '16:9', label: '16:9' },
-                { value: '4:3', label: '4:3' },
-                { value: '9:16', label: '9:16' },
-              ]}
-              onChange={(aspect) => onChange({ ...tour, stage: { ...tour.stage, aspect } })}
-            />
-          </div>
-          <ColorField
-            triggerVariant="swatch"
-            floatingPlacement="side"
-            layout="stacked"
-            palette={DEFAULT_DRAWING_COLORS}
-            label={t('scenario.editor.tourBackground')}
-            title={t('scenario.editor.tourBackground')}
-            value={tour.stage.background}
-            disabled={disabled}
-            allowAlpha={false}
-            allowTransparent={false}
-            onChange={(background) => onChange({ ...tour, stage: { ...tour.stage, background } })}
-          />
-          {(
-            [
-              { key: 'accent', label: t('scenario.editor.appearanceAccent') },
-              { key: 'text', label: t('scenario.editor.tourSceneTextColor') },
-            ] as const
-          ).map(({ key, label }) => (
-            <ColorField
-              triggerVariant="swatch"
-              floatingPlacement="side"
-              layout="stacked"
-              palette={DEFAULT_DRAWING_COLORS}
-              key={key}
-              label={label}
-              title={label}
-              value={tour.style[key]}
-              disabled={disabled}
-              allowAlpha={false}
-              allowTransparent={false}
-              onChange={(value) => onChange({ ...tour, style: { ...tour.style, [key]: value } })}
-            />
-          ))}
-        </>
-      )}
-      {section === 'explanations' && (
-        <TourTextPresentation
-          inherit={false}
-          value={tour.style.textAppearance}
-          defaults={tour.style.textAppearance}
-          disabled={disabled}
-          t={t}
-          onChange={(textAppearance) => {
-            if (textAppearance) onChange({ ...tour, style: { ...tour.style, textAppearance } });
-          }}
-        />
-      )}
-    </GuideInspectorGroup>
   );
 }
