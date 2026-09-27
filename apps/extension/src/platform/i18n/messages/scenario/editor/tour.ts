@@ -261,6 +261,7 @@ export const scenarioTourMessages = {
   tourImageEmpty: { ru: 'Добавьте изображение для этого слайда', en: 'Add an image to this slide' },
   tourImageDrop: { ru: 'Перетащите изображение сюда', en: 'Drop an image here' },
   tourHotspot: { ru: 'Точка действия', en: 'Hotspot' },
+  tourAdvancedSettings: { ru: 'Дополнительные настройки', en: 'Advanced settings' },
   tourAnnotation: { ru: 'Пояснение к слайду', en: 'Slide explanation' },
   tourSlidePlacement: { ru: 'Расположение на слайде', en: 'Placement on slide' },
   tourMask: { ru: 'Выделение', en: 'Highlight' },

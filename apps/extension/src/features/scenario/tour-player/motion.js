@@ -96,12 +96,14 @@ function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
     : final;
   const targets = scene.querySelectorAll('.tour-hotspot');
   const target = targets.length === 1 && !targets[0].hidden ? targets[0] : null;
-  const marker = target ? scene.ownerDocument.createElement('div') : null;
+  const marker = target ? target.cloneNode(true) : null;
   if (marker) {
     if (previous?.point)
       previous.pixels.querySelectorAll('.tour-hotspot').forEach((node) => node.remove());
-    marker.className = 'tour-hotspot tour-motion-hotspot';
-    marker.textContent = target.textContent;
+    marker.classList.add('tour-motion-hotspot');
+    marker.removeAttribute('href');
+    marker.tabIndex = -1;
+    marker.inert = true;
     marker.setAttribute('aria-hidden', 'true');
   }
   return {

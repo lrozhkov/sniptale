@@ -191,11 +191,6 @@ a:focus-visible {
   z-index: 2;
   cursor: pointer;
 }
-.tour-motion-hotspot {
-  border: 2px solid #fff;
-  background: var(--tour-accent);
-  box-shadow: 0 1px 5px #0006;
-}
 .tour-hotspot[data-pulse='true']::before {
   content: '';
   position: absolute;
@@ -587,6 +582,18 @@ a:focus-visible {
 }
 .tour-hint-header span {
   opacity: 0.65;
+}
+.tour-hint-action-title {
+  min-width: 0;
+  margin-right: auto;
+  overflow-wrap: anywhere;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.tour-hint-header [data-tour-hint-point-count] {
+  flex: none;
+  order: -1;
+  font-variant-numeric: tabular-nums;
 }
 .tour-hint .tour-button {
   background: transparent;

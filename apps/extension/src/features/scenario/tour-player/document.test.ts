@@ -301,7 +301,31 @@ it('uses a numberless hotspot and readable explanation controls without a compou
   expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('Back');
   expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('Next');
   expect(doc.querySelector('[data-tour-hint-count]')?.textContent).not.toContain('·');
-  expect(doc.querySelector<HTMLElement>('[data-tour-hint-point-count]')?.hidden).toBe(true);
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 1');
+  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
+  dom.close();
+});
+
+it('shows each action name in the callout header and omits an empty description', async () => {
+  const args = fixture();
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.hotspots.push({
+    ...slide.hotspots[0]!,
+    id: 'empty-description',
+    label: 'Finish setup',
+    text: '  ',
+  });
+  const dom = open(await buildTourPlayerHtml(args));
+  const doc = dom.window.document;
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 2');
+  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
+  expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(false);
+  expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('Explanation');
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('2 / 2');
+  expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Finish setup');
+  expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(true);
   dom.close();
 });
 

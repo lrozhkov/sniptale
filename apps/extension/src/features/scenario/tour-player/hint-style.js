@@ -46,10 +46,9 @@ export function updateTourHintNavigation(hint, { index, count, page, pages, poin
   pageCount.textContent = `${page + 1} / ${pages}`;
   pageCount.hidden = pages < 2;
   const position = `${index + 1} / ${count}`;
-  pointCount.textContent =
-    hint.dataset.presentation === 'callout' ? `${pointLabel} ${position}` : position;
+  pointCount.textContent = position;
   pointCount.setAttribute('aria-label', `${pointLabel} ${position}`);
-  pointCount.hidden = count < 2;
+  pointCount.hidden = count < 2 && hint.dataset.presentation !== 'callout';
   hint.querySelector('[data-tour-hint-previous]').disabled = index === 0 && page === 0;
   hint.querySelector('[data-tour-hint-next]').disabled = index === count - 1 && page === pages - 1;
 }

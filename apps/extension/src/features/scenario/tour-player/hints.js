@@ -48,15 +48,11 @@ export function createTourHints(
   const viewport = query('viewport');
   const hint = query('hint');
   const hintText = query('hint-text');
+  const actionTitle = query('hint-action-title');
   const hintPrevious = query('hint-previous');
   const hintNext = query('hint-next');
   const hintClose = query('hint-close');
-  const voice = root.ownerDocument.createElement('button');
-  voice.className = 'tour-button';
-  voice.textContent = labels.play;
-  voice.type = 'button';
-  hintClose.before(voice);
-  signal.addEventListener('abort', () => voice.remove(), { once: true });
+  const voice = createTourVoiceButton(hintClose, labels, signal);
   let activeHint = 0;
   let activeHintId = null;
   let textPage = 0;
@@ -88,10 +84,11 @@ export function createTourHints(
     );
     hint.dataset.presentation = appearance.presentation;
     caption.prepare(current, appearance.presentation);
+    const copy = setTourHintCopy(actionTitle, current, labels);
     const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
     hint.style.textAlign = appearance.alignment;
     sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
-    pages = measureHintPages(hintText, current.text || current.label || '');
+    pages = measureHintPages(hintText, copy.text);
     textPage = Math.min(textPage, pages.length - 1);
     hintText.textContent = pages[textPage];
     updateTourHintNavigation(hint, {
@@ -102,6 +99,7 @@ export function createTourHints(
       pointLabel: labels.point,
     });
     caption.finish();
+    hintText.hidden = hintText.hidden || copy.hideBody;
     const position = positionHint({ hint, viewport, geometry, current, appearance });
     hint.style.left = `${position.left}px`;
     hint.style.top = `${position.top}px`;
@@ -175,6 +173,26 @@ export function createTourHints(
       geometry = dimensions;
       paginate();
     },
+  };
+}
+
+function createTourVoiceButton(close, labels, signal) {
+  const voice = close.ownerDocument.createElement('button');
+  voice.className = 'tour-button';
+  voice.textContent = labels.play;
+  voice.type = 'button';
+  close.before(voice);
+  signal.addEventListener('abort', () => voice.remove(), { once: true });
+  return voice;
+}
+
+function setTourHintCopy(actionTitle, current, labels) {
+  const hotspot = Boolean(current.point);
+  actionTitle.hidden = !hotspot;
+  actionTitle.textContent = hotspot ? current.label || labels.point : '';
+  return {
+    text: hotspot ? current.text || '' : current.text || current.label || '',
+    hideBody: hotspot && !current.text?.trim(),
   };
 }
 

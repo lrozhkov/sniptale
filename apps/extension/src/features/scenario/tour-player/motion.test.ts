@@ -80,6 +80,23 @@ it('holds the old point through image switch, then travels while real targets st
   f.motion.cancel();
   expect(f.scene.inert).toBe(false);
 });
+it('retains the authored point appearance while it travels between slides', () => {
+  const f = fixture();
+  const target = f.scene.querySelector<HTMLElement>('.tour-hotspot')!;
+  target.style.borderRadius = '4px';
+  target.style.background = 'rgb(20, 40, 60)';
+  target.dataset['pulse'] = 'true';
+  f.prepare();
+  f.motion.ready();
+  f.motion.frame(350);
+  const marker = f.root.querySelector<HTMLElement>('.tour-motion-hotspot')!;
+  expect(marker.style.borderRadius).toBe('4px');
+  expect(marker.style.background).toBe('rgb(20, 40, 60)');
+  expect(marker.dataset['pulse']).toBe('true');
+  expect(marker.style.left).toBe('264px');
+  expect(marker.getAttribute('aria-hidden')).toBe('true');
+  expect(marker.tabIndex).toBe(-1);
+});
 it('projects camera motion on the image and masks plane and settles exactly', () => {
   const f = fixture();
   f.tour.playback.autoZoom = true;

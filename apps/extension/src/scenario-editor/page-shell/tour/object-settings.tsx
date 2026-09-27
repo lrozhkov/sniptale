@@ -72,11 +72,14 @@ export function TourHotspotSettings({
           icon={Crosshair}
           title={t('scenario.editor.tourPosition')}
         >
-          <TourPointFields
-            point={value.point}
-            disabled={disabled}
-            onChange={(point) => onChange({ ...value, point })}
-          />
+          <details className="tour-coordinate-disclosure">
+            <summary>{t('scenario.editor.tourAdvancedSettings')}</summary>
+            <TourPointFields
+              point={value.point}
+              disabled={disabled}
+              onChange={(point) => onChange({ ...value, point })}
+            />
+          </details>
         </GuideInspectorGroup>
       ),
     },

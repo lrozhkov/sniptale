@@ -143,6 +143,11 @@ it('edits an image slide and hotspots through canonical commands without changin
   await fill('Action label', 'Open settings');
   await fill('Text', 'Click here');
   await click('Pulse hotspot');
+  const coordinates = host.querySelector<HTMLDetailsElement>('.tour-coordinate-disclosure')!;
+  expect(coordinates.open).toBe(false);
+  expect(coordinates.querySelector<HTMLInputElement>('[aria-label="X"]')).not.toBeNull();
+  await act(async () => coordinates.querySelector('summary')!.click());
+  expect(coordinates.open).toBe(true);
   await fill('X', '30');
   await fill('Y', '40');
   await click('Target area');
