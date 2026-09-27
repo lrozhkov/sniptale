@@ -34,6 +34,11 @@ export function handleSelectionModeClick(
 
   stopSelectionModeEvent(event);
 
+  if (state.frozenFrame?.areaOnly) {
+    if (state.currentState === 'confirmed') options.resetToIdleState();
+    return;
+  }
+
   if ((state.currentState === 'idle' || state.currentState === 'hover') && !state.hasMovedEnough) {
     options.selectElement(state.hoveredElement ?? target, iframe);
     return;

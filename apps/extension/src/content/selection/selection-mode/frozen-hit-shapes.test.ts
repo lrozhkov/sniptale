@@ -46,3 +46,24 @@ it.each(['rotate', 'reflection', 'ancestor-rotate', 'ancestor-reflection'])(
     parent.remove();
   }
 );
+
+it('keeps a square quarter-turn with equal corners on narrow boundary bands', () => {
+  const element = document.createElement('button');
+  element.style.transform = 'matrix(0, -1, 1, 0, 0, 0)';
+  for (const corner of [
+    'borderTopLeftRadius',
+    'borderTopRightRadius',
+    'borderBottomRightRadius',
+    'borderBottomLeftRadius',
+  ] as const) {
+    element.style[corner] = '2px';
+  }
+  Object.defineProperty(element, 'offsetWidth', { value: 22 });
+  Object.defineProperty(element, 'offsetHeight', { value: 22 });
+  document.body.append(element);
+  const rect = { x: 0, y: 0, width: 22, height: 22 };
+  const bands = getFrozenHitSamplingBoxes(element, rect, 1);
+  expect(bands).not.toEqual([rect]);
+  expect(bands.reduce((area, band) => area + band.width * band.height, 0)).toBeLessThan(30);
+  element.remove();
+});

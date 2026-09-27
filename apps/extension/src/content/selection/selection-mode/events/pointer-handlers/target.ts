@@ -48,6 +48,7 @@ export function resolveSelectionModePointerTarget(
       !target.classList.contains('sniptale-selection-frozen-frame')
     )
       return target;
+    if (frozenFrame.areaOnly) return document.body;
     return frozenFrame.geometry.targetAt(event.clientX, event.clientY);
   }
   const shieldedTarget = resolveShieldedPageElement(event);

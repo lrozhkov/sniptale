@@ -1,9 +1,17 @@
-import { getFrozenHitSamplingBoxes } from './frozen-hit-shapes';
+import { getFrozenHitShape, type FrozenHitShape } from './frozen-hit-shapes';
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { getAbsolutePosition, getIframeDocument } from '../../platform/frame';
 import type { FrozenSelectionFrame, FrozenSelectionGeometry, Selection } from './types';
 
 type HitRegion = Selection & { element: HTMLElement };
+type HitBox = { rect: Selection; id: number };
+type ShapedHitBox = { rect: Selection };
+type ShapeGroup = {
+  containsPoint: FrozenHitShape['containsPoint'];
+  rect: Selection;
+  id: number;
+};
+const MAX_SVG_SAMPLE_PIXELS = 20_000;
 
 function contains(rect: Selection, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
@@ -17,12 +25,13 @@ function isIframe(element: Element): element is HTMLIFrameElement {
   return isHtmlElement(element) && element.localName === 'iframe';
 }
 
-function collectElements(root: Document | ShadowRoot, depth = 0): HTMLElement[] {
-  const result: HTMLElement[] = [];
+function collectElements(root: Document | ShadowRoot, depth = 0): Element[] {
+  const result: Element[] = [];
   if (depth > 12) return result;
   for (const element of root.querySelectorAll('*')) {
     if (isContentOwnedElement(element)) continue;
-    if (isHtmlElement(element)) result.push(element);
+    if (isHtmlElement(element) || element.namespaceURI === 'http://www.w3.org/2000/svg')
+      result.push(element);
     if (element.shadowRoot) result.push(...collectElements(element.shadowRoot, depth + 1));
     const nestedDocument = isIframe(element) ? getIframeDocument(element) : null;
     if (nestedDocument) result.push(...collectElements(nestedDocument, depth + 1));
@@ -37,9 +46,11 @@ function targetAt(
   depth = 0
 ): HTMLElement | null {
   if (depth > 12) return null;
-  const element = root
-    .elementsFromPoint(x, y)
-    .find((candidate) => !isContentOwnedElement(candidate));
+  const top = root.elementFromPoint?.(x, y);
+  const element =
+    top && !isContentOwnedElement(top)
+      ? top
+      : root.elementsFromPoint(x, y).find((candidate) => !isContentOwnedElement(candidate));
   if (!element) return null;
   if (isIframe(element)) {
     const nestedDocument = getIframeDocument(element);
@@ -72,6 +83,7 @@ export function captureFrozenSelectionGeometry(): FrozenSelectionGeometry {
   const viewportScale = window.visualViewport?.scale ?? 1;
   const rects = new Map<HTMLElement, Selection>();
   const fragments: Selection[] = [];
+  const svgBounds: Selection[] = [];
   for (const element of collectElements(document)) {
     const rect = getAbsolutePosition(element);
     if (
@@ -82,6 +94,10 @@ export function captureFrozenSelectionGeometry(): FrozenSelectionGeometry {
       rect.x + rect.width > 0 &&
       rect.y + rect.height > 0
     ) {
+      if (!isHtmlElement(element)) {
+        svgBounds.push(rect);
+        continue;
+      }
       rects.set(element, rect);
       const clientRects = element.getClientRects();
       if (clientRects.length > 1) {
@@ -99,14 +115,37 @@ export function captureFrozenSelectionGeometry(): FrozenSelectionGeometry {
       }
     }
   }
-  const shapedBoxes = [...rects].flatMap(([element, rect]) =>
-    getFrozenHitSamplingBoxes(element, rect, scale)
-  );
-  const regions = captureHitRegions(rects, fragments, shapedBoxes, width, height, scale);
+  const shapeGroups: ShapeGroup[] = [];
+  const shapedBoxes = [...rects].flatMap(([element, rect], id): ShapedHitBox[] => {
+    const shape = getFrozenHitShape(element, rect, scale);
+    if (shape.boxes.length > 0) shapeGroups.push({ rect, id, containsPoint: shape.containsPoint });
+    return shape.boxes.map((box) => ({ rect: box }));
+  });
+  const areaOnly =
+    svgBounds.reduce(
+      (total, rect) =>
+        total +
+        Math.ceil(Math.min(width, rect.width) * scale) *
+          Math.ceil(Math.min(height, rect.height) * scale),
+      0
+    ) > MAX_SVG_SAMPLE_PIXELS;
+  const regions = areaOnly
+    ? []
+    : captureHitRegions(
+        rects,
+        fragments,
+        shapedBoxes,
+        shapeGroups,
+        svgBounds,
+        width,
+        height,
+        scale
+      );
   return {
     width,
     height,
     scale,
+    ...(areaOnly ? { areaOnly: true } : {}),
     getRect: (element) => ({ ...(rects.get(element) ?? { x: 0, y: 0, width: 0, height: 0 }) }),
     targetAt: (x, y) => regions.find((region) => contains(region, x, y))?.element ?? null,
     assertViewport: () => {
@@ -133,20 +172,28 @@ function pixelEdges(start: number, length: number, maximum: number, scale: numbe
 function captureHitRegions(
   rects: Map<HTMLElement, Selection>,
   fragments: Selection[],
-  shapedBoxes: Selection[],
+  shapedBoxes: ShapedHitBox[],
+  shapeGroups: ShapeGroup[],
+  svgBounds: Selection[],
   width: number,
   height: number,
   scale: number
 ): HitRegion[] {
-  const boxes = [...rects.values(), ...fragments];
+  const boxes = [...rects.values(), ...fragments].map((rect, id): HitBox => ({ rect, id }));
+  const hitCache = new Map<string, HTMLElement | null>();
   const edges = (values: number[], maximum: number) =>
     [
       ...new Set([0, maximum, ...values.map((value) => Math.max(0, Math.min(maximum, value)))]),
     ].sort((a, b) => a - b);
   const ys = edges(
     [
-      ...boxes.flatMap((rect) => [rect.y, rect.y + rect.height]),
-      ...shapedBoxes.flatMap((rect) => pixelEdges(rect.y, rect.height, height, scale)),
+      ...boxes.flatMap(({ rect }) => [rect.y, rect.y + rect.height]),
+      ...shapedBoxes.flatMap(({ rect }) => pixelEdges(rect.y, rect.height, height, scale)),
+      ...svgBounds.flatMap((rect) => [
+        rect.y,
+        ...pixelEdges(rect.y, rect.height, height, scale),
+        rect.y + rect.height,
+      ]),
     ],
     height
   );
@@ -156,12 +203,21 @@ function captureHitRegions(
     const top = ys[row - 1]!;
     const bottom = ys[row]!;
     const y = (top + bottom) / 2;
-    const rowBoxes = boxes.filter((rect) => y >= rect.y && y < rect.y + rect.height);
-    const rowShapes = shapedBoxes.filter((rect) => y >= rect.y && y < rect.y + rect.height);
+    const rowBoxes = boxes.filter(({ rect }) => y >= rect.y && y < rect.y + rect.height);
+    const rowShapes = shapedBoxes.filter(({ rect }) => y >= rect.y && y < rect.y + rect.height);
+    const rowShapeGroups = shapeGroups.filter(
+      ({ rect }) => y >= rect.y && y < rect.y + rect.height
+    );
+    const rowSvgBounds = svgBounds.filter((rect) => y >= rect.y && y < rect.y + rect.height);
     const xs = edges(
       [
-        ...rowBoxes.flatMap((rect) => [rect.x, rect.x + rect.width]),
-        ...rowShapes.flatMap((rect) => pixelEdges(rect.x, rect.width, width, scale)),
+        ...rowBoxes.flatMap(({ rect }) => [rect.x, rect.x + rect.width]),
+        ...rowShapes.flatMap(({ rect }) => pixelEdges(rect.x, rect.width, width, scale)),
+        ...rowSvgBounds.flatMap((rect) => [
+          rect.x,
+          ...pixelEdges(rect.x, rect.width, width, scale),
+          rect.x + rect.width,
+        ]),
       ],
       width
     );
@@ -170,7 +226,15 @@ function captureHitRegions(
       if (++probes > 16_777_216) throw new Error('Selection geometry exceeds viewport budget');
       const left = xs[column - 1]!;
       const right = xs[column]!;
-      const element = targetAt(document, (left + right) / 2, y);
+      const x = (left + right) / 2;
+      const hitKey = buildHitCacheKey(x, y, rowBoxes, rowShapeGroups, rowSvgBounds);
+      let element: HTMLElement | null;
+      if (hitKey !== null && hitCache.has(hitKey)) {
+        element = hitCache.get(hitKey) ?? null;
+      } else {
+        element = targetAt(document, x, y);
+        if (hitKey !== null) hitCache.set(hitKey, element);
+      }
       if (!element || !rects.has(element)) continue;
       const previous = regions.at(-1);
       if (
@@ -185,6 +249,29 @@ function captureHitRegions(
     }
   }
   return regions;
+}
+
+/** Reuse browser hit order only when the same boxes and shape-side regions cover a cell. */
+function buildHitCacheKey(
+  x: number,
+  y: number,
+  rowBoxes: HitBox[],
+  shapeGroups: ShapeGroup[],
+  svgBounds: Selection[]
+): string | null {
+  if (svgBounds.some((rect) => contains(rect, x, y))) return null;
+  const boxIds = rowBoxes
+    .filter(({ rect }) => x >= rect.x && x < rect.x + rect.width)
+    .map(({ id }) => id);
+  const shapeSides: string[] = [];
+  for (const shape of shapeGroups) {
+    if (!contains(shape.rect, x, y)) continue;
+    if (!shape.containsPoint) return null;
+    const side = shape.containsPoint(x, y);
+    if (side === null) return null;
+    shapeSides.push(`${shape.id}:${side ? 1 : 0}`);
+  }
+  return `${boxIds.join(',')}|${shapeSides.join(',')}`;
 }
 
 /** Mounts the retained raster below selection chrome; the parent owns its removal. */

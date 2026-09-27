@@ -184,6 +184,11 @@ export function handleSelectionModeMouseMove(
     return;
   }
 
+  if (state.frozenFrame?.areaOnly) {
+    options.hideHoverFrame();
+    return;
+  }
+
   const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
     options.hideHoverFrame();

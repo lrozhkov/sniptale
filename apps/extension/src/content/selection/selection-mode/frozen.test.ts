@@ -221,3 +221,83 @@ it('resolves nested SVG icon hits to the retained HTML button for selection and 
   const event = new MouseEvent('mousedown', { clientX: 40, clientY: 45 });
   expect(resolveSelectionModePointerTarget(event, undefined, { dataUrl: '', geometry })).toBe(item);
 });
+
+it('does not reuse a painted SVG hit for a transparent row with the same HTML boxes', () => {
+  const background = box(document.body, 0, 0, window.innerWidth, window.innerHeight);
+  const wrapper = box(document.createElement('div'), 200, 100, 100, 100);
+  wrapper.style.pointerEvents = 'none';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 100, 100));
+  vi.spyOn(path, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 100, 45));
+  svg.append(path);
+  wrapper.append(svg);
+  document.body.append(wrapper);
+  Object.defineProperty(document, 'elementsFromPoint', {
+    configurable: true,
+    value: vi.fn((x: number, y: number) =>
+      x >= 200 && x < 300 && y >= 100 && y < 145 ? [path, svg, wrapper, background] : [background]
+    ),
+  });
+  const geometry = captureFrozenSelectionGeometry();
+  wrapper.remove();
+  expect(geometry.targetAt(250, 120)).toBe(wrapper);
+  expect(geometry.targetAt(250, 170)).toBe(background);
+});
+
+it('retains transparent points inside an SVG painted shape bounds', () => {
+  const background = box(document.body, 0, 0, window.innerWidth, window.innerHeight);
+  const wrapper = box(document.createElement('div'), 200, 100, 100, 100);
+  wrapper.style.pointerEvents = 'none';
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 100, 100));
+  vi.spyOn(circle, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 100, 100));
+  svg.append(circle);
+  wrapper.append(svg);
+  document.body.append(wrapper);
+  Object.defineProperty(document, 'elementsFromPoint', {
+    configurable: true,
+    value: vi.fn((x: number, y: number) =>
+      (x - 250) ** 2 + (y - 150) ** 2 < 50 ** 2 ? [circle, svg, wrapper, background] : [background]
+    ),
+  });
+  const geometry = captureFrozenSelectionGeometry();
+  wrapper.remove();
+  expect(geometry.targetAt(250, 150)).toBe(wrapper);
+  expect(geometry.targetAt(205, 105)).toBe(background);
+});
+
+it('bounds dense SVG hit testing and marks its geometry for manual area selection', () => {
+  box(document.body, 0, 0, window.innerWidth, window.innerHeight);
+  const wrapper = box(document.createElement('div'), 200, 100, 200, 200);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 200, 200));
+  wrapper.append(svg);
+  document.body.append(wrapper);
+  const hitTest = vi.fn(() => [wrapper, document.body]);
+  Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest });
+  const geometry = captureFrozenSelectionGeometry();
+  expect(geometry.areaOnly).toBe(true);
+  expect(geometry.targetAt(250, 150)).toBeNull();
+  expect(hitTest).not.toHaveBeenCalled();
+});
+
+it('bounds browser hit probes outside a large rounded boundary', () => {
+  const background = box(document.body, 0, 0, window.innerWidth, window.innerHeight);
+  const circle = box(document.createElement('button'), 100, 100, 500, 500);
+  circle.style.borderTopLeftRadius = '50%';
+  circle.style.borderTopRightRadius = '50%';
+  circle.style.borderBottomRightRadius = '50%';
+  circle.style.borderBottomLeftRadius = '50%';
+  document.body.append(circle);
+  const hitTest = vi.fn((x: number, y: number) => {
+    const inside = (x - 350) ** 2 + (y - 350) ** 2 < 250 ** 2;
+    return inside ? [circle, background] : [background];
+  });
+  Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest });
+  const geometry = captureFrozenSelectionGeometry();
+  expect(geometry.targetAt(350, 350)).toBe(circle);
+  expect(geometry.targetAt(101, 101)).toBe(background);
+  expect(hitTest.mock.calls.length).toBeLessThan(2_500);
+});

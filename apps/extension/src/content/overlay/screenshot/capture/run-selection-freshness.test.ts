@@ -42,6 +42,7 @@ vi.mock('../persistence', () => ({
 }));
 
 const frozenMocks = vi.hoisted(() => ({
+  acquireFrame: vi.fn(),
   captureGeometry: vi.fn(),
   prepareFrame: vi.fn(),
   assertViewport: vi.fn(),
@@ -53,13 +54,12 @@ vi.mock('../../../selection/selection-mode/frozen', async (importOriginal) => ({
 }));
 
 vi.mock('../../../selection/selection-mode/frozen-acquisition', () => ({
-  acquireFrozenSelectionFrame: async (capture: () => Promise<string>) => ({
-    dataUrl: await capture(),
-    geometry: frozenMocks.captureGeometry(),
-  }),
+  SelectionFrameChangedError: class SelectionFrameChangedError extends Error {},
+  acquireFrozenSelectionFrame: frozenMocks.acquireFrame,
 }));
 
 import { runSelectionScreenshot } from './run';
+import { SelectionFrameChangedError } from '../../../selection/selection-mode/frozen-acquisition';
 import type { ScreenshotControllerRuntime } from '../types';
 
 function createRuntime(): ScreenshotControllerRuntime {
@@ -103,6 +103,10 @@ function hasSelectionFrameDispatch(): boolean {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  frozenMocks.acquireFrame.mockImplementation(async (capture: () => Promise<string>) => ({
+    dataUrl: await capture(),
+    geometry: frozenMocks.captureGeometry(),
+  }));
   frozenMocks.captureGeometry.mockReturnValue({
     width: 1024,
     height: 768,
@@ -276,6 +280,52 @@ it('captures once before timed selection and crops that same frame after the pag
       ([message]) => message.type === CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP
     )
   ).toHaveLength(1);
+});
+
+it('uses the captured raster for area-only selection when the page changes', async () => {
+  frozenMocks.acquireFrame.mockImplementationOnce(
+    async (capture: () => Promise<string>, options?: { onChanged?: string }) => {
+      const dataUrl = await capture();
+      if (options?.onChanged !== 'area-only') throw new SelectionFrameChangedError();
+      return { areaOnly: true, dataUrl, geometry: frozenMocks.captureGeometry() };
+    }
+  );
+  const selected = createDeferred<{ x: number; y: number; width: number; height: number }>();
+  enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(() => selected.promise);
+  const pending = runSelectionScreenshot(createRuntime(), { freezeSelection: true, runToken: 1 });
+  await settleCaptureTimers();
+  expect(enableSelectionModeDeferredIfCurrentMock).toHaveBeenCalledWith(
+    expect.any(Function),
+    expect.objectContaining({
+      frozenFrame: expect.objectContaining({
+        areaOnly: true,
+        dataUrl: 'data:image/png;base64,frame',
+      }),
+    })
+  );
+  const area = { x: 10, y: 20, width: 30, height: 40 };
+  selected.resolve(area);
+  await settleCaptureTimers();
+  await pending;
+  expect(cropImageMock).toHaveBeenCalledWith('data:image/png;base64,frame', area);
+  expect(
+    sendRuntimeMessageMock.mock.calls.filter(
+      ([message]) => message.type === CaptureMessageType.CAPTURE_VISIBLE_FOR_CROP
+    )
+  ).toHaveLength(1);
+});
+
+it('restores the visible UI after an unrecoverable acquisition failure', async () => {
+  frozenMocks.acquireFrame.mockRejectedValue(new Error('acquisition failed'));
+  const runtime = createRuntime();
+  const pending = runSelectionScreenshot(runtime, { freezeSelection: true, runToken: 1 });
+  const rejected = expect(pending).rejects.toThrow('acquisition failed');
+  await settleCaptureTimers();
+  await rejected;
+  expect(frozenMocks.acquireFrame).toHaveBeenCalledOnce();
+  expect(enableSelectionModeDeferredIfCurrentMock).not.toHaveBeenCalled();
+  expect(persistSelectionCaptureMock).not.toHaveBeenCalled();
+  expect(setUIHiddenMock).toHaveBeenLastCalledWith(false);
 });
 
 it('keeps untimed selection dynamic and captures only after confirmation', async () => {

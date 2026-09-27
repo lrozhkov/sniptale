@@ -264,6 +264,68 @@ it('draws an area from the nested Wikipedia TOC link and consumes the post-drag 
   expect(state.skipNextClick).toBe(false);
 });
 
+it('draws on an area-only frozen frame without showing or selecting an element', () => {
+  const state: SelectionModeInteractionState = {
+    ...createInteractionState(),
+    currentState: 'idle',
+    frozenFrame: {
+      areaOnly: true,
+      dataUrl: 'data:image/png;base64,frame',
+      geometry: {
+        width: 800,
+        height: 600,
+        scale: 1,
+        getRect: vi.fn(),
+        targetAt: vi.fn(() => null),
+        assertViewport: vi.fn(),
+      },
+    },
+  };
+  const options = { ...createSelectionModeOptions(), isExtensionUIElement: () => false };
+  vi.mocked(options.startDragSelection).mockImplementation(() => {
+    state.currentState = 'drag';
+  });
+  vi.mocked(options.finalizeDragSelection).mockImplementation(() => {
+    state.currentState = 'confirmed';
+  });
+  const target = document.createElement('button');
+  const down = createSelectionModeMouseEvent({
+    clientX: 20,
+    clientY: 30,
+    target,
+    type: 'mousedown',
+  });
+  const move = createSelectionModeMouseEvent({
+    clientX: 100,
+    clientY: 90,
+    target,
+    type: 'mousemove',
+  });
+  const up = createSelectionModeMouseEvent({
+    clientX: 100,
+    clientY: 90,
+    target,
+    type: 'mouseup',
+  });
+  const click = createSelectionModeMouseEvent({
+    clientX: 100,
+    clientY: 90,
+    target,
+    type: 'click',
+  });
+
+  handleSelectionModeMouseDown(down, state, options);
+  handleSelectionModeMouseMove(move, state, options);
+  handleSelectionModeMouseUp(up, state, options);
+  handleSelectionModeClick(click, state, options);
+
+  expect(options.startDragSelection).toHaveBeenCalledWith(20, 30);
+  expect(options.finalizeDragSelection).toHaveBeenCalledOnce();
+  expect(options.showHoverFrame).not.toHaveBeenCalled();
+  expect(options.selectElement).not.toHaveBeenCalled();
+  expect(click.preventDefault).toHaveBeenCalledOnce();
+});
+
 it('treats native dragstart from a nested Wikipedia link as area selection', () => {
   const state: SelectionModeInteractionState = {
     ...createInteractionState(),

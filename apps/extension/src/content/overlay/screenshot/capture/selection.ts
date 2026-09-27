@@ -100,9 +100,11 @@ async function captureFrozenFrame(
   setUIHidden(true);
   await waitForUiHideSettle();
   assertCurrentScreenshotRun(runtime, runToken);
-  const { dataUrl, geometry } = await acquireFrozenSelectionFrame(() =>
-    captureSelectionFrameWithRetry(runtime, runToken, contentIntentSource)
+  const acquired = await acquireFrozenSelectionFrame(
+    () => captureSelectionFrameWithRetry(runtime, runToken, contentIntentSource),
+    { onChanged: 'area-only' }
   );
+  const { dataUrl, geometry } = acquired;
   assertCurrentScreenshotRun(runtime, runToken);
   await withCaptureStepTimeout({
     promise: prepareFrozenSelectionFrame({ dataUrl, geometry }),
@@ -112,7 +114,7 @@ async function captureFrozenFrame(
   assertCurrentScreenshotRun(runtime, runToken);
   geometry.assertViewport();
   setUIHidden(false);
-  return { dataUrl, geometry };
+  return acquired;
 }
 
 async function captureRegularSelectionDataUrl(

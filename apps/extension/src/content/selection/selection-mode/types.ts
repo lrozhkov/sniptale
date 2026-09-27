@@ -26,6 +26,8 @@ export interface FrozenSelectionGeometry {
   width: number;
   height: number;
   scale: number;
+  /** Dense painted regions exceeded the safe browser hit-test budget. */
+  areaOnly?: boolean;
   getRect: (element: HTMLElement) => Selection;
   targetAt: (x: number, y: number) => HTMLElement | null;
   assertViewport: () => void;
@@ -35,4 +37,6 @@ export interface FrozenSelectionGeometry {
 export interface FrozenSelectionFrame {
   dataUrl: string;
   geometry: FrozenSelectionGeometry;
+  /** Geometry could not be paired with the raster; only rectangle drawing is safe. */
+  areaOnly?: boolean;
 }
