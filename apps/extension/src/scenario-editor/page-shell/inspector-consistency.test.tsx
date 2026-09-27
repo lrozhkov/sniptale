@@ -102,6 +102,47 @@ it('keeps document entry separate and only shows presentation controls for the s
   await click('Select step');
   expect(panel.querySelector('[aria-label="Show settings sections"]')).not.toBeNull();
 });
+it('keeps structure and resources selection explicit in the shared left panel', async () => {
+  await act(async () => root.render(<Workspace />));
+  const tabs = host.querySelectorAll<HTMLButtonElement>(
+    '.guide-left-navigation .guide-section-tab'
+  );
+  expect([...tabs].map((tab) => [tab.title, tab.getAttribute('aria-pressed')])).toEqual([
+    ['Outline', 'true'],
+    ['Resources', 'false'],
+  ]);
+  await act(async () => tabs[1]?.click());
+  expect([...tabs].map((tab) => tab.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+});
+
+it('preserves placement, text size and alignment order and active state', async () => {
+  const block = { id: 'text', kind: 'text' as const, paragraphs: [] };
+  await act(async () =>
+    root.render(
+      <GuideBlockInspector
+        item={step}
+        block={block}
+        disabled={false}
+        onChange={() => {}}
+        onClose={() => {}}
+        t={t}
+      />
+    )
+  );
+  const placement = host.querySelector<HTMLElement>('[aria-label="Block width"]')!;
+  expect([...placement.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+    '1:1',
+    '1:2',
+    '1:3',
+    '1:4',
+  ]);
+  expect(placement.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+  for (const label of ['Text size', 'Text alignment']) {
+    const group = host.querySelector<HTMLElement>(`[role="group"][aria-label="${label}"]`)!;
+    expect(group.querySelectorAll('button')).toHaveLength(3);
+    expect(group.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+  }
+});
 it('labels text reset separately and restores inherited formatting without altering content', async () => {
   const block = {
     id: 'text',

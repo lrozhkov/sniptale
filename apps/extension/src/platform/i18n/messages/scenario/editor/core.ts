@@ -265,6 +265,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideImageHeight: { ru: 'Высота рамки', en: 'Frame height' },
   guideImageCaption: { ru: 'Подпись', en: 'Caption' },
   guideImageAlt: { ru: 'Описание для чтения с экрана', en: 'Alternative text' },
+  guideImageAltHint: {
+    ru: 'Описывает изображение для программ чтения с экрана и сохраняется при экспорте.',
+    en: 'Describes the image to screen readers and is included in exports.',
+  },
   guideImageResetZoom: { ru: 'Масштаб 100%', en: 'Zoom 100%' },
   guideImageCenter: { ru: 'По центру', en: 'Center image' },
 

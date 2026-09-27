@@ -53,28 +53,28 @@ export function GuideBlockInspector({
       width: 'full',
       percent: 100,
       label: t('scenario.editor.guideFullWidth'),
-      icon: <span aria-label={t('scenario.editor.guideFullWidth')}>1/1</span>,
+      icon: <span aria-label={t('scenario.editor.guideFullWidth')}>1:1</span>,
     },
     {
       value: 'half',
       width: 'half',
       percent: 50,
       label: t('scenario.editor.guideHalfWidth'),
-      icon: <span aria-label={t('scenario.editor.guideHalfWidth')}>1/2</span>,
+      icon: <span aria-label={t('scenario.editor.guideHalfWidth')}>1:2</span>,
     },
     {
       value: 'third',
       width: 33,
       percent: 33,
       label: t('scenario.editor.guideThirdWidth'),
-      icon: <span aria-label={t('scenario.editor.guideThirdWidth')}>1/3</span>,
+      icon: <span aria-label={t('scenario.editor.guideThirdWidth')}>1:3</span>,
     },
     {
       value: 'quarter',
       width: 25,
       percent: 25,
       label: t('scenario.editor.guideQuarterWidth'),
-      icon: <span aria-label={t('scenario.editor.guideQuarterWidth')}>1/4</span>,
+      icon: <span aria-label={t('scenario.editor.guideQuarterWidth')}>1:4</span>,
     },
   ];
   const selected = presets.find((preset) => preset.percent === width)?.value ?? 'custom';

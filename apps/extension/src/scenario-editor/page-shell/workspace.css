@@ -1948,9 +1948,9 @@ html[data-guide-height-resizing] * {
 
 /* Enabled commands are readable before hover; disabled commands remain visibly muted. */
 .guide-page
-  .sniptale-glass-toolbar-button:not(.sniptale-btn-utility):not(:disabled):not(
-    [data-active='true']
-  ):not(.sniptale-btn-danger) {
+  .sniptale-glass-toolbar-button:not(.guide-section-tab):not(.sniptale-btn-utility):not(
+    :disabled
+  ):not([data-active='true']):not(.sniptale-btn-danger) {
   color: var(--sniptale-color-text-primary);
 }
 .guide-page .sniptale-btn-danger:not(:disabled) {
@@ -1992,6 +1992,12 @@ html[data-guide-height-resizing] * {
   flex: 1;
   width: auto;
   min-width: 0;
+  color: var(--sniptale-color-text-secondary);
+  font-weight: 400;
+}
+.guide-page .guide-left-navigation .guide-section-tab[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  font-weight: 600;
 }
 .guide-page .guide-left-navigation .guide-section-tab svg {
   color: inherit;

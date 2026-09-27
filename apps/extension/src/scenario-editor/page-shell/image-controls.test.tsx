@@ -69,9 +69,8 @@ it('changes fit and resets the frame from the decoded image dimensions', async (
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   await click('Reset frame and position');
   expect(change.mock.calls[1]?.[0].frame).toEqual({ width: 1200, height: 900 });
-  await click('Zoom 100%');
   await click('Center image');
-  expect(change).toHaveBeenCalledTimes(4);
+  expect(change).toHaveBeenCalledTimes(3);
 });
 
 it('edits bounded zoom/frame fields and keeps caption and alternative text as plain text', async () => {
@@ -101,7 +100,27 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
   expect(change.mock.calls.at(-1)?.[0].caption).toBe('<script>text</script>');
   await update('Alternative text', 'Description');
   expect(change.mock.calls.at(-1)?.[0].alt).toBe('Description');
+  expect(host.textContent).toContain('Describes the image to screen readers');
   expect(host.querySelector('script')).toBeNull();
+});
+
+it('synchronizes visible sliders with zoom and frame values', async () => {
+  await render();
+  const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
+  expect(ranges.map((range) => range.getAttribute('aria-label'))).toEqual([
+    'Zoom, %',
+    'Frame width',
+    'Frame height',
+  ]);
+  expect(ranges.map((range) => range.value)).toEqual(['100', '800', '600']);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      ranges[0],
+      '200'
+    );
+    ranges[0]?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
 });
 
 it('discards stale decode callbacks and disables reset until current media is ready', async () => {
@@ -126,7 +145,6 @@ it('keeps geometry disabled after a decode failure or while edits are locked', a
   await click('Reset frame and position');
   expect(change).not.toHaveBeenCalled();
   await render('blob:image', true);
-  await click('Zoom 100%');
   await click('Center image');
   expect(change).not.toHaveBeenCalled();
 });

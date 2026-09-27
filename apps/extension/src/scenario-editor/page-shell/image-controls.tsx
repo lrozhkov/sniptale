@@ -1,7 +1,7 @@
 import { ScenarioInspectorBackButton } from './inspector-actions';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
-import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
@@ -76,10 +76,11 @@ export function GuideImageControls({
               onChange={(fit) => geometry({ kind: 'fit', fit })}
             />
           </fieldset>
-          <GuideInspectorNumber
+          <GuideImageRangeField
             label={t('scenario.editor.guideImageZoom')}
             min={10}
             max={10000}
+            sliderMax={400}
             step={10}
             disabled={geometryDisabled}
             value={Math.round(block.contentTransform.scale * 100)}
@@ -88,7 +89,7 @@ export function GuideImageControls({
             }
           />
           {(['width', 'height'] as const).map((dimension) => (
-            <GuideInspectorNumber
+            <GuideImageRangeField
               key={dimension}
               label={t(
                 dimension === 'width'
@@ -97,6 +98,7 @@ export function GuideImageControls({
               )}
               min={1}
               max={GUIDE_LIMITS.maxDimension}
+              sliderMax={2000}
               disabled={geometryDisabled}
               value={Math.round(block.frame[dimension])}
               onChange={(value) =>
@@ -107,55 +109,26 @@ export function GuideImageControls({
               }
             />
           ))}
+          <div className="guide-image-reset-actions">
+            <ContentToolbarButton
+              title={t('scenario.editor.guideImageCenter')}
+              disabled={geometryDisabled}
+              onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
+            >
+              <Focus size={16} aria-hidden="true" />
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              title={t('scenario.editor.guideImageReset')}
+              disabled={geometryDisabled || !dimensions}
+              onClick={() => {
+                if (dimensions) geometry({ kind: 'reset', ...dimensions });
+              }}
+            >
+              <RotateCcw size={16} aria-hidden="true" />
+            </ContentToolbarButton>
+          </div>
         </GuideInspectorGroup>
-        <GuideInspectorGroup
-          id="description"
-          icon={Text}
-          title={t('scenario.editor.guideDescriptionGroup')}
-        >
-          {(['caption', 'alt'] as const).map((field) => (
-            <label key={field} className="guide-image-description">
-              {t(
-                field === 'caption'
-                  ? 'scenario.editor.guideImageCaption'
-                  : 'scenario.editor.guideImageAlt'
-              )}
-              <ProductInput
-                value={block[field]}
-                maxLength={GUIDE_LIMITS.maxTextLength}
-                disabled={disabled}
-                onChange={(event) =>
-                  onChange({ ...block, [field]: event.target.value }, `image-${field}:${block.id}`)
-                }
-              />
-            </label>
-          ))}
-        </GuideInspectorGroup>
-        <div className="guide-image-reset-actions">
-          <ContentToolbarButton
-            title={t('scenario.editor.guideImageResetZoom')}
-            disabled={geometryDisabled}
-            onClick={() => geometry({ kind: 'zoom', scale: 1 })}
-          >
-            <Maximize2 size={16} aria-hidden="true" />
-          </ContentToolbarButton>
-          <ContentToolbarButton
-            title={t('scenario.editor.guideImageCenter')}
-            disabled={geometryDisabled}
-            onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
-          >
-            <Focus size={16} aria-hidden="true" />
-          </ContentToolbarButton>
-          <ContentToolbarButton
-            title={t('scenario.editor.guideImageReset')}
-            disabled={geometryDisabled || !dimensions}
-            onClick={() => {
-              if (dimensions) geometry({ kind: 'reset', ...dimensions });
-            }}
-          >
-            <RotateCcw size={16} aria-hidden="true" />
-          </ContentToolbarButton>
-        </div>
+        <GuideImageDescriptionFields block={block} disabled={disabled} onChange={onChange} t={t} />
         <ImageActionContext source={block.source} t={t} />
         <ImageHtmlSettings
           block={block}
@@ -165,6 +138,87 @@ export function GuideImageControls({
           t={t}
         />
       </fieldset>
+    </div>
+  );
+}
+
+function GuideImageDescriptionFields({
+  block,
+  disabled,
+  onChange,
+  t,
+}: Pick<Parameters<typeof GuideImageControls>[0], 'block' | 'disabled' | 'onChange' | 't'>) {
+  return (
+    <GuideInspectorGroup
+      id="description"
+      icon={Text}
+      title={t('scenario.editor.guideDescriptionGroup')}
+    >
+      {(['caption', 'alt'] as const).map((field) => {
+        const label = t(
+          field === 'caption'
+            ? 'scenario.editor.guideImageCaption'
+            : 'scenario.editor.guideImageAlt'
+        );
+        return (
+          <label key={field} className="guide-image-description">
+            {label}
+            <ProductInput
+              aria-label={label}
+              value={block[field]}
+              maxLength={GUIDE_LIMITS.maxTextLength}
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({ ...block, [field]: event.target.value }, `image-${field}:${block.id}`)
+              }
+            />
+            {field === 'alt' && <small>{t('scenario.editor.guideImageAltHint')}</small>}
+          </label>
+        );
+      })}
+    </GuideInspectorGroup>
+  );
+}
+
+function GuideImageRangeField({
+  label,
+  min,
+  max,
+  sliderMax,
+  step = 1,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  min: number;
+  max: number;
+  sliderMax: number;
+  step?: number;
+  value: number;
+  disabled: boolean;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="guide-image-range-field">
+      <GuideInspectorNumber
+        label={label}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        value={value}
+        onChange={onChange}
+      />
+      <ProductRange
+        aria-label={label}
+        min={min}
+        max={Math.min(max, Math.max(sliderMax, value))}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+      />
     </div>
   );
 }

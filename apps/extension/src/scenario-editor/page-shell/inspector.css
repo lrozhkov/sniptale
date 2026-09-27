@@ -161,6 +161,28 @@
 .guide-inspector-panel .guide-image-controls .guide-inspector-number {
   grid-template-columns: none;
 }
+.guide-inspector-panel .guide-image-range-field {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.guide-inspector-panel .guide-image-range-field .guide-inspector-number {
+  grid-template-columns: minmax(0, 1fr) 6.25rem;
+}
+.guide-inspector-panel .guide-image-range-field .guide-inspector-number input {
+  width: 100%;
+}
+.guide-inspector-panel .guide-image-range-field .sniptale-range {
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.guide-inspector-panel .guide-image-description small {
+  color: var(--sniptale-color-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
 .guide-inspector-panel .guide-inspector-hint {
   margin: 0 0 8px;
   font-size: 11px;
@@ -190,6 +212,7 @@
 }
 .guide-inspector-panel .guide-image-reset-actions {
   padding-block: 8px;
+  justify-content: flex-start;
 }
 .guide-template-controls,
 .guide-template-controls form {
@@ -849,6 +872,9 @@
 .guide-inspector-panel .guide-block-inspector > .scenario-inspector-navigation {
   margin-bottom: 8px;
 }
+.guide-inspector-panel .guide-image-inspector > .scenario-inspector-navigation {
+  margin-bottom: 8px;
+}
 .guide-inspector-panel .guide-block-inspector button:has(> svg.lucide-rotate-ccw) {
   justify-content: flex-start;
   text-align: start;
@@ -875,6 +901,72 @@
   [data-ui='shared.ui.compact-inspector.segmented-row']
   button:hover:not(:disabled) {
   color: var(--sniptale-color-text-primary-strong);
+}
+
+/* Match the canvas crop mode switch for the block's placement and text choices. */
+.guide-page
+  .guide-inspector-panel
+  .guide-block-inspector
+  [data-ui='shared.ui.compact-inspector.segmented-row'] {
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--sniptale-radius-md);
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-page
+  .guide-inspector-panel
+  .guide-block-inspector
+  [data-ui='shared.ui.compact-inspector.segmented-row']
+  button {
+  min-height: 32px;
+  border-radius: var(--sniptale-radius-sm);
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-page
+  .guide-inspector-panel
+  .guide-block-inspector
+  [data-ui='shared.ui.compact-inspector.segmented-row']
+  button[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-panel);
+  box-shadow: var(--sniptale-shadow-sm);
+  font-weight: 600;
+}
+.guide-page
+  .guide-inspector-panel
+  .guide-block-inspector
+  [data-ui='shared.ui.compact-inspector.segmented-row']
+  button:focus-visible {
+  outline: 2px solid var(--sniptale-color-focus-ring);
+  outline-offset: 1px;
+}
+.guide-page .guide-inspector-panel .tour-layout-setting > [role='group'] {
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--sniptale-radius-md);
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-page .guide-inspector-panel .tour-layout-setting > [role='group'] button {
+  min-height: 32px;
+  border-color: transparent;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-page
+  .guide-inspector-panel
+  .tour-layout-setting
+  > [role='group']
+  button[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-panel);
+  box-shadow: var(--sniptale-shadow-sm);
+  font-weight: 600;
+}
+.guide-page .guide-inspector-panel .tour-layout-setting > [role='group'] button:focus-visible {
+  outline: 2px solid var(--sniptale-color-focus-ring);
+  outline-offset: 1px;
 }
 
 .guide-inspector-categorized > .guide-style-fields + .guide-inspector-hint {
