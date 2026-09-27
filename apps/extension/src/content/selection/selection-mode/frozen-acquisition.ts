@@ -87,6 +87,7 @@ function observePageDuringAcquisition() {
   const initiallyNotVisible = new Set<Element>();
   const roots = new Set<Document | ShadowRoot>();
   const windows = new Set<Window>();
+  const pausedAnimations = new Set<Animation>();
   let changed = false;
   let metadataChanged = false;
   const canReadGeneratedContent = globalThis.CSS?.supports?.('selector(::before)') === true;
@@ -100,9 +101,26 @@ function observePageDuringAcquisition() {
     noteMetadata(records);
     if (hasUncertainPageMutation(records)) markChanged();
   });
+  const pauseAnimations = (root: Document | ShadowRoot) => {
+    if (!('getAnimations' in root)) return;
+    for (const animation of root.getAnimations()) {
+      const effect = animation.effect;
+      const target = effect && 'target' in effect ? effect.target : null;
+      if (
+        animation.playState !== 'running' ||
+        (target instanceof Element && isContentOwnedElement(target)) ||
+        pausedAnimations.has(animation)
+      ) {
+        continue;
+      }
+      animation.pause();
+      pausedAnimations.add(animation);
+    }
+  };
   const collect = (root: Document | ShadowRoot, depth = 0) => {
     if (depth > 12 || roots.has(root)) return;
     roots.add(root);
+    pauseAnimations(root);
     observer.observe(root, {
       attributes: true,
       childList: true,
@@ -137,6 +155,10 @@ function observePageDuringAcquisition() {
     initiallyNotVisible.clear();
     roots.clear();
     windows.clear();
+    for (const animation of pausedAnimations) {
+      if (animation.playState === 'paused') animation.play();
+    }
+    pausedAnimations.clear();
   };
   try {
     collect(document);

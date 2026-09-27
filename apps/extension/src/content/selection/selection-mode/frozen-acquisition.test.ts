@@ -16,8 +16,79 @@ vi.mock('./frozen', () => ({
 
 afterEach(() => {
   document.body.replaceChildren();
+  Reflect.deleteProperty(document, 'getAnimations');
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+function animatedPopup() {
+  const popup = document.createElement('div');
+  popup.className = 'mwe-popups mwe-popups-type-page mwe-popups-fade-in-up';
+  document.body.append(popup);
+  let x = 10;
+  vi.spyOn(popup, 'getBoundingClientRect').mockImplementation(() => new DOMRect(x, 20, 100, 50));
+  const animation = {
+    effect: { target: popup },
+    playState: 'running',
+    pause: vi.fn(() => {
+      animation.playState = 'paused';
+    }),
+    play: vi.fn(() => {
+      animation.playState = 'running';
+    }),
+  };
+  Object.defineProperty(document, 'getAnimations', {
+    configurable: true,
+    value: () => [animation],
+  });
+  return { animation, move: () => (x = 30) };
+}
+
+it('keeps an animated hover popup fixed for the raster and geometry, then resumes it', async () => {
+  const { animation, move } = animatedPopup();
+  const capture = vi.fn(async () => {
+    if (animation.playState === 'running') move();
+    return 'data:image/png;base64,popup';
+  });
+  const frame = await acquireFrozenSelectionFrame(capture, { onChanged: 'area-only' });
+  expect(frame.areaOnly).toBeUndefined();
+  expect(animation.pause).toHaveBeenCalledOnce();
+  expect(animation.play).toHaveBeenCalledOnce();
+  expect(animation.playState).toBe('running');
+});
+
+it('resumes an animated hover popup after a capture failure', async () => {
+  const { animation } = animatedPopup();
+  await expect(
+    acquireFrozenSelectionFrame(async () => {
+      throw new Error('capture failed');
+    })
+  ).rejects.toThrow('capture failed');
+  expect(animation.pause).toHaveBeenCalledOnce();
+  expect(animation.play).toHaveBeenCalledOnce();
+});
+
+it('leaves an already paused page animation paused', async () => {
+  const { animation } = animatedPopup();
+  animation.playState = 'paused';
+  await acquireFrozenSelectionFrame(async () => 'data:image/png;base64,popup');
+  expect(animation.pause).not.toHaveBeenCalled();
+  expect(animation.play).not.toHaveBeenCalled();
+  expect(animation.playState).toBe('paused');
+});
+
+it('still falls back on a real page mutation while an animation is paused', async () => {
+  const { animation } = animatedPopup();
+  const frame = await acquireFrozenSelectionFrame(
+    async () => {
+      document.body.classList.add('changed');
+      return 'data:image/png;base64,popup';
+    },
+    { onChanged: 'area-only' }
+  );
+  expect(frame.areaOnly).toBe(true);
+  expect(animation.play).toHaveBeenCalledOnce();
+  document.body.classList.remove('changed');
 });
 
 function fixture() {
@@ -75,6 +146,25 @@ it('accepts accessibility metadata changes without a visible geometry change', a
   menu.setAttribute('aria-label', 'updated accessible label');
   resolve('data:image/png;base64,frame');
   await expect(frame).resolves.toMatchObject({ dataUrl: 'data:image/png;base64,frame' });
+});
+
+it('falls back when a script child could change visible CSS selector results', async () => {
+  const parent = document.createElement('div');
+  document.body.append(parent);
+  vi.spyOn(parent, 'getBoundingClientRect').mockReturnValue(new DOMRect(10, 20, 100, 50));
+  let finish: (dataUrl: string) => void = () => undefined;
+  const response = new Promise<string>((resolve) => {
+    finish = resolve;
+  });
+  const frame = acquireFrozenSelectionFrame(() => response, { onChanged: 'area-only' });
+  const script = document.createElement('script');
+  script.type = 'application/json';
+  parent.append(script);
+  finish('data:image/png;base64,frame');
+  await expect(frame).resolves.toMatchObject({
+    areaOnly: true,
+    dataUrl: 'data:image/png;base64,frame',
+  });
 });
 
 it('rejects a menu that becomes visible after geometry was captured', async () => {

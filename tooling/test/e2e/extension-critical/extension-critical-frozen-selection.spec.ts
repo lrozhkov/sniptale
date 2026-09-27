@@ -99,17 +99,40 @@ test('timed selection freezes a busy large page and leaves annotation frames res
       .getByText('3 seconds', { exact: true })
       .click();
   };
-  const capture = async () => {
+  const capture = async (withAnimatedPopup = false) => {
     await chooseTimer();
     await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+    if (withAnimatedPopup) {
+      await page.waitForTimeout(1_500);
+      await page.evaluate(() => {
+        const style = document.createElement('style');
+        style.textContent =
+          '@keyframes popup-fade-in { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }' +
+          '.mwe-popups-fade-in-up { animation: popup-fade-in 8s linear both }';
+        document.head.append(style);
+        const popup = document.createElement('div');
+        popup.className =
+          'mwe-popups mwe-popups-type-page mwe-popups-fade-in-up mwe-popups-no-image-pointer mwe-popups-is-tall';
+        popup.style.cssText =
+          'position:fixed;left:614px;top:535px;width:300px;height:140px;background:white;z-index:10000';
+        const link = document.createElement('a');
+        link.href = '/wiki/Satire_(film_and_television)';
+        link.textContent = 'Satire is a television and film genre';
+        popup.append(link);
+        document.body.append(popup);
+      });
+    }
     await expect(page.locator('.sniptale-selection-frozen-frame')).toBeAttached({
       timeout: 15_000,
     });
   };
 
-  await capture();
+  await capture(true);
   await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', /crosshair/u);
   await expect(page.locator('.sniptale-selection-cancel-button')).toHaveCSS('cursor', 'pointer');
+  await expect(page.locator('.sniptale-selection-area-only-hint')).toHaveCount(0);
+  await page.mouse.move(650, 550);
+  await expect(page.locator('.sniptale-selection-hover-size')).toBeVisible();
   await page.evaluate(() => document.querySelector('#frozen-menu')?.remove());
   await page.mouse.click(150, 170);
   await expect(page.locator('.sniptale-selection-size-confirm-button')).toBeVisible();
