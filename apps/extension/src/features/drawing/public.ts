@@ -1,4 +1,5 @@
 export * from './arrow';
+export { resolveDrawingToolCursor } from './cursors';
 export * from './freehand';
 export * from './geometry';
 export * from './model';

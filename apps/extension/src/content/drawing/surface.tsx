@@ -4,11 +4,11 @@ import {
   getDrawingObjectBounds,
   getDrawingObjectRotation,
   hitTestDrawingDocument,
+  resolveDrawingToolCursor,
   type DrawingObject,
   type DrawingPoint,
   type DrawingResizeHandle,
   type DrawingSessionSnapshot,
-  type DrawingTool,
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { useDrawingSessionSnapshot } from './controller';
@@ -51,9 +51,9 @@ function consumeTextGestureClick(ref: React.MutableRefObject<TextPointerGesture>
 const DRAWING_MODE_HOST_CLASS = 'sniptale-drawing-mode-active';
 const NO_VISUAL_EFFECTS_SUBSCRIPTION = () => () => undefined;
 const ZERO_VISUAL_EFFECTS_REVISION = () => 0;
-function resolveDrawingCanvasCursor(active: boolean, tool: DrawingTool): string {
-  if (!active || tool === 'select') return 'default';
-  return tool === 'text' ? 'text' : 'crosshair';
+function resolveDrawingCanvasCursor(active: boolean, snapshot: DrawingSessionSnapshot): string {
+  if (!active) return 'default';
+  return resolveDrawingToolCursor(snapshot.activeTool, snapshot.defaults.arrow.drawFromTip);
 }
 
 function stopDrawingHostEvent(event: React.SyntheticEvent<Element>): void {
@@ -127,7 +127,7 @@ function resolveDrawingCanvasHoverCursor(args: {
   pointer: DrawingPointerRuntime;
   snapshot: DrawingSessionSnapshot;
 }): string {
-  const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot.activeTool);
+  const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot);
   if (!args.active) return baseCursor;
   const draft = args.pointer.draftRef.current;
   if (draft?.kind === 'rotate') return 'grabbing';
@@ -265,7 +265,7 @@ function DrawingCanvasLayer(props: {
         inset: 0,
         touchAction: props.active ? 'none' : 'auto',
         pointerEvents: props.active ? 'auto' : 'none',
-        cursor: resolveDrawingCanvasCursor(props.active, props.snapshot.activeTool),
+        cursor: resolveDrawingCanvasCursor(props.active, props.snapshot),
       }}
       {...pointerHandlers}
       onMouseDown={stopDrawingHostEvent}
