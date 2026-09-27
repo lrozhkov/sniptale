@@ -85,48 +85,32 @@ beforeEach(() => {
   root = createRoot(container);
 });
 
-it('shows a dismissible one-line warning above navigation on an unsupported extension page', async () => {
+it('keeps navigation in place without an unsupported-tab banner on extension pages', async () => {
   mocks.activeTab.url = 'chrome-extension://sniptale/apps/extension/src/settings/index.html';
   mocks.activeTab.videoByMode.TAB.supported = false;
   mocks.coordinator.mockReturnValue(new Promise(() => undefined));
   const { PopupApp } = await import('./index');
   act(() => root.render(<PopupApp />));
 
-  const warning = container.querySelector<HTMLElement>('[data-ui="popup.app.extension-warning"]');
-  const navigation = container.querySelector<HTMLElement>('[data-ui="popup.app.tabs"]');
-  const close = warning?.querySelector<HTMLButtonElement>('button');
-  expect(warning?.textContent).toBe('Режим вкладки недоступен на странице расширения');
-  expect(warning?.compareDocumentPosition(navigation!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(warning?.getAttribute('role')).toBe('status');
-  expect(close?.getAttribute('aria-label')).toBe('Закрыть');
-  expect(close?.type).toBe('button');
-  expect(close?.tabIndex).toBe(0);
-  expect([...navigation!.querySelectorAll('button')].every((button) => !button.disabled)).toBe(
-    true
-  );
-
-  act(() => close?.click());
   expect(container.querySelector('[data-ui="popup.app.extension-warning"]')).toBeNull();
   expect(
     container.querySelector('[data-ui="popup.app.root"]')?.hasAttribute('data-extension-warning')
   ).toBe(false);
+  expect(container.querySelector('[data-ui="popup.app.tabs"]')).not.toBeNull();
 });
 
-it('limits the warning to unsupported pages owned by this extension', async () => {
+it('preloads a tab from keyboard focus and pointer intent without changing navigation', async () => {
   mocks.coordinator.mockReturnValue(new Promise(() => undefined));
   const { PopupApp } = await import('./index');
-  mocks.activeTab.url = 'chrome://newtab/';
-  mocks.activeTab.videoByMode.TAB.supported = false;
   act(() => root.render(<PopupApp />));
-  expect(container.querySelector('[data-ui="popup.app.extension-warning"]')).toBeNull();
+  const menu = container.querySelector<HTMLButtonElement>('button[data-page="menu"]')!;
+  const video = container.querySelector<HTMLButtonElement>('button[data-page="video"]')!;
 
-  mocks.activeTab.url = 'chrome-extension://sniptale/apps/extension/src/settings/index.html';
-  act(() => root.render(<PopupApp />));
-  expect(container.querySelector('[data-ui="popup.app.extension-warning"]')).not.toBeNull();
-
-  mocks.activeTab.videoByMode.TAB.supported = true;
-  act(() => root.render(<PopupApp />));
-  expect(container.querySelector('[data-ui="popup.app.extension-warning"]')).toBeNull();
+  act(() => menu.focus());
+  await vi.waitFor(() => expect(mocks.preload).toHaveBeenCalledWith('menu'));
+  act(() => video.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  await vi.waitFor(() => expect(mocks.preload).toHaveBeenCalledWith('video'));
+  expect(container.querySelector('[data-ui="popup.app.route-skeleton"]')).not.toBeNull();
 });
 
 it('keeps current content until a cold navigation commits and only then persists it', async () => {

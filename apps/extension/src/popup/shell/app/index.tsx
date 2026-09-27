@@ -7,7 +7,6 @@ import type { PopupPage } from '../navigation/actions';
 import { preloadPopupPage } from '../startup/resource';
 import { usePopupRouteController } from '../startup/use-route-controller';
 import { usePopupStartupReconciliation } from './use-startup-reconciliation';
-import { ExtensionPageWarning, useExtensionPageWarning } from './extension-warning';
 
 const pages: Array<{ page: PopupPage; icon: ReactNode }> = [
   { page: 'screenshots', icon: <GalleryThumbnails aria-hidden="true" /> },
@@ -43,18 +42,10 @@ export function PopupApp() {
   const route = usePopupRouteController();
   const Route = route.Route;
   const [locale, setLocale] = useState<AppLocale>(readInitialLocale);
-  const extensionWarning = useExtensionPageWarning();
   usePopupStartupReconciliation(setLocale);
 
   return (
-    <div
-      className="popup-react-shell sniptale-extension-surface"
-      data-ui="popup.app.root"
-      data-extension-warning={extensionWarning.visible ? 'true' : undefined}
-    >
-      {extensionWarning.visible ? (
-        <ExtensionPageWarning locale={locale} onClose={extensionWarning.dismiss} />
-      ) : null}
+    <div className="popup-react-shell sniptale-extension-surface" data-ui="popup.app.root">
       <PopupNavigation locale={locale} route={route} />
       <PopupRouteError
         locale={locale}

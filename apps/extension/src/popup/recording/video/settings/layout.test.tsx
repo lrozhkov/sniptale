@@ -106,19 +106,12 @@ describe('video settings layout', () => {
   });
 
   it.each(Object.values(CaptureMode))(
-    'reserves the cursor checkbox after countdown for %s',
+    'omits the unavailable cursor-theme option for %s',
     (captureMode) => {
-      const onSettingsChange = vi.fn();
-      renderGrid({ captureMode, onSettingsChange });
-      const checkbox = container.querySelector<HTMLInputElement>('input[type="checkbox"]');
-      expect(checkbox?.disabled).toBe(true);
-      expect(checkbox?.checked).toBe(false);
-      expect(checkbox?.closest('label')?.textContent).toContain('popup.video.cursorThemePending');
-      expect(container.textContent.indexOf('popup.video.countdownLabel')).toBeLessThan(
-        container.textContent.indexOf('popup.video.cursorThemeLabel')
-      );
-      act(() => checkbox?.click());
-      expect(onSettingsChange).not.toHaveBeenCalled();
+      renderGrid({ captureMode, onSettingsChange: vi.fn() });
+      expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+      expect(container.textContent).not.toContain('popup.video.cursorThemeLabel');
+      expect(container.textContent).not.toContain('popup.video.cursorThemePending');
     }
   );
 

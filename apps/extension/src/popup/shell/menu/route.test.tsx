@@ -133,6 +133,20 @@ it('uses the shared screenshot icon set for visible, full-page, and selection ca
   expect(
     container.querySelector('[title="popup.home.captureSelectionHint"] svg')?.getAttribute('class')
   ).toContain('lucide-crop');
+  const captureButtons = [
+    'popup.home.captureVisibleHint',
+    'popup.home.captureFullHint',
+    'popup.home.captureSelectionHint',
+  ].map((title) => container.querySelector<HTMLButtonElement>(`[title="${title}"]`));
+  expect(captureButtons.every((button) => button?.className.includes('group '))).toBe(true);
+  expect(
+    captureButtons.every((button) =>
+      button?.querySelector('svg')?.getAttribute('class')?.includes('group-hover:scale-110')
+    )
+  ).toBe(true);
+  expect(
+    captureButtons.every((button) => button?.querySelector('span')?.className.includes('scale-'))
+  ).toBe(false);
 });
 
 it('wires the workspace, direct page tools and menu-only footer', async () => {

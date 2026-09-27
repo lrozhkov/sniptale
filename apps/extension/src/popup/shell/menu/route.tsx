@@ -92,11 +92,16 @@ const MENU_SURFACE_CLASS_NAME = [
 ].join(' ');
 
 const CAPTURE_BUTTON_CLASS_NAME = [
-  'flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[12px] border-0',
+  'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[12px] border-0',
   'bg-[var(--sniptale-color-surface-input)]',
   'px-1.5 py-2.5 text-center transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50',
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+].join(' ');
+const CAPTURE_ICON_CLASS_NAME = [
+  'h-7 w-7 text-[var(--sniptale-color-accent)]',
+  'transition-transform duration-180 ease-out motion-reduce:transition-none',
+  'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
 ].join(' ');
 
 const WORKSPACE_BUTTON_CLASS_NAME = [
@@ -271,7 +276,7 @@ function MenuCaptureActions(props: {
           title={props.disabledReason ?? hint}
           onClick={() => void props.onCapture(`download:${mode}`, mode)}
         >
-          <Icon className="h-7 w-7 text-[var(--sniptale-color-accent)]" />
+          <Icon className={CAPTURE_ICON_CLASS_NAME} />
           <span className={CAPTURE_LABEL_CLASS_NAME}>
             {props.pendingAction === `download:${mode}`
               ? translate('popup.home.capturePendingLabel')

@@ -71,13 +71,6 @@ export function VideoSettingsGrid({
         selectedLabel={formatCountdownOption(settings.countdownSeconds)}
         onChange={(value) => onSettingsChange({ countdownSeconds: Number(value) })}
       />
-      <label className="mt-2 mr-1 flex items-start gap-2 px-3 py-2 text-[var(--sniptale-color-text-secondary)]">
-        <input type="checkbox" disabled checked={false} className="mt-1 shrink-0" />
-        <span>
-          <span className="block text-sm">{translate('popup.video.cursorThemeLabel')}</span>
-          <span className="block text-xs">{translate('popup.video.cursorThemePending')}</span>
-        </span>
-      </label>
       {showSourceCount ? (
         <CounterCard
           label={translate('popup.video.sourceCountLabel')}

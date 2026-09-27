@@ -63,68 +63,6 @@ body {
   gap: 12px;
 }
 
-.popup-react-shell[data-extension-warning='true'] .popup-react-shell__tabs {
-  margin-top: 16px;
-}
-
-.popup-react-shell__extension-warning {
-  box-sizing: border-box;
-  position: absolute;
-  z-index: 3;
-  top: 2px;
-  left: 18px;
-  right: 18px;
-  display: flex;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 0 5px 0 9px;
-  border: 1px solid var(--sniptale-color-warning);
-  border-radius: 9px;
-  background: var(--sniptale-color-surface-panel);
-  color: var(--sniptale-color-text-primary);
-  box-shadow: 0 3px 10px var(--sniptale-color-warning-soft);
-  font: 600 10px/1.2 var(--sniptale-font-sans);
-  white-space: nowrap;
-}
-
-.popup-react-shell__extension-warning span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.popup-react-shell__extension-warning button {
-  display: flex;
-  width: 20px;
-  height: 20px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.popup-react-shell__extension-warning button:hover,
-.popup-react-shell__extension-warning button:focus-visible {
-  background: var(--sniptale-color-warning-soft);
-}
-
-.popup-react-shell__extension-warning button:focus-visible {
-  outline: 2px solid var(--sniptale-color-warning);
-  outline-offset: 1px;
-}
-
-.popup-react-shell__extension-warning button svg {
-  width: 14px;
-  height: 14px;
-}
-
 .popup-react-shell__tabs {
   box-sizing: border-box;
   position: relative;
@@ -259,7 +197,12 @@ body {
 .popup-react-shell__tabs button:hover,
 .popup-react-shell__tabs button:focus-visible {
   color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
-  background: var(--sniptale-color-surface-hover, var(--popup-initial-panel));
+  background: transparent;
+}
+
+.popup-react-shell__tabs button:hover svg,
+.popup-react-shell__tabs button:focus-visible svg {
+  transform: scale(1.16);
 }
 
 .popup-react-shell__tabs button:focus-visible {
@@ -268,7 +211,7 @@ body {
 }
 
 .popup-react-shell__tabs button:active {
-  background: var(--sniptale-color-surface-hover, var(--popup-initial-panel));
+  background: transparent;
 }
 
 .popup-react-shell__tabs button[data-page='menu'] {
@@ -285,28 +228,19 @@ body {
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
 }
 
+.popup-react-shell__tabs button[data-page='menu'] svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
 .popup-react-shell__tabs button[data-page='menu']::after {
   display: none;
 }
 
 .popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
-  color: var(--sniptale-color-accent, var(--popup-initial-accent));
+  color: var(--popup-initial-active-text);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-}
-
-.popup-react-shell__tabs[data-animate='true'] button[data-page='menu'][data-active='true'] {
-  animation: popup-menu-accent-arrival 221ms linear both;
-}
-
-@keyframes popup-menu-accent-arrival {
-  0%,
-  99% {
-    color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
-  }
-
-  100% {
-    color: var(--sniptale-color-accent, var(--popup-initial-accent));
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -314,10 +248,6 @@ body {
   .popup-react-shell__tabs button,
   .popup-react-shell__tabs button svg {
     transition: none;
-  }
-
-  .popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
-    animation: none;
   }
 }
 
