@@ -84,7 +84,7 @@ afterEach(async () => {
   root = null;
 });
 
-it('keeps core source image geometry visible and expands advanced settings on demand', async () => {
+it('keeps core source image geometry visible and expands shadow and border settings on demand', async () => {
   const applyFramePatch = vi.fn();
 
   await renderUi(
@@ -97,12 +97,15 @@ it('keeps core source image geometry visible and expands advanced settings on de
     />
   );
 
-  expect(container?.querySelector('details')?.open).toBe(false);
+  expect(
+    Array.from(container?.querySelectorAll('details') ?? []).every((group) => !group.open)
+  ).toBe(true);
   expect(container?.querySelectorAll('[data-testid="range"]').length).toBeGreaterThanOrEqual(2);
 
   await act(async () => {
-    const details = container?.querySelector('details');
-    if (details) details.open = true;
+    container?.querySelectorAll('details').forEach((details) => {
+      details.open = true;
+    });
   });
   await act(async () => {
     container
@@ -114,7 +117,9 @@ it('keeps core source image geometry visible and expands advanced settings on de
       .forEach((element) => (element as HTMLButtonElement).click());
   });
 
-  expect(container?.querySelector('details')?.open).toBe(true);
+  expect(
+    Array.from(container?.querySelectorAll('details') ?? []).every((group) => group.open)
+  ).toBe(true);
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({ sourceImage: expect.objectContaining({ opacity: 0.5 }) })
   );
@@ -149,4 +154,27 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({ sourceImage: expect.objectContaining({ shadow: 50 }) })
   );
+});
+
+it('gives shadow and border separate collapsible groups', async () => {
+  await renderUi(
+    <EditorInspectorFrameSourceImageFields
+      applyFramePatch={vi.fn()}
+      frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
+      recentColors={[]}
+    />
+  );
+
+  const groups = Array.from(container?.querySelectorAll('details') ?? []);
+  expect(groups).toHaveLength(2);
+  expect(groups.map((group) => group.querySelector('summary')?.textContent)).toEqual([
+    translate('highlighter.editor.shadowLabel'),
+    translate('editor.compact.blurBorder'),
+  ]);
+  expect(groups.every((group) => !group.open)).toBe(true);
+  await act(async () => {
+    groups[0]?.setAttribute('open', '');
+  });
+  expect(groups[0]?.open).toBe(true);
+  expect(groups[1]?.open).toBe(false);
 });

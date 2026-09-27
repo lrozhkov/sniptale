@@ -54,6 +54,32 @@ function clearCanvasShadow(ctx: CanvasRenderingContext2D): void {
   ctx.shadowOffsetY = 0;
 }
 
+function renderOuterSourceImageShadow(
+  object: ImageStyleRuntimeObject,
+  ctx: CanvasRenderingContext2D,
+  settings: EditorImageSettings
+): void {
+  if (!object.shadow) return;
+  const width = Math.max(1, Math.round(object.width ?? 1));
+  const height = Math.max(1, Math.round(object.height ?? 1));
+  const radius = Math.min(Math.max(0, settings.radius), width / 2, height / 2);
+  const margin = Math.max(
+    256,
+    (settings.shadowBlur ?? 12) * 4 + (settings.shadowDistance ?? 4) + settings.strokeWidth
+  );
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-width / 2 - margin, -height / 2 - margin, width + margin * 2, height + margin * 2);
+  ctx.roundRect(-width / 2, -height / 2, width, height, radius);
+  ctx.clip('evenodd');
+  ctx.beginPath();
+  ctx.roundRect(-width / 2, -height / 2, width, height, radius);
+  ctx.fillStyle = '#000000';
+  ctx.fill();
+  ctx.restore();
+}
+
 function renderClippedImageContent(
   object: ImageStyleRuntimeObject,
   ctx: CanvasRenderingContext2D,
@@ -94,6 +120,15 @@ export function attachImageStyleRenderer(
   runtimeObject._render = function renderImageStyleObject(ctx: CanvasRenderingContext2D) {
     const target = this as ImageStyleRuntimeObject;
     const settings = readSettings(target);
+    if (target.sniptaleType === 'source-image' && target.shadow) {
+      renderOuterSourceImageShadow(target, ctx, settings);
+      ctx.save();
+      clearCanvasShadow(ctx);
+      renderClippedImageContent(target, ctx, settings);
+      renderImageFrame(target, ctx, settings);
+      ctx.restore();
+      return;
+    }
     renderClippedImageContent(target, ctx, settings);
     renderImageFrame(target, ctx, settings);
   };

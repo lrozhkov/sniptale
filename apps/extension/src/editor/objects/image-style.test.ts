@@ -208,6 +208,48 @@ it('does not render the image frame with an independent shadow', () => {
   expect(context.stroke).toHaveBeenCalledOnce();
 });
 
+it('keeps the source-image shadow outside its contour before drawing translucent content', () => {
+  const baseRender = vi.fn((ctx: CanvasRenderingContext2D) => {
+    expect(ctx.shadowBlur).toBe(0);
+    expect(ctx.shadowColor).toBe('rgba(0, 0, 0, 0)');
+  });
+  const object = createObject() as ReturnType<typeof createObject> & {
+    _render: typeof baseRender;
+    sniptaleType: string;
+  };
+  object._render = baseRender;
+  object.sniptaleType = 'source-image';
+  const context = {
+    beginPath: vi.fn(),
+    clip: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    lineTo: vi.fn(),
+    moveTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    rect: vi.fn(),
+    restore: vi.fn(),
+    roundRect: vi.fn(),
+    save: vi.fn(),
+    shadowBlur: 18,
+    shadowColor: '#abcdef',
+    shadowOffsetX: 4,
+    shadowOffsetY: 5,
+  };
+
+  applyImageSettings(object as never, {
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    opacity: 0.5,
+    radius: 12,
+    shadow: 60,
+  });
+  object._render(context as never);
+
+  expect(context.clip).toHaveBeenCalledWith('evenodd');
+  expect(context.fill).toHaveBeenCalledOnce();
+  expect(baseRender).toHaveBeenCalledOnce();
+});
+
 it('skips frame rendering when image border width is disabled', () => {
   const baseRender = vi.fn();
   const object = createObject() as ReturnType<typeof createObject> & {

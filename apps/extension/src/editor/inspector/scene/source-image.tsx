@@ -99,16 +99,8 @@ export function EditorInspectorFrameSourceImageFields(
         valueText={`${settings.radius}px`}
         onChange={(radius) => patchSourceImage(props, { radius })}
       />
-      <EditorInspectorDetails
-        preferenceId="frame:source-image-advanced"
-        level="group"
-        label={translate('content.callout.additionalSettings')}
-      >
-        <div className="space-y-4">
-          <SourceImageShadowSection props={props} settings={settings} />
-          <SourceImageBorderSection props={props} settings={settings} />
-        </div>
-      </EditorInspectorDetails>
+      <SourceImageShadowSection props={props} settings={settings} />
+      <SourceImageBorderSection props={props} settings={settings} />
     </div>
   );
 }
@@ -119,10 +111,11 @@ function SourceImageShadowSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <div className="space-y-3">
-      <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {translate('highlighter.editor.shadowLabel')}
-      </div>
+    <EditorInspectorDetails
+      preferenceId="frame:source-image-shadow"
+      level="group"
+      label={translate('highlighter.editor.shadowLabel')}
+    >
       <div className="space-y-3">
         <SourceImageRangeControl
           label={translate('editor.compact.shadowSize')}
@@ -143,7 +136,7 @@ function SourceImageShadowSection(args: {
         />
         <SourceImageShadowGeometry props={props} settings={settings} />
       </div>
-    </div>
+    </EditorInspectorDetails>
   );
 }
 
@@ -185,10 +178,11 @@ function SourceImageBorderSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <div className="space-y-3 border-t border-[color:var(--sniptale-color-border-soft)] pt-3">
-      <div className="text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {translate('editor.compact.blurBorder')}
-      </div>
+    <EditorInspectorDetails
+      preferenceId="frame:source-image-border"
+      level="group"
+      label={translate('editor.compact.blurBorder')}
+    >
       <div className="space-y-3">
         <SelectField
           label={translate('highlighter.editor.styleLabel')}
@@ -207,7 +201,7 @@ function SourceImageBorderSection(args: {
         />
         <SourceImageBorderColor props={props} settings={settings} />
       </div>
-    </div>
+    </EditorInspectorDetails>
   );
 }
 
