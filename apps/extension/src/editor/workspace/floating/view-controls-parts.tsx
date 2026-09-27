@@ -9,13 +9,13 @@ import type { EditorFloatingDocumentController } from './document-bar';
 import { CompactWorkspacePopoverContent } from './view-controls-popovers';
 
 const VIEW_POPOVER_CLASS_NAME = floatingChromeClassNames(
-  'absolute right-0 top-[calc(100%+0.75rem+1px)] z-50',
+  'absolute right-0 top-[calc(100%+0.375rem)] z-50',
   'w-[min(22rem,calc(100vw-1.5rem-var(--editor-floating-edge-right,0px)))]',
   'overflow-visible !rounded-none p-3'
 );
 
 const VIEW_MAP_POPOVER_CLASS_NAME = floatingChromeClassNames(
-  'absolute right-0 top-[calc(100%+0.75rem+1px)] z-50',
+  'absolute right-0 top-[calc(100%+0.375rem)] z-50',
   'w-[var(--editor-view-toolbar-width,min(18rem,calc(100vw-1.5rem)))] !rounded-none p-3'
 );
 

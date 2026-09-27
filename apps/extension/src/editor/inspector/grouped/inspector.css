@@ -1,7 +1,7 @@
 @layer theme, base, components, utilities;
 
 [data-ui='editor.page.root'] {
-  --sniptale-settings-popover-gap: 12px;
+  --sniptale-settings-popover-gap: 6px;
 }
 
 [data-ui='editor.inspector.content'] {

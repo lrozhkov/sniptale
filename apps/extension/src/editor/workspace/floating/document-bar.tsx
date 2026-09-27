@@ -395,7 +395,7 @@ function EditorFloatingDocumentSummary(props: {
           className={[
             'truncate rounded text-left text-sm font-semibold leading-snug',
             'text-[var(--sniptale-color-text-primary)] hover:underline focus-visible:outline',
-            'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+            'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-border-strong)]',
             'disabled:no-underline',
           ].join(' ')}
         >

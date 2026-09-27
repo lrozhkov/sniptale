@@ -98,10 +98,10 @@ export function EditorDocumentTitleEditor(props: {
             readOnly={saving}
             value={draft}
             className={[
-              'w-full min-w-0 rounded-md border border-[var(--sniptale-color-accent)]',
+              'w-full min-w-0 rounded-md border border-[var(--sniptale-color-border-strong)]',
               'bg-[var(--sniptale-color-surface-panel)] pl-2 pr-8 py-1.5 text-sm',
-              'text-[var(--sniptale-color-text-primary)] outline-none focus-visible:ring-2',
-              'focus-visible:ring-[var(--sniptale-color-accent)]',
+              'text-[var(--sniptale-color-text-primary)] outline-none focus-visible:ring-1',
+              'focus-visible:ring-[var(--sniptale-color-border-strong)]',
             ].join(' ')}
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => {

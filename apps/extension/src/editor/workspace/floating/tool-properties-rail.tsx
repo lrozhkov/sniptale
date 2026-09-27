@@ -29,7 +29,7 @@ function useToolRailPlacement(enabled: boolean) {
     if (!enabled || !panel || !toolbar) return;
     const update = () => {
       const parentTop = panel.offsetParent?.getBoundingClientRect().top ?? 0;
-      setTop(toolbar.getBoundingClientRect().bottom - parentTop + 12);
+      setTop(toolbar.getBoundingClientRect().bottom - parentTop + 6);
     };
     update();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);

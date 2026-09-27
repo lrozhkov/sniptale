@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const VIEWPORT_GAP_PX = 12;
+const TOOLBAR_POPOVER_GAP_PX = 6;
 const DEFAULT_POPOVER_LAYOUT = { left: 0, maxHeight: 384, top: 0 };
 
 function resolvePopoverLayout(button: HTMLButtonElement, popover: HTMLDivElement | null) {
@@ -9,15 +10,15 @@ function resolvePopoverLayout(button: HTMLButtonElement, popover: HTMLDivElement
   const narrow = window.innerWidth < 720;
   const width = popover?.offsetWidth || 288;
   const height = Math.min(popover?.scrollHeight ?? 384, window.innerHeight - VIEWPORT_GAP_PX * 2);
-  const preferredLeft = narrow ? toolbar.left : toolbar.right + VIEWPORT_GAP_PX;
+  const preferredLeft = narrow ? toolbar.left : toolbar.right + TOOLBAR_POPOVER_GAP_PX;
   const left = Math.max(
     VIEWPORT_GAP_PX,
     preferredLeft + width <= window.innerWidth - VIEWPORT_GAP_PX
       ? preferredLeft
-      : toolbar.left - width - VIEWPORT_GAP_PX
+      : toolbar.left - width - TOOLBAR_POPOVER_GAP_PX
   );
   const top = narrow
-    ? toolbar.bottom + VIEWPORT_GAP_PX
+    ? toolbar.bottom + TOOLBAR_POPOVER_GAP_PX
     : Math.max(
         VIEWPORT_GAP_PX,
         Math.min(buttonRect.top, window.innerHeight - height - VIEWPORT_GAP_PX)

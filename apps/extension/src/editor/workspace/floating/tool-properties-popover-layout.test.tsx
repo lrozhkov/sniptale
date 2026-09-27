@@ -11,9 +11,9 @@ afterEach(() => {
 });
 
 it.each([
-  { viewportWidth: 1200, toolbarLeft: 560, left: 57, top: 0, maxHeight: 605 },
-  { viewportWidth: 719, toolbarLeft: 12, left: -7, top: 57, maxHeight: 548 },
-  { viewportWidth: 1200, toolbarLeft: 1140, left: -307, top: 0, maxHeight: 605 },
+  { viewportWidth: 1200, toolbarLeft: 560, left: 51, top: 0, maxHeight: 605 },
+  { viewportWidth: 719, toolbarLeft: 12, left: -7, top: 51, maxHeight: 554 },
+  { viewportWidth: 1200, toolbarLeft: 1140, left: -301, top: 0, maxHeight: 605 },
 ])('measures toolbar clearance at width $viewportWidth and left $toolbarLeft', (expected) => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('innerWidth', expected.viewportWidth);

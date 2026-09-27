@@ -182,7 +182,7 @@ it('keeps drawing options stable during canvas interaction and only honors an ex
   expect(container.querySelector('[data-ui="drawing-options.selection"]')).not.toBeNull();
 });
 
-it('keeps drawing options twelve pixels below the outer tool rail after viewport changes', () => {
+it('keeps drawing options six pixels below the outer tool rail after viewport changes', () => {
   const toolbar = document.createElement('div');
   toolbar.dataset['ui'] = 'editor.floating.tool-rail';
   document.body.append(toolbar);
@@ -190,9 +190,9 @@ it('keeps drawing options twelve pixels below the outer tool rail after viewport
   bounds.mockReturnValue(new DOMRect(20, 12, 400, 52));
   renderRail();
   const panel = container.querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]');
-  expect(panel?.style.top).toBe('76px');
+  expect(panel?.style.top).toBe('70px');
   bounds.mockReturnValue(new DOMRect(12, 136, 400, 94));
   act(() => window.dispatchEvent(new Event('resize')));
-  expect(panel?.style.top).toBe('242px');
+  expect(panel?.style.top).toBe('236px');
   toolbar.remove();
 });
