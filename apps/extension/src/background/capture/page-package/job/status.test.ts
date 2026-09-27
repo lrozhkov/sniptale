@@ -196,3 +196,13 @@ it('accepts the exact canonical tab-title byte ceiling', () => {
   const exact = { ...status(), orderedTabs: [{ tabId: 7, title: 'x'.repeat(2 * 1024) }] };
   expect(parsePagePackageJobStatusV1(exact)).toEqual(exact);
 });
+
+it('retains HTML job format and rejects unsupported or Library-bound formats', () => {
+  expect(parsePagePackageJobStatusV1({ ...status(), downloadFormat: 'html' })).toMatchObject({
+    downloadFormat: 'html',
+  });
+  expect(parsePagePackageJobStatusV1({ ...status(), downloadFormat: 'exe' })).toBeNull();
+  expect(
+    parsePagePackageJobStatusV1({ ...status(), downloadFormat: 'html', intent: 'save' })
+  ).toBeNull();
+});

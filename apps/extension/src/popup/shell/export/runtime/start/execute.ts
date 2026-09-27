@@ -16,7 +16,8 @@ import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts
 export async function startPopupExport(
   state: PopupExportRuntimeContract,
   deps: PopupExportRuntimeDeps = getDefaultPopupExportRuntimeDeps(),
-  intent: 'export' | 'save' = 'export'
+  intent: 'export' | 'save' = 'export',
+  downloadFormat?: 'html'
 ): Promise<void> {
   if (!state.hasLoadedPreferences) {
     return;
@@ -26,7 +27,7 @@ export async function startPopupExport(
     return;
   }
 
-  if (intent === 'export' && !state.canExport) {
+  if (intent === 'export' && downloadFormat !== 'html' && !state.canExport) {
     return;
   }
 
@@ -53,16 +54,30 @@ export async function startPopupExport(
     if (sources.length === 0) return;
 
     const plan =
-      intent === 'save'
+      downloadFormat === 'html'
         ? {
-            ...state.saveSelection,
-            includeFullPageScreenshot: true,
             includeWebCopy: true,
+            includeAnnotations: false,
+            includeBasicLogs: false,
+            includeCssDiagnostics: false,
+            includeFiles: false,
+            includeFullPageScreenshot: true,
+            includeViewportScreenshot: false,
+            includePageDiagnostics: false,
+            includeImages: false,
+            includeJson: false,
+            includeMarkdown: false,
           }
-        : {
-            ...getPopupExportSelection(state),
-            includeWebCopy: state.includeWebCopy,
-          };
+        : intent === 'save'
+          ? {
+              ...state.saveSelection,
+              includeFullPageScreenshot: true,
+              includeWebCopy: true,
+            }
+          : {
+              ...getPopupExportSelection(state),
+              includeWebCopy: state.includeWebCopy,
+            };
     const resourceLimits = deps.loadExportResourceLimits
       ? await deps.loadExportResourceLimits()
       : { ...DEFAULT_EXPORT_RESOURCE_LIMITS };
@@ -118,6 +133,7 @@ export async function startPopupExport(
       type: MessageType.START_PAGE_PACKAGE_JOB,
       includeWebCopy: effectivePlan.includeWebCopy,
       intent,
+      ...(downloadFormat ? { downloadFormat } : {}),
       jobId,
       locale,
       captureTiming,

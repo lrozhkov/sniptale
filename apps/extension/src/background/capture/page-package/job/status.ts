@@ -35,7 +35,7 @@ const REQUIRED_STATUS_KEYS = [
   'revision',
   'warnings',
 ] as const;
-const OPTIONAL_STATUS_KEYS = ['result'] as const;
+const OPTIONAL_STATUS_KEYS = ['result', 'downloadFormat'] as const;
 const UTF8_ENCODER = new TextEncoder();
 const MAX_JOB_TABS = MAX_POPUP_EXPORT_JOB_TABS;
 const COMPONENT_IDS: PagePackageComponentId[] = [
@@ -285,6 +285,8 @@ export function parsePagePackageJobStatusV1(value: unknown): PagePackageJobStatu
     !progress ||
     !originalTabs ||
     result === null ||
+    (value['downloadFormat'] !== undefined && value['downloadFormat'] !== 'html') ||
+    (value['downloadFormat'] === 'html' && value['intent'] !== 'export') ||
     (value['intent'] !== 'export' && value['intent'] !== 'save') ||
     !isBoundedJobId(value['jobId']) ||
     !isNonNegativeInteger(value['revision']) ||

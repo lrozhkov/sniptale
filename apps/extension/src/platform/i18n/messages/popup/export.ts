@@ -178,13 +178,18 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Ресурсы сверх лимита пропускаются с предупреждением, а пакет продолжает собираться.',
     en: 'Resources over a limit are skipped with a warning while package creation continues.',
   },
+  packageDestinationHtml: { ru: 'Скачать HTML', en: 'Download HTML' },
+  packageDestinationHtmlDescription: {
+    ru: 'Отдельный HTML-файл для каждой страницы: веб-копия со стилями, изображениями и шрифтами. Без скриптов, активных ссылок, вложений и диагностики.',
+    en: 'One HTML file per page: a Web copy with styles, images and fonts. No scripts, active links, attachments or diagnostics.',
+  },
   packageDestinationLabel: {
     ru: 'Настройки действия',
     en: 'Action settings',
   },
   packageDestinationDownload: {
-    ru: 'Скачать',
-    en: 'Download',
+    ru: 'Скачать ZIP',
+    en: 'Download ZIP',
   },
   packageDestinationDownloadDescription: {
     ru: 'Скачать полный пакет страницы как ZIP-архив.',

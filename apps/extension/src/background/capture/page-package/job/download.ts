@@ -80,6 +80,7 @@ async function preparePages(
 }
 
 export async function downloadCollectedPagePackages(args: {
+  downloadFormat?: 'html';
   errors: readonly string[];
   failedPages: readonly { message: string; ordinal: number; title: string | null }[];
   jobId: string;
@@ -90,6 +91,31 @@ export async function downloadCollectedPagePackages(args: {
 }): Promise<{ filename: string; pageCount: number }> {
   const prepared = await preparePages(args.jobId, args.packages, args.signal);
   if (prepared.length === 0) throw new Error('No valid Page Packages were staged.');
+  if (args.downloadFormat === 'html') {
+    let filename = '';
+    for (const page of prepared) {
+      args.signal.throwIfAborted();
+      filename = await createOutputFilename({
+        category: 'documents',
+        type: 'page-package',
+        extension: 'html',
+        title: page.descriptor.title ?? undefined,
+      });
+      const file = await readAssetFile(
+        page.reference,
+        `${page.descriptor.stagedBlobId}.page-package`
+      );
+      const reference = await duplicateSinglePageOutput(file);
+      await downloadPagePackageReference({
+        filename,
+        jobId: args.jobId,
+        reference,
+        signal: args.signal,
+        downloadFormat: 'html',
+      });
+    }
+    return { filename, pageCount: prepared.length };
+  }
   if (prepared.length === 1 && args.requestedPageCount === 1) {
     const filename = await createOutputFilename({
       category: 'documents',

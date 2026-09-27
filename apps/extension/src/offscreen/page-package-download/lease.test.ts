@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { readAssetFileMock } = vi.hoisted(() => ({ readAssetFileMock: vi.fn() }));
+const { readAssetFileMock, convertHtml } = vi.hoisted(() => ({
+  readAssetFileMock: vi.fn(),
+  convertHtml: vi.fn(),
+}));
+vi.mock('./html', () => ({ createPagePackageHtmlDownload: convertHtml }));
 
 vi.mock('../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/assets')>()),
@@ -135,4 +139,30 @@ describe('offscreen Page Package download lease owner', () => {
     ]);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
   });
+});
+
+it('rejects reusing a ZIP download identity for an HTML conversion', async () => {
+  readAssetFileMock.mockClear();
+  const args = { downloadOperationId: 'format-replay', filename: 'page.zip', reference };
+  await createPagePackageDownloadLease(args);
+  await expect(
+    createPagePackageDownloadLease({ ...args, filename: 'page.html', downloadFormat: 'html' })
+  ).rejects.toThrow('changed its asset reference');
+  expect(readAssetFileMock).toHaveBeenCalledTimes(1);
+});
+
+it('publishes the converted HTML and permits retry after conversion failure', async () => {
+  const args = {
+    downloadOperationId: 'html-retry',
+    filename: 'page.html',
+    reference,
+    downloadFormat: 'html' as const,
+  };
+  convertHtml.mockRejectedValueOnce(new Error('conversion failed'));
+  await expect(createPagePackageDownloadLease(args)).rejects.toThrow('conversion failed');
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  const html = new Blob(['<html>page</html>'], { type: 'text/html' });
+  convertHtml.mockResolvedValueOnce(html);
+  await createPagePackageDownloadLease(args);
+  expect(URL.createObjectURL).toHaveBeenCalledWith(html);
 });

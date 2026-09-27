@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { createPagePackageManifestFixture } from '../../features/web-snapshot/manifest.test-support';
-import type { LoadedWebSnapshotPackage } from './assets';
+import { createPagePackageManifestFixture } from './manifest.test-support';
+import type { WebSnapshotHtmlExportInput } from './html-export';
 import { createWebSnapshotHtmlExport } from './html-export';
 
 function readBlob(blob: Blob): Promise<string> {
@@ -24,10 +24,7 @@ function fixture(html: string, files: Array<{ path: string; type: string; text: 
     Object.defineProperty(blob, 'text', { value: () => readBlob(blob) });
     return blob;
   });
-  const loaded: LoadedWebSnapshotPackage = {
-    archiveFilename: 'page.zip',
-    archiveSize: 100,
-    archiveUrl: 'blob:archive',
+  const loaded: WebSnapshotHtmlExportInput = {
     assets: files.map((file) => ({
       path: file.path,
       mimeType: file.type,
@@ -35,17 +32,11 @@ function fixture(html: string, files: Array<{ path: string; type: string; text: 
       url: `blob:${file.path}`,
       downloadUrl: null,
     })),
-    documentUrl: null,
     html,
     manifest: createPagePackageManifestFixture({
       source: { title: 'Пример / page', url: 'https://example.com/page', faviconUrl: null },
     }),
-    objectUrls: [],
-    packageFiles: [],
     extractPackageFile,
-    screenshotFilename: 'page.png',
-    screenshotUrl: 'blob:screenshot',
-    screenshotCoverage: 'full-page',
   };
   return loaded;
 }
@@ -210,5 +201,49 @@ it.each([false, true])(
     expect(html).not.toContain('<animate');
     expect(html).toContain('Open');
     expect(html).not.toContain('https://bad.test');
+  }
+);
+
+it('embeds captured relative resources in raw archive HTML and removes active content', async () => {
+  const loaded = fixture(
+    '<!doctype html><html><head><link rel="stylesheet" href="../assets/main.css"></head><body><img src="../assets/image.png"><script>alert(1)</script><iframe src="https://example.com"></iframe></body></html>',
+    [
+      { path: 'assets/main.css', type: 'text/css', text: 'body{color:red}' },
+      { path: 'assets/image.png', type: 'image/png', text: 'image' },
+    ]
+  );
+  const result = await createWebSnapshotHtmlExport({
+    ...loaded,
+    assetBasePath: 'snapshot/index.html',
+  });
+  const html = await readBlob(result.blob);
+  expect(html).toContain('data:text/css');
+  expect(html).toContain('data:image/png');
+  expect(html).not.toContain('<script');
+  expect(html).not.toContain('<iframe');
+  expect(html).not.toContain('../assets/');
+  expect(html).not.toContain('blob:');
+});
+
+it.each(['html', 'xhtml'] as const)(
+  'preserves inline CSS text through raw %s archive normalization',
+  async (format) => {
+    const opening =
+      format === 'xhtml'
+        ? '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml">'
+        : '<html>';
+    const css =
+      format === 'xhtml'
+        ? 'body &gt; p { color: rgb(1,2,3); } p::before { content: "&amp;"; }'
+        : 'body > p { color: rgb(1,2,3); } p::before { content: "&"; }';
+    const source = `${opening}<head><style>${css}</style></head><body><p>Text</p></body></html>`;
+    const result = await createWebSnapshotHtmlExport({
+      ...fixture(source),
+      assetBasePath: 'snapshot/index.html',
+    });
+    const html = await readBlob(result.blob);
+    const document = new DOMParser().parseFromString(html, 'text/html');
+    expect(document.querySelector('style')?.textContent).toContain('body > p');
+    expect(document.querySelector('style')?.textContent).toContain('content: "&"');
   }
 );

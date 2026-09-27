@@ -69,7 +69,7 @@ async function settleLastSettingsLoad() {
 
 async function renderPage(args: {
   controller?: ReturnType<typeof createPopupExportControllerFixture>;
-  initialDestination?: 'export' | 'save';
+  initialDestination?: 'export' | 'save' | 'html';
   isRestrictedPage?: boolean;
 }) {
   if (!container) {
@@ -305,4 +305,16 @@ describe('ExportPage', () => {
     'uses the required Library plan instead of the Download selection',
     verifyLibraryUsesItsRequiredPackagePlan
   );
+});
+
+it('routes HTML through export even when ZIP has no selected components', async () => {
+  const controller = await renderPage({
+    initialDestination: 'html',
+    controller: createPopupExportControllerFixture({ derived: { canExport: false } }),
+  });
+  const footer = getRenderedFooterProps();
+  expect(footer.canExport).toBe(true);
+  footer.onStartExport();
+  expect(controller.actions.handleStartExport).toHaveBeenCalledWith('html');
+  expect(controller.actions.handleSaveWebSnapshot).not.toHaveBeenCalled();
 });

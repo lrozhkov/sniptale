@@ -349,8 +349,10 @@ export function isPagePackageJobStatus(value: unknown): value is PagePackageJobS
         'originalActiveTabs',
         'activatedTabIds',
       ],
-      ['result']
+      ['result', 'downloadFormat']
     ) &&
+    hasOptionalField(value, 'downloadFormat', (format) => format === 'html') &&
+    (value['downloadFormat'] !== 'html' || value['intent'] === 'export') &&
     isPopupExportJobId(value['jobId']) &&
     isNonNegativeInteger(value['revision']) &&
     value['revision'] > 0 &&

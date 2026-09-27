@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 import type { ViewerPackageFile } from '../../viewer/package-files';
-import { createWebSnapshotHtmlExport } from '../../viewer/html-export';
+import { createWebSnapshotHtmlExport } from '../../../features/web-snapshot/html-export';
 import { createViewablePackageFileBlob } from './asset-opening';
 
 const DOWNLOAD_URL_LIFETIME_MS = 1500;

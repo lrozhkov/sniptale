@@ -3,15 +3,25 @@ import {
   collectWebSnapshotQueryRoots,
   isWebSnapshotXhtml,
   sanitizeWebSnapshotXhtml,
+  serializeWebSnapshotXhtmlDocument,
   resolveWebSnapshotLocalAssetReference,
   sanitizeWebSnapshotCssText,
   sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotHtml,
   sanitizeWebSnapshotStylesheetText,
   sanitizeWebSnapshotSvgText,
-} from '../../features/web-snapshot/public';
+} from './public';
 import { blobToDataUrl } from '../../platform/media-utils/data-url';
-import type { LoadedWebSnapshotPackage } from './assets';
+import type { PagePackageManifest } from '@sniptale/runtime-contracts/page-package';
+
+/** Verified web-copy inputs; callers own archive validation and resource lifetime. */
+export interface WebSnapshotHtmlExportInput {
+  html: string;
+  assetBasePath?: string;
+  manifest: Pick<PagePackageManifest, 'source' | 'capturedAt'>;
+  assets: Array<{ path: string; mimeType: string; url: string }>;
+  extractPackageFile: (path: string) => Promise<Blob>;
+}
 
 const MAX_EXPORT_CHARACTERS = 350 * 1024 * 1024;
 const MAX_CSS_DEPTH = 32;
@@ -39,7 +49,7 @@ function cssDataUrl(css: string): string {
 }
 
 async function createEmbeddedAssets(
-  loaded: LoadedWebSnapshotPackage
+  loaded: WebSnapshotHtmlExportInput
 ): Promise<Map<string, string>> {
   const urlsByPath = new Map<string, string>();
   const stylesByPath = new Map<string, string>();
@@ -92,16 +102,24 @@ async function createEmbeddedAssets(
   return new Map(loaded.assets.map((asset) => [asset.url, urlsByPath.get(asset.path)!]));
 }
 
-function rewriteDocument(document: Document, embedded: Map<string, string>): void {
+function rewriteDocument(
+  document: Document,
+  embedded: Map<string, string>,
+  sourcePath?: string
+): void {
+  const paths = new Set(embedded.keys());
   let expandedSize = document.documentElement.outerHTML.length;
   const resolve = (value: string): string | null => {
     const fragmentIndex = value.indexOf('#');
     const base = fragmentIndex < 0 ? value : value.slice(0, fragmentIndex);
-    const url = embedded.get(base);
+    const reference = sourcePath
+      ? resolveWebSnapshotLocalAssetReference(value, sourcePath, paths)
+      : null;
+    const url = embedded.get(reference?.path ?? base);
     if (url) {
       expandedSize += url.length;
       assertExportSize(expandedSize);
-      return url + (fragmentIndex < 0 ? '' : value.slice(fragmentIndex));
+      return url + (reference?.fragment ?? (fragmentIndex < 0 ? '' : value.slice(fragmentIndex)));
     }
     return value.startsWith('#') || value.startsWith('data:') ? value : null;
   };
@@ -118,7 +136,16 @@ function rewriteDocument(document: Document, embedded: Map<string, string>): voi
       if (srcset) {
         element.setAttribute(
           'srcset',
-          srcset.replace(/blob:[^\s,]+/gu, (url) => resolve(url) ?? '')
+          sourcePath
+            ? srcset
+                .split(',')
+                .flatMap((candidate) => {
+                  const [url = '', ...descriptor] = candidate.trim().split(/\s+/u);
+                  const resolved = resolve(url);
+                  return resolved ? [`${resolved} ${descriptor.join(' ')}`.trim()] : [];
+                })
+                .join(', ')
+            : srcset.replace(/blob:[^\s,]+/gu, (url) => resolve(url) ?? '')
         );
       }
       const style = element.getAttribute('style');
@@ -130,7 +157,7 @@ function rewriteDocument(document: Document, embedded: Map<string, string>): voi
   }
 }
 
-function normalizeHtmlSource(loaded: LoadedWebSnapshotPackage): string {
+function normalizeHtmlSource(loaded: WebSnapshotHtmlExportInput): string {
   if (!isWebSnapshotXhtml(loaded.html)) return loaded.html;
   const xhtml = sanitizeWebSnapshotXhtml(loaded.html, loaded.manifest.source.url, {
     allowedObjectUrls: loaded.assets.map((asset) => asset.url),
@@ -151,10 +178,22 @@ function normalizeHtmlSource(loaded: LoadedWebSnapshotPackage): string {
 }
 
 /** Build a passive, standalone HTML artifact from the verified saved web copy. */
-export async function createWebSnapshotHtmlExport(loaded: LoadedWebSnapshotPackage): Promise<{
+export async function createWebSnapshotHtmlExport(loaded: WebSnapshotHtmlExportInput): Promise<{
   blob: Blob;
   filename: string;
 }> {
+  if (loaded.assetBasePath) {
+    const source = new DOMParser().parseFromString(
+      loaded.html,
+      isWebSnapshotXhtml(loaded.html) ? 'application/xhtml+xml' : 'text/html'
+    );
+    rewriteDocument(
+      source,
+      new Map(loaded.assets.map((asset) => [asset.path, asset.url])),
+      loaded.assetBasePath
+    );
+    loaded = { ...loaded, html: serializeWebSnapshotXhtmlDocument(source) };
+  }
   const embedded = await createEmbeddedAssets(loaded);
   const sanitized = sanitizeWebSnapshotHtml(
     normalizeHtmlSource(loaded),

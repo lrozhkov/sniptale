@@ -291,6 +291,7 @@ function throwDownloadOutcome(args: {
 export async function downloadPagePackageReference(args: {
   filename: string;
   jobId: string;
+  downloadFormat?: 'html';
   reference: AssetRef;
   signal: AbortSignal;
 }): Promise<void> {
@@ -309,6 +310,7 @@ export async function downloadPagePackageReference(args: {
       gateway.create({
         downloadOperationId: operationId,
         filename: args.filename,
+        ...(args.downloadFormat ? { downloadFormat: args.downloadFormat } : {}),
         reference: args.reference,
         signal: args.signal,
       })

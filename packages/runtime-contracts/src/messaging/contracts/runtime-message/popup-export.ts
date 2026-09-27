@@ -36,6 +36,7 @@ type PopupExportBuildPackageResourcePolicy =
 export type RuntimePopupExportRequestByType = {
   [MessageType.START_PAGE_PACKAGE_JOB]: {
     type: typeof MessageType.START_PAGE_PACKAGE_JOB;
+    downloadFormat?: 'html';
     includeWebCopy: boolean;
     intent: 'export' | 'save';
     jobId: string;

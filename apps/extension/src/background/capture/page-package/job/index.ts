@@ -57,8 +57,12 @@ export { assertActivePopupExportStageBinding } from './active-job';
 function assertPagePackageStartInvariants(args: {
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
   options: ExportOptions;
 }): void {
+  if (args.downloadFormat === 'html' && (args.intent !== 'export' || !args.includeWebCopy)) {
+    throw new Error('HTML download requires an exported Web copy.');
+  }
   if (args.intent !== 'save') return;
   if (!args.includeWebCopy) throw new Error('Saved Page Packages require a Web copy.');
   if (!args.options.includeFullPageScreenshot) {
@@ -70,6 +74,7 @@ function createPopupExportJob(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -101,6 +106,7 @@ function createPopupExportJob(args: {
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {
+      ...(args.downloadFormat ? { downloadFormat: args.downloadFormat } : {}),
       effectiveComponentPlan: createEffectiveComponentPlan(
         args.intent,
         effectiveOptions,
@@ -205,6 +211,7 @@ export async function startPagePackageJob(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -237,6 +244,7 @@ export async function startPagePackageJobFromSources(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;

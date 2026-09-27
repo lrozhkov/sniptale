@@ -60,3 +60,17 @@ describe('Page Package offscreen download lease contracts', () => {
     ).toThrow();
   });
 });
+
+it('validates the explicit HTML conversion format at the offscreen boundary', () => {
+  const request = {
+    type: MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+    capabilityToken: 'capability',
+    downloadOperationId: 'html-op',
+    filename: 'page.html',
+    reference,
+  };
+  expect(parseRuntimeRequestMessage({ ...request, downloadFormat: 'html' })).toMatchObject({
+    downloadFormat: 'html',
+  });
+  expect(() => parseRuntimeRequestMessage({ ...request, downloadFormat: 'exe' })).toThrow();
+});

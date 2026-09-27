@@ -2,7 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
 
 import { translate } from '../../../../platform/i18n/popup';
-import { ExportDataTypeSection } from '../data-type/section';
+import { ExportDataTypeSection, WebCopyResourceControls } from '../data-type/section';
 import { ExportPagesSection } from '../pages/section';
 import type { PopupExportTabItem } from '../selection/tabs/types';
 import type { PopupPagePackagePreferenceState } from '../session/types';
@@ -87,6 +87,18 @@ function renderDataTypeSection(
   onOpenSettings: () => void,
   captureBehavior: ReturnType<typeof usePackageCaptureBehaviorPreferences>
 ) {
+  if (destination === 'html') {
+    return (
+      <div className="max-h-[220px] overflow-y-auto text-[11px] text-[var(--sniptale-color-text-secondary)]">
+        <p>{translate('popup.export.packageDestinationHtmlDescription')}</p>
+        <WebCopyResourceControls
+          disabled={props.disabled}
+          resources={props.webCopyResources}
+          offlineOnly
+        />
+      </div>
+    );
+  }
   return (
     <ExportDataTypeSection
       disabled={props.disabled}

@@ -205,6 +205,7 @@ export interface PagePackageJobTab {
 }
 
 export interface PagePackageJobStatusV1 {
+  downloadFormat?: 'html';
   activatedTabIds: number[];
   effectiveComponentPlan: PagePackageEffectiveComponentPlanV1;
   effectiveOptions: PagePackageExportOptionsV1;

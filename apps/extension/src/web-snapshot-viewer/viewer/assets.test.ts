@@ -658,7 +658,7 @@ it('exports a loaded package with real verified web-copy extraction as standalon
     },
   });
   const loaded = await loadWebSnapshotPackage('snapshot-1');
-  const { createWebSnapshotHtmlExport } = await import('./html-export');
+  const { createWebSnapshotHtmlExport } = await import('../../features/web-snapshot/html-export');
   const artifact = await createWebSnapshotHtmlExport(loaded);
   const html = await readTestBlobText(artifact.blob);
   expect(html).toContain('data:image/png;base64,');

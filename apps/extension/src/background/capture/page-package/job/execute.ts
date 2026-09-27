@@ -332,6 +332,7 @@ async function completeExportJob(
   const result = await downloadValidatedPagePackages({
     errors: state.errors,
     failedPages: failedDownloadPages(job),
+    ...(job.status.downloadFormat ? { downloadFormat: job.status.downloadFormat } : {}),
     jobId: job.status.jobId,
     packages,
     requestedPageCount: job.status.orderedTabs.length,

@@ -18,6 +18,7 @@ type PagePackageDownloadOffscreenGateway = {
   create(args: {
     downloadOperationId: string;
     filename: string;
+    downloadFormat?: 'html';
     reference: AssetRef;
     signal: AbortSignal;
   }): Promise<PagePackageDownloadLease>;
@@ -37,6 +38,7 @@ export function createPagePackageDownloadOffscreenGateway(): PagePackageDownload
           type: MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
           downloadOperationId: args.downloadOperationId,
           filename: args.filename,
+          ...(args.downloadFormat ? { downloadFormat: args.downloadFormat } : {}),
           reference: args.reference,
         })
       );

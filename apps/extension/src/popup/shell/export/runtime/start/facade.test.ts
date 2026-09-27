@@ -323,3 +323,30 @@ it('normalizes browser titles and caps generated start requests to the contract 
       .byteLength
   ).toBeLessThanOrEqual(2 * 1024);
 });
+
+it('launches HTML with a fixed web-copy plan even when no ZIP components are selected', async () => {
+  const state = createStartState();
+  state.canExport = false;
+  state.includeFiles = true;
+  state.includeJson = true;
+  const deps = createStartDeps();
+  await startPopupExportImpl(state, deps, 'export', 'html');
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      downloadFormat: 'html',
+      intent: 'export',
+      includeWebCopy: true,
+      sources: [{ kind: 'tab', tabId: 42, title: 'Page' }],
+      options: expect.objectContaining({
+        includeFiles: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includeBasicLogs: false,
+        includePageDiagnostics: false,
+      }),
+    })
+  );
+  await startPopupExportImpl(state, deps, 'export', 'html');
+  expect(deps.sendStartJobMessage).toHaveBeenCalledTimes(1);
+});

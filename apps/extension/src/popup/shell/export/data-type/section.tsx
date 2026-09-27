@@ -295,7 +295,8 @@ function QuickSelection(props: {
   );
 }
 
-function WebCopyResourceControls(props: {
+export function WebCopyResourceControls(props: {
+  offlineOnly?: boolean;
   disabled: boolean;
   resources: WebCopyResourcePreferences;
 }) {
@@ -331,25 +332,30 @@ function WebCopyResourceControls(props: {
   ];
   return (
     <div className="ml-5 pl-3">
-      {items.map((item) => (
-        <label key={item.label} className="flex items-start gap-2 py-1.5">
-          <input
-            type="checkbox"
-            className={checkboxClassName}
-            checked={item.checked}
-            disabled={props.disabled || item.pending || props.resources.pending !== null}
-            onChange={(event) => void item.setChecked(event.currentTarget.checked)}
-          />
-          <span className="min-w-0">
-            <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
-              {item.label}
+      {items
+        .filter(
+          (item) =>
+            !props.offlineOnly || item.setChecked !== props.resources.setExternalLinksEnabled
+        )
+        .map((item) => (
+          <label key={item.label} className="flex items-start gap-2 py-1.5">
+            <input
+              type="checkbox"
+              className={checkboxClassName}
+              checked={item.checked}
+              disabled={props.disabled || item.pending || props.resources.pending !== null}
+              onChange={(event) => void item.setChecked(event.currentTarget.checked)}
+            />
+            <span className="min-w-0">
+              <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+                {item.label}
+              </span>
+              <span className="block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+                {item.description}
+              </span>
             </span>
-            <span className="block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
-              {item.description}
-            </span>
-          </span>
-        </label>
-      ))}
+          </label>
+        ))}
       {props.resources.error ? (
         <div role="status" className="pb-1 text-[10px] text-[var(--sniptale-color-danger)]">
           {translate('popup.export.webCopyResourceSettingsError')}

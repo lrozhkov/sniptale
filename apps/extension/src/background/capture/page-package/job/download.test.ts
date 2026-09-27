@@ -680,3 +680,38 @@ it('rejects an empty staged collection and delegates job release to staging auth
   const { pagePackageJobStaging } = await import('./stage-route');
   expect(pagePackageJobStaging.releaseJob).toHaveBeenCalledWith('job-1');
 });
+
+it('downloads selected pages sequentially as HTML through the tracked lease lifecycle', async () => {
+  const args = singlePageArgs();
+  args.packages.push({
+    ...args.packages[0]!,
+    descriptor: { ...args.packages[0]!.descriptor, ordinal: 1, stagedBlobId: 'stage-2' },
+  });
+  args.requestedPageCount = 2;
+  const result = await downloadCollectedPagePackages({ ...args, downloadFormat: 'html' });
+  expect(result.pageCount).toBe(2);
+  expect(mocks.createLease).toHaveBeenCalledTimes(2);
+  expect(mocks.createLease).toHaveBeenCalledWith(
+    expect.objectContaining({ downloadFormat: 'html' })
+  );
+  expect(mocks.cleanupOutput.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.createLease.mock.invocationCallOrder[1]!
+  );
+  expect(mocks.writeCollection).not.toHaveBeenCalled();
+});
+
+it('does not begin the next HTML download after cancellation', async () => {
+  const controller = new AbortController();
+  const args = singlePageArgs(controller.signal);
+  args.packages.push({
+    ...args.packages[0]!,
+    descriptor: { ...args.packages[0]!.descriptor, ordinal: 1, stagedBlobId: 'stage-2' },
+  });
+  mocks.cleanupOutput.mockImplementationOnce(async () => {
+    controller.abort();
+  });
+  await expect(
+    downloadCollectedPagePackages({ ...args, downloadFormat: 'html', requestedPageCount: 2 })
+  ).rejects.toThrow();
+  expect(mocks.createLease).toHaveBeenCalledTimes(1);
+});

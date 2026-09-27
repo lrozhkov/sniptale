@@ -40,7 +40,7 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   createLogger: () => ({ error: mocks.loggerError, warn: mocks.loggerWarn }),
 }));
 
-vi.mock('../../viewer/html-export', () => ({
+vi.mock('../../../features/web-snapshot/html-export', () => ({
   createWebSnapshotHtmlExport: mocks.createWebSnapshotHtmlExport,
 }));
 

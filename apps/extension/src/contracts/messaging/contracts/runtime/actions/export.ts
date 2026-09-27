@@ -103,6 +103,7 @@ export const runtimeActionExportMessageContracts = {
       'runtime START_PAGE_PACKAGE_JOB message',
       createMessageGuard({
         type: MessageType.START_PAGE_PACKAGE_JOB,
+        optional: { downloadFormat: (value) => value === 'html' },
         required: {
           includeWebCopy: (value) => typeof value === 'boolean',
           intent: (value) => value === 'export' || value === 'save',

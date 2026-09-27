@@ -158,7 +158,7 @@ export function ExportPage({
     ? translate('popup.common.restrictedPageFeatures')
     : null;
   const canExport =
-    destination === 'save'
+    destination !== 'export'
       ? controller.state.preferences.hasLoadedPreferences &&
         controller.state.tabs.selectedCount > 0 &&
         controller.state.derived.exportDisabledReason === null &&
@@ -171,7 +171,8 @@ export function ExportPage({
     canExport,
     controller,
     exportDisabledTitle,
-    onRequestExport: () => void controller.actions.handleStartExport(),
+    onRequestExport: () =>
+      void controller.actions.handleStartExport(destination === 'html' ? 'html' : undefined),
     ...(destination === 'save'
       ? { onRequestWebSnapshotSave: () => void controller.actions.handleSaveWebSnapshot() }
       : {}),
@@ -184,7 +185,7 @@ export function ExportPage({
       footerProps={footerProps}
       onDestinationChange={(nextDestination) => {
         setDestination(nextDestination);
-        void savePopupLastExportDestination(nextDestination);
+        if (nextDestination !== 'html') void savePopupLastExportDestination(nextDestination);
       }}
       webCopyResources={webCopyResources}
     />

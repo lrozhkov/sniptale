@@ -13,7 +13,10 @@ export function createPopupExportRuntimeActions(
   return {
     handleCopyJson: () => copyPopupExportPreview(state, 'json', deps),
     handleCopyMarkdown: () => copyPopupExportPreview(state, 'markdown', deps),
-    handleStartExport: () => startPopupExport(state, deps),
+    handleStartExport: (downloadFormat?: 'html') =>
+      downloadFormat
+        ? startPopupExport(state, deps, 'export', downloadFormat)
+        : startPopupExport(state, deps),
     handleSaveWebSnapshot: () => startPopupExport(state, deps, 'save'),
     handleCancelExport: () => cancelPopupExport(state, deps),
     handleResetExportView: () => resetPopupExportView(state, deps),

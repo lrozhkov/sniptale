@@ -665,3 +665,21 @@ it('erasure aborts an active job, waits for it, and clears persisted state', asy
   expect(mocks.clearStatus).toHaveBeenCalledOnce();
   expect(mocks.clearStatus).toHaveBeenCalledWith('job-1');
 });
+
+it.each([
+  { includeWebCopy: false, intent: 'export' as const },
+  { includeWebCopy: true, intent: 'save' as const },
+])('rejects HTML without export web-copy authority: %j', async (plan) => {
+  await expect(
+    startPagePackageJob({
+      ...plan,
+      downloadFormat: 'html',
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      jobId: 'html-invalid',
+      options,
+      orderedTabs: tabs,
+      warnings: [],
+    })
+  ).rejects.toThrow('HTML download requires an exported Web copy');
+  expect(mocks.reconcileTemporaryTabs).not.toHaveBeenCalled();
+});
