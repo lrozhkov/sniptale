@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe('EditorInspectorSizePanel', () => {
-  it('renders compact size controls with inline aspect action and apply button', () => {
+  it('renders aligned size controls with a labeled aspect action and apply button', () => {
     const onApply = vi.fn();
     const onToggleLock = vi.fn();
 
@@ -82,10 +82,11 @@ describe('EditorInspectorSizePanel', () => {
     expect(rowChildren[0]?.querySelector('[aria-label="editor.compact.widthDimension"]')).not.toBe(
       null
     );
-    expect(rowChildren[1]?.getAttribute('title')).toBe('editor.compact.keepAspectRatio');
     expect(
-      rowChildren[2]?.querySelector('[aria-label="editor.compact.heightDimension"]')
+      rowChildren[1]?.querySelector('[aria-label="editor.compact.heightDimension"]')
     ).not.toBeNull();
+    expect(rowChildren[2]?.getAttribute('title')).toBe('editor.compact.keepAspectRatio');
+    expect(rowChildren[2]?.textContent).toContain('editor.compact.keepAspectRatio');
     expect(applyButton?.className).toContain('border-none');
     expect(applyButton?.className).toContain('h-10 min-h-10');
     expect(onToggleLock).toHaveBeenCalledOnce();

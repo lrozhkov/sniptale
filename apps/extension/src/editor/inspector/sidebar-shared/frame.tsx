@@ -48,10 +48,11 @@ function CompactAspectToggle({ checked, onClick }: AspectToggleProps) {
       title={title}
       aria-pressed={checked}
       active={checked}
-      className="h-8 w-8"
+      className="col-span-2 h-8 w-fit max-w-full justify-self-start gap-1.5 px-2 text-xs font-medium"
       onClick={onClick}
     >
-      <Link2 size={16} strokeWidth={2} />
+      <Link2 size={16} strokeWidth={2} aria-hidden="true" className="shrink-0" />
+      <span>{title}</span>
     </EditorIconButton>
   );
 }

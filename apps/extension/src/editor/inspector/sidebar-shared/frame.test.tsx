@@ -108,7 +108,7 @@ it('renders the aspect toggle and reflects checked state in the status text', ()
   expect(onClick).toHaveBeenCalledOnce();
 });
 
-it('renders a compact aspect toggle for inline size controls', () => {
+it('renders a labeled compact aspect toggle with pressed state', () => {
   const onClick = vi.fn();
   renderAspectToggle(<AspectToggle checked compact onClick={onClick} />);
 
@@ -119,6 +119,7 @@ it('renders a compact aspect toggle for inline size controls', () => {
 
   expect(button?.title).toBe('editor.compact.keepAspectRatio');
   expect(button?.getAttribute('aria-pressed')).toBe('true');
+  expect(button?.textContent).toBe('editor.compact.keepAspectRatio');
   expect(container?.textContent).not.toContain('editor.compact.linked');
   expect(onClick).toHaveBeenCalledOnce();
 });
