@@ -29,9 +29,9 @@ it('renders a draft badge and compact autosave marker while routing quick action
   expect(container?.querySelector('[data-storage-class="temporary"]')?.className).toContain(
     'border'
   );
-  expect(container?.querySelector('[data-state="saved"]')?.getAttribute('aria-label')).toBe(
-    translate('common.states.saved')
-  );
+  expect(
+    container?.querySelector('[data-ui="autosave-control"] button')?.getAttribute('aria-label')
+  ).toContain(translate('common.states.saved'));
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.file-menu-button"]')
   ).toBeNull();
@@ -79,12 +79,11 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
   renderDocumentBar(createProps({}, controller));
   await act(async () => Promise.resolve());
 
-  const actionIds = Array.from(container?.querySelectorAll('button') ?? []).map((button) =>
-    button.getAttribute('data-ui')
-  );
+  const actionIds = Array.from(
+    container?.querySelectorAll('[data-ui="editor.floating.document-bar"] button') ?? []
+  ).map((button) => button.getAttribute('data-ui'));
   expect(actionIds).toEqual([
     'editor.floating.document-bar.title',
-    'editor.floating.document-bar.autosave-trigger',
     'editor.floating.document-bar.promote-button',
     'editor.floating.document-bar.save-button',
     'editor.floating.document-bar.save-as-button',
@@ -270,6 +269,7 @@ it('keeps stale-copy actions disabled while promotion owns the aggregate lock', 
   const commit = createDeferred<void>();
   mocks.commitImagePresentation.mockImplementationOnce(() => commit.promise);
   mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
+  storeState.value.saveState = 'error';
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
@@ -388,6 +388,7 @@ it('does not rebind a stale conflict copy after an A to B to A activation change
   const copy = createDeferred<string>();
   mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
   mocks.saveImageAggregateCopyFromDocument.mockImplementationOnce(() => copy.promise);
+  storeState.value.saveState = 'error';
   renderDocumentBar();
   const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
@@ -508,12 +509,9 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
     renderDocumentBar();
     await act(async () => Promise.resolve());
     expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-    const status = container?.querySelector(`[data-state="${state.saveState}"]`);
-    expect(status?.getAttribute('aria-label')).toBe(expectedLabel);
-    expect(status?.getAttribute('title')).toBe(expectedLabel);
-    expect(status?.textContent).toBe(
-      state.saveState === 'saved' || state.saveState === 'saving' ? '' : expectedLabel
-    );
+    const status = container?.querySelector('[data-ui="autosave-control"] button');
+    expect(status?.getAttribute('aria-label')).toContain(expectedLabel);
+    expect(status?.getAttribute('title')).toContain(expectedLabel);
     expect(container?.textContent).not.toContain('Disk error');
     unmountDocumentBar();
   };
@@ -543,7 +541,7 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
       saveState: 'error',
       sessionId: 'asset-1',
     },
-    translate('common.states.error')
+    translate('editor.documentActions.saveErrorTitle')
   );
   await renderStatus(
     { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'idle', sessionId: 'asset-1' },
@@ -551,26 +549,30 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
   );
 });
 
-it('toggles autosave in its anchored status popover and keeps the library control icon-only', async () => {
+it('toggles autosave in its shared status popover and keeps the library control icon-only', async () => {
   renderDocumentBar();
   await act(async () => Promise.resolve());
-  const trigger = getButton('editor.floating.document-bar.autosave-trigger');
-  expect(trigger.getAttribute('data-state')).toBe('saved');
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="autosave-control"] button'
+  );
+  if (!trigger) throw new Error('Missing autosave trigger');
+  expect(trigger.getAttribute('aria-label')).toContain(translate('common.states.saved'));
   act(() => trigger.click());
-  const popover = document.querySelector('#editor-autosave-status');
+  const popover = document.querySelector('[role="dialog"]');
   expect(popover?.textContent).toContain(translate('editor.documentActions.autosaveOnDescription'));
   const toggle = popover?.querySelector<HTMLInputElement>('input[role="switch"]');
   expect(toggle?.checked).toBe(true);
   act(() => toggle?.click());
   expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(false, expect.any(Function));
-  expect(trigger.getAttribute('data-state')).toBe('off');
-  expect(trigger.textContent).toBe(translate('editor.documentActions.autosaveOffStatus'));
+  expect(trigger.getAttribute('aria-label')).toContain(
+    translate('editor.documentActions.autosaveOffStatus')
+  );
   expect(popover?.textContent).toContain(
     translate('editor.documentActions.autosaveOffDescription')
   );
   act(() => toggle?.click());
   expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(true, expect.any(Function));
-  expect(trigger.getAttribute('data-state')).toBe('saved');
+  expect(trigger.getAttribute('aria-label')).toContain(translate('common.states.saved'));
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
   expect(document.activeElement).toBe(trigger);
@@ -607,18 +609,18 @@ it('automatically opens a new error after recovery and never exposes diagnostic 
   storeState.value.saveErrorMessage = 'internal-record-id=secret';
   renderDocumentBar();
   await act(async () => Promise.resolve());
-  let trigger = container?.querySelector<HTMLButtonElement>('[data-state="error"]');
-  expect(document.querySelector('#editor-save-error')?.textContent).toContain(
+  let trigger = container?.querySelector<HTMLButtonElement>('[data-ui="autosave-control"] button');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
     translate('editor.documentActions.saveErrorDescription')
   );
   expect(document.body.textContent).not.toContain('internal-record-id');
   act(() => trigger?.click());
   storeState.value.saveState = 'saved';
   rerenderDocumentBar();
-  expect(document.querySelector('#editor-save-error')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   storeState.value.saveState = 'error';
   rerenderDocumentBar();
-  trigger = container?.querySelector<HTMLButtonElement>('[data-state="error"]');
+  trigger = container?.querySelector<HTMLButtonElement>('[data-ui="autosave-control"] button');
   expect(trigger?.getAttribute('aria-expanded')).toBe('true');
 });
 
@@ -628,17 +630,19 @@ it('keeps autosave control reachable after a failed save while the mode is off',
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
-  expect(
-    container?.querySelector('[data-ui="editor.floating.document-bar.error-trigger"]')
-  ).not.toBeNull();
-  const trigger = getButton('editor.floating.document-bar.autosave-trigger');
-  expect(trigger.getAttribute('data-state')).toBe('off');
-  act(() => trigger.click());
-  const toggle = document.querySelector<HTMLInputElement>(
-    '#editor-autosave-status input[role="switch"]'
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="autosave-control"] button'
   );
+  if (!trigger) throw new Error('Missing autosave trigger');
+  expect(trigger.getAttribute('aria-label')).toContain(
+    translate('editor.documentActions.saveErrorTitle')
+  );
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  const toggle = document.querySelector<HTMLInputElement>('[role="dialog"] input[role="switch"]');
   expect(toggle?.checked).toBe(false);
   act(() => toggle?.click());
   expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(true, expect.any(Function));
-  expect(trigger.getAttribute('data-state')).toBe('autosave-settings');
+  expect(trigger.getAttribute('aria-label')).toContain(
+    translate('editor.documentActions.saveErrorTitle')
+  );
 });

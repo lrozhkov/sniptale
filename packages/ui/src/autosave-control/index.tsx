@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { AlertCircle, Check, Circle, LoaderCircle, PauseCircle, X } from 'lucide-react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { CloudAlert, CloudCheck, CloudOff, CloudSync, X } from 'lucide-react';
 import { ContentToolbarButton } from '../content-toolbar';
 import { useGlassSelectOverlay } from '../glass-select/overlay-state';
 import { ContentPopoverAdapter } from '../content-popover-adapter';
@@ -8,8 +8,12 @@ type AutosaveControlProps = {
   enabled: boolean;
   state: 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';
   onChange(enabled: boolean): void;
+  actions?: ReactNode;
+  openOnError?: boolean;
   labels: {
     title: string;
+    switch: string;
+    errorDescription: string;
     on: string;
     off: string;
     paused: string;
@@ -35,11 +39,47 @@ function useSavingIndicator(saving: boolean) {
 
 function statusPresentation(props: AutosaveControlProps, spinning: boolean) {
   if (props.state === 'error' || props.state === 'conflict') {
-    return { label: props.labels[props.state], Icon: AlertCircle, failed: true };
+    return { label: props.labels[props.state], Icon: CloudAlert, tone: 'danger' as const };
   }
-  if (!props.enabled) return { label: props.labels.paused, Icon: PauseCircle, failed: false };
-  const Icon = props.state === 'saved' ? Check : Circle;
-  return { label: props.labels[props.state], Icon: spinning ? LoaderCircle : Icon, failed: false };
+  if (!props.enabled) {
+    return { label: props.labels.paused, Icon: CloudOff, tone: 'warning' as const };
+  }
+  if (props.state === 'saving') {
+    return {
+      label: props.labels.saving,
+      Icon: CloudSync,
+      tone: spinning ? ('sync' as const) : ('neutral' as const),
+    };
+  }
+  return { label: props.labels[props.state], Icon: CloudCheck, tone: 'success' as const };
+}
+
+function AutosaveStatusIcon(props: {
+  props: AutosaveControlProps;
+  spinning: boolean;
+  size: number;
+}) {
+  const { Icon, tone } = statusPresentation(props.props, props.spinning);
+  return (
+    <Icon
+      size={props.size}
+      aria-hidden="true"
+      className={
+        tone === 'success'
+          ? '[&>path:first-child]:stroke-[var(--sniptale-color-success)]'
+          : tone === 'sync'
+            ? [
+                '[&>path:not(:nth-child(3))]:motion-safe:animate-spin',
+                '[&>path:not(:nth-child(3))]:[transform-origin:12px_16px]',
+              ].join(' ')
+            : tone === 'danger'
+              ? 'text-[var(--sniptale-color-danger)]'
+              : tone === 'warning'
+                ? 'text-[var(--sniptale-color-warning)]'
+                : undefined
+      }
+    />
+  );
 }
 
 function useAutosavePopover() {
@@ -74,7 +114,12 @@ export function AutosaveControl(props: AutosaveControlProps) {
   const popover = useAutosavePopover();
   const { open, setOpen, anchor, trigger, id } = popover;
   const spinning = useSavingIndicator(props.enabled && props.state === 'saving');
-  const { label, Icon } = statusPresentation(props, spinning);
+  const { label, tone } = statusPresentation(props, spinning);
+  useEffect(() => {
+    if (props.openOnError && (props.state === 'error' || props.state === 'conflict')) {
+      setOpen(true);
+    }
+  }, [props.openOnError, props.state, setOpen]);
   return (
     <div ref={anchor} className="inline-flex shrink-0 items-center" data-ui="autosave-control">
       <ContentToolbarButton
@@ -85,22 +130,16 @@ export function AutosaveControl(props: AutosaveControlProps) {
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-controls={open ? id : undefined}
-        className="!h-8 !w-8 !min-w-8 !px-0"
+        className={[
+          '!h-8 !w-8 !min-w-8 !px-0',
+          tone === 'danger' ? '!text-[var(--sniptale-color-danger)]' : '',
+          tone === 'warning' ? '!text-[var(--sniptale-color-warning)]' : '',
+        ].join(' ')}
         onClick={() => setOpen(!open)}
       >
-        <Icon
-          size={14}
-          aria-hidden="true"
-          className={
-            spinning
-              ? 'motion-safe:animate-spin'
-              : props.enabled && props.state === 'saved'
-                ? 'text-[var(--sniptale-color-success)]'
-                : undefined
-          }
-        />
+        <AutosaveStatusIcon props={props} spinning={spinning} size={17} />
       </ContentToolbarButton>
-      <AutosavePopover props={props} popover={popover} />
+      <AutosavePopover props={props} popover={popover} spinning={spinning} />
     </div>
   );
 }
@@ -108,13 +147,15 @@ export function AutosaveControl(props: AutosaveControlProps) {
 function AutosavePopover({
   props,
   popover,
+  spinning,
 }: {
   props: AutosaveControlProps;
   popover: ReturnType<typeof useAutosavePopover>;
+  spinning: boolean;
 }) {
   const { open, anchor, layer, id, portalStyle, menuPosition, close } = popover;
-  const { failed, label } = statusPresentation(props, false);
-  const StatusIcon = failed ? AlertCircle : props.enabled ? Check : PauseCircle;
+  const { label, tone } = statusPresentation(props, spinning);
+  const failed = tone === 'danger';
   const rect = anchor.current?.getBoundingClientRect();
   const arrow = Math.max(
     12,
@@ -150,23 +191,12 @@ function AutosavePopover({
         onKeyDown={(event) => handlePopoverKeyDown(event, close)}
       >
         <div className="flex items-start gap-2">
-          <StatusIcon
-            size={16}
-            aria-hidden="true"
-            className={[
-              'mt-0.5 shrink-0',
-              failed
-                ? 'text-[var(--sniptale-color-danger)]'
-                : props.enabled
-                  ? 'text-[var(--sniptale-color-success)]'
-                  : 'text-[var(--sniptale-color-text-secondary)]',
-            ].join(' ')}
-          />
+          <AutosaveStatusIcon props={props} spinning={spinning} size={16} />
           <h3
             id={id + '-title'}
             className="min-w-0 flex-1 text-sm font-medium text-[var(--sniptale-color-text-primary)]"
           >
-            {props.labels.title}
+            {failed ? props.labels.error : label}
           </h3>
           <ContentToolbarButton
             title={props.labels.close}
@@ -181,10 +211,13 @@ function AutosavePopover({
         </p>
         <AutosaveSwitch props={props} />
         {failed && (
-          <p className="text-xs leading-relaxed text-[var(--sniptale-color-danger)]" role="alert">
-            {label}
-          </p>
+          <div role="alert" className="text-xs leading-relaxed text-[var(--sniptale-color-danger)]">
+            {props.state === 'conflict' ? props.labels.conflict : props.labels.errorDescription}
+          </div>
         )}
+        {failed && props.actions ? (
+          <div className="flex flex-wrap gap-2">{props.actions}</div>
+        ) : null}
       </div>
     </ContentPopoverAdapter>
   );
@@ -198,7 +231,7 @@ function AutosaveSwitch({ props }: { props: AutosaveControlProps }) {
         'text-xs text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
     >
-      {props.labels.title}
+      {props.labels.switch}
       <input
         type="checkbox"
         role="switch"
@@ -213,7 +246,7 @@ function AutosaveSwitch({ props }: { props: AutosaveControlProps }) {
           'relative h-5 w-9 shrink-0 rounded-full border border-[var(--sniptale-color-border-soft)]',
           'bg-[var(--sniptale-color-surface-hover)] transition-colors',
           'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
-          'peer-checked:bg-[var(--sniptale-color-accent)]',
+          'peer-checked:bg-[var(--sniptale-color-text-secondary)]',
           'before:absolute before:left-0.5 before:top-0.5 before:size-3.5 before:rounded-full',
           'before:bg-[var(--sniptale-color-surface-panel)] before:shadow-sm',
           'before:transition-transform peer-checked:before:translate-x-4',

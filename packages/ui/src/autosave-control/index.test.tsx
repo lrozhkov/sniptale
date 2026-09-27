@@ -7,6 +7,8 @@ let host: HTMLDivElement;
 let root: Root;
 const labels = {
   title: 'Autosave',
+  switch: 'Automatically',
+  errorDescription: 'Latest edits were not saved',
   on: 'Saved automatically',
   off: 'Edits stay here',
   paused: 'Not saving',
@@ -54,25 +56,55 @@ it('opens a themed disclosure, toggles the setting and restores focus on Escape'
 });
 it('does not flash a spinner for short saves and respects reduced motion', () => {
   draw({ state: 'saving' });
+  expect(host.querySelector('.lucide-cloud-sync')).not.toBeNull();
   act(() => vi.advanceTimersByTime(200));
-  expect(host.querySelector('.motion-safe\\:animate-spin')).toBeNull();
+  expect(host.querySelector('.lucide-cloud-sync path[class]')).toBeNull();
   draw({ state: 'saved' });
+  expect(host.querySelector('.lucide-cloud-check')).not.toBeNull();
   act(() => vi.advanceTimersByTime(500));
-  expect(host.querySelector('.motion-safe\\:animate-spin')).toBeNull();
+  expect(host.querySelector('.lucide-cloud-sync')).toBeNull();
   draw({ state: 'saving' });
   act(() => vi.advanceTimersByTime(350));
-  expect(host.querySelector('.motion-safe\\:animate-spin')).not.toBeNull();
+  expect(host.querySelector('.lucide-cloud-sync')?.getAttribute('class')).toContain('animate-spin');
   draw({ state: 'saved' });
-  expect(host.querySelector('.motion-safe\\:animate-spin')).toBeNull();
+  expect(host.querySelector('.lucide-cloud-sync')).toBeNull();
 });
 it('keeps conflict explanation available even with autosave disabled and dismisses outside', () => {
-  draw({ state: 'conflict', enabled: false });
+  draw({ state: 'conflict', enabled: false, actions: <button>Save copy</button> });
   const trigger = host.querySelector('button')!;
   expect(trigger.getAttribute('aria-label')).toContain(labels.conflict);
+  expect(trigger.querySelector('.lucide-cloud-alert')).not.toBeNull();
   act(() => trigger.click());
   expect(document.querySelector('[role=alert]')?.textContent).toBe(labels.conflict);
+  expect(document.querySelector('[role=dialog]')?.textContent).toContain('Save copy');
   act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
   expect(document.querySelector('[role=dialog]')).toBeNull();
+});
+
+it('uses the four requested cloud icons and a neutral, separately labelled switch', () => {
+  draw({ enabled: false, state: 'saved' });
+  expect(host.querySelector('.lucide-cloud-off')?.getAttribute('class')).toContain('color-warning');
+  act(() => host.querySelector('button')!.click());
+  const dialog = document.querySelector('[role=dialog]')!;
+  expect(dialog.textContent?.match(/Autosave/g)).toBeNull();
+  expect(dialog.textContent).toContain(labels.switch);
+  expect(
+    dialog.querySelector('.peer-checked\\:bg-\\[var\\(--sniptale-color-accent\\)\\]')
+  ).toBeNull();
+});
+
+it('prioritizes red failure over paused yellow and colors only the check when saved', () => {
+  draw({ enabled: false, state: 'error', openOnError: true });
+  expect(host.querySelector('.lucide-cloud-alert')?.getAttribute('class')).toContain(
+    'color-danger'
+  );
+  expect(
+    document.querySelector('[role=dialog] .lucide-cloud-alert')?.getAttribute('class')
+  ).toContain('color-danger');
+  draw({ enabled: true, state: 'saved' });
+  const check = host.querySelector('.lucide-cloud-check');
+  expect(check?.getAttribute('class')).toContain('path:first-child');
+  expect(check?.getAttribute('class')).not.toContain('text-[var(--sniptale-color-success)]');
 });
 
 it('contains Tab traversal and restores the trigger after document-level dismissal', () => {

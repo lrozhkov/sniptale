@@ -77,6 +77,11 @@ function useEditorPageBootstrapEffects(
   }, [services, setPageTitle, runOpen]);
 
   useEffect(() => {
+    const protectUnsaved = (event: BeforeUnloadEvent) => {
+      if (!hasImageRef.current || !services.autosaveService.hasUnsavedChanges()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
     const handlePageHide = () => flushEditorAutosaveIfNeeded(services, () => hasImageRef.current);
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -84,10 +89,12 @@ function useEditorPageBootstrapEffects(
       }
     };
 
+    window.addEventListener('beforeunload', protectUnsaved);
     window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      window.removeEventListener('beforeunload', protectUnsaved);
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };

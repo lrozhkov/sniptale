@@ -85,6 +85,17 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+it('warns before closing for a local note draft before it reaches the review session', async () => {
+  const { session } = setup();
+  const close = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+  expect(close()).toBe(true);
+  act(() => composer.change(annotation, null));
+  expect(session.getSnapshot().dirty).toBe(false);
+  expect(close()).toBe(false);
+  await act(async () => composer.flush());
+  expect(close()).toBe(true);
+});
+
 it('coalesces many field changes, restores recovery on reopen, and commits exactly one operation', async () => {
   const { session, deps, Harness } = setup();
   act(() => {

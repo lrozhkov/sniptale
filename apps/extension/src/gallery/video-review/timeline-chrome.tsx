@@ -1,10 +1,12 @@
 import { ReviewResetControl } from './reset-control';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import { Play, BetweenHorizontalStart, Undo2, Redo2, StickyNote } from 'lucide-react';
-import type { ReactNode, CSSProperties } from 'react';
+import { useState, type ReactNode, type CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
@@ -156,8 +158,11 @@ export function ReviewHistoryControls(props: {
   autosave?: {
     enabled: boolean;
     error: string | null;
+    errorMessage: string | null;
     dirty: boolean;
     saving: boolean;
+    busy: boolean;
+    onReload(): Promise<void>;
     onChange(enabled: boolean): void;
   };
 }) {
@@ -195,7 +200,15 @@ export function ReviewHistoryControls(props: {
         </ReviewButton>
       ))}
       <ReviewResetControl busy={props.busy} onReset={async () => props.onHistory('reset')} />
-      {props.autosave && <ReviewAutosaveControl {...props.autosave} />}
+      {props.autosave && (
+        <>
+          <span
+            aria-hidden="true"
+            className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
+          />
+          <ReviewAutosaveControl {...props.autosave} />
+        </>
+      )}
     </>
   );
 }
@@ -203,31 +216,66 @@ export function ReviewHistoryControls(props: {
 function ReviewAutosaveControl(props: {
   enabled: boolean;
   error: string | null;
+  errorMessage: string | null;
   dirty: boolean;
   saving: boolean;
+  busy: boolean;
+  onReload(): Promise<void>;
   onChange(enabled: boolean): void;
 }) {
+  const [confirmReload, setConfirmReload] = useState(false);
   let state: 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' = 'saved';
   if (props.dirty) state = 'dirty';
   if (props.saving) state = 'saving';
   if (props.error) state = props.error === 'conflict' ? 'conflict' : 'error';
   return (
-    <AutosaveControl
-      enabled={props.enabled}
-      onChange={props.onChange}
-      state={state}
-      labels={{
-        title: translate('editor.documentActions.autosaveTitle'),
-        on: translate('editor.documentActions.autosaveOnDescription'),
-        off: translate('editor.documentActions.autosaveOffDescription'),
-        paused: translate('editor.documentActions.autosaveOffStatus'),
-        dirty: translate('common.states.dirty'),
-        saving: translate('common.states.saving'),
-        saved: translate('common.states.saved'),
-        error: translate('editor.documentActions.saveErrorTitle'),
-        conflict: translate('editor.documentActions.autosaveConflict'),
-        close: translate('common.actions.close'),
-      }}
-    />
+    <>
+      <AutosaveControl
+        enabled={props.enabled}
+        onChange={props.onChange}
+        state={state}
+        openOnError
+        actions={
+          props.error ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              disabled={props.busy}
+              onClick={() => setConfirmReload(true)}
+            >
+              {translate('gallery.videoReview.reload')}
+            </ProductActionButton>
+          ) : null
+        }
+        labels={{
+          title: translate('editor.documentActions.autosaveTitle'),
+          switch: translate('editor.documentActions.autosaveSwitch'),
+          on: translate('editor.documentActions.autosaveOnDescription'),
+          off: translate('editor.documentActions.autosaveOffDescription'),
+          paused: translate('editor.documentActions.autosaveOffStatus'),
+          dirty: translate('common.states.dirty'),
+          saving: translate('common.states.saving'),
+          saved: translate('common.states.saved'),
+          error: translate('editor.documentActions.saveErrorTitle'),
+          errorDescription:
+            props.errorMessage ?? translate('editor.documentActions.autosaveErrorDescription'),
+          conflict: translate('editor.documentActions.autosaveConflict'),
+          close: translate('common.actions.close'),
+        }}
+      />
+      <ProductConfirmDialog
+        isOpen={confirmReload}
+        isLoading={props.busy}
+        title={translate('gallery.videoReview.reload')}
+        message={translate('editor.documentActions.autosaveReloadWarning')}
+        confirmText={translate('gallery.videoReview.reload')}
+        cancelText={translate('common.actions.cancel')}
+        onCancel={() => setConfirmReload(false)}
+        onConfirm={async () => {
+          await props.onReload();
+          setConfirmReload(false);
+        }}
+      />
+    </>
   );
 }

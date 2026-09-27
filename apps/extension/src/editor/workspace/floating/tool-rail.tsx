@@ -7,9 +7,15 @@ import {
   createCanvasToolAction,
   type CanvasToolDescriptorKind,
 } from '@sniptale/ui/canvas-tools/descriptors';
-import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
+import {
+  FloatingChromeDivider,
+  FloatingChromeToolbar,
+  floatingChromeClassNames,
+} from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
+import { useEditorEmbedContext } from '../../application/embed-context/context';
+import { useEditorStore } from '../../state/useEditorStore';
 import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
 import { getToolLabel } from '../../chrome/tool-icons';
 import {
@@ -23,6 +29,7 @@ import { getRedoButtonTitle, getUndoButtonTitle } from '../toolbar/history-title
 import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 import { EditorAnchoredConfirmPopover } from './anchored-feedback';
+import { DocumentAutosaveStatus } from './document-autosave-status';
 
 const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-start gap-3',
@@ -246,6 +253,7 @@ function EditorFloatingToolHistoryControls(props: {
         >
           <RotateCcw size={18} strokeWidth={2} />
         </ContentToolbarButton>
+        <ImageHistoryAutosave hasImage={props.hasImage} />
       </FloatingChromeToolbar>
       {resetConfirmOpen ? (
         <EditorAnchoredConfirmPopover
@@ -259,6 +267,18 @@ function EditorFloatingToolHistoryControls(props: {
           onConfirm={confirmReset}
         />
       ) : null}
+    </>
+  );
+}
+
+function ImageHistoryAutosave({ hasImage }: { hasImage: boolean }) {
+  const standalone = useEditorEmbedContext().mode !== 'scenario';
+  const sessionId = useEditorStore((state) => state.sessionId);
+  if (!standalone || !hasImage) return null;
+  return (
+    <>
+      <FloatingChromeDivider vertical />
+      <DocumentAutosaveStatus key={sessionId} />
     </>
   );
 }

@@ -23,6 +23,9 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/controller-context')>()),
   useEditorController: () => controller,
 }));
+vi.mock('./document-autosave-status', () => ({
+  DocumentAutosaveStatus: () => <button data-ui="autosave-control">Autosave</button>,
+}));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

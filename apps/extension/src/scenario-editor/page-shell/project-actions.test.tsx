@@ -13,7 +13,6 @@ it('keeps project mutations in the overflow menu disabled across an autosave loc
   const root = createRoot(host);
   const duplicate = vi.fn();
   const remove = vi.fn();
-  const reload = vi.fn();
   const project = createGuideProject('Project');
   const draw = async (disabled: boolean) =>
     act(async () =>
@@ -21,11 +20,9 @@ it('keeps project mutations in the overflow menu disabled across an autosave loc
         <GuideProjectActions
           project={project}
           disabled={disabled}
-          status="failed"
           t={createTranslator('en')}
           onDuplicate={duplicate}
           onDelete={remove}
-          onReload={reload}
         />
       )
     );
@@ -40,7 +37,7 @@ it('keeps project mutations in the overflow menu disabled across an autosave loc
     const items = [...menu!.querySelectorAll<HTMLButtonElement>('button')];
     const labels = items.map((item) => item.textContent?.trim());
     expect(labels).toContain('Duplicate project');
-    expect(labels).toContain('Reload project');
+    expect(labels).not.toContain('Reload project');
     expect(labels).toContain('Delete project');
     expect(labels).not.toContain('Guide appearance');
     for (const item of items) {
@@ -49,7 +46,6 @@ it('keeps project mutations in the overflow menu disabled across an autosave loc
     }
     expect(duplicate).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
-    expect(reload).not.toHaveBeenCalled();
     await draw(false);
     await act(async () => trigger.click());
     expect(

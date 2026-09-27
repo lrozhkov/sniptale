@@ -1,12 +1,15 @@
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { GuideSnapButton } from './layout-assistance';
 import { GuideVoiceField } from './voice-field';
-import { useLayoutEffect, useRef, type ReactNode, type Ref, type ComponentProps } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { GuideAiEntry } from './ai-assistant';
 import { GuideProjectActions } from './project-actions';
+import type { useGuidePageState } from './runtime/use-state';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { Undo2, Redo2, Download, Palette } from 'lucide-react';
 
 type GuidePageHeaderProps = {
@@ -21,7 +24,7 @@ type GuidePageHeaderProps = {
   contextControls?: ReactNode;
   representationControls?: ReactNode;
   showSnap?: boolean;
-  status: ComponentProps<typeof GuideProjectActions>['status'];
+  status: ReturnType<typeof useGuidePageState>['status'];
   commandsDisabled: boolean;
   onDuplicate: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -138,43 +141,24 @@ export function GuidePageHeader({
                 <Download size={16} aria-hidden="true" />
                 <span>{t('scenario.editor.guideReaderOpen')}</span>
               </ContentToolbarButton>
-              <div
-                className="guide-history-controls"
-                role="group"
-                aria-label={t('scenario.editor.guideHistoryActions')}
-              >
-                <ContentToolbarButton
-                  type="button"
-                  disabled={disabled || !canUndo}
-                  onClick={onUndo}
-                  title={t('scenario.editor.guideUndoHint')}
-                  aria-label={t('scenario.editor.guideUndo')}
-                >
-                  <Undo2 size={16} aria-hidden="true" />
-                </ContentToolbarButton>
-                <ContentToolbarButton
-                  type="button"
-                  disabled={disabled || !canRedo}
-                  onClick={onRedo}
-                  title={t('scenario.editor.guideRedoHint')}
-                  aria-label={t('scenario.editor.guideRedo')}
-                >
-                  <Redo2 size={16} aria-hidden="true" />
-                </ContentToolbarButton>
-              </div>
-              <GuideAutosaveStatus
+              <GuideHistoryAutosave
+                disabled={disabled}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={onUndo}
+                onRedo={onRedo}
                 enabled={autosaveEnabled}
                 onChange={onAutosaveChange}
+                onReload={onReload}
+                commandsDisabled={commandsDisabled}
                 status={status}
                 t={t}
               />
               <GuideProjectActions
                 project={project}
                 disabled={commandsDisabled}
-                status={status}
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
-                onReload={onReload}
                 t={t}
               />
             </>
@@ -215,30 +199,122 @@ function guideAutosaveState(status: GuidePageHeaderProps['status']) {
   return status === 'failed' ? 'error' : 'saved';
 }
 
-function GuideAutosaveStatus(props: {
+function GuideHistoryAutosave(props: {
+  disabled: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   enabled: boolean;
   onChange: ((enabled: boolean) => void) | undefined;
+  onReload: () => Promise<void>;
+  commandsDisabled: boolean;
   status: GuidePageHeaderProps['status'];
   t: Translate;
 }) {
-  if (!props.onChange) return null;
   return (
-    <AutosaveControl
-      enabled={props.enabled}
-      onChange={props.onChange}
-      state={guideAutosaveState(props.status)}
-      labels={{
-        title: props.t('editor.documentActions.autosaveTitle'),
-        on: props.t('editor.documentActions.autosaveOnDescription'),
-        off: props.t('editor.documentActions.autosaveOffDescription'),
-        paused: props.t('editor.documentActions.autosaveOffStatus'),
-        dirty: props.t('common.states.dirty'),
-        saving: props.t('common.states.saving'),
-        saved: props.t('common.states.saved'),
-        error: props.t('editor.documentActions.saveErrorTitle'),
-        conflict: props.t('editor.documentActions.autosaveConflict'),
-        close: props.t('common.actions.close'),
-      }}
-    />
+    <>
+      <div
+        className="guide-history-controls"
+        role="group"
+        aria-label={props.t('scenario.editor.guideHistoryActions')}
+      >
+        <ContentToolbarButton
+          type="button"
+          disabled={props.disabled || !props.canUndo}
+          onClick={props.onUndo}
+          title={props.t('scenario.editor.guideUndoHint')}
+          aria-label={props.t('scenario.editor.guideUndo')}
+        >
+          <Undo2 size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+        <ContentToolbarButton
+          type="button"
+          disabled={props.disabled || !props.canRedo}
+          onClick={props.onRedo}
+          title={props.t('scenario.editor.guideRedoHint')}
+          aria-label={props.t('scenario.editor.guideRedo')}
+        >
+          <Redo2 size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      {props.onChange && (
+        <>
+          <span
+            aria-hidden="true"
+            className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
+          />
+          <GuideAutosaveStatus
+            enabled={props.enabled}
+            onChange={props.onChange}
+            onReload={props.onReload}
+            disabled={props.commandsDisabled}
+            status={props.status}
+            t={props.t}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+function GuideAutosaveStatus(props: {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+  onReload: () => Promise<void>;
+  disabled: boolean;
+  status: GuidePageHeaderProps['status'];
+  t: Translate;
+}) {
+  const [confirmReload, setConfirmReload] = useState(false);
+  const failed = props.status === 'conflict' || props.status === 'failed';
+  return (
+    <>
+      <AutosaveControl
+        enabled={props.enabled}
+        onChange={props.onChange}
+        state={guideAutosaveState(props.status)}
+        openOnError
+        actions={
+          failed ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              disabled={props.disabled}
+              onClick={() => setConfirmReload(true)}
+            >
+              {props.t('scenario.editor.guideReload')}
+            </ProductActionButton>
+          ) : null
+        }
+        labels={{
+          title: props.t('editor.documentActions.autosaveTitle'),
+          switch: props.t('editor.documentActions.autosaveSwitch'),
+          errorDescription: props.t('editor.documentActions.autosaveErrorDescription'),
+          on: props.t('editor.documentActions.autosaveOnDescription'),
+          off: props.t('editor.documentActions.autosaveOffDescription'),
+          paused: props.t('editor.documentActions.autosaveOffStatus'),
+          dirty: props.t('common.states.dirty'),
+          saving: props.t('common.states.saving'),
+          saved: props.t('common.states.saved'),
+          error: props.t('editor.documentActions.saveErrorTitle'),
+          conflict: props.t('editor.documentActions.autosaveConflict'),
+          close: props.t('common.actions.close'),
+        }}
+      />
+      <ProductConfirmDialog
+        isOpen={confirmReload}
+        isLoading={props.disabled}
+        title={props.t('scenario.editor.guideReload')}
+        message={props.t('scenario.editor.guideReloadMessage')}
+        confirmText={props.t('scenario.editor.guideReload')}
+        cancelText={props.t('common.actions.cancel')}
+        onCancel={() => setConfirmReload(false)}
+        onConfirm={async () => {
+          await props.onReload();
+          setConfirmReload(false);
+        }}
+      />
+    </>
   );
 }

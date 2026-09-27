@@ -23,6 +23,7 @@ export function activateAutosaveContext(
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
+  state.hasUnsavedChanges = false;
   state.activeContext = context;
   if (!options.preserveHydratedDocument) state.enabled = true;
   useEditorStore.getState().setSessionId(context.aggregateId);
@@ -89,6 +90,7 @@ export async function discardAutosaveDraft(
   state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
+  state.hasUnsavedChanges = false;
   state.activeContext = null;
   state.enabled = true;
   useEditorStore.getState().setSessionId(null);

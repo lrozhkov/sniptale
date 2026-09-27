@@ -367,16 +367,23 @@ it('confirms project deletion and clears the project route only after success', 
 });
 
 it('confirms replacing failed edits with the persisted version', async () => {
+  const clickRecoveryReload = async () => {
+    const button = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
+      (candidate) => candidate.textContent === 'Reload project'
+    );
+    if (!button) throw new Error('Missing autosave reload action');
+    await act(async () => button.click());
+  };
   io.save.mockRejectedValue(new Error('Storage failure'));
   await render();
   await click('Add step');
   await settleAutosave();
-  await click('Reload project');
+  await clickRecoveryReload();
   expect(io.load).toHaveBeenCalledTimes(1);
   await click('Cancel');
   expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Reload project');
-  const confirm = [...container.querySelectorAll('[role="alertdialog"] button')].find(
+  await clickRecoveryReload();
+  const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find(
     (button) => button.textContent === 'Reload project'
   );
   if (!(confirm instanceof HTMLButtonElement)) throw new Error('Missing reload confirmation');

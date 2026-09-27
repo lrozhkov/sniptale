@@ -3,7 +3,7 @@ import { FloatingChromeRoot } from '@sniptale/ui/floating-chrome';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { useEditorInspectorSidebarController } from '../../inspector/sidebar-controller';
 import { useEditorToolbarController } from '../toolbar/use-controller';
-import { EditorFloatingDocumentBar } from './document-bar';
+import { EditorFloatingDocumentBar, ImageDocumentOperationsProvider } from './document-bar';
 import { EditorFloatingLeftDrawer } from './left-drawer';
 import { EditorFloatingWorkspaceOverlays } from './overlays';
 import { EditorFloatingRightStack } from './right-stack';
@@ -243,7 +243,7 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
       style={getFloatingWorkspaceEdgeInsetStyle(edgeInsets)}
     >
       {hasImage ? (
-        <>
+        <ImageDocumentOperationsProvider hasImage={hasImage}>
           <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
           <EditorFloatingToolRail
             {...railProps}
@@ -264,7 +264,7 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
             surfaceRoute={surfaceRoute}
             toolbarProps={toolbarProps}
           />
-        </>
+        </ImageDocumentOperationsProvider>
       ) : null}
     </FloatingChromeRoot>
   );

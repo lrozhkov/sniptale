@@ -91,6 +91,7 @@ describe('image autosave mode', () => {
     autosave.setEnabled(false);
     expect(autosave.isEnabled()).toBe(false);
     autosave.scheduleAutosave(createDocument('edited-while-off'));
+    expect(autosave.hasUnsavedChanges()).toBe(true);
     const document = vi.fn(() => createDocument('latest'));
     await autosave.flushAutosave(document);
     await autosave.persistSnapshot(document);
@@ -105,6 +106,7 @@ describe('image autosave mode', () => {
       expect.objectContaining({ document: expect.objectContaining({ sourceImageData: 'latest' }) })
     );
     expect(autosave.getDurableRevision()).toBe(1);
+    expect(autosave.hasUnsavedChanges()).toBe(false);
   });
 
   it('allows an explicit save while autosave is off and resets the mode for a new document', async () => {
@@ -114,6 +116,7 @@ describe('image autosave mode', () => {
     autosave.setEnabled(false);
     await autosave.saveNow(() => createDocument('explicit'));
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+    expect(autosave.hasUnsavedChanges()).toBe(false);
     expect(autosave.isEnabled()).toBe(false);
     autosave.activate({
       aggregateId: 'image-2',

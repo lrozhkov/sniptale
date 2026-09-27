@@ -142,8 +142,15 @@ it('keeps conflict recovery accessible while a Basic comment is being edited', a
     await fixture.fill('Conflicting comment');
     integration.commit.mockRejectedValueOnce({ code: 'conflict' });
     await fixture.click('save');
-    expect(fixture.button('reload').disabled).toBe(false);
-    await fixture.click('reload');
+    const reload = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
+      (button) => button.textContent?.trim() === 'gallery.videoReview.reload'
+    );
+    expect(reload?.disabled).toBe(false);
+    await act(async () => reload?.click());
+    const confirm = [
+      ...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+    ].find((button) => button.textContent?.trim() === 'gallery.videoReview.reload');
+    await act(async () => confirm?.click());
     expect(integration.read).toHaveBeenCalled();
   } finally {
     await fixture.cleanup();

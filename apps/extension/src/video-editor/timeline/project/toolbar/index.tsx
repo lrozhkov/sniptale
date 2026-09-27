@@ -1,4 +1,5 @@
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProjectMenu } from './project-menu';
 import { Redo2, Undo2, Magnet } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -13,6 +14,7 @@ import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
 import type { ProjectTimelineToolbarProps } from './types';
+import { requestVideoEditorSaveRetry } from '../../../runtime/session/save-retry';
 
 type ToolbarTrailingControlsInput = Pick<
   ProjectTimelineToolbarProps,
@@ -142,8 +144,8 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         >
           <Redo2 aria-hidden="true" />
         </ContentToolbarButton>
-        <TimelineAutosaveControl />
         <ToolbarSeparator />
+        <TimelineAutosaveControl />
         <ProjectTimelineToolbarTrailingActions
           {...createToolbarTrailingControlsProps(controlsProps)}
         />
@@ -184,11 +186,25 @@ function TimelineAutosaveControl() {
   return (
     <AutosaveControl
       {...autosave}
+      openOnError
+      actions={
+        header.saveStateMeta.state === 'conflict' ? (
+          <ProductActionButton compact tone="secondary" onClick={() => window.location.reload()}>
+            {translate('editor.documentActions.reloadLatest')}
+          </ProductActionButton>
+        ) : header.saveStateMeta.state === 'error' ? (
+          <ProductActionButton compact tone="secondary" onClick={requestVideoEditorSaveRetry}>
+            {translate('common.actions.retry')}
+          </ProductActionButton>
+        ) : null
+      }
       state={
         header.saveStateMeta.state === 'idle' ? 'dirty' : (header.saveStateMeta.state ?? 'saved')
       }
       labels={{
         title: translate('editor.documentActions.autosaveTitle'),
+        switch: translate('editor.documentActions.autosaveSwitch'),
+        errorDescription: translate('editor.documentActions.autosaveErrorDescription'),
         on: translate('editor.documentActions.autosaveOnDescription'),
         off: translate('editor.documentActions.autosaveOffDescription'),
         paused: translate('editor.documentActions.autosaveOffStatus'),

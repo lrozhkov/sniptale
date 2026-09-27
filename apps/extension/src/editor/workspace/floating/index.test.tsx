@@ -65,6 +65,7 @@ vi.mock('../../inspector/sidebar-controller', () => ({
 vi.mock('./document-bar', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./document-bar')>()),
   EditorFloatingDocumentBar: mocks.documentBar,
+  ImageDocumentOperationsProvider: ({ children }: { children: React.ReactNode }) => children,
   EditorFloatingDocumentController: undefined,
 }));
 vi.mock('./left-drawer', () => ({

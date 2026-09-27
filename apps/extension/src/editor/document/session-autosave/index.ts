@@ -35,6 +35,7 @@ export interface EditorSessionAutosaveService {
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
   saveNow: (getDocument: () => EditorDocument) => Promise<void>;
   isEnabled: () => boolean;
+  hasUnsavedChanges: () => boolean;
   setEnabled: (enabled: boolean, getDocument?: () => EditorDocument) => void;
   discardDraft: (aggregateId?: string | null) => Promise<void>;
   getDurableRevision: () => number | null;
@@ -57,6 +58,7 @@ function createEditorSessionAutosaveActions(
     persistSnapshot: (getDocument) => persistAutosaveSnapshot(state, getDocument),
     saveNow: (getDocument) => saveEditorSessionSnapshot(state, getDocument),
     isEnabled: () => state.enabled,
+    hasUnsavedChanges: () => state.hasUnsavedChanges,
     setEnabled: (enabled, getDocument) => {
       if (state.enabled === enabled) return;
       state.enabled = enabled;

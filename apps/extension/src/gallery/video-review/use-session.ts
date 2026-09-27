@@ -62,6 +62,18 @@ export function useReviewSnapshot(session: Session) {
   return snapshot;
 }
 
+function useComposerUnloadProtection(latest: RefObject<{ dirty: boolean }>) {
+  useEffect(() => {
+    const protect = (event: BeforeUnloadEvent) => {
+      if (!latest.current.dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protect);
+    return () => window.removeEventListener('beforeunload', protect);
+  }, [latest]);
+}
+
 /** Coalesces field recovery without making typing into document-history operations. */
 export function useReviewComposer(session: Session) {
   const initial = session.getSnapshot().snapshot.draft;
@@ -72,6 +84,7 @@ export function useReviewComposer(session: Session) {
     saving: false,
   });
   const latest = useRef({ annotation, before, dirty: false, version: 0 });
+  useComposerUnloadProtection(latest);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstDirtyAt = useRef<number | null>(null);
   const draining = useRef<Promise<void> | null>(null);

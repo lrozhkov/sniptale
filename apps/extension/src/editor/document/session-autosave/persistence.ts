@@ -84,6 +84,7 @@ async function persistEditorSessionDocument(args: {
       args.state.activeContext?.aggregateId === args.context.aggregateId &&
       args.revision === args.state.autosaveRevision
     ) {
+      args.state.hasUnsavedChanges = false;
       setEditorSaveErrorMessage(null);
       setEditorSaveState('saved');
     }
@@ -118,6 +119,7 @@ function enqueueEditorSessionDocument(
   }
 
   const revision = ++state.autosaveRevision;
+  state.hasUnsavedChanges = true;
   setEditorSaveErrorMessage(null);
   setEditorSaveState('saving');
 
@@ -141,12 +143,12 @@ export function queuePendingAutosave(
   state: EditorSessionAutosaveState,
   document: EditorDocument
 ): void {
-  if (!state.activeContext || !state.enabled) {
-    return;
-  }
+  if (!state.activeContext) return;
+  state.autosaveRevision += 1;
+  state.hasUnsavedChanges = true;
+  if (!state.enabled) return;
 
   state.pendingDocument = document;
-  state.autosaveRevision += 1;
   setEditorSaveErrorMessage(null);
   setEditorSaveState('saving');
   clearPendingAutosaveTimer(state);

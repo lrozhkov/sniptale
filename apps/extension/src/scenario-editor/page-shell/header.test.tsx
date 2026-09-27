@@ -144,8 +144,13 @@ it('reports appearance selection from the inspector scope without owning another
 it('places autosave between history and menu and forwards the switch', async () => {
   const { autosave } = await draw();
   const anchor = host.querySelector('[data-ui="autosave-control"]')!;
-  expect(anchor.previousElementSibling?.className).toContain('guide-history-controls');
-  await act(async () => anchor.querySelector<HTMLButtonElement>('button')!.click());
+  expect(anchor.previousElementSibling?.className).toContain('w-px');
+  expect(anchor.previousElementSibling?.previousElementSibling?.className).toContain(
+    'guide-history-controls'
+  );
+  expect(anchor.querySelector<HTMLButtonElement>('button')?.getAttribute('aria-expanded')).toBe(
+    'true'
+  );
   await act(async () => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
   expect(autosave).toHaveBeenCalledWith(false);
 });

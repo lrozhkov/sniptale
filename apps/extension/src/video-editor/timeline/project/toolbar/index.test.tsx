@@ -230,8 +230,10 @@ it('holds editing actions disabled during playback and preparation, retaining na
 it('places autosave directly after redo and binds its switch', () => {
   renderToolbar();
   const redo = container!.querySelector('[data-ui="video-editor.timeline.toolbar.redo"]')!;
-  expect(redo.nextElementSibling?.getAttribute('data-ui')).toBe('autosave-control');
-  act(() => redo.nextElementSibling!.querySelector<HTMLButtonElement>('button')!.click());
+  expect(redo.nextElementSibling?.className).toContain('w-px');
+  const autosave = redo.nextElementSibling?.nextElementSibling;
+  expect(autosave?.getAttribute('data-ui')).toBe('autosave-control');
+  act(() => autosave!.querySelector<HTMLButtonElement>('button')!.click());
   act(() => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
   expect(history.onAutosaveChange).toHaveBeenCalledWith(false);
 });

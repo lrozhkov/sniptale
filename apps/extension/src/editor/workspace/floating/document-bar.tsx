@@ -1,5 +1,14 @@
 import { Images, LoaderCircle } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -8,15 +17,12 @@ import { useEditorStore } from '../../state/useEditorStore';
 import { EditorFloatingDocumentQuickActions } from './document-bar-quick-actions';
 import type { EditorFloatingDocumentBarProps } from './document-bar-types';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library';
-import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
+import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
 import type { LibraryStorageClass } from '../../../contracts/settings/library-lifecycle';
 import { useEditorController } from '../../application/controller-context';
-import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
 import { useEditorEmbedContext } from '../../application/embed-context/context';
+import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
 import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-library';
-import { saveStaleEditorImageCopy } from '../../workflows/save-stale-image-copy';
-import { DocumentSaveError } from './document-save-conflict';
-import { DocumentAutosaveStatus } from './document-autosave-status';
 import { EditorDocumentTitleEditor } from './document-title';
 import { EditorAnchoredAlert } from './anchored-feedback';
 export type { EditorFloatingDocumentController } from './document-bar-types';
@@ -170,6 +176,61 @@ function useDocumentLibraryStatus(aggregateId: string | null, enabled: boolean) 
   return { promotionButtonVisible, setStorageClass, storageClass };
 }
 
+type ConflictCopyOperation = {
+  activeDocumentRef: RefObject<ActiveDocumentGeneration>;
+  editorController: ReturnType<typeof useEditorController>;
+  inFlightOperationsRef: RefObject<Map<string, InFlightDocumentOperation>>;
+  pageTitle: string;
+  setOperationFeedback: (feedback: DocumentOperationFeedback) => void;
+  setStorageClass: (storageClass: LibraryStorageClass) => void;
+};
+
+function saveConflictCopyOperation(args: ConflictCopyOperation): Promise<void> {
+  const sourceAggregateId = args.activeDocumentRef.current.aggregateId;
+  const sourceGeneration = args.activeDocumentRef.current.generation;
+  const autosaveService = args.editorController.autosaveService;
+  if (!sourceAggregateId || !autosaveService) {
+    return Promise.reject(new Error('Image autosave is unavailable.'));
+  }
+  if (args.inFlightOperationsRef.current.has(sourceAggregateId)) {
+    return Promise.reject(new Error('Another image operation is already in progress.'));
+  }
+  const token = Symbol(`copy:${sourceAggregateId}`);
+  const promise = (async () => {
+    args.setOperationFeedback({ aggregateId: sourceAggregateId, state: 'saving' });
+    try {
+      const result = await saveStaleEditorImageCopy({
+        autosaveService,
+        controller: args.editorController,
+        isSourceActive: () =>
+          args.activeDocumentRef.current.aggregateId === sourceAggregateId &&
+          args.activeDocumentRef.current.generation === sourceGeneration,
+        pageTitle: args.pageTitle,
+        sourceAggregateId,
+      });
+      if (result === 'stale') return;
+      args.setStorageClass('library');
+      args.setOperationFeedback({ aggregateId: sourceAggregateId, state: 'idle' });
+    } catch (error) {
+      if (args.activeDocumentRef.current.aggregateId === sourceAggregateId) {
+        args.setOperationFeedback({ aggregateId: sourceAggregateId, state: 'error' });
+      }
+      throw error;
+    } finally {
+      if (args.inFlightOperationsRef.current.get(sourceAggregateId)?.token === token) {
+        args.inFlightOperationsRef.current.delete(sourceAggregateId);
+      }
+    }
+  })();
+  args.inFlightOperationsRef.current.set(sourceAggregateId, {
+    aggregateId: sourceAggregateId,
+    kind: 'copy',
+    promise,
+    token,
+  });
+  return promise;
+}
+
 function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, enabled: boolean) {
   const editorController = useEditorController();
   const { promotionButtonVisible, setStorageClass, storageClass } = useDocumentLibraryStatus(
@@ -186,6 +247,19 @@ function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, 
     generation: 0,
   });
   updateActiveDocumentGeneration(activeDocumentRef, aggregateId, enabled);
+
+  const saveConflictCopy = useCallback(
+    () =>
+      saveConflictCopyOperation({
+        activeDocumentRef,
+        editorController,
+        inFlightOperationsRef,
+        pageTitle,
+        setOperationFeedback,
+        setStorageClass,
+      }),
+    [editorController, pageTitle, setStorageClass]
+  );
 
   const promote = useCallback((): Promise<void> => {
     const autosaveService = editorController.autosaveService;
@@ -239,52 +313,6 @@ function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, 
     return promise;
   }, [aggregateId, editorController, setStorageClass]);
 
-  const saveConflictCopy = useCallback((): Promise<void> => {
-    const sourceAggregateId = activeDocumentRef.current.aggregateId;
-    const sourceGeneration = activeDocumentRef.current.generation;
-    const autosaveService = editorController.autosaveService;
-    if (!sourceAggregateId || !autosaveService) {
-      return Promise.reject(new Error('Image autosave is unavailable.'));
-    }
-    if (inFlightOperationsRef.current.has(sourceAggregateId)) {
-      return Promise.reject(new Error('Another image operation is already in progress.'));
-    }
-    const token = Symbol(`copy:${sourceAggregateId}`);
-    const promise = (async () => {
-      setOperationFeedback({ aggregateId: sourceAggregateId, state: 'saving' });
-      try {
-        const result = await saveStaleEditorImageCopy({
-          autosaveService,
-          controller: editorController,
-          isSourceActive: () =>
-            activeDocumentRef.current.aggregateId === sourceAggregateId &&
-            activeDocumentRef.current.generation === sourceGeneration,
-          pageTitle,
-          sourceAggregateId,
-        });
-        if (result === 'stale') return;
-        setStorageClass('library');
-        setOperationFeedback({ aggregateId: sourceAggregateId, state: 'idle' });
-      } catch (error) {
-        if (activeDocumentRef.current.aggregateId === sourceAggregateId) {
-          setOperationFeedback({ aggregateId: sourceAggregateId, state: 'error' });
-        }
-        throw error;
-      } finally {
-        if (inFlightOperationsRef.current.get(sourceAggregateId)?.token === token) {
-          inFlightOperationsRef.current.delete(sourceAggregateId);
-        }
-      }
-    })();
-    inFlightOperationsRef.current.set(sourceAggregateId, {
-      aggregateId: sourceAggregateId,
-      kind: 'copy',
-      promise,
-      token,
-    });
-    return promise;
-  }, [editorController, pageTitle, setStorageClass]);
-
   useEffect(() => {
     if (!enabled || !aggregateId) return;
     const presence = connectAggregateEditorPresence({
@@ -295,9 +323,12 @@ function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, 
   }, [aggregateId, enabled, promote]);
 
   return {
-    hasStaleConflict:
-      editorController.autosaveService?.getLastWriteError() instanceof StaleImageWorkspaceError,
     promote,
+    saveConflictCopy,
+    copyPending:
+      enabled && aggregateId
+        ? inFlightOperationsRef.current.get(aggregateId)?.kind === 'copy'
+        : false,
     promotionState:
       enabled && aggregateId && inFlightOperationsRef.current.has(aggregateId)
         ? 'saving'
@@ -305,9 +336,32 @@ function useDocumentStorageClass(aggregateId: string | null, pageTitle: string, 
           ? operationFeedback.state
           : 'idle',
     promotionButtonVisible,
-    saveConflictCopy,
     storageClass,
   };
+}
+
+type ImageDocumentOperations = ReturnType<typeof useDocumentStorageClass>;
+const ImageDocumentOperationsContext = createContext<ImageDocumentOperations | null>(null);
+
+export function ImageDocumentOperationsProvider(props: { children: ReactNode; hasImage: boolean }) {
+  const state = useDocumentBarState();
+  const standalone = useEditorEmbedContext().mode !== 'scenario';
+  const operations = useDocumentStorageClass(
+    state.sessionId,
+    state.pageTitle,
+    standalone && props.hasImage
+  );
+  return (
+    <ImageDocumentOperationsContext.Provider value={operations}>
+      {props.children}
+    </ImageDocumentOperationsContext.Provider>
+  );
+}
+
+export function useImageDocumentOperations(): ImageDocumentOperations {
+  const operations = useContext(ImageDocumentOperationsContext);
+  if (!operations) throw new Error('Image document operations are unavailable.');
+  return operations;
 }
 
 function resolveDocumentTitle(pageTitle: string, hasImage: boolean): string {
@@ -326,11 +380,7 @@ function EditorFloatingDocumentSummary(props: {
   onEdit: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const storage = useDocumentStorageClass(
-    props.documentState.sessionId,
-    props.documentState.pageTitle,
-    props.standalone && props.hasImage
-  );
+  const storage = useImageDocumentOperations();
   const promotionButtonRef = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -368,19 +418,6 @@ function EditorFloatingDocumentSummary(props: {
                   : 'editor.documentActions.draft'
               )}
             </span>
-            {storage.hasStaleConflict || props.documentState.saveState === 'error' ? (
-              <DocumentSaveError
-                key={`save-error:${props.documentState.sessionId}`}
-                conflict={storage.hasStaleConflict}
-                pending={storage.promotionState === 'saving'}
-                onSaveCopy={storage.saveConflictCopy}
-              />
-            ) : null}
-            <DocumentAutosaveStatus
-              key={`autosave:${props.documentState.sessionId}`}
-              saveState={props.documentState.saveState}
-              hasSaveError={storage.hasStaleConflict || props.documentState.saveState === 'error'}
-            />
           </div>
         ) : null}
       </div>

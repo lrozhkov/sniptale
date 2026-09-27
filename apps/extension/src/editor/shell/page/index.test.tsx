@@ -95,6 +95,7 @@ function createServices() {
   return {
     autosaveService: {
       dispose: vi.fn(),
+      hasUnsavedChanges: vi.fn(() => false),
     },
     controller: {
       dispose: vi.fn(),
@@ -244,6 +245,19 @@ async function verifiesBootstrapEventRoutingAndDispose() {
 
 describe('EditorPage', () => {
   useEditorPageTestScope();
+
+  it('warns before closing only while the current image has unsaved changes', async () => {
+    const services = createServices();
+    createEditorPageServicesMock.mockReturnValue(services);
+    applyEditorStoreState(createEditorStoreState());
+    await renderEditorPage();
+    const close = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+    expect(close()).toBe(true);
+    services.autosaveService.hasUnsavedChanges.mockReturnValue(true);
+    expect(close()).toBe(false);
+    services.autosaveService.hasUnsavedChanges.mockReturnValue(false);
+    expect(close()).toBe(true);
+  });
 
   it('keeps the loader visible during bootstrap and shows a friendly error on failure', async () => {
     let rejectOpen: (error: Error) => void = () => undefined;

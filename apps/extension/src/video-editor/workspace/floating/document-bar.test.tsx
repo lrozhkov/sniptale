@@ -74,7 +74,7 @@ it('enables available history commands and surfaces history failures', () => {
   expect(markup).toContain('videoEditor.app.historyError');
 });
 
-it('exposes an explicit retry action for an autosave error', () => {
+it('keeps autosave recovery in the timeline toolbar', () => {
   hookMocks.header.mockReturnValue({
     ...createHeaderProps(),
     saveStateMeta: { className: 'is-error', label: 'Error', state: 'error' },
@@ -88,8 +88,7 @@ it('exposes an explicit retry action for an autosave error', () => {
   });
   const markup = renderToStaticMarkup(<VideoEditorFloatingDocumentBar />);
 
-  expect(markup).toContain('common.actions.retry');
-  expect(markup).toContain('<button');
+  expect(markup).not.toContain('common.actions.retry');
 });
 
 it.each(['dirty', 'saving', 'saved', 'idle'])(
@@ -112,7 +111,7 @@ it.each(['dirty', 'saving', 'saved', 'idle'])(
   }
 );
 
-it('replaces project identity with source navigation without hiding recovery errors', () => {
+it('replaces project identity with source navigation while recovery stays in the timeline toolbar', () => {
   hookMocks.header.mockReturnValue({
     ...createHeaderProps(),
     saveStateMeta: { state: 'error', label: 'Failed', className: '' },
@@ -126,5 +125,5 @@ it('replaces project identity with source navigation without hiding recovery err
   expect(markup).toContain('Source / Montage');
   expect(markup).not.toContain('Product Demo Recording');
   expect(markup).not.toContain('<input');
-  expect(markup).toContain('common.actions.retry');
+  expect(markup).not.toContain('common.actions.retry');
 });

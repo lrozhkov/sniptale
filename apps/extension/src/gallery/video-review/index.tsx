@@ -422,7 +422,6 @@ function ReviewInspectorBinding({
             : 'saved'
       }
       onRetry={() => void run(state.retryAdvanced)}
-      recovery={<ReviewConflictRecovery state={state} />}
       message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
       onBack={() => leave(onBack)}
       onClose={() => leave(onClose)}
@@ -478,27 +477,6 @@ function ReviewInspectorBinding({
   );
 }
 
-/** Conflict recovery reloads the document and its staged advanced state together. */
-function ReviewConflictRecovery({
-  state,
-}: {
-  state: Pick<InspectorState, 'snapshot' | 'busy' | 'run' | 'composer' | 'resetAdvanced'>;
-}) {
-  if (state.snapshot.error !== 'conflict') return null;
-  return (
-    <ReviewButton
-      label={translate('gallery.videoReview.reload')}
-      disabled={state.busy}
-      onClick={() =>
-        void state.run(async () => {
-          await state.composer.reload();
-          state.resetAdvanced();
-        })
-      }
-    />
-  );
-}
-
 function ReviewCommentComposer({
   state,
   annotation,
@@ -539,6 +517,37 @@ function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
     audio: state.audio,
   });
   return { onImportAudioFile, voiceover };
+}
+
+function ReviewHistoryControlBinding({
+  state,
+}: {
+  state: ReturnType<typeof useReviewEditorState>;
+}) {
+  const { busy, composer, editing, snapshot } = state;
+  return (
+    <ReviewHistoryControls
+      busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
+      cursor={snapshot.snapshot.workspace.cursor}
+      length={snapshot.snapshot.workspace.history.length}
+      onHistory={state.moveHistory}
+      onAddNote={() => state.add()}
+      autosave={{
+        enabled: snapshot.autosaveEnabled,
+        error: snapshot.error,
+        errorMessage: snapshot.error ? reviewErrorMessage(snapshot.error) : null,
+        dirty: snapshot.dirty,
+        saving: snapshot.pending > 0,
+        busy,
+        onChange: state.session.setAutosaveEnabled,
+        onReload: () =>
+          state.run(async () => {
+            await state.composer.reload();
+            state.resetAdvanced();
+          }),
+      }}
+    />
+  );
 }
 
 function ReviewEditor({
@@ -623,22 +632,7 @@ function ReviewEditor({
         }
       >
         <ReviewTimelineBinding
-          historyControls={
-            <ReviewHistoryControls
-              busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
-              cursor={snapshot.snapshot.workspace.cursor}
-              length={snapshot.snapshot.workspace.history.length}
-              onHistory={state.moveHistory}
-              onAddNote={() => state.add()}
-              autosave={{
-                enabled: snapshot.autosaveEnabled,
-                error: snapshot.error,
-                dirty: snapshot.dirty,
-                saving: snapshot.pending > 0,
-                onChange: state.session.setAutosaveEnabled,
-              }}
-            />
-          }
+          historyControls={<ReviewHistoryControlBinding state={state} />}
           editing={editing}
           edits={snapshot.document.edits}
           annotations={snapshot.document.annotations}

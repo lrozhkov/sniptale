@@ -3,7 +3,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, vi } from 'vitest';
-import { EditorFloatingDocumentBar } from './document-bar';
+import { EditorFloatingDocumentBar, ImageDocumentOperationsProvider } from './document-bar';
+import { DocumentAutosaveStatus } from './document-autosave-status';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 
@@ -152,12 +153,21 @@ export function renderDocumentBar(props = createProps()) {
   root = createRoot(container);
 
   act(() => {
-    root?.render(<EditorFloatingDocumentBar {...props} />);
+    root?.render(<DocumentBarFixture {...props} />);
   });
 }
 
 export function rerenderDocumentBar(props = createProps()) {
-  act(() => root?.render(<EditorFloatingDocumentBar {...props} />));
+  act(() => root?.render(<DocumentBarFixture {...props} />));
+}
+
+function DocumentBarFixture(props: ReturnType<typeof createProps>) {
+  return (
+    <ImageDocumentOperationsProvider hasImage={props.hasImage}>
+      <EditorFloatingDocumentBar {...props} />
+      {props.hasImage && mocks.embed.mode !== 'scenario' ? <DocumentAutosaveStatus /> : null}
+    </ImageDocumentOperationsProvider>
+  );
 }
 
 export function createDeferred<T>() {

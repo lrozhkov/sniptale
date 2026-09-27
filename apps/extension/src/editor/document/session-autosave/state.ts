@@ -12,6 +12,7 @@ export interface ActiveEditorSessionContext {
 export type EditorSessionAutosaveState = {
   activeContext: ActiveEditorSessionContext | null;
   enabled: boolean;
+  hasUnsavedChanges: boolean;
   autosaveRevision: number;
   pendingDocument: EditorDocument | null;
   pendingTimer: number;
@@ -25,6 +26,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
   return {
     activeContext: null,
     enabled: true,
+    hasUnsavedChanges: false,
     autosaveRevision: 0,
     pendingDocument: null,
     pendingTimer: 0,

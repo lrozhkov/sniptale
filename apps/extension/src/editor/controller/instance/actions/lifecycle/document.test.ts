@@ -54,6 +54,7 @@ function createAutosaveService(
     flushAutosave: vi.fn(async () => undefined),
     getDurableRevision: vi.fn(() => 0),
     getLastWriteError: vi.fn(() => null),
+    hasUnsavedChanges: vi.fn(() => false),
     isEnabled: vi.fn(() => true),
     persistSnapshot: vi.fn(async (read) => {
       read();

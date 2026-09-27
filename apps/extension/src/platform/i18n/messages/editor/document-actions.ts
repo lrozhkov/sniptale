@@ -17,6 +17,10 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'Автосохранение',
     en: 'Autosave',
   },
+  autosaveSwitch: {
+    ru: 'Автоматически',
+    en: 'Automatically',
+  },
   autosaveOnDescription: {
     ru: 'Изменения автоматически сохраняются в документ.',
     en: 'Changes are saved to this document automatically.',
@@ -28,6 +32,14 @@ export const editorDocumentActionsMessages = defineMessageSource({
   autosaveOffStatus: {
     ru: 'Не сохраняется',
     en: 'Not saving',
+  },
+  autosaveErrorDescription: {
+    ru: 'Последние изменения не сохранены. Проверьте доступные действия ниже.',
+    en: 'Your latest changes were not saved. Check the available actions below.',
+  },
+  autosaveReloadWarning: {
+    ru: 'Загрузить сохранённую версию? Незаписанные изменения будут заменены.',
+    en: 'Load the saved version? Unsaved changes will be replaced.',
   },
   saveToLibrary: {
     ru: 'Сохранить в библиотеку',
