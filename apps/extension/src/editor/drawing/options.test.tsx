@@ -19,6 +19,18 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../ui/drawing-tools/options', () => ({
+  ArrowDrawDirectionOption: (props: {
+    active: boolean;
+    dataUi: string;
+    onChange: (value: boolean) => void;
+  }) => (
+    <button
+      type="button"
+      data-ui={props.dataUi}
+      aria-pressed={props.active}
+      onClick={() => props.onChange(!props.active)}
+    />
+  ),
   ArrowWidthModeOptions: () => <span data-ui="mock.arrow-mode-options" />,
   DrawingColorOptions: mocks.colorOptions,
   DrawingDeleteOption: () => null,

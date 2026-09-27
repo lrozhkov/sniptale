@@ -15,6 +15,7 @@ import { measureContentDrawingText } from '../../../drawing/text-measurement';
 import { translate } from '../../../../platform/i18n';
 import {
   ArrowWidthModeOptions,
+  ArrowDrawDirectionOption,
   DrawingColorOptions,
   DrawingDeleteOption,
   DrawingDeselectOption,
@@ -45,7 +46,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
   Record<DrawingQuickOptionsTool, { height: number; width: number }>
 > = {
   horizontal: {
-    arrow: { height: 48, width: 534 },
+    arrow: { height: 48, width: 574 },
     blur: { height: 48, width: 80 },
     marker: { height: 48, width: 534 },
     pencil: { height: 48, width: 314 },
@@ -54,7 +55,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
     text: { height: 88, width: 676 },
   },
   vertical: {
-    arrow: { height: 346, width: 136 },
+    arrow: { height: 386, width: 136 },
     blur: { height: 80, width: 48 },
     marker: { height: 346, width: 136 },
     pencil: { height: 266, width: 136 },
@@ -192,6 +193,7 @@ function updateQuickToolOption(args: {
         ...snapshot.defaults.arrow,
         color: update.color ?? snapshot.defaults.arrow.color,
         design: update.design ?? snapshot.defaults.arrow.design,
+        drawFromTip: snapshot.defaults.arrow.drawFromTip,
         dynamicWidth: update.dynamicWidth ?? snapshot.defaults.arrow.dynamicWidth,
         width: update.width ?? snapshot.defaults.arrow.width,
       },
@@ -429,6 +431,7 @@ function DrawingMarkerToolOptions(props: {
 }
 
 function DrawingArrowToolOptions(props: {
+  controller: ContentDrawingController;
   selected: SelectedQuickDrawingObject;
   snapshot: DrawingSessionSnapshot;
   vertical: boolean;
@@ -443,6 +446,17 @@ function DrawingArrowToolOptions(props: {
         design={selected?.design ?? defaults.design}
         dynamic={selected?.dynamicWidth ?? defaults.dynamicWidth}
         onChange={props.update}
+      />
+      <DrawingOptionsDivider vertical={props.vertical} />
+      <ArrowDrawDirectionOption
+        active={defaults.drawFromTip}
+        dataUi="content.toolbar.drawing-options.arrow.from-tip"
+        onChange={(drawFromTip) =>
+          props.controller.session.setDefaults({
+            ...props.snapshot.defaults,
+            arrow: { ...defaults, drawFromTip },
+          })
+        }
       />
     </>
   );
@@ -511,6 +525,7 @@ function DrawingNonTextToolOptions(props: {
       ) : null}
       {tool === 'arrow' ? (
         <DrawingArrowToolOptions
+          controller={controller}
           selected={selected}
           snapshot={snapshot}
           vertical={vertical}

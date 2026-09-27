@@ -1,4 +1,15 @@
-import { Ban, Blend, Circle, PaintBucket, Square, Trash2, Triangle, Type, X } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  Ban,
+  Blend,
+  Circle,
+  PaintBucket,
+  Square,
+  Trash2,
+  Triangle,
+  Type,
+  X,
+} from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReactNode, RefObject } from 'react';
@@ -260,6 +271,28 @@ export function ArrowWidthModeOptions(props: {
       </QuickOptionButton>
     );
   });
+}
+
+export function ArrowDrawDirectionOption(props: {
+  active: boolean;
+  dataUi: string;
+  onChange: (value: boolean) => void;
+}) {
+  const label = translate('editor.compact.arrowDrawFromTip');
+  return (
+    <ContentToolbarButton
+      type="button"
+      active={props.active}
+      aria-label={label}
+      aria-pressed={props.active}
+      title={label}
+      dataUi={props.dataUi}
+      className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
+      onClick={() => props.onChange(!props.active)}
+    >
+      <ArrowDownLeft aria-hidden size={16} />
+    </ContentToolbarButton>
+  );
 }
 
 export function DrawingColorOptions(props: {

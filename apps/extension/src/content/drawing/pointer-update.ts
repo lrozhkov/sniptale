@@ -32,6 +32,7 @@ function updateCreateDraft(
   ) {
     const sample = samples.at(-1) ?? event.nativeEvent;
     object = updateCreatedDrawingObject({
+      arrowFromTip: draft.arrowFromTip,
       modifiers,
       object,
       start: draft.start,
@@ -53,6 +54,7 @@ function updateCreateDraft(
   } else {
     samples.forEach((sample) => {
       object = updateCreatedDrawingObject({
+        arrowFromTip: draft.arrowFromTip,
         modifiers,
         object,
         start: draft.start,

@@ -201,7 +201,7 @@ it('commits an arbitrary pencil color through the shared application picker', as
   act(() => root.unmount());
 });
 
-it('shows persistent arrow color, size, and shaft profile controls', () => {
+it('shows persistent arrow color, size, shaft profile, and gesture direction controls', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
@@ -241,7 +241,11 @@ it('shows persistent arrow color, size, and shaft profile controls', () => {
   const freehand = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.arrow.freehand"]'
   );
+  const fromTip = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.drawing-options.arrow.from-tip"]'
+  );
   expect(freehand).not.toBeNull();
+  expect(fromTip?.getAttribute('aria-pressed')).toBe('false');
   const blue = panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]');
   act(() => width24?.click());
   act(() => uniform?.click());
@@ -249,9 +253,13 @@ it('shows persistent arrow color, size, and shaft profile controls', () => {
   expect(session.getSnapshot().defaults.arrow).toEqual({
     color: '#60a5fa',
     design: 'standard',
+    drawFromTip: false,
     dynamicWidth: false,
     width: 24,
   });
+  act(() => fromTip?.click());
+  expect(session.getSnapshot().defaults.arrow.drawFromTip).toBe(true);
+  expect(fromTip?.getAttribute('aria-pressed')).toBe('true');
   act(() => freehand?.click());
   expect(session.getSnapshot().defaults.arrow.design).toBe('freehand');
   expect(freehand?.getAttribute('aria-pressed')).toBe('true');
@@ -293,7 +301,7 @@ it('shows compact two-row text and background palettes with text-size controls',
   );
   expect(textPalette?.querySelector('.grid.grid-cols-4')).not.toBeNull();
   expect(backgroundPalette?.querySelector('.grid.grid-cols-4')).not.toBeNull();
-  expect(textPalette?.querySelectorAll('button[title^="#"]')).toHaveLength(8);
+  expect(textPalette?.querySelectorAll('.grid.grid-cols-4 button[title^="#"]')).toHaveLength(8);
   expect(textPalette?.querySelector('button[title="#14b8a6"]')).toBeNull();
   expect(textPalette?.querySelector('button[title="#ec4899"]')).toBeNull();
   expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);

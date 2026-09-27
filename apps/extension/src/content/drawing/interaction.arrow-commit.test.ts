@@ -12,7 +12,7 @@ function createArrowDraft(length: number, width: number): PointerDraft {
     start: { x: 0, y: 0 },
     width,
   };
-  return { kind: 'create', object, start: object.start };
+  return { kind: 'create', object, start: object.start, arrowFromTip: false };
 }
 
 it.each([

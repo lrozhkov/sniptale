@@ -46,6 +46,7 @@ it.each(['move', 'resize'] as const)(
 it('keeps committed objects and appends a lightweight create preview', () => {
   const draft: PointerDraft = {
     kind: 'create',
+    arrowFromTip: false,
     object: original,
     start: { x: 10, y: 20 },
   };

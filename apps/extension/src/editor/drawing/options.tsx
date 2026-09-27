@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
-import { ArrowDownLeft } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   DRAWING_ARROW_WIDTHS,
   DRAWING_MARKER_WIDTHS,
@@ -15,6 +13,7 @@ import {
 } from '../../composition/persistence/drawing-palette';
 import {
   ArrowWidthModeOptions,
+  ArrowDrawDirectionOption,
   DrawingColorOptions,
   DrawingDeleteOption,
   DrawingDeselectOption,
@@ -176,18 +175,11 @@ function ArrowOptions(props: {
         onChange={(patch) => props.update('arrow', patch)}
       />
       <DrawingOptionsDivider vertical={false} />
-      <ContentToolbarButton
-        type="button"
+      <ArrowDrawDirectionOption
         active={props.drawFromTip}
-        aria-label={translate('editor.compact.arrowDrawFromTip')}
-        aria-pressed={props.drawFromTip}
-        title={translate('editor.compact.arrowDrawFromTip')}
         dataUi="editor.drawing.options.arrow.from-tip"
-        className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
-        onClick={() => props.onDirectionChange(!props.drawFromTip)}
-      >
-        <ArrowDownLeft aria-hidden size={16} />
-      </ContentToolbarButton>
+        onChange={props.onDirectionChange}
+      />
     </>
   );
 }
