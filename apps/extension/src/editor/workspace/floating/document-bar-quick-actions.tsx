@@ -263,7 +263,6 @@ function ScenarioQuickActions(props: {
         tone="primary"
         disabled={!hasImage || pending || !embed.onApply}
         aria-busy={pending}
-        className="!bg-[var(--sniptale-color-accent-soft)] !border-[var(--sniptale-color-border-accent-strong)]"
         onClick={() => {
           if (applying.current) return;
           applying.current = true;

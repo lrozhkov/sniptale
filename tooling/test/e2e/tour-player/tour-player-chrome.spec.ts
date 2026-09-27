@@ -242,9 +242,12 @@ test.describe('standalone tour player chrome', () => {
       await expectChromeBelowFrame(page);
       await page.locator('[data-tour-contents]').click();
       const dialog = await page.locator('[data-tour-navigation]').boundingBox();
-      const trigger = await page.locator('[data-tour-contents]').boundingBox();
-      if (!dialog || !trigger) throw new Error('Missing menu geometry');
-      expect(dialog.y + dialog.height).toBeLessThanOrEqual(trigger.y + 0.5);
+      const player = await page.locator('#tour-player').boundingBox();
+      if (!dialog || !player) throw new Error('Missing drawer geometry');
+      expect(dialog.y).toBeCloseTo(player.y, 0);
+      expect(dialog.height).toBeCloseTo(player.height, 0);
+      expect(dialog.x + dialog.width).toBeCloseTo(player.x + player.width, 0);
+      await page.screenshot({ path: path.join(proofDir, `tour-drawer-${name}.png`) });
       expect(dialog.y).toBeGreaterThanOrEqual(0);
       expect(dialog.x).toBeGreaterThanOrEqual(0);
       expect(dialog.x + dialog.width).toBeLessThanOrEqual(size.width + 0.5);
@@ -252,6 +255,28 @@ test.describe('standalone tour player chrome', () => {
       await page.screenshot({ path: path.join(proofDir, `tour-player-${name}.png`) });
     });
   }
+
+  test('drawer scrolls long lists and follows resize while open', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.setContent(await buildPlayerHtml());
+    await page.locator('[data-tour-contents]').click();
+    await page.locator('.tour-contents-list').evaluate((list) => {
+      const row = list.lastElementChild!;
+      for (let index = 0; index < 80; index += 1) list.append(row.cloneNode(true));
+    });
+    await page.setViewportSize({ width: 320, height: 280 });
+    const drawer = page.locator('[data-tour-navigation]');
+    const box = await drawer.boundingBox();
+    expect(box?.height).toBe(280);
+    expect(box!.x + box!.width).toBeCloseTo(320, 0);
+    await drawer.locator('.tour-contents-list').evaluate((list) => {
+      list.scrollTop = list.scrollHeight;
+    });
+    await expect(drawer.getByRole('button', { name: 'Close', exact: true })).toBeInViewport();
+    await drawer.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(drawer).not.toBeVisible();
+    await expect(page.locator('[data-tour-contents]')).toBeFocused();
+  });
 
   test('explanation disclosure never repeats body copy in its heading', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });

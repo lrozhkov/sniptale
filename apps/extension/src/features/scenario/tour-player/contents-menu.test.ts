@@ -53,8 +53,8 @@ async function mount() {
   return value;
 }
 
-/** The contents menu opens non-modal, anchored to the trigger, with the current slide visible. */
-it('opens the contents menu as a non-modal list anchored to its trigger', async () => {
+/** The drawer keeps the current slide visible and restores focus on commit or Escape. */
+it('opens the slide drawer and selects or dismisses it predictably', async () => {
   const { player, root } = await mount();
   const navigation = root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!;
   const trigger = root.querySelector<HTMLButtonElement>('[data-tour-contents]')!;
@@ -92,7 +92,7 @@ it('keeps clicks inside an editor shadow-root menu until the selected action run
   try {
     root.querySelector<HTMLButtonElement>('[data-tour-contents]')!.click();
     const navigation = root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!;
-    const second = navigation.querySelectorAll<HTMLButtonElement>('button')[1]!;
+    const second = navigation.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')[1]!;
     second.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
     expect(navigation.open).toBe(true);
     second.click();
@@ -104,35 +104,38 @@ it('keeps clicks inside an editor shadow-root menu until the selected action run
   }
 });
 
-/** The trigger sits in the bottom toolbar: the menu opens upward and stays inside the player. */
-it('anchors the menu above the bottom toolbar trigger and inside the player', async () => {
+it('keeps keyboard focus within the drawer and restores its trigger on close', async () => {
   const { root } = await mount();
   const navigation = root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!;
   const trigger = root.querySelector<HTMLButtonElement>('[data-tour-contents]')!;
-  vi.spyOn(root, 'getBoundingClientRect').mockReturnValue({
-    left: 0,
-    top: 0,
-    right: 800,
-    bottom: 600,
-    width: 800,
-    height: 600,
-  } as DOMRect);
-  vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
-    left: 12,
-    top: 552,
-    right: 100,
-    bottom: 588,
-    width: 88,
-    height: 36,
-  } as DOMRect);
-  Object.defineProperty(navigation, 'offsetWidth', { value: 320, configurable: true });
-  Object.defineProperty(navigation, 'offsetHeight', { value: 220, configurable: true });
   trigger.click();
-  expect(navigation.open).toBe(true);
-  expect(navigation.style.top).toBe('326px');
-  expect(navigation.style.left).toBe('12px');
-  navigation.removeAttribute('open');
-  Object.defineProperty(navigation, 'offsetHeight', { value: 700, configurable: true });
+  const buttons = [...navigation.querySelectorAll<HTMLButtonElement>('button')];
+  expect(navigation.querySelector('h2')?.textContent).toBe(labels.contents);
+  buttons.at(-1)!.focus();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', cancelable: true }));
+  expect(document.activeElement).toBe(buttons[0]);
+  document.dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      cancelable: true,
+    })
+  );
+  expect(document.activeElement).toBe(buttons.at(-1));
+  buttons[0]!.click();
+  expect(navigation.open).toBe(false);
+  expect(document.activeElement).toBe(trigger);
   trigger.click();
-  expect(navigation.style.top).toBe('4px');
+  trigger.click();
+  expect(navigation.open).toBe(false);
+});
+
+it('releases drawer listeners when disposed while open', async () => {
+  const { root, player } = await mount();
+  root.querySelector<HTMLButtonElement>('[data-tour-contents]')!.click();
+  player.dispose();
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+  document.dispatchEvent(escape);
+  expect(escape.defaultPrevented).toBe(false);
+  expect(root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!.open).toBe(false);
 });

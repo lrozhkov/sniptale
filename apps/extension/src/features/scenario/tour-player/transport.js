@@ -3,7 +3,7 @@ const FACES = {
   play: { fill: 'currentColor', d: 'M8 5v14l11-7z' },
   pause: { fill: 'currentColor', d: 'M7 5h4v14H7zm6 0h4v14h-4z' },
   retry: { fill: 'none', d: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6' },
-  contents: { fill: 'none', d: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01' },
+  contents: { fill: 'none', d: 'M3 4h18v16H3zM14 4v16M17 8h1M17 12h1M17 16h1' },
   previous: { fill: 'none', d: 'm15 18-6-6 6-6' },
   next: { fill: 'none', d: 'm9 18 6-6-6-6' },
 };

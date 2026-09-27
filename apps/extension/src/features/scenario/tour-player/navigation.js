@@ -51,21 +51,17 @@ export function createTourNavigation({
       });
       list.append(button);
     });
-    navigation.append(list);
+    const header = element('div', 'tour-contents-header');
+    const heading = element('h2', 'tour-contents-title');
+    heading.textContent = labels.contents;
+    const close = actionButton(labels.close, { kind: 'none' }, 'tour-button');
+    close.addEventListener('click', () => closeContents(true));
+    header.append(heading, close);
+    navigation.append(header, list);
     navigation.setAttribute('open', '');
     trigger.setAttribute('aria-expanded', 'true');
-    const player = root.getBoundingClientRect();
-    const bounds = trigger.getBoundingClientRect();
-    const width = navigation.offsetWidth;
-    const height = navigation.offsetHeight;
-    // The trigger lives in the bottom toolbar: the menu opens upward and stays inside the player.
-    navigation.style.left = `${Math.max(
-      4,
-      Math.min(bounds.left - player.left, player.width - width - 4)
-    )}px`;
-    navigation.style.top = `${Math.max(4, bounds.top - player.top - height - 6)}px`;
     current?.scrollIntoView?.({ block: 'nearest' });
-    current?.focus({ preventScroll: true });
+    (current ?? close).focus({ preventScroll: true });
     root.ownerDocument.addEventListener('keydown', onContentsKey, true);
     root.ownerDocument.addEventListener('pointerdown', onContentsPointerDown, true);
   }
@@ -83,9 +79,20 @@ export function createTourNavigation({
 
   function onContentsKey(event) {
     const navigation = root.querySelector('[data-tour-navigation]');
-    if (event.key !== 'Escape' || !navigation.open || event.defaultPrevented) return;
-    event.preventDefault();
-    closeContents(true);
+    if (!navigation.open || event.defaultPrevented) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeContents(true);
+    } else if (event.key === 'Tab') {
+      const buttons = [...navigation.querySelectorAll('button')];
+      const active = navigation.getRootNode().activeElement;
+      const next = buttons.indexOf(active) + (event.shiftKey ? -1 : 1);
+      if (next < 0 || next >= buttons.length) {
+        event.preventDefault();
+        buttons[event.shiftKey ? buttons.length - 1 : 0]?.focus();
+      }
+    }
   }
 
   function onContentsPointerDown(event) {
