@@ -7,6 +7,7 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
+import { useGuideMenuHover } from './menu-hover';
 
 type GuideMenuItem = {
   label: string;
@@ -23,17 +24,20 @@ export function GuideActionMenu({
   items,
   disabled = false,
   tone = 'default',
+  openOnHover = false,
 }: {
   label: string;
   icon: ReactNode;
   items: GuideMenuItem[];
   disabled?: boolean;
   tone?: 'default' | 'utility';
+  openOnHover?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const focusMenu = useRef(false);
   const id = useId();
   const theme = useResolvedPortalTheme(containerRef.current);
   const { portalStyle } = useGlassSelectOverlay({
@@ -44,12 +48,16 @@ export function GuideActionMenu({
     menuRef,
     menuWidth: 232,
   });
+  const hover = useGuideMenuHover(openOnHover, disabled, menuRef, setOpen);
   const close = () => {
+    hover.cancel();
     setOpen(false);
     trigger.current?.focus();
   };
   useEffect(() => {
-    if (open) menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    if (open && focusMenu.current)
+      menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    focusMenu.current = false;
   }, [open]);
   useEffect(() => {
     if (disabled) setOpen(false);
@@ -58,6 +66,7 @@ export function GuideActionMenu({
     <div
       ref={containerRef}
       className="guide-action-menu-anchor"
+      onMouseLeave={hover.leave}
       onBlurCapture={(event) => {
         if (!open) return;
         const next = event.relatedTarget;
@@ -77,10 +86,19 @@ export function GuideActionMenu({
         aria-expanded={open}
         aria-controls={id}
         disabled={disabled}
-        onClick={() => setOpen((value) => !value)}
+        onMouseEnter={hover.enter}
+        onClick={() => {
+          focusMenu.current = true;
+          if (open && openOnHover) {
+            menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+            return;
+          }
+          setOpen((value) => (openOnHover ? true : !value));
+        }}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return;
           event.preventDefault();
+          focusMenu.current = true;
           setOpen(true);
         }}
       >
@@ -94,6 +112,8 @@ export function GuideActionMenu({
             data-theme={theme ?? undefined}
             className="sniptale-ai-modal-root guide-action-menu"
             style={portalStyle}
+            onMouseEnter={hover.cancel}
+            onMouseLeave={hover.leave}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
                 event.preventDefault();

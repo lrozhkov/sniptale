@@ -437,8 +437,8 @@
 }
 .guide-block-actions {
   position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
+  top: 0;
+  right: 0;
   z-index: 5;
   display: flex;
   justify-content: flex-end;
@@ -832,20 +832,8 @@
   padding: 1.25rem 0.75rem;
 }
 .guide-block-actions {
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-block[data-guide-hover] .guide-block-actions,
-.guide-block:focus-within .guide-block-actions,
-.guide-block-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
-}
-@media (hover: none) {
-  .guide-block-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 .guide-inspector-panel .guide-inspector-title {
@@ -986,13 +974,14 @@
   top: 0.5rem;
   right: 0.5rem;
   z-index: 4;
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-document > :is(article, section)[data-guide-hover] > .guide-item-actions,
-.guide-item-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
+}
+.guide-document > :is(article, section) > :is(header, h2) {
+  padding-inline-end: 2.5rem;
+}
+.guide-document .guide-block {
+  padding-block-start: 2.25rem;
 }
 .guide-document
   :is(.guide-item-actions, .guide-block-actions, .guide-insertion-chrome, .guide-image-tools) {
@@ -1009,19 +998,19 @@
 .guide-document
   :is(.guide-action-menu-anchor, .guide-image-tools, .guide-insertion-chrome)
   > button {
-  width: 1.5rem;
-  height: 1.5rem;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
   padding: 0;
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: 50%;
-  background: var(--sniptale-color-surface-panel) !important;
-  color: var(--sniptale-color-text-primary);
+  border: 1px solid var(--guide-border);
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--guide-paper) !important;
+  color: var(--guide-muted) !important;
 }
 .guide-insertion {
   position: relative;
-  height: 0;
+  height: 2.5rem;
   z-index: 3;
 }
 .guide-insertion::before {
@@ -1036,46 +1025,39 @@
 }
 .guide-insertion-chrome {
   position: absolute;
-  top: -1rem;
+  top: 0.25rem;
   left: 50%;
   transform: translateX(-50%);
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-insertion[data-guide-hover] > .guide-insertion-chrome,
-.guide-insertion:focus-within > .guide-insertion-chrome {
   opacity: 1;
   pointer-events: auto;
 }
 .guide-insertion-block {
   position: absolute;
-  top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
+  top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5 - 1.25rem);
   left: 0;
   right: 0;
 }
 .guide-insertion-block[data-end='true'] {
   top: auto;
-  bottom: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
+  bottom: -2.5rem;
 }
 .guide-empty-step {
   position: relative;
   min-height: 1rem;
+}
+.guide-empty-step > .guide-insertion-block {
+  position: relative;
+  top: auto;
+  bottom: auto;
 }
 .guide-document .guide-image-surface {
   position: relative;
   margin: 0;
 }
 .guide-image-tools {
-  position: absolute;
-  top: 0.375rem;
-  left: 0.5rem;
+  position: relative;
   z-index: 2;
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-image-surface[data-guide-hover] > .guide-image-tools,
-.guide-image-surface:focus-within > .guide-image-tools,
-.guide-image-surface[data-editing='true'] > .guide-image-tools {
+  margin-bottom: 0.5rem;
   opacity: 1;
   pointer-events: auto;
 }
@@ -1393,15 +1375,6 @@ html[data-guide-reordering] .guide-block-grip {
   padding: 0.125rem 0.375rem;
   background: transparent;
   border: 1px solid transparent;
-}
-.guide-note-callout .guide-action-menu-anchor > button {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: color-mix(in srgb, var(--guide-callout-color) 65%, var(--guide-ink));
-  background: color-mix(in srgb, var(--guide-callout-color) 12%, var(--guide-paper)) !important;
-}
-.guide-note-callout .guide-action-menu-anchor > button:hover {
-  background: color-mix(in srgb, var(--guide-callout-color) 20%, var(--guide-paper)) !important;
 }
 
 .guide-numbering-fields {
@@ -1753,11 +1726,7 @@ html[data-guide-width-resizing] * {
 
 /* Contextual chrome fades in place; intent timing belongs to the central pointer owner. */
 .guide-center-panel {
-  --guide-tool-hover-surface: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 8%,
-    var(--sniptale-color-surface-panel)
-  );
+  --guide-tool-hover-surface: color-mix(in srgb, var(--guide-ink) 8%, var(--guide-paper));
 }
 .guide-center-panel
   :is(
@@ -1829,11 +1798,13 @@ html[data-guide-width-resizing] * {
     .guide-voice-control > button
   ):hover:not(:disabled):not([aria-pressed='true']) {
   background: var(--guide-tool-hover-surface) !important;
-  border-color: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 35%,
-    var(--sniptale-color-border-soft)
-  );
+  border-color: var(--guide-muted);
+  color: var(--guide-ink) !important;
+}
+.guide-document
+  :is(.guide-action-menu-anchor > button, .guide-insertion-chrome > button):active:not(:disabled) {
+  background: color-mix(in srgb, var(--guide-ink) 15%, var(--guide-paper)) !important;
+  color: var(--guide-ink) !important;
 }
 .guide-document
   :is(
@@ -1845,7 +1816,7 @@ html[data-guide-width-resizing] * {
     .guide-insertion-chrome > button,
     .guide-voice-control > button
   ):focus-visible {
-  outline: 1px solid var(--sniptale-color-accent);
+  outline: 2px solid var(--guide-ink);
   outline-offset: 2px;
 }
 .guide-document

@@ -77,3 +77,40 @@ it('dismisses when keyboard focus moves to another context without stealing that
   expect(document.querySelector('.guide-action-menu')).toBeNull();
   expect(document.activeElement).toBe(outside);
 });
+
+it('opens on hover without moving editing focus and closes after leaving the portaled menu', async () => {
+  vi.useFakeTimers();
+  const editor = document.createElement('input');
+  document.body.append(editor);
+  await act(async () =>
+    root.render(
+      <GuideActionMenu
+        label="Insert"
+        icon="+"
+        openOnHover
+        items={[{ label: 'Step', icon: null, onSelect: vi.fn() }]}
+      />
+    )
+  );
+  editor.focus();
+  const trigger = container.querySelector('button')!;
+  await act(async () => trigger.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+  expect(document.activeElement).toBe(editor);
+  await act(async () => trigger.dispatchEvent(new MouseEvent('mouseout', { bubbles: true })));
+  const menu = document.querySelector('.guide-action-menu')!;
+  await act(async () => menu.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  act(() => vi.advanceTimersByTime(200));
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+  await act(async () => trigger.click());
+  expect(document.activeElement?.textContent).toBe('Step');
+  await act(async () => menu.dispatchEvent(new MouseEvent('mouseout', { bubbles: true })));
+  act(() => vi.advanceTimersByTime(200));
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+  await act(async () => editor.focus());
+  await act(async () => menu.dispatchEvent(new MouseEvent('mouseout', { bubbles: true })));
+  act(() => vi.advanceTimersByTime(200));
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  editor.remove();
+  vi.useRealTimers();
+});

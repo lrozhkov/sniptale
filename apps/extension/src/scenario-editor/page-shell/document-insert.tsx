@@ -1,7 +1,16 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { FileText, Heading, Image, ListPlus, MessageSquare, CornerDownLeft } from 'lucide-react';
+import {
+  FileText,
+  Heading,
+  Image,
+  ListPlus,
+  MessageSquare,
+  CornerDownLeft,
+  Plus,
+} from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
+import { GuideActionMenu } from './action-menu';
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
@@ -103,18 +112,17 @@ export function GuideDocumentInsert({
             <CornerDownLeft size={15} aria-hidden="true" />
           </ContentToolbarButton>
         )}
-        {items.map((item) => (
-          <ContentToolbarButton
-            key={item.label}
-            type="button"
-            title={item.label}
-            aria-label={item.label}
-            disabled={disabled}
-            onClick={item.onSelect}
-          >
-            {item.icon}
-          </ContentToolbarButton>
-        ))}
+        <GuideActionMenu
+          label={t(
+            target.kind === 'item'
+              ? 'scenario.editor.guideInsertItem'
+              : 'scenario.editor.guideAddBlock'
+          )}
+          icon={<Plus size={16} aria-hidden="true" />}
+          items={items}
+          disabled={disabled}
+          openOnHover
+        />
       </div>
     </div>
   );

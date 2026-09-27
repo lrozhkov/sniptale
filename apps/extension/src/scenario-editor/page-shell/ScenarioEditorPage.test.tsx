@@ -62,6 +62,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import type { GuideLibraryBrowser } from './library-browser';
+import { clickGuideControl } from './test-support/guide-controls';
 
 let root: Root;
 let container: HTMLDivElement;
@@ -95,34 +96,7 @@ async function render() {
   await act(async () => root.render(<ScenarioEditorPage />));
 }
 async function click(label: string, scope: ParentNode = container) {
-  const menus = [
-    [
-      ['Duplicate project', 'Delete project', 'Reload project'],
-      '.guide-page-header .guide-action-menu-anchor',
-    ],
-    [
-      ['Move up', 'Move down', 'Duplicate item', 'Remove item', 'Merge with next step'],
-      '.guide-document [data-selected="true"] > .guide-item-actions',
-    ],
-  ] as const;
-  const selector =
-    scope instanceof Element && scope.matches('.guide-block')
-      ? '.guide-block-actions'
-      : menus.find(([labels]) => labels.some((name) => name === label))?.[1];
-  if (selector) {
-    const trigger = scope.querySelector<HTMLButtonElement>(`${selector} button`);
-    await act(async () => trigger?.click());
-    scope = document.body;
-  }
-  if (['Text', 'Heading', 'Note'].includes(label))
-    scope = scope.querySelector('.guide-insertion-block[data-end="true"]') ?? scope;
-  if (['Add step', 'Add section'].includes(label))
-    scope = scope.querySelector('.guide-insertion-item[data-end="true"]') ?? scope;
-  const button = [...scope.querySelectorAll('button')].find(
-    (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
-  );
-  if (!button) throw new Error(`Missing test control ${label}`);
-  await act(async () => button.click());
+  await clickGuideControl(label, scope);
 }
 
 async function settleAutosave() {
@@ -775,10 +749,14 @@ it('inserts at a block boundary and focuses the new field before typing', async 
   project.items = [step];
   io.load.mockResolvedValue(project);
   await render();
-  const command = container.querySelector<HTMLButtonElement>(
-    '[data-insert-before="b"] button[aria-label="Heading"]'
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '[data-insert-before="b"] .guide-action-menu-anchor > button'
   );
-  expect(command).not.toBeNull();
+  expect(trigger).not.toBeNull();
+  await act(async () => trigger?.click());
+  const command = [
+    ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
+  ].find((button) => button.textContent === 'Heading');
   await act(async () => command?.click());
   const heading = container.querySelector<HTMLTextAreaElement>('.guide-block-heading');
   expect(document.activeElement).toBe(heading);
