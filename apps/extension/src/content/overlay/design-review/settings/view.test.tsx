@@ -74,7 +74,7 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
 
   const navigation = container.querySelector('nav');
-  expect(navigation?.querySelectorAll('button')).toHaveLength(4);
+  expect(navigation?.querySelectorAll('button')).toHaveLength(5);
   expect(navigation?.className).toContain('border-solid');
   expect(container.querySelector('details')).toBeNull();
   expect(container.querySelector('summary')).toBeNull();
@@ -94,8 +94,14 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   );
   expect(container.querySelector('[data-ui="content.design-review.side-values"]')).toBeNull();
   expect(container.querySelector('[data-ui="content.design-review.field"]')?.className).toContain(
-    'grid-cols-[7rem_minmax(0,1fr)]'
+    '!grid-cols-1'
   );
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="content.design-review.close-settings"]')
+      ?.click()
+  );
+  expect(actions.setSettingsOpen).toHaveBeenCalledWith(false);
   expect(container.querySelector('input[type="file"]')).toBeNull();
 });
 
@@ -134,7 +140,7 @@ it('shows image layout properties without preview or asset-upload controls', () 
     root.render(<DesignReviewSettings actions={actions} disabled={false} state={imageState} />)
   );
 
-  expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(5);
+  expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(6);
   expect(container.textContent).toContain('Вписывание');
   expect(container.textContent).toContain('Позиция');
   expect(container.querySelector('img')).toBeNull();

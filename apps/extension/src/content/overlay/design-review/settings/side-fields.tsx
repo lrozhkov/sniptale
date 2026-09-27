@@ -113,7 +113,10 @@ function CompactSideValues(props: {
   state: DesignReviewViewState;
 }) {
   return (
-    <div className={COMPACT_VALUES_CLASS_NAME} data-ui="content.design-review.side-values-compact">
+    <div
+      className={`${COMPACT_VALUES_CLASS_NAME} ${props.properties[0]?.endsWith('-color') ? '!w-36' : ''}`}
+      data-ui="content.design-review.side-values-compact"
+    >
       <SideValueControl
         compact
         disabled={props.disabled}
@@ -212,8 +215,12 @@ export function LinkedSideFields(props: {
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1">
+      <div
+        className={`flex min-w-0 items-center gap-2 ${props.properties[0]?.endsWith('-color') ? 'flex-wrap' : ''}`}
+      >
+        <div
+          className={`min-w-0 flex-1 ${props.properties[0]?.endsWith('-color') ? 'basis-full' : ''}`}
+        >
           <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
         </div>
         <div className="flex shrink-0 items-center gap-1.5">

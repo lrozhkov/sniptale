@@ -165,6 +165,7 @@ it('renders the footer with quiet matte action styling', () => {
 
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onApply).toHaveBeenCalledOnce();
+  expect(footer.props.className).toContain('sticky bottom-0');
   expect(footerButtons[0]?.props.className).toContain('text-xs font-medium');
   expect(footerButtons[0]?.props.className).toContain('bg-transparent');
   expect(footerButtons[1]?.props.className).toContain('text-xs font-medium');

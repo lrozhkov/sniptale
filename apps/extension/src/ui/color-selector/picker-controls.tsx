@@ -115,7 +115,7 @@ export function PickerManualColorField(props: {
 
 export function PickerFooter(props: { onApply: () => void; onCancel: () => void }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="sticky bottom-0 z-10 grid grid-cols-2 gap-2 bg-[var(--sniptale-color-surface-panel)] py-1">
       <button type="button" onClick={props.onCancel} className={TEXT_ACTION_CLASS_NAME}>
         {translate('shared.ui.colorSelectorCancel')}
       </button>

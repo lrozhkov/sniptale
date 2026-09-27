@@ -1,4 +1,4 @@
-import { Droplets, Image, Maximize2, Square, Type } from 'lucide-react';
+import { Droplets, Image, Maximize2, Square, Type, X } from 'lucide-react';
 import { useLayoutEffect, useState, type ComponentType } from 'react';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
@@ -81,6 +81,8 @@ export function DesignReviewSettings(props: {
                 section === option.key
                   ? 'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]'
                   : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
+                'active:bg-[var(--sniptale-color-surface-hover)] focus:outline-none',
+                'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
               ].join(' ')}
               aria-label={translate(option.labelKey)}
               aria-pressed={section === option.key}
@@ -91,6 +93,23 @@ export function DesignReviewSettings(props: {
             </button>
           );
         })}
+        <button
+          type="button"
+          className={[
+            'mt-2 inline-flex h-9 w-9 items-center justify-center rounded-[7px]',
+            'text-[var(--sniptale-color-text-secondary)]',
+            'hover:bg-[var(--sniptale-color-surface-input)] active:bg-[var(--sniptale-color-surface-hover)]',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+          ].join(' ')}
+          aria-label={
+            `${translate('content.designReview.close')}: ` +
+            translate('content.designReview.settingsNavigation')
+          }
+          data-ui="content.design-review.close-settings"
+          onClick={() => props.actions.setSettingsOpen(false)}
+        >
+          <X aria-hidden="true" size={17} />
+        </button>
       </nav>
       <div className="min-w-0 p-2.5">
         <SettingsContent {...props} section={section} />

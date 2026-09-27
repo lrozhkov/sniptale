@@ -2,7 +2,6 @@ import { useCallback, useEffect, type RefObject } from 'react';
 import { isContentEventWithinElement, queryContentUiElement } from '../../../platform/dom-host';
 
 const PANEL_TOGGLE_SELECTOR = '[data-ui="content.toolbar.design-review-panel-button"]';
-const ACTION_MENU_SELECTOR = '[data-ui="content.design-review.action-menu"]';
 
 function focusPanelToggle(): void {
   queueMicrotask(() => queryContentUiElement<HTMLButtonElement>(PANEL_TOGGLE_SELECTOR)?.focus());
@@ -45,7 +44,6 @@ export function useFeedbackPanelLifecycle(args: {
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (queryContentUiElement(ACTION_MENU_SELECTOR)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (filterOpen) {

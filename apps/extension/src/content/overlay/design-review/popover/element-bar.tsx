@@ -5,6 +5,7 @@ import type { PageStyleSelectionSnapshot } from '../../../selection/design-revie
 import { describeDesignReviewElement } from './element-label';
 
 export function DesignReviewElementBar(props: {
+  hasFeedback: boolean;
   onCopyElement: () => void;
   onCopyPath: () => void;
   onDeleteRequest: () => void;
@@ -20,7 +21,10 @@ export function DesignReviewElementBar(props: {
   return (
     <div className="flex min-w-0 items-center gap-2 px-3 pb-2 pt-1">
       <span
-        className="shrink-0 text-xs text-[var(--sniptale-color-text-dim)] outline-none"
+        className={[
+          'shrink-0 rounded-[4px] text-xs text-[var(--sniptale-color-text-dim)] outline-none',
+          'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        ].join(' ')}
         data-ui="content.design-review.element-tag"
         tabIndex={0}
         title={describeDesignReviewElement(selection.tagName)}
@@ -36,6 +40,7 @@ export function DesignReviewElementBar(props: {
           'min-w-0 flex-1 text-left font-mono text-[10px]',
           'text-[var(--sniptale-color-text-dim)]',
           'hover:text-[var(--sniptale-color-text-primary)]',
+          'rounded-[4px] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         ].join(' ')}
         aria-label={translate('content.designReview.copyFullPath')}
         title={selection.domPath}
@@ -51,49 +56,46 @@ export function DesignReviewElementBar(props: {
       >
         <ClipboardCopy size={16} />
       </ElementActionButton>
-      <ElementActionButton
-        active={props.settingsOpen}
-        label={translate('content.designReview.editProperties')}
-        onClick={() => props.onSettingsOpenChange(!props.settingsOpen)}
-      >
-        <Pencil size={16} />
-      </ElementActionButton>
-      <ElementActionButton
-        danger
-        label={translate('content.designReview.deleteFeedback')}
-        onClick={props.onDeleteRequest}
-      >
-        <Trash2 size={16} />
-      </ElementActionButton>
+      {props.settingsOpen ? (
+        props.hasFeedback ? (
+          <ElementActionButton
+            danger
+            label={translate('content.designReview.deleteFeedback')}
+            onClick={props.onDeleteRequest}
+          >
+            <Trash2 size={16} />
+          </ElementActionButton>
+        ) : null
+      ) : (
+        <ElementActionButton
+          label={translate('content.designReview.editProperties')}
+          onClick={() => props.onSettingsOpenChange(true)}
+        >
+          <Pencil size={16} />
+        </ElementActionButton>
+      )}
     </div>
   );
 }
 
 function ElementActionButton(props: {
-  active?: boolean;
   children: ReactNode;
   danger?: boolean;
   label: string;
   onClick: () => void;
 }) {
-  const activeClassName = props.active
-    ? [
-        'border-[color:var(--sniptale-color-accent)]',
-        'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]',
-      ].join(' ')
-    : '';
-
   return (
     <button
       type="button"
       className={[
-        'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[7px] border',
-        'border-[color:var(--sniptale-color-border-soft)]',
-        activeClassName,
-        props.danger ? 'text-[var(--sniptale-color-danger)]' : '',
+        'inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-[7px]',
+        'border border-transparent active:bg-[var(--sniptale-color-surface-hover)]',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        props.danger
+          ? 'ml-1 text-[var(--sniptale-color-danger)] hover:bg-[var(--sniptale-color-danger-soft)]'
+          : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
       ].join(' ')}
       aria-label={props.label}
-      aria-pressed={props.active}
       title={props.label}
       onClick={props.onClick}
     >

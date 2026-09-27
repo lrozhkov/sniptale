@@ -76,6 +76,7 @@ type NumericFieldProps = {
   modified?: boolean | undefined;
   onChange: (value: string) => void;
   onReset?: (() => void) | undefined;
+  stacked?: boolean | undefined;
   value: string;
 };
 
@@ -133,6 +134,7 @@ function NumericUnitLabel(props: { unit: string }) {
 export function NumericField(props: NumericFieldProps) {
   return (
     <Field
+      className={props.stacked ? '!grid-cols-1 gap-1' : undefined}
       defaultValue={props.defaultValue}
       label={props.label}
       modified={props.modified}

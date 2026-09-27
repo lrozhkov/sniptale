@@ -233,6 +233,10 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Закрыть',
     en: 'Close',
   },
+  actionLabel: {
+    ru: 'Тип замечания',
+    en: 'Feedback type',
+  },
   actionRefine: {
     ru: 'Доработать',
     en: 'Refine',

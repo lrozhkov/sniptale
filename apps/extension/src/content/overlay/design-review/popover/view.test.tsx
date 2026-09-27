@@ -36,7 +36,7 @@ const element = document.createElement('h1');
 const state: DesignReviewViewState = {
   action: 'refine',
   anchor: { x: 40, y: 40 },
-  comment: { commitFailed: false, draft: '', marker: null },
+  comment: { commitFailed: false, draft: '', marker: 1 },
   defaultValues: {},
   draftPatch: { declarations: [] },
   modifiedProperties: [],
@@ -95,14 +95,8 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(
     root.querySelector('[data-ui="content.design-review.comment-submit-hint"]')
   ).not.toBeNull();
-  expect(
-    root.querySelector('button[aria-label="Изменить свойства элемента"]')?.className
-  ).toContain('bg-[var(--sniptale-color-accent-soft)]');
-  for (const label of [
-    'Копировать данные элемента',
-    'Изменить свойства элемента',
-    'Удалить замечание',
-  ]) {
+  expect(root.querySelector('button[aria-label="Изменить свойства элемента"]')).toBeNull();
+  for (const label of ['Копировать данные элемента', 'Удалить замечание']) {
     expect(root.querySelector(`button[aria-label="${label}"]`)?.className).toContain(
       'cursor-pointer'
     );
@@ -110,6 +104,19 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(root.querySelector('[data-ui="content.design-review.popover"]')?.className).toContain(
     'cursor-default'
   );
+  const commentField = root.querySelector(
+    '[data-ui="content.design-review.comment"] textarea'
+  )?.parentElement;
+  expect(commentField?.className).toContain('border-[color:var(--sniptale-color-border-soft)]');
+  expect(commentField?.className).toContain('focus-within:ring-1');
+  expect(commentField?.className).not.toContain('focus-within:ring-2');
+  const copyButton = root.querySelector('button[aria-label="Копировать данные элемента"]');
+  expect(copyButton?.className).toContain('focus-visible:ring-2');
+  expect(copyButton?.className).toContain('hover:bg-');
+  expect(copyButton?.className).toContain('active:bg-');
+  const deleteButton = root.querySelector('button[aria-label="Удалить замечание"]');
+  expect(deleteButton?.className).toContain('text-[var(--sniptale-color-danger)]');
+  expect(deleteButton?.className).toContain('ml-1');
   const closeButton = root.querySelector('button[aria-label="Закрыть"]');
   expect(closeButton?.className).toContain('pointer-events-auto');
   expect(closeButton?.className).toContain('cursor-pointer');
@@ -143,40 +150,77 @@ it('does not render without an active click selection', () => {
   ).toBe('');
 });
 
-it('uses the mock icon palette without recoloring selected action labels', () => {
-  const renderActionButton = (action: DesignReviewViewState['action']) => {
+it('shows edit and delete in separate popover states', () => {
+  for (const settingsOpen of [false, true]) {
     const root = document.createElement('div');
     root.innerHTML = renderToStaticMarkup(
-      <DesignReviewPopover actions={actions} open={true} state={{ ...state, action }} />
+      <DesignReviewPopover actions={actions} open state={{ ...state, settingsOpen }} />
     );
-    const button = [...root.querySelectorAll('button')].find((button) =>
-      button.hasAttribute('aria-expanded')
+    expect(Boolean(root.querySelector('[aria-label="Изменить свойства элемента"]'))).toBe(
+      !settingsOpen
     );
-    return { button, icon: button?.querySelector('svg') };
-  };
+    expect(Boolean(root.querySelector('[aria-label="Удалить замечание"]'))).toBe(settingsOpen);
+  }
+});
 
-  expect(renderActionButton('refine').icon?.getAttribute('class')).toContain('text-[#8b5cf6]');
-  expect(renderActionButton('fix').icon?.getAttribute('class')).toContain(
-    'text-[var(--sniptale-color-danger)]'
+it('hides delete when the selected element has no saved feedback', () => {
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <DesignReviewPopover
+      actions={actions}
+      open
+      state={{ ...state, comment: { ...state.comment, marker: null } }}
+    />
   );
-  expect(renderActionButton('simplify').icon?.getAttribute('class')).toContain(
-    'text-[var(--sniptale-color-success)]'
+  expect(root.querySelector('[aria-label="Удалить замечание"]')).toBeNull();
+});
+
+it('shows five compact action choices with only the selected label and colored icon', () => {
+  const root = document.createElement('div');
+  root.innerHTML = renderToStaticMarkup(
+    <DesignReviewPopover actions={actions} open state={state} />
   );
-  expect(renderActionButton('verify').icon?.getAttribute('class')).toContain(
-    'text-[var(--sniptale-color-info)]'
+  const choices = root.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="content.design-review.action-switch"] button'
   );
-  expect(renderActionButton('explain').icon?.getAttribute('class')).toContain(
-    'text-[var(--sniptale-color-warning)]'
-  );
-  expect(renderActionButton('fix').button?.className).toContain(
-    'text-[var(--sniptale-color-text-primary)]'
-  );
-  expect(renderActionButton('fix').button?.className).not.toContain(
+  expect(choices).toHaveLength(5);
+  expect(
+    [...choices].filter((button) => button.getAttribute('aria-pressed') === 'true')
+  ).toHaveLength(1);
+  expect(choices[0]?.textContent).toContain('Доработать');
+  expect(choices[1]?.textContent).toBe('');
+  expect(choices[1]?.getAttribute('title')).toBe('Исправить');
+  expect(choices[0]?.querySelector('svg')?.getAttribute('class')).toContain('text-[#8b5cf6]');
+  expect(choices[1]?.querySelector('svg')?.getAttribute('class')).not.toContain(
     'text-[var(--sniptale-color-danger)]'
   );
 });
 
-it('keeps the action menu interactive across the content shadow boundary', () => {
+it('keeps only the selected action icon colored and label visible', () => {
+  for (const action of ['refine', 'fix', 'simplify', 'verify', 'explain'] as const) {
+    const root = document.createElement('div');
+    root.innerHTML = renderToStaticMarkup(
+      <DesignReviewPopover actions={actions} open state={{ ...state, action }} />
+    );
+    const selected = root.querySelector<HTMLButtonElement>(
+      '[data-ui="content.design-review.action-switch"] button[aria-pressed="true"]'
+    );
+    expect(selected?.textContent?.length).toBeGreaterThan(0);
+    expect(selected?.querySelector('svg')?.getAttribute('class')).toContain('text-[');
+    const unselected = root.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="content.design-review.action-switch"] button[aria-pressed="false"]'
+    );
+    expect(unselected).toHaveLength(4);
+    expect([...unselected].every((button) => button.textContent === '')).toBe(true);
+    expect(
+      [...unselected].every(
+        (button) => !button.querySelector('svg')?.getAttribute('class')?.includes('text-[')
+      )
+    ).toBe(true);
+  }
+});
+
+it('keeps the compact switch interactive across the content shadow boundary', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const shadowRoot = host.attachShadow({ mode: 'open' });
@@ -189,49 +233,22 @@ it('keeps the action menu interactive across the content shadow boundary', () =>
       root.render(
         <DesignReviewPopover
           actions={{ ...actions, selectAction }}
-          open={true}
+          open
           state={{ ...state, settingsOpen: false }}
         />
       );
     });
-    const trigger = shadowRoot.querySelector<HTMLButtonElement>('button[aria-expanded]');
-    if (!trigger) throw new Error('Expected action menu trigger');
-    expect(trigger.className).toContain('cursor-pointer');
-    act(() => trigger.click());
-    const fixOption = [
-      ...shadowRoot.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
-    ].find((button) => button.textContent?.includes('Исправить'));
-    if (!fixOption) throw new Error('Expected Fix action');
-
-    act(() => {
-      fixOption.dispatchEvent(
-        new MouseEvent('pointerdown', { bubbles: true, composed: true, cancelable: true })
-      );
-    });
-    expect(
-      shadowRoot.querySelector('[data-ui="content.design-review.action-menu"]')
-    ).not.toBeNull();
-    expect(
-      shadowRoot.querySelector('[data-ui="content.design-review.action-menu"]')?.className
-    ).toContain('cursor-pointer');
-    const actionOptions = [
-      ...shadowRoot.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
-    ];
-    const findActionIcon = (label: string) =>
-      actionOptions
-        .find((button) => button.textContent?.includes(label))
-        ?.querySelector('svg')
-        ?.getAttribute('class');
-    expect(findActionIcon('Доработать')).toContain('text-[#8b5cf6]');
-    expect(findActionIcon('Упростить')).toContain('text-[var(--sniptale-color-success)]');
-    expect(findActionIcon('Проверить')).toContain('text-[var(--sniptale-color-info)]');
-    expect(findActionIcon('Объяснить')).toContain('text-[var(--sniptale-color-warning)]');
-    expect(fixOption.className).toContain('text-[var(--sniptale-color-text-primary)]');
-    expect(fixOption.className).toContain('cursor-pointer');
-    expect(fixOption.className).not.toContain('text-[var(--sniptale-color-danger)]');
-
-    act(() => fixOption.click());
+    const fix = shadowRoot.querySelector<HTMLButtonElement>(
+      '[data-ui="content.design-review.action-switch"] button[aria-label="Исправить"]'
+    );
+    if (!fix) throw new Error('Expected Fix action');
+    expect(fix.getAttribute('title')).toBe('Исправить');
+    expect(fix.className).toContain('focus-visible:ring-2');
+    act(() => fix.click());
     expect(selectAction).toHaveBeenCalledWith('fix');
+    expect(
+      shadowRoot.querySelectorAll('[data-ui="content.design-review.action-switch"] button')
+    ).toHaveLength(5);
   } finally {
     act(() => root.unmount());
     host.remove();
@@ -344,35 +361,15 @@ it('measures and reclamps base, delete, and action-menu states inside the viewpo
         />
       );
     });
-    const actionButton = container.querySelector<HTMLButtonElement>('button[aria-expanded]');
-    if (!actionButton) {
-      throw new Error('Expected action menu trigger');
-    }
-    expect(actionButton.closest('[data-ui="content.design-review.comment"]')).not.toBeNull();
-    popoverHeight = 360;
-    act(() => actionButton.click());
+    const actionSwitch = container.querySelector<HTMLElement>(
+      '[data-ui="content.design-review.action-switch"]'
+    );
+    expect(actionSwitch?.closest('[data-ui="content.design-review.comment"]')).not.toBeNull();
+    expect(actionSwitch?.querySelectorAll('button')).toHaveLength(5);
     act(() => {
       (resizeCallback as ResizeObserverCallback)([], {} as ResizeObserver);
     });
-    const actionMenu = container.querySelector<HTMLElement>(
-      '[data-ui="content.design-review.action-menu"]'
-    );
-    expect(actionMenu).not.toBeNull();
-    expect(actionMenu?.className).toContain('absolute');
-    expect(actionMenu?.closest('.overflow-y-auto')).toBeNull();
-    expect(actionMenu?.closest('[data-ui="content.design-review.comment-layer"]')).not.toBeNull();
-    const wheelEvent = new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 80 });
-    actionMenu?.dispatchEvent(wheelEvent);
-    expect(wheelEvent.defaultPrevented).toBe(true);
     expect(popover.style.top).toBe('12px');
-
-    act(() => {
-      document.dispatchEvent(
-        new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
-      );
-    });
-    expect(container.querySelector('[data-ui="content.design-review.action-menu"]')).toBeNull();
-    expect(document.activeElement).toBe(actionButton);
   } finally {
     act(() => root.unmount());
     container.remove();

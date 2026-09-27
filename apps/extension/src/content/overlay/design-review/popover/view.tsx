@@ -35,14 +35,22 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           type="button"
-          className="h-9 rounded-[8px] border border-[color:var(--sniptale-color-border-soft)] text-xs font-semibold"
+          className={[
+            'h-9 rounded-[8px] border border-[color:var(--sniptale-color-border-soft)] text-xs font-semibold',
+            'hover:bg-[var(--sniptale-color-surface-input)] active:bg-[var(--sniptale-color-surface-hover)]',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+          ].join(' ')}
           onClick={props.onCancel}
         >
           {translate('content.designReview.cancel')}
         </button>
         <button
           type="button"
-          className="h-9 rounded-[8px] bg-[var(--sniptale-color-danger)] text-xs font-semibold text-white"
+          className={[
+            'h-9 rounded-[8px] bg-[var(--sniptale-color-danger)] text-xs font-semibold text-white',
+            'hover:opacity-90 active:opacity-80',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+          ].join(' ')}
           onClick={props.onConfirm}
         >
           {translate('content.designReview.delete')}
@@ -146,6 +154,8 @@ export function DesignReviewPopover(props: {
           'rounded-full border shadow-md',
           'border-[color:var(--sniptale-color-border-soft)]',
           'bg-[var(--sniptale-color-surface-panel)]',
+          'hover:bg-[var(--sniptale-color-surface-input)] active:bg-[var(--sniptale-color-surface-hover)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         ].join(' ')}
         aria-label={translate('content.designReview.close')}
         title={translate('content.designReview.close')}
@@ -187,6 +197,7 @@ export function DesignReviewPopover(props: {
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain">
           <DesignReviewElementBar
+            hasFeedback={props.state.comment.marker !== null}
             onCopyElement={() => void props.actions.copyElement()}
             onCopyPath={() => void props.actions.copyPath()}
             onDeleteRequest={() => view.setDeleteRequested(true)}
