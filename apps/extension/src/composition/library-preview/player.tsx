@@ -53,7 +53,11 @@ export function LibraryMediaPlayer(props: PlayerProps) {
           {...props}
           playback={playback}
           zoom={zoom}
-          onImageReady={() => setImageReady(true)}
+          imageSize={state.imageSize}
+          onImageReady={(node) => {
+            state.onImageLoad(node);
+            setImageReady(true);
+          }}
           onDecodeFailed={() => {
             setDecodeFailed(true);
             setImageReady(false);
@@ -90,7 +94,8 @@ function LibraryMediaPicture(
   props: PlayerProps & {
     playback: ReturnType<typeof useLibraryPlayback>;
     zoom: number;
-    onImageReady(): void;
+    imageSize: { width: number; height: number } | null;
+    onImageReady(node: HTMLImageElement): void;
     onDecodeFailed(): void;
   }
 ) {
@@ -98,17 +103,30 @@ function LibraryMediaPicture(
   if (!props.src) return props.children;
   return (
     <div
-      style={{ width: `${props.zoom * 100}%`, height: `${props.zoom * 100}%` }}
-      className="relative"
+      style={
+        props.kind === 'image' && props.imageSize
+          ? {
+              width: '100%',
+              minWidth: props.imageSize.width,
+              height: '100%',
+              minHeight: props.imageSize.height,
+            }
+          : { width: `${props.zoom * 100}%`, height: `${props.zoom * 100}%` }
+      }
+      className="relative flex items-center justify-center"
       data-ui="library-media-picture"
     >
       {props.kind === 'image' ? (
         <img
+          key={props.src}
           src={props.src}
           alt={props.filename}
           draggable={false}
           className="block h-full w-full object-contain"
-          onLoad={props.onImageReady}
+          style={
+            props.imageSize ? { ...props.imageSize, maxWidth: 'none', flex: 'none' } : undefined
+          }
+          onLoad={(event) => props.onImageReady(event.currentTarget)}
           onError={props.onDecodeFailed}
         />
       ) : (

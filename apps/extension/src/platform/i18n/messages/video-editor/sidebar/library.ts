@@ -261,6 +261,14 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     ru: 'Вписать',
     en: 'Fit',
   },
+  mediaPreviewImageZoomLabel: {
+    ru: 'Масштаб',
+    en: 'Zoom',
+  },
+  mediaPreviewImageZoomHint: {
+    ru: 'Ctrl/⌘ + колесо — масштаб. Перетаскивайте увеличенное изображение. «Вписать» — показать целиком.',
+    en: 'Ctrl/⌘ + wheel to zoom. Drag the enlarged image. Fit shows the whole image.',
+  },
   mediaPreviewZoomHint: {
     ru: '1× — целиком в окне. Увеличьте и перетаскивайте изображение для просмотра деталей.',
     en: '1× fits the whole image. Zoom in and drag the picture to inspect details.',

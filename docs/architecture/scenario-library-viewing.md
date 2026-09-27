@@ -73,3 +73,9 @@ Both Library actions require route-level proof that viewing performs no project 
 Run built-extension browser proof for both modes: effective CSP, extension API/storage isolation, script execution, denied remote requests, rejected forged/replayed/oversized messages, user-initiated external links and frame teardown. Existing unit tests and source inspection do not substitute for this proof. Preserve the effect-sandbox artifact checks when touching shared sandbox policy.
 
 Cover reload after a committed edit, exclusion of unsaved editor changes, stable already-open playback, cancellation during preparation, stale completion, missing assets, deletion/trash, invalid or future project data, empty guide and absent/incomplete tour. Check keyboard operation, visible focus, translated labels, theme, reduced motion, narrow viewport, progress and recovery controls against `DESIGN.md`. Run preflight on actual implementation files and all checkpoint-routed security/architecture reviews before closeout.
+
+## Material preview while editing a guide
+
+Guide library insertion and resource-image viewing reuse `composition/library-preview/player.tsx`, also used by the video editor's library and source viewer. Its viewport owns disposable fit, zoom, pan and fullscreen state; transport owns playback controls. Callers own material selection, asynchronous reads, object-URL disposal and insertion into projects. Preview does not change stored media or project timing.
+
+Image viewing follows Gallery's basic interaction pattern: aspect-preserving fit without upscaling, natural-pixel percentage zoom, Ctrl/Cmd-wheel, dragging enlarged content and explicit Fit. Gallery retains its own review/navigation state and cross-item zoom lock. Neither editor imports Gallery runtime implementations. The guide drawer owns its list/preview proportions and modal dismissal; resource rows own preview selection and usage-menu state through their existing dialog/menu owners.

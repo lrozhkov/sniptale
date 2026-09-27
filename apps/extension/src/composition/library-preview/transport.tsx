@@ -83,7 +83,11 @@ export function LibraryMediaTransport(props: {
         </ContentToolbarButton>
       ) : null}
       <p className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.sidebar.mediaPreviewZoomHint')}
+        {translate(
+          props.image
+            ? 'videoEditor.sidebar.mediaPreviewImageZoomHint'
+            : 'videoEditor.sidebar.mediaPreviewZoomHint'
+        )}
       </p>
     </div>
   );
@@ -142,6 +146,12 @@ export function LibraryViewControls({
   ready: boolean;
 }) {
   const { fullscreen, fullscreenButton, enterFullscreen, zoom, setZoom } = state;
+  const image = state.imageSize !== null;
+  const zoomLabel = translate(
+    image
+      ? 'videoEditor.sidebar.mediaPreviewImageZoomLabel'
+      : 'videoEditor.sidebar.mediaPreviewZoomLabel'
+  );
   const fullscreenLabel = translate('videoEditor.stage.enterFullscreen');
   return (
     <>
@@ -157,23 +167,38 @@ export function LibraryViewControls({
         </ContentToolbarButton>
       ) : null}
       <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums">
-        <span>{translate('videoEditor.sidebar.mediaPreviewZoomLabel')}</span>
+        <span>{zoomLabel}</span>
         <Search size={14} aria-hidden />
         <ProductRange
           className="!w-24"
-          min={1}
-          max={2}
-          step={0.1}
-          value={zoom}
+          min={image ? state.fitScale : 1}
+          max={image ? 4 : 2}
+          step={image ? 0.01 : 0.1}
+          value={image ? zoom * state.fitScale : zoom}
           disabled={!ready}
-          aria-label={translate('videoEditor.sidebar.mediaPreviewZoomLabel')}
-          onChange={(event) => setZoom(Number(event.currentTarget.value))}
+          aria-label={zoomLabel}
+          onChange={(event) =>
+            setZoom(Math.max(1, Number(event.currentTarget.value) / (image ? state.fitScale : 1)))
+          }
         />
-        <span className="w-8 text-right">{zoom.toFixed(1)}×</span>
+        <span className="min-w-10 text-right">
+          {image ? `${Math.round(zoom * state.fitScale * 100)}%` : `${zoom.toFixed(1)}×`}
+        </span>
       </label>
+      {image && (
+        <ContentToolbarButton
+          className="!w-auto !px-3 text-xs"
+          disabled={!ready}
+          aria-pressed={Math.abs(zoom * state.fitScale - 1) < 0.001}
+          onClick={() => setZoom(1 / state.fitScale)}
+        >
+          100%
+        </ContentToolbarButton>
+      )}
       <ContentToolbarButton
         className="!w-auto !px-3 text-xs"
-        disabled={!ready || zoom === 1}
+        disabled={!ready}
+        aria-pressed={zoom === 1}
         onClick={() => setZoom(1)}
       >
         {translate('videoEditor.sidebar.mediaPreviewFit')}

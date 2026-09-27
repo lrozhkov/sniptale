@@ -309,8 +309,8 @@ export function GuideLibraryBrowser({
           previewContent
         ) : preview ? (
           <>
+            <strong title={preview.filename}>{preview.filename}</strong>
             <LibraryRaster item={preview} full t={t} />
-            <strong>{preview.filename}</strong>
             <span>
               {preview.width} × {preview.height}
             </span>

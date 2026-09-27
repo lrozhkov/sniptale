@@ -102,15 +102,19 @@ export function GuideResources({
           </button>
           <div className="guide-resource-actions">
             <ContentToolbarButton
+              tone="utility"
               title={t('scenario.editor.guideResourcePreview')}
+              aria-expanded={previewId === assetId}
+              aria-controls={previewId === assetId ? 'guide-resource-preview' : undefined}
               disabled={!images[assetId]}
               onClick={() => setPreviewId(assetId)}
             >
-              <Maximize2 size={14} aria-hidden="true" />
+              <Maximize2 size={16} aria-hidden="true" />
             </ContentToolbarButton>
             <GuideActionMenu
+              tone="utility"
               label={t('scenario.editor.guideResourceUses').replace('{count}', String(uses.length))}
-              icon={<LocateFixed size={14} aria-hidden="true" />}
+              icon={<LocateFixed size={16} aria-hidden="true" />}
               disabled={disabled}
               items={uses.map((use, index) => ({
                 label: `${use.item.title || t('scenario.editor.untitledStep')} · ${index + 1}`,

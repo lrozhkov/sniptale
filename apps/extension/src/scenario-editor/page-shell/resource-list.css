@@ -251,3 +251,35 @@
     font-size: 12px;
   }
 }
+
+.guide-page .guide-library-panel .guide-resource-actions {
+  align-items: center;
+  gap: 4px;
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-page .guide-library-panel .guide-resource-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-page
+  .guide-library-panel
+  .guide-resource-actions
+  button:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-page .guide-library-panel .guide-resource-actions button[aria-expanded='true'] {
+  color: var(--sniptale-color-accent);
+  background: var(--sniptale-color-surface-hover);
+  box-shadow: inset 0 -2px currentColor;
+}
+.guide-resource-full-preview [data-ui='library-media-player'] {
+  min-width: 0;
+}
