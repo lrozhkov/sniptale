@@ -13,6 +13,7 @@ import { createRecordingDrawingOwner } from '../toolbar/video-recording/drawing-
 import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/session/state';
 import type { ToolbarVideoRecordingProps } from '../toolbar/types';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
+import { pagePreparationHistory } from '../../parser/page-preparation/history';
 
 const {
   clearAllPagePreparationChangesMock,
@@ -333,6 +334,25 @@ async function verifiesToolbarResetUsesSharedOwner() {
   expect(showToastMock).toHaveBeenCalledWith('Все изменения очищены', 'info');
 }
 
+async function verifiesDrawingOnlyHistoryEnablesResetInNavigation() {
+  const props = createProps();
+  props.toolbar.frameCount = 0;
+  props.toolbar.modes.screenshotMode = false;
+  props.toolbar.modes.aiPickMode = false;
+  const getHistoryState = vi
+    .spyOn(pagePreparationHistory, 'getState')
+    .mockReturnValue({ canRedo: false, canUndo: true, revision: 1 });
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      canClearPagePreparation: boolean;
+    };
+    expect(lastToolbarProps.canClearPagePreparation).toBe(true);
+  } finally {
+    getHistoryState.mockRestore();
+  }
+}
+
 async function verifiesScenarioSidebarPreloadOnIntent() {
   const props = createProps();
   await renderShell(props);
@@ -477,6 +497,10 @@ describe('ContentToolbarShell', () => {
   it(
     'routes reset through the shared page-preparation owner when frames exist',
     verifiesToolbarResetUsesSharedOwner
+  );
+  it(
+    'enables reset in navigation when only shared Drawing history exists',
+    verifiesDrawingOnlyHistoryEnablesResetInNavigation
   );
   it(
     'keeps the toolbar visible while switching transactionally into video recording mode',

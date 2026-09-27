@@ -21,6 +21,7 @@ import { translate } from '../../../platform/i18n';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
+import { clearAllHighlights } from '../../selection/highlighter';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -145,13 +146,10 @@ function createToolbarAutoBlurProps(
   };
 }
 
-function clearPagePreparation(
-  toolbar: ContentAppLayoutToolbarProps,
-  modeController: ContentAppLayoutToolbarProps['modeController']
-) {
+function clearPagePreparation(toolbar: ContentAppLayoutToolbarProps) {
   toolbar.drawingController?.finalizeInteraction();
   const fullyCleared = clearAllPagePreparationChanges({
-    clearHighlights: modeController.handleClearHighlights,
+    clearHighlights: clearAllHighlights,
     history: pagePreparationHistory,
     resetAnnotations: browserAnnotationSession.resetForDocument,
   });
@@ -254,7 +252,7 @@ function renderToolbarShell(args: {
         onTakeScreenshot={args.toolbar.handleTakeScreenshot}
         onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
-        onClearPagePreparation={() => clearPagePreparation(args.toolbar, modeController)}
+        onClearPagePreparation={() => clearPagePreparation(args.toolbar)}
         canClearPagePreparation={args.canClearPagePreparation || args.toolbar.frameCount > 0}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}

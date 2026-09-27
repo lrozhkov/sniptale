@@ -1,5 +1,4 @@
 import {
-  BrushCleaning,
   Droplet,
   Highlighter,
   MousePointer2,
@@ -203,27 +202,14 @@ export function ToolbarDrawingControls(props: {
         ))}
         {props.owner?.renderTrailingControls?.(snapshot)}
       </ContentToolbarGroup>
-      {props.owner?.showActions === false ? null : (
+      {props.owner?.showActions === false || !props.owner?.renderActions ? null : (
         <>
           <ContentToolbarDivider dataUi="content.toolbar.drawing-actions-divider" />
           <ContentToolbarGroup
             aria-label={translate('content.toolbar.drawingActions')}
             dataUi="content.toolbar.drawing-actions-group"
           >
-            {props.owner?.renderActions ? (
-              props.owner.renderActions(snapshot)
-            ) : (
-              <ContentToolbarButton
-                type="button"
-                tone="danger"
-                disabled={snapshot.document.objects.length === 0}
-                aria-label={translate('content.toolbar.drawingClear')}
-                title={translate('content.toolbar.drawingClear')}
-                onClick={() => controller.session.clear()}
-              >
-                <BrushCleaning size={18} strokeWidth={2} />
-              </ContentToolbarButton>
-            )}
+            {props.owner.renderActions(snapshot)}
           </ContentToolbarGroup>
         </>
       )}

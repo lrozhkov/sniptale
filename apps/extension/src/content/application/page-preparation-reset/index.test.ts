@@ -33,7 +33,7 @@ it('undoes every page preparation change before clearing residual owners', () =>
   expect(dependencies.history.clear).toHaveBeenCalledOnce();
 });
 
-it('stops safely when a history owner cannot make progress and still clears overlays', () => {
+it('preserves recovery history and residual owners when an undo cannot make progress', () => {
   const dependencies = {
     clearHighlights: vi.fn(),
     history: {
@@ -47,7 +47,7 @@ it('stops safely when a history owner cannot make progress and still clears over
   expect(clearAllPagePreparationChanges(dependencies)).toBe(false);
 
   expect(dependencies.history.undo).toHaveBeenCalledOnce();
-  expect(dependencies.clearHighlights).toHaveBeenCalledOnce();
-  expect(dependencies.resetAnnotations).toHaveBeenCalledOnce();
-  expect(dependencies.history.clear).toHaveBeenCalledOnce();
+  expect(dependencies.clearHighlights).not.toHaveBeenCalled();
+  expect(dependencies.resetAnnotations).not.toHaveBeenCalled();
+  expect(dependencies.history.clear).not.toHaveBeenCalled();
 });

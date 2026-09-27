@@ -45,8 +45,6 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
   ).not.toBeNull();
   expect([...host.children].map((element) => element.getAttribute('data-ui'))).toEqual([
     'content.toolbar.drawing-tools-group',
-    'content.toolbar.drawing-actions-divider',
-    'content.toolbar.drawing-actions-group',
   ]);
   const panel = host.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.pencil"]'
@@ -97,13 +95,7 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
   expect(host.querySelector('[aria-label="content.toolbar.drawingUndo"]')).toBeNull();
   expect(host.querySelector('[aria-label="content.toolbar.drawingRedo"]')).toBeNull();
   expect(host.querySelector('[aria-label="content.toolbar.drawingDelete"]')).toBeNull();
-  expect(host.querySelector('[aria-label="content.toolbar.drawingClear"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="content.toolbar.drawingClear"]')?.className).toContain(
-    'sniptale-btn-danger'
-  );
-  expect(
-    host.querySelector('[aria-label="content.toolbar.drawingClear"] .lucide-brush-cleaning')
-  ).not.toBeNull();
+  expect(host.querySelector('[aria-label="content.toolbar.drawingClear"]')).toBeNull();
   act(() => root.unmount());
 });
 

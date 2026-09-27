@@ -108,7 +108,7 @@ it('reuses the complete drawing catalog while recording owns navigation, eraser,
   owner.dispose();
 });
 
-it('keeps the page-preparation owner contract optional and does not change its toolbar structure', () => {
+it('keeps the page-preparation drawing toolbar free of separate clear actions', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const owner = createRecordingDrawingOwner();
   const host = document.createElement('div');
@@ -120,8 +120,6 @@ it('keeps the page-preparation owner contract optional and does not change its t
 
   expect([...host.children].map((element) => element.getAttribute('data-ui'))).toEqual([
     'content.toolbar.drawing-tools-group',
-    'content.toolbar.drawing-actions-divider',
-    'content.toolbar.drawing-actions-group',
   ]);
   expect(host.querySelector('[data-ui="content.toolbar.video-recording.navigation"]')).toBeNull();
   act(() => root.unmount());

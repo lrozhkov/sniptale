@@ -33,12 +33,12 @@ export function clearAllPagePreparationChanges(
   }
 
   const fullyReverted = !dependencies.history.getState().canUndo;
+  if (!fullyReverted) {
+    logger.warn('Page preparation reset could not finish undoing changes', { undoSteps });
+    return false;
+  }
   dependencies.clearHighlights();
   dependencies.resetAnnotations();
   dependencies.history.clear();
-
-  if (!fullyReverted) {
-    logger.warn('Page preparation reset reached its bounded undo limit', { undoSteps });
-  }
-  return fullyReverted;
+  return true;
 }
