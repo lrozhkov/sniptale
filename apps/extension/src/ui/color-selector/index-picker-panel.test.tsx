@@ -144,6 +144,7 @@ it('places the compact opacity control after the active color-format fields', as
   )?.parentElement;
   const opacity = document.body.querySelector('[data-ui="shared.ui.color-selector.opacity"]');
   const opacityField = opacity?.querySelector<HTMLInputElement>('input[type="text"]');
+  const footer = getButton('shared.ui.colorSelectorApply')?.parentElement;
 
   expect(formatFields?.compareDocumentPosition(opacity!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(opacityField?.type).toBe('text');
@@ -153,6 +154,8 @@ it('places the compact opacity control after the active color-format fields', as
     opacity?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
   ).not.toBeNull();
   expect(opacity?.querySelector('.sniptale-color-selector-alpha-range')).toBeNull();
+  expect(opacity?.compareDocumentPosition(footer!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(footer?.className).not.toContain('sticky');
 });
 
 it('labels the compact format switch and retains its hover and keyboard target', async () => {

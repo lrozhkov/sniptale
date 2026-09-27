@@ -25,6 +25,7 @@ import {
 } from '../floating-interactions/scale';
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
+const COLOR_SELECTOR_PICKER_LAYER_WIDTH = 328;
 const COLOR_SELECTOR_LAYER_GAP = 10;
 const COLOR_SELECTOR_VIEWPORT_PADDING = 8;
 
@@ -53,11 +54,12 @@ function resolveSideLayerStyle(args: {
   viewportHeight: number;
   viewportWidth: number;
   layerHeight: number;
+  layerWidth: number;
 }): CSSProperties | null {
   const boundaryRight = args.boundaryRect.x + args.boundaryRect.width;
   const rightRoom = args.viewportWidth - boundaryRight - COLOR_SELECTOR_VIEWPORT_PADDING;
   const leftRoom = args.boundaryRect.x - COLOR_SELECTOR_VIEWPORT_PADDING;
-  const requiredRoom = COLOR_SELECTOR_LAYER_WIDTH + COLOR_SELECTOR_LAYER_GAP;
+  const requiredRoom = args.layerWidth + COLOR_SELECTOR_LAYER_GAP;
   if (Math.max(leftRoom, rightRoom) < requiredRoom) return null;
 
   const placeRight =
@@ -84,7 +86,7 @@ function resolveSideLayerStyle(args: {
     maxHeight,
     top: clientPosition.y,
     transform: placeRight ? undefined : 'translateX(-100%)',
-    width: COLOR_SELECTOR_LAYER_WIDTH,
+    width: args.layerWidth,
   };
 }
 
@@ -92,10 +94,13 @@ function resolveColorSelectorLayerStyle(
   anchor: HTMLElement | null,
   placement: ColorSelectorFloatingPlacement,
   boundary: HTMLElement | null,
-  layer: HTMLElement | null = null
+  layer: HTMLElement | null = null,
+  layerKind: 'palette' | 'picker' = 'palette'
 ): CSSProperties {
+  const preferredWidth =
+    layerKind === 'picker' ? COLOR_SELECTOR_PICKER_LAYER_WIDTH : COLOR_SELECTOR_LAYER_WIDTH;
   if (!anchor || typeof window === 'undefined') {
-    return { width: COLOR_SELECTOR_LAYER_WIDTH };
+    return { width: preferredWidth };
   }
 
   const uiScale = readContentUiScaleCompensation(anchor);
@@ -109,6 +114,7 @@ function resolveColorSelectorLayerStyle(
   });
   const viewportWidth = viewport.width;
   const viewportHeight = viewport.height;
+  const layerWidth = Math.min(preferredWidth, Math.max(0, viewportWidth - 16));
   if (placement === 'side') {
     const sideStyle = resolveSideLayerStyle({
       anchorRect: rect,
@@ -117,6 +123,7 @@ function resolveColorSelectorLayerStyle(
       viewportHeight,
       viewportWidth,
       layerHeight: layer ? projectElementRect(layer, uiScale).rect.height : 420,
+      layerWidth,
     });
     if (sideStyle) return sideStyle;
   }
@@ -129,10 +136,10 @@ function resolveColorSelectorLayerStyle(
     Math.min(420, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
   );
   const left = Math.min(
-    Math.max(right - COLOR_SELECTOR_LAYER_WIDTH, COLOR_SELECTOR_VIEWPORT_PADDING),
+    Math.max(right - layerWidth, COLOR_SELECTOR_VIEWPORT_PADDING),
     Math.max(
       COLOR_SELECTOR_VIEWPORT_PADDING,
-      viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING - COLOR_SELECTOR_LAYER_WIDTH
+      viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING - layerWidth
     )
   );
 
@@ -150,7 +157,7 @@ function resolveColorSelectorLayerStyle(
     maxHeight,
     top: clientPosition.y,
     transform: placeAbove ? 'translateY(-100%)' : undefined,
-    width: COLOR_SELECTOR_LAYER_WIDTH,
+    width: layerWidth,
   };
 }
 
@@ -163,11 +170,13 @@ export function useColorSelectorLayerStyle(
   layerKind: 'palette' | 'picker' = 'palette'
 ) {
   const [style, setStyle] = useState<CSSProperties>(() =>
-    resolveColorSelectorLayerStyle(anchor, placement, boundary)
+    resolveColorSelectorLayerStyle(anchor, placement, boundary, layerRef?.current, layerKind)
   );
   const updateStyle = useCallback(() => {
-    setStyle(resolveColorSelectorLayerStyle(anchor, placement, boundary, layerRef?.current));
-  }, [anchor, boundary, layerRef, placement]);
+    setStyle(
+      resolveColorSelectorLayerStyle(anchor, placement, boundary, layerRef?.current, layerKind)
+    );
+  }, [anchor, boundary, layerKind, layerRef, placement]);
 
   useEffect(() => {
     if (!open) {

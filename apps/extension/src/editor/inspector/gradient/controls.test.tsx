@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ReactNode } from 'react';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 
@@ -184,4 +184,37 @@ it('adds stops and delegates opacity and angle commits through optional handlers
   });
   expect(onAngleChange).toHaveBeenCalledWith(40);
   expect(onAngleCommit).toHaveBeenCalledOnce();
+});
+
+it('keeps the second image-editor gradient stop selected when its color changes', () => {
+  const initial = [
+    { color: '#111111', offset: 0 },
+    { color: '#222222', offset: 1 },
+  ];
+  let committed = initial;
+  const Controlled = () => {
+    const [stops, setStops] = useState(initial);
+    return (
+      <EditorGradientControls
+        angle={0}
+        showAngle={false}
+        stops={stops}
+        onAngleChange={vi.fn()}
+        onStopsChange={(next) => {
+          committed = next;
+          setStops(next);
+        }}
+      />
+    );
+  };
+  render(<Controlled />);
+
+  clickGradientControl('[aria-label="editor.gradient.stop 2"]');
+  clickGradientControl('button:not([aria-label])');
+
+  expect(committed[0]?.color).toBe('#111111');
+  expect(committed[1]?.color).toBe('#abcdef');
+  expect(container?.querySelector('[aria-label="editor.gradient.stop 2"]')?.className).toContain(
+    'border-[color:var(--sniptale-color-accent)]'
+  );
 });
