@@ -447,6 +447,47 @@ it('opens with the static document and switches explicitly to the screenshot', a
   expect(mocks.printWebSnapshotProjection).not.toHaveBeenCalled();
 });
 
+it('opens a verified package image in a new tab while keeping the snapshot viewer usable', async () => {
+  const extractPackageFile = vi.fn(async () => new Blob(['png'], { type: 'image/png' }));
+  const createObjectURL = vi.fn(() => 'blob:opened-image');
+  const revokeObjectURL = vi.fn();
+  vi.stubGlobal('URL', Object.assign(class extends URL {}, { createObjectURL, revokeObjectURL }));
+  mocks.loadWebSnapshotPackage.mockResolvedValue(
+    createLoadedPackage({
+      extractPackageFile,
+      packageFiles: [
+        {
+          kind: 'exported-image',
+          mimeType: 'image/png',
+          name: 'photo.png',
+          path: 'exports/images/photo.png',
+          size: 3,
+        },
+      ],
+    })
+  );
+
+  await act(async () => root?.render(<WebSnapshotViewerApp />));
+  await act(async () =>
+    Array.from(container?.querySelectorAll('button') ?? [])
+      .find((button) => button.textContent === 'Files')
+      ?.click()
+  );
+  await act(async () =>
+    container
+      ?.querySelector<HTMLButtonElement>('button[aria-label="Open in new tab: photo.png"]')
+      ?.click()
+  );
+
+  expect(extractPackageFile).toHaveBeenCalledExactlyOnceWith('exports/images/photo.png');
+  expect(mocks.browserTabsCreate).toHaveBeenCalledExactlyOnceWith({
+    active: true,
+    url: 'blob:opened-image',
+  });
+  expect(container?.textContent).toContain('photo.png');
+  expect(container?.querySelector('[data-testid="snapshot-asset-catalog"]')).not.toBeNull();
+});
+
 it('shows verified nested assets without replacing the static-document default', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({

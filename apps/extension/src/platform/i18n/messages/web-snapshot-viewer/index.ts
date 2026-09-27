@@ -70,6 +70,26 @@ export const webSnapshotViewerMessages = defineMessageSource({
       ru: 'Скачать оригинал',
       en: 'Download original',
     },
+    previewAsset: {
+      ru: 'Предпросмотр',
+      en: 'Preview',
+    },
+    closeAssetPreview: {
+      ru: 'Назад к файлам',
+      en: 'Back to files',
+    },
+    openAsset: {
+      ru: 'Открыть в новой вкладке',
+      en: 'Open in new tab',
+    },
+    assetOpenFailed: {
+      ru: 'Не удалось открыть файл. Попробуйте ещё раз.',
+      en: 'Could not open the file. Try again.',
+    },
+    previewZoom: {
+      ru: 'Масштаб предпросмотра',
+      en: 'Preview zoom',
+    },
     exportActions: {
       ru: 'Скачать и экспортировать',
       en: 'Download and export',

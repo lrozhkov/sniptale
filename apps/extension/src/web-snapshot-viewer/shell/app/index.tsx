@@ -12,6 +12,7 @@ import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 import type { ViewerPackageFile } from '../../viewer/package-files';
 import { WebSnapshotVisualSurface, type WebSnapshotViewerMode } from './view-mode';
 import { WebSnapshotAssetCatalog } from './asset-catalog';
+import { useViewerAssetActions } from './asset-actions';
 import { useViewerZoom } from './viewport-zoom';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -26,7 +27,6 @@ type ViewerViewport = { width: number; height: number } | null;
 type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error' };
 type ReadySnapshotIframe = { iframe: HTMLIFrameElement; loadedKey: string };
 let loadedPackageRevisionSeed = 0;
-const PACKAGE_FILE_DOWNLOAD_URL_LIFETIME_MS = 1500;
 const logger = createLogger({ namespace: 'WebSnapshotViewer' });
 
 function getSourceTitle(sourceTitle: string | null | undefined): string | null {
@@ -53,18 +53,6 @@ function getViewerErrorMessage(error: ViewerError, locale: AppLocale): string {
     locale,
     summaryKey: 'common.errors.loadFailed',
   });
-}
-
-function downloadViewerPackageFile(blob: Blob, filename: string): void {
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.download = filename;
-  anchor.href = objectUrl;
-  anchor.hidden = true;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), PACKAGE_FILE_DOWNLOAD_URL_LIFETIME_MS);
 }
 
 function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLocale {
@@ -285,6 +273,9 @@ function SnapshotModeContent(props: {
   locale: AppLocale;
   mode: WebSnapshotViewerMode;
   onDownloadPackageFile: (file: ViewerPackageFile) => Promise<void>;
+  onExtractPackageFile: (file: ViewerPackageFile) => Promise<Blob>;
+  onOpenPackageFile: (file: ViewerPackageFile) => Promise<void>;
+  onOpenResourceAsset: (url: string) => Promise<void>;
   onViewportChange: (viewport: ViewerViewport) => void;
   onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
@@ -298,6 +289,9 @@ function SnapshotModeContent(props: {
         assets={props.loaded.assets}
         locale={props.locale}
         onDownloadPackageFile={props.onDownloadPackageFile}
+        onExtractPackageFile={props.onExtractPackageFile}
+        onOpenPackageFile={props.onOpenPackageFile}
+        onOpenResourceAsset={props.onOpenResourceAsset}
         packageFiles={props.loaded.packageFiles}
       />
     );
@@ -350,7 +344,6 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
   const [mode, setMode] = useState<WebSnapshotViewerMode>('static-document');
   const [printState, setPrintState] = useState<'error' | 'idle' | 'preparing'>('idle');
   const printPendingRef = useRef(false);
-  const packageFileDownloadPendingRef = useRef(false);
   const { handleIframeElementChange, handleIframeLoaded, iframeRef, preparationIframe } =
     useSnapshotPreparationFrame(props.loaded);
   const resolvedViewport = currentViewport ?? props.loaded.manifest.viewport ?? null;
@@ -367,21 +360,8 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       logger.warn('Failed to open an external snapshot link');
     });
   }, []);
-  const downloadPackageFile = useCallback(
-    async (file: ViewerPackageFile) => {
-      if (packageFileDownloadPendingRef.current) {
-        throw new Error('Another snapshot package file is already being extracted.');
-      }
-      packageFileDownloadPendingRef.current = true;
-      try {
-        const blob = await props.loaded.extractPackageFile(file.path);
-        downloadViewerPackageFile(blob, file.name);
-      } finally {
-        packageFileDownloadPendingRef.current = false;
-      }
-    },
-    [props.loaded]
-  );
+  const { downloadPackageFile, extractPackageFile, openPackageFile, openResourceAsset } =
+    useViewerAssetActions(props.loaded);
   const printSnapshot = useCallback(() => {
     if (printPendingRef.current) return;
     printPendingRef.current = true;
@@ -465,6 +445,9 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
           locale={props.locale}
           mode={mode}
           onDownloadPackageFile={downloadPackageFile}
+          onExtractPackageFile={extractPackageFile}
+          onOpenPackageFile={openPackageFile}
+          onOpenResourceAsset={openResourceAsset}
           onViewportChange={setCurrentViewport}
           onExternalLinkPreviewChange={setExternalLinkPreview}
           onOpenExternalLink={openExternalLink}
