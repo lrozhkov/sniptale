@@ -66,6 +66,29 @@ it('keeps a panned drawing at the same screen position while history restores th
   expect(viewport.scrollTop).toBe(2170);
 });
 
+it('covers the full right edge of a viewport with symmetric scrollbar gutters', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientLeft: { value: 15 },
+    clientWidth: { value: 770 },
+    clientHeight: { value: 580 },
+  });
+  surface.getBoundingClientRect = () =>
+    ({ left: -3411, right: 785, top: 0, width: 4196, height: 4176 }) as DOMRect;
+  viewport.getBoundingClientRect = () =>
+    ({ left: 0, right: 800, top: 0, width: 800, height: 600 }) as DOMRect;
+
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 100, height: 80 }, 2048);
+
+  expect(Number.parseFloat(canvas.wrapperEl.style.left)).toBe(3426);
+  expect(Number.parseFloat(canvas.wrapperEl.style.left) + canvas.width).toBe(4196);
+});
+
 it('restores the same document point under the viewport after a size-changing undo', () => {
   const surface = document.createElement('div');
   const viewport = document.createElement('div');

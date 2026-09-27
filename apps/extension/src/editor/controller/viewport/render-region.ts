@@ -310,11 +310,17 @@ export class EditorCanvas extends Canvas {
     const viewportRect = this.renderViewport.getBoundingClientRect();
     const left = Math.max(
       0,
-      Math.min(logicalWidth * scale - width, viewportRect.left - surfaceRect.left)
+      Math.min(
+        logicalWidth * scale - width,
+        viewportRect.left + this.renderViewport.clientLeft - surfaceRect.left
+      )
     );
     const top = Math.max(
       0,
-      Math.min(logicalHeight * scale - height, viewportRect.top - surfaceRect.top)
+      Math.min(
+        logicalHeight * scale - height,
+        viewportRect.top + this.renderViewport.clientTop - surfaceRect.top
+      )
     );
     this.wrapperEl.style.left = `${left}px`;
     this.wrapperEl.style.top = `${top}px`;
