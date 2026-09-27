@@ -1,4 +1,10 @@
-import { Control, controlsUtils, type FabricObject, type TransformActionHandler } from 'fabric';
+import {
+  Control,
+  Ellipse,
+  controlsUtils,
+  type FabricObject,
+  type TransformActionHandler,
+} from 'fabric';
 import { createDrawingRotationControl, renderDrawingBoxHandle } from './chrome';
 import { createCornerCursorStyleHandler } from './corner-cursor';
 
@@ -58,7 +64,22 @@ const scaleYProportionally = createProportionalSideScale('y');
 
 function resolveBoxActionHandler(object: FabricObject, key: BoxControlKey) {
   if (key === 'tl' || key === 'tr' || key === 'br' || key === 'bl') {
-    return controlsUtils.scalingEqually;
+    if (!(object instanceof Ellipse)) {
+      return controlsUtils.scalingEqually;
+    }
+    const scale: TransformActionHandler = (event, transform, x, y) => {
+      const canvas = transform.target.canvas;
+      if (!canvas) return false;
+      const toggleKey = canvas.uniScaleKey;
+      const scaleEvent = new Proxy(event, {
+        get(target, property) {
+          if (property === toggleKey) return event.shiftKey !== canvas.uniformScaling;
+          return Reflect.get(target, property, target) as unknown;
+        },
+      });
+      return controlsUtils.scalingEqually(scaleEvent, transform, x, y);
+    };
+    return scale;
   }
   if (key === 'ml' || key === 'mr') {
     if (object.sniptaleType === 'text') return controlsUtils.changeWidth;
