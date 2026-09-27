@@ -18,68 +18,54 @@ import { DRAWING_SELECTION_ACCENT } from './chrome';
 
 type DrawingArrow = Extract<DrawingObject, { kind: 'arrow' }>;
 type ArrowEndpoint = 'start' | 'end';
+const arrowControlAnchors = new WeakMap<FabricObject, Record<ArrowEndpoint, Point>>();
+
+export function syncDrawingArrowControlAnchors(object: FabricObject, drawing: DrawingArrow): void {
+  const sceneToObject = util.invertTransform(object.calcTransformMatrix());
+  arrowControlAnchors.set(object, {
+    start: new Point(drawing.start.x, drawing.start.y).transform(sceneToObject),
+    end: new Point(drawing.end.x, drawing.end.y).transform(sceneToObject),
+  });
+}
 
 function toViewportPoint<
   Props extends Partial<PathProps>,
   SerializedProps extends SerializedPathProps,
   Events extends ObjectEvents,
->(object: Path<Props, SerializedProps, Events>, point: { x: number; y: number }): Point {
-  return new Point(point.x, point.y)
-    .subtract(object.pathOffset)
-    .transform(
-      util.multiplyTransformMatrices(object.getViewportTransform(), object.calcTransformMatrix())
-    );
-}
-
-function toGeometryPoint<
-  Props extends Partial<PathProps>,
-  SerializedProps extends SerializedPathProps,
-  Events extends ObjectEvents,
->(object: Path<Props, SerializedProps, Events>, x: number, y: number): Point {
-  return util
-    .sendPointToPlane(new Point(x, y), undefined, object.calcOwnMatrix())
-    .add(object.pathOffset);
-}
-
-function toParentPoint<
-  Props extends Partial<PathProps>,
-  SerializedProps extends SerializedPathProps,
-  Events extends ObjectEvents,
->(object: Path<Props, SerializedProps, Events>, point: { x: number; y: number }): Point {
-  return new Point(point.x, point.y).subtract(object.pathOffset).transform(object.calcOwnMatrix());
+>(
+  object: Path<Props, SerializedProps, Events>,
+  endpoint: ArrowEndpoint,
+  point: { x: number; y: number }
+): Point {
+  const anchor = arrowControlAnchors.get(object)?.[endpoint];
+  return (anchor ?? new Point(point.x, point.y).subtract(object.pathOffset)).transform(
+    util.multiplyTransformMatrices(object.getViewportTransform(), object.calcTransformMatrix())
+  );
 }
 
 function updateArrowPathInPlace<
   Props extends Partial<PathProps>,
   SerializedProps extends SerializedPathProps,
   Events extends ObjectEvents,
->(
-  object: Path<Props, SerializedProps, Events>,
-  current: DrawingArrow,
-  next: DrawingArrow,
-  anchor: ArrowEndpoint
-): void {
-  const anchorBefore = toParentPoint(object, current[anchor]);
+>(object: Path<Props, SerializedProps, Events>, next: DrawingArrow): void {
   const geometry = createEditorDrawingFabricObject(next, 1);
   if (!(geometry instanceof Path)) return;
   object.set({
     fill: geometry.fill,
     height: geometry.height,
+    left: geometry.left,
     path: geometry.path,
     pathOffset: geometry.pathOffset,
     stroke: geometry.stroke,
     strokeLineCap: geometry.strokeLineCap,
     strokeLineJoin: geometry.strokeLineJoin,
     strokeWidth: geometry.strokeWidth,
+    top: geometry.top,
     width: geometry.width,
   });
   writeEditorDrawingObject(object, next);
-  const anchorAfter = toParentPoint(object, next[anchor]);
-  object.set({
-    left: object.left + anchorBefore.x - anchorAfter.x,
-    top: object.top + anchorBefore.y - anchorAfter.y,
-  });
   object.setCoords();
+  syncDrawingArrowControlAnchors(object, next);
   object.canvas?.requestRenderAll();
 }
 
@@ -144,7 +130,7 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
     positionHandler: (_dimensions, _matrix, object) => {
       const drawing = readEditorDrawingObject(object as FabricObject);
       return object instanceof Path && drawing?.kind === 'arrow'
-        ? toViewportPoint(object, drawing[endpoint])
+        ? toViewportPoint(object, endpoint, drawing[endpoint])
         : new Point(0, 0);
     },
     actionHandler: (event, transform, x, y) => {
@@ -155,10 +141,10 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
       const next = resolveMovedArrow(
         drawing,
         endpoint,
-        toGeometryPoint(object, x, y),
+        new Point(x, y),
         event as MouseEvent | PointerEvent
       );
-      updateArrowPathInPlace(object, drawing, next, endpoint === 'start' ? 'end' : 'start');
+      updateArrowPathInPlace(object, next);
       return true;
     },
     render: renderEndpoint as Control['render'],

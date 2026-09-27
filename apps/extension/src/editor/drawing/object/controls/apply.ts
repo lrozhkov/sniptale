@@ -1,6 +1,6 @@
 import { ActiveSelection, Path, type FabricObject } from 'fabric';
 import { isEditorDrawingSelection, readEditorDrawingObject } from '../metadata';
-import { createDrawingArrowControls } from './arrow';
+import { createDrawingArrowControls, syncDrawingArrowControlAnchors } from './arrow';
 import { createDrawingBoxControls, createDrawingTextControls } from './box';
 import { applyDrawingSelectionChrome } from './chrome';
 
@@ -10,6 +10,7 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
   applyDrawingSelectionChrome(object);
   if (drawing.kind === 'arrow' && object instanceof Path) {
     object.controls = createDrawingArrowControls();
+    syncDrawingArrowControlAnchors(object, drawing);
     object.set({ hasBorders: false, lockRotation: true, perPixelTargetFind: true });
     return;
   }
