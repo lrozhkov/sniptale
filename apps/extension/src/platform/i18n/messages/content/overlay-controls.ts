@@ -139,4 +139,8 @@ export const contentOverlayControlsMessages = defineMessageSource({
     ru: 'Перетащите область для записи или измените её размер',
     en: 'Drag a region to record or resize it',
   },
+  manualAreaSelectionHint: {
+    ru: 'Выбор элемента недоступен. Потяните, чтобы выделить область.',
+    en: 'Element selection unavailable. Drag to select an area.',
+  },
 });

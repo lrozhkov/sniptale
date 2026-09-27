@@ -7,6 +7,7 @@ import {
   watchFrozenSelectionViewport,
 } from './frozen';
 import { resolveSelectionModePointerTarget } from './events/pointer-handlers/target';
+import { translate } from '../../../platform/i18n';
 
 function box(element: HTMLElement, x: number, y: number, width: number, height: number) {
   vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(x, y, width, height));
@@ -65,6 +66,8 @@ it('mounts a pointer shield under the selection controls and resolves through it
   const image = container.querySelector<HTMLElement>('.sniptale-selection-frozen-frame')!;
   expect(container.firstChild).toBe(image);
   expect(image.style.pointerEvents).toBe('auto');
+  expect(image.style.cursor).toContain('crosshair');
+  expect(container.querySelector('.sniptale-selection-area-only-hint')).toBeNull();
   let selected: HTMLElement | null = null;
   container.addEventListener('click', (event) => {
     selected = resolveSelectionModePointerTarget(event, undefined, frame);
@@ -73,6 +76,26 @@ it('mounts a pointer shield under the selection controls and resolves through it
   expect(selected).toBe(item);
   control.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 40, clientY: 45 }));
   expect(selected).toBe(control);
+});
+
+it('shows a non-intercepting manual-area hint only for an area-only frozen frame', () => {
+  page();
+  const container = document.createElement('div');
+  document.body.append(container);
+  mountFrozenSelectionFrame(container, {
+    areaOnly: true,
+    dataUrl: 'data:image/png;base64,frame',
+    geometry: captureFrozenSelectionGeometry(),
+  });
+  const hint = container.querySelector<HTMLElement>('.sniptale-selection-area-only-hint');
+  expect(hint?.getAttribute('role')).toBe('status');
+  expect(hint?.textContent).toBe(translate('content.overlayControls.manualAreaSelectionHint'));
+  expect(hint?.style.pointerEvents).toBe('none');
+  expect(
+    container.querySelector<HTMLElement>('.sniptale-selection-frozen-frame')?.style.cursor
+  ).toContain('crosshair');
+  container.remove();
+  expect(document.querySelector('.sniptale-selection-area-only-hint')).toBeNull();
 });
 
 it('invalidates changed viewport coordinates and removes its resize watcher on cleanup', () => {

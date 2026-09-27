@@ -108,6 +108,8 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   };
 
   await capture();
+  await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', /crosshair/u);
+  await expect(page.locator('.sniptale-selection-cancel-button')).toHaveCSS('cursor', 'pointer');
   await page.evaluate(() => document.querySelector('#frozen-menu')?.remove());
   await page.mouse.click(150, 170);
   await expect(page.locator('.sniptale-selection-size-confirm-button')).toBeVisible();
@@ -124,6 +126,11 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   });
   expect(await enableMode()).toMatchObject({ success: true });
   await capture();
+  await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCSS('cursor', /crosshair/u);
+  await expect(page.locator('.sniptale-selection-area-only-hint')).toBeVisible();
+  await expect(page.locator('.sniptale-selection-area-only-hint')).toContainText(
+    /(?:Drag to select an area|Потяните, чтобы выделить область)/u
+  );
   await page.mouse.move(160, 180);
   await expect(page.locator('.sniptale-selection-hover-size')).toBeHidden();
   await page.mouse.click(160, 180);
@@ -135,6 +142,7 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   await expect(page.locator('.sniptale-selection-size-confirm-button')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCount(0);
+  await expect(page.locator('.sniptale-selection-area-only-hint')).toHaveCount(0);
   await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
 
   expect(await enableMode()).toMatchObject({ success: true });

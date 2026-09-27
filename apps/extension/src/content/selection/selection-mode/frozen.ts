@@ -1,4 +1,6 @@
 import { getFrozenHitShape, type FrozenHitShape } from './frozen-hit-shapes';
+import { createSelectionCrosshairCursor } from './interaction/cursor';
+import { translate } from '../../../platform/i18n';
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { getAbsolutePosition, getIframeDocument } from '../../platform/frame';
 import type { FrozenSelectionFrame, FrozenSelectionGeometry, Selection } from './types';
@@ -288,6 +290,7 @@ export function mountFrozenSelectionFrame(
   const privateRoot = host.attachShadow({ mode: 'closed' });
   image.alt = '';
   image.draggable = false;
+  const cursor = createSelectionCrosshairCursor();
   image.style.cssText = `
     position: absolute;
     left: 0;
@@ -295,11 +298,34 @@ export function mountFrozenSelectionFrame(
     width: ${frame.geometry.width}px;
     height: ${frame.geometry.height}px;
     pointer-events: auto;
+    cursor: ${cursor};
   `;
   host.style.cssText = image.style.cssText;
   image.src = frame.dataUrl;
   privateRoot.append(image);
   container.prepend(host);
+  if (frame.areaOnly) {
+    const hint = document.createElement('div');
+    hint.className = 'sniptale-selection-area-only-hint';
+    hint.setAttribute('role', 'status');
+    hint.textContent = translate('content.overlayControls.manualAreaSelectionHint');
+    hint.style.cssText = `
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      max-width: min(320px, calc(100vw - 72px));
+      padding: 8px 12px;
+      border: 1px solid var(--sniptale-color-border-soft);
+      border-radius: 8px;
+      background: var(--sniptale-color-surface-panel);
+      color: var(--sniptale-color-text-primary);
+      box-shadow: var(--sniptale-shadow-md);
+      font: 500 13px/1.35 var(--sniptale-font-sans);
+      pointer-events: none;
+      z-index: 1;
+    `;
+    container.append(hint);
+  }
 }
 
 /** Decode before activation so failed image loading cannot expose a live page beneath frozen bounds. */
