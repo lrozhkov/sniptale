@@ -89,15 +89,24 @@ it('composes folder and tag sections inside the shared shell', () => {
   expect(container?.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).toContain(
     'overflow-hidden'
   );
-  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
-    'overflow-y-auto'
+  const scrollRegion = container?.querySelector<HTMLElement>('[data-ui="gallery.sidebar.scroll"]');
+  expect(scrollRegion?.className).toContain('overflow-y-auto');
+  expect(scrollRegion?.className).toContain('overscroll-contain');
+  expect(scrollRegion?.className).not.toContain('[overflow-anchor:none]');
+  expect(
+    scrollRegion?.contains(container?.querySelector('[data-ui="test.facet-filters"]') ?? null)
+  ).toBe(true);
+  expect(
+    scrollRegion?.contains(container?.querySelector('[data-ui="gallery.sidebar.footer"]') ?? null)
+  ).toBe(false);
+  scrollRegion!.scrollTop = 240;
+  act(() => root?.render(<GallerySidebar {...props} filteredItemCount={1} />));
+  expect(container?.querySelector('[data-ui="gallery.sidebar.scroll"]')).toBe(scrollRegion);
+  expect(scrollRegion?.scrollTop).toBe(240);
+  const trashButton = container?.querySelector<HTMLElement>(
+    '[data-ui="gallery.sidebar.footer"] button'
   );
-  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
-    'overscroll-contain'
-  );
-  expect(container?.querySelector('[data-ui="gallery.sidebar.panel"]')?.className).toContain(
-    '[overflow-anchor:none]'
-  );
+  expect(trashButton?.classList.contains('w-full')).toBe(false);
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
 });

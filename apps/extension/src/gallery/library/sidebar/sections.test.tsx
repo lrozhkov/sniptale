@@ -280,9 +280,10 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
 
   const labels = Array.from(container?.querySelectorAll('label') ?? []);
   const selectedLabel = labels.find((label) => label.textContent?.includes('beta'));
-  expect(selectedLabel?.className).toContain(
-    'focus-within:ring-[var(--sniptale-color-text-primary)]'
-  );
+  expect(selectedLabel?.className).toContain('relative');
+  expect(selectedLabel?.className).toContain('has-[:focus-visible]:ring-1');
+  expect(selectedLabel?.className).not.toContain('focus-within:ring-2');
+  expect(selectedLabel?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   expect(selectedLabel?.className).toContain('hover:bg-[var(--sniptale-color-surface-hover)]');
   expect(selectedLabel?.querySelector('[aria-hidden="true"]')?.className).not.toContain('accent');
   click(labels.find((label) => label.textContent?.includes('alpha')));

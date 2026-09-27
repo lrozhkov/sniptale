@@ -220,6 +220,13 @@ function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>)
   expect(pageRoot?.className).toContain('overflow-hidden');
   expect(pageRoot?.className).not.toContain('fixed inset-0');
   expect(pageRoot?.className).not.toContain('h-screen');
+  expect(pageRoot?.className).toContain('p-3');
+  expect(container?.querySelector('[data-ui="test.header"]')?.parentElement?.className).toContain(
+    'gap-3'
+  );
+  expect(container?.querySelector('[data-ui="test.sidebar"]')?.parentElement?.className).toContain(
+    'gap-3'
+  );
   expect(sidebarPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       counts: expect.objectContaining({ scenario: 1 }),

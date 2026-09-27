@@ -57,7 +57,7 @@ export function GalleryImportDropTarget(props: GalleryImportDropTargetProps) {
       data-ui="gallery.page.root"
       className={
         'sniptale-extension-surface relative flex h-full min-h-0 w-full overflow-hidden ' +
-        'bg-[var(--sniptale-color-surface-canvas)] p-4 ' +
+        'bg-[var(--sniptale-color-surface-canvas)] p-3 ' +
         'text-[var(--sniptale-color-text-primary)]'
       }
       onDragEnter={handleDragEnter}
@@ -72,7 +72,7 @@ export function GalleryImportDropTarget(props: GalleryImportDropTargetProps) {
           role="status"
           aria-live="polite"
           className={
-            'pointer-events-none absolute inset-4 z-50 flex items-center justify-center rounded-2xl ' +
+            'pointer-events-none absolute inset-3 z-50 flex items-center justify-center rounded-2xl ' +
             'border-2 border-dashed border-[var(--sniptale-color-border-accent-strong)] ' +
             'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)] ' +
             'shadow-[0_18px_48px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_22%,transparent)] ' +

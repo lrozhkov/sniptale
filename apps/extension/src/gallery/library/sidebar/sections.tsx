@@ -15,10 +15,10 @@ function cx(...values: Array<string | false | null | undefined>): string {
 }
 
 const facetOptionRowClassName = [
-  'flex h-8 cursor-pointer items-center gap-2 rounded-[7px] px-1.5',
+  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] px-1.5',
   'transition-colors hover:bg-[var(--sniptale-color-surface-hover)]',
-  'focus-within:outline-none focus-within:ring-2 focus-within:ring-inset',
-  'focus-within:ring-[var(--sniptale-color-text-primary)]',
+  'has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-inset',
+  'has-[:focus-visible]:ring-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const facetSummaryClassName = [
@@ -172,6 +172,7 @@ function GalleryFacetOptionRow(props: {
       aria-disabled={props.disabled || undefined}
       className={cx(
         facetOptionRowClassName,
+        props.checked && 'bg-[var(--sniptale-color-surface-hover)]',
         props.disabled && 'cursor-default opacity-55 hover:bg-transparent'
       )}
     >

@@ -11,9 +11,9 @@ import { GalleryFacetFilters, GalleryFolderList } from './sections';
 
 const gallerySidebarPanelClassName = [
   [
-    'flex flex-col overflow-y-auto overscroll-contain [overflow-anchor:none]',
+    'flex flex-col overflow-hidden',
     'rounded-[var(--sniptale-radius-lg)] border',
-    'border-[var(--sniptale-color-border-soft)] p-3 shadow-sm',
+    'border-[var(--sniptale-color-border-soft)] shadow-sm',
   ].join(' '),
   [
     'bg-[linear-gradient(',
@@ -32,27 +32,37 @@ export function GallerySidebar(props: GallerySidebarProps) {
       dataUi="gallery.sidebar.shell"
     >
       <InspectorShellPanel dataUi="gallery.sidebar.panel" className={gallerySidebarPanelClassName}>
-        {props.trashMode ? (
-          <GalleryTrashControls {...props} />
-        ) : (
-          <>
-            <GalleryFolderList {...props} />
-            <GalleryFacetFilters {...props} />
-          </>
-        )}
-        <button
-          type="button"
-          disabled={props.busy}
-          className={`${getControlSecondaryButtonClassName({ density: 'compact' })} mt-auto w-full shrink-0`}
-          onClick={() => props.onTrashModeChange?.(!props.trashMode)}
+        <div
+          data-ui="gallery.sidebar.scroll"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
         >
           {props.trashMode ? (
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <GalleryTrashControls {...props} />
           ) : (
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            <>
+              <GalleryFolderList {...props} />
+              <GalleryFacetFilters {...props} />
+            </>
           )}
-          {translate(props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle')}
-        </button>
+        </div>
+        <div
+          data-ui="gallery.sidebar.footer"
+          className="flex shrink-0 border-t border-[var(--sniptale-color-border-soft)] p-2.5"
+        >
+          <button
+            type="button"
+            disabled={props.busy}
+            className={`${getControlSecondaryButtonClassName({ density: 'compact' })} max-w-full`}
+            onClick={() => props.onTrashModeChange?.(!props.trashMode)}
+          >
+            {props.trashMode ? (
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            )}
+            {translate(props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle')}
+          </button>
+        </div>
       </InspectorShellPanel>
     </InspectorShellFrame>
   );
