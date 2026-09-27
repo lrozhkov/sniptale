@@ -1,3 +1,7 @@
+import {
+  createRecommendedContextMenuSettings,
+  parseContextMenuLayout,
+} from '../../../contracts/settings/context-menu-layout';
 import type {
   CaptureActionType,
   ContentToolbarPreferences,
@@ -41,18 +45,7 @@ let settingsMutationQueue = Promise.resolve<NormalizedSettings | null>(null);
 
 const DEFAULT_VIEWPORT_PRESETS: ViewportPreset[] = createSystemViewportPresetCatalog();
 
-const DEFAULT_CONTEXT_MENU_SETTINGS: ContextMenuSettings = {
-  enabled: true,
-  showScreenshots: true,
-  showVideo: true,
-  showExport: true,
-  showImageEditor: true,
-  showVideoEditor: true,
-  showGallery: true,
-  showPageLinkCopy: true,
-  showWindowResize: true,
-  showSettings: true,
-};
+const DEFAULT_CONTEXT_MENU_SETTINGS = createRecommendedContextMenuSettings();
 
 const DEFAULT_CONTENT_TOOLBAR_SETTINGS: ContentToolbarPreferences = {
   displayMode: 'horizontal',
@@ -96,7 +89,7 @@ function cloneViewportPresets(presets: readonly ViewportPreset[]): ViewportPrese
 }
 
 function cloneContextMenuSettings(settings: ContextMenuSettings): ContextMenuSettings {
-  return { ...settings };
+  return { ...settings, ...(settings.layout ? { layout: structuredClone(settings.layout) } : {}) };
 }
 
 function cloneContentToolbarSettings(
@@ -149,6 +142,12 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
  * against the latest persisted payload.
  */
 export async function saveSettings(settings: Settings): Promise<void> {
+  if (
+    settings.contextMenu.layout !== undefined &&
+    !parseContextMenuLayout(settings.contextMenu.layout)
+  ) {
+    throw new Error('Context menu layout is invalid');
+  }
   if (settings.filenameRules != null && !parseFilenameRules(settings.filenameRules)) {
     throw new Error('Filename rules are invalid');
   }

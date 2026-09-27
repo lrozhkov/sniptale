@@ -1,3 +1,4 @@
+import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
 vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
   listImportedEffectBundles: vi.fn(async () => []),
@@ -387,3 +388,16 @@ function settingsFixture() {
     voiceInput: { language: 'ru-RU', mode: 'local-first', microphoneDeviceId: 'device-secret' },
   };
 }
+
+it('exports the complete menu layout in interface preferences and preserves it on revalidation', async () => {
+  const layout = createContextMenuLayout();
+  mocks.settings.mockResolvedValue({
+    ...settingsFixture(),
+    contextMenu: { enabled: true, layout },
+  });
+  const snapshot = await readSettingsTransferSnapshot();
+  const parsed = parseSettingsTransferDomains(JSON.parse(JSON.stringify(snapshot.domains)));
+  expect(parsed['interface.preferences']?.data).toMatchObject({
+    contextMenu: { enabled: true, layout },
+  });
+});

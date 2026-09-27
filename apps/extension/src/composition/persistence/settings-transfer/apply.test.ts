@@ -1,3 +1,5 @@
+import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
+import { parseSettingsTransferDomains } from '../../../workflows/settings-transfer/domain-parser';
 import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
 import { serializeHighlighterSettings } from '../highlighter/mutation-write';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -585,3 +587,16 @@ function settingsFixture(): NormalizedSettings {
     pagePackageCaptureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
   };
 }
+
+it('applies the validated menu layout through the existing settings transfer transaction', async () => {
+  const layout = createContextMenuLayout();
+  const contextMenu = { ...settingsFixture().contextMenu, showVideo: false, layout };
+  const domains = parseSettingsTransferDomains({
+    'interface.preferences': { schemaVersion: 1, data: { contextMenu } },
+  });
+  await applySettingsTransferDomains({ domains, summary: emptySummary() });
+  expect(mocks.syncSet).toHaveBeenCalledWith(
+    expect.objectContaining({ sniptale_settings: expect.objectContaining({ contextMenu }) }),
+    undefined
+  );
+});

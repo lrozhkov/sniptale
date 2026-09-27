@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react';
+import { ContextMenuEditor } from './context-menu-editor';
 import { Check } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
@@ -48,6 +50,33 @@ function ContextMenuItem(props: {
 }
 
 export function ContextMenuControls({ state }: { state: AppearanceSectionState }) {
+  const [editing, setEditing] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'saving' | 'failed'>('idle');
+  const busy = useRef(false);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const update = async (patch: Parameters<typeof state.updateContextMenu>[0]) => {
+    if (busy.current) return;
+    busy.current = true;
+    setStatus('saving');
+    try {
+      await state.updateContextMenu(patch);
+      setStatus('idle');
+    } catch {
+      setStatus('failed');
+    } finally {
+      busy.current = false;
+    }
+  };
+  if (editing)
+    return (
+      <ContextMenuEditor
+        state={state}
+        onClose={() => {
+          setEditing(false);
+          requestAnimationFrame(() => editButton.current?.focus());
+        }}
+      />
+    );
   const enabledLabel = translate('settings.appearance.contextMenuEnabledLabel', state.locale);
   return (
     <div className="pb-1 pt-2">
@@ -61,16 +90,39 @@ export function ContextMenuControls({ state }: { state: AppearanceSectionState }
           </p>
         </div>
         <SettingsSwitch
+          disabled={status === 'saving'}
           checked={state.contextMenu.enabled}
           size="sm"
           aria-label={enabledLabel}
           title={enabledLabel}
           onClick={() => {
-            void state.updateContextMenu({ enabled: !state.contextMenu.enabled });
+            void update({ enabled: !state.contextMenu.enabled });
           }}
         />
       </div>
 
+      <button
+        ref={editButton}
+        type="button"
+        disabled={status === 'saving'}
+        className={[
+          'mt-3 rounded-lg px-3 py-2 text-sm hover:bg-[var(--sniptale-color-surface-hover)]',
+          'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)] disabled:opacity-45',
+        ].join(' ')}
+        onClick={() => setEditing(true)}
+      >
+        {translate('settings.appearance.contextMenuCustomize', state.locale)}
+      </button>
+      {status !== 'idle' && (
+        <p role={status === 'failed' ? 'alert' : 'status'} className="text-sm">
+          {translate(
+            status === 'failed'
+              ? 'settings.appearance.contextMenuSaveFailed'
+              : 'settings.appearance.contextMenuSaving',
+            state.locale
+          )}
+        </p>
+      )}
       <div className="mt-3 max-w-[34rem]">
         <div
           className={[
@@ -90,11 +142,11 @@ export function ContextMenuControls({ state }: { state: AppearanceSectionState }
             <ContextMenuItem
               key={option.key}
               checked={state.contextMenu[option.key]}
-              disabled={!state.contextMenu.enabled}
+              disabled={!state.contextMenu.enabled || status === 'saving'}
               label={option.label}
               onToggle={() => {
                 if (!state.contextMenu.enabled) return;
-                void state.updateContextMenu({
+                void update({
                   [option.key]: !state.contextMenu[option.key],
                 });
               }}

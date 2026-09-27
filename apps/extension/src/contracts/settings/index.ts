@@ -33,6 +33,8 @@ export interface SavePreset {
 }
 
 export interface ContextMenuSettings {
+  /** Missing layout retains the original root ordering. */
+  layout?: import('./context-menu-layout').ContextMenuLayout;
   enabled: boolean;
   showScreenshots: boolean;
   showVideo: boolean;

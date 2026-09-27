@@ -1,3 +1,7 @@
+import type {
+  ContextMenuItemKey,
+  ContextMenuLayout,
+} from '../../../contracts/settings/context-menu-layout';
 import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
 import { translate } from '../../../platform/i18n';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
@@ -31,6 +35,7 @@ import {
   CONTEXT_MENU_VIDEO_WINDOW_ID,
   CONTEXT_MENU_WINDOW_RESIZE_ID,
 } from './constants';
+import { CONTEXT_MENU_PAGE_LINK_ID } from './page-link/constants';
 import { buildPageLinkCopyDescriptors } from './page-link/descriptors';
 import type { ContextMenuDescriptor } from './types';
 
@@ -225,7 +230,7 @@ function buildSettingsDescriptors(hasPrimaryItems: boolean): ContextMenuDescript
   return descriptors;
 }
 
-export function buildContextMenuDescriptors(args: {
+function buildLegacyDescriptors(args: {
   quickActions: QuickAction[];
   settings: ContextMenuSettings;
   viewportPresets: readonly ViewportPreset[];
@@ -262,4 +267,49 @@ export function buildContextMenuDescriptors(args: {
   }
 
   return descriptors;
+}
+
+const BLOCK_IDS: Record<ContextMenuItemKey, string> = {
+  showScreenshots: CONTEXT_MENU_SCREENSHOTS_ID,
+  showVideo: CONTEXT_MENU_VIDEO_ID,
+  showExport: CONTEXT_MENU_EXPORT_ID,
+  showImageEditor: CONTEXT_MENU_IMAGE_EDITOR_ID,
+  showVideoEditor: CONTEXT_MENU_VIDEO_EDITOR_ID,
+  showGallery: CONTEXT_MENU_GALLERY_ID,
+  showPageLinkCopy: CONTEXT_MENU_PAGE_LINK_ID,
+  showWindowResize: CONTEXT_MENU_WINDOW_RESIZE_ID,
+  showSettings: CONTEXT_MENU_SETTINGS_ID,
+};
+
+/** Project configured sections without changing stable action IDs or preset ownership. */
+export function buildContextMenuDescriptors(args: {
+  quickActions: QuickAction[];
+  settings: ContextMenuSettings;
+  viewportPresets: readonly ViewportPreset[];
+}): ContextMenuDescriptor[] {
+  const legacy = buildLegacyDescriptors(args);
+  if (!args.settings.layout) return legacy;
+  return projectLayout(legacy, args.settings.layout);
+}
+
+function projectLayout(
+  legacy: ContextMenuDescriptor[],
+  layout: ContextMenuLayout
+): ContextMenuDescriptor[] {
+  const result = [createDescriptor(CONTEXT_MENU_ROOT_ID, PRODUCT_BRAND_NAME)];
+  for (const section of layout.sections) {
+    const parentId =
+      section.id === 'root' ? CONTEXT_MENU_ROOT_ID : `sniptale.section.${section.id}`;
+    const blocks = section.items.flatMap((key) => {
+      const id = BLOCK_IDS[key];
+      return legacy
+        .filter((descriptor) => descriptor.id === id || descriptor.parentId === id)
+        .map((descriptor) => (descriptor.id === id ? { ...descriptor, parentId } : descriptor));
+    });
+    if (blocks.length === 0) continue;
+    if (section.id !== 'root')
+      result.push(createDescriptor(parentId, section.title, CONTEXT_MENU_ROOT_ID));
+    result.push(...blocks);
+  }
+  return result;
 }

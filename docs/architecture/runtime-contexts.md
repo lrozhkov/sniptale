@@ -55,3 +55,51 @@ For a new or changed runtime, update the runtime registry, manifest or build inp
 `apps/extension/src/tour-preview-sandbox/index.html` is a manifest sandbox for exact prepared guide and tour HTML preview. It receives one bounded HTML Blob with an explicit representation from its parent with source, origin and per-mount nonce validation. It owns its child Blob URL and has no extension APIs, storage, automatic network or mutation authority. The child executes the unchanged standalone file under its hashed CSP. Readiness and failure messages are bound to the current opaque frame and nonce and carry no commands. The existing effect sandbox retains its stricter head CSP; extension-page CSP is unchanged.
 
 The scenario-page `view=guide|tour` route loads a committed project through the read-only scenario persistence owner before preparing a disposable HTML artifact. It does not mount editor state or invoke publication recovery, autosave or export-history writes. Library links pass only project identity and representation. [Scenario viewing from Library](scenario-library-viewing.md) owns opening and refresh semantics.
+
+## Browser context menu
+
+The background context-menu owner projects preferences into Chrome menu descriptors and routes existing action IDs. Settings owns the editor; the composition settings owner persists the preferences under `sniptale_settings` in sync storage. The editor holds a disposable draft and commits only on Save. Cancel discards the draft; a failed write leaves it available for retry. Other settings are unaffected.
+
+### Audit and recommended configuration
+
+| Block | Available scenario | Recommendation |
+| --- | --- | --- |
+| Screenshots | Page preparation and enabled screenshot quick actions, including desktop capture | On: primary capture entry point |
+| Video | Tab, area, viewport preset, screen/window recording | On: primary recording entry point |
+| Export | Page export and JSON/Markdown copy | On: page capture and structured reuse |
+| Image editor | Open standalone image editor | Off: also accessible from popup and Library |
+| Video editor | Open standalone video editor | Off: also accessible from popup and Library |
+| Library | Open saved files and projects | On: retrieve results |
+| Copy title and link | Rich, Markdown and plain-text formats | On: lightweight page sharing |
+| Window size | Enabled window-target viewport presets | Off: specialist workflow; no menu when no presets exist |
+| Settings | Open settings | On: discovery and recovery |
+
+All blocks retain their existing action handlers. Screenshot quick actions and window presets expand from their respective authoritative catalogs; this editor does not duplicate their order or enable state. Video, Export and Copy title and link retain coherent submenus. The configurable unit is a block, not an individual subcommand or preset.
+
+Camera-only recording, scenario authoring, drawing and AI interaction remain in their existing popup/editor/page surfaces: they need additional input or an active editing session. The audit does not identify a missing one-click command necessary for the accepted browser-menu workflow. No arbitrary commands, scripts or URLs can be configured. The editor does not request permissions or start actions.
+
+New profiles use the recommendations above. Existing explicit boolean preferences are preserved. The default order is the table order. Restore replaces the draft with the recommended visibility and original order; it preserves the master enabled switch and requires Save. Cancel therefore also cancels a restore.
+
+### Structure and behavior
+
+There is one Sniptale root. Users can create up to nine named sections, rename them, move blocks between sections and the root, and reorder both sections and blocks using keyboard-operable controls. Disabled blocks retain their positions. Deleting a section moves its blocks to the end of the root draft, with Cancel available before committing. Empty sections are omitted from the browser menu. An empty configured menu has no root item. Page capabilities continue to control the existing capture, export, recording and link blocks. A custom section with no visible blocks is hidden for that page.
+
+### Configuration and transfer
+
+`ContextMenuSettings` retains `enabled` and its nine `show*` booleans. Its optional `layout` is a versioned object:
+
+```json
+{
+  "version": 1,
+  "sections": [
+    { "id": "root", "title": "", "items": ["showScreenshots", "showVideo", "showExport", "showGallery", "showPageLinkCopy", "showSettings"] },
+    { "id": "tools", "title": "Tools", "items": ["showImageEditor", "showVideoEditor", "showWindowResize"] }
+  ]
+}
+```
+
+The array order is authoritative. Exactly one `root` section and exactly one occurrence of every known block are required, including disabled blocks. Other section IDs match `[a-z][a-z0-9-]{0,31}`. Their titles are trimmed plain text of 1–40 characters without control characters; the root title is empty. Titles are literal user text and are not interpreted as markup. Sections have no recursive children. Unknown fields inside a supplied layout, unknown block identities, duplicate/missing identities, invalid titles, excessive sections and unsupported versions are invalid.
+
+Settings transfer includes this value in `interface.preferences.contextMenu`, using the existing v1 envelope and domain. A missing layout in old or partial preferences retains the original root order. Missing booleans use the current recommended defaults on settings normalization; explicit old booleans retain their values. A supplied layout is atomic: an incomplete or malformed layout rejects the import before mutation, preserving the currently saved menu. A missing contextMenu field leaves the current setting unchanged during selective import. Invalid stored layouts are dropped on read with existing invalid-field diagnostics and fall back to root ordering; reads never repair storage. Save validates layouts again before writing.
+
+Action availability remains an independent runtime decision. Section titles and positions convey no action authority, and action/preset IDs cannot be introduced by imported section data.

@@ -293,3 +293,22 @@ it('logs rebuild failures from the storage listener', async () => {
     );
   });
 });
+
+it('refreshes menu section availability from the current viewport catalog on menu shown', async () => {
+  const currentSettings = createSettings();
+  loadSettingsMock.mockResolvedValue(currentSettings);
+  resolveContextMenuDynamicStateMock.mockReturnValue({
+    'sniptale.section.tools': { visible: false },
+  });
+  const dispose = initializeBackgroundContextMenus(createDeps());
+  shownListener?.({}, createContextMenuTestTab());
+  await vi.waitFor(() =>
+    expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
+      hasVideoPreset: true,
+      settings: currentSettings.contextMenu,
+      viewportPresets: currentSettings.viewportPresets,
+      tab: createContextMenuTestTab(),
+    })
+  );
+  dispose();
+});

@@ -141,6 +141,7 @@ async function refreshContextMenuVisibility(tab?: chrome.tabs.Tab): Promise<void
   const updates = resolveContextMenuDynamicState({
     hasVideoPreset,
     settings: contextMenuSettings,
+    viewportPresets: settings.viewportPresets,
     ...(tab ? { tab } : {}),
   });
 

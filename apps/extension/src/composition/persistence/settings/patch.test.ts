@@ -1,3 +1,4 @@
+import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { browserStorageSyncGetMock, browserStorageSyncSetMock, loggerDebugMock, loggerWarnMock } =
@@ -115,5 +116,27 @@ describe('settings reset persistence', () => {
     expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith({
       sniptale_settings: createDefaultSettings(),
     });
+  });
+});
+
+it('persists menu layout, retains it in unrelated patches and rejects malformed writes', async () => {
+  const layout = createContextMenuLayout();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: {
+      ...createDefaultSettings(),
+      contextMenu: { ...DEFAULT_SETTINGS.contextMenu, layout },
+    },
+  });
+  const patched = await patchSettings({ contextMenu: { showVideo: false } });
+  expect(patched.contextMenu).toMatchObject({ layout, showVideo: false });
+  const invalid = createContextMenuLayout();
+  invalid.sections = [];
+  browserStorageSyncSetMock.mockClear();
+  await expect(patchSettings({ contextMenu: { layout: invalid } })).rejects.toThrow(
+    'Context menu layout is invalid'
+  );
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+  await expect(patchSettings({ contextMenu: { layout } })).resolves.toMatchObject({
+    contextMenu: { layout },
   });
 });

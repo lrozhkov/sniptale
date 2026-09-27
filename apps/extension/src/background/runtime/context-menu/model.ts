@@ -115,11 +115,12 @@ function resolvePageLinkDynamicState(args: {
 export function resolveContextMenuDynamicState(args: {
   hasVideoPreset: boolean;
   settings: ContextMenuSettings;
+  viewportPresets?: readonly ViewportPreset[];
   tab?: chrome.tabs.Tab;
 }): Record<string, BrowserContextMenuUpdateProperties> {
   const capabilities = getTabCapabilities(args.tab);
 
-  return {
+  const updates: Record<string, BrowserContextMenuUpdateProperties> = {
     [CONTEXT_MENU_SCREENSHOTS_ID]: {
       visible: args.settings.showScreenshots && capabilities.screenshotMode.supported,
     },
@@ -133,4 +134,36 @@ export function resolveContextMenuDynamicState(args: {
     },
     ...resolvePageLinkDynamicState({ capabilities, settings: args.settings }),
   };
+
+  for (const section of args.settings.layout?.sections ?? []) {
+    if (section.id === 'root') continue;
+    const presentItems = section.items.filter(
+      (key) =>
+        args.settings[key] &&
+        (key !== 'showWindowResize' ||
+          args.viewportPresets?.some((preset) => preset.enabled && preset.target === 'window'))
+    );
+    if (presentItems.length === 0) continue;
+    const visible = presentItems.some((key) => {
+      if (!args.settings[key]) return false;
+      switch (key) {
+        case 'showScreenshots':
+          return updates[CONTEXT_MENU_SCREENSHOTS_ID]?.visible !== false;
+        case 'showVideo':
+          return updates[CONTEXT_MENU_VIDEO_ID]?.visible !== false;
+        case 'showExport':
+          return updates[CONTEXT_MENU_EXPORT_ID]?.visible !== false;
+        case 'showPageLinkCopy':
+          return updates[CONTEXT_MENU_PAGE_LINK_ID]?.visible !== false;
+        case 'showGallery':
+        case 'showImageEditor':
+        case 'showSettings':
+        case 'showVideoEditor':
+        case 'showWindowResize':
+          return true;
+      }
+    });
+    updates[`sniptale.section.${section.id}`] = { visible };
+  }
+  return updates;
 }

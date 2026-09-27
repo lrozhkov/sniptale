@@ -259,6 +259,7 @@ it('refreshes dynamic visibility and logs update failures per item', async () =>
   expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
     hasVideoPreset: true,
     settings: createSettings().contextMenu,
+    viewportPresets: createSettings().viewportPresets,
     tab: createTab(),
   });
   expect(browserContextMenusUpdateMock).toHaveBeenCalledTimes(2);
@@ -279,6 +280,7 @@ it('refreshes dynamic visibility without a tab payload when no tab is available'
   expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
     hasVideoPreset: true,
     settings: createSettings().contextMenu,
+    viewportPresets: createSettings().viewportPresets,
   });
   expect(browserContextMenusRefreshMock).toHaveBeenCalledOnce();
 });
@@ -307,6 +309,7 @@ it('does not let a delayed tab refresh overwrite the latest shown-tab state', as
   expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
     hasVideoPreset: false,
     settings: createSettings().contextMenu,
+    viewportPresets: createSettings().viewportPresets,
     tab: latestTab,
   });
   expect(browserContextMenusUpdateMock).toHaveBeenCalledOnce();

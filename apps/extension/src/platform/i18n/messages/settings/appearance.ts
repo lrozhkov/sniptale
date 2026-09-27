@@ -207,4 +207,39 @@ export const settingsAppearanceMessages = defineMessageSource({
     ru: 'Открывать страницу настроек из нижнего пункта меню.',
     en: 'Open the settings page from the bottom menu item.',
   },
+  contextMenuCustomize: { ru: 'Настроить разделы и порядок', en: 'Customize sections and order' },
+  contextMenuRoot: { ru: 'Основное меню', en: 'Main menu' },
+  contextMenuEditorHelp: {
+    ru: 'Включайте блоки, перемещайте их между разделами и меняйте порядок стрелками. Подкоманды остаются внутри блоков. Быстрые действия снимков и шаблоны размеров окна настраиваются в своих разделах. Пустые разделы не показываются в меню.',
+    en: 'Enable blocks, move them between sections, and reorder them with the arrow buttons. Subcommands stay inside their blocks. Screenshot quick actions and window size presets are managed in their own settings. Empty sections are omitted from the menu.',
+  },
+  contextMenuSectionName: { ru: 'Название раздела', en: 'Section name' },
+  contextMenuSection: { ru: 'Раздел', en: 'Section' },
+  contextMenuUp: { ru: 'Выше', en: 'Move up' },
+  contextMenuDown: { ru: 'Ниже', en: 'Move down' },
+  contextMenuRemoveSection: {
+    ru: 'Убрать раздел, перенести пункты в основное меню',
+    en: 'Remove section and move items to main menu',
+  },
+  contextMenuNewSection: { ru: 'Новый раздел', en: 'New section' },
+  contextMenuAddSection: { ru: 'Добавить раздел', en: 'Add section' },
+  contextMenuRestore: {
+    ru: 'Восстановить рекомендуемый вариант',
+    en: 'Restore recommended configuration',
+  },
+  contextMenuInvalidName: {
+    ru: 'Укажите название раздела: от 1 до 40 символов, без пробелов по краям и управляющих символов.',
+    en: 'Enter a section name: 1\u201340 characters, without leading/trailing spaces or control characters.',
+  },
+  contextMenuSaveFailed: {
+    ru: 'Не удалось сохранить меню. Повторите попытку.',
+    en: 'Could not save the menu. Please try again.',
+  },
+  contextMenuSaving: { ru: 'Сохранение меню…', en: 'Saving menu\u2026' },
+  contextMenuUnsaved: {
+    ru: 'Изменения применятся после сохранения. Отмена сохранит прежнее меню.',
+    en: 'Changes take effect after saving. Cancel keeps the previous menu.',
+  },
+  contextMenuSave: { ru: 'Сохранить меню', en: 'Save menu' },
+  contextMenuCancel: { ru: 'Отмена', en: 'Cancel' },
 });

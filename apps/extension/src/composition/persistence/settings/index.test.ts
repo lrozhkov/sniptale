@@ -1,3 +1,4 @@
+import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -63,11 +64,11 @@ const DEFAULT_CONTEXT_MENU = {
   showScreenshots: true,
   showVideo: true,
   showExport: true,
-  showImageEditor: true,
-  showVideoEditor: true,
+  showImageEditor: false,
+  showVideoEditor: false,
   showGallery: true,
   showPageLinkCopy: true,
-  showWindowResize: true,
+  showWindowResize: false,
   showSettings: true,
 };
 const DEFAULT_VIEWPORT_PRESETS = createSystemViewportPresetCatalog();
@@ -349,10 +350,10 @@ const expectedInvalidStoredSettingsResult = {
     showVideo: true,
     showExport: false,
     showImageEditor: true,
-    showVideoEditor: true,
+    showVideoEditor: false,
     showGallery: true,
     showPageLinkCopy: true,
-    showWindowResize: true,
+    showWindowResize: false,
     showSettings: false,
   },
   saveCapturesToGallery: true,
@@ -520,4 +521,29 @@ describe('settings', () => {
     expect(settings.defaultViewportPresetId).toBeNull();
     expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
   });
+});
+
+it('reads a custom layout without writes and preserves explicit legacy visibility', async () => {
+  const layout = createContextMenuLayout();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { contextMenu: { layout, showWindowResize: true } },
+  });
+  browserStorageSyncSetMock.mockClear();
+  const loaded = await loadSettings();
+  expect(loaded.contextMenu.layout).toEqual(layout);
+  expect(loaded.contextMenu.showWindowResize).toBe(true);
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+  loaded.contextMenu.layout!.sections[0]!.items.length = 0;
+  expect((await loadSettings()).contextMenu.layout).toEqual(layout);
+});
+
+it('drops a malformed stored layout without changing valid booleans or repairing storage', async () => {
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { contextMenu: { enabled: false, layout: { version: 9 } } },
+  });
+  browserStorageSyncSetMock.mockClear();
+  const loaded = await loadSettings();
+  expect(loaded.contextMenu.enabled).toBe(false);
+  expect(loaded.contextMenu.layout).toBeUndefined();
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
 });
