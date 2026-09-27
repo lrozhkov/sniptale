@@ -43,7 +43,11 @@ async function routeConsume(tabId: number) {
 it('consumes matching popup export navigation once without page forwarding', async () => {
   issuePopupExportLaunchIntent(62);
 
-  await expect(routeConsume(62)).resolves.toEqual({ page: 'export', success: true });
+  await expect(routeConsume(62)).resolves.toEqual({
+    page: 'export',
+    startExport: false,
+    success: true,
+  });
   await expect(routeConsume(62)).resolves.toEqual({ page: null, success: true });
 });
 
@@ -51,5 +55,30 @@ it('does not consume another tab launch intent', async () => {
   issuePopupExportLaunchIntent(63);
 
   await expect(routeConsume(62)).resolves.toEqual({ page: null, success: true });
-  await expect(routeConsume(63)).resolves.toEqual({ page: 'export', success: true });
+  await expect(routeConsume(63)).resolves.toEqual({
+    page: 'export',
+    startExport: false,
+    success: true,
+  });
+});
+
+it('returns download mode only after document authorization and only once', async () => {
+  issuePopupExportLaunchIntent(63, Date.now(), true, 'document-63');
+  assertPopupTabRouteTargetDocumentMock.mockResolvedValue('document-63');
+  assertPopupTabRouteTargetDocumentMock.mockRejectedValueOnce(new Error('document changed'));
+  await expect(routeConsume(63)).resolves.toMatchObject({ success: false });
+  await expect(routeConsume(63)).resolves.toEqual({
+    page: 'export',
+    startExport: true,
+    sourceDocumentId: 'document-63',
+    success: true,
+  });
+  await expect(routeConsume(63)).resolves.toEqual({ page: null, success: true });
+});
+
+it('drops direct export handoff after the source tab navigates before popup consumption', async () => {
+  issuePopupExportLaunchIntent(64, Date.now(), true, 'original-document');
+  assertPopupTabRouteTargetDocumentMock.mockResolvedValue('replacement-document');
+
+  await expect(routeConsume(64)).resolves.toEqual({ page: null, success: true });
 });

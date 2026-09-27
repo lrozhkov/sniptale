@@ -144,16 +144,29 @@ it('ignores malformed capability requests before sender authorization', () => {
   expect(sendResponse).not.toHaveBeenCalled();
 });
 
-it('allows the popup to consume its tab-bound launch intent without page access', async () => {
-  hasActivePageAccessMock.mockResolvedValue(false);
-
+it('binds popup launch intent consumption to the current main-frame document', async () => {
   const issued = await issueCapability({
     operation: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
   });
 
   expect(issued.success).toBe(true);
-  expect(browserTabsGetMock).not.toHaveBeenCalled();
-  expect(hasActivePageAccessMock).not.toHaveBeenCalled();
+  expect(browserTabsGetMock).toHaveBeenCalledWith(7);
+  expect(hasActivePageAccessMock).toHaveBeenCalledWith(7);
+  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith({
+    func: expect.any(Function),
+    target: { frameIds: [0], tabId: 7 },
+  });
+
+  const message = {
+    tabId: 7,
+    tabRouteCapabilityToken: issued.capabilityToken as string,
+    tabRouteRequestId: 'route-req-1',
+    type: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
+  } as const;
+  assertPopupTabRouteCapability({ message, senderUrl: POPUP_URL });
+  await expect(
+    assertPopupTabRouteTargetDocument({ tabId: 7, token: issued.capabilityToken as string })
+  ).resolves.toBe('document-7');
 });
 
 it('consumes matching capabilities once and rejects replay', async () => {
@@ -226,7 +239,7 @@ it('accepts the exact Chromium document once after admission', async () => {
       tabId: 7,
       token: issued.capabilityToken as string,
     })
-  ).resolves.toBeUndefined();
+  ).resolves.toBe('document-7');
   await expect(
     assertPopupTabRouteTargetDocument({
       tabId: 7,

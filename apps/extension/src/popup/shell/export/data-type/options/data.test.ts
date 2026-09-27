@@ -158,3 +158,17 @@ describe('popup export option toggles', () => {
     expect(props.setIncludeCssDiagnostics).toHaveBeenCalledWith(false);
   });
 });
+
+it('updates dependent web-copy preferences in the initiating event, not inside a state updater', () => {
+  const props = createProps();
+  toggleExportOption('webCopy', props);
+  expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(true);
+  expect(props.setIncludeWebCopy).toHaveBeenCalledWith(true);
+});
+
+it('ignores disabled option mutations from summary and toggle actions', () => {
+  const props = createProps({ disabled: true });
+  toggleExportOption('json', props);
+  setExportOptionActive('json', false, props);
+  expect(props.setIncludeJson).not.toHaveBeenCalled();
+});

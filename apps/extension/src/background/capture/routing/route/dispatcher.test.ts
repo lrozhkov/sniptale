@@ -17,6 +17,7 @@ const {
   ensureActivePageAccessRuntimeMock,
   loadQuickActionRuntimeContextMock,
   waitForContentToolbarReadyMock,
+  routeToolbarAnnotationExportMock,
 } = vi.hoisted(() => ({
   handleFullCaptureMock: vi.fn(),
   handleVisibleCaptureMock: vi.fn(),
@@ -34,6 +35,11 @@ const {
   ensureActivePageAccessRuntimeMock: vi.fn(),
   loadQuickActionRuntimeContextMock: vi.fn(),
   waitForContentToolbarReadyMock: vi.fn(),
+  routeToolbarAnnotationExportMock: vi.fn(),
+}));
+
+vi.mock('../../annotation-export/route', () => ({
+  routeToolbarAnnotationExportMessage: routeToolbarAnnotationExportMock,
 }));
 
 vi.mock('../../../page-access/service', async (importOriginal) => ({
@@ -138,6 +144,7 @@ beforeEach(() => {
   browserTabsGetMock.mockResolvedValue({ id: 42, url: 'https://example.test/page' });
   ensureActivePageAccessRuntimeMock.mockResolvedValue(undefined);
   waitForContentToolbarReadyMock.mockResolvedValue({ screenshotMode: false, visible: false });
+  routeToolbarAnnotationExportMock.mockReturnValue(true);
 });
 
 it('renews a screenshot surface only for its preauthorized content document', async () => {
@@ -230,6 +237,24 @@ it('routes capture requests through handler contexts', async () => {
     42,
     args.sendResponse
   );
+});
+
+it('forwards trusted sender document identity to the annotation export route', () => {
+  const args = createRouteArgs();
+  const sender = {
+    documentId: 'source-document-42',
+    frameId: 0,
+    url: 'https://example.test/page',
+  };
+  const message = { type: MessageType.OPEN_EXPORT_MODAL, startExport: true } as const;
+
+  expect(routeCaptureMessage({ ...args, message, sender })).toBe(true);
+  expect(routeToolbarAnnotationExportMock).toHaveBeenCalledWith({
+    message,
+    resolvedTabId: 42,
+    sender,
+    sendResponse: args.sendResponse,
+  });
 });
 
 it('normalizes omitted execute-save actions once before dispatch', () => {

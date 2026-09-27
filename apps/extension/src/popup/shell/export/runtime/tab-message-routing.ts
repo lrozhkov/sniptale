@@ -68,7 +68,11 @@ export async function sendPopupExportTabMessage<TMessage extends PopupExportTabM
   return response as TabResponseByType[TMessage['type']];
 }
 
-export async function consumePopupExportLaunchIntentForActiveTab(): Promise<'export' | null> {
+export async function consumePopupExportLaunchIntentForActiveTab(): Promise<{
+  tabId: number;
+  startExport: boolean;
+  sourceDocumentId?: string;
+} | null> {
   const [activeTab] = await browserTabs.query({ active: true, currentWindow: true });
   if (typeof activeTab?.id !== 'number') {
     return null;
@@ -80,5 +84,13 @@ export async function consumePopupExportLaunchIntentForActiveTab(): Promise<'exp
   if (!response.success) {
     throw new Error(response.error || 'Failed to consume popup export launch intent.');
   }
-  return response.page === 'export' ? 'export' : null;
+  return response.page === 'export'
+    ? {
+        tabId: activeTab.id,
+        startExport: response.startExport === true && typeof response.sourceDocumentId === 'string',
+        ...(typeof response.sourceDocumentId === 'string'
+          ? { sourceDocumentId: response.sourceDocumentId }
+          : {}),
+      }
+    : null;
 }

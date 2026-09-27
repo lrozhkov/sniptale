@@ -48,10 +48,11 @@ async function downloadBrowserAnnotations(
 }
 
 async function openPopupExport(
-  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
+  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined,
+  startExport = false
 ): Promise<void> {
   const message = await attachContentActionIntent(
-    { type: MessageType.OPEN_EXPORT_MODAL },
+    { type: MessageType.OPEN_EXPORT_MODAL, ...(startExport ? { startExport: true } : {}) },
     contentIntentSource
   );
   const response = await getContentRuntimeServices().messaging.sendRuntimeMessage(message);
@@ -71,7 +72,7 @@ export function executeToolbarAnnotationExportAction(
     return downloadBrowserAnnotations(contentIntentSource);
   }
   if (action === 'export-page') {
-    return openPopupExport(contentIntentSource);
+    return openPopupExport(contentIntentSource, true);
   }
   return openPopupExport(contentIntentSource);
 }

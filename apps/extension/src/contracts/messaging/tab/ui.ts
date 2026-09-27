@@ -102,5 +102,7 @@ export type TabUiResponseByType = {
   [MessageType.EXPORT_POPUP_CANCEL]: PopupExportStartResponse;
   [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: RuntimeMessageResponse<{
     page: 'export' | null;
+    startExport?: boolean;
+    sourceDocumentId?: string;
   }>;
 };

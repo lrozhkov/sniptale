@@ -65,7 +65,7 @@ export function renderDataTypeSummaryItems(
           accentClassName={item.accentClassName}
           icon={item.icon}
           label={item.label}
-          {...(requiredKeys.has(item.key)
+          {...(toggleProps.disabled || requiredKeys.has(item.key)
             ? {}
             : { onRemove: () => setExportOptionActive(item.key, false, toggleProps) })}
         />

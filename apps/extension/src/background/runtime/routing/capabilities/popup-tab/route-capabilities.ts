@@ -131,13 +131,8 @@ function issuePopupTabRouteCapability(
 }
 
 async function resolvePopupTabRouteTargetDocument(
-  tabId: number,
-  operation: PopupTabRouteOperation
+  tabId: number
 ): Promise<string | null | undefined> {
-  if (operation === MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT) {
-    return null;
-  }
-
   const tab = await browserTabs.get(tabId);
   if (isOwnedSnapshotViewerPage(tab.url)) {
     return null;
@@ -173,7 +168,7 @@ export function routePopupTabRouteCapabilityRequest(
     return true;
   }
 
-  void resolvePopupTabRouteTargetDocument(capabilityRequest.tabId, capabilityRequest.operation)
+  void resolvePopupTabRouteTargetDocument(capabilityRequest.tabId)
     .then((targetDocumentId) => {
       if (targetDocumentId === undefined) {
         sendResponse(createRouteErrorResponse('Page access is required for export.'));
@@ -234,13 +229,13 @@ export function assertPopupTabRouteCapability(args: {
 export async function assertPopupTabRouteTargetDocument(args: {
   tabId: number;
   token: string;
-}): Promise<void> {
+}): Promise<string | null> {
   const record = popupTabRouteCapabilities.get(args.token);
   popupTabRouteCapabilities.delete(args.token);
   if (!record || record.state !== 'admitted' || record.tabId !== args.tabId) {
     throw new Error('Invalid tab route capability');
   }
-  if (record.targetDocumentId === null) return;
+  if (record.targetDocumentId === null) return null;
   const [injection] = await browserScripting.executeScript({
     func: () => undefined,
     target: { frameIds: [0], tabId: args.tabId },
@@ -248,6 +243,7 @@ export async function assertPopupTabRouteTargetDocument(args: {
   if (injection?.documentId !== record.targetDocumentId) {
     throw new Error('Invalid tab route capability target document');
   }
+  return injection.documentId;
 }
 
 export function resetPopupTabRouteCapabilitiesForTests(): void {

@@ -253,3 +253,23 @@ it('keeps a failed action retryable and rejects untrusted privileged clicks', as
   act(() => copy.click());
   expect(mocks.executeAction).not.toHaveBeenCalled();
 });
+
+it('rejects two page-export activations before React commits the busy state', async () => {
+  let finish!: () => void;
+  mocks.executeAction.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const view = renderMenu();
+  const button = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export.export-page"]'
+  )!;
+  act(() => {
+    button.click();
+    button.click();
+  });
+  expect(mocks.executeAction).toHaveBeenCalledTimes(1);
+  await act(async () => finish());
+});

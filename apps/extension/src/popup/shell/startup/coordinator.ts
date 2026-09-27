@@ -61,7 +61,7 @@ export async function resolvePopupStartupRoute(): Promise<PopupStartupDescriptor
       postRecordSnapshot,
     };
   }
-  if (exportIntent) return { page: 'export', launchSelection: { includeAnnotations: true } };
+  if (exportIntent) return { page: 'export', destination: 'export', launch: exportIntent };
   if (startup.selection === 'remember-last') {
     return startup.lastPage === 'video'
       ? { page: 'video', recordingSnapshot, postRecordSnapshot }

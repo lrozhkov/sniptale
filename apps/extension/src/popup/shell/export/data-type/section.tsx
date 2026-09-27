@@ -193,8 +193,10 @@ function DataTypeFilterBar(props: {
       <button
         type="button"
         onClick={props.onToggleAll}
+        disabled={props.disabled}
         className={[
           'h-8 shrink-0 rounded-[9px] px-1.5 text-[10px] font-medium',
+          'disabled:cursor-not-allowed disabled:opacity-40',
           'text-[var(--sniptale-color-text-primary)] transition-colors',
           'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
           'outline-none focus-visible:outline-none',

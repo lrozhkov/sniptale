@@ -154,6 +154,36 @@ it('starts Save through the same background job without requesting export-only h
   );
 });
 
+it('uses the click-authorized source document without requesting access from popup startup', async () => {
+  const state = createStartState(true);
+  const requestAllUrlsPermission = vi.fn(async () => false);
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps, 'export', undefined, {
+    sourceDocumentId: 'document-42',
+  });
+
+  expect(requestAllUrlsPermission).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceDocumentId: 'document-42' })
+  );
+});
+
+it('uses the click-authorized source document without requesting access from popup startup', async () => {
+  const state = createStartState(true);
+  const requestAllUrlsPermission = vi.fn(async () => false);
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps, 'export', undefined, {
+    sourceDocumentId: 'document-42',
+  });
+
+  expect(requestAllUrlsPermission).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceDocumentId: 'document-42' })
+  );
+});
+
 it('launches a combined download from the remembered download plan', async () => {
   const state = createStartState();
   state.includeWebCopy = true;

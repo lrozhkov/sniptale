@@ -45,7 +45,7 @@ beforeEach(() => {
 
 it('keeps recording and export precedence ahead of persisted startup', async () => {
   mocks.startup.mockResolvedValue({ selection: 'tools', lastPage: 'menu' });
-  mocks.exportIntent.mockResolvedValue('export');
+  mocks.exportIntent.mockResolvedValue({ tabId: 7, startExport: false });
   mocks.recording.mockResolvedValue({ state: { status: VideoRecordingStatus.RECORDING } });
   expect(await resolvePopupStartupRoute()).toMatchObject({ page: 'video' });
 });
@@ -101,3 +101,24 @@ it('restores unified Export for both fixed and remember-last startup choices', a
   });
   expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'save' });
 });
+
+it.each([false, true])(
+  'preserves export launch mode %s without overriding saved artifact preferences',
+  async (startExport) => {
+    mocks.startup.mockResolvedValue({ selection: 'export:library', lastPage: 'export' });
+    mocks.exportIntent.mockResolvedValue({
+      tabId: 7,
+      startExport,
+      ...(startExport ? { sourceDocumentId: 'document-7' } : {}),
+    });
+    expect(await resolvePopupStartupRoute()).toEqual({
+      page: 'export',
+      destination: 'export',
+      launch: {
+        tabId: 7,
+        startExport,
+        ...(startExport ? { sourceDocumentId: 'document-7' } : {}),
+      },
+    });
+  }
+);

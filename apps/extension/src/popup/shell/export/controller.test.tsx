@@ -40,6 +40,7 @@ let latestValue: ReturnType<typeof usePopupExportController> | null = null;
 function ControllerHarness(props: {
   activeTabCapabilities: ActiveTabCapabilities;
   isActive: boolean;
+  initialTabId?: number;
   pageAccess: PopupPageAccessRuntime;
 }) {
   latestValue = usePopupExportController(props);
@@ -49,6 +50,7 @@ function ControllerHarness(props: {
 async function renderHarness(args: {
   activeTabCapabilities: ActiveTabCapabilities;
   isActive: boolean;
+  initialTabId?: number;
   pageAccess?: PopupPageAccessRuntime;
 }) {
   if (!container) {
@@ -62,6 +64,7 @@ async function renderHarness(args: {
       <ControllerHarness
         activeTabCapabilities={args.activeTabCapabilities}
         isActive={args.isActive}
+        {...(args.initialTabId !== undefined ? { initialTabId: args.initialTabId } : {})}
         pageAccess={args.pageAccess ?? createPageAccessRuntime()}
       />
     );
@@ -184,4 +187,18 @@ it('merges popup export state with runtime actions for the current active tab se
     state,
     tabSelection,
   });
+});
+
+it('passes the originating tab through the controller instead of restoring a multi-tab selection', async () => {
+  const state = createGroupedExportState();
+  popupExportControllerMocks.usePopupExportStateMock.mockReturnValue(state);
+  popupExportControllerMocks.usePopupExportTabSelectionMock.mockReturnValue(state.tabs);
+  await renderHarness({
+    activeTabCapabilities: createActiveTabCapabilities(),
+    isActive: true,
+    initialTabId: 7,
+  });
+  expect(popupExportControllerMocks.usePopupExportTabSelectionMock).toHaveBeenCalledWith(
+    expect.objectContaining({ initialTabId: 7 })
+  );
 });

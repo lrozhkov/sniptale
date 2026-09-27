@@ -131,7 +131,10 @@ it('consumes launch intent for the active current-window tab only', async () => 
   mocks.tabsQuery.mockResolvedValueOnce([{ id: 9 }]);
   mockRuntimeCapabilityResponses({ page: 'export', success: true });
 
-  await expect(consumePopupExportLaunchIntentForActiveTab()).resolves.toBe('export');
+  await expect(consumePopupExportLaunchIntentForActiveTab()).resolves.toEqual({
+    tabId: 9,
+    startExport: false,
+  });
   expect(mocks.tabsQuery).toHaveBeenCalledWith({ active: true, currentWindow: true });
   expect(mocks.sendRuntimeMessage).toHaveBeenNthCalledWith(1, {
     operation: MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT,
@@ -151,4 +154,19 @@ it('surfaces failed launch-intent consumption', async () => {
   mockRuntimeCapabilityResponses({ error: 'expired', success: false });
 
   await expect(consumePopupExportLaunchIntentForActiveTab()).rejects.toThrow('expired');
+});
+
+it('retains download mode and the exact tab that consumed the handoff', async () => {
+  mocks.tabsQuery.mockResolvedValueOnce([{ id: 9 }]);
+  mockRuntimeCapabilityResponses({
+    page: 'export',
+    sourceDocumentId: 'document-9',
+    startExport: true,
+    success: true,
+  });
+  await expect(consumePopupExportLaunchIntentForActiveTab()).resolves.toEqual({
+    tabId: 9,
+    startExport: true,
+    sourceDocumentId: 'document-9',
+  });
 });

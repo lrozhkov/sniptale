@@ -3,7 +3,7 @@ import type { PopupExportRuntimeDeps } from './types';
 import type { PopupExportRuntimeContract } from './state';
 import { cancelPopupExport } from './cancel';
 import { copyPopupExportPreview } from './copy';
-import { startPopupExport } from './start/execute';
+import { startPopupExport, type PopupExportStartContext } from './start/execute';
 import { resetPopupExportView } from './reset';
 
 export function createPopupExportRuntimeActions(
@@ -13,10 +13,12 @@ export function createPopupExportRuntimeActions(
   return {
     handleCopyJson: () => copyPopupExportPreview(state, 'json', deps),
     handleCopyMarkdown: () => copyPopupExportPreview(state, 'markdown', deps),
-    handleStartExport: (downloadFormat?: 'html') =>
-      downloadFormat
-        ? startPopupExport(state, deps, 'export', downloadFormat)
-        : startPopupExport(state, deps),
+    handleStartExport: (downloadFormat?: 'html', startContext?: PopupExportStartContext) => {
+      if (downloadFormat || startContext) {
+        return startPopupExport(state, deps, 'export', downloadFormat, startContext);
+      }
+      return startPopupExport(state, deps);
+    },
     handleSaveWebSnapshot: () => startPopupExport(state, deps, 'save'),
     handleCancelExport: () => cancelPopupExport(state, deps),
     handleResetExportView: () => resetPopupExportView(state, deps),

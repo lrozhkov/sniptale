@@ -4,6 +4,8 @@ const POPUP_EXPORT_LAUNCH_INTENT_TTL_MS = 10_000;
 type PopupExportLaunchIntent = {
   expiresAtEpochMs: number;
   generation: number;
+  sourceDocumentId: string | null;
+  startExport: boolean;
 };
 
 type PopupExportLaunchIntentHandle = {
@@ -24,13 +26,17 @@ function pruneExpiredPopupExportLaunchIntents(nowEpochMs: number): void {
 
 export function issuePopupExportLaunchIntent(
   tabId: number,
-  nowEpochMs = Date.now()
+  nowEpochMs = Date.now(),
+  startExport = false,
+  sourceDocumentId: string | null = null
 ): PopupExportLaunchIntentHandle {
   pruneExpiredPopupExportLaunchIntents(nowEpochMs);
   const generation = ++nextGeneration;
   popupExportLaunchIntents.set(tabId, {
     expiresAtEpochMs: nowEpochMs + POPUP_EXPORT_LAUNCH_INTENT_TTL_MS,
     generation,
+    sourceDocumentId,
+    startExport: startExport && sourceDocumentId !== null,
   });
   return { generation, tabId };
 }
@@ -41,14 +47,22 @@ export function revokePopupExportLaunchIntent(handle: PopupExportLaunchIntentHan
   }
 }
 
-export function consumePopupExportLaunchIntent(tabId: number, nowEpochMs = Date.now()): boolean {
+export function consumePopupExportLaunchIntent(
+  tabId: number,
+  sourceDocumentId: string | null = null,
+  nowEpochMs = Date.now()
+): { sourceDocumentId?: string; startExport: boolean } | null {
   const intent = popupExportLaunchIntents.get(tabId);
   if (!intent) {
-    return false;
+    return null;
   }
 
   popupExportLaunchIntents.delete(tabId);
-  return intent.expiresAtEpochMs > nowEpochMs;
+  if (intent.expiresAtEpochMs <= nowEpochMs) return null;
+  if (intent.startExport && intent.sourceDocumentId !== sourceDocumentId) return null;
+  return intent.startExport && intent.sourceDocumentId
+    ? { sourceDocumentId: intent.sourceDocumentId, startExport: true }
+    : { startExport: false };
 }
 
 export function resetPopupExportLaunchIntentsForTests(): void {

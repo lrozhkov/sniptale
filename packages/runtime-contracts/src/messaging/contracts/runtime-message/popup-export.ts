@@ -37,6 +37,7 @@ export type RuntimePopupExportRequestByType = {
   [MessageType.START_PAGE_PACKAGE_JOB]: {
     type: typeof MessageType.START_PAGE_PACKAGE_JOB;
     downloadFormat?: 'html';
+    sourceDocumentId?: string;
     includeWebCopy: boolean;
     intent: 'export' | 'save';
     jobId: string;
@@ -109,5 +110,7 @@ export type RuntimePopupExportResponseByType = {
   [MessageType.EXPORT_POPUP_BUILD_PACKAGE]: PopupExportPackageResponse;
   [MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT]: import('../response').RuntimeMessageResponse<{
     page: 'export' | null;
+    startExport?: boolean;
+    sourceDocumentId?: string;
   }>;
 };

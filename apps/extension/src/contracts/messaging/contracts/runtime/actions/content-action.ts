@@ -189,7 +189,10 @@ export const contentActionRuntimeContracts = {
       'runtime OPEN_EXPORT_MODAL message',
       createMessageGuard({
         type: MessageType.OPEN_EXPORT_MODAL,
-        optional: { contentIntent: isContentPrivilegedActionCapability },
+        optional: {
+          contentIntent: isContentPrivilegedActionCapability,
+          startExport: (value) => typeof value === 'boolean',
+        },
       })
     ),
     parseResponse: createGuardParser(

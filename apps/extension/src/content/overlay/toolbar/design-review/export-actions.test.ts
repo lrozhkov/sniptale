@@ -175,12 +175,13 @@ it('opens the popup export flow for a complete page export', async () => {
   await executeToolbarAnnotationExportAction('export-page', source);
 
   expect(mocks.attachContentActionIntent).toHaveBeenCalledWith(
-    { type: MessageType.OPEN_EXPORT_MODAL },
+    { type: MessageType.OPEN_EXPORT_MODAL, startExport: true },
     source
   );
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith({
     contentIntent: { requestId: 'request-1', token: 'token-1' },
     type: MessageType.OPEN_EXPORT_MODAL,
+    startExport: true,
   });
 });
 

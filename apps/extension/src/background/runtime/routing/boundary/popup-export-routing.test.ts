@@ -162,6 +162,35 @@ it('attaches the canonical full-page capability to staged Page Package productio
   );
 });
 
+it('routes a direct Page Package request only to its original content document', async () => {
+  sendTabMessageMock.mockResolvedValue({ success: true });
+
+  await requestPopupExportPagePackage({
+    batchRequestId: 'job-bound',
+    includeWebCopy: false,
+    intent: 'export',
+    ordinal: 0,
+    options: {
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: true,
+      includeFullPageScreenshot: false,
+      includeImages: true,
+      includeJson: true,
+      includeMarkdown: true,
+      includePageDiagnostics: false,
+    },
+    sourceDocumentId: 'document-62',
+    tabId: 62,
+  });
+
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    62,
+    expect.objectContaining({ type: MessageType.EXPORT_POPUP_BUILD_PACKAGE }),
+    { documentId: 'document-62' }
+  );
+});
+
 it('grants data-only visible capture alongside full-page capture', async () => {
   sendTabMessageMock.mockResolvedValue({ success: true });
 

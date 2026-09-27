@@ -68,6 +68,7 @@ export const tabUiExportMessageContracts = {
         required: {
           page: isNullable((value: unknown): value is 'export' => value === 'export'),
         },
+        optional: { startExport: (value) => typeof value === 'boolean' },
       })
     ),
   },

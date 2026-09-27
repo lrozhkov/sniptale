@@ -1,5 +1,6 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
+import { browserScripting } from '@sniptale/platform/browser/scripting';
 import { runtimeActionExportMessageContracts } from '../../../../contracts/messaging/contracts/runtime/actions/export';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import {
@@ -24,10 +25,23 @@ export function routePagePackageJobMessage(
         runtimeActionExportMessageContracts[MessageType.START_PAGE_PACKAGE_JOB].parseRequest(
           message
         );
-      work = startPagePackageJobFromSources({ ...parsed, contentPort }).then((status) => ({
-        success: true,
-        status,
-      }));
+      work = (async () => {
+        if (parsed.sourceDocumentId !== undefined) {
+          const [source] = parsed.sources;
+          if (parsed.sources.length !== 1 || source?.kind !== 'tab') {
+            throw new Error('Document-bound Page Package jobs require exactly one tab source.');
+          }
+          const [injection] = await browserScripting.executeScript({
+            func: () => undefined,
+            target: { documentIds: [parsed.sourceDocumentId], tabId: source.tabId },
+          });
+          if (injection?.documentId !== parsed.sourceDocumentId) {
+            throw new Error('The source page changed before export could start.');
+          }
+        }
+        const status = await startPagePackageJobFromSources({ ...parsed, contentPort });
+        return { success: true, status };
+      })();
       break;
     }
     case MessageType.GET_PAGE_PACKAGE_JOB_STATUS: {

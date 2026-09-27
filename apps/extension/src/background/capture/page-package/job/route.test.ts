@@ -6,8 +6,13 @@ import { runtimeActionExportMessageContracts } from '../../../../contracts/messa
 const mocks = vi.hoisted(() => ({
   ack: vi.fn(),
   cancel: vi.fn(),
+  executeScript: vi.fn(),
   getSnapshot: vi.fn(),
   start: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/scripting', () => ({
+  browserScripting: { executeScript: mocks.executeScript },
 }));
 
 vi.mock('./index', async (importOriginal) => ({
@@ -40,6 +45,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.ack.mockResolvedValue(null);
   mocks.cancel.mockResolvedValue({ phase: 'cancelling' });
+  mocks.executeScript.mockResolvedValue([{ documentId: 'document-7', frameId: 0 }]);
   mocks.getSnapshot.mockResolvedValue({ locale: 'en', status: null });
   mocks.start.mockResolvedValue({ phase: 'running' });
 });
@@ -103,6 +109,62 @@ it('rejects unrelated messages and surfaces owner failures', async () => {
   await vi.waitFor(() =>
     expect(sendResponse).toHaveBeenCalledWith({ error: 'cancel failed', success: false })
   );
+});
+
+it('admits a direct export only while the original source document is still present', async () => {
+  const sendResponse = vi.fn();
+  routePagePackageJobMessage(
+    {
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'job-bound',
+      locale: 'en',
+      options,
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      sourceDocumentId: 'document-7',
+      sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
+      type: MessageType.START_PAGE_PACKAGE_JOB,
+      warnings: [],
+    },
+    sendResponse,
+    contentPort
+  );
+  await vi.waitFor(() => expect(mocks.start).toHaveBeenCalledOnce());
+
+  expect(mocks.executeScript).toHaveBeenCalledWith({
+    func: expect.any(Function),
+    target: { documentIds: ['document-7'], tabId: 7 },
+  });
+  expect(mocks.start).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceDocumentId: 'document-7', contentPort })
+  );
+
+  mocks.start.mockClear();
+  mocks.executeScript.mockResolvedValueOnce([{ documentId: 'replacement-document', frameId: 0 }]);
+  const staleResponse = vi.fn();
+  routePagePackageJobMessage(
+    {
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'job-stale',
+      locale: 'en',
+      options,
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      sourceDocumentId: 'document-7',
+      sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
+      type: MessageType.START_PAGE_PACKAGE_JOB,
+      warnings: [],
+    },
+    staleResponse,
+    contentPort
+  );
+  await vi.waitFor(() => expect(staleResponse).toHaveBeenCalledOnce());
+
+  expect(mocks.start).not.toHaveBeenCalled();
+  expect(staleResponse).toHaveBeenCalledWith({
+    error: 'The source page changed before export could start.',
+    success: false,
+  });
 });
 
 it('returns a parseable canonical failure when status snapshot reading fails', async () => {

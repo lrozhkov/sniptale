@@ -22,6 +22,7 @@ export type PopupExportJobContentPort = {
     intent: 'export' | 'save';
     ordinal: number;
     options: import('@sniptale/runtime-contracts/export').ExportOptions;
+    sourceDocumentId?: string;
     tabId: number;
   }) => Promise<unknown>;
 };
@@ -34,6 +35,7 @@ export type ActivePopupExportJob = {
   cancellationCleanupError: unknown | null;
   cancellationQueue: Promise<void>;
   contentPort: PopupExportJobContentPort;
+  sourceDocumentId?: string;
   captureTiming?: import('@sniptale/runtime-contracts/page-package').PagePackageCaptureTimingPolicy;
   expectedActivation: { tabId: number; windowId: number } | null;
   lastActivatedByWindow: Map<number, number>;

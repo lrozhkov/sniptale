@@ -247,6 +247,52 @@ it('materializes URL sources before claiming the job and retains capture timing'
   await execution.settled;
 });
 
+it('retains a direct export source document in the admitted job', async () => {
+  const execution = createExecutionControl();
+  mocks.materialize.mockResolvedValue({
+    orderedTabs: [{ tabId: 42, title: 'Page' }],
+    temporaryTabIds: [],
+  });
+
+  await expect(
+    startPagePackageJobFromSources({
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'document-job',
+      options,
+      sourceDocumentId: 'document-42',
+      sources: [{ kind: 'tab', tabId: 42, title: 'Page' }],
+      warnings: [],
+    })
+  ).resolves.toMatchObject({ jobId: 'document-job', phase: 'running' });
+
+  expect(execution.activeJob.sourceDocumentId).toBe('document-42');
+  execution.finish();
+  await execution.settled;
+});
+
+it('rejects a document-bound job with multiple or non-tab sources', async () => {
+  await expect(
+    startPagePackageJobFromSources({
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'document-job',
+      options,
+      sourceDocumentId: 'document-42',
+      sources: [
+        { kind: 'tab', tabId: 42, title: 'Page' },
+        { kind: 'tab', tabId: 43, title: 'Other' },
+      ],
+      warnings: [],
+    })
+  ).rejects.toThrow('Document-bound Page Package jobs require exactly one tab source.');
+  expect(mocks.materialize).not.toHaveBeenCalled();
+});
+
 it('closes materialized tabs if initial publication rejects the job', async () => {
   mocks.materialize.mockResolvedValue({
     orderedTabs: [{ tabId: 31, title: 'https://example.test/' }],

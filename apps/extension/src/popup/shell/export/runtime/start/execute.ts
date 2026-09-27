@@ -13,11 +13,27 @@ import {
 import { getCurrentLocale, translate } from '../../../../../platform/i18n/popup';
 import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 
+export type PopupExportStartContext = {
+  sourceDocumentId: string;
+};
+
+function isValidStartSourceSelection(
+  state: PopupExportRuntimeContract,
+  sources: readonly { kind: 'url' | 'tab' }[],
+  startContext?: PopupExportStartContext
+): boolean {
+  return (
+    !startContext ||
+    (state.activeSourceMode === 'tabs' && sources.length === 1 && sources[0]?.kind === 'tab')
+  );
+}
+
 export async function startPopupExport(
   state: PopupExportRuntimeContract,
   deps: PopupExportRuntimeDeps = getDefaultPopupExportRuntimeDeps(),
   intent: 'export' | 'save' = 'export',
-  downloadFormat?: 'html'
+  downloadFormat?: 'html',
+  startContext?: PopupExportStartContext
 ): Promise<void> {
   if (!state.hasLoadedPreferences) {
     return;
@@ -51,7 +67,7 @@ export async function startPopupExport(
       state.activeSourceMode === 'urls'
         ? state.selectedUrls.map((url) => ({ kind: 'url' as const, url }))
         : orderedTabs.map((tab) => ({ kind: 'tab' as const, ...tab }));
-    if (sources.length === 0) return;
+    if (sources.length === 0 || !isValidStartSourceSelection(state, sources, startContext)) return;
 
     const plan =
       downloadFormat === 'html'
@@ -84,9 +100,10 @@ export async function startPopupExport(
     const options = { ...buildPopupExportOptions(plan), resourceLimits };
     const warnings: string[] = [];
     if (
-      state.activeSourceMode === 'urls' ||
-      (intent === 'export' &&
-        (options.includeFullPageScreenshot || options.includeViewportScreenshot === true))
+      !startContext &&
+      (state.activeSourceMode === 'urls' ||
+        (intent === 'export' &&
+          (options.includeFullPageScreenshot || options.includeViewportScreenshot === true)))
     ) {
       const granted = await (deps.requestAllUrlsPermission?.() ?? Promise.resolve(true));
       if (!granted) {
@@ -134,6 +151,7 @@ export async function startPopupExport(
       includeWebCopy: effectivePlan.includeWebCopy,
       intent,
       ...(downloadFormat ? { downloadFormat } : {}),
+      ...(startContext ? { sourceDocumentId: startContext.sourceDocumentId } : {}),
       jobId,
       locale,
       captureTiming,

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { ContextMenuSettings } from './index';
 
 /** Stable block identities shared by settings, transfer and browser menu projection. */
 export const CONTEXT_MENU_ITEMS = [
@@ -69,7 +68,10 @@ export function createContextMenuLayout(): ContextMenuLayout {
 }
 
 /** Recommended visibility for new profiles and explicit reset; returns an isolated value. */
-export function createRecommendedContextMenuSettings(): ContextMenuSettings {
+export function createRecommendedContextMenuSettings(): Record<
+  ContextMenuItemKey | 'enabled',
+  boolean
+> & { layout?: ContextMenuLayout } {
   return {
     enabled: true,
     showScreenshots: true,

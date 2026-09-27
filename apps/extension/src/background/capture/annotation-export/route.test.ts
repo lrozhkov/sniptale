@@ -4,6 +4,9 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 const mocks = vi.hoisted(() => ({
   executeDownloadBlob: vi.fn(),
   openPopup: vi.fn(),
+  permissionsContains: vi.fn(),
+  permissionsRequest: vi.fn(),
+  loadPreferences: vi.fn(),
   tabsGet: vi.fn(),
 }));
 
@@ -13,6 +16,17 @@ vi.mock('@sniptale/platform/browser/action', () => ({
 
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: mocks.tabsGet },
+}));
+
+vi.mock('@sniptale/platform/browser/permissions', () => ({
+  browserPermissions: {
+    contains: mocks.permissionsContains,
+    request: mocks.permissionsRequest,
+  },
+}));
+
+vi.mock('../../../composition/persistence/popup-export-preferences', () => ({
+  loadPopupPagePackagePreferences: mocks.loadPreferences,
 }));
 
 vi.mock('../download/download-router', async (importOriginal) => ({
@@ -29,7 +43,19 @@ import { routeToolbarAnnotationExportMessage } from './route';
 beforeEach(() => {
   mocks.executeDownloadBlob.mockReset();
   mocks.openPopup.mockReset();
+  mocks.permissionsContains.mockReset();
+  mocks.permissionsRequest.mockReset();
+  mocks.loadPreferences.mockReset();
   mocks.tabsGet.mockReset();
+  mocks.permissionsContains.mockResolvedValue(true);
+  mocks.permissionsRequest.mockResolvedValue(true);
+  mocks.loadPreferences.mockResolvedValue({
+    export: {
+      includeFullPageScreenshot: false,
+      includeViewportScreenshot: false,
+      includeWebCopy: false,
+    },
+  });
   resetPopupExportLaunchIntentsForTests();
 });
 
@@ -100,7 +126,7 @@ it('opens the popup only for the active originating tab and retains its intent',
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
   expect(mocks.openPopup).toHaveBeenCalledWith({ windowId: 3 });
-  expect(consumePopupExportLaunchIntent(7)).toBe(true);
+  expect(consumePopupExportLaunchIntent(7)).toEqual({ startExport: false });
   expect(sendResponse).toHaveBeenCalledWith({ success: true });
 });
 
@@ -115,7 +141,7 @@ it('revokes launch intent when popup open fails and rejects an inactive tab', as
   });
   await vi.waitFor(() => expect(failedOpenResponse).toHaveBeenCalled());
 
-  expect(consumePopupExportLaunchIntent(7)).toBe(false);
+  expect(consumePopupExportLaunchIntent(7)).toBeNull();
   expect(failedOpenResponse).toHaveBeenCalledWith({ error: 'popup denied', success: false });
 
   mocks.tabsGet.mockResolvedValueOnce({ active: false, id: 7, windowId: 3 });
@@ -132,4 +158,68 @@ it('revokes launch intent when popup open fails and rejects an inactive tab', as
     error: 'The originating tab is no longer active.',
     success: false,
   });
+});
+
+it('carries direct export into the popup handoff without reporting a completed download', async () => {
+  mocks.tabsGet.mockResolvedValue({ active: true, id: 7, windowId: 3 });
+  mocks.openPopup.mockResolvedValue(undefined);
+  const sendResponse = vi.fn();
+  routeToolbarAnnotationExportMessage({
+    message: { type: MessageType.OPEN_EXPORT_MODAL, startExport: true },
+    resolvedTabId: 7,
+    sender: { documentId: 'document-7', frameId: 0 },
+    sendResponse,
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+  expect(consumePopupExportLaunchIntent(7, 'document-7')).toEqual({
+    sourceDocumentId: 'document-7',
+    startExport: true,
+  });
+  expect(sendResponse).toHaveBeenCalledWith({ success: true });
+});
+
+it('requests required page access before opening the popup and defers launch when denied', async () => {
+  mocks.tabsGet.mockResolvedValue({ active: true, id: 7, windowId: 3 });
+  mocks.openPopup.mockResolvedValue(undefined);
+  mocks.loadPreferences.mockResolvedValue({
+    export: {
+      includeFullPageScreenshot: true,
+      includeViewportScreenshot: false,
+      includeWebCopy: false,
+    },
+  });
+  mocks.permissionsContains.mockResolvedValue(false);
+  mocks.permissionsRequest.mockResolvedValue(false);
+  const sendResponse = vi.fn();
+
+  routeToolbarAnnotationExportMessage({
+    message: { type: MessageType.OPEN_EXPORT_MODAL, startExport: true },
+    resolvedTabId: 7,
+    sender: { documentId: 'document-7', frameId: 0 },
+    sendResponse,
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  expect(mocks.permissionsRequest).toHaveBeenCalledWith({ origins: ['<all_urls>'] });
+  expect(mocks.permissionsRequest.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.openPopup.mock.invocationCallOrder[0]!
+  );
+  expect(consumePopupExportLaunchIntent(7, 'document-7')).toEqual({ startExport: false });
+});
+
+it('does not auto-start without a main-frame source document identity', async () => {
+  mocks.tabsGet.mockResolvedValue({ active: true, id: 7, windowId: 3 });
+  mocks.openPopup.mockResolvedValue(undefined);
+  const sendResponse = vi.fn();
+
+  routeToolbarAnnotationExportMessage({
+    message: { type: MessageType.OPEN_EXPORT_MODAL, startExport: true },
+    resolvedTabId: 7,
+    sender: { frameId: 1 },
+    sendResponse,
+  });
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+
+  expect(mocks.loadPreferences).not.toHaveBeenCalled();
+  expect(consumePopupExportLaunchIntent(7)).toEqual({ startExport: false });
 });

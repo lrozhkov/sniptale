@@ -95,10 +95,15 @@ function createReorderedWindowTabs() {
   ];
 }
 
-function Harness(props: { capabilities: ActiveTabCapabilities; isActive: boolean }) {
+function Harness(props: {
+  capabilities: ActiveTabCapabilities;
+  isActive: boolean;
+  initialTabId?: number;
+}) {
   latestValue = usePopupExportTabSelection({
     activeTabCapabilities: props.capabilities,
     isActive: props.isActive,
+    ...(props.initialTabId !== undefined ? { initialTabId: props.initialTabId } : {}),
   });
   return null;
 }
@@ -107,6 +112,7 @@ async function renderHarness(
   args: {
     capabilities?: ActiveTabCapabilities;
     isActive?: boolean;
+    initialTabId?: number;
   } = {}
 ) {
   if (!container) {
@@ -120,6 +126,7 @@ async function renderHarness(
       <Harness
         capabilities={args.capabilities ?? createCapabilities()}
         isActive={args.isActive ?? true}
+        {...(args.initialTabId !== undefined ? { initialTabId: args.initialTabId } : {})}
       />
     );
   });
@@ -264,4 +271,24 @@ it('resets selection when the ordered window tab list changes', async () => {
   await flushEffects();
 
   expect(latestValue?.selectedTabIds).toEqual([7]);
+});
+
+it('replaces restored multi-tab selection with the requested design-review source', async () => {
+  mocks.browserTabsQuery.mockResolvedValue(createWindowTabs());
+  await renderHarness();
+  await flushEffects();
+  act(() => latestValue?.toggleSelectAllTabs());
+  await flushEffects();
+  expect(latestValue?.selectedTabIdsInOrder).toEqual([7, 9, 10]);
+  await unmountHarness();
+  await renderHarness({ initialTabId: 7 });
+  await flushEffects();
+  expect(latestValue?.selectedTabIdsInOrder).toEqual([7]);
+});
+
+it('does not substitute another tab for an unavailable design-review source', async () => {
+  mocks.browserTabsQuery.mockResolvedValue(createWindowTabs());
+  await renderHarness({ initialTabId: 99 });
+  await flushEffects();
+  expect(latestValue?.selectedTabIdsInOrder).toEqual([]);
 });

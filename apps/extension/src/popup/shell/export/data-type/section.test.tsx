@@ -361,7 +361,7 @@ it('clears Web copy and its full-page screenshot together in Download mode', asy
   expect(setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
 });
 
-it('clears selected options and forwards row toggles in disabled presentation', async () => {
+it('keeps bulk and row toggles disabled while export is pending', async () => {
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({
     disabled: true,
@@ -387,9 +387,10 @@ it('clears selected options and forwards row toggles in disabled presentation', 
   );
   expect(checkboxes.every((checkbox) => checkbox.disabled)).toBe(true);
 
+  expect(findButton('t:popup.export.clearAllTabsButton').disabled).toBe(true);
   await act(async () => findButton('t:popup.export.clearAllTabsButton').click());
-  expect(setIncludeJson).toHaveBeenCalledWith(false);
-  expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
+  expect(setIncludeJson).not.toHaveBeenCalled();
+  expect(props.setIncludeFullPageScreenshot).not.toHaveBeenCalled();
 
   setIncludeJson.mockClear();
   checkboxes[0]?.dispatchEvent(new Event('change', { bubbles: true }));
@@ -457,7 +458,7 @@ it('renders Web Copy inside the data grid and nests resource controls only while
     ).find((checkbox) => checkbox.parentElement?.textContent?.includes('packageWebCopyLabel'));
     webCopyCheckbox?.click();
   });
-  expect(setIncludeWebCopy).toHaveBeenCalledWith(expect.any(Function));
+  expect(setIncludeWebCopy).toHaveBeenCalledWith(false);
 });
 
 it('keeps redirect capture subordinate to external resource capture', async () => {

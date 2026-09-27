@@ -67,6 +67,7 @@ export type RuntimeContentActionRequestByType = {
   };
   [MessageType.OPEN_EXPORT_MODAL]: {
     type: typeof MessageType.OPEN_EXPORT_MODAL;
+    startExport?: boolean;
     contentIntent?: ContentPrivilegedActionCapability;
   };
   [MessageType.TRIGGER_QUICK_ACTION]: {

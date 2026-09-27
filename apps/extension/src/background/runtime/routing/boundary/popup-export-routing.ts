@@ -143,13 +143,16 @@ function sendPopupExportToContent(args: NonSavePopupExportRouteArgs): Promise<un
 }
 
 async function routePopupExportMessageWork(args: PopupExportRouteArgs): Promise<unknown> {
-  await assertPopupTabRouteTargetDocument({
+  const targetDocumentId = await assertPopupTabRouteTargetDocument({
     tabId: args.resolvedTabId,
     token: args.message.tabRouteCapabilityToken,
   });
   if (args.message.type === MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT) {
+    const launch = consumePopupExportLaunchIntent(args.resolvedTabId, targetDocumentId);
     return {
-      page: consumePopupExportLaunchIntent(args.resolvedTabId) ? ('export' as const) : null,
+      page: launch ? ('export' as const) : null,
+      ...(launch ? { startExport: launch.startExport } : {}),
+      ...(launch?.sourceDocumentId ? { sourceDocumentId: launch.sourceDocumentId } : {}),
       success: true,
     };
   }
@@ -178,11 +181,17 @@ type BuildPagePackageMessage = Extract<
 async function sendPopupExportBuildPackage(
   target: PopupExportTarget,
   tabId: number,
-  message: BuildPagePackageMessage
+  message: BuildPagePackageMessage,
+  sourceDocumentId?: string
 ): Promise<unknown> {
+  if (sourceDocumentId && target.isOwnedSnapshotViewer) {
+    throw new Error('Document-bound Page Package requests require the original content page.');
+  }
   const request = target.isOwnedSnapshotViewer
     ? sendViewerPopupExportMessage(createWebSnapshotViewerPorts(), tabId, message)
-    : sendTabMessage(tabId, message);
+    : sourceDocumentId
+      ? sendTabMessage(tabId, message, { documentId: sourceDocumentId })
+      : sendTabMessage(tabId, message);
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(
@@ -221,6 +230,7 @@ export async function requestPopupExportPagePackage(args: {
   intent: 'export' | 'save';
   ordinal: number;
   options: import('@sniptale/runtime-contracts/export').ExportOptions;
+  sourceDocumentId?: string;
   tabId: number;
 }): Promise<unknown> {
   const resourcePolicy: {
@@ -285,7 +295,12 @@ export async function requestPopupExportPagePackage(args: {
       };
   let response: unknown;
   try {
-    response = await sendPopupExportBuildPackage(target, args.tabId, message);
+    response = await sendPopupExportBuildPackage(
+      target,
+      args.tabId,
+      message,
+      args.sourceDocumentId
+    );
   } catch (error) {
     try {
       await cancelPopupExportPagePackage({

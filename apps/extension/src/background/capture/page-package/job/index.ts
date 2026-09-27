@@ -70,11 +70,24 @@ function assertPagePackageStartInvariants(args: {
   }
 }
 
+function assertDocumentBoundPagePackageSources(args: {
+  sourceDocumentId?: string;
+  sources: PagePackageCaptureSource[];
+}): void {
+  if (
+    args.sourceDocumentId !== undefined &&
+    (args.sources.length !== 1 || args.sources[0]?.kind !== 'tab')
+  ) {
+    throw new Error('Document-bound Page Package jobs require exactly one tab source.');
+  }
+}
+
 function createPopupExportJob(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
   downloadFormat?: 'html';
+  sourceDocumentId?: string;
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -97,6 +110,7 @@ function createPopupExportJob(args: {
     cancellationCleanupError: null,
     cancellationQueue: Promise.resolve(),
     contentPort: args.contentPort,
+    ...(args.sourceDocumentId ? { sourceDocumentId: args.sourceDocumentId } : {}),
     captureTiming: args.captureTiming ?? { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
     completion: null,
     finishCancellation: null,
@@ -245,6 +259,7 @@ export async function startPagePackageJobFromSources(args: {
   includeWebCopy: boolean;
   intent: 'export' | 'save';
   downloadFormat?: 'html';
+  sourceDocumentId?: string;
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -252,6 +267,7 @@ export async function startPagePackageJobFromSources(args: {
   warnings: string[];
 }): Promise<PagePackageJobStatusV1> {
   await ensureLocaleHydrated().catch(() => undefined);
+  assertDocumentBoundPagePackageSources(args);
   assertPagePackageStartInvariants(args);
   const releaseMutation = acquireStartPermit(args.sources.length);
   let materialized: Awaited<ReturnType<typeof materializePagePackageCaptureSources>> | null = null;
