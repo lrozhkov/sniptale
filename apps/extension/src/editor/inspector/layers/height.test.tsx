@@ -254,3 +254,27 @@ it('can use the full parent height for floating layer panels', () => {
   expect(getPanelFrame()?.style.height).toBe('357px');
   expectLastListViewport({ reserveScrollbarGutter: true, scrollable: false });
 });
+
+it('allocates the remaining height below floating panel controls to the scrollable layer list', () => {
+  setOverflowLayerMetrics();
+  renderPanel(
+    <div className="flex h-80 flex-col">
+      <div className="h-12 shrink-0">Panel controls</div>
+      <EditorInspectorLayersPanel
+        expanded
+        fillContainer
+        layers={['a', 'b', 'c'].map((id) => ({ id }) as never)}
+        selectedObjectCount={1}
+        draggedLayerId={null}
+        dragOverLayerId={null}
+        onOpenLayerEffects={vi.fn()}
+      />
+    </div>
+  );
+
+  const frame = getPanelFrame();
+  expect(frame?.className).toContain('flex-1');
+  expect(frame?.className).not.toContain('h-full');
+  expect(frame?.className).not.toContain('shrink-0');
+  expectLastListViewport({ reserveScrollbarGutter: true, scrollable: true });
+});

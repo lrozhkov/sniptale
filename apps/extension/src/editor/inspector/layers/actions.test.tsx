@@ -26,8 +26,16 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
 
 vi.mock('../../chrome/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../chrome/ui')>()),
-  EditorIconButton: (props: React.ButtonHTMLAttributes<HTMLButtonElement> & { title: string }) => (
-    <button type="button" title={props.title} disabled={props.disabled} onClick={props.onClick}>
+  EditorIconButton: (
+    props: React.ButtonHTMLAttributes<HTMLButtonElement> & { title: string; active?: boolean }
+  ) => (
+    <button
+      type="button"
+      title={props.title}
+      data-active={String(Boolean(props.active))}
+      disabled={props.disabled}
+      onClick={props.onClick}
+    >
       {props.title}
     </button>
   ),
@@ -119,6 +127,31 @@ afterEach(() => {
 });
 
 describe('LayerActionRail', () => {
+  it('accents only hidden and locked states', () => {
+    renderExpandedActions();
+    expect(
+      container
+        ?.querySelector('button[title="editor.toolbar.hideLayer"]')
+        ?.getAttribute('data-active')
+    ).toBe('false');
+    expect(
+      container
+        ?.querySelector('button[title="editor.toolbar.lockLayer"]')
+        ?.getAttribute('data-active')
+    ).toBe('false');
+    act(() => root?.render(<LayerActionRail layer={{ ...LAYER, locked: true, visible: false }} />));
+    expect(
+      container
+        ?.querySelector('button[title="editor.toolbar.showLayer"]')
+        ?.getAttribute('data-active')
+    ).toBe('true');
+    expect(
+      container
+        ?.querySelector('button[title="editor.toolbar.unlockLayer"]')
+        ?.getAttribute('data-active')
+    ).toBe('true');
+  });
+
   it('keeps visibility and lock controls in the stable top rail', () => {
     renderExpandedActions();
 

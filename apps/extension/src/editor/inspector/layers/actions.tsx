@@ -114,7 +114,7 @@ function LayerVisibilityButton(props: {
           : translate('editor.toolbar.showLayer')
       }
       onClick={props.onToggle}
-      active={props.layer.visible}
+      active={!props.layer.visible}
       disabled={props.disabled}
       className={LAYER_ACTION_BUTTON_CLASS_NAME}
     >

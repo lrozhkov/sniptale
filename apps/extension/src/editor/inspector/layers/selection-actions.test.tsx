@@ -109,12 +109,12 @@ describe('LayerSelectionActions layout', () => {
       'editor.layers.selection-actions.reorder-group',
       'editor.layers.selection-actions.mass-group',
     ]);
-    expect(groups[0]?.querySelectorAll('button')).toHaveLength(5);
-    expect(groups[1]?.querySelectorAll('button')).toHaveLength(3);
-    expect(groups[0]?.querySelector('button:last-child')?.getAttribute('title')).toBe(
+    expect(groups[0]?.querySelectorAll('button')).toHaveLength(4);
+    expect(groups[1]?.querySelectorAll('button')).toHaveLength(4);
+    expect(groups[1]?.querySelectorAll('button')[0]?.getAttribute('title')).toBe(
       'editor.toolbar.insertImage'
     );
-    expect(groups[1]?.querySelector('button:first-child')?.getAttribute('title')).toBe(
+    expect(groups[1]?.querySelectorAll('button')[1]?.getAttribute('title')).toBe(
       'editor.toolbar.mergeLayers'
     );
   });

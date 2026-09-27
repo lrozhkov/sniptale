@@ -95,6 +95,7 @@ function LayerSelectionActionGroup(props: {
 }) {
   return (
     <div data-ui={props.dataUi} className={props.className}>
+      {props.children}
       {props.actions.map((action) => (
         <EditorIconButton
           key={action.label}
@@ -107,7 +108,6 @@ function LayerSelectionActionGroup(props: {
           <action.icon size={14} strokeWidth={2} />
         </EditorIconButton>
       ))}
-      {props.children}
     </div>
   );
 }
@@ -127,14 +127,14 @@ export function LayerSelectionActions(props: {
           actions={reorderActions}
           className={actionGroupClassName}
           dataUi="editor.layers.selection-actions.reorder-group"
-        >
-          <LayerInsertImageControl />
-        </LayerSelectionActionGroup>
+        />
         <LayerSelectionActionGroup
           actions={massActions}
           className={massActionGroupClassName}
           dataUi="editor.layers.selection-actions.mass-group"
-        />
+        >
+          <LayerInsertImageControl />
+        </LayerSelectionActionGroup>
       </div>
     </div>
   );
