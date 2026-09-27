@@ -291,20 +291,28 @@ it('retains transparent points inside an SVG painted shape bounds', () => {
   expect(geometry.targetAt(205, 105)).toBe(background);
 });
 
-it('bounds dense SVG hit testing and marks its geometry for manual area selection', () => {
-  box(document.body, 0, 0, window.innerWidth, window.innerHeight);
-  const wrapper = box(document.createElement('div'), 200, 100, 200, 200);
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 200, 200));
-  wrapper.append(svg);
-  document.body.append(wrapper);
-  const hitTest = vi.fn(() => [wrapper, document.body]);
-  Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest });
-  const geometry = captureFrozenSelectionGeometry();
-  expect(geometry.areaOnly).toBe(true);
-  expect(geometry.targetAt(250, 150)).toBeNull();
-  expect(hitTest).not.toHaveBeenCalled();
-});
+it.each([1, 2])(
+  'limits dense SVG locally while keeping a separate tooltip targetable at DPR %i',
+  (scale) => {
+    vi.stubGlobal('devicePixelRatio', scale);
+    box(document.body, 0, 0, window.innerWidth, window.innerHeight);
+    const tooltip = box(document.createElement('div'), 10, 10, 100, 40);
+    const wrapper = box(document.createElement('div'), 200, 100, 200, 200);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(200, 100, 200, 200));
+    wrapper.append(svg);
+    document.body.append(wrapper, tooltip);
+    const hitTest = vi.fn((x: number, y: number) =>
+      x >= 10 && x < 110 && y >= 10 && y < 50 ? [tooltip, document.body] : [document.body]
+    );
+    Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest });
+    const geometry = captureFrozenSelectionGeometry();
+    expect(geometry.areaOnly).toBeUndefined();
+    expect(geometry.targetAt(250, 150)).toBeNull();
+    expect(geometry.targetAt(20, 20)).toBe(tooltip);
+    expect(hitTest.mock.calls.length).toBeLessThan(30);
+  }
+);
 
 it('bounds browser hit probes outside a large rounded boundary', () => {
   const background = box(document.body, 0, 0, window.innerWidth, window.innerHeight);
@@ -323,4 +331,36 @@ it('bounds browser hit probes outside a large rounded boundary', () => {
   expect(geometry.targetAt(350, 350)).toBe(circle);
   expect(geometry.targetAt(101, 101)).toBe(background);
   expect(hitTest.mock.calls.length).toBeLessThan(2_500);
+});
+
+it('retains completed regions and manual drawing when a dense map exhausts its cell budget', () => {
+  const { background, item } = page();
+  for (let index = 0; index < 550; index += 1) {
+    document.body.append(box(document.createElement('div'), index, index + 100, 0.5, 768));
+  }
+  const geometry = captureFrozenSelectionGeometry();
+  expect(geometry.areaOnly).toBeUndefined();
+  expect(geometry.targetAt(40, 45)).toBe(item);
+  expect(geometry.targetAt(900, 10)).toBe(background);
+  expect(geometry.targetAt(900, 760)).toBeNull();
+  expect(() => geometry.assertViewport()).not.toThrow();
+});
+
+it('limits slow uncached pixel probes without losing ordinary targets below the shape', () => {
+  const background = box(document.body, 0, 0, window.innerWidth, window.innerHeight);
+  const tooltip = box(document.createElement('div'), 10, 300, 100, 40);
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100));
+  document.body.append(svg, tooltip);
+  let time = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => time);
+  const hitTest = vi.fn((_x: number, y: number) => {
+    time += 25;
+    return y >= 300 && y < 340 ? [tooltip, background] : [background];
+  });
+  Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hitTest });
+  const geometry = captureFrozenSelectionGeometry();
+  expect(geometry.targetAt(95, 95)).toBeNull();
+  expect(geometry.targetAt(20, 320)).toBe(tooltip);
+  expect(hitTest.mock.calls.length).toBeLessThan(100);
 });

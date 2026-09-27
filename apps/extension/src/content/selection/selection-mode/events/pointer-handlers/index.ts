@@ -60,6 +60,12 @@ export function handleSelectionModeMouseDown(
 
   const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
+    if (state.frozenFrame && (state.currentState === 'idle' || state.currentState === 'hover')) {
+      stopSelectionModeEvent(event);
+      state.hoveredElement = null;
+      state.mouseDownPoint = { x: event.clientX, y: event.clientY };
+      state.hasMovedEnough = false;
+    }
     return;
   }
 

@@ -3,6 +3,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { acquireFrozenSelectionFrame } from './frozen-acquisition';
 import { captureFrozenSelectionGeometry } from './frozen';
 
+const diagnostics = vi.hoisted(() => ({ info: vi.fn(), warn: vi.fn() }));
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => diagnostics,
+}));
+
 vi.mock('./frozen', () => ({
   captureFrozenSelectionGeometry: vi.fn(() => ({
     width: 1024,
@@ -19,6 +24,8 @@ afterEach(() => {
   Reflect.deleteProperty(document, 'getAnimations');
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  diagnostics.info.mockClear();
+  diagnostics.warn.mockClear();
 });
 
 function animatedPopup() {
@@ -125,6 +132,15 @@ it.each(['remove', 'scroll', 'resize', 'style'] as const)(
     if (change === 'style') menu.style.opacity = '0';
     resolve('data:image/png;base64,frame');
     await rejected;
+    expect(diagnostics.warn).toHaveBeenCalledWith('Frozen selection fallback', {
+      diagnosticsVersion: 1,
+      reason:
+        change === 'remove'
+          ? 'host-child-list'
+          : change === 'style'
+            ? 'host-attributes'
+            : 'scroll-or-resize',
+    });
   }
 );
 
@@ -134,6 +150,10 @@ it('rejects layout movement without a mutation record while the capture is pendi
   const rejected = expect(frame).rejects.toThrow('Page changed while acquiring selection frame');
   resolve('data:image/png;base64,frame');
   await rejected;
+  expect(diagnostics.warn).toHaveBeenCalledWith('Frozen selection fallback', {
+    diagnosticsVersion: 1,
+    reason: 'visible-layout-or-style',
+  });
 });
 
 it('allows the source page to change after a stable acquisition', async () => {
@@ -143,6 +163,13 @@ it('allows the source page to change after a stable acquisition', async () => {
   menu.remove();
   window.dispatchEvent(new Event('scroll'));
   expect(result.dataUrl).toBe('data:image/png;base64,frame');
+  expect(diagnostics.info).toHaveBeenCalledWith('Frozen selection acquisition', {
+    diagnosticsVersion: 1,
+    pixelRatio: window.devicePixelRatio || 1,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  });
+  expect(diagnostics.warn).not.toHaveBeenCalled();
   result.geometry.assertViewport();
 });
 
@@ -225,6 +252,10 @@ it('retains one raster and disables element targeting when SVG sampling exceeds 
   expect(capture).toHaveBeenCalledOnce();
   expect(frame).toMatchObject({ areaOnly: true, dataUrl: 'data:image/png;base64,large-svg' });
   expect(frame.geometry.targetAt(20, 30)).toBeNull();
+  expect(diagnostics.warn).toHaveBeenCalledWith('Frozen selection fallback', {
+    diagnosticsVersion: 1,
+    reason: 'geometry-budget',
+  });
 });
 
 it('rejects new text that makes an empty element visible', async () => {

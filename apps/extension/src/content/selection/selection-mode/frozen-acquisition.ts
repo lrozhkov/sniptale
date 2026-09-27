@@ -2,6 +2,22 @@ import { isContentOwnedElement } from '../../platform/dom-host';
 import { getAbsolutePosition, getIframeDocument } from '../../platform/frame';
 import { captureFrozenSelectionGeometry } from './frozen';
 import type { FrozenSelectionFrame, FrozenSelectionGeometry } from './types';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'ContentSelectionMode:Acquisition' });
+type ChangeReason =
+  | 'host-attributes'
+  | 'host-child-list'
+  | 'host-text'
+  | 'scroll-or-resize'
+  | 'visible-layout-or-style'
+  | 'newly-visible-element'
+  | 'generated-content';
+
+function rejectChangedFrame(reason: ChangeReason): never {
+  logger.warn('Frozen selection fallback', { diagnosticsVersion: 1, reason });
+  throw new SelectionFrameChangedError();
+}
 
 export class SelectionFrameChangedError extends Error {
   constructor() {
@@ -71,10 +87,14 @@ function isMetadataAttributeChange(record: MutationRecord): boolean {
   );
 }
 
-function hasUncertainPageMutation(records: MutationRecord[]): boolean {
-  return records.some(
+function pageMutationReason(records: MutationRecord[]): ChangeReason | undefined {
+  const record = records.find(
     (record) => !isContentOwnedElement(record.target) && !isMetadataAttributeChange(record)
   );
+  if (record?.type === 'attributes') return 'host-attributes';
+  if (record?.type === 'childList') return 'host-child-list';
+  if (record?.type === 'characterData') return 'host-text';
+  return undefined;
 }
 
 function isIframe(element: Element): element is HTMLIFrameElement {
@@ -88,18 +108,18 @@ function observePageDuringAcquisition() {
   const roots = new Set<Document | ShadowRoot>();
   const windows = new Set<Window>();
   const pausedAnimations = new Set<Animation>();
-  let changed = false;
+  let changeReason: ChangeReason | undefined;
   let metadataChanged = false;
   const canReadGeneratedContent = globalThis.CSS?.supports?.('selector(::before)') === true;
   const markChanged = () => {
-    changed = true;
+    changeReason ??= 'scroll-or-resize';
   };
   const noteMetadata = (records: MutationRecord[]) => {
     if (records.some(isMetadataAttributeChange)) metadataChanged = true;
   };
   const observer = new MutationObserver((records) => {
     noteMetadata(records);
-    if (hasUncertainPageMutation(records)) markChanged();
+    changeReason ??= pageMutationReason(records);
   });
   const pauseAnimations = (root: Document | ShadowRoot) => {
     if (!('getAnimations' in root)) return;
@@ -178,22 +198,28 @@ function observePageDuringAcquisition() {
     assertStable: () => {
       const records = observer.takeRecords();
       noteMetadata(records);
+      changeReason ??= pageMutationReason(records);
+      if (changeReason) rejectChangedFrame(changeReason);
       if (
-        changed ||
-        hasUncertainPageMutation(records) ||
         [...signatures].some(
           ([element, signature]) => !element.isConnected || geometrySignature(element) !== signature
-        ) ||
-        (metadataChanged &&
-          [...initiallyNotVisible].some(
-            (element) => element.isConnected && isVisibleInViewport(element)
-          )) ||
-        (metadataChanged &&
-          [...generatedContent].some(
-            ([element, signature]) => generatedContentSignature(element) !== signature
-          ))
+        )
+      )
+        rejectChangedFrame('visible-layout-or-style');
+      if (
+        metadataChanged &&
+        [...initiallyNotVisible].some(
+          (element) => element.isConnected && isVisibleInViewport(element)
+        )
+      )
+        rejectChangedFrame('newly-visible-element');
+      if (
+        metadataChanged &&
+        [...generatedContent].some(
+          ([element, signature]) => generatedContentSignature(element) !== signature
+        )
       ) {
-        throw new SelectionFrameChangedError();
+        rejectChangedFrame('generated-content');
       }
     },
   };
@@ -215,6 +241,12 @@ export async function acquireFrozenSelectionFrame(
   capture: () => Promise<string>,
   options: { onChanged?: 'area-only' } = {}
 ): Promise<FrozenSelectionFrame> {
+  logger.info('Frozen selection acquisition', {
+    diagnosticsVersion: 1,
+    pixelRatio: window.devicePixelRatio || 1,
+    viewportWidth: Math.min(32_768, Math.max(0, Math.round(window.innerWidth))),
+    viewportHeight: Math.min(32_768, Math.max(0, Math.round(window.innerHeight))),
+  });
   const observation = observePageDuringAcquisition();
   try {
     const geometry = captureFrozenSelectionGeometry();
@@ -230,6 +262,10 @@ export async function acquireFrozenSelectionFrame(
     }
     geometry.assertViewport();
     if (geometry.areaOnly) {
+      logger.warn('Frozen selection fallback', {
+        diagnosticsVersion: 1,
+        reason: 'geometry-budget',
+      });
       return { areaOnly: true, dataUrl, geometry: areaOnlyGeometry(geometry) };
     }
     return { dataUrl, geometry };

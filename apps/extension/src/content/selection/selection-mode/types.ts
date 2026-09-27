@@ -26,7 +26,7 @@ export interface FrozenSelectionGeometry {
   width: number;
   height: number;
   scale: number;
-  /** Dense painted regions exceeded the safe browser hit-test budget. */
+  /** No safe hit regions could be retained within the geometry budget. */
   areaOnly?: boolean;
   getRect: (element: HTMLElement) => Selection;
   targetAt: (x: number, y: number) => HTMLElement | null;

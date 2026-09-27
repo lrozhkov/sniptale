@@ -46,6 +46,14 @@ test('timed selection freezes a busy large page and leaves annotation frames res
     menu.id = 'frozen-menu';
     menu.textContent = 'Frozen menu';
     document.body.append(menu);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.style.cssText = 'position:fixed;left:1000px;top:100px;width:250px;height:250px';
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('r', '100');
+    circle.setAttribute('cx', '125');
+    circle.setAttribute('cy', '125');
+    svg.append(circle);
+    document.body.append(svg);
     const fragment = document.createDocumentFragment();
     for (let index = 0; index < 6_000; index += 1) {
       const item = document.createElement('span');
@@ -141,6 +149,18 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   await page.locator('.sniptale-selection-size-confirm-button').click();
   await expect(page.locator('.sniptale-selection-frozen-frame')).toHaveCount(0);
   await expect(page.locator('.sniptale-selection-container')).toHaveCount(0);
+
+  expect(await enableMode()).toMatchObject({ success: true });
+  await capture();
+  await page.mouse.move(1125, 225);
+  await expect(page.locator('.sniptale-selection-hover-size')).toBeHidden();
+  await page.mouse.click(1125, 225);
+  await expect(page.locator('.sniptale-selection-size-confirm-button')).toHaveCount(0);
+  await page.mouse.down();
+  await page.mouse.move(1225, 325, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.locator('.sniptale-selection-size-confirm-button')).toBeVisible();
+  await page.keyboard.press('Escape');
 
   await page.evaluate(() => {
     const offscreen = document.createElement('div');

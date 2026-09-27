@@ -4,6 +4,7 @@ import { translate } from '../../../platform/i18n';
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { getAbsolutePosition, getIframeDocument } from '../../platform/frame';
 import type { FrozenSelectionFrame, FrozenSelectionGeometry, Selection } from './types';
+import { createLogger } from '@sniptale/platform/observability/logger';
 
 type HitRegion = Selection & { element: HTMLElement };
 type HitBox = { rect: Selection; id: number };
@@ -14,6 +15,9 @@ type ShapeGroup = {
   id: number;
 };
 const MAX_SVG_SAMPLE_PIXELS = 20_000;
+const MAX_HIT_CELLS = 250_000;
+const MAX_UNCACHED_PROBE_MS = 100;
+const logger = createLogger({ namespace: 'ContentSelectionMode:Geometry' });
 
 function contains(rect: Selection, x: number, y: number): boolean {
   return x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height;
@@ -123,26 +127,47 @@ export function captureFrozenSelectionGeometry(): FrozenSelectionGeometry {
     if (shape.boxes.length > 0) shapeGroups.push({ rect, id, containsPoint: shape.containsPoint });
     return shape.boxes.map((box) => ({ rect: box }));
   });
-  const areaOnly =
-    svgBounds.reduce(
-      (total, rect) =>
-        total +
-        Math.ceil(Math.min(width, rect.width) * scale) *
-          Math.ceil(Math.min(height, rect.height) * scale),
-      0
-    ) > MAX_SVG_SAMPLE_PIXELS;
-  const regions = areaOnly
-    ? []
-    : captureHitRegions(
-        rects,
-        fragments,
-        shapedBoxes,
-        shapeGroups,
-        svgBounds,
-        width,
-        height,
-        scale
-      );
+  const sampledSvgBounds: Selection[] = [];
+  const manualRegions: Selection[] = [];
+  let svgPixels = 0;
+  for (const rect of svgBounds) {
+    if (
+      [...sampledSvgBounds, ...manualRegions].some(
+        (outer) =>
+          outer.x <= rect.x &&
+          outer.y <= rect.y &&
+          outer.x + outer.width >= rect.x + rect.width &&
+          outer.y + outer.height >= rect.y + rect.height
+      )
+    )
+      continue;
+    const pixels =
+      Math.ceil((Math.min(width, rect.x + rect.width) - Math.max(0, rect.x)) * scale) *
+      Math.ceil((Math.min(height, rect.y + rect.height) - Math.max(0, rect.y)) * scale);
+    if (svgPixels + pixels > MAX_SVG_SAMPLE_PIXELS) manualRegions.push(rect);
+    else {
+      sampledSvgBounds.push(rect);
+      svgPixels += pixels;
+    }
+  }
+  if (manualRegions.length > 0) {
+    logger.warn('Frozen selection geometry limited', {
+      diagnosticsVersion: 1,
+      reason: 'svg-region-budget',
+    });
+  }
+  const regions = captureHitRegions(
+    rects,
+    fragments,
+    shapedBoxes,
+    shapeGroups,
+    sampledSvgBounds,
+    manualRegions,
+    width,
+    height,
+    scale
+  );
+  const areaOnly = regions.length === 0;
   return {
     width,
     height,
@@ -177,6 +202,7 @@ function captureHitRegions(
   shapedBoxes: ShapedHitBox[],
   shapeGroups: ShapeGroup[],
   svgBounds: Selection[],
+  manualRegions: Selection[],
   width: number,
   height: number,
   scale: number
@@ -190,6 +216,7 @@ function captureHitRegions(
   const ys = edges(
     [
       ...boxes.flatMap(({ rect }) => [rect.y, rect.y + rect.height]),
+      ...manualRegions.flatMap((rect) => [rect.y, rect.y + rect.height]),
       ...shapedBoxes.flatMap(({ rect }) => pixelEdges(rect.y, rect.height, height, scale)),
       ...svgBounds.flatMap((rect) => [
         rect.y,
@@ -201,11 +228,17 @@ function captureHitRegions(
   );
   const regions: HitRegion[] = [];
   let probes = 0;
+  let uncachedProbeMs = 0;
+  let reportedSlowProbes = false;
   for (let row = 1; row < ys.length; row += 1) {
     const top = ys[row - 1]!;
     const bottom = ys[row]!;
     const y = (top + bottom) / 2;
     const rowBoxes = boxes.filter(({ rect }) => y >= rect.y && y < rect.y + rect.height);
+    const boxCoverageKey = createBoxCoverageKey(rowBoxes, width);
+    const rowManualRegions = manualRegions.filter(
+      (rect) => y >= rect.y && y < rect.y + rect.height
+    );
     const rowShapes = shapedBoxes.filter(({ rect }) => y >= rect.y && y < rect.y + rect.height);
     const rowShapeGroups = shapeGroups.filter(
       ({ rect }) => y >= rect.y && y < rect.y + rect.height
@@ -214,6 +247,7 @@ function captureHitRegions(
     const xs = edges(
       [
         ...rowBoxes.flatMap(({ rect }) => [rect.x, rect.x + rect.width]),
+        ...rowManualRegions.flatMap((rect) => [rect.x, rect.x + rect.width]),
         ...rowShapes.flatMap(({ rect }) => pixelEdges(rect.x, rect.width, width, scale)),
         ...rowSvgBounds.flatMap((rect) => [
           rect.x,
@@ -224,17 +258,36 @@ function captureHitRegions(
       width
     );
     for (let column = 1; column < xs.length; column += 1) {
-      // Bound synchronous page work; never silently fall back to live, mismatched geometry.
-      if (++probes > 16_777_216) throw new Error('Selection geometry exceeds viewport budget');
       const left = xs[column - 1]!;
       const right = xs[column]!;
       const x = (left + right) / 2;
-      const hitKey = buildHitCacheKey(x, y, rowBoxes, rowShapeGroups, rowSvgBounds);
+      if (rowManualRegions.some((rect) => contains(rect, x, y))) continue;
+      // Unvisited cells stay manual-only; a geometry budget must not discard the raster.
+      if (++probes > MAX_HIT_CELLS) {
+        logger.warn('Frozen selection geometry limited', {
+          diagnosticsVersion: 1,
+          reason: 'cell-budget',
+        });
+        return regions;
+      }
+      const hitKey = buildHitCacheKey(x, y, boxCoverageKey(x), rowShapeGroups, rowSvgBounds);
+      if (hitKey === null && uncachedProbeMs >= MAX_UNCACHED_PROBE_MS) {
+        if (!reportedSlowProbes) {
+          logger.warn('Frozen selection geometry limited', {
+            diagnosticsVersion: 1,
+            reason: 'pixel-probe-time-budget',
+          });
+          reportedSlowProbes = true;
+        }
+        continue;
+      }
       let element: HTMLElement | null;
       if (hitKey !== null && hitCache.has(hitKey)) {
         element = hitCache.get(hitKey) ?? null;
       } else {
+        const started = hitKey === null ? performance.now() : 0;
         element = targetAt(document, x, y);
+        if (hitKey === null) uncachedProbeMs += performance.now() - started;
         if (hitKey !== null) hitCache.set(hitKey, element);
       }
       if (!element || !rects.has(element)) continue;
@@ -253,18 +306,38 @@ function captureHitRegions(
   return regions;
 }
 
+function createBoxCoverageKey(boxes: HitBox[], width: number): (x: number) => string {
+  const events = boxes
+    .flatMap(({ rect, id }) => [
+      { x: Math.max(0, rect.x), id, entering: true },
+      { x: Math.min(width, rect.x + rect.width), id, entering: false },
+    ])
+    .sort((a, b) => a.x - b.x);
+  const active = new Set<number>();
+  let index = 0;
+  let key = '';
+  return (x) => {
+    let changed = false;
+    while (index < events.length && events[index]!.x <= x) {
+      const event = events[index++]!;
+      if (event.entering) active.add(event.id);
+      else active.delete(event.id);
+      changed = true;
+    }
+    if (changed) key = [...active].sort((a, b) => a - b).join(',');
+    return key;
+  };
+}
+
 /** Reuse browser hit order only when the same boxes and shape-side regions cover a cell. */
 function buildHitCacheKey(
   x: number,
   y: number,
-  rowBoxes: HitBox[],
+  boxKey: string,
   shapeGroups: ShapeGroup[],
   svgBounds: Selection[]
 ): string | null {
   if (svgBounds.some((rect) => contains(rect, x, y))) return null;
-  const boxIds = rowBoxes
-    .filter(({ rect }) => x >= rect.x && x < rect.x + rect.width)
-    .map(({ id }) => id);
   const shapeSides: string[] = [];
   for (const shape of shapeGroups) {
     if (!contains(shape.rect, x, y)) continue;
@@ -273,7 +346,7 @@ function buildHitCacheKey(
     if (side === null) return null;
     shapeSides.push(`${shape.id}:${side ? 1 : 0}`);
   }
-  return `${boxIds.join(',')}|${shapeSides.join(',')}`;
+  return `${boxKey}|${shapeSides.join(',')}`;
 }
 
 /** Mounts the retained raster below selection chrome; the parent owns its removal. */
