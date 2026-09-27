@@ -17,6 +17,7 @@ import {
 export interface DesignReviewModeState {
   enabled: boolean;
   measurementsEnabled: boolean;
+  measurementsExpanded: boolean;
   selection: DesignReviewSelection | null;
 }
 
@@ -24,7 +25,12 @@ type DesignReviewModeListener = () => void;
 type DesignReviewInspectorDismissRequestHandler = () => boolean;
 
 let pickerRuntime: DesignReviewPickerRuntime | null = null;
-let state: DesignReviewModeState = { enabled: false, measurementsEnabled: false, selection: null };
+let state: DesignReviewModeState = {
+  enabled: false,
+  measurementsEnabled: false,
+  measurementsExpanded: false,
+  selection: null,
+};
 const listeners = new Set<DesignReviewModeListener>();
 let inspectorDismissRequestHandler: DesignReviewInspectorDismissRequestHandler | null = null;
 
@@ -67,7 +73,12 @@ function disableDesignReviewModeInternal(dispatchDisabled: boolean): void {
   }
   pickerRuntime?.dispose();
   pickerRuntime = null;
-  state = { enabled: false, measurementsEnabled: false, selection: null };
+  state = {
+    enabled: false,
+    measurementsEnabled: false,
+    measurementsExpanded: false,
+    selection: null,
+  };
   setContentModeEnabled('design-review', false);
   publish();
   if (dispatchDisabled) {
@@ -85,7 +96,12 @@ export function enableDesignReviewMode(): void {
     onInspectorDismissRequested: requestInspectorDismiss,
     onSelection: setSelection,
   });
-  state = { enabled: true, measurementsEnabled: false, selection: null };
+  state = {
+    enabled: true,
+    measurementsEnabled: false,
+    measurementsExpanded: false,
+    selection: null,
+  };
   setContentModeEnabled('design-review', true);
   publish();
   dispatchContentModeEnabled({ mode: 'design-review' });
@@ -114,7 +130,21 @@ export function toggleDesignReviewMeasurements(): void {
   if (!state.enabled || !pickerRuntime) return;
   const measurementsEnabled = !state.measurementsEnabled;
   pickerRuntime.setMeasurementsEnabled(measurementsEnabled);
-  state = { ...state, measurementsEnabled };
+  if (!measurementsEnabled) pickerRuntime.setMeasurementsExpanded(false);
+  state = {
+    ...state,
+    measurementsEnabled,
+    measurementsExpanded: measurementsEnabled && state.measurementsExpanded,
+  };
+  publish();
+}
+
+/** Shows container and viewport space and full-viewport guides beside sibling rulers. */
+export function toggleDesignReviewMeasurementDetails(): void {
+  if (!state.enabled || !state.measurementsEnabled || !pickerRuntime) return;
+  const measurementsExpanded = !state.measurementsExpanded;
+  pickerRuntime.setMeasurementsExpanded(measurementsExpanded);
+  state = { ...state, measurementsExpanded };
   publish();
 }
 

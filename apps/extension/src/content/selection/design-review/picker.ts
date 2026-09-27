@@ -35,6 +35,7 @@ export interface DesignReviewSelection {
 
 export interface DesignReviewPickerRuntime {
   setMeasurementsEnabled: (enabled: boolean) => void;
+  setMeasurementsExpanded: (expanded: boolean) => void;
   dismissSelection: () => void;
   dispose: () => void;
   selectElement: (element: Element) => boolean;
@@ -243,13 +244,16 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     'mouseleave',
     () => {
       handlePickerMouseLeave(state);
-      measurements.hover(null);
+      measurements.hover(state.selectedElement);
     },
     { capture: true }
   );
   const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'click',
-    (event, iframe) => handlePickerClick(state, args, event, iframe),
+    (event, iframe) => {
+      handlePickerClick(state, args, event, iframe);
+      measurements.hover(state.selectedElement);
+    },
     { capture: true }
   );
   const cleanupPointerDown = addEventListenerToAllWindowsDynamic<PointerEvent>(
@@ -296,8 +300,12 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   );
 
   return {
-    dismissSelection: () => dismissPickerSelection(state),
+    dismissSelection: () => {
+      dismissPickerSelection(state);
+      measurements.hover(null);
+    },
     setMeasurementsEnabled: measurements.setEnabled,
+    setMeasurementsExpanded: measurements.setExpanded,
     dispose: () => {
       measurements.dispose();
       cleanupMove();
@@ -311,6 +319,10 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       cleanupCursor();
       removeDesignReviewFrame();
     },
-    selectElement: (element) => selectPickerElement(state, args, element),
+    selectElement: (element) => {
+      const selected = selectPickerElement(state, args, element);
+      if (selected) measurements.hover(element);
+      return selected;
+    },
   };
 }

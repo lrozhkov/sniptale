@@ -98,11 +98,23 @@ it('toggles rulers through the mode owner and reflects reset on exit', () => {
   const toggle = container.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.design-review-measurements-button"]'
   )!;
+  const details = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.design-review-measurement-details-button"]'
+  )!;
   expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  expect(details.disabled).toBe(true);
   act(() => toggle.click());
   expect(toggle.getAttribute('aria-pressed')).toBe('true');
   expect(toggle.title).toBe('content.designReview.hideDistances');
   expect(getDesignReviewModeState().measurementsEnabled).toBe(true);
+  expect(details.disabled).toBe(false);
+  act(() => details.click());
+  expect(details.getAttribute('aria-pressed')).toBe('true');
+  expect(getDesignReviewModeState().measurementsExpanded).toBe(true);
+  act(() => toggle.click());
+  expect(details.disabled).toBe(true);
+  expect(details.getAttribute('aria-pressed')).toBe('false');
+  act(() => toggle.click());
   act(() => disableDesignReviewMode());
   expect(toggle.disabled).toBe(true);
   expect(toggle.getAttribute('aria-pressed')).toBe('false');

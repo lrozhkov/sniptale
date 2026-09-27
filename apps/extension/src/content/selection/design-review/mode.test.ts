@@ -46,6 +46,7 @@ import {
   registerDesignReviewInspectorDismissRequestHandler,
   subscribeToDesignReviewMode,
   toggleDesignReviewMeasurements,
+  toggleDesignReviewMeasurementDetails,
 } from './mode';
 import type { PageStyleSelectionSnapshot } from './snapshot';
 
@@ -169,11 +170,13 @@ it('releases the active picker selection and publishes the cleared inspector sta
 
 it('toggles measurements without changing selection and resets them between mode sessions', () => {
   const setMeasurementsEnabled = vi.fn();
+  const setMeasurementsExpanded = vi.fn();
   mocks.startDesignReviewPicker.mockReturnValue({
     dismissSelection: mocks.dismissSelection,
     dispose: mocks.disposePicker,
     selectElement: mocks.selectElement,
     setMeasurementsEnabled,
+    setMeasurementsExpanded,
   });
   toggleDesignReviewMeasurements();
   expect(setMeasurementsEnabled).not.toHaveBeenCalled();
@@ -182,8 +185,13 @@ it('toggles measurements without changing selection and resets them between mode
   toggleDesignReviewMeasurements();
   expect(getDesignReviewModeState()).toMatchObject({ measurementsEnabled: true, selection });
   expect(setMeasurementsEnabled).toHaveBeenLastCalledWith(true);
+  toggleDesignReviewMeasurementDetails();
+  expect(getDesignReviewModeState().measurementsExpanded).toBe(true);
+  expect(setMeasurementsExpanded).toHaveBeenLastCalledWith(true);
   toggleDesignReviewMeasurements();
   expect(setMeasurementsEnabled).toHaveBeenLastCalledWith(false);
+  expect(getDesignReviewModeState().measurementsExpanded).toBe(false);
+  expect(setMeasurementsExpanded).toHaveBeenLastCalledWith(false);
   toggleDesignReviewMeasurements();
   disableDesignReviewMode();
   expect(getDesignReviewModeState().measurementsEnabled).toBe(false);

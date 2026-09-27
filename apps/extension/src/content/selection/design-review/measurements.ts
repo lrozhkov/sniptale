@@ -1,6 +1,7 @@
 import { appendToContentOverlayRoot } from '../../platform/dom-host';
 import { getAbsolutePosition } from '../../platform/frame';
 import { isSelectablePageElement } from '../page-element-target';
+import { translate } from '../../../platform/i18n';
 
 type Direction = 'left' | 'right' | 'top' | 'bottom';
 interface Measurement {
@@ -11,6 +12,12 @@ interface Measurement {
   x2: number;
   y2: number;
 }
+
+interface LayoutMeasurement extends Measurement {
+  scope: 'container' | 'viewport';
+}
+
+type Rect = ReturnType<typeof getAbsolutePosition>;
 
 function measurementParent(element: Element): Element | null {
   if (element.parentElement) return element.parentElement;
@@ -138,27 +145,120 @@ export function measureDesignReviewNeighbors(element: Element): Measurement[] {
   return [...nearest.values()];
 }
 
-function renderMeasurement(measurement: Measurement): HTMLElement {
+function containingMeasurementParent(element: Element, source: Rect): Rect | null {
+  let parent = measurementParent(element);
+  while (parent) {
+    if (parent.localName !== 'body' && parent.localName !== 'html') {
+      const bounds = getAbsolutePosition(parent);
+      if (
+        bounds.width > 0 &&
+        bounds.height > 0 &&
+        bounds.x <= source.x &&
+        bounds.y <= source.y &&
+        bounds.x + bounds.width >= source.x + source.width &&
+        bounds.y + bounds.height >= source.y + source.height
+      ) {
+        return bounds;
+      }
+    }
+    parent = measurementParent(parent);
+  }
+  return null;
+}
+
+function viewportRect(): Rect {
+  const viewport = window.visualViewport;
+  return {
+    x: viewport?.offsetLeft ?? 0,
+    y: viewport?.offsetTop ?? 0,
+    width: viewport?.width ?? window.innerWidth,
+    height: viewport?.height ?? window.innerHeight,
+  };
+}
+
+function measureWithinBounds(source: Rect, bounds: Rect, scope: LayoutMeasurement['scope']) {
+  const centerX = source.x + source.width / 2;
+  const centerY = source.y + source.height / 2;
+  const edges: Measurement[] = [
+    {
+      direction: 'left',
+      distance: source.x - bounds.x,
+      x1: bounds.x,
+      y1: centerY,
+      x2: source.x,
+      y2: centerY,
+    },
+    {
+      direction: 'right',
+      distance: bounds.x + bounds.width - source.x - source.width,
+      x1: source.x + source.width,
+      y1: centerY,
+      x2: bounds.x + bounds.width,
+      y2: centerY,
+    },
+    {
+      direction: 'top',
+      distance: source.y - bounds.y,
+      x1: centerX,
+      y1: bounds.y,
+      x2: centerX,
+      y2: source.y,
+    },
+    {
+      direction: 'bottom',
+      distance: bounds.y + bounds.height - source.y - source.height,
+      x1: centerX,
+      y1: source.y + source.height,
+      x2: centerX,
+      y2: bounds.y + bounds.height,
+    },
+  ];
+  return edges.filter((edge) => edge.distance >= 0).map((edge) => ({ ...edge, scope }));
+}
+
+/** Free space around an element in its nearest containing box and the visible viewport. */
+export function measureDesignReviewLayout(element: Element): LayoutMeasurement[] {
+  const source = visibleRect(element);
+  if (!source) return [];
+  const container = containingMeasurementParent(element, source);
+  return [
+    ...(container ? measureWithinBounds(source, container, 'container') : []),
+    ...measureWithinBounds(source, viewportRect(), 'viewport'),
+  ];
+}
+
+function renderMeasurement(measurement: Measurement | LayoutMeasurement): HTMLElement {
   const horizontal = measurement.direction === 'left' || measurement.direction === 'right';
   const line = document.createElement('div');
   line.dataset['direction'] = measurement.direction;
+  const scope = 'scope' in measurement ? measurement.scope : 'neighbor';
+  line.dataset['scope'] = scope;
+  const stroke = scope === 'neighbor' ? 'solid' : scope === 'container' ? 'dashed' : 'dotted';
   Object.assign(line.style, {
     position: 'fixed',
     left: `${measurement.x1}px`,
     top: `${measurement.y1}px`,
     width: `${measurement.x2 - measurement.x1}px`,
     height: `${measurement.y2 - measurement.y1}px`,
-    [horizontal ? 'borderTop' : 'borderLeft']: '1px solid var(--sniptale-color-accent)',
+    [horizontal ? 'borderTop' : 'borderLeft']: `${stroke} 1px var(--sniptale-color-accent)`,
   });
-  for (const end of [0, 100]) {
-    const cap = document.createElement('span');
-    cap.style.cssText = horizontal
-      ? `position:absolute;left:${end}%;top:-3px;height:5px;border-left:1px solid var(--sniptale-color-accent)`
-      : `position:absolute;top:${end}%;left:-3px;width:5px;border-top:1px solid var(--sniptale-color-accent)`;
-    line.append(cap);
+  if (scope === 'neighbor') {
+    for (const end of [0, 100]) {
+      const cap = document.createElement('span');
+      cap.style.cssText = horizontal
+        ? `position:absolute;left:${end}%;top:-3px;height:5px;border-left:1px solid var(--sniptale-color-accent)`
+        : `position:absolute;top:${end}%;left:-3px;width:5px;border-top:1px solid var(--sniptale-color-accent)`;
+      line.append(cap);
+    }
   }
   const label = document.createElement('span');
-  label.textContent = `${Math.round(measurement.distance * 10) / 10} px`;
+  const prefix =
+    scope === 'container'
+      ? `${translate('content.designReview.parentDistanceLabel')}: `
+      : scope === 'viewport'
+        ? `${translate('content.designReview.viewportDistanceLabel')}: `
+        : '';
+  label.textContent = `${prefix}${Math.round(measurement.distance * 10) / 10} px`;
   Object.assign(label.style, {
     position: 'fixed',
     padding: '2px 4px',
@@ -172,19 +272,70 @@ function renderMeasurement(measurement: Measurement): HTMLElement {
   const viewport = window.visualViewport;
   const left = viewport?.offsetLeft ?? 0;
   const top = viewport?.offsetTop ?? 0;
-  const maxLeft = left + (viewport?.width ?? window.innerWidth) - 70;
+  const maxLeft = left + (viewport?.width ?? window.innerWidth) - (scope === 'neighbor' ? 70 : 130);
   const maxTop = top + (viewport?.height ?? window.innerHeight) - 24;
-  const midpointX = (measurement.x1 + measurement.x2) / 2 + 4;
-  const midpointY = (measurement.y1 + measurement.y2) / 2 + 4;
+  const labelOffset = scope === 'neighbor' ? 4 : scope === 'container' ? 18 : 32;
+  const midpointX = (measurement.x1 + measurement.x2) / 2 + (horizontal ? 4 : labelOffset);
+  const midpointY = (measurement.y1 + measurement.y2) / 2 + (horizontal ? labelOffset : 4);
   label.style.left = `${Math.max(left + 4, Math.min(midpointX, maxLeft))}px`;
   label.style.top = `${Math.max(top + 4, Math.min(midpointY, maxTop))}px`;
   line.append(label);
   return line;
 }
 
+function renderLayoutGuides(element: Element): HTMLElement[] {
+  const source = visibleRect(element);
+  if (!source) return [];
+  const viewport = viewportRect();
+  const guides = [source.x, source.x + source.width].map((x) => {
+    const line = document.createElement('div');
+    line.dataset['scope'] = 'guide-vertical';
+    Object.assign(line.style, {
+      position: 'fixed',
+      left: `${x}px`,
+      top: `${viewport.y}px`,
+      height: `${viewport.height}px`,
+      borderLeft: '1px dotted var(--sniptale-color-accent)',
+      opacity: '0.4',
+    });
+    return line;
+  });
+  for (const y of [source.y, source.y + source.height]) {
+    const line = document.createElement('div');
+    line.dataset['scope'] = 'guide-horizontal';
+    Object.assign(line.style, {
+      position: 'fixed',
+      left: `${viewport.x}px`,
+      top: `${y}px`,
+      width: `${viewport.width}px`,
+      borderTop: '1px dotted var(--sniptale-color-accent)',
+      opacity: '0.4',
+    });
+    guides.push(line);
+  }
+  const container = containingMeasurementParent(element, source);
+  if (container) {
+    const outline = document.createElement('div');
+    outline.dataset['scope'] = 'container-outline';
+    Object.assign(outline.style, {
+      position: 'fixed',
+      left: `${container.x}px`,
+      top: `${container.y}px`,
+      width: `${container.width}px`,
+      height: `${container.height}px`,
+      border: '1px dashed var(--sniptale-color-accent)',
+      boxSizing: 'border-box',
+      opacity: '0.65',
+    });
+    guides.push(outline);
+  }
+  return guides;
+}
+
 /** Disposable projection; the picker owns activation, hover and teardown. */
 export function createDesignReviewMeasurements() {
   let enabled = false;
+  let expanded = false;
   let hovered: Element | null = null;
   let layer: HTMLElement | null = null;
   let frame = 0;
@@ -201,13 +352,21 @@ export function createDesignReviewMeasurements() {
       clear();
       return;
     }
-    const measurements = measureDesignReviewNeighbors(hovered);
+    const measurements = [
+      ...measureDesignReviewNeighbors(hovered),
+      ...(expanded ? measureDesignReviewLayout(hovered) : []),
+    ];
+    const source = expanded ? visibleRect(hovered) : null;
     const next = JSON.stringify([
       measurements,
+      source,
+      source ? containingMeasurementParent(hovered, source) : null,
       window.innerWidth,
       window.innerHeight,
       window.visualViewport?.offsetLeft,
       window.visualViewport?.offsetTop,
+      expanded ? translate('content.designReview.parentDistanceLabel') : null,
+      expanded ? translate('content.designReview.viewportDistanceLabel') : null,
     ]);
     if (!layer) {
       layer = document.createElement('div');
@@ -219,7 +378,8 @@ export function createDesignReviewMeasurements() {
       appendToContentOverlayRoot(layer);
     }
     if (signature !== next) {
-      layer.replaceChildren(...measurements.map(renderMeasurement));
+      const guides = expanded ? renderLayoutGuides(hovered) : [];
+      layer.replaceChildren(...guides, ...measurements.map(renderMeasurement));
       signature = next;
     }
   }
@@ -232,6 +392,11 @@ export function createDesignReviewMeasurements() {
       enabled = value;
       clear();
       if (enabled && hovered) track();
+    },
+    setExpanded(value: boolean) {
+      expanded = value;
+      signature = '';
+      refresh();
     },
     hover(element: Element | null) {
       hovered = element;

@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createDesignReviewMeasurements, measureDesignReviewNeighbors } from './measurements';
+import {
+  createDesignReviewMeasurements,
+  measureDesignReviewLayout,
+  measureDesignReviewNeighbors,
+} from './measurements';
 
 function box(x: number, y: number, width = 50, height = 50, parent: Element = document.body) {
   const element = document.createElement('div');
@@ -71,6 +75,23 @@ it('keeps DOM-order ties deterministic and emits no rulers without neighbors', (
   expect(measureDesignReviewNeighbors(target.element)).toMatchObject([{ distance: 20, y1: 105 }]);
 });
 
+it('measures free space inside the parent and viewport even without siblings', () => {
+  const parent = box(80, 60, 300, 240).element;
+  const target = box(120, 110, 50, 40, parent).element;
+  const layout = measureDesignReviewLayout(target);
+  expect(
+    layout
+      .filter(({ scope }) => scope === 'container')
+      .map(({ direction, distance }) => [direction, distance])
+  ).toEqual([
+    ['left', 40],
+    ['right', 210],
+    ['top', 50],
+    ['bottom', 150],
+  ]);
+  expect(layout.filter(({ scope }) => scope === 'viewport')).toHaveLength(4);
+});
+
 it('refreshes stationary hover after layout changes and removes rulers on leave, disable and disposal', () => {
   const frames: FrameRequestCallback[] = [];
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -103,6 +124,31 @@ it('refreshes stationary hover after layout changes and removes rulers on leave,
   runtime.dispose();
   expect(layer()).toBeNull();
   expect(cancel).toHaveBeenCalled();
+});
+
+it('adds viewport guides and a container outline only in expanded mode', () => {
+  const parent = box(80, 60, 300, 240).element;
+  const target = box(120, 110, 50, 40, parent).element;
+  const runtime = createDesignReviewMeasurements();
+  runtime.hover(target);
+  runtime.setEnabled(true);
+  const layer = () =>
+    document.querySelector<HTMLElement>('[data-ui="content.design-review.measurements"]');
+  expect(layer()?.querySelector('[data-scope="viewport"]')).toBeNull();
+
+  runtime.setExpanded(true);
+  expect(layer()?.querySelectorAll('[data-scope="viewport"]')).toHaveLength(4);
+  expect(layer()?.querySelectorAll('[data-scope="container"]')).toHaveLength(4);
+  expect(layer()?.textContent).toMatch(/Parent|Контейнер/u);
+  expect(layer()?.textContent).toMatch(/Viewport|Экран/u);
+  expect(layer()?.querySelectorAll('[data-scope="guide-horizontal"]')).toHaveLength(2);
+  expect(layer()?.querySelectorAll('[data-scope="guide-vertical"]')).toHaveLength(2);
+  expect(layer()?.querySelector('[data-scope="container-outline"]')).not.toBeNull();
+  expect(layer()?.style.pointerEvents).toBe('none');
+
+  runtime.setExpanded(false);
+  expect(layer()?.querySelector('[data-scope="viewport"]')).toBeNull();
+  runtime.dispose();
 });
 
 it('excludes fully overflow-clipped siblings but measures the original bounds of partially visible ones', () => {

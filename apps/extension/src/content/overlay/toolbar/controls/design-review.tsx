@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import { Ruler } from 'lucide-react';
+import { Ruler, ScanLine } from 'lucide-react';
 import {
   getDesignReviewModeState,
   subscribeToDesignReviewMode,
+  toggleDesignReviewMeasurementDetails,
   toggleDesignReviewMeasurements,
 } from '../../../selection/design-review';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
@@ -57,6 +58,23 @@ export function ToolbarDesignReviewControls(props: {
         )}
       >
         <Ruler size={20} strokeWidth={2} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        active={mode.measurementsExpanded}
+        aria-pressed={mode.measurementsExpanded}
+        disabled={!mode.enabled || !mode.measurementsEnabled}
+        dataUi="content.toolbar.design-review-measurement-details-button"
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleDesignReviewMeasurementDetails();
+        }}
+        title={translate(
+          mode.measurementsExpanded
+            ? 'content.designReview.hideLayoutGuides'
+            : 'content.designReview.showLayoutGuides'
+        )}
+      >
+        <ScanLine size={20} strokeWidth={2} />
       </ContentToolbarButton>
       <AnnotationExportMenu
         compactMenus={props.compactMenus}

@@ -628,6 +628,7 @@ it('measures a hovered sibling while preserving the selected element and clears 
   const runtime = startPicker({ onSelection });
   runtime.selectElement(selected);
   runtime.setMeasurementsEnabled(true);
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).not.toBeNull();
   hovered.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
   expectFrameSummary('section');
   expect(onSelection).toHaveBeenCalledTimes(1);

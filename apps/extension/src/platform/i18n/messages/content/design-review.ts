@@ -10,6 +10,16 @@ export const contentDesignReviewMessages = defineMessageSource({
     en: 'Show distances to sibling elements',
   },
   hideDistances: { ru: 'Скрыть расстояния', en: 'Hide distances' },
+  showLayoutGuides: {
+    ru: 'Показать расстояния до контейнера и экрана и направляющие',
+    en: 'Show container and viewport distances and guides',
+  },
+  hideLayoutGuides: {
+    ru: 'Скрыть дополнительные расстояния и направляющие',
+    en: 'Hide additional distances and guides',
+  },
+  parentDistanceLabel: { ru: 'Контейнер', en: 'Parent' },
+  viewportDistanceLabel: { ru: 'Экран', en: 'Viewport' },
   title: {
     ru: 'Дизайн-ревью',
     en: 'Design review',
