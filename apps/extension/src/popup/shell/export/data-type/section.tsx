@@ -265,7 +265,10 @@ function QuickSelection(props: {
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {(['web-copy', 'materials'] as const).map((preset) => (
+      {(props.destination === 'save'
+        ? (['materials'] as const)
+        : (['web-copy', 'materials'] as const)
+      ).map((preset) => (
         <button
           key={preset}
           type="button"
@@ -314,8 +317,6 @@ function WebCopyResourceControls(props: {
     {
       checked: props.resources.externalAssetRedirectsEnabled,
       description: translate('popup.export.webCopyExternalRedirectsDescription'),
-      disabled: !props.resources.anonymousCrossOriginAssetsEnabled,
-      indent: true,
       label: translate('popup.export.webCopyExternalRedirectsLabel'),
       pending: props.resources.pending === 'external-redirects',
       setChecked: props.resources.setExternalAssetRedirectsEnabled,
@@ -331,20 +332,12 @@ function WebCopyResourceControls(props: {
   return (
     <div className="ml-5 pl-3">
       {items.map((item) => (
-        <label
-          key={item.label}
-          className={['flex items-start gap-2 py-1.5', item.indent ? 'ml-4' : ''].join(' ')}
-        >
+        <label key={item.label} className="flex items-start gap-2 py-1.5">
           <input
             type="checkbox"
             className={checkboxClassName}
             checked={item.checked}
-            disabled={
-              props.disabled ||
-              item.disabled === true ||
-              item.pending ||
-              props.resources.pending !== null
-            }
+            disabled={props.disabled || item.pending || props.resources.pending !== null}
             onChange={(event) => void item.setChecked(event.currentTarget.checked)}
           />
           <span className="min-w-0">

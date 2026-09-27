@@ -244,7 +244,7 @@ it('places compact quick choices beside the filter and applies them to the full 
   const setIncludeWebCopy = vi.fn();
   const setIncludeFullPageScreenshot = vi.fn();
   const props = await renderSection({
-    destination: 'save',
+    destination: 'export',
     setIncludeFullPageScreenshot,
     packagePreferences: {
       ...createProps().packagePreferences,
@@ -263,11 +263,41 @@ it('places compact quick choices beside the filter and applies them to the full 
   expect(quickSelection?.querySelectorAll('button')).toHaveLength(3);
 
   await act(async () => findButton('t:popup.export.packagePresetMaterials').click());
-  expect(setIncludeWebCopy).not.toHaveBeenCalled();
+  expect(setIncludeWebCopy).toHaveBeenCalledWith(false);
   expect(setIncludeFullPageScreenshot).toHaveBeenCalledWith(true);
   expect(props.setIncludeFiles).toHaveBeenCalledWith(true);
   expect(props.setIncludeImages).toHaveBeenCalledWith(true);
   expect(props.setIncludeBasicLogs).not.toHaveBeenCalled();
+});
+
+it('hides the redundant Web copy preset in Library mode and keeps data selection working', async () => {
+  const setIncludeJson = vi.fn();
+  const setIncludeWebCopy = vi.fn();
+  await renderSection({
+    destination: 'save',
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      setIncludeWebCopy,
+    },
+    setIncludeJson,
+  });
+
+  expect(
+    Array.from(container?.querySelectorAll('button') ?? []).some(
+      (button) => button.textContent === 't:popup.export.packagePresetWebCopy'
+    )
+  ).toBe(false);
+  await act(async () => findButton('t:popup.export.packagePresetMaterials').click());
+  expect(setIncludeJson).toHaveBeenCalledWith(true);
+  expect(setIncludeWebCopy).not.toHaveBeenCalled();
+  setIncludeJson.mockClear();
+  const jsonRow = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+    label.textContent?.includes('t:popup.export.includeJsonLabel')
+  );
+  expect(jsonRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(false);
+  await act(async () => jsonRow?.querySelector<HTMLInputElement>('input')?.click());
+  expect(setIncludeJson).toHaveBeenCalledWith(expect.any(Function));
 });
 
 it('clears optional Library contents without disabling the mandatory Web copy', async () => {
@@ -448,8 +478,39 @@ it('keeps redirect capture subordinate to external resource capture', async () =
     label.textContent?.includes('t:popup.export.webCopyExternalRedirectsLabel')
   );
   expect(redirectRow?.querySelector<HTMLInputElement>('input')?.checked).toBe(true);
-  expect(redirectRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
+  expect(redirectRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(false);
 });
+
+it.each(['export', 'save'] as const)(
+  'keeps redirect preference independently operable in %s mode',
+  async (destination) => {
+    const setExternalAssetRedirectsEnabled = vi.fn();
+    const setAnonymousCrossOriginAssetsEnabled = vi.fn();
+    await renderSection({
+      destination,
+      packagePreferences: {
+        ...createProps().packagePreferences,
+        includeWebCopy: true,
+      },
+      webCopyResources: {
+        ...createProps().webCopyResources,
+        anonymousCrossOriginAssetsEnabled: false,
+        externalAssetRedirectsEnabled: true,
+        setExternalAssetRedirectsEnabled,
+        setAnonymousCrossOriginAssetsEnabled,
+      },
+    });
+    const redirectRow = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+      label.textContent?.includes('t:popup.export.webCopyExternalRedirectsLabel')
+    );
+    const redirect = redirectRow?.querySelector<HTMLInputElement>('input');
+    expect(redirect?.checked).toBe(true);
+    expect(redirect?.disabled).toBe(false);
+    await act(async () => redirect?.click());
+    expect(setExternalAssetRedirectsEnabled).toHaveBeenCalledWith(false);
+    expect(setAnonymousCrossOriginAssetsEnabled).not.toHaveBeenCalled();
+  }
+);
 
 it('does not add a separate private-data warning marker to the compact summary', async () => {
   await renderSection({ includePageDiagnostics: true, isOpen: false });
