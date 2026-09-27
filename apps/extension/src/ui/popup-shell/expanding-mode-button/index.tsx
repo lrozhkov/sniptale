@@ -40,14 +40,21 @@ interface PopupExpandingModeButtonProps {
   disabled?: boolean;
   icon: ComponentType<{ className?: string }>;
   label: string;
+  compact?: boolean;
   onClick(): void;
 }
 
-function getButtonClassName(active: boolean, animate: boolean, disabled: boolean): string {
+function getButtonClassName(
+  active: boolean,
+  animate: boolean,
+  disabled: boolean,
+  compact: boolean
+): string {
   return cx(
     BUTTON_BASE_CLASS_NAME,
     animate && BUTTON_ANIMATION_CLASS_NAME,
     active ? BUTTON_ACTIVE_CLASS_NAME : BUTTON_INACTIVE_CLASS_NAME,
+    compact && active && 'grow-[2.2]',
     disabled && 'cursor-not-allowed opacity-40'
   );
 }
@@ -62,9 +69,10 @@ function getCompactLayerClassName(active: boolean, animate: boolean): string {
   );
 }
 
-function getExpandedLayerClassName(active: boolean, animate: boolean): string {
+function getExpandedLayerClassName(active: boolean, animate: boolean, compact: boolean): string {
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
+    compact && 'right-2 w-auto gap-1.5',
     animate && 'transition-[opacity,transform] ease-out motion-reduce:transition-none',
     animate && (active ? 'duration-150' : 'duration-75'),
     active ? 'opacity-100' : 'opacity-0',
@@ -80,6 +88,7 @@ export function PopupExpandingModeButton({
   disabled = false,
   icon: Icon,
   label,
+  compact = false,
   onClick,
 }: PopupExpandingModeButtonProps) {
   return (
@@ -87,7 +96,7 @@ export function PopupExpandingModeButton({
       type="button"
       aria-label={label}
       aria-pressed={active}
-      className={getButtonClassName(active, animate, disabled)}
+      className={getButtonClassName(active, animate, disabled, compact)}
       disabled={disabled}
       onClick={onClick}
       title={`${label}. ${description}`}
@@ -99,7 +108,7 @@ export function PopupExpandingModeButton({
         </span>
       </span>
 
-      <span aria-hidden="true" className={getExpandedLayerClassName(active, animate)}>
+      <span aria-hidden="true" className={getExpandedLayerClassName(active, animate, compact)}>
         <Icon
           className={cx(
             'h-[19px] w-[19px] shrink-0',

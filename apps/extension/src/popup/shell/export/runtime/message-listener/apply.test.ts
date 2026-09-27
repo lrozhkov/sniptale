@@ -37,3 +37,34 @@ it('keeps raw background job failures out of popup progress and results', () => 
     expect.objectContaining({ message: expect.stringContaining('Failed to prepare export') })
   );
 });
+
+it('projects an HTML job as Web copy progress without a visible screenshot component', () => {
+  const setLaunchedPlan = vi.fn();
+  const status = {
+    jobId: 'html-job',
+    revision: 1,
+    phase: 'running',
+    downloadFormat: 'html',
+    effectiveOptions: {},
+    effectiveComponentPlan: { components: { webCopy: true }, includeScreenshot: true },
+    progress: { current: 0, total: 1, errors: [], message: '', phase: 'scanning' },
+    warnings: [],
+    result: null,
+  };
+  applyPopupExportRuntimeMessage({
+    clearRequestId: vi.fn(),
+    latestStatus: null,
+    message: { status, type: 'PAGE_PACKAGE_JOB_STATUS_UPDATED' },
+    requestId: 'html-job',
+    setLatestStatus: vi.fn(),
+    setLaunchedPlan,
+    setProgress: vi.fn(),
+    setResult: vi.fn(),
+  } as never);
+  expect(setLaunchedPlan).toHaveBeenCalledWith(
+    expect.objectContaining({
+      includeWebCopy: true,
+      includeFullPageScreenshot: false,
+    })
+  );
+});

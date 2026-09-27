@@ -180,8 +180,19 @@ export const popupExportMessages = defineMessageSource({
   },
   packageDestinationHtml: { ru: 'Скачать HTML', en: 'Download HTML' },
   packageDestinationHtmlDescription: {
-    ru: 'Отдельный HTML-файл для каждой страницы: веб-копия со стилями, изображениями и шрифтами. Без скриптов, активных ссылок, вложений и диагностики.',
-    en: 'One HTML file per page: a Web copy with styles, images and fonts. No scripts, active links, attachments or diagnostics.',
+    ru: 'По одному файлу на страницу. Стили, изображения и шрифты внутри; ссылки открываются по нажатию.',
+    en: 'One file per page. Styles, images and fonts are embedded; links open when clicked.',
+  },
+  packageDestinationHtmlShortDescription: {
+    ru: 'Веб-копия одним файлом',
+    en: 'Web copy in one file',
+  },
+  htmlCompositionTitle: { ru: 'Состав файла', en: 'File contents' },
+  htmlCompositionFileTitle: { ru: 'Веб-копия · HTML', en: 'Web copy · HTML' },
+  htmlResourceSettingsTitle: { ru: 'Ресурсы веб-копии', en: 'Web copy resources' },
+  htmlResourceSettingsDescription: {
+    ru: 'Выберите, какие ресурсы сохранять внутри HTML-файла.',
+    en: 'Choose which resources to save inside the HTML file.',
   },
   packageDestinationLabel: {
     ru: 'Настройки действия',
@@ -195,6 +206,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Скачать полный пакет страницы как ZIP-архив.',
     en: 'Download the complete page package as a ZIP archive.',
   },
+  packageDestinationDownloadShortDescription: {
+    ru: 'Полный пакет ZIP',
+    en: 'Complete ZIP package',
+  },
   packageDestinationLibrary: {
     ru: 'В библиотеку',
     en: 'To Library',
@@ -202,6 +217,10 @@ export const popupExportMessages = defineMessageSource({
   packageDestinationLibraryDescription: {
     ru: 'Сохранить веб-копию и открыть веб-снимок.',
     en: 'Save the Web copy and open the Web Snapshot.',
+  },
+  packageDestinationLibraryShortDescription: {
+    ru: 'Снимок в библиотеке',
+    en: 'Snapshot in Library',
   },
   packagePresetLabel: {
     ru: 'Быстрый выбор',

@@ -299,6 +299,7 @@ function QuickSelection(props: {
 
 export function WebCopyResourceControls(props: {
   offlineOnly?: boolean;
+  className?: string;
   disabled: boolean;
   resources: WebCopyResourcePreferences;
 }) {
@@ -333,7 +334,7 @@ export function WebCopyResourceControls(props: {
     },
   ];
   return (
-    <div className="ml-5 pl-3">
+    <div className={props.className ?? 'ml-5 pl-3'}>
       {items
         .filter(
           (item) =>

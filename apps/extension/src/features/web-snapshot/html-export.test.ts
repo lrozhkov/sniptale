@@ -126,13 +126,43 @@ it('retains passive form state while stripping executable and external content',
   expect(
     doc.querySelector('script, iframe, [onerror], [action], input[value="secret"]')
   ).toBeNull();
-  expect(doc.querySelector('a')?.hasAttribute('href')).toBe(false);
-  expect(doc.querySelector('a[href]')).toBeNull();
+  expect(doc.querySelector('a')?.getAttribute('href')).toBe('https://bad.test/');
+  expect(doc.querySelector('a')?.getAttribute('target')).toBe('_blank');
+  expect(doc.querySelector('a')?.getAttribute('rel')).toContain('noopener');
+  expect(doc.querySelector('a[href="#section"]')).not.toBeNull();
   expect(doc.querySelector('input')?.getAttribute('value')).toBe('saved');
   expect(doc.querySelector('img')?.hasAttribute('src')).toBe(false);
   expect(doc.querySelector('meta[http-equiv]')?.getAttribute('content')).toContain(
     "default-src 'none'"
   );
+});
+
+it('restores validated captured and relative links without allowing active URLs', async () => {
+  const loaded = fixture(`<body>
+    <base target="_blank" href="https://other.test/">
+    <a href="../article">Relative</a>
+    <a data-sniptale-external-href="https://saved.test/story">Captured</a>
+    <a href="javascript:alert(1)">Script</a>
+    <a href="data:text/html,evil">Data</a>
+    <a href="#part" download target="_blank">Part</a>
+    <div id="part">Destination</div>
+  </body>`);
+  const html = await readBlob((await createWebSnapshotHtmlExport(loaded)).blob);
+  const anchors = [...new DOMParser().parseFromString(html, 'text/html').querySelectorAll('a')];
+  expect(anchors[0]?.getAttribute('href')).toBe('https://example.com/article');
+  expect(anchors[1]?.getAttribute('href')).toBe('https://saved.test/story');
+  expect(anchors[2]?.hasAttribute('href')).toBe(false);
+  expect(anchors[3]?.hasAttribute('href')).toBe(false);
+  expect(anchors[4]?.getAttribute('href')).toBe('#part');
+  expect(anchors[4]?.hasAttribute('download')).toBe(false);
+  expect(anchors[4]?.hasAttribute('target')).toBe(false);
+  expect(new DOMParser().parseFromString(html, 'text/html').querySelector('base')).toBeNull();
+  expect(anchors.slice(0, 2).every((anchor) => anchor.getAttribute('target') === '_blank')).toBe(
+    true
+  );
+  expect(
+    anchors.slice(0, 2).every((anchor) => anchor.getAttribute('rel')?.includes('noreferrer'))
+  ).toBe(true);
 });
 
 it('breaks cyclic CSS imports and removes remote imports', async () => {
@@ -223,6 +253,21 @@ it('embeds captured relative resources in raw archive HTML and removes active co
   expect(html).not.toContain('<iframe');
   expect(html).not.toContain('../assets/');
   expect(html).not.toContain('blob:');
+});
+
+it('keeps safe links in raw archives and XHTML captures', async () => {
+  for (const source of [
+    '<html><body><a href="../article">Story</a></body></html>',
+    '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body><a href="../article">Story</a></body></html>',
+  ]) {
+    const loaded = fixture(source);
+    const result = await createWebSnapshotHtmlExport({
+      ...loaded,
+      assetBasePath: 'snapshot/index.html',
+    });
+    const doc = new DOMParser().parseFromString(await readBlob(result.blob), 'text/html');
+    expect(doc.querySelector('a')?.getAttribute('href')).toBe('https://example.com/article');
+  }
 });
 
 it.each(['html', 'xhtml'] as const)(

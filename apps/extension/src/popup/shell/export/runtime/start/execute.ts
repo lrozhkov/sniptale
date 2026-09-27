@@ -3,6 +3,7 @@ import type { PopupExportRuntimeDeps } from '../types';
 import type { PopupExportRuntimeContract } from '../state';
 import { PopupExportPublicStartError, reportStartExportFailure } from './failure';
 import { getPopupExportSelection } from '../../session/selectors';
+import type { PopupPagePackageSelection } from '../../../../../composition/persistence/popup-export-preferences';
 import { buildPopupExportOptions } from '../options';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
@@ -26,6 +27,32 @@ function isValidStartSourceSelection(
     !startContext ||
     (state.activeSourceMode === 'tabs' && sources.length === 1 && sources[0]?.kind === 'tab')
   );
+}
+
+function getStartPlan(
+  state: PopupExportRuntimeContract,
+  intent: 'export' | 'save',
+  downloadFormat?: 'html'
+): PopupPagePackageSelection {
+  if (downloadFormat === 'html') {
+    return {
+      includeWebCopy: true,
+      includeAnnotations: false,
+      includeBasicLogs: false,
+      includeCssDiagnostics: false,
+      includeFiles: false,
+      includeFullPageScreenshot: true,
+      includeViewportScreenshot: false,
+      includePageDiagnostics: false,
+      includeImages: false,
+      includeJson: false,
+      includeMarkdown: false,
+    };
+  }
+  if (intent === 'save') {
+    return { ...state.saveSelection, includeFullPageScreenshot: true, includeWebCopy: true };
+  }
+  return { ...getPopupExportSelection(state), includeWebCopy: state.includeWebCopy };
 }
 
 export async function startPopupExport(
@@ -69,31 +96,7 @@ export async function startPopupExport(
         : orderedTabs.map((tab) => ({ kind: 'tab' as const, ...tab }));
     if (sources.length === 0 || !isValidStartSourceSelection(state, sources, startContext)) return;
 
-    const plan =
-      downloadFormat === 'html'
-        ? {
-            includeWebCopy: true,
-            includeAnnotations: false,
-            includeBasicLogs: false,
-            includeCssDiagnostics: false,
-            includeFiles: false,
-            includeFullPageScreenshot: true,
-            includeViewportScreenshot: false,
-            includePageDiagnostics: false,
-            includeImages: false,
-            includeJson: false,
-            includeMarkdown: false,
-          }
-        : intent === 'save'
-          ? {
-              ...state.saveSelection,
-              includeFullPageScreenshot: true,
-              includeWebCopy: true,
-            }
-          : {
-              ...getPopupExportSelection(state),
-              includeWebCopy: state.includeWebCopy,
-            };
+    const plan = getStartPlan(state, intent, downloadFormat);
     const resourceLimits = deps.loadExportResourceLimits
       ? await deps.loadExportResourceLimits()
       : { ...DEFAULT_EXPORT_RESOURCE_LIMITS };
@@ -136,7 +139,11 @@ export async function startPopupExport(
       includeViewportScreenshot: options.includeViewportScreenshot === true,
     };
     state.setResult(null);
-    state.setLaunchedPlan(effectivePlan);
+    state.setLaunchedPlan(
+      downloadFormat === 'html'
+        ? { ...effectivePlan, includeFullPageScreenshot: false }
+        : effectivePlan
+    );
     state.setProgress({
       activeStepKey: effectivePlan.includeWebCopy ? 'webSnapshotDom' : null,
       current: 0,

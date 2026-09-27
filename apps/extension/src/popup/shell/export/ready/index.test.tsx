@@ -196,10 +196,10 @@ it('switches the common editor between independent download and Library preferen
     expect.objectContaining({ destination: 'export', includeFiles: true })
   );
   expect(
-    container?.querySelector('button[title="popup.export.packageDestinationDownloadDescription"]')
+    container?.querySelector('button[aria-label="popup.export.packageDestinationDownload"]')
   ).not.toBeNull();
   expect(
-    container?.querySelector('button[title="popup.export.packageDestinationLibraryDescription"]')
+    container?.querySelector('button[aria-label="popup.export.packageDestinationLibrary"]')
   ).not.toBeNull();
   const libraryButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent?.includes('packageDestinationLibrary')
@@ -242,7 +242,33 @@ it('shows the no-selectable-tabs hint only after loaded disabled state has no se
 it('shows HTML composition and resource settings without ZIP component controls', async () => {
   renderReady(createProps({ destination: 'html' }));
   expect(container?.textContent).toContain('packageDestinationHtmlDescription');
-  expect(container?.querySelector('[data-ui="resources"]')).not.toBeNull();
-  expect(container?.querySelector('[data-ui="data-types"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="html-composition"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="pages"]')).not.toBeNull();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="popup.export.selection-trigger"]')
+      ?.click()
+  );
+  expect(container?.querySelector('[data-ui="html-resource-settings"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="data-types"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="pages"]')).toBeNull();
+});
+
+it('uses the expanding transition for all three destinations', () => {
+  renderReady(createProps({ destination: 'html' }));
+  const library = [
+    ...(container?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]') ?? []),
+  ].find(
+    (button) => button.getAttribute('aria-label') === 'popup.export.packageDestinationLibrary'
+  );
+  act(() => library?.click());
+  renderReady(createProps({ destination: 'save' }));
+  const switchButtons = [...(container?.querySelectorAll('button[aria-pressed]') ?? [])];
+  expect(switchButtons).toHaveLength(3);
+  expect(switchButtons.every((button) => button.className.includes('transition-[flex-grow'))).toBe(
+    true
+  );
+  expect(
+    switchButtons.find((button) => button.getAttribute('aria-pressed') === 'true')?.className
+  ).toContain('grow-');
 });

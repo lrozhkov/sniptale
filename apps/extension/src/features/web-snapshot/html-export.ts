@@ -126,6 +126,7 @@ function rewriteDocument(
   for (const root of collectWebSnapshotQueryRoots(document)) {
     for (const element of root.querySelectorAll('*')) {
       for (const name of ['src', 'href', 'poster', 'xlink:href']) {
+        if (name === 'href' && element.tagName.toLowerCase() === 'a') continue;
         const value = element.getAttribute(name);
         if (!value) continue;
         const replacement = resolve(value);
@@ -161,6 +162,7 @@ function normalizeHtmlSource(loaded: WebSnapshotHtmlExportInput): string {
   if (!isWebSnapshotXhtml(loaded.html)) return loaded.html;
   const xhtml = sanitizeWebSnapshotXhtml(loaded.html, loaded.manifest.source.url, {
     allowedObjectUrls: loaded.assets.map((asset) => asset.url),
+    allowStandaloneNavigation: true,
     offlineOnly: true,
     removeSvgAnimations: true,
   });
@@ -200,6 +202,7 @@ export async function createWebSnapshotHtmlExport(loaded: WebSnapshotHtmlExportI
     loaded.manifest.source.url,
     {
       allowedObjectUrls: loaded.assets.map((asset) => asset.url),
+      allowStandaloneNavigation: true,
       offlineOnly: true,
       removeSvgAnimations: true,
     }

@@ -361,6 +361,12 @@ it('launches HTML with a fixed web-copy plan even when no ZIP components are sel
   state.includeJson = true;
   const deps = createStartDeps();
   await startPopupExportImpl(state, deps, 'export', 'html');
+  expect(state.setLaunchedPlan).toHaveBeenCalledWith(
+    expect.objectContaining({
+      includeWebCopy: true,
+      includeFullPageScreenshot: false,
+    })
+  );
   expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
     expect.objectContaining({
       downloadFormat: 'html',

@@ -45,7 +45,7 @@ LLM request history may retain only timestamp, model ID, request kind, result co
 - Accept cross-origin Web Snapshot responses only from public HTTPS final URLs.
 - Install the Declarative Net Request session guard before a redirect-enabled Web Snapshot fetch. Reject the fetch if guard installation fails.
 - Block HTTP and syntactically private or local redirect hops. Treat DNS rebinding as a residual browser limitation because fetch and Declarative Net Request do not expose the resolved IP.
-- Keep archived links inert. Open a validated HTTP(S) target in a new tab only after the user enables the default-off control and clicks the link.
+- Keep links inert in the embedded Web Snapshot viewer. Open a validated HTTP(S) target there only after the user enables the default-off control and clicks the link. Downloaded standalone HTML may expose validated HTTP(S) links in a new tab with `noopener noreferrer` and same-file fragment links; it must not load external assets or run page scripts.
 
 ## Import and export
 
