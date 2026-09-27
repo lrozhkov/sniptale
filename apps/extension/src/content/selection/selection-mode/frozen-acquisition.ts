@@ -113,8 +113,11 @@ function observePageDuringAcquisition() {
       ) {
         continue;
       }
+      const currentTime = animation.currentTime;
       animation.pause();
       pausedAnimations.add(animation);
+      // Seeking settles the pending pause before geometry reads can observe another frame.
+      if (currentTime !== null) animation.currentTime = currentTime;
     }
   };
   const collect = (root: Document | ShadowRoot, depth = 0) => {

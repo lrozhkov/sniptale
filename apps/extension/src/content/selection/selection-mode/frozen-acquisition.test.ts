@@ -26,12 +26,22 @@ function animatedPopup() {
   popup.className = 'mwe-popups mwe-popups-type-page mwe-popups-fade-in-up';
   document.body.append(popup);
   let x = 10;
+  let currentTime = 1_000;
   vi.spyOn(popup, 'getBoundingClientRect').mockImplementation(() => new DOMRect(x, 20, 100, 50));
   const animation = {
     effect: { target: popup },
     playState: 'running',
+    pending: false,
+    get currentTime() {
+      return currentTime;
+    },
+    set currentTime(value: number) {
+      currentTime = value;
+      animation.pending = false;
+    },
     pause: vi.fn(() => {
       animation.playState = 'paused';
+      animation.pending = true;
     }),
     play: vi.fn(() => {
       animation.playState = 'running';
@@ -44,10 +54,10 @@ function animatedPopup() {
   return { animation, move: () => (x = 30) };
 }
 
-it('keeps an animated hover popup fixed for the raster and geometry, then resumes it', async () => {
+it('settles a pending animation pause before pairing the raster and geometry, then resumes it', async () => {
   const { animation, move } = animatedPopup();
   const capture = vi.fn(async () => {
-    if (animation.playState === 'running') move();
+    if (animation.playState === 'running' || animation.pending) move();
     return 'data:image/png;base64,popup';
   });
   const frame = await acquireFrozenSelectionFrame(capture, { onChanged: 'area-only' });
@@ -55,6 +65,7 @@ it('keeps an animated hover popup fixed for the raster and geometry, then resume
   expect(animation.pause).toHaveBeenCalledOnce();
   expect(animation.play).toHaveBeenCalledOnce();
   expect(animation.playState).toBe('running');
+  expect(animation.currentTime).toBe(1_000);
 });
 
 it('resumes an animated hover popup after a capture failure', async () => {
