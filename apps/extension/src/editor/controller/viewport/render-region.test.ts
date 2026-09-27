@@ -3,6 +3,7 @@
 import { Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { EditorCanvas } from './render-region';
+import { selectEditorLayerById } from '../public-actions/selection/layers/select';
 import { prepareCanvasForDocumentLoad } from '../document/apply/canvas';
 
 it('keeps replacement documents centered after crop, image resize, undo, and redo', () => {
@@ -87,6 +88,44 @@ it('covers the full right edge of a viewport with symmetric scrollbar gutters', 
 
   expect(Number.parseFloat(canvas.wrapperEl.style.left)).toBe(3426);
   expect(Number.parseFloat(canvas.wrapperEl.style.left) + canvas.width).toBe(4196);
+});
+
+it('targets a selected lower layer through overlapping artwork until selection clears', () => {
+  const canvas = new EditorCanvas(document.createElement('canvas'), {
+    preserveObjectStacking: true,
+  });
+  canvas.setDimensions({ width: 300, height: 200 });
+  canvas.upperCanvasEl.getBoundingClientRect = () =>
+    ({ left: 0, top: 0, width: 300, height: 200 }) as DOMRect;
+  const lower = new Rect({ left: 30, top: 30, width: 100, height: 80, fill: '#f00' });
+  const upper = new Rect({ left: 30, top: 30, width: 100, height: 80, fill: '#00f' });
+  lower.sniptaleId = 'lower';
+  upper.sniptaleId = 'upper';
+  canvas.add(lower, upper);
+  lower.setCoords();
+  upper.setCoords();
+  const pointer = new MouseEvent('mousedown', { clientX: 60, clientY: 60 });
+  expect(canvas.findTarget(pointer).target).toBe(upper);
+
+  selectEditorLayerById({
+    canvas,
+    id: 'lower',
+    ensureObjectReachable: () => false,
+    focusObjectInViewport: () => undefined,
+    commitHistory: () => undefined,
+    syncRuntimeState: () => undefined,
+  });
+
+  expect(canvas.getActiveObject()).toBe(lower);
+  expect(canvas.findTarget(pointer).target).toBe(lower);
+  expect(canvas.preserveObjectStacking).toBe(true);
+
+  canvas.setActiveObject(upper);
+  canvas.setActiveObject(lower);
+  expect(canvas.findTarget(pointer).target).toBe(upper);
+
+  canvas.discardActiveObject();
+  expect(canvas.findTarget(pointer).target).toBe(upper);
 });
 
 it('restores the same document point under the viewport after a size-changing undo', () => {

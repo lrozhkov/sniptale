@@ -1,5 +1,6 @@
 import type { Canvas, FabricObject } from 'fabric';
 import { selectLayerObject } from '../../../layer-actions';
+import { EditorCanvas } from '../../../viewport/render-region';
 
 export function selectEditorLayerById(options: {
   canvas: Canvas | null;
@@ -25,6 +26,13 @@ export function selectEditorLayerById(options: {
   );
   if (recovered === null) {
     return;
+  }
+
+  if (options.canvas instanceof EditorCanvas) {
+    const activeObjects = options.canvas.getActiveObjects();
+    options.canvas.setLayerSelectionPriority(
+      activeObjects.length === 1 ? (activeObjects[0] ?? null) : null
+    );
   }
 
   if (recovered) {

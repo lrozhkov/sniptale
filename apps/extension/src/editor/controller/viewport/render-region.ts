@@ -1,4 +1,4 @@
-import { Canvas } from 'fabric';
+import { Canvas, type FabricObject, type TPointerEvent } from 'fabric';
 import { isBackgroundObject, isUserObject } from '../../document/model';
 import {
   createEditorWorkspaceInsets,
@@ -29,6 +29,37 @@ export class EditorCanvas extends Canvas {
   private expandingCanvasWorkspace = false;
   private presentationScale = 1;
   private showOutsideCanvas = true;
+  private layerSelectionPriority: FabricObject | null = null;
+  private tracksLayerSelectionPriority = false;
+
+  setLayerSelectionPriority(object: FabricObject | null): void {
+    if (!this.tracksLayerSelectionPriority) {
+      const clearPriority = () => {
+        this.layerSelectionPriority = null;
+      };
+      this.on('selection:created', clearPriority);
+      this.on('selection:updated', clearPriority);
+      this.on('selection:cleared', clearPriority);
+      this.tracksLayerSelectionPriority = true;
+    }
+    this.layerSelectionPriority = object;
+  }
+
+  override findTarget(e: TPointerEvent): ReturnType<Canvas['findTarget']> {
+    const priority = this.layerSelectionPriority;
+    if (!priority) return super.findTarget(e);
+    if (this.getActiveObject() !== priority) {
+      this.layerSelectionPriority = null;
+      return super.findTarget(e);
+    }
+    const preserveObjectStacking = this.preserveObjectStacking;
+    this.preserveObjectStacking = false;
+    try {
+      return super.findTarget(e);
+    } finally {
+      this.preserveObjectStacking = preserveObjectStacking;
+    }
+  }
 
   setRenderViewport(viewport: HTMLElement | null, stage?: HTMLElement): void {
     this.renderViewport = viewport;
