@@ -253,6 +253,14 @@ function measureScene(root, viewport, aspect) {
 function markTourSelection(scene, selectedObjectId, focused) {
   for (const node of scene.querySelectorAll('[data-tour-object-id]'))
     node.dataset.selected = String(node.dataset.tourObjectId === selectedObjectId);
+  const selectedMask = scene.querySelector(
+    '.tour-mask[data-selected=true]:not(.tour-camera-frame)'
+  );
+  const imagePlane = scene.querySelector('.tour-image-plane');
+  if (imagePlane) {
+    imagePlane.style.zIndex = selectedMask ? '4' : '';
+    imagePlane.style.pointerEvents = selectedMask ? 'none' : '';
+  }
   if (focused?.classList.contains('tour-camera-frame')) {
     scene.querySelector('.tour-camera-frame')?.focus({ preventScroll: true });
     return;

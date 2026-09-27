@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourPlayer } from '../../../features/scenario/tour-player/controller';
 import styles from '../../../features/scenario/tour-player/player.css?raw';
+import stageStyles from './stage-shadow.css?raw';
 import { tourPlayerLabels } from './labels';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
@@ -106,30 +107,7 @@ export function TourStage({
         createPortal(
           <>
             <style>{styles}</style>
-            <style>{`
-              :host { display: block; height: 100%; min-height: 0; font: 14px system-ui, sans-serif; }
-              #tour-player { height: 100%; min-height: 0; }
-              :host(:not([data-view=preview])) #tour-player { background: transparent; }
-              :host(:not([data-view=preview])) .tour-toolbar { display: none; }
-              :host(:not([data-view=preview])) .tour-viewport {
-                margin: 0; border: 0; border-radius: 0; background: transparent;
-              }
-              :host(:not([data-view=preview])) .tour-stage {
-                border-color: var(--sniptale-color-border-soft);
-                border-radius: var(--sniptale-radius-xl);
-                border-bottom-width: 1px;
-              }
-              .tour-scene[data-dragging=true], .tour-scene[data-dragging=true] * { cursor: grabbing !important; }
-              :host([data-view=frame]) .tour-hint,
-              :host([data-view=frame]) .tour-hotspot,
-              :host([data-view=frame]) .tour-mask:not(.tour-camera-frame) { display: none; }
-              .tour-camera-frame { box-shadow: 0 0 0 100vmax #11182766; z-index: 5; }
-              .tour-mask { border: 0; padding: 0; }
-              .tour-mask[data-selected=true] { outline: 2px solid var(--tour-accent); outline-offset: 2px; }
-              .tour-hotspot[data-selected=true], .tour-button[data-selected=true] {
-                z-index: 3; outline: 2px solid var(--tour-accent); outline-offset: 4px;
-              }
-            `}</style>
+            <style>{stageStyles}</style>
             <TourStageScaffold root={root} labels={labels} />
           </>,
           shadow
@@ -164,6 +142,7 @@ function TourStageScaffold({
         <aside className="tour-hint" data-tour-hint hidden>
           <div className="tour-hint-header">
             <span data-tour-hint-point-count hidden />
+            <strong className="tour-hint-action-title" data-tour-hint-action-title hidden />
             <button
               className="tour-button tour-caption-title"
               data-tour-hint-toggle

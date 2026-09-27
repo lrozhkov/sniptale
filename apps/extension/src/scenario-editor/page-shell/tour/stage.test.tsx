@@ -185,6 +185,64 @@ it('resizes a selected mask on canvas with live geometry, one commit and Escape 
   expect(props.onMoveObject).not.toHaveBeenCalled();
 });
 
+it.each(['blur', 'highlight'] as const)(
+  'shows %s mask handles without a frame and gives the selected mask pointer priority',
+  (kind) => {
+    const props = fixture();
+    const slide = props.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image');
+    slide.hotspots.push({
+      ...slide.hotspots[0]!,
+      id: 'inactive',
+      point: { x: 0.7, y: 0.5 },
+      action: { kind: 'none' },
+    });
+    slide.masks = [
+      {
+        id: 'mask',
+        kind,
+        color: '#f97316',
+        opacity: 0.3,
+        rect: { x: 0.2, y: 0.4, width: 0.3, height: 0.2 },
+      },
+    ];
+    act(() =>
+      root.render(
+        <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'mask' }} />
+      )
+    );
+    const plane = shadow().querySelector<HTMLElement>('.tour-image-plane')!;
+    const mask = shadow().querySelector<HTMLElement>('.tour-mask')!;
+    expect(plane.style.zIndex).toBe('4');
+    expect(plane.style.pointerEvents).toBe('none');
+    expect(shadow().querySelector('style:last-of-type')!.textContent).not.toMatch(
+      /\.tour-mask\[data-selected=['"]?true['"]?\]\s*\{[^}]*outline:/
+    );
+    expect(mask.querySelectorAll('.tour-resize-handle')).toHaveLength(8);
+    expect(mask.querySelector<HTMLButtonElement>('[data-edge=se]')!.disabled).toBe(false);
+    const pointer = (name: string, x: number) => {
+      const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      act(() => mask.dispatchEvent(event));
+    };
+    pointer('pointerdown', 0);
+    pointer('pointermove', 108);
+    expect(props.onMoveObject).not.toHaveBeenCalled();
+    pointer('pointerup', 108);
+    expect(props.onMoveObject).toHaveBeenCalledExactlyOnceWith('mask', { x: 0.5, y: 0.4 });
+    expect(props.onSelectObject).toHaveBeenCalledWith('mask');
+    expect(props.onSelectObject).not.toHaveBeenCalledWith('point');
+    expect(props.onSelectObject).not.toHaveBeenCalledWith('inactive');
+    act(() =>
+      root.render(
+        <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'point' }} />
+      )
+    );
+    expect(plane.style.zIndex).toBe('');
+    expect(plane.style.pointerEvents).toBe('');
+  }
+);
+
 it('renders independent neutral spotlight and visual blur; locked resize stays inert', () => {
   const props = fixture();
   const slide = props.tour.slides[0]!;

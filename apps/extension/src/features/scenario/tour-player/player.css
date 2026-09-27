@@ -743,6 +743,10 @@ a:focus-visible {
 .tour-mask[data-selected='true'] > .tour-resize-handle {
   display: block;
 }
+.tour-camera-frame[data-selected='true'] {
+  outline: 2px solid var(--tour-accent);
+  outline-offset: 2px;
+}
 .tour-resize-handle[data-edge='nw'] {
   left: 0;
   top: 0;
