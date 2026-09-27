@@ -63,7 +63,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('groups appearance and independent grid controls while passing workspace save state through', () => {
+it('keeps workspace settings in one collapsible section and passes save state through', () => {
   const updateWorkspace = vi.fn();
   const saveWorkspaceColorAsDefault = vi.fn();
   container = document.createElement('div');
@@ -89,10 +89,16 @@ it('groups appearance and independent grid controls while passing workspace save
     )
   );
 
-  expect(container.querySelectorAll('section')).toHaveLength(2);
+  expect(container.querySelectorAll('section')).toHaveLength(1);
+  const heading = container.querySelector<HTMLButtonElement>('h2 button');
+  expect(heading?.getAttribute('aria-expanded')).toBe('true');
   expect(container.textContent).toContain('#f2f4f7');
   expect(container.textContent).toContain('Could not save');
-  expect(container.querySelector<HTMLButtonElement>('button')?.disabled).toBe(true);
+  expect(
+    Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Save default'
+    )?.disabled
+  ).toBe(true);
   expect(container.querySelector('[class*="overflow-y-auto"]')).not.toBeNull();
   act(() => {
     Array.from(container?.querySelectorAll('button') ?? [])
@@ -105,4 +111,9 @@ it('groups appearance and independent grid controls while passing workspace save
   expect(updateWorkspace).toHaveBeenCalledWith({ gridEnabled: true });
   expect(updateWorkspace).toHaveBeenCalledWith({ gridSnapEnabled: true });
   expect(saveWorkspaceColorAsDefault).not.toHaveBeenCalled();
+  act(() => heading?.click());
+  expect(heading?.getAttribute('aria-expanded')).toBe('false');
+  expect(container.textContent).not.toContain('#f2f4f7');
+  act(() => heading?.click());
+  expect(container.textContent).toContain('#f2f4f7');
 });

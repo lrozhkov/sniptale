@@ -1,18 +1,12 @@
 export const WORKSPACE_BACKGROUND_PALETTE = [
   '#f2f4f7',
   '#fafafa',
-  '#f4f4f5',
-  '#f5f5f4',
   '#f3f0ea',
   '#e7e5e4',
   '#e4e4e7',
-  '#d6d3d1',
   '#d4d4d8',
-  '#a8a29e',
   '#a1a1aa',
-  '#78716c',
   '#71717a',
-  '#44403c',
   '#3f3f46',
   '#27272a',
 ] as const;

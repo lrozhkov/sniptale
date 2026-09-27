@@ -43,9 +43,8 @@ export function renderCompactWorkspaceDefaultAction(params: InspectorCommandPara
 
 export function CompactWorkspaceColorPanel({ params }: { params: InspectorCommandParams }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {renderCompactWorkspaceColorField(params)}
-      {renderCompactWorkspacePaletteGrid(params)}
       {renderCompactWorkspaceDefaultAction(params)}
     </div>
   );

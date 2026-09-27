@@ -7,7 +7,7 @@ import {
 } from './data';
 
 it('exposes stable palette and gradient preset data', () => {
-  expect(WORKSPACE_BACKGROUND_PALETTE).toHaveLength(16);
+  expect(WORKSPACE_BACKGROUND_PALETTE).toHaveLength(10);
   expect(WORKSPACE_BACKGROUND_PALETTE[0]).toBe('#f2f4f7');
   expect(GRID_COLOR_PALETTE).toHaveLength(14);
   expect(GRID_COLOR_PALETTE).not.toEqual(

@@ -99,8 +99,8 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Workspace',
   },
   viewSettings: {
-    ru: 'Рабочая зона и сетка',
-    en: 'Workspace and grid',
+    ru: 'Настройки рабочей зоны',
+    en: 'Workspace settings',
   },
   gridMode: {
     ru: 'Режим сетки',

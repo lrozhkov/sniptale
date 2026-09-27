@@ -1,4 +1,4 @@
-import { Magnet, Map, Palette } from 'lucide-react';
+import { Magnet, Map, SlidersHorizontal } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -70,7 +70,7 @@ function WorkspacePopoverButton(props: {
       active={props.activePopover === 'workspace'}
       open={props.activePopover === 'workspace'}
       disabled={!props.hasImage}
-      trigger={<Palette size={15} strokeWidth={2} />}
+      trigger={<SlidersHorizontal size={15} strokeWidth={2} />}
       onToggle={props.onToggle}
       popover={<CompactWorkspacePopoverContent {...props} />}
     />

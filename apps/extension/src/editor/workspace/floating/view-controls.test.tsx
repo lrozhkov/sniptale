@@ -135,6 +135,13 @@ it('opens combined workspace and grid settings and the map below the top-right t
   ).not.toBeNull();
   expect(container?.textContent).toContain('#F2F4F7');
   expect(container?.textContent).toContain('Grid');
+  const workspacePopover = container?.querySelector(
+    '[data-ui="editor.floating.view-controls.popover.workspace"]'
+  );
+  expect(
+    workspacePopover?.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+  ).not.toBeNull();
+  expect(workspacePopover?.querySelector('.sniptale-glass-color-palette')).toBeNull();
 
   click('editor.floating.view-controls.map');
   expect(container?.querySelector('[data-ui="mock.viewport-preview"]')).not.toBeNull();

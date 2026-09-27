@@ -1,3 +1,5 @@
+import { ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { useState } from 'react';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { buildGridCompactCommands } from '../../inspector/compact/inspector/workspace-sections';
 import type { InspectorCommandParams } from '../../inspector/compact/inspector/command-types';
@@ -22,6 +24,7 @@ export function CompactWorkspacePopoverContent({
   documentController: FloatingWorkspacePopoverController;
   hasImage?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(true);
   const params = createFloatingWorkspaceCommandParams({ documentController, hasImage });
   // The color field already exposes the same palette in its picker.
   const commands = buildGridCompactCommands(params).filter(
@@ -32,43 +35,60 @@ export function CompactWorkspacePopoverContent({
     <div
       className={[
         'sniptale-inspector-surface editor-inspector-surface',
-        'max-h-[min(70vh,36rem)] space-y-3 overflow-y-auto overscroll-contain',
+        'max-h-[min(70vh,36rem)] overflow-y-auto overscroll-contain',
       ].join(' ')}
     >
-      <section aria-label={translate('editor.toolbar.workspace')} className="space-y-3">
-        <h2 className="text-xs font-medium text-[color:var(--sniptale-color-text-secondary)]">
-          {translate('editor.toolbar.workspace')}
+      <section aria-label={translate('editor.toolbar.viewSettings')}>
+        <h2>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+            className={[
+              'flex w-full items-center gap-2 rounded-md px-1 py-1 text-left',
+              'text-xs font-semibold text-[color:var(--sniptale-color-text-primary)]',
+              'hover:bg-[color:var(--sniptale-color-surface-hover)]',
+              'focus-visible:outline focus-visible:outline-1',
+              'focus-visible:outline-[color:var(--sniptale-color-border-strong)]',
+            ].join(' ')}
+          >
+            <SlidersHorizontal size={15} aria-hidden="true" />
+            <span className="min-w-0 flex-1">{translate('editor.toolbar.viewSettings')}</span>
+            <ChevronDown
+              size={15}
+              aria-hidden="true"
+              className={expanded ? 'transition-transform' : '-rotate-90 transition-transform'}
+            />
+          </button>
         </h2>
-        <CompactWorkspaceColorPanel params={params} />
-      </section>
-      <section
-        aria-label={translate('editor.toolbar.gridMode')}
-        className="space-y-3 border-t border-[color:var(--sniptale-color-border-soft)] pt-3"
-      >
-        <h2 className="text-xs font-medium text-[color:var(--sniptale-color-text-secondary)]">
-          {translate('editor.toolbar.gridMode')}
-        </h2>
-        {commands.map((command) => (
-          <div key={command.id}>
-            {command.active === undefined ? (
-              renderFloatingToolbarCommandBody(command, { hideLabel: true })
-            ) : (
-              <div
-                data-inspector-toggle
-                className="flex min-h-9 items-center justify-between gap-3"
-              >
-                <span className="min-w-0 text-xs">{command.title}</span>
-                <ProductGlassSwitch
-                  aria-label={command.title}
-                  aria-pressed={command.active}
-                  on={command.active}
-                  disabled={command.disabled}
-                  onClick={() => void command.onClick?.()}
-                />
-              </div>
-            )}
+        {expanded ? (
+          <div className="space-y-3 pt-2">
+            <CompactWorkspaceColorPanel params={params} />
+            <div className="space-y-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
+              {commands.map((command) => (
+                <div key={command.id}>
+                  {command.active === undefined ? (
+                    renderFloatingToolbarCommandBody(command, { hideLabel: true })
+                  ) : (
+                    <div
+                      data-inspector-toggle
+                      className="flex min-h-8 items-center justify-between gap-3"
+                    >
+                      <span className="min-w-0 text-xs">{command.title}</span>
+                      <ProductGlassSwitch
+                        aria-label={command.title}
+                        aria-pressed={command.active}
+                        on={command.active}
+                        disabled={command.disabled}
+                        onClick={() => void command.onClick?.()}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-        ))}
+        ) : null}
       </section>
     </div>
   );
