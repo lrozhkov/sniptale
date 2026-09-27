@@ -75,12 +75,12 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Reset all changes?',
   },
   resetOriginalMessage: {
-    ru: 'Документ вернётся к исходному состоянию. Эту операцию нельзя отменить.',
-    en: 'The document will return to its original state. This action cannot be undone.',
+    ru: 'Документ вернётся к исходному состоянию. Изменение можно отменить.',
+    en: 'The document will return to its original state. You can undo this change.',
   },
   resetOriginalTooltip: {
-    ru: 'Вернуть документ к исходному состоянию. Операцию нельзя отменить.',
-    en: 'Return the document to its original state. This action cannot be undone.',
+    ru: 'Вернуть документ к исходному состоянию. Изменение можно отменить.',
+    en: 'Return the document to its original state. You can undo this change.',
   },
   annotationFrame: {
     ru: 'Рамка',

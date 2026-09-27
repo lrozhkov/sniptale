@@ -78,6 +78,7 @@ vi.mock('../public-actions/selection/objects/settings', async (importOriginal) =
 vi.mock('../history', () => ({
   createEditorSnapshotHistory: vi.fn(),
   pushEditorSnapshotHistory: vi.fn(),
+  readCurrentEditorSnapshot: vi.fn(() => null),
   redoEditorSnapshot: mocks.redoMock,
   undoEditorSnapshot: mocks.undoMock,
 }));
@@ -126,8 +127,9 @@ function createController() {
     applyDocument: vi.fn(async () => undefined),
     canvas: { getObjects: vi.fn(() => []), id: 'canvas' },
     canvasDocumentSize: { height: 80, width: 120 },
-    history: { id: 'history' },
+    history: { id: 'history', push: vi.fn() },
     originalDocument: { id: 'original' },
+    publishHistoryDocument: vi.fn(),
     renderToDataUrl: vi.fn(() => 'rendered'),
     scheduleZoomToFit: vi.fn(),
     setActiveTool: vi.fn(),
@@ -205,15 +207,15 @@ it('applies history documents only when a snapshot exists', async () => {
 
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'undo' },
-    { resetHistory: false, updateOriginal: false }
+    { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'redo' },
-    { resetHistory: false, updateOriginal: false }
+    { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'original' },
-    { resetHistory: true, updateOriginal: true }
+    { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
   expect(controller.applyDocument).toHaveBeenCalledTimes(3);
 });

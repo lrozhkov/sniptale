@@ -124,11 +124,23 @@ export async function resetEditorControllerToOriginal(
   controller: EditorDocumentResetController
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history ?? null, async () => {
+    flushActiveFrameAnnotationDraft();
     const document = controller.originalDocument;
-    await applyHistoryDocument(controller, document, {
-      resetHistory: true,
-      updateOriginal: true,
-    });
-    if (document) controller.publishHistoryDocument(document);
+    if (!document) return;
+    const previousDocument = readCurrentEditorSnapshot(controller.history ?? null);
+    try {
+      await controller.applyDocument(document, {
+        resetHistory: false,
+        updateOriginal: false,
+        preserveViewport: true,
+      });
+    } catch (error) {
+      if (previousDocument && (await restoreHistoryDocument(controller, previousDocument, error))) {
+        controller.publishHistoryDocument(previousDocument);
+      }
+      throw error;
+    }
+    controller.history?.push(JSON.stringify(document));
+    controller.publishHistoryDocument(document);
   });
 }
