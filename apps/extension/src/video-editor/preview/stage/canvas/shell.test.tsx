@@ -120,6 +120,7 @@ it('preserves canvas, seek position and shared zoom across fullscreen transition
   try {
     await render(false);
     const canvas = host.querySelector('canvas');
+    expect(host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]')).toBeNull();
     await render(true);
     expect(host.querySelector('canvas')).toBe(canvas);
     const footer = host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]');
@@ -133,9 +134,7 @@ it('preserves canvas, seek position and shared zoom across fullscreen transition
     expect(onPreviewZoomChange).toHaveBeenCalledExactlyOnceWith('fit');
     expect(footer?.querySelector('input[type="range"]')?.getAttribute('value')).toBe('1');
     await render(false);
-    expect(
-      host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]')?.textContent
-    ).toContain('75%');
+    expect(host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]')).toBeNull();
     await render(true);
     expect(host.querySelector('canvas')).toBe(canvas);
   } finally {

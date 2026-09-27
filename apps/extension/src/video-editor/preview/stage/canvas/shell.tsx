@@ -302,7 +302,7 @@ function PreviewStageContent(props: {
 }
 
 function StageShellFullscreenTransport(props: PreviewStageShellLayoutProps) {
-  return !props.alternateView?.active ? (
+  return props.isFullscreen && !props.alternateView?.active ? (
     <PreviewStageFullscreenTransport
       zoom={props.previewZoom ?? 'fit'}
       onZoomChange={props.onPreviewZoomChange}
