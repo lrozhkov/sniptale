@@ -224,7 +224,10 @@ export function synchronizeEditorDrawingTextLayout(textbox: Textbox): boolean {
     textbox.set({ width });
     textbox.initDimensions();
   }
-  const height = resolveDrawingTextHeight(textbox.text ?? '', textbox.fontSize, width, measure);
+  const height = Math.max(
+    resolveDrawingTextHeight(textbox.text ?? '', textbox.fontSize, width, measure),
+    textbox.calcTextHeight() + DRAWING_TEXT_VERTICAL_PADDING * 2
+  );
   const heightChanged = Math.abs(textbox.height - height) >= 0.5;
   if (!widthChanged && !heightChanged) {
     return false;

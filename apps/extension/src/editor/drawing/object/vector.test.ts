@@ -86,6 +86,28 @@ describe('Fabric drawing adapter', () => {
     expect(object.width).toBeLessThanOrEqual(220);
   });
 
+  it('keeps every line of a growing multiline textbox inside its selection bounds', () => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'text-multiline',
+        kind: 'text',
+        bounds: { x: 5, y: 6, width: 180, height: 30 },
+        text: 'One\nTwo',
+        color: '#111',
+        backgroundColor: null,
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    object.set({ text: 'One\nTwo\nThree\nFour\nFive\nSix' });
+    object.initDimensions();
+
+    expect(synchronizeEditorDrawingTextLayout(object)).toBe(true);
+    expect(object.height).toBeGreaterThanOrEqual(object.calcTextHeight() + 4);
+    expect(object._textLines).toHaveLength(6);
+  });
+
   it.each([
     { fontFamily: 'serif' as const, fontSize: 24 },
     { fontFamily: 'sans' as const, fontSize: 36 },
