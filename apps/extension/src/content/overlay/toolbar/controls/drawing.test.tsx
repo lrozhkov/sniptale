@@ -122,10 +122,14 @@ it('toggles options on repeated active-tool clicks but keeps Selection options v
     '[data-ui="content.toolbar.drawing.pencil"]'
   );
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.pencil"]')).not.toBeNull();
+  expect(pencil?.dataset['menuIndicator']).toBe('true');
+  expect(pencil?.getAttribute('aria-expanded')).toBe('true');
   act(() => pencil?.click());
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.pencil"]')).toBeNull();
+  expect(pencil?.getAttribute('aria-expanded')).toBe('false');
   act(() => pencil?.click());
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.pencil"]')).not.toBeNull();
+  expect(pencil?.getAttribute('aria-expanded')).toBe('true');
 
   act(() =>
     host.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing.arrow"]')?.click()

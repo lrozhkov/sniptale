@@ -197,4 +197,16 @@
     0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
 }
 
+.sniptale-toolbar-root
+  .sniptale-btn:is(
+    [aria-haspopup='menu'],
+    [data-menu-open],
+    [data-menu-indicator='true']
+  ):focus-visible {
+  outline: 2px solid var(--sniptale-color-text-primary);
+  outline-offset: 1px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 /* Drag handle tooltip removed */

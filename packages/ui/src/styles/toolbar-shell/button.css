@@ -72,6 +72,12 @@
   pointer-events: none;
 }
 
+.sniptale-btn[data-menu-indicator='true'][aria-expanded='true']::before,
+.sniptale-btn[data-menu-indicator='true'][data-menu-open='true']::before {
+  border-top-color: var(--sniptale-color-accent);
+  opacity: 1;
+}
+
 .sniptale-toolbar-menu-item > svg,
 .sniptale-toolbar-menu-item > .sniptale-toolbar-mode-icon {
   width: 18px;

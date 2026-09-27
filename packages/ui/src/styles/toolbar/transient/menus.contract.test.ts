@@ -70,11 +70,17 @@ describe('toolbar-transient-menus contract', () => {
     expect(toolbarTransientMenusStylesheet).toMatch(
       /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:not\(\[data-active='true'\]\):has\(\s*\.sniptale-btn:not\(:disabled\)\s*\):hover::after/su
     );
-    expect(toolbarTransientMenusStylesheet).toMatch(
-      /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:has\(\s*\.sniptale-full-page-chevron\[aria-expanded='true'\],\s*\.sniptale-btn:focus-visible\s*\)::after/su
+    expect(toolbarTransientMenusStylesheet).not.toMatch(
+      /\.sniptale-full-page-wrapper:has\([^)]*aria-expanded='true'[^)]*\)::after/su
+    );
+    expect(toolbarTransientMenusStylesheet).toContain(
+      ".sniptale-full-page-chevron[aria-expanded='true'] svg"
     );
     expect(toolbarTransientMenusStylesheet).toMatch(
       /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:has\(\.sniptale-btn:focus-visible\)\s+\.sniptale-btn\s*\{[^}]*box-shadow:\s*none;/su
+    );
+    expect(toolbarTransientMenusStylesheet).toMatch(
+      /\.sniptale-toolbar-root \.sniptale-full-page-wrapper \.sniptale-btn:focus-visible \{[^}]*outline: 2px solid var\(--sniptale-color-text-primary\);/su
     );
     expect(toolbarTransientMenusStylesheet).not.toContain(
       '.sniptale-full-page-wrapper:focus-within'

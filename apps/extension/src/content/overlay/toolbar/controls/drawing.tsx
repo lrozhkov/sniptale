@@ -99,6 +99,7 @@ function DrawingToolControl(props: {
   const label = translate(props.label);
   const modifierHint = props.modifierHint ? translate(props.modifierHint) : null;
   const title = modifierHint ? `${label}\n${modifierHint}` : label;
+  const disclosureAvailable = props.tool !== 'select' && props.optionsTool === props.tool;
   return (
     <div className="relative flex">
       <ContentToolbarButton
@@ -106,9 +107,12 @@ function DrawingToolControl(props: {
         type="button"
         active={props.active}
         aria-pressed={props.active}
+        aria-expanded={disclosureAvailable ? props.showOptions : undefined}
         aria-label={label}
         aria-describedby={modifierHint ? modifierHintId : undefined}
         title={title}
+        menuIndicator={disclosureAvailable}
+        data-menu-open={disclosureAvailable ? String(props.showOptions) : undefined}
         dataUi={`content.toolbar.drawing.${props.tool}`}
         onClick={() => {
           if (props.active && props.tool !== 'select') {
