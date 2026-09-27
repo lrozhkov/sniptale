@@ -141,8 +141,10 @@ function renderToolbarSettingsUtilityItems(props: {
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
+  autoBlurEnabled?: boolean;
   screenshotMode: boolean;
   showPinItem?: boolean;
+  showHideItem?: boolean;
 }) {
   return (
     <>
@@ -159,12 +161,14 @@ function renderToolbarSettingsUtilityItems(props: {
       />
       {props.showPinItem !== false ? renderPinToTabItem(props) : null}
       <ProductToolbarMenuDivider />
-      {renderActionItem({
-        icon: <PanelBottomClose className="sniptale-popover-icon" />,
-        label: translate('content.toolbar.hideToolbar'),
-        onAction: () => props.onHide(),
-        onClose: props.onClose,
-      })}
+      {props.showHideItem === false
+        ? null
+        : renderActionItem({
+            icon: <PanelBottomClose className="sniptale-popover-icon" />,
+            label: translate('content.toolbar.hideToolbar'),
+            onAction: () => props.onHide(),
+            onClose: props.onClose,
+          })}
       {renderDisableScreenshotModeItem(props)}
     </>
   );
@@ -178,6 +182,7 @@ function renderPinToTabItem(props: {
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
+  autoBlurEnabled?: boolean;
 }) {
   return (
     <ToolbarSettingsItem
@@ -191,7 +196,11 @@ function renderPinToTabItem(props: {
       label={translate('content.toolbar.pinToTab')}
       hint={
         props.pinToTabLocked
-          ? translate('content.toolbar.pinToTabLockedHint')
+          ? translate(
+              props.autoBlurEnabled
+                ? 'content.toolbar.pinToTabAutoBlurLockedHint'
+                : 'content.toolbar.pinToTabLockedHint'
+            )
           : !props.pinToTabAvailable
             ? translate('content.toolbar.pinToTabUnavailableHint')
             : translate('content.toolbar.pinToTabHint')
@@ -270,8 +279,10 @@ type ToolbarSettingsDropdownProps = {
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
+  autoBlurEnabled?: boolean;
   screenshotMode: boolean;
   showPinItem?: boolean;
+  showHideItem?: boolean;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
   viewportRightInset?: number;
 };

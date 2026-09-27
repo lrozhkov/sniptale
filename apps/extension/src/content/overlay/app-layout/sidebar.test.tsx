@@ -94,6 +94,7 @@ function createScenarioProps() {
 function createProps() {
   return {
     isCompletelyHidden: false,
+    keepPinnedForAutoBlur: false,
     modeController: {
       handleToggleScreenshotMode: vi.fn(),
     },
@@ -200,6 +201,18 @@ describe('ContentScenarioRecorderSidebar finish flow', () => {
 
     await verifySidebarHideStates(props);
     await verifyDeferredHighlightRestore(props);
+  });
+
+  it('keeps the panel pinned when finishing a scenario with automatic blur active', async () => {
+    const props = createProps();
+    props.keepPinnedForAutoBlur = true;
+    await renderSidebar(props);
+
+    await clickRenderedSidebarButton();
+
+    expect(props.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+    expect(props.setPinToTab).not.toHaveBeenCalled();
+    expect(props.scenario.actions.openEditor).toHaveBeenCalledWith();
   });
 });
 

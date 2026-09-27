@@ -26,7 +26,7 @@ export function ToolbarUtilityButtons(props: {
   futureFrameStepBadgeActions?: import('../types').ToolbarFutureFrameStepBadgeActions;
 }) {
   const { autoBlur, highlighterMode, isLoading } = props;
-  const showPersistentAutoBlur = props.isCursorMode && autoBlur?.autoApplyAllowed === true;
+  const showPersistentAutoBlur = props.isCursorMode && autoBlur !== undefined;
 
   if (!highlighterMode && !showPersistentAutoBlur) {
     return null;

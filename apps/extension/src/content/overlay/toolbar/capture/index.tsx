@@ -18,6 +18,8 @@ export const ToolbarCaptureActions: React.FC<ToolbarCaptureActionsProps> = (prop
   return (
     <ToolbarCaptureActionGroup
       screenshotMode={props.screenshotMode}
+      isNavigationMode={props.isNavigationMode ?? false}
+      autoBlurEnabled={props.autoBlurEnabled ?? false}
       isLoading={props.isLoading}
       captureAction={props.captureAction}
       compactMenus={props.compactMenus}

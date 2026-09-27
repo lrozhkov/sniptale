@@ -81,6 +81,8 @@ export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
 export interface ToolbarCaptureActionsProps {
   windowSize?: ScreenshotWindowSizeControls;
   screenshotMode: boolean;
+  isNavigationMode?: boolean;
+  autoBlurEnabled?: boolean;
   canClearPagePreparation?: boolean;
   onClearPagePreparation?: () => void;
   isLoading: boolean;
@@ -115,6 +117,7 @@ export interface ToolbarCaptureActionsProps {
 export interface ToolbarAutoBlurProps {
   autoApplyAllowed: boolean;
   autoApplyEnabled: boolean;
+  pinToTabAvailable?: boolean;
   isApplying: boolean;
   onApplyOnce: () => Promise<void>;
   onOpenAutoApplySettings: () => void;

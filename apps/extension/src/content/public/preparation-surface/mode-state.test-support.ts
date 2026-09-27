@@ -15,6 +15,7 @@ export function createModeState(): ContentAppModeState {
     navigationLockEnabled: false,
     pendingAutoStartCapture: null,
     pinToTab: false,
+    pinToTabConfirmed: false,
     pinToTabAvailable: true,
     quickActionOverlayRef: { current: null },
     quickActionToastCountdown: null,

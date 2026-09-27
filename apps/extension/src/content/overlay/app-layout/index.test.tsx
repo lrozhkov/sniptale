@@ -284,6 +284,7 @@ async function verifiesLayoutComposition() {
   expect(toolbarCall?.[0]).toHaveProperty('designReview.panel.open', false);
   expect(sidebarCall?.[0]).toEqual({
     isCompletelyHidden: props.toolbar.isCompletelyHidden,
+    keepPinnedForAutoBlur: false,
     modeController: props.toolbar.modeController,
     scenario: props.scenario,
     setPinToTab: props.toolbar.setPinToTab,

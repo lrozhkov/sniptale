@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarCaptureActionGroup } from './group';
 import type { ToolbarMenuState } from '../state/menu';
+import { translate } from '../../../../platform/i18n';
 
 vi.mock('./options', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./options')>()),
@@ -48,7 +49,14 @@ function createClosedToolbarMenuState(): ToolbarMenuState {
   };
 }
 
-function renderGroup(screenshotMode = true, canClearPagePreparation = false) {
+function renderGroup(
+  screenshotMode = true,
+  canClearPagePreparation = false,
+  isNavigationMode = false,
+  autoBlurEnabled = false
+) {
+  const onPinToTabChange = vi.fn();
+  const onClose = vi.fn();
   if (!container) {
     container = document.createElement('div');
     document.body.append(container);
@@ -59,6 +67,8 @@ function renderGroup(screenshotMode = true, canClearPagePreparation = false) {
     root?.render(
       <ToolbarCaptureActionGroup
         screenshotMode={screenshotMode}
+        isNavigationMode={isNavigationMode}
+        autoBlurEnabled={autoBlurEnabled}
         canClearPagePreparation={canClearPagePreparation}
         isLoading={false}
         captureAction="download_default"
@@ -66,12 +76,12 @@ function renderGroup(screenshotMode = true, canClearPagePreparation = false) {
         displayMode="vertical"
         pinToTab={false}
         pinToTabAvailable={true}
-        pinToTabLocked={false}
+        pinToTabLocked={autoBlurEnabled}
         onCompactMenusChange={() => undefined}
         onDisplayModeChange={() => undefined}
-        onPinToTabChange={() => undefined}
+        onPinToTabChange={onPinToTabChange}
         onCaptureActionChange={() => undefined}
-        onClose={() => undefined}
+        onClose={onClose}
         onDisableScreenshotMode={() => undefined}
         timerDelay={0}
         onTimerDelayChange={() => undefined}
@@ -84,6 +94,7 @@ function renderGroup(screenshotMode = true, canClearPagePreparation = false) {
       />
     );
   });
+  return { onClose, onPinToTabChange };
 }
 
 beforeEach(() => {
@@ -131,5 +142,36 @@ describe('ToolbarCaptureActionGroup', () => {
   it('shows reset beside history when existing changes can be cleared outside screenshot mode', () => {
     renderGroup(false, true);
     expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).not.toBeNull();
+  });
+
+  it('places Navigation pin and collapse immediately before settings and blocks unpin during auto-blur', () => {
+    const handlers = renderGroup(true, false, true);
+    const group = container?.querySelector('[data-ui="content.toolbar.settings-group"]');
+    expect(Array.from(group?.children ?? []).map((child) => child.getAttribute('data-ui'))).toEqual(
+      [
+        'content.toolbar.navigation.pin-to-tab',
+        'content.toolbar.navigation.collapse',
+        'test.settings-menu',
+      ]
+    );
+    act(() =>
+      group
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.navigation.pin-to-tab"]')
+        ?.click()
+    );
+    act(() =>
+      group
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.navigation.collapse"]')
+        ?.click()
+    );
+    expect(handlers.onPinToTabChange).toHaveBeenCalledWith(true, undefined);
+    expect(handlers.onClose).toHaveBeenCalledOnce();
+
+    renderGroup(true, false, true, true);
+    const pin = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.navigation.pin-to-tab"]'
+    );
+    expect(pin?.disabled).toBe(true);
+    expect(pin?.title).toBe(translate('content.toolbar.pinToTabAutoBlurLockedHint'));
   });
 });

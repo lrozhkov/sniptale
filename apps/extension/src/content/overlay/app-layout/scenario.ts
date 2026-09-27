@@ -23,6 +23,7 @@ type UserScreenshotModeExitArgs = {
     handleToggleScreenshotMode: (enabled: boolean) => void;
   };
   setPinToTab: (value: boolean) => void;
+  keepPinnedForAutoBlur?: boolean;
 };
 
 export function isScenarioByClickBlocked(modes: ScenarioBlockedModes) {
@@ -53,7 +54,9 @@ export function resolveScenarioByClickTransition(args: {
 
 export function exitScreenshotModeFromUserAction(args: UserScreenshotModeExitArgs): void {
   args.modeController.handleToggleScreenshotMode(false);
-  args.setPinToTab(false);
+  if (!args.keepPinnedForAutoBlur) {
+    args.setPinToTab(false);
+  }
 }
 
 export async function finishScenarioRecorder(args: FinishScenarioRecorderArgs) {

@@ -10,6 +10,7 @@ type ContentScenarioRecorderSidebarArgs = {
   modeController: Pick<ContentAppModeController, 'handleToggleScreenshotMode'>;
   scenario: ContentAppLayoutScenarioProps;
   setPinToTab: (value: boolean) => void;
+  keepPinnedForAutoBlur: boolean;
 };
 
 export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSidebarArgs) {
@@ -33,6 +34,7 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
             exitScreenshotModeFromUserAction({
               modeController: args.modeController,
               setPinToTab: args.setPinToTab,
+              keepPinnedForAutoBlur: args.keepPinnedForAutoBlur,
             }),
           scenarioController: args.scenario.actions,
         })

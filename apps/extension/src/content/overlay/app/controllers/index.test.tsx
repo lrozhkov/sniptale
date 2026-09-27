@@ -136,6 +136,7 @@ function createModeState(): ContentAppControllersModeState {
     navigationLockEnabled: true,
     pendingAutoStartCapture: { type: 'selection' },
     pinToTab: false,
+    pinToTabConfirmed: false,
     pinToTabAvailable: true,
     quickActionToastCountdown: null,
     quickActionOverlayRef: { current: null },

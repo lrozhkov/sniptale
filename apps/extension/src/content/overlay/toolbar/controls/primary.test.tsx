@@ -247,23 +247,12 @@ describe('ToolbarPrimaryControls', () => {
     expect(document.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
   });
 
-  it('shows pin and collapse actions only next to Navigation', () => {
+  it('keeps Navigation pin and collapse actions with the settings group', () => {
     const navigation = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(navigation.props);
 
-    const pin = document.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.navigation.pin-to-tab"]'
-    );
-    const collapse = document.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.navigation.collapse"]'
-    );
-    expect(pin).not.toBeNull();
-    expect(collapse).not.toBeNull();
-
-    act(() => pin?.click());
-    act(() => collapse?.click());
-    expect(navigation.props.toolbarProps.onPinToTabChange).toHaveBeenCalledWith(true, undefined);
-    expect(navigation.props.toolbarProps.onHide).toHaveBeenCalledOnce();
+    expect(document.querySelector('[data-ui="content.toolbar.navigation.pin-to-tab"]')).toBeNull();
+    expect(document.querySelector('[data-ui="content.toolbar.navigation.collapse"]')).toBeNull();
 
     const editing = createToolbarPrimaryControlsProps({ quickEditMode: true });
     renderToolbarPrimaryControls(editing.props);

@@ -133,11 +133,13 @@ function createScreenshotModeToggleHandler(args: {
 }
 
 function createToolbarAutoBlurProps(
-  autoBlurController: ContentAppLayoutToolbarProps['autoBlurController']
+  autoBlurController: ContentAppLayoutToolbarProps['autoBlurController'],
+  pinToTabAvailable: boolean
 ) {
   return {
     autoApplyAllowed: autoBlurController.autoApplyAllowed,
-    autoApplyEnabled: autoBlurController.autoApplyEnabled,
+    autoApplyEnabled: autoBlurController.autoApplyEnabled && autoBlurController.autoApplyAllowed,
+    pinToTabAvailable,
     isApplying: autoBlurController.isApplying,
     onApplyOnce: autoBlurController.applyOnce,
     onOpenAutoApplySettings: autoBlurController.openForAutoApply,
@@ -203,7 +205,10 @@ function renderToolbarShell(args: {
   toolbar: ContentAppLayoutToolbarProps;
 }) {
   const { modeController, modes } = args.toolbar;
-  const autoBlur = createToolbarAutoBlurProps(args.toolbar.autoBlurController);
+  const autoBlur = createToolbarAutoBlurProps(
+    args.toolbar.autoBlurController,
+    args.toolbar.pinToTabAvailable
+  );
   const handleHideToolbar = () => {
     useFrameUIStore.getState().dismissFrameUi();
     args.toolbar.setPinnedToolbarVisible(false);
@@ -242,6 +247,7 @@ function renderToolbarShell(args: {
         pinToTab={Boolean(args.toolbar.pinToTab || modes.videoRecordingMode)}
         pinToTabAvailable={args.toolbar.pinToTabAvailable}
         pinToTabLocked={
+          autoBlur.autoApplyEnabled ||
           modes.videoRecordingMode ||
           (args.toolbar.captureAction === 'scenario' && modes.screenshotMode)
         }
@@ -292,6 +298,8 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
     exitScreenshotModeFromUserAction({
       modeController: toolbar.modeController,
       setPinToTab: toolbar.setPinToTab,
+      keepPinnedForAutoBlur:
+        toolbar.autoBlurController.autoApplyEnabled && toolbar.autoBlurController.autoApplyAllowed,
     });
   const handleFinishScenario = createFinishScenarioHandler({
     onDisableScreenshotMode: handleDisableScreenshotMode,

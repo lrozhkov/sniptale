@@ -21,6 +21,7 @@ function createModeState(): ContentAppModeState {
     navigationLockEnabled: false,
     pendingAutoStartCapture: { type: 'selection' },
     pinToTab: false,
+    pinToTabConfirmed: false,
     pinToTabAvailable: true,
     quickActionOverlayRef: { current: null },
     quickActionToastCountdown: 5,

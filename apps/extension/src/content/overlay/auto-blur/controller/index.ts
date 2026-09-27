@@ -15,17 +15,23 @@ import type { AutoBlurFrameManager } from './operations';
 import { useAutoBlurSession } from './state';
 import type { AppliedBorderSettings } from '../../../../features/highlighter/contracts';
 import { useAutoBlurFullPageRun } from './full-page-run';
+import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 type UseAutoBlurControllerParams = {
   autoApplyAllowed: boolean;
   frameManager: AutoBlurFrameManager;
   highlighterMode: boolean;
+  ensurePinned?: (source?: ContentPrivilegedActionIntentSource) => Promise<boolean>;
+  navigationMode?: boolean;
 };
 
 type AutoBlurSession = ReturnType<typeof useAutoBlurSession>;
 
 function createControllerResult(args: {
-  apply: (borderSettings: AppliedBorderSettings) => Promise<void>;
+  apply: (
+    borderSettings: AppliedBorderSettings,
+    source?: ContentPrivilegedActionIntentSource
+  ) => Promise<void>;
   applyOnce: () => Promise<void>;
   autoApplyAllowed: boolean;
   clear: () => void;
@@ -101,9 +107,9 @@ function useAutoBlurControllerEffects(args: {
     startScan: transitions.startScan,
   });
   useHighlighterModeCloseEffect({
-    autoApplyAllowed: params.autoApplyAllowed,
     closeForMode: transitions.closeForMode,
     highlighterMode: params.highlighterMode,
+    navigationMode: params.navigationMode ?? false,
     isOpen: state.isOpen,
   });
   useAutoBlurAutoApplyEffect({
@@ -135,6 +141,7 @@ function useAutoBlurControllerActions(args: {
     blurSettings: state.blurSettings,
     close: transitions.close,
     enableAutoApplyOnApply: state.enableAutoApplyOnApply,
+    ...(params.ensurePinned ? { ensurePinned: params.ensurePinned } : {}),
     failApplying: transitions.failApplying,
     frameManager: params.frameManager,
     matches: state.matches,
@@ -151,6 +158,7 @@ function useAutoBlurControllerActions(args: {
   });
   const toggleAutoApply = useToggleAutoApplyAction({
     autoApplyAllowed: params.autoApplyAllowed,
+    ...(params.ensurePinned ? { ensurePinned: params.ensurePinned } : {}),
     beginApplying: transitions.beginApplying,
     failApplying: transitions.failApplying,
     finishApplying: transitions.finishApplying,

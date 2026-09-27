@@ -20,6 +20,20 @@ it('always clears authoritative pin state on explicit exit despite a stale false
   expect(setPinToTab).toHaveBeenCalledWith(false);
 });
 
+it('keeps the panel pinned when exiting a screenshot while automatic blur is active', () => {
+  const handleToggleScreenshotMode = vi.fn();
+  const setPinToTab = vi.fn();
+
+  exitScreenshotModeFromUserAction({
+    modeController: { handleToggleScreenshotMode },
+    setPinToTab,
+    keepPinnedForAutoBlur: true,
+  });
+
+  expect(handleToggleScreenshotMode).toHaveBeenCalledWith(false);
+  expect(setPinToTab).not.toHaveBeenCalled();
+});
+
 it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   expect(
     isScenarioByClickBlocked({

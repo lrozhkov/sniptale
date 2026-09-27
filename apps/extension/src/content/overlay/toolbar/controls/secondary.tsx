@@ -99,6 +99,7 @@ function createUtilityButtonsProps(args: {
 }
 
 function createCaptureActionProps(args: {
+  interactionMode: ReturnType<typeof resolveEffectiveInteractionMode>;
   onViewportChange: (viewport: { width: number; height: number } | null) => void;
   scenarioCaptureProps: ToolbarProps['scenario'] | undefined;
   toolbarProps: ToolbarProps;
@@ -106,6 +107,12 @@ function createCaptureActionProps(args: {
 }) {
   return {
     screenshotMode: args.viewModel.screenshotMode,
+    isNavigationMode:
+      args.interactionMode === 'cursor' &&
+      !args.toolbarProps.drawingMode &&
+      !args.viewModel.designReviewMode &&
+      !args.toolbarProps.videoRecordingMode,
+    autoBlurEnabled: args.toolbarProps.autoBlur?.autoApplyEnabled ?? false,
     isLoading: args.viewModel.derivedState.isLoading,
     captureAction: args.viewModel.capture.action,
     compactMenus: args.viewModel.derivedState.compactMenus,
@@ -152,6 +159,7 @@ function createSecondaryControlsRenderState(props: {
   return {
     interactionMode,
     captureActionProps: createCaptureActionProps({
+      interactionMode,
       onViewportChange: props.onViewportChange,
       scenarioCaptureProps,
       toolbarProps: props.toolbarProps,

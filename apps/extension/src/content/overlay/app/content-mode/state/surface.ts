@@ -18,6 +18,7 @@ function useContentPinToTabState(
 ) {
   const [pinToTab, setPinToTabState] = useState(readContentPinToTabSessionState);
   const [pinToTabAvailable, setPinToTabAvailable] = useState(false);
+  const [pinToTabConfirmed, setPinToTabConfirmed] = useState(pinToTab);
   const confirmedPinToTabRef = useRef(pinToTab);
   const refreshGenerationRef = useRef(0);
   const writeGenerationRef = useRef(0);
@@ -29,34 +30,42 @@ function useContentPinToTabState(
   const commitConfirmedPinToTabState = useCallback(
     (value: boolean) => {
       confirmedPinToTabRef.current = value;
+      setPinToTabConfirmed(value);
       commitPinToTabState(value);
     },
     [commitPinToTabState]
   );
 
   const setPinToTab = useCallback(
-    (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => {
+    async (
+      value: boolean,
+      contentIntentSource?: ContentPrivilegedActionIntentSource
+    ): Promise<boolean> => {
       const writeGeneration = writeGenerationRef.current + 1;
       writeGenerationRef.current = writeGeneration;
       const isCurrent = () => writeGenerationRef.current === writeGeneration;
 
       commitPinToTabState(value);
-      void writeContentPinToTabSessionState(value, isCurrent, contentIntentSource)
+      return writeContentPinToTabSessionState(value, isCurrent, contentIntentSource)
         .then((result) => {
           if (result.status === 'acknowledged') {
-            confirmedPinToTabRef.current = result.value;
             if (isCurrent()) {
+              confirmedPinToTabRef.current = result.value;
               refreshGenerationRef.current += 1;
               setPinToTabAvailable(result.pinToTabAvailable);
+              setPinToTabConfirmed(result.value);
               commitPinToTabState(result.value);
             }
           }
+          return isCurrent() && result.status === 'acknowledged' && result.value === value;
         })
         .catch(() => {
           if (isCurrent()) {
             refreshGenerationRef.current += 1;
+            setPinToTabConfirmed(confirmedPinToTabRef.current);
             commitPinToTabState(confirmedPinToTabRef.current);
           }
+          return false;
         });
     },
     [commitPinToTabState]
@@ -103,7 +112,7 @@ function useContentPinToTabState(
     };
   }, [refreshPinToTabState]);
 
-  return { pinToTab, pinToTabAvailable, setPinToTab };
+  return { pinToTab, pinToTabAvailable, pinToTabConfirmed, setPinToTab };
 }
 
 function useQuickActionOverlayState() {
@@ -151,7 +160,7 @@ function useContentVisibilityState() {
     return () =>
       !overlapsPendingWrite && visibilityWriteGenerationRef.current === startedAtGeneration;
   }, []);
-  const { pinToTab, pinToTabAvailable, setPinToTab } = useContentPinToTabState(
+  const { pinToTab, pinToTabAvailable, pinToTabConfirmed, setPinToTab } = useContentPinToTabState(
     setIsToolbarVisible,
     createToolbarVisibilityRefreshGuard
   );
@@ -186,6 +195,7 @@ function useContentVisibilityState() {
     navigationLockEnabled,
     pinToTab,
     pinToTabAvailable,
+    pinToTabConfirmed,
     quickActionOverlayRef,
     quickActionToastCountdown,
     saveDialogState,

@@ -295,6 +295,10 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Панель закреплена, пока включён сценарий',
     en: 'The toolbar stays pinned while scenario mode is on',
   },
+  pinToTabAutoBlurLockedHint: {
+    ru: 'Выключите авторазмытие данных, чтобы открепить панель',
+    en: 'Turn off automatic data blur before unpinning the toolbar',
+  },
   pinToTabUnavailableHint: {
     ru: 'Разрешите расширению доступ ко всем сайтам, чтобы панель восстанавливалась после переходов',
     en: 'Allow the extension on all sites so the toolbar can return after navigation',

@@ -26,11 +26,6 @@ export function ToolbarPrimaryControls(props: {
     quickEditMode: viewModel.quickEditMode,
     highlighterMode: viewModel.highlighterMode,
     toolbarMenuState: viewModel.toolbarMenuState,
-    pinToTab: toolbarProps.pinToTab ?? false,
-    pinToTabAvailable: toolbarProps.pinToTabAvailable ?? false,
-    pinToTabLocked: toolbarProps.pinToTabLocked ?? false,
-    onPinToTabChange: toolbarProps.onPinToTabChange ?? (() => undefined),
-    onHide: toolbarProps.onHide,
     ...(typeof viewModel.pendingInteractionMode === 'undefined'
       ? {}
       : { pendingMode: viewModel.pendingInteractionMode }),

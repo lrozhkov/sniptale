@@ -14,6 +14,7 @@ function ContentScenarioRecorderSidebarSlot(props: {
   modeController: ContentAppLayoutProps['toolbar']['modeController'];
   scenario: ContentAppLayoutProps['scenario'];
   setPinToTab: ContentAppLayoutProps['toolbar']['setPinToTab'];
+  keepPinnedForAutoBlur: boolean;
 }) {
   if (
     !shouldRenderContentScenarioRecorderSidebar({
@@ -31,6 +32,7 @@ function ContentScenarioRecorderSidebarSlot(props: {
         modeController={props.modeController}
         scenario={props.scenario}
         setPinToTab={props.setPinToTab}
+        keepPinnedForAutoBlur={props.keepPinnedForAutoBlur}
       />
     </Suspense>
   );
@@ -131,6 +133,10 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
         modeController={props.toolbar.modeController}
         scenario={props.scenario}
         setPinToTab={props.toolbar.setPinToTab}
+        keepPinnedForAutoBlur={
+          props.toolbar.autoBlurController.autoApplyEnabled &&
+          props.toolbar.autoBlurController.autoApplyAllowed
+        }
       />
       {isCaptureUiHidden ? null : <ContentDialogStack dialogs={props.dialogs} />}
     </>
