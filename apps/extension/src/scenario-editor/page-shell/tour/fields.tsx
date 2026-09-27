@@ -1,6 +1,9 @@
 import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  TOUR_LIMITS,
+  resolveTourTextAppearance,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useEffect, useState } from 'react';
 import type {
   TourAction,
@@ -77,7 +80,7 @@ export function TourPointFields({
 
 export function TourTextPresentation({
   inherit = true,
-  allowCallout = true,
+  kind,
   value,
   defaults,
   disabled,
@@ -85,38 +88,49 @@ export function TourTextPresentation({
   t,
 }: {
   inherit?: boolean;
-  allowCallout?: boolean;
+  kind?: 'hotspot' | 'annotation';
   value: TourTextAppearance | null;
   defaults: TourTextAppearance;
   disabled: boolean;
   onChange: (value: TourTextAppearance | null) => void;
   t: Translate;
 }) {
+  const effective = kind ? resolveTourTextAppearance(kind, value, defaults) : (value ?? defaults);
+  const presentationLabel = t(
+    kind === 'annotation'
+      ? 'scenario.editor.tourSlidePlacement'
+      : kind === 'hotspot'
+        ? 'scenario.editor.tourHotspotHint'
+        : 'scenario.editor.tourTextPresentation'
+  );
   return (
     <div className="tour-text-field">
-      <span>{t('scenario.editor.tourTextPresentation')}</span>
+      <span>{presentationLabel}</span>
       <CompactSelect
-        aria-label={t('scenario.editor.tourTextPresentation')}
+        aria-label={presentationLabel}
         disabled={disabled}
-        value={value?.presentation ?? 'inherit'}
+        value={value ? effective.presentation : 'inherit'}
         options={[
           ...(inherit
             ? [{ value: 'inherit' as const, label: t('scenario.editor.tourInherited') }]
             : []),
-          ...(allowCallout || value?.presentation === 'callout'
+          ...(kind !== 'annotation'
             ? [
                 {
                   value: 'callout' as const,
                   label: t('scenario.editor.tourCallout'),
-                  disabled: !allowCallout,
                 },
               ]
             : []),
-          { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
-          { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
+          ...(kind !== 'hotspot'
+            ? [
+                { value: 'caption-top' as const, label: t('scenario.editor.tourCaptionTop') },
+                { value: 'caption-bottom' as const, label: t('scenario.editor.tourCaptionBottom') },
+              ]
+            : []),
         ]}
         onChange={(presentation) =>
-          onChange(presentation === 'inherit' ? null : { ...(value ?? defaults), presentation })
+          onChange(presentation === 'inherit' ? null : { ...effective, presentation })
         }
       />
       {value && (
@@ -131,9 +145,9 @@ export function TourTextPresentation({
               { value: 'center', label: t('scenario.editor.tourAlignCenter') },
               { value: 'end', label: t('scenario.editor.tourAlignEnd') },
             ]}
-            onChange={(alignment) => onChange({ ...value, alignment })}
+            onChange={(alignment) => onChange({ ...effective, alignment })}
           />
-          {value.presentation === 'callout' && allowCallout && (
+          {effective.presentation === 'callout' && (
             <>
               <span>{t('scenario.editor.tourTextPlacement')}</span>
               <CompactSelect
@@ -147,18 +161,13 @@ export function TourTextPresentation({
                   { value: 'left', label: t('scenario.editor.tourPlacementLeft') },
                   { value: 'right', label: t('scenario.editor.tourPlacementRight') },
                 ]}
-                onChange={(placement) => onChange({ ...value, placement })}
+                onChange={(placement) => onChange({ ...effective, placement })}
               />
             </>
           )}
         </>
       )}
-      <TourHintStyle
-        value={{ ...(value ?? defaults), surface: value?.surface ?? defaults.surface }}
-        disabled={disabled}
-        onChange={onChange}
-        t={t}
-      />
+      <TourHintStyle value={effective} disabled={disabled} onChange={onChange} t={t} />
     </div>
   );
 }

@@ -344,14 +344,11 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     const args = fixture();
     const slide = args.tour.slides[0]!;
     if (slide.kind !== 'image') throw new Error('Expected image');
-    slide.hotspots[0]!.label = 'First explanation';
-    slide.hotspots[0]!.text = 'A'.repeat(170);
-    slide.hotspots.push({
-      ...slide.hotspots[0]!,
-      id: 'other',
-      label: 'Second explanation',
-      text: 'Second body',
-    });
+    slide.hotspots = [];
+    slide.annotations = [
+      { id: 'first-note', text: 'A'.repeat(170), anchor: null, appearance: null },
+      { id: 'second-note', text: 'Second body', anchor: null, appearance: null },
+    ];
     args.tour.style.textAppearance.presentation = presentation;
     const dom = open(await buildTourPlayerHtml(args));
     const doc = dom.window.document;
@@ -359,20 +356,20 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
     const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    expect(toggle.textContent).toContain('First explanation');
+    expect(toggle.textContent).toContain('Details');
     expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 2');
     next.click();
     expect(body.textContent).toBe('A'.repeat(10));
     toggle.click();
     expect(body.hidden).toBe(true);
-    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: First explanation');
+    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
     toggle.click();
     expect(body.hidden).toBe(false);
     expect(body.textContent).toBe('A'.repeat(10));
     toggle.click();
     next.click();
     expect(body.hidden).toBe(false);
-    expect(toggle.textContent).toContain('Second explanation');
+    expect(toggle.textContent).toContain('Details');
     expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 2');
     expect(doc.querySelector<HTMLElement>('[data-tour-hint-count]')!.hidden).toBe(true);
     dom.close();
@@ -384,6 +381,10 @@ it.each(['caption-top', 'caption-bottom'] as const)(
   async (presentation) => {
     const args = fixture();
     args.tour.style.textAppearance.presentation = presentation;
+    const slide = args.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image');
+    slide.hotspots = [];
+    slide.annotations = [{ id: 'note', text: 'Slide explanation', anchor: null, appearance: null }];
     const dom = open(await buildTourPlayerHtml(args));
     const viewport = dom.window.document.querySelector('[data-tour-viewport]')!;
     const hint = dom.window.document.querySelector<HTMLElement>('[data-tour-hint]')!;
@@ -458,18 +459,14 @@ it('lays out one content frame above one bottom toolbar that owns every control'
   dom.close();
 });
 
-it.each([
-  ['Explanation', 'Explanation'],
-  ['  explanation  ', 'Explanation'],
-  ['Explanation.', 'Explanation'],
-  ['Open the menu', 'Open the menu — then save the page'],
-])('uses the neutral disclosure heading when label "%s" repeats the body', async (label, text) => {
+it('uses a neutral disclosure heading for slide explanations', async () => {
+  const text = 'Slide explanation body';
   const args = fixture();
   args.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = args.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots[0]!.label = label;
-  slide.hotspots[0]!.text = text;
+  slide.hotspots = [];
+  slide.annotations = [{ id: 'note', text, anchor: null, appearance: null }];
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
   const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
@@ -483,7 +480,7 @@ it.each([
   dom.close();
 });
 
-it('keeps a distinct authored label and falls back when the label is missing', async () => {
+it('separates action callouts and slide captions despite a shared caption default', async () => {
   const args = fixture();
   args.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = args.tour.slides[0]!;
@@ -501,10 +498,16 @@ it('keeps a distinct authored label and falls back when the label is missing', a
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
   const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
-  expect(toggle.textContent?.trim()).toBe('Continue');
+  expect(toggle.hidden).toBe(true);
+  expect(doc.querySelector<HTMLElement>('[data-tour-hint]')!.dataset['presentation']).toBe(
+    'callout'
+  );
   doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
   expect(doc.querySelector('[data-tour-hint-text]')!.textContent).toBe('Slide note body');
   expect(toggle.textContent?.trim()).toBe('Details');
+  expect(doc.querySelector<HTMLElement>('[data-tour-hint]')!.dataset['presentation']).toBe(
+    'caption-bottom'
+  );
   dom.close();
 });
 

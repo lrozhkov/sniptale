@@ -58,6 +58,7 @@ export function TourHotspotSettings({
           {t('scenario.editor.tourPulse')}
         </label>
         <TourTextPresentation
+          kind="hotspot"
           value={value.appearance}
           defaults={tour.style.textAppearance}
           disabled={disabled}
@@ -132,7 +133,7 @@ export function TourAnnotationSettings({
         onChange={(text) => onChange({ ...value, text })}
       />
       <TourTextPresentation
-        allowCallout={false}
+        kind="annotation"
         value={value.appearance}
         defaults={tour.style.textAppearance}
         disabled={disabled}

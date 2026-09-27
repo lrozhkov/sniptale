@@ -147,8 +147,8 @@ it('edits an image slide and hotspots through canonical commands without changin
   await fill('Y', '40');
   await click('Target area');
   await click('Target area');
-  await choose('Explanations', 'Top captions');
-  await choose('Explanations', 'Use tour default');
+  await choose('Hotspot hint', 'At hotspot');
+  await choose('Hotspot hint', 'Use tour default');
   await choose('On click', 'Open link');
   await fill('Open link', 'javascript:alert(1)');
   expect(host.querySelector('[role=alert]')).not.toBeNull();
@@ -166,10 +166,10 @@ it('edits an image slide and hotspots through canonical commands without changin
   expect(current().hotspots).toHaveLength(0);
 });
 it('edits annotations and masks, keeping their geometry bounded and supports deletion', async () => {
-  await click('Explanation');
+  await click('Slide explanation');
   await fill('Text', 'A note');
   expect(host.querySelector('[aria-label="X"]')).toBeNull();
-  await choose('Explanations', 'Bottom captions');
+  await choose('Placement on slide', 'Bottom captions');
   expect(current().annotations[0]?.appearance?.presentation).toBe('caption-bottom');
   await click('Back to slide settings');
   await choose('Add', 'Highlight');
@@ -236,7 +236,7 @@ it('lists mixed objects in stored order and moves them through one mutation', as
 it('derives the object list without a stored order and swaps the actions for one Add menu', async () => {
   expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
   expect(host.querySelector('[aria-label="Add"]')).toBeNull();
-  await click('Explanation');
+  await click('Slide explanation');
   await click('Back to slide settings');
   expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(0);
   const objectsGroup = host.querySelector('section[aria-label="Slide objects"]')!;
@@ -266,13 +266,13 @@ it('derives the object list without a stored order and swaps the actions for one
   await click('Back to slide settings');
   expect(
     [...host.querySelectorAll('.tour-object-row')].map((row) => row.textContent?.trim())
-  ).toEqual(['Hotspot', 'Explanation']);
+  ).toEqual(['Hotspot', 'Slide explanation']);
 });
 
 it('restores empty-state direct actions after the last object is deleted', async () => {
-  await click('Explanation');
+  await click('Slide explanation');
   await click('Back to slide settings');
-  await click('Explanation');
+  await click('Slide explanation');
   await click('Delete');
   expect(current().annotations).toHaveLength(0);
   expect(current().objectOrder).toBeUndefined();
@@ -281,7 +281,7 @@ it('restores empty-state direct actions after the last object is deleted', async
 });
 
 it('deletes directly from the object row and removes its ordering entry', async () => {
-  await click('Explanation');
+  await click('Slide explanation');
   await click('Back to slide settings');
   const slide = current();
   slide.objectOrder = [slide.annotations[0]!.id];
@@ -295,7 +295,7 @@ it('deletes directly from the object row and removes its ordering entry', async 
 });
 
 it('moves the Add control into the objects heading seam in both presentations', async () => {
-  await click('Explanation');
+  await click('Slide explanation');
   await click('Back to slide settings');
   const group = host.querySelector('section[aria-label="Slide objects"]')!;
   expect(group.querySelector('.guide-inspector-group-heading [aria-label="Add"]')).not.toBeNull();
@@ -315,7 +315,7 @@ it('moves the Add control into the objects heading seam in both presentations', 
   await click('Hotspot');
   await click('Delete');
   expect(current().hotspots).toHaveLength(0);
-  await click('Explanation');
+  await click('Slide explanation');
   await click('Delete');
   expect(heading().querySelector('[aria-label="Add"]')).toBeNull();
   expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
@@ -757,4 +757,27 @@ it('remembers document disclosure groups independently after leaving document se
   draw();
   expect(disclosure('Appearance').getAttribute('aria-expanded')).toBe('true');
   expect(disclosure('Explanations').getAttribute('aria-expanded')).toBe('false');
+});
+
+it('offers slide placement only for independently edited slide explanations', async () => {
+  await click('Hotspot');
+  await fill('Text', 'Action details');
+  await click('Hotspot hint');
+  expect(document.body.textContent).not.toContain('Top captions');
+  expect(document.body.textContent).not.toContain('Bottom captions');
+  await click('At hotspot');
+  const hotspot = structuredClone(current().hotspots[0]);
+  await click('Back to slide settings');
+  await choose('Add', 'Slide explanation');
+  await fill('Text', 'Slide context');
+  expect(host.querySelector('[aria-label="X"]')).toBeNull();
+  expect(host.querySelector('[aria-label="On click"]')).toBeNull();
+  await choose('Placement on slide', 'Top captions');
+  expect(current().annotations[0]?.appearance?.presentation).toBe('caption-top');
+  await choose('Placement on slide', 'Bottom captions');
+  expect(current().annotations[0]?.appearance?.presentation).toBe('caption-bottom');
+  expect(current().hotspots[0]).toEqual(hotspot);
+  await click('Placement on slide');
+  expect(document.body.textContent).not.toContain('At hotspot');
+  await click('Bottom captions');
 });

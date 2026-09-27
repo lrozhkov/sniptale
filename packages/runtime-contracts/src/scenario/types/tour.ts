@@ -54,6 +54,30 @@ export interface TourTextAppearance {
   placement: 'auto' | 'top' | 'bottom' | 'left' | 'right';
 }
 
+/**
+ * Object purpose owns presentation, including version-1 inherited/legacy appearances.
+ * Keep authored styling intact; an action point can never become a slide caption.
+ */
+export function resolveTourTextAppearance(
+  kind: 'hotspot' | 'annotation',
+  value: TourTextAppearance | null,
+  defaults: TourTextAppearance
+): TourTextAppearance {
+  const appearance = value ?? defaults;
+  return {
+    ...appearance,
+    ...((appearance.surface ?? defaults.surface)
+      ? { surface: appearance.surface ?? defaults.surface }
+      : {}),
+    presentation:
+      kind === 'hotspot'
+        ? 'callout'
+        : appearance.presentation === 'caption-top'
+          ? 'caption-top'
+          : 'caption-bottom',
+  };
+}
+
 export interface TourHotspot {
   narration?: TourObjectNarration | null | undefined;
   id: string;

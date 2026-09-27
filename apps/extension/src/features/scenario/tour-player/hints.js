@@ -1,4 +1,5 @@
 import { createTourCaption } from './caption.js';
+import { resolveTourTextAppearance } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { applyTourHintSurface, sizeTourHint, updateTourHintNavigation } from './hint-style.js';
 /** Measures bounded text pages for captions and primary navigation copy. */
 export function measureHintPages(hintText, fullText) {
@@ -73,12 +74,11 @@ export function createTourHints(
     voice.dataset.tourNarration = current.id;
     activeHintId = current.id;
     hint.hidden = false;
-    const authoredAppearance = current.appearance ?? defaultAppearance;
-    // Slide-level explanations never anchor to a point; legacy callout input projects to a caption.
-    const appearance =
-      authoredAppearance.presentation === 'callout' && (stageWidth < 480 || !current.point)
-        ? { ...authoredAppearance, presentation: 'caption-bottom' }
-        : authoredAppearance;
+    const appearance = resolveTourTextAppearance(
+      current.point ? 'hotspot' : 'annotation',
+      current.appearance,
+      defaultAppearance
+    );
     hint.dataset.presentation = appearance.presentation;
     caption.prepare(current, appearance.presentation);
     const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);

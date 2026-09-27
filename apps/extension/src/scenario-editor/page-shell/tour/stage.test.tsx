@@ -113,7 +113,8 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   props.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots[0]!.text = 'A'.repeat(170);
+  slide.hotspots = [];
+  slide.annotations = [{ id: 'point', text: 'A'.repeat(170), anchor: null, appearance: null }];
   const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
   act(() => root.render(<TourStage {...props} selection={selection} />));
   const toggle = shadow().querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;

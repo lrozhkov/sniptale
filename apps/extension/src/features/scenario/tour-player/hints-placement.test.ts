@@ -127,3 +127,56 @@ it('places a right callout at the shared anchor gap', async () => {
   const anchorX = Number.parseFloat(root.querySelector<HTMLElement>('.tour-hotspot')!.style.left);
   expect(Number.parseFloat(hint.style.left)).toBe(anchorX + 30);
 });
+
+it.each([320, 640])(
+  'keeps legacy and inherited point captions anchored at width %s',
+  async (width) => {
+    const { player, root } = await mount();
+    const viewport = root.querySelector('[data-tour-viewport]')!;
+    Object.defineProperties(viewport, {
+      clientWidth: { value: width },
+      clientHeight: { value: 360 },
+    });
+    const input = authoringInput();
+    const slide = input.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    const hotspot = slide.hotspots[0]!;
+    const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+    for (const presentation of ['caption-top', 'caption-bottom'] as const) {
+      input.tour.style.textAppearance.presentation = presentation;
+      hotspot.appearance = null;
+      player.update(input);
+      expect(hint.dataset['presentation']).toBe('callout');
+      expect(Number.parseFloat(hint.style.width)).toBeLessThan(width);
+      hotspot.appearance = { presentation, alignment: 'center', placement: 'right' };
+      player.update(input);
+      expect(hint.dataset['presentation']).toBe('callout');
+      expect(hint.style.textAlign).toBe('center');
+      expect(root.querySelector<HTMLElement>('[data-tour-hint-toggle]')!.hidden).toBe(true);
+    }
+  }
+);
+
+it('keeps a legacy anchored annotation at the slide edge independently of the action point', async () => {
+  const { player, root } = await mount();
+  const input = authoringInput();
+  const slide = input.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  slide.annotations = [
+    {
+      id: 'note',
+      text: 'Independent note',
+      anchor: { x: 0.1, y: 0.2 },
+      appearance: { presentation: 'callout', placement: 'left', alignment: 'end' },
+    },
+  ];
+  player.update(input);
+  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+  expect(hint.dataset['presentation']).toBe('callout');
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(hint.dataset['presentation']).toBe('caption-bottom');
+  expect(root.querySelector('[data-tour-hint-text]')!.textContent).toBe('Independent note');
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click();
+  expect(hint.dataset['presentation']).toBe('callout');
+  expect(root.querySelector('[data-tour-hint-text]')!.textContent).toBe('Text');
+});

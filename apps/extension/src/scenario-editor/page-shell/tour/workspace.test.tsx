@@ -283,7 +283,7 @@ it('keeps explanations slide-level: no canvas point marker and a preserved legac
   expect(result.annotations[0]!.appearance?.presentation).toBe('callout');
   const hint = shadow.querySelector<HTMLElement>('[data-tour-hint]')!;
   expect(hint.dataset['presentation']).toBe('caption-bottom');
-  expect(hint.querySelector('[data-tour-hint-title]')!.textContent).toBe('Explanation');
+  expect(hint.querySelector('[data-tour-hint-title]')!.textContent).toBe('Slide explanation');
   expect(hint.querySelector('[data-tour-hint-text]')!.textContent).toBe('Note');
 });
 it('keeps resource payloads identity-only', async () => {
