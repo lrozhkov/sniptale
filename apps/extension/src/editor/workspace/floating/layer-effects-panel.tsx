@@ -16,7 +16,7 @@ export function EditorFloatingLayerEffectsPanel({
 
   return (
     <div data-ui="editor.floating.layer-effects-panel" className="flex min-h-0 flex-1 flex-col">
-      <div className="shrink-0 px-3 py-2">
+      <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] px-3 py-2">
         <button
           type="button"
           className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
@@ -24,7 +24,7 @@ export function EditorFloatingLayerEffectsPanel({
           data-ui="editor.floating.layer-effects-panel.back"
         >
           <ArrowLeft size={16} aria-hidden="true" />
-          {translate('editor.toolbar.layersTitle')}
+          {translate('editor.toolbar.layerEffectsBackToLayers')}
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-3 [scrollbar-gutter:stable]">

@@ -55,6 +55,7 @@ function createZoomContext() {
     stageElement,
     syncRuntimeState: vi.fn(),
     syncViewportState: vi.fn(),
+    setZoomLevel: vi.fn(),
     viewportElement,
     zoomLevel: 1,
   };
@@ -74,7 +75,9 @@ it('routes fit, centered, explicit, and point zoom through viewport actions', ()
 
   expect(context.canvas.setDimensions).toHaveBeenCalled();
   expect(context.canvas.requestRenderAll).toHaveBeenCalled();
-  expect(context.syncRuntimeState).toHaveBeenCalledTimes(4);
+  expect(context.syncRuntimeState).not.toHaveBeenCalled();
+  expect(context.setZoomLevel).toHaveBeenCalledTimes(4);
+  expect(context.setZoomLevel).toHaveBeenLastCalledWith(1.25);
   expect(context.syncViewportState).toHaveBeenCalled();
 });
 

@@ -9,6 +9,8 @@ export function createViewportPresentationContext(controller: EditorControllerIn
     zoomLevel: controller.zoomLevel,
     devicePixelRatioBaseline: controller.viewportDevicePixelRatioBaseline,
     syncViewportState: () => controller.syncViewportState(),
-    syncRuntimeState: () => controller.syncRuntimeState(),
+    setZoomLevel: (zoomLevel: number) => {
+      controller.zoomLevel = zoomLevel;
+    },
   };
 }

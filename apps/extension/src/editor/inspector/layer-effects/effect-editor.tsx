@@ -136,7 +136,7 @@ function RasterEffectEditor(props: {
       data-section="effect"
       tabIndex={-1}
     >
-      <div className="space-y-4">
+      <div className="space-y-3 border-l-2 border-[color:var(--sniptale-color-border-soft)] pl-3">
         <EditorRasterEffectForm draftEffect={props.draftEffect} onChange={props.onChange} />
         <RasterEffectActions
           draftEffect={props.draftEffect}
@@ -191,12 +191,11 @@ function RasterEffectActions(props: {
   const applied = isAppliedRasterEffect(props.layer, props.draftEffect.id);
 
   return (
-    <div className="flex items-center gap-3 border-t border-[color:var(--sniptale-color-border-soft)] pt-3">
+    <div className="flex items-center gap-3 border-b border-[color:var(--sniptale-color-border-soft)] pb-3">
       <button
         type="button"
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
         onClick={() => {
-          props.resetLayerEffectPreview(props.layer.id);
           void (applied
             ? props.updateLayerEffect(props.layer.id, props.draftEffect)
             : props.applyLayerEffect(props.layer.id, props.draftEffect));
@@ -254,12 +253,14 @@ function useLayerEffectPreview(
   const { previewLayerEffect, resetLayerEffectPreview } = props;
 
   React.useEffect(() => {
+    return () => resetLayerEffectPreview(layerId);
+  }, [props.activeEffectId, layerEffectsCategory, layerId, resetLayerEffectPreview]);
+
+  React.useEffect(() => {
     if (draftEffect && layerEffectsCategory !== 'transformations') {
       previewLayerEffect(layerId, draftEffect);
     }
-
-    return () => resetLayerEffectPreview(layerId);
-  }, [draftEffect, layerEffectsCategory, layerId, previewLayerEffect, resetLayerEffectPreview]);
+  }, [draftEffect, layerEffectsCategory, layerId, previewLayerEffect]);
 }
 
 export function LayerEffectsEditor(props: LayerEffectsEditorProps) {

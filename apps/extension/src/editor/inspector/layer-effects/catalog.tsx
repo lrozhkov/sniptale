@@ -51,8 +51,9 @@ function LayerEffectsCatalogItem(props: {
       className={cx(
         'flex min-h-8 w-full items-center justify-between gap-2 rounded-[6px] px-2 text-left text-xs',
         'text-[color:var(--sniptale-color-text-secondary)] hover:bg-[color:var(--sniptale-color-surface-hover)]',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--sniptale-color-accent)]',
         props.activeEffectId === props.definition.id &&
-          'bg-[color:var(--sniptale-color-surface-hover)]'
+          'bg-[color:var(--sniptale-color-surface-hover)] font-medium text-[color:var(--sniptale-color-text-primary)]'
       )}
       onClick={() =>
         props.onOpenLayerEffects(props.layerId, props.definition.category, props.definition.id, {
@@ -80,7 +81,7 @@ export function LayerEffectsCatalog(props: {
 
   return (
     <div
-      className="grid gap-1.5"
+      className="grid gap-1"
       role="group"
       aria-label={translateLayerEffects('editor.layerEffects.availableEffects')}
     >

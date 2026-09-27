@@ -49,7 +49,7 @@ function createZoomContext() {
 
 function registerZoomToFitTest() {
   it('zooms to fit and restores an anchored viewport zoom', () => {
-    const { canvas, syncRuntimeState, syncViewportState, viewport } = createZoomContext();
+    const { canvas, syncViewportState, viewport } = createZoomContext();
     const requestAnimationFrameSpy = vi
       .spyOn(globalThis, 'requestAnimationFrame')
       .mockImplementation((callback: FrameRequestCallback) => {
@@ -61,7 +61,7 @@ function registerZoomToFitTest() {
       canvas: canvas as never,
       canvasDocumentSize: { height: 200, width: 300 },
       stageElement: document.createElement('div'),
-      syncRuntimeState,
+      setZoomLevel: vi.fn(),
       syncViewportState,
       viewportElement: viewport,
       zoomLevel: 1.5,
@@ -85,7 +85,7 @@ function registerZoomToFitTest() {
 
 function registerNoCanvasZoomTest() {
   it('returns the current zoom when no canvas is available', () => {
-    const { syncRuntimeState, syncViewportState, viewport } = createZoomContext();
+    const { syncViewportState, viewport } = createZoomContext();
 
     expect(
       setEditorZoom(
@@ -93,7 +93,7 @@ function registerNoCanvasZoomTest() {
           canvas: null,
           canvasDocumentSize: { height: 200, width: 300 },
           stageElement: null,
-          syncRuntimeState,
+          setZoomLevel: vi.fn(),
           syncViewportState,
           viewportElement: viewport,
           zoomLevel: 1.25,

@@ -128,7 +128,9 @@ it('applies the current draft effect on first apply for configurable raster effe
     button.textContent?.includes('editor.toolbar.layerEffectsApply')
   );
 
+  vi.mocked(props.resetLayerEffectPreview).mockClear();
   act(() => (changeButton as HTMLButtonElement | null)?.click());
+  expect(props.resetLayerEffectPreview).not.toHaveBeenCalled();
   expect(props.previewLayerEffect).toHaveBeenLastCalledWith('layer-1', {
     blue: 1.7,
     enabled: true,
@@ -136,9 +138,10 @@ it('applies the current draft effect on first apply for configurable raster effe
     id: 'gamma',
     red: 1.4,
   });
+  vi.mocked(props.resetLayerEffectPreview).mockClear();
   act(() => applyButton?.click());
 
-  expect(props.resetLayerEffectPreview).toHaveBeenCalledWith('layer-1');
+  expect(props.resetLayerEffectPreview).not.toHaveBeenCalled();
   expect(props.applyLayerEffect).toHaveBeenCalledWith('layer-1', {
     blue: 1.7,
     enabled: true,
@@ -194,6 +197,23 @@ it('cleans up the old layer preview when the selected layer changes', () => {
     id: 'gamma',
     red: 1.15,
   });
+});
+
+it('cleans up the preview when the effect selection is cleared', () => {
+  const props = renderEditor();
+  vi.mocked(props.resetLayerEffectPreview).mockClear();
+
+  act(() => {
+    root?.render(
+      <LayerEffectsEditor
+        {...props}
+        activeEffectId={null}
+        layerEffectsState={{ ...props.layerEffectsState, activeEffectId: null }}
+      />
+    );
+  });
+
+  expect(props.resetLayerEffectPreview).toHaveBeenCalledWith('layer-1');
 });
 
 it('removes an applied effect after clearing its preview', () => {

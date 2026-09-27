@@ -98,6 +98,7 @@ export function setEditorZoomAtViewportPoint(
   const localPoint = readLocalViewportPoint(viewportElement, metricsBefore, point);
   const anchor = capturePointAnchor({ metrics: metricsBefore, point: localPoint });
   const nextZoomLevel = clamp(value, 0.2, 4);
+  context.setZoomLevel(nextZoomLevel);
 
   applyEditorViewportZoom(
     canvas,
@@ -109,6 +110,5 @@ export function setEditorZoomAtViewportPoint(
   if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) restore();
   else requestAnimationFrame(restore);
   canvas.requestRenderAll();
-  context.syncRuntimeState();
   return nextZoomLevel;
 }

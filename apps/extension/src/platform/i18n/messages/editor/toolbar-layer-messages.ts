@@ -37,6 +37,10 @@ export const editorToolbarLayerMessages = defineMessageSource({
     ru: 'Эффекты слоя',
     en: 'Layer effects',
   },
+  layerEffectsBackToLayers: {
+    ru: 'Назад к списку слоёв',
+    en: 'Back to layer list',
+  },
   layerEffectsSubtitle: {
     ru: 'Коррекции, трансформации и фильтры для выбранного слоя',
     en: 'Adjustments, transformations, and filters for the selected layer',

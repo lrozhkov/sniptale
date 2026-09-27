@@ -1,6 +1,6 @@
 import React from 'react';
 import { Contrast, Move, Sparkles } from 'lucide-react';
-import { SegmentedSelector, cx } from '../../chrome/ui';
+import { SegmentedSelector } from '../../chrome/ui';
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
@@ -64,10 +64,7 @@ function LayerEffectsLayerSection(
   return (
     <section
       aria-label={translateLayerEffects('editor.layerEffects.selectedLayer')}
-      className={cx(
-        EDITOR_INSPECTOR_SECTION_CLASS_NAME,
-        'sticky top-0 z-10 bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]'
-      )}
+      className={EDITOR_INSPECTOR_SECTION_CLASS_NAME}
       data-section="layer"
       tabIndex={-1}
     >

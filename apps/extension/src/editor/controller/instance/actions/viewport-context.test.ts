@@ -15,7 +15,7 @@ it('creates viewport presentation context from controller state and bound sync c
 
   const context = createViewportPresentationContext(controller as never);
   context.syncViewportState();
-  context.syncRuntimeState();
+  context.setZoomLevel(1.5);
 
   expect(context).toMatchObject({
     canvas: controller.canvas,
@@ -26,5 +26,6 @@ it('creates viewport presentation context from controller state and bound sync c
     zoomLevel: 1.25,
   });
   expect(controller.syncViewportState).toHaveBeenCalledOnce();
-  expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
+  expect(controller.zoomLevel).toBe(1.5);
+  expect(controller.syncRuntimeState).not.toHaveBeenCalled();
 });
