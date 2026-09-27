@@ -135,7 +135,13 @@ function collectAuthoredPrintSelectors(document: Document): AuthoredPrintSelecto
       if (owner.sheet) styleSheets.add(owner.sheet);
     }
     for (const sheet of root.adoptedStyleSheets ?? []) styleSheets.add(sheet);
-    for (const sheet of styleSheets) collectPrintSelectors(sheet.cssRules, false, selectors);
+    for (const sheet of styleSheets) {
+      collectPrintSelectors(
+        sheet.cssRules,
+        includesPrintMedia(sheet.media?.mediaText ?? ''),
+        selectors
+      );
+    }
     policies.set(root, selectors);
   }
   return policies;
@@ -159,7 +165,10 @@ function freezeRootStyleSheets(root: Document | ShadowRoot, targetWindow: Window
     }
     const replacement = createProjectionStyleElement(owner.ownerDocument);
     replacement.setAttribute('data-sniptale-print-frozen-styles', '');
-    replacement.textContent = serializeCssRules(sheet.cssRules, targetWindow);
+    replacement.textContent =
+      !sheet.disabled && mediaMatches(owner.media, targetWindow)
+        ? serializeCssRules(sheet.cssRules, targetWindow)
+        : '';
     owner.replaceWith(replacement);
   }
 }
@@ -331,6 +340,44 @@ function appendPrintStyles(document: Document): void {
   (document.head ?? document.documentElement).append(style);
 }
 
+function hasViewportPositionedScrollLayout(
+  document: Document,
+  candidates: HTMLElement[],
+  policies: AuthoredPrintSelectors,
+  targetWindow: Window
+): boolean {
+  if (
+    document.documentElement.scrollHeight > targetWindow.innerHeight + 1 ||
+    document.documentElement.scrollWidth > targetWindow.innerWidth + 1 ||
+    Array.from(policies.values()).some((selectors) => selectors.length > 0)
+  ) {
+    return false;
+  }
+  return candidates.some((element) => {
+    if (!isPrintVisible(element, targetWindow)) return false;
+    let current: Element | null = element;
+    while (current && isHtmlElement(current)) {
+      const position = targetWindow.getComputedStyle(current).position;
+      if (position === 'absolute' || position === 'fixed') return true;
+      current = getLayoutParent(current);
+    }
+    return false;
+  });
+}
+
+function appendViewportPrintStyles(document: Document, targetWindow: Window): void {
+  const { innerWidth: width, innerHeight: height } = targetWindow;
+  const style = createProjectionStyleElement(document);
+  style.setAttribute('data-sniptale-print-policy', '');
+  // Positioned application windows share one captured coordinate system, not a flowing page.
+  style.textContent = [
+    `@page{size:${width}px ${height}px;margin:0}`,
+    `html{width:${width}px!important;height:${height}px!important;overflow:hidden!important}`,
+    'html,body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}',
+  ].join('');
+  (document.head ?? document.documentElement).append(style);
+}
+
 function appendImagePrintStyles(document: Document, pageWidth: number, pageHeight: number): void {
   const style = createProjectionStyleElement(document);
   style.setAttribute('data-sniptale-image-print-policy', '');
@@ -448,18 +495,30 @@ export async function printWebSnapshotProjection(args: {
       throw new Error('Snapshot print projection is unavailable.');
     }
     hydrateSnapshotDeclarativeShadowDom(projectionDocument);
-    const scrollRegionCandidates = collectSnapshotScrollRegions(projectionDocument);
-    const authoredPrintSelectors = collectAuthoredPrintSelectors(projectionDocument);
-    appendPrintStyles(projectionDocument);
     await withProjectionTimeout(
       waitForProjectionLayout(projectionDocument, projectionWindow),
       hostWindow
     );
-    expandScrollRegionsBeforePrint(
-      scrollRegionCandidates,
-      authoredPrintSelectors,
-      projectionWindow
-    );
+    const scrollRegionCandidates = collectSnapshotScrollRegions(projectionDocument);
+    const authoredPrintSelectors = collectAuthoredPrintSelectors(projectionDocument);
+    if (
+      hasViewportPositionedScrollLayout(
+        projectionDocument,
+        scrollRegionCandidates,
+        authoredPrintSelectors,
+        projectionWindow
+      )
+    ) {
+      freezeSnapshotMediaQueries(projectionDocument, projectionWindow);
+      appendViewportPrintStyles(projectionDocument, projectionWindow);
+    } else {
+      appendPrintStyles(projectionDocument);
+      expandScrollRegionsBeforePrint(
+        scrollRegionCandidates,
+        authoredPrintSelectors,
+        projectionWindow
+      );
+    }
     projectionWindow.focus();
     projectionWindow.print();
   } finally {
