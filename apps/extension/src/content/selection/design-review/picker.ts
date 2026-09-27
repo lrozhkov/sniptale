@@ -14,6 +14,7 @@ import {
 } from '../../platform/frame';
 import {
   projectSelectablePageElement,
+  resolveSelectablePageElement,
   resolveSelectablePageProjection,
 } from '../page-element-target';
 import {
@@ -21,6 +22,7 @@ import {
   isTrustedMouseEvent,
   isTrustedPointerEvent,
 } from '../../platform/trusted-events';
+import { createDesignReviewMeasurements } from './measurements';
 import { mountDesignReviewCursor } from './cursor';
 import { hideDesignReviewFrame, removeDesignReviewFrame, showDesignReviewFrame } from './frame';
 import { addInaccessibleIframeSelectionListener } from './inaccessible-iframe';
@@ -32,6 +34,7 @@ export interface DesignReviewSelection {
 }
 
 export interface DesignReviewPickerRuntime {
+  setMeasurementsEnabled: (enabled: boolean) => void;
   dismissSelection: () => void;
   dispose: () => void;
   selectElement: (element: Element) => boolean;
@@ -225,15 +228,23 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     inspectorPointerGestureStarted: false,
     selectedElement: null,
   };
+  const measurements = createDesignReviewMeasurements();
   const cleanupCursor = mountDesignReviewCursor();
   const cleanupMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mousemove',
-    (event, iframe) => handlePickerMouseMove(state, event, iframe),
+    (event, iframe) => {
+      handlePickerMouseMove(state, event, iframe);
+      if (isTrustedMouseEvent(event))
+        measurements.hover(resolveSelectablePageElement(event, iframe));
+    },
     { capture: true }
   );
   const cleanupLeave = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mouseleave',
-    () => handlePickerMouseLeave(state),
+    () => {
+      handlePickerMouseLeave(state);
+      measurements.hover(null);
+    },
     { capture: true }
   );
   const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>(
@@ -286,7 +297,9 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
 
   return {
     dismissSelection: () => dismissPickerSelection(state),
+    setMeasurementsEnabled: measurements.setEnabled,
     dispose: () => {
+      measurements.dispose();
       cleanupMove();
       cleanupLeave();
       cleanupClick();

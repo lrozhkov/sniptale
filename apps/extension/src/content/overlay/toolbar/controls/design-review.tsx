@@ -1,3 +1,10 @@
+import { useSyncExternalStore } from 'react';
+import { Ruler } from 'lucide-react';
+import {
+  getDesignReviewModeState,
+  subscribeToDesignReviewMode,
+  toggleDesignReviewMeasurements,
+} from '../../../selection/design-review';
 import { ContentToolbarButton, ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { FeedbackCollectionIcon } from '../../design-review/icons';
 import { translate } from '../../../../platform/i18n';
@@ -11,6 +18,11 @@ export function ToolbarDesignReviewControls(props: {
   toolbarMenuState: ToolbarMenuState;
   onTogglePanel: () => void;
 }) {
+  const mode = useSyncExternalStore(
+    subscribeToDesignReviewMode,
+    getDesignReviewModeState,
+    getDesignReviewModeState
+  );
   return (
     <ContentToolbarGroup dataUi="content.toolbar.design-review-controls" utilities>
       <ContentToolbarButton
@@ -28,6 +40,23 @@ export function ToolbarDesignReviewControls(props: {
         )}
       >
         <FeedbackCollectionIcon size={20} strokeWidth={2} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        active={mode.measurementsEnabled}
+        aria-pressed={mode.measurementsEnabled}
+        disabled={!mode.enabled}
+        dataUi="content.toolbar.design-review-measurements-button"
+        onClick={(event) => {
+          event.stopPropagation();
+          toggleDesignReviewMeasurements();
+        }}
+        title={translate(
+          mode.measurementsEnabled
+            ? 'content.designReview.hideDistances'
+            : 'content.designReview.showDistances'
+        )}
+      >
+        <Ruler size={20} strokeWidth={2} />
       </ContentToolbarButton>
       <AnnotationExportMenu
         compactMenus={props.compactMenus}

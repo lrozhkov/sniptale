@@ -5,6 +5,11 @@ import { contentDesignReviewOptionMessages } from './design-review-options';
 export const contentDesignReviewMessages = defineMessageSource({
   ...contentDesignReviewOptionMessages,
   ...contentDesignReviewAppearanceMessages,
+  showDistances: {
+    ru: 'Показать расстояния до соседних элементов',
+    en: 'Show distances to sibling elements',
+  },
+  hideDistances: { ru: 'Скрыть расстояния', en: 'Hide distances' },
   title: {
     ru: 'Дизайн-ревью',
     en: 'Design review',

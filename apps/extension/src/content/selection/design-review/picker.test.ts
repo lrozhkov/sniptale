@@ -608,3 +608,35 @@ it('restores inaccessible iframe preview after dismissal and keeps the pin when 
   expect(onSelection).toHaveBeenCalledOnce();
   expectFrameSummary('iframe');
 });
+
+it('measures a hovered sibling while preserving the selected element and clears over owned UI', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const shadow = host.attachShadow({ mode: 'open' });
+  const { appContainer } = initializeContentUiRoots(shadow);
+  const control = document.createElement('button');
+  appContainer.append(control);
+  const selected = makeVisible(document.createElement('section'));
+  const hovered = makeVisible(document.createElement('button'));
+  const neighbor = makeVisible(document.createElement('div'));
+  Object.defineProperty(neighbor, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => new DOMRect(150, 30, 50, 32),
+  });
+  document.body.append(selected, hovered, neighbor);
+  const onSelection = vi.fn();
+  const runtime = startPicker({ onSelection });
+  runtime.selectElement(selected);
+  runtime.setMeasurementsEnabled(true);
+  hovered.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  expectFrameSummary('section');
+  expect(onSelection).toHaveBeenCalledTimes(1);
+  expect(
+    queryContentUiElement('[data-ui="content.design-review.measurements"]')?.textContent
+  ).toContain('34 px');
+  control.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, composed: true }));
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBeNull();
+  runtime.setMeasurementsEnabled(false);
+  hovered.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBeNull();
+});

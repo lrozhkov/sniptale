@@ -6,5 +6,6 @@ export {
   openDesignReviewTarget,
   registerDesignReviewInspectorDismissRequestHandler,
   subscribeToDesignReviewMode,
+  toggleDesignReviewMeasurements,
   type DesignReviewModeState,
 } from './mode';

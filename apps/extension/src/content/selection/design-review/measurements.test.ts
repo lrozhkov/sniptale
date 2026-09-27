@@ -1,0 +1,171 @@
+// @vitest-environment jsdom
+import { afterEach, expect, it, vi } from 'vitest';
+import { createDesignReviewMeasurements, measureDesignReviewNeighbors } from './measurements';
+
+function box(x: number, y: number, width = 50, height = 50, parent: Element = document.body) {
+  const element = document.createElement('div');
+  let rect = new DOMRect(x, y, width, height);
+  element.getBoundingClientRect = () => rect;
+  element.getClientRects = () => ({
+    0: rect,
+    length: 1,
+    item: () => rect,
+    [Symbol.iterator]: () => [rect][Symbol.iterator](),
+  });
+  parent.append(element);
+  return {
+    element,
+    move: (next: DOMRect) => {
+      rect = next;
+    },
+  };
+}
+
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.restoreAllMocks();
+});
+
+it('chooses the nearest sibling on each axis and ignores diagonal, overlapping, hidden and nested boxes', () => {
+  const target = box(100, 100);
+  box(180, 100);
+  box(160, 110);
+  box(20, 100);
+  box(100, 30);
+  box(100, 170);
+  box(170, 170);
+  box(110, 110);
+  box(150, 100).element.style.visibility = 'hidden';
+  box(150, 100, 0, 50);
+  box(150, 100, 50, 50, target.element);
+  expect(
+    measureDesignReviewNeighbors(target.element).map(({ direction, distance }) => [
+      direction,
+      distance,
+    ])
+  ).toEqual([
+    ['right', 10],
+    ['left', 30],
+    ['top', 20],
+    ['bottom', 20],
+  ]);
+});
+
+it('includes touching edges and excludes offscreen or detached targets', () => {
+  const target = box(100, 100);
+  box(150, 100);
+  box(-100, 100);
+  box(100, -100);
+  expect(measureDesignReviewNeighbors(target.element)).toMatchObject([
+    { direction: 'right', distance: 0 },
+  ]);
+  target.element.remove();
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+});
+
+it('keeps DOM-order ties deterministic and emits no rulers without neighbors', () => {
+  const target = box(100, 100);
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+  box(170, 100, 50, 10);
+  box(170, 130, 50, 10);
+  expect(measureDesignReviewNeighbors(target.element)).toMatchObject([{ distance: 20, y1: 105 }]);
+});
+
+it('refreshes stationary hover after layout changes and removes rulers on leave, disable and disposal', () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+  const target = box(100, 100);
+  const sibling = box(180, 100);
+  const runtime = createDesignReviewMeasurements();
+  runtime.hover(target.element);
+  const layer = () =>
+    document.querySelector<HTMLElement>('[data-ui="content.design-review.measurements"]');
+  expect(layer()).toBeNull();
+  runtime.setEnabled(true);
+  expect(layer()?.textContent).toBe('30 px');
+  expect(layer()?.style.pointerEvents).toBe('none');
+  expect(layer()?.dataset['floatingUiCaptureTransient']).toBe('true');
+  expect(layer()?.style.scale).toBe('none');
+  sibling.move(new DOMRect(200, 100, 50, 50));
+  frames.shift()?.(0);
+  expect(layer()?.textContent).toBe('50 px');
+  runtime.hover(null);
+  expect(layer()).toBeNull();
+  runtime.hover(target.element);
+  expect(layer()?.textContent).toBe('50 px');
+  runtime.setEnabled(false);
+  expect(layer()).toBeNull();
+  runtime.setEnabled(true);
+  runtime.dispose();
+  expect(layer()).toBeNull();
+  expect(cancel).toHaveBeenCalled();
+});
+
+it('excludes fully overflow-clipped siblings but measures the original bounds of partially visible ones', () => {
+  const parent = box(100, 100, 100, 100).element;
+  // jsdom does not expand the overflow shorthand into computed axis values.
+  parent.style.overflowX = 'hidden';
+  parent.style.overflowY = 'hidden';
+  const target = box(110, 110, 40, 40, parent);
+  const sibling = box(220, 110, 40, 40, parent);
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+  sibling.move(new DOMRect(180, 110, 40, 40));
+  expect(measureDesignReviewNeighbors(target.element)).toMatchObject([
+    { direction: 'right', distance: 30 },
+  ]);
+  parent.style.overflowX = 'visible';
+  parent.style.overflowY = 'visible';
+  sibling.move(new DOMRect(220, 110, 40, 40));
+  expect(measureDesignReviewNeighbors(target.element)).toMatchObject([
+    { direction: 'right', distance: 70 },
+  ]);
+});
+
+it('applies clipping per axis through nested scroll containers', () => {
+  const outer = box(100, 100, 100, 100).element;
+  outer.style.overflowX = 'hidden';
+  const inner = box(100, 100, 300, 300, outer).element;
+  const target = box(110, 110, 40, 40, inner);
+  box(220, 110, 40, 40, inner);
+  box(110, 220, 40, 40, inner);
+  expect(measureDesignReviewNeighbors(target.element)).toMatchObject([
+    { direction: 'bottom', distance: 70 },
+  ]);
+  outer.style.overflowY = 'auto';
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+});
+
+it('honors a clipping shadow host and hidden ancestors', () => {
+  const host = box(100, 100, 100, 100).element;
+  host.style.overflowX = 'hidden';
+  host.style.overflowY = 'hidden';
+  const root = host.attachShadow({ mode: 'open' });
+  const inner = document.createElement('div');
+  root.append(inner);
+  const target = box(110, 110, 40, 40, inner);
+  box(220, 110, 40, 40, inner);
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+  host.style.overflowX = 'visible';
+  host.style.overflowY = 'visible';
+  expect(measureDesignReviewNeighbors(target.element)).toHaveLength(1);
+  host.style.opacity = '0';
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+});
+
+it('projects accessible iframe distances and excludes siblings clipped by the frame', () => {
+  const iframe = document.createElement('iframe');
+  document.body.append(iframe);
+  iframe.getBoundingClientRect = () => new DOMRect(200, 200, 100, 100);
+  const body = iframe.contentDocument!.body;
+  const target = box(10, 10, 40, 40, body);
+  const neighbor = box(120, 10, 40, 40, body);
+  expect(measureDesignReviewNeighbors(target.element)).toEqual([]);
+  neighbor.move(new DOMRect(70, 10, 40, 40));
+  expect(measureDesignReviewNeighbors(target.element)).toMatchObject([
+    { direction: 'right', distance: 20, x1: 250, x2: 270, y1: 230 },
+  ]);
+});

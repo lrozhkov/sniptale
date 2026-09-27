@@ -35,6 +35,13 @@ function createEvidence(selector: string): BrowserAnnotationTargetEvidence {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.stubGlobal('innerHeight', 720);
   vi.stubGlobal('innerWidth', 1280);
   Object.defineProperties(HTMLElement.prototype, {
@@ -88,13 +95,13 @@ it('lists only Design Review feedback and opens the live element from the row or
   ).toBe('3');
 
   act(() => items[0]?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
-  expect(
-    container.querySelector('[data-ui="content.design-review.feedback-preview"]')
-  ).not.toBeNull();
+  const preview = document.querySelector('[data-ui="content.design-review.feedback-preview"]');
+  expect(preview).not.toBeNull();
+  expect(preview?.closest('[data-ui="content.design-review.feedback-panel"]')).toBeNull();
 
   act(() => (items[0] as HTMLButtonElement).click());
   expect(onOpenRecord).toHaveBeenCalledWith(1);
-  expect(container.querySelector('[data-ui="content.design-review.feedback-preview"]')).toBeNull();
+  expect(document.querySelector('[data-ui="content.design-review.feedback-preview"]')).toBeNull();
 
   const close = container.querySelector<HTMLButtonElement>(
     '[aria-label="content.designReview.panelClose"]'
