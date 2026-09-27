@@ -116,6 +116,7 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
         <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
         <div className="contents">
           <FrameAnnotationCreationControls
+            allowInactiveFrameMenu
             context="content"
             disabled={!props.hasImage}
             frameActive={frameAnnotationActive}

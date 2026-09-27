@@ -9,6 +9,7 @@ import {
   setFrameAnnotationCreationDefaults,
 } from '../../frame-annotation/creation-defaults';
 import { translate } from '../../../platform/i18n';
+import type { FrameAnnotationStyleSettings } from '../../../composition/frame-annotation-controls/contracts';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 import { EditorFloatingToolRail } from './tool-rail';
 
@@ -25,6 +26,23 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
 }));
 vi.mock('./document-autosave-status', () => ({
   DocumentAutosaveStatus: () => <button data-ui="autosave-control">Autosave</button>,
+}));
+vi.mock('../../../composition/frame-annotation-controls/frame/popover', () => ({
+  FrameAnnotationCreationFramePopover: ({
+    isOpen,
+    onChange,
+    settings,
+  }: {
+    isOpen: boolean;
+    onChange: (settings: FrameAnnotationStyleSettings) => void;
+    settings: FrameAnnotationStyleSettings;
+  }) =>
+    isOpen ? (
+      <button
+        data-ui="frame-annotation.creation.frame-popover"
+        onClick={() => onChange({ ...settings, effectMode: 'focus' })}
+      />
+    ) : null,
 }));
 
 let container: HTMLDivElement | null = null;
@@ -198,6 +216,30 @@ it('activates the frame group from its persistent frame button', () => {
   act(() => frame.click());
 
   expect(props.onActivateTool).toHaveBeenCalledWith('frame-annotation');
+});
+
+it('opens the frame settings menu while another tool is selected', async () => {
+  const props = createProps();
+  renderToolRail(props);
+
+  await act(async () => {
+    getContentFrameButton('future-frame-style.menu').click();
+    await Promise.resolve();
+  });
+
+  expect(getContentFrameButton('future-frame-style.menu').getAttribute('aria-expanded')).toBe(
+    'true'
+  );
+  expect(
+    document.querySelector('[data-ui="frame-annotation.creation.frame-popover"]')
+  ).not.toBeNull();
+  act(() => {
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="frame-annotation.creation.frame-popover"]')
+      ?.click();
+  });
+  expect(getFrameAnnotationCreationDefaults().effectMode).toBe('focus');
+  expect(props.onActivateTool).not.toHaveBeenCalled();
 });
 
 it('describes drawing modifiers and toggles options on a repeated active-tool click', () => {

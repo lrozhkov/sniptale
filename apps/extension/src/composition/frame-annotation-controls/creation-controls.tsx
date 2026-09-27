@@ -22,6 +22,7 @@ export type {
 
 export function FrameAnnotationCreationControls(props: {
   activeMenu?: FrameAnnotationCreationMenu | null;
+  allowInactiveFrameMenu?: boolean;
   context?: 'content' | 'editor';
   dataUi?: string;
   disabled?: boolean;
@@ -57,10 +58,15 @@ export function FrameAnnotationCreationControls(props: {
   const toggle = (menu: FrameAnnotationCreationMenu) =>
     setActiveMenu(activeMenu === menu ? null : menu);
   useEffect(() => {
-    if (frameActive || activeMenu === null) return;
+    if (
+      frameActive ||
+      activeMenu === null ||
+      (props.allowInactiveFrameMenu && activeMenu === 'frame')
+    )
+      return;
     if (controlledActiveMenu === undefined) setInternalActiveMenu(null);
     onMenuChange?.(null);
-  }, [activeMenu, controlledActiveMenu, frameActive, onMenuChange]);
+  }, [activeMenu, controlledActiveMenu, frameActive, onMenuChange, props.allowInactiveFrameMenu]);
   const contentContext = props.context === 'content';
   const showCallout = props.showCallout ?? true;
   const showStepBadge = props.showStepBadge ?? true;
