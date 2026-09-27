@@ -8,6 +8,7 @@ import { createPagePackageManifestFixture } from '../../../features/web-snapshot
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 
 const mocks = vi.hoisted(() => ({
+  createWebSnapshotHtmlExport: vi.fn(),
   blockSnapshotFrameNavigation: vi.fn(),
   browserTabsCreate: vi.fn(),
   latestFrameLoad: null as (() => void) | null,
@@ -37,6 +38,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
   createLogger: () => ({ error: mocks.loggerError, warn: mocks.loggerWarn }),
+}));
+
+vi.mock('../../viewer/html-export', () => ({
+  createWebSnapshotHtmlExport: mocks.createWebSnapshotHtmlExport,
 }));
 
 vi.mock('./route', () => ({
@@ -145,6 +150,7 @@ async function loadSnapshotIframe(): Promise<HTMLIFrameElement> {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
+  mocks.createWebSnapshotHtmlExport.mockReset();
   mocks.latestFrameLoad = null;
   mocks.loadWebSnapshotPackage.mockReset();
   mocks.loggerError.mockReset();
@@ -705,4 +711,88 @@ it('resolves the viewer title messages from shared Web Snapshot naming', () => {
   expect(translate('webSnapshotViewer.app.documentTitleFallback', 'ru')).toBe('Веб-снимок');
   expect(translate('webSnapshotViewer.app.documentTitleSuffix', 'ru')).toBe('Веб-снимок');
   expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe('Web Snapshot');
+});
+
+function htmlExportButton(): HTMLButtonElement | null | undefined {
+  return container?.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('webSnapshotViewer.app.exportHtml', 'en')}"]`
+  );
+}
+
+it('downloads a single HTML beside ZIP and PDF and releases the download URL', async () => {
+  vi.useFakeTimers();
+  const createUrl = vi.fn(() => 'blob:html-download');
+  const revokeUrl = vi.fn();
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = createUrl;
+      static revokeObjectURL = revokeUrl;
+    }
+  );
+  const clicks: string[] = [];
+  const click = vi
+    .spyOn(HTMLAnchorElement.prototype, 'click')
+    .mockImplementation(function (this: HTMLAnchorElement) {
+      clicks.push(this.download);
+    });
+  const blob = new Blob(['<!doctype html><p>Saved</p>'], { type: 'text/html' });
+  mocks.createWebSnapshotHtmlExport.mockResolvedValue({ blob, filename: 'Saved.html' });
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+  await act(async () => root?.render(<WebSnapshotViewerApp />));
+  expect(htmlExportButton()?.parentElement?.textContent).toContain('ZIPHTMLPDF');
+  await act(async () => htmlExportButton()?.click());
+  expect(clicks).toEqual(['Saved.html']);
+  expect(createUrl).toHaveBeenCalledWith(blob);
+  await act(async () => vi.advanceTimersByTime(1500));
+  expect(revokeUrl).toHaveBeenCalledWith('blob:html-download');
+  click.mockRestore();
+  vi.useRealTimers();
+});
+
+it('prevents duplicate HTML exports and exposes a localized retry after failure', async () => {
+  let rejectExport: (error: Error) => void = () => {};
+  mocks.createWebSnapshotHtmlExport.mockReturnValue(
+    new Promise((_resolve, reject) => {
+      rejectExport = reject;
+    })
+  );
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+  await act(async () => root?.render(<WebSnapshotViewerApp />));
+  act(() => {
+    htmlExportButton()?.click();
+    htmlExportButton()?.click();
+  });
+  expect(mocks.createWebSnapshotHtmlExport).toHaveBeenCalledOnce();
+  expect(htmlExportButton()?.disabled).toBe(true);
+  expect(htmlExportButton()?.getAttribute('aria-busy')).toBe('true');
+  await act(async () => rejectExport(new Error('private detail')));
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    translate('webSnapshotViewer.app.exportHtmlFailed', 'en')
+  );
+  expect(container?.textContent).not.toContain('private detail');
+  expect(htmlExportButton()?.disabled).toBe(false);
+  await act(async () => htmlExportButton()?.click());
+  expect(mocks.createWebSnapshotHtmlExport).toHaveBeenCalledTimes(2);
+});
+
+it('does not download a completed HTML export after leaving static document mode', async () => {
+  let resolveExport: (artifact: { blob: Blob; filename: string }) => void = () => {};
+  mocks.createWebSnapshotHtmlExport.mockReturnValue(
+    new Promise((resolve) => {
+      resolveExport = resolve;
+    })
+  );
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+  await act(async () => root?.render(<WebSnapshotViewerApp />));
+  act(() => htmlExportButton()?.click());
+  const screenshot = Array.from(container?.querySelectorAll('button') ?? []).find(
+    (button) => button.textContent === translate('webSnapshotViewer.app.visualMode', 'en')
+  );
+  act(() => screenshot?.click());
+  await act(async () => resolveExport({ blob: new Blob(['saved']), filename: 'Saved.html' }));
+  expect(htmlExportButton()).toBeNull();
+  expect(click).not.toHaveBeenCalled();
+  click.mockRestore();
 });

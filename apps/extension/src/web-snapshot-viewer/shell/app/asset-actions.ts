@@ -1,7 +1,8 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserTabs } from '@sniptale/platform/browser/tabs';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 import type { ViewerPackageFile } from '../../viewer/package-files';
+import { createWebSnapshotHtmlExport } from '../../viewer/html-export';
 import { createViewablePackageFileBlob } from './asset-opening';
 
 const DOWNLOAD_URL_LIFETIME_MS = 1500;
@@ -58,4 +59,36 @@ export function useViewerAssetActions(loaded: LoadedWebSnapshotPackage) {
     await browserTabs.create({ active: true, url });
   }, []);
   return { downloadPackageFile, extractPackageFile, openPackageFile, openResourceAsset };
+}
+
+/** Own the disposable HTML export transaction and suppress downloads after owner release. */
+export function useViewerHtmlExport(loaded: LoadedWebSnapshotPackage) {
+  const [state, setState] = useState<'idle' | 'pending' | 'error'>('idle');
+  const pending = useRef(false);
+  const active = useRef<object | null>(null);
+  useEffect(() => {
+    active.current = {};
+    pending.current = false;
+    setState('idle');
+    return () => {
+      active.current = null;
+    };
+  }, [loaded]);
+  const download = useCallback(async () => {
+    if (pending.current || !active.current) return;
+    const owner = active.current;
+    pending.current = true;
+    setState('pending');
+    try {
+      const artifact = await createWebSnapshotHtmlExport(loaded);
+      if (active.current !== owner) return;
+      downloadPackageFileBlob(artifact.blob, artifact.filename);
+      setState('idle');
+    } catch {
+      if (active.current === owner) setState('error');
+    } finally {
+      if (active.current === owner) pending.current = false;
+    }
+  }, [loaded]);
+  return { download, state };
 }

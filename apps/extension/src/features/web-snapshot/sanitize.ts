@@ -28,6 +28,8 @@ interface WebSnapshotHtmlSanitizeOptions {
   allowedObjectUrls?: readonly string[];
   offlineOnly?: boolean;
   removeForms?: boolean;
+  /** Freeze SVG mutations when a document is exported outside the viewer navigation sandbox. */
+  removeSvgAnimations?: boolean;
 }
 
 const WEB_SNAPSHOT_XHTML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
@@ -363,6 +365,13 @@ function sanitizeWebSnapshotDocument(
   for (const root of collectWebSnapshotQueryRoots(document)) {
     for (const element of root.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
       element.remove();
+    }
+    if (options.removeSvgAnimations) {
+      for (const animation of root.querySelectorAll(
+        'animate, animateMotion, animateTransform, set, discard'
+      )) {
+        animation.remove();
+      }
     }
     if (options.removeForms) removeFormElements(root);
     else disableFormSubmissions(root);

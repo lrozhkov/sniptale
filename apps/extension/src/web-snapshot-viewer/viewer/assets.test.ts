@@ -640,3 +640,32 @@ it('retains the saved archive filename when re-downloading a snapshot', async ()
   expect(mocks.getMediaLibraryEntry).toHaveBeenCalledWith('snapshot-1');
   expect(loaded.archiveFilename).toBe('My saved capture.sniptale-page-package.zip');
 });
+
+it('exports a loaded package with real verified web-copy extraction as standalone HTML', async () => {
+  class ReadableBlob extends Blob {
+    text(): Promise<string> {
+      return readTestBlobText(this);
+    }
+  }
+  vi.stubGlobal('Blob', ReadableBlob);
+  let ordinal = 0;
+  stubObjectUrlStatics({ createObjectURL: vi.fn(() => `blob:asset-${ordinal++}`) });
+  await stubWebSnapshotRecord({
+    html: '<link rel="stylesheet" href="../assets/site.css"><img src="../assets/image.png">',
+    extras: {
+      'assets/site.css': 'body { background: url(image.png); }',
+      'assets/image.png': createPagePackagePngBytes(),
+    },
+  });
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const { createWebSnapshotHtmlExport } = await import('./html-export');
+  const artifact = await createWebSnapshotHtmlExport(loaded);
+  const html = await readTestBlobText(artifact.blob);
+  expect(html).toContain('data:image/png;base64,');
+  expect(html).toContain('data:text/css;charset=utf-8;base64,');
+  expect(html).not.toContain('blob:');
+  expect(loaded.packageFiles).toEqual([]);
+  await expect(loaded.extractPackageFile(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml)).rejects.toThrow(
+    'not available for download'
+  );
+});

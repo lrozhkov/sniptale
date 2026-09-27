@@ -3,6 +3,18 @@ import { sharedWebSnapshotSingularNameMessage } from '../shared/web-snapshot';
 
 export const webSnapshotViewerMessages = defineMessageSource({
   app: {
+    exportHtml: {
+      ru: 'Скачать HTML',
+      en: 'Download HTML',
+    },
+    exportHtmlDescription: {
+      ru: 'Один HTML-файл с сохранёнными стилями, изображениями и шрифтами. Работает без интернета; скрипты и внешние ссылки отключены.',
+      en: 'One HTML file with saved styles, images and fonts. Works offline; scripts and external links are disabled.',
+    },
+    exportHtmlFailed: {
+      ru: 'Не удалось создать HTML. Повторите попытку или скачайте ZIP.',
+      en: 'Could not create HTML. Try again or download the ZIP.',
+    },
     documentTitleFallback: sharedWebSnapshotSingularNameMessage,
     documentTitleSuffix: sharedWebSnapshotSingularNameMessage,
     frameTitle: sharedWebSnapshotSingularNameMessage,

@@ -391,3 +391,18 @@ it('projects safe anchors as inert external targets and removes external resourc
   expect(html).not.toContain('https://tracker.example/icon.svg');
   expect(html).not.toContain('https://tracker.example/poster.png');
 });
+
+it('removes SVG mutation elements only for the explicit standalone policy, including shadow roots', () => {
+  const svg =
+    '<svg><a><set attributeName="href" to="https://example.test/" />' +
+    '<animate attributeName="href" values="https://example.test/" />' +
+    '<animateMotion /><animateTransform /><discard /><text>Saved</text></a></svg>';
+  const source = `${svg}<x-card><template shadowrootmode="open">${svg}</template></x-card>`;
+  const passive = sanitizeWebSnapshotHtml(source, null, {
+    offlineOnly: true,
+    removeSvgAnimations: true,
+  });
+  expect(passive).not.toMatch(/<(?:set|animate|discard)/u);
+  expect(passive).toContain('Saved');
+  expect(sanitizeWebSnapshotHtml(source, null)).toContain('<set');
+});
