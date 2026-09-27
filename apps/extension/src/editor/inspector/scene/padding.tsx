@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useState } from 'react';
 
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
@@ -6,8 +7,29 @@ import {
   ProductGlassLinkedPaddingFields,
   type ProductGlassLinkedPaddingValue,
 } from '@sniptale/ui/product-glass-controls';
-import { CompactRange, NumericRow } from '../../chrome/ui';
+import { NumericRow } from '../../chrome/ui';
 import { PanelSection } from './shared';
+
+type PaddingHoverSide = keyof ProductGlassLinkedPaddingValue | 'all';
+
+function readPaddingHoverSide(target: EventTarget | null): PaddingHoverSide | null {
+  const value =
+    target instanceof Element
+      ? target.closest<HTMLElement>('[data-padding-hover]')?.dataset['paddingHover']
+      : null;
+  switch (value) {
+    case 'all':
+    case 'top':
+    case 'right':
+    case 'bottom':
+    case 'left':
+      return value;
+    case null:
+    case undefined:
+    default:
+      return null;
+  }
+}
 
 function selectFramePadding(frame: EditorFrameSettings): ProductGlassLinkedPaddingValue {
   return {
@@ -35,39 +57,62 @@ export function FramePaddingFields(props: {
   frameDraft: EditorFrameSettings;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
 }) {
+  const [hoveredSide, setHoveredSide] = useState<PaddingHoverSide | null>(null);
+  const [focusedSide, setFocusedSide] = useState<PaddingHoverSide | null>(null);
   return (
-    <ProductGlassLinkedPaddingFields
-      fieldLayout="stacked"
-      renderUniformField={({ onChange, value }) => (
-        <PaddingValue
-          label={translate('highlighter.editor.paddingLabel')}
-          value={value}
-          onChange={onChange}
-        />
-      )}
-      labels={{
-        padding: translate('highlighter.editor.paddingLabel'),
-        top: translate('highlighter.editor.paddingTop'),
-        right: translate('highlighter.editor.paddingRight'),
-        bottom: translate('highlighter.editor.paddingBottom'),
-        left: translate('highlighter.editor.paddingLeft'),
-        link: translate('highlighter.editor.paddingLinked'),
-        unlink: translate('highlighter.editor.paddingSeparate'),
-      }}
-      padding={selectFramePadding(props.frameDraft)}
-      onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
-      renderValueField={({ label, onChange, side, value }) => (
-        <div className="min-w-0" data-padding-side={side}>
-          <PaddingValue label={label} value={value} onChange={onChange} />
-        </div>
-      )}
-    />
+    <div
+      onPointerMoveCapture={(event) => setHoveredSide(readPaddingHoverSide(event.target))}
+      onPointerLeave={() => setHoveredSide(null)}
+      onFocusCapture={(event) => setFocusedSide(readPaddingHoverSide(event.target))}
+      onBlurCapture={(event) => setFocusedSide(readPaddingHoverSide(event.relatedTarget))}
+    >
+      <ProductGlassLinkedPaddingFields
+        fieldLayout="stacked"
+        renderUniformField={({ onChange, value }) => (
+          <PaddingValue
+            label={translate('highlighter.editor.paddingLabel')}
+            value={value}
+            onChange={onChange}
+            side="all"
+            revealSlider={hoveredSide === 'all' || focusedSide === 'all'}
+          />
+        )}
+        labels={{
+          padding: translate('highlighter.editor.paddingLabel'),
+          top: translate('highlighter.editor.paddingTop'),
+          right: translate('highlighter.editor.paddingRight'),
+          bottom: translate('highlighter.editor.paddingBottom'),
+          left: translate('highlighter.editor.paddingLeft'),
+          link: translate('highlighter.editor.paddingLinked'),
+          unlink: translate('highlighter.editor.paddingSeparate'),
+        }}
+        padding={selectFramePadding(props.frameDraft)}
+        onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
+        renderValueField={({ label, onChange, side, value }) => (
+          <div className="min-w-0" data-padding-side={side}>
+            <PaddingValue
+              label={label}
+              value={value}
+              onChange={onChange}
+              side={side}
+              revealSlider={hoveredSide === side || focusedSide === side}
+            />
+          </div>
+        )}
+      />
+    </div>
   );
 }
 
-function PaddingValue(props: { label: string; value: number; onChange: (value: number) => void }) {
+function PaddingValue(props: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  side: PaddingHoverSide;
+  revealSlider: boolean;
+}) {
   return (
-    <div className="grid min-w-0 gap-1">
+    <div className="min-w-0" data-padding-hover={props.side}>
       <NumericRow
         labelVisible={false}
         label={props.label}
@@ -77,14 +122,8 @@ function PaddingValue(props: { label: string; value: number; onChange: (value: n
         onPreviewValue={props.onChange}
         unit="px"
         value={props.value}
-      />
-      <CompactRange
-        aria-label={props.label}
-        min={0}
-        max={256}
-        step={1}
-        value={Math.min(256, props.value)}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
+        scrub={{ min: 0, max: 256, step: 1, value: Math.min(256, props.value) }}
+        revealScrub={props.revealSlider}
       />
     </div>
   );

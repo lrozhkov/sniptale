@@ -1,0 +1,8 @@
+[data-ui='editor.frame.categories'] > div {
+  padding: 6px 10px 10px 6px;
+}
+
+[data-ui='editor.frame.categories'] [data-ui='shared.categorized-inspector.section-heading'] {
+  min-height: 24px;
+  margin-bottom: 4px;
+}

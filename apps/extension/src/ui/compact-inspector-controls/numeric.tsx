@@ -145,6 +145,7 @@ export interface NumericRowProps extends NumericValueFieldProps {
   appearance?: 'surface' | 'plain';
   className?: string;
   labelVisible?: boolean;
+  revealScrub?: boolean;
 }
 
 export function NumericRow({
@@ -152,10 +153,11 @@ export function NumericRow({
   className,
   label,
   labelVisible = true,
+  revealScrub = false,
   scrub,
   ...props
 }: NumericRowProps) {
-  const range = useNumericRowRangeState(scrub, props.disabled);
+  const range = useNumericRowRangeState(scrub, props.disabled, revealScrub);
 
   return (
     <div
@@ -212,7 +214,8 @@ export function NumericRow({
 
 function useNumericRowRangeState(
   scrub: CompactInspectorNumericScrub | undefined,
-  disabled: boolean | undefined
+  disabled: boolean | undefined,
+  revealScrub: boolean
 ) {
   const [hot, setHot] = useState(false);
   const [active, setActive] = useState(false);
@@ -233,7 +236,7 @@ function useNumericRowRangeState(
     setActive,
     setTextFocused,
     show,
-    visible: !textFocused && (hot || active),
+    visible: !disabled && (revealScrub || (!textFocused && (hot || active))),
   };
 }
 

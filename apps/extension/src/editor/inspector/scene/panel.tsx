@@ -9,6 +9,7 @@ import { FrameApplyButton } from './apply-button';
 import type { EditorInspectorFramePanelProps } from './types';
 import { EditorInspectorBackgroundBlurControl } from './background/blur';
 import { EditorInspectorFrameSourceImageFields } from './source-image';
+import './panel.css';
 
 export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps) {
   return (
@@ -16,11 +17,12 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
       <div
         data-ui="editor.inspector.sections"
         className={[
-          'min-h-0 flex-1 divide-y divide-[var(--sniptale-color-border-soft)]',
+          'min-h-0 flex-1 border-t border-[var(--sniptale-color-border-soft)]',
           'overflow-y-auto [scrollbar-gutter:stable] [&_nav]:sticky [&_nav]:top-0 [&_nav]:self-start',
         ].join(' ')}
       >
         <CategorizedInspector
+          dataUi="editor.frame.categories"
           ariaLabel={translate('editor.scene.sceneBackgroundTitle')}
           initialSection="background"
           showSectionHeading

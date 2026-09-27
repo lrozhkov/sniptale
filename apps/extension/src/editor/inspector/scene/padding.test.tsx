@@ -70,3 +70,56 @@ it('offers four independently editable sides without short inline sliders', asyn
     paddingLeft: 32,
   });
 });
+
+it('reveals only the hovered padding slider from its label and hides it on leave', async () => {
+  const row = container.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.compact-inspector.numeric-row"]'
+  );
+  expect(row?.dataset['rangeVisible']).toBe('false');
+  const label = container.querySelector<HTMLElement>(
+    '[data-ui="shared.linked-padding-fields"] > div:first-child span'
+  );
+  await act(async () => {
+    label?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+  });
+  expect(row?.dataset['rangeVisible']).toBe('true');
+  await act(async () => {
+    label?.dispatchEvent(
+      new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    );
+  });
+  expect(row?.dataset['rangeVisible']).toBe('false');
+});
+
+it('reveals just one side slider while unlinked padding labels are hovered', async () => {
+  for (const name of ['all', 'vertical', 'horizontal']) {
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(`[data-padding-link="${name}"]`)?.click()
+    );
+  }
+  const label = container.querySelector<HTMLElement>('span[data-padding-hover="top"]');
+  await act(async () => {
+    label?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+  });
+  const rows = Array.from(
+    container.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+  );
+  expect(rows.map((row) => row.dataset['rangeVisible'])).toEqual([
+    'true',
+    'false',
+    'false',
+    'false',
+  ]);
+});
+
+it('keeps the padding slider reachable after the numeric input receives keyboard focus', async () => {
+  const input = container.querySelector<HTMLInputElement>('input[type="text"]')!;
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  await act(async () => input.focus());
+  expect(range.tabIndex).toBe(0);
+  expect(
+    range
+      .closest('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+      ?.getAttribute('data-range-visible')
+  ).toBe('true');
+});

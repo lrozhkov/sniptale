@@ -104,7 +104,10 @@ function ExpandedAxisGroup(props: {
             }
             key={side}
           >
-            <span className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
+            <span
+              data-padding-hover={side}
+              className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]"
+            >
               {props.linked
                 ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
                 : props.shared.labels[side]}
@@ -201,7 +204,9 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
     <div className="grid gap-1.5" data-ui="shared.linked-padding-fields">
       <div className="flex min-w-0 items-center gap-1.5">
         <div className="min-w-0 flex-1 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-          <span className="truncate">{props.labels.padding}</span>
+          <span className="truncate" data-padding-hover="all">
+            {props.labels.padding}
+          </span>
         </div>
         {!expanded && !props.renderUniformField ? (
           <div className="w-[4.75rem] rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-0.5">
