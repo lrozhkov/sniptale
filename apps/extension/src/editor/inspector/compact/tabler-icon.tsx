@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { memo, type CSSProperties } from 'react';
 import { Icon } from '@iconify/react';
 import alignCenterIcon from '@iconify-icons/tabler/align-center';
 import alignJustifiedIcon from '@iconify-icons/tabler/align-justified';
@@ -220,28 +220,49 @@ function getTablerIconData(icon: TablerIconName): IconifyIconData {
   return TABLER_ICON_DATA[icon];
 }
 
-export function TablerIcon(props: {
+type TablerIconProps = {
   className?: string;
   color?: string;
   icon: TablerIconName;
   opacity?: number;
   size?: number;
   style?: CSSProperties;
-}) {
-  const size = props.size ?? 15;
-  const optionalProps = {
-    ...(props.className === undefined ? {} : { className: props.className }),
-    ...(props.color === undefined ? {} : { color: props.color }),
-  };
+};
 
-  return (
-    <Icon
-      aria-hidden="true"
-      height={size}
-      icon={getTablerIconData(props.icon)}
-      style={{ opacity: props.opacity, ...props.style }}
-      width={size}
-      {...optionalProps}
-    />
+function sameStyle(left?: CSSProperties, right?: CSSProperties): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const leftEntries = Object.entries(left);
+  if (leftEntries.length !== Object.keys(right).length) return false;
+  return leftEntries.every(
+    ([key, value]) => Object.hasOwn(right, key) && Object.is(value, Reflect.get(right, key))
   );
 }
+
+export const TablerIcon = memo(
+  function TablerIcon(props: TablerIconProps) {
+    const size = props.size ?? 15;
+    const optionalProps = {
+      ...(props.className === undefined ? {} : { className: props.className }),
+      ...(props.color === undefined ? {} : { color: props.color }),
+    };
+
+    return (
+      <Icon
+        aria-hidden="true"
+        height={size}
+        icon={getTablerIconData(props.icon)}
+        style={{ opacity: props.opacity, ...props.style }}
+        width={size}
+        {...optionalProps}
+      />
+    );
+  },
+  (left, right) =>
+    left.className === right.className &&
+    left.color === right.color &&
+    left.icon === right.icon &&
+    left.opacity === right.opacity &&
+    left.size === right.size &&
+    sameStyle(left.style, right.style)
+);
