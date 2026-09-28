@@ -37,6 +37,7 @@ type ResetDocumentState = Pick<
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
+  | 'showOutsideCanvas'
   | 'saveErrorMessage'
   | 'saveState'
   | 'selectionToolSettings'
@@ -146,6 +147,7 @@ function createResetDocumentUiState(
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
+  | 'showOutsideCanvas'
   | 'saveErrorMessage'
   | 'saveState'
   | 'selectionToolSettings'
@@ -164,6 +166,7 @@ function createResetDocumentUiState(
     viewportPreviewOpen: state.viewportPreviewAutomationBlockedInSession
       ? state.viewportPreviewOpen
       : false,
+    showOutsideCanvas: false,
     saveErrorMessage: null,
     saveState: 'idle',
     selectionToolSettings: state.toolSettings,

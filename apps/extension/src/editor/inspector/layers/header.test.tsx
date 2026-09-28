@@ -32,7 +32,7 @@ it('renders layer header controls without insertion', () => {
   expect(markup).toContain('editor.toolbar.layerAutoNavigate');
   expect(markup).toContain('data-active="true"');
   expect(markup).not.toContain('mock.insert');
-  expect(markup).toContain('editor.layers.show-outside-canvas');
+  expect(markup).not.toContain('editor.layers.show-outside-canvas');
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('text-[12px] font-semibold uppercase');
   expect(markup).not.toContain(
@@ -86,5 +86,5 @@ it('keeps insertion out of the integrated header', () => {
   expect(markup).toContain('4 editor.toolbar.layerCountSuffix');
   expect(markup).not.toContain('mock.insert');
   expect(markup).not.toContain('lucide-layers-3');
-  expect(markup.match(/<button/g)).toHaveLength(2);
+  expect(markup.match(/<button/g)).toHaveLength(1);
 });

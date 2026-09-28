@@ -4,11 +4,24 @@ import {
   loadEditorDocumentViaController,
   openEditorImageViaController,
 } from './lifecycle';
+import { EditorCanvas } from '../../viewport/render-region';
 
 const mocks = vi.hoisted(() => ({
   closeDocument: vi.fn(),
   loadDocument: vi.fn(async () => undefined),
   openImage: vi.fn(async () => undefined),
+}));
+
+const visibility = vi.hoisted(() => ({
+  activeTool: 'select' as 'select' | 'crop',
+  canvasCropMode: 'crop' as 'crop' | 'expand',
+  showOutsideCanvas: true,
+  setCanvasCropMode: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
+}));
+
+vi.mock('../../../state/useEditorStore', () => ({
+  useEditorStore: { getState: () => visibility },
 }));
 
 vi.mock('../../document/lifecycle/close/run', async (importOriginal) => ({
@@ -47,6 +60,56 @@ function createController() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  visibility.activeTool = 'select';
+  visibility.canvasCropMode = 'crop';
+  visibility.showOutsideCanvas = true;
+  visibility.setCanvasCropMode.mockImplementation((mode: 'crop' | 'expand') => {
+    visibility.canvasCropMode = mode;
+  });
+  visibility.setShowOutsideCanvas.mockImplementation((show: boolean) => {
+    visibility.showOutsideCanvas = show;
+  });
+});
+
+it('masks outside pixels before applying a replacement document and leaves them hidden', async () => {
+  const controller = createController();
+  const canvas = Object.create(EditorCanvas.prototype) as EditorCanvas;
+  canvas.setShowOutsideCanvas = vi.fn();
+  controller.canvas = canvas;
+  controller.applyDocument.mockImplementation(async () => {
+    expect(canvas.setShowOutsideCanvas).toHaveBeenCalledWith(false);
+    expect(visibility.showOutsideCanvas).toBe(false);
+    expect(visibility.canvasCropMode).toBe('crop');
+  });
+
+  await openEditorImageViaController(controller, 'data-url');
+  const openArgs = (mocks.openImage.mock.calls as any[][])[0]?.[0];
+  await openArgs.applyDocument({ id: 'second-document' }, { resetHistory: true });
+
+  expect(visibility.showOutsideCanvas).toBe(false);
+  expect(canvas.setShowOutsideCanvas).toHaveBeenCalledTimes(1);
+});
+
+it('keeps outside pixels hidden when replacement fails after changing the canvas', async () => {
+  const controller = createController();
+  const canvas = Object.create(EditorCanvas.prototype) as EditorCanvas;
+  canvas.setShowOutsideCanvas = vi.fn();
+  controller.canvas = canvas;
+  visibility.activeTool = 'crop';
+  visibility.canvasCropMode = 'expand';
+  visibility.showOutsideCanvas = true;
+  controller.applyDocument.mockRejectedValueOnce(new Error('apply failed'));
+
+  await loadEditorDocumentViaController(controller, { id: 'next-document' } as never);
+  const loadArgs = (mocks.loadDocument.mock.calls as any[][])[0]?.[0];
+  await expect(
+    loadArgs.applyDocument({ id: 'next-document' }, { resetHistory: true })
+  ).rejects.toThrow('apply failed');
+
+  expect(visibility.showOutsideCanvas).toBe(false);
+  expect(visibility.canvasCropMode).toBe('crop');
+  expect(canvas.setShowOutsideCanvas).toHaveBeenNthCalledWith(1, false);
+  expect(canvas.setShowOutsideCanvas).toHaveBeenCalledTimes(1);
 });
 
 it('bridges open and load callbacks back into the controller', async () => {

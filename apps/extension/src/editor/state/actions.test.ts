@@ -10,6 +10,14 @@ afterEach(() => {
 });
 
 function registerDocumentDefaultsTests() {
+  it('starts with outside shapes hidden and resets the toggle for a new document', () => {
+    expect(useEditorStore.getState().showOutsideCanvas).toBe(false);
+    useEditorStore.getState().setShowOutsideCanvas(true);
+    expect(useEditorStore.getState().showOutsideCanvas).toBe(true);
+    useEditorStore.getState().resetDocumentState();
+    expect(useEditorStore.getState().showOutsideCanvas).toBe(false);
+  });
+
   it('exposes crop state only as a runtime projection', () => {
     expect('setCropReady' in useEditorStore.getState()).toBe(false);
 

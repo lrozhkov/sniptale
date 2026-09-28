@@ -10,6 +10,7 @@ const storeState = {
   setImageData: vi.fn(),
   setInspector: vi.fn(),
   setPageTitle: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
   toolSettings: {
     step: { alphabet: 'latin', color: '#ff671d', sizeLevel: 3, type: 'number', value: '1' },
   },

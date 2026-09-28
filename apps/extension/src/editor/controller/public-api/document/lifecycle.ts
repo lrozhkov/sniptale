@@ -2,11 +2,29 @@ import type { EditorDocument } from '../../../../features/editor/document/types'
 import { closeEditorControllerDocument } from '../../document/lifecycle/close/run';
 import { openEditorControllerImage } from '../../document/lifecycle/open/image/run';
 import { openLoadedEditorControllerDocument } from '../../document/lifecycle/open/load/run';
-import type { OpenImageOptions } from '../../core/types';
+import type { ApplyDocumentOptions, OpenImageOptions } from '../../core/types';
+import { useEditorStore } from '../../../state/useEditorStore';
+import { EditorCanvas } from '../../viewport/render-region';
 import type {
   EditorDocumentCloseLifecycleController,
   EditorDocumentOpenLifecycleController,
 } from './lifecycle-controller';
+
+async function applyNewDocumentWithOutsideHidden(
+  controller: EditorDocumentOpenLifecycleController,
+  document: EditorDocument,
+  options: ApplyDocumentOptions
+): Promise<void> {
+  const store = useEditorStore.getState();
+  const canvas = controller.canvas;
+
+  if (canvas instanceof EditorCanvas) canvas.setShowOutsideCanvas(false);
+  store.setShowOutsideCanvas(false);
+  store.setCanvasCropMode('crop');
+  // A failed load can leave partially replaced canvas objects behind. Keep the outside
+  // region hidden until the user explicitly enables it again.
+  await controller.applyDocument(document, options);
+}
 
 export async function openEditorImageViaController(
   controller: EditorDocumentOpenLifecycleController,
@@ -18,7 +36,8 @@ export async function openEditorImageViaController(
     dataUrl,
     sourceName,
     openOptions: options,
-    applyDocument: (document, applyOptions) => controller.applyDocument(document, applyOptions),
+    applyDocument: (document, applyOptions) =>
+      applyNewDocumentWithOutsideHidden(controller, document, applyOptions),
     scheduleZoomToFit: () => controller.scheduleZoomToFit(),
   });
 }
@@ -30,7 +49,7 @@ export async function loadEditorDocumentViaController(
   await openLoadedEditorControllerDocument({
     document,
     applyDocument: (nextDocument, applyOptions) =>
-      controller.applyDocument(nextDocument, applyOptions),
+      applyNewDocumentWithOutsideHidden(controller, nextDocument, applyOptions),
     scheduleZoomToFit: () => controller.scheduleZoomToFit(),
   });
 }

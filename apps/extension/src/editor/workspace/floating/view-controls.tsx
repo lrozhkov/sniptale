@@ -101,6 +101,8 @@ export function EditorFloatingViewControls(
 ) {
   const [activePopover, setActivePopover] = useState<ViewPopoverId | null>(null);
   const magnetEnabled = useEditorStore((state) => state.workspace.magnetEnabled);
+  const showOutsideCanvas = useEditorStore((state) => state.showOutsideCanvas);
+  const setShowOutsideCanvas = useEditorStore((state) => state.setShowOutsideCanvas);
   const updateWorkspace = useEditorStore((state) => state.updateWorkspace);
   const { toolbarRef, toolbarWidth } = useMeasuredToolbarWidth();
   const rootRef = useDismissViewPopover(
@@ -135,8 +137,10 @@ export function EditorFloatingViewControls(
           hasImage={props.hasImage}
           mapWidth={toolbarWidth}
           magnetEnabled={magnetEnabled}
+          showOutsideCanvas={showOutsideCanvas}
           onToggle={togglePopover}
           onToggleMagnet={() => updateWorkspace({ magnetEnabled: !magnetEnabled })}
+          onToggleShowOutsideCanvas={() => setShowOutsideCanvas(!showOutsideCanvas)}
         />
         <ContentToolbarDivider />
         <ViewZoomControls hasImage={props.hasImage} zoomPercent={props.zoomPercent} />

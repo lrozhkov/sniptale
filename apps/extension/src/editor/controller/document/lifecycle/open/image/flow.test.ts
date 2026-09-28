@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   setImageDataMock: vi.fn(),
   setInspectorMock: vi.fn(),
   setPageTitleMock: vi.fn(),
+  setShowOutsideCanvasMock: vi.fn(),
+  outsideVisible: true,
   traceEditorImageDocumentAppliedMock: vi.fn(),
   traceEditorImageDocumentCreatedMock: vi.fn(),
   traceEditorImageOpenStartMock: vi.fn(),
@@ -33,12 +35,14 @@ vi.mock('../../../../../state/useEditorStore', async (importOriginal) => ({
       setImageData: mocks.setImageDataMock,
       setInspector: mocks.setInspectorMock,
       setPageTitle: mocks.setPageTitleMock,
+      setShowOutsideCanvas: mocks.setShowOutsideCanvasMock,
     }),
   },
 }));
 
 import { syncLoadedDocumentState } from '../store';
 import { applyOpenedEditorDocument } from './apply';
+import { applyLoadedEditorDocument } from '../load/apply';
 import { completeOpenedEditorDocument } from './complete';
 import { createOpenedEditorDocument } from './create';
 
@@ -60,6 +64,10 @@ function createOpenImageContext() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.outsideVisible = true;
+  mocks.setShowOutsideCanvasMock.mockImplementation((show: boolean) => {
+    mocks.outsideVisible = show;
+  });
   mocks.createBaseDocumentMock.mockResolvedValue({
     version: 1,
     browserFrame: null,
@@ -149,6 +157,42 @@ async function expectNullFaviconStateSync(): Promise<void> {
 }
 
 describe('open image document flow', () => {
+  it('resets outside visibility after each successful document switch without closing', async () => {
+    const applyDocument = vi.fn(async () => undefined);
+    const scheduleZoomToFit = vi.fn();
+    await applyOpenedEditorDocument({
+      applyDocument,
+      browserFrameUrl: '',
+      dataUrl: 'first',
+      document: { version: 1 } as never,
+      pageTitle: 'First',
+      scheduleZoomToFit,
+    });
+    expect(mocks.outsideVisible).toBe(false);
+    mocks.outsideVisible = true;
+    await applyLoadedEditorDocument({
+      applyDocument,
+      document: { version: 1, sourceImageData: 'second' } as never,
+      scheduleZoomToFit,
+    });
+    expect(mocks.outsideVisible).toBe(false);
+    expect(mocks.setShowOutsideCanvasMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retains visibility if opening a replacement document fails', async () => {
+    const applyDocument = vi.fn(async () => {
+      throw new Error('apply failed');
+    });
+    await expect(
+      applyLoadedEditorDocument({
+        applyDocument,
+        document: { version: 1, sourceImageData: 'next' } as never,
+        scheduleZoomToFit: vi.fn(),
+      })
+    ).rejects.toThrow('apply failed');
+    expect(mocks.outsideVisible).toBe(true);
+    expect(mocks.setShowOutsideCanvasMock).not.toHaveBeenCalled();
+  });
   it('creates a base document with the opened title, url, and a reset favicon payload', async () => {
     await expectCreatedOpenDocument();
   });

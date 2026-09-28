@@ -29,7 +29,7 @@ export class EditorCanvas extends Canvas {
   } | null = null;
   private expandingCanvasWorkspace = false;
   private presentationScale = 1;
-  private showOutsideCanvas = true;
+  private showOutsideCanvas = false;
   private layerSelectionPriority: FabricObject | null = null;
   private tracksLayerSelectionPriority = false;
 

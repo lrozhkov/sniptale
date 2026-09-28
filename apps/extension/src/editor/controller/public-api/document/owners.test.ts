@@ -38,6 +38,7 @@ vi.mock('../../document/lifecycle/open/image/run', async (importOriginal) => ({
 function createOpenLifecycleController(): EditorDocumentOpenLifecycleController {
   return {
     applyDocument: vi.fn(async () => undefined),
+    canvas: null,
     scheduleZoomToFit: vi.fn(),
   };
 }

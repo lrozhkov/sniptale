@@ -59,7 +59,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   layerEffectsCategory: 'adjustments',
   viewportPreviewOpen: false,
   viewportPreviewAutomationBlockedInSession: false,
-  showOutsideCanvas: true,
+  showOutsideCanvas: false,
   canvasCropMode: 'crop',
   saveErrorMessage: null,
   saveState: 'idle',

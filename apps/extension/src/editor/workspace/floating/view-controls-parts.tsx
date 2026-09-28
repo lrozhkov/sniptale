@@ -21,6 +21,25 @@ const VIEW_MAP_POPOVER_CLASS_NAME = floatingChromeClassNames(
 
 export type ViewPopoverId = 'workspace' | 'map';
 
+function OutsideCanvasIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      width="18"
+      height="18"
+    >
+      <rect x="3.5" y="6.5" width="15" height="14" rx="1.5" />
+      <circle cx="18" cy="6" r="3.5" />
+    </svg>
+  );
+}
+
 function ViewToolbarPopoverAnchor(props: {
   active: boolean;
   disabled?: boolean;
@@ -115,12 +134,27 @@ export function ViewSettingsControls(props: {
   hasImage: boolean;
   mapWidth: number;
   magnetEnabled: boolean;
+  showOutsideCanvas: boolean;
   onToggle: (id: ViewPopoverId) => void;
   onToggleMagnet: () => void;
+  onToggleShowOutsideCanvas: () => void;
 }) {
   return (
     <ContentToolbarGroup className="gap-1.5" dataUi="editor.floating.view-controls.settings-group">
       <WorkspacePopoverButton {...props} />
+      <ContentToolbarButton
+        title={getDocumentRequiredTitle(
+          translate('editor.toolbar.showOutsideCanvas'),
+          props.hasImage
+        )}
+        active={props.showOutsideCanvas}
+        aria-pressed={props.showOutsideCanvas}
+        disabled={!props.hasImage}
+        onClick={props.onToggleShowOutsideCanvas}
+        dataUi="editor.floating.view-controls.show-outside-canvas"
+      >
+        <OutsideCanvasIcon />
+      </ContentToolbarButton>
       <ContentToolbarButton
         title={getDocumentRequiredTitle(translate('editor.toolbar.magnetMode'), props.hasImage)}
         active={props.magnetEnabled}

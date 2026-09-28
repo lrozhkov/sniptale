@@ -14,13 +14,14 @@ const mocks = vi.hoisted(() => ({
   onApply: vi.fn(async () => undefined),
   saveWorkspaceColorAsDefault: vi.fn(),
   updateWorkspace: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
   viewportPreview: vi.fn(() => <div data-ui="mock.viewport-preview" />),
   zoomIn: vi.fn(),
   zoomOut: vi.fn(),
   zoomToFit: vi.fn(),
   resetZoom: vi.fn(),
   embed: { mode: 'scenario' as 'scenario' | 'standalone', onApply: vi.fn(async () => undefined) },
-  store: { magnetEnabled: false },
+  store: { magnetEnabled: false, showOutsideCanvas: false },
 }));
 
 vi.mock('../../application/controller-context', () => ({
@@ -39,11 +40,18 @@ vi.mock('../../application/embed-context/context', () => ({
 }));
 vi.mock('../../state/useEditorStore', () => ({
   useEditorStore: (
-    selector: (state: { updateWorkspace: unknown; workspace: unknown }) => unknown
+    selector: (state: {
+      updateWorkspace: unknown;
+      workspace: unknown;
+      showOutsideCanvas: boolean;
+      setShowOutsideCanvas: unknown;
+    }) => unknown
   ) =>
     selector({
       updateWorkspace: mocks.updateWorkspace,
       workspace: { magnetEnabled: mocks.store.magnetEnabled },
+      showOutsideCanvas: mocks.store.showOutsideCanvas,
+      setShowOutsideCanvas: mocks.setShowOutsideCanvas,
     }),
 }));
 vi.mock('../../inspector/compact/inspector/workspace-sections', () => ({
@@ -113,6 +121,7 @@ beforeEach(() => {
   mocks.embed.mode = 'scenario';
   mocks.embed.onApply = mocks.onApply;
   mocks.store.magnetEnabled = false;
+  mocks.store.showOutsideCanvas = false;
 });
 
 afterEach(() => {
@@ -168,6 +177,35 @@ it('routes direct view toolbar actions through existing controller and store han
   ).toBeNull();
 });
 
+it('places the outside-shapes toggle before magnet with the same active treatment', () => {
+  renderControls();
+  const outside = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
+  );
+  const magnet = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.view-controls.magnet"]'
+  );
+  expect(outside?.getAttribute('aria-pressed')).toBe('false');
+  expect(outside?.className).not.toContain('sniptale-glass-toolbar-button--active');
+  expect(outside?.nextElementSibling).toBe(magnet);
+  expect(outside?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  click('editor.floating.view-controls.show-outside-canvas');
+  expect(mocks.setShowOutsideCanvas).toHaveBeenCalledWith(true);
+
+  act(() => root?.unmount());
+  root = null;
+  container?.remove();
+  mocks.store.showOutsideCanvas = true;
+  renderControls();
+  const enabled = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
+  );
+  expect(enabled?.getAttribute('aria-pressed')).toBe('true');
+  expect(enabled?.className).toContain('sniptale-glass-toolbar-button--active');
+  click('editor.floating.view-controls.show-outside-canvas');
+  expect(mocks.setShowOutsideCanvas).toHaveBeenLastCalledWith(false);
+});
+
 it('uses the zoom percent button as fit-to-window at 100 percent', () => {
   renderControls(true, { zoomPercent: 100 });
 
@@ -179,6 +217,12 @@ it('uses the zoom percent button as fit-to-window at 100 percent', () => {
 
 it('disables document-required controls without an image and dismisses transient popovers outside', () => {
   renderControls(false);
+
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
+    )?.disabled
+  ).toBe(true);
 
   expect(
     container?.querySelector<HTMLButtonElement>(

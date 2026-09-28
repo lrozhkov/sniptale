@@ -58,6 +58,7 @@ it('renders the empty intake path without grid overlay when no document is loade
 });
 
 it('updates only live canvas presentation when outside visibility or crop mode changes', async () => {
+  resetEditorStore({ showOutsideCanvas: false, canvasCropMode: 'crop', activeTool: 'select' });
   const { CanvasWrapper } = await import('.');
   const canvas = Object.create(EditorCanvas.prototype) as EditorCanvas;
   canvas.setShowOutsideCanvas = vi.fn();
@@ -66,6 +67,9 @@ it('updates only live canvas presentation when outside visibility or crop mode c
     getPublicApiAdapter: () => ({ canvas }),
   };
   renderWithController(<CanvasWrapper hasImage />, controller);
+  expect(canvas.setShowOutsideCanvas).toHaveBeenLastCalledWith(false);
+
+  act(() => useEditorStore.getState().setShowOutsideCanvas(true));
   expect(canvas.setShowOutsideCanvas).toHaveBeenLastCalledWith(true);
 
   act(() => useEditorStore.getState().setShowOutsideCanvas(false));

@@ -23,6 +23,7 @@ const storeState = {
   setImageData: vi.fn(),
   setInspector: vi.fn(),
   setPageTitle: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
 };
 
 const mocks = vi.hoisted(() => ({
@@ -207,6 +208,8 @@ function expectOpenAndLoadState(
   expect(scheduleZoomToFit).toHaveBeenCalledTimes(2);
   expect(storeState.setInspector).toHaveBeenCalledWith('file');
   expect(storeState.setImageData).toHaveBeenCalledWith('loaded-data');
+  expect(storeState.setShowOutsideCanvas).toHaveBeenCalledTimes(2);
+  expect(storeState.setShowOutsideCanvas).toHaveBeenCalledWith(false);
   expect(storeState.setPageTitle).toHaveBeenCalledWith('Source');
   expect(storeState.setBrowserFrame).toHaveBeenCalledWith({
     faviconDataUrl: null,

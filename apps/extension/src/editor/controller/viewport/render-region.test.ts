@@ -351,6 +351,10 @@ it('omits outside pixels from interactive rendering while retaining the object f
   const outside = new Rect({ left: -35, top: 10, width: 25, height: 20, fill: '#ff0000' });
   canvas.add(outside);
   canvas.renderAll();
+  expect(canvas.getContext().getImageData(20, 65, 1, 1).data[3]).toBe(0);
+
+  canvas.setShowOutsideCanvas(true);
+  canvas.renderAll();
   expect(canvas.getContext().getImageData(20, 65, 1, 1).data[3]).toBe(255);
 
   canvas.setShowOutsideCanvas(false);

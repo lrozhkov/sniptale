@@ -8,6 +8,7 @@ export function syncOpenedDocumentState(options: {
 }): void {
   const store = useEditorStore.getState();
 
+  store.setShowOutsideCanvas(false);
   store.setInspector('file');
   store.setImageData(options.dataUrl);
   store.setPageTitle(options.pageTitle);
@@ -21,6 +22,7 @@ export function syncOpenedDocumentState(options: {
 export function syncLoadedDocumentState(sourceImageData: string): void {
   const store = useEditorStore.getState();
 
+  store.setShowOutsideCanvas(false);
   store.setInspector('file');
   store.setImageData(sourceImageData);
 }
