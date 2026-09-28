@@ -10,14 +10,18 @@ const {
   getAggregatePresentationMock,
   getCurrentLocaleMock,
   getMediaThumbnailMock,
+  getGalleryProjectCoverMock,
   revokeObjectURLMock,
 } = vi.hoisted(() => ({
   formatDateTimeMock: vi.fn(() => 'Jan 01, 2024, 12:30 PM'),
   getAggregatePresentationMock: vi.fn(),
   getCurrentLocaleMock: vi.fn(() => 'en'),
   getMediaThumbnailMock: vi.fn(),
+  getGalleryProjectCoverMock: vi.fn(),
   revokeObjectURLMock: vi.fn(),
 }));
+
+vi.mock('../items/project-covers', () => ({ getGalleryProjectCover: getGalleryProjectCoverMock }));
 
 vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
   ...(await importOriginal<
@@ -106,6 +110,7 @@ beforeEach(() => {
   });
   getMediaThumbnailMock.mockReset();
   getAggregatePresentationMock.mockReset();
+  getGalleryProjectCoverMock.mockReset();
   revokeObjectURLMock.mockReset();
 });
 
@@ -277,11 +282,8 @@ function createMediaThumbItem(
   };
 }
 
-it('refreshes a project thumbnail when its saved presentation revision changes', async () => {
-  getAggregatePresentationMock.mockResolvedValue({
-    thumbnailBlob: new Blob(['first']),
-    updatedAt: 1,
-  });
+it('clears the old project cover immediately when its workspace revision changes', async () => {
+  getGalleryProjectCoverMock.mockResolvedValueOnce(new Blob(['first']));
   const item = {
     ...createVideoProjectItem(),
     hasThumbnail: true,
@@ -290,13 +292,108 @@ it('refreshes a project thumbnail when its saved presentation revision changes',
   };
   renderItemThumb(item);
   await flushEffects();
-  getAggregatePresentationMock.mockResolvedValue({
-    thumbnailBlob: new Blob(['second']),
-    updatedAt: 2,
-  });
+  let resolveSecond: (blob: Blob) => void = () => {};
+  getGalleryProjectCoverMock.mockReturnValueOnce(
+    new Promise<Blob>((resolve) => {
+      resolveSecond = resolve;
+    })
+  );
   renderItemThumb({ ...item, presentationRevision: 2, workspaceRevision: 2 });
+  expect(container?.querySelector('img')).toBeNull();
+  resolveSecond(new Blob(['second']));
   await flushEffects();
-  expect(getAggregatePresentationMock).toHaveBeenCalledTimes(2);
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledTimes(2);
+  expect(getAggregatePresentationMock).not.toHaveBeenCalled();
   expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:thumb');
   expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+});
+
+it('ignores an older project cover that finishes after the current revision', async () => {
+  let resolveOld: (blob: Blob) => void = () => {};
+  getGalleryProjectCoverMock.mockReturnValueOnce(
+    new Promise<Blob>((resolve) => {
+      resolveOld = resolve;
+    })
+  );
+  getGalleryProjectCoverMock.mockResolvedValueOnce(new Blob(['current']));
+  vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:current');
+  const item = { ...createVideoProjectItem(), workspaceRevision: 1 };
+  renderItemThumb(item);
+  renderItemThumb({ ...item, workspaceRevision: 2 });
+  await flushEffects();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:current');
+  resolveOld(new Blob(['old']));
+  await flushEffects();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:current');
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+});
+
+it('requests only viewport-near project covers in a large mounted list and releases hidden URLs', async () => {
+  const observed = new Map<Element, IntersectionObserverCallback>();
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      private readonly callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        observed.set(target, this.callback);
+      }
+      unobserve(target: Element) {
+        observed.delete(target);
+      }
+      disconnect() {
+        for (const [target, callback] of observed)
+          if (callback === this.callback) observed.delete(target);
+      }
+    }
+  );
+  getGalleryProjectCoverMock.mockResolvedValue(new Blob(['cover']));
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  const items = Array.from({ length: 80 }, (_, index) => ({
+    ...createVideoProjectItem(),
+    id: `video-project:${index}`,
+    entityId: `project-${index}`,
+  }));
+  act(() =>
+    root?.render(items.map((item) => <MediaThumb key={item.id} item={item} deferUntilVisible />))
+  );
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).not.toHaveBeenCalled();
+  const targets = [...observed.keys()];
+  expect(targets).toHaveLength(80);
+  act(() =>
+    observed.get(targets[41]!)?.(
+      [{ isIntersecting: true, target: targets[41]! } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    )
+  );
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledTimes(1);
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledWith(items[41], expect.any(AbortSignal));
+  expect(container?.querySelectorAll('img')).toHaveLength(1);
+  act(() =>
+    observed.get(targets[41]!)?.(
+      [{ isIntersecting: false, target: targets[41]! } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    )
+  );
+  await flushEffects();
+  expect(container?.querySelectorAll('img')).toHaveLength(0);
+  expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:thumb');
+  act(() =>
+    observed.get(targets[41]!)?.(
+      [{ isIntersecting: true, target: targets[41]! } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    )
+  );
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledTimes(2);
+  act(() => root?.unmount());
+  root = null;
+  expect(observed.size).toBe(0);
+  expect(revokeObjectURLMock).toHaveBeenCalledTimes(2);
 });

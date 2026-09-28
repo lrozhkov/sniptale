@@ -3,6 +3,7 @@ import { isGalleryMediaItem, type GalleryItem } from '../items';
 import { formatDate, getRecordingGroupRoleLabel } from '../ui';
 import { Clock3 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
+import { GalleryProjectOpenAction, getGalleryProjectSummary } from '../ui/project-presentation';
 
 interface GalleryCardDetailsProps {
   compact?: boolean;
@@ -142,7 +143,11 @@ function getGallerySourcePresentation(item: GalleryItem) {
 }
 
 export function GalleryListDetails(
-  props: GalleryCardDetailsProps & { previewUnavailable?: boolean; onRetryPreview?: () => void }
+  props: GalleryCardDetailsProps & {
+    previewUnavailable?: boolean;
+    onRetryPreview?: () => void;
+    onProjectOpen?: (item: GalleryItem) => void;
+  }
 ) {
   const tagsLabel = props.item.tags.join(', ');
   const dateLabel = formatDate(props.item.createdAt);
@@ -183,6 +188,23 @@ export function GalleryListDetails(
           </div>
           <GalleryRecordingGroupLabel item={props.item} />
         </button>
+        {getGalleryProjectSummary(props.item) ? (
+          <div
+            className="mt-0.5 truncate text-xs text-[var(--sniptale-color-text-secondary)]"
+            title={getGalleryProjectSummary(props.item) ?? undefined}
+          >
+            {getGalleryProjectSummary(props.item)}
+          </div>
+        ) : null}
+        {props.onProjectOpen && getGalleryProjectSummary(props.item) ? (
+          <div className="mt-1.5">
+            <GalleryProjectOpenAction
+              item={props.item}
+              layout="list"
+              onOpen={props.onProjectOpen}
+            />
+          </div>
+        ) : null}
         {props.previewUnavailable ? (
           <div className="flex items-center gap-2 text-xs">
             <span role="status">{translate('gallery.app.previewUnavailable')}</span>

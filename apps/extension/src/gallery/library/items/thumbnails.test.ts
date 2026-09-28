@@ -12,6 +12,7 @@ const {
   getAggregatePresentationMock,
   getMediaAssetBlobMock,
   getMediaThumbnailMock,
+  getGalleryProjectCoverMock,
   listRecentScenarioStepsMock,
   saveMediaThumbnailMock,
 } = vi.hoisted(() => ({
@@ -21,9 +22,12 @@ const {
   getAggregatePresentationMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
   getMediaThumbnailMock: vi.fn(),
+  getGalleryProjectCoverMock: vi.fn(),
   listRecentScenarioStepsMock: vi.fn(),
   saveMediaThumbnailMock: vi.fn(),
 }));
+
+vi.mock('./project-covers', () => ({ getGalleryProjectCover: getGalleryProjectCoverMock }));
 
 vi.mock('../../../composition/persistence/aggregate-presentations', () => ({
   getAggregatePresentation: getAggregatePresentationMock,
@@ -71,6 +75,7 @@ import { ensureGalleryItemThumbnail } from './thumbnails';
 beforeEach(() => {
   vi.clearAllMocks();
   getAggregatePresentationMock.mockResolvedValue(undefined);
+  getGalleryProjectCoverMock.mockResolvedValue(undefined);
 });
 
 it('returns existing thumbnails without rebuilding them', async () => {
@@ -177,13 +182,9 @@ it('deduplicates media thumbnail generation and persists the generated entry', a
   });
 });
 
-it('reads scenario thumbnails only from aggregate presentations', async () => {
+it('uses a disposable Gallery cover for scenarios', async () => {
   const thumbnailBlob = new Blob(['thumb'], { type: 'image/png' });
-  getAggregatePresentationMock.mockResolvedValueOnce({
-    presentationRevision: 3,
-    thumbnailBlob,
-    updatedAt: 4,
-  });
+  getGalleryProjectCoverMock.mockResolvedValueOnce(thumbnailBlob);
 
   const result = await ensureGalleryItemThumbnail(
     createScenarioItem({
@@ -199,16 +200,14 @@ it('reads scenario thumbnails only from aggregate presentations', async () => {
     })
   );
 
-  expect(getAggregatePresentationMock).toHaveBeenCalledWith({
-    id: 'project-1',
-    kind: 'scenario',
-  });
+  expect(getAggregatePresentationMock).not.toHaveBeenCalled();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledOnce();
   expect(listRecentScenarioStepsMock).not.toHaveBeenCalled();
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
   expect(result).toMatchObject({ assetId: 'scenario:project-1' });
 });
 
-it('reads video project thumbnails only from aggregate presentations', async () => {
+it('does not read an old aggregate poster for a current video project', async () => {
   const thumbnailBlob = new Blob(['thumb'], { type: 'image/png' });
   getAggregatePresentationMock.mockResolvedValueOnce({
     presentationRevision: 2,
@@ -223,11 +222,9 @@ it('reads video project thumbnails only from aggregate presentations', async () 
     })
   );
 
-  expect(getAggregatePresentationMock).toHaveBeenCalledWith({
-    id: 'video-project-1',
-    kind: 'video-project',
-  });
+  expect(getAggregatePresentationMock).not.toHaveBeenCalled();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledOnce();
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(saveMediaThumbnailMock).not.toHaveBeenCalled();
-  expect(result).toMatchObject({ assetId: 'video-project:project-1' });
+  expect(result?.blob).not.toBe(thumbnailBlob);
 });

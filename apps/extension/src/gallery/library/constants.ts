@@ -33,8 +33,8 @@ export const GRID_CARD_MIN_WIDTH_BY_MODE: Record<Exclude<GalleryViewMode, 'list'
 };
 
 const GRID_CARD_DETAILS_HEIGHT_BY_MODE: Record<Exclude<GalleryViewMode, 'list'>, number> = {
-  'compact-grid': 40,
-  'large-grid': 94,
+  'compact-grid': 144,
+  'large-grid': 144,
 };
 
 export function getGalleryGridCardLayout(args: {
@@ -47,7 +47,7 @@ export function getGalleryGridCardLayout(args: {
     (args.gridWidth - GRID_GAP * Math.max(0, args.columnCount - 1)) / args.columnCount
   );
   const cardHeight = Math.ceil(
-    cardWidth * (10 / 16) + GRID_CARD_DETAILS_HEIGHT_BY_MODE[args.viewMode]
+    cardWidth * (9 / 16) + GRID_CARD_DETAILS_HEIGHT_BY_MODE[args.viewMode]
   );
   return { cardHeight, cardWidth, rowHeight: cardHeight + GRID_GAP };
 }

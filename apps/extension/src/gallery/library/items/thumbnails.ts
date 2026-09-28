@@ -2,17 +2,12 @@ import type { MediaThumbnailEntry } from '../../../composition/persistence/media
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import type { GalleryItem } from './types';
 import { ensureLegacyGalleryThumbnail } from './legacy-thumbnails';
+import { getGalleryProjectCover } from './project-covers';
 
 const THUMBNAIL_WIDTH = 320;
 const THUMBNAIL_HEIGHT = 180;
 
 function resolveEditableAggregateRef(item: GalleryItem) {
-  if (item.type === 'video-project') {
-    return { id: item.entityId, kind: 'video-project' as const };
-  }
-  if (item.type === 'scenario') {
-    return { id: item.entityId, kind: 'scenario' as const };
-  }
   if (
     item.type === 'media' &&
     (item.kind === 'image' || item.kind === 'screenshot') &&
@@ -39,8 +34,22 @@ async function readAggregateThumbnail(item: GalleryItem): Promise<MediaThumbnail
 }
 
 export async function ensureGalleryItemThumbnail(
-  item: GalleryItem
+  item: GalleryItem,
+  signal?: AbortSignal
 ): Promise<MediaThumbnailEntry | undefined> {
+  if (item.type === 'scenario' || item.type === 'video-project') {
+    const blob = await getGalleryProjectCover(item, signal);
+    return blob
+      ? {
+          assetId: item.id,
+          blob,
+          createdAt: item.createdAt,
+          height: 360,
+          updatedAt: item.updatedAt,
+          width: 640,
+        }
+      : undefined;
+  }
   return resolveEditableAggregateRef(item)
     ? readAggregateThumbnail(item)
     : ensureLegacyGalleryThumbnail(item);

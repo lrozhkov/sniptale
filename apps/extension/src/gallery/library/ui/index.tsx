@@ -132,8 +132,9 @@ export function isVideoKind(kind: GalleryItemKind): boolean {
 function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => void) {
   let disposed = false;
   let objectUrl: string | null = null;
+  const controller = new AbortController();
 
-  ensureGalleryItemThumbnail(item)
+  ensureGalleryItemThumbnail(item, controller.signal)
     .then((thumb) => {
       if (disposed) {
         return;
@@ -155,6 +156,7 @@ function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => 
 
   return () => {
     disposed = true;
+    controller.abort();
     if (objectUrl) {
       URL.revokeObjectURL(objectUrl);
     }
@@ -166,13 +168,14 @@ function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
     return `${item.id}:${item.hasThumbnail}:${item.presentationRevision ?? ''}:${item.workspaceRevision ?? ''}`;
   }
   if (item.type === 'scenario' || item.type === 'scenario-export') {
-    return `${item.id}:${item.hasThumbnail}:${item.project.updatedAt}`;
+    return `${item.id}:${item.hasThumbnail}:${item.project.updatedAt}:${item.workspaceRevision ?? ''}`;
   }
   return `${item.id}:${item.hasThumbnail}:${item.entityId ?? item.id}`;
 }
 
 type MediaThumbProps = {
   assetId?: string;
+  deferUntilVisible?: boolean;
   fit?: 'contain' | 'cover';
   showProjectHint?: boolean;
   item?: GalleryItem;
@@ -206,26 +209,74 @@ export function MediaThumb(props: MediaThumbProps) {
   const itemRef = useRef(item);
   itemRef.current = item;
   const thumbnailIdentity = getGalleryItemThumbnailIdentity(item);
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const deferUntilVisible =
+    props.deferUntilVisible === true && (item.type === 'scenario' || item.type === 'video-project');
+  const visibilityRoot = useRef<HTMLDivElement>(null);
+  const [visibility, setVisibility] = useState({ visible: false, epoch: 0 });
+  const visible = !deferUntilVisible || visibility.visible;
+  const epoch = deferUntilVisible ? visibility.epoch : 0;
+  const [thumb, setThumb] = useState<{
+    epoch: number;
+    identity: string;
+    url: string | null;
+  } | null>(null);
 
   useEffect(() => {
-    return loadThumbUrl(itemRef.current, setThumbUrl);
-  }, [thumbnailIdentity]);
-
-  if (thumbUrl) {
-    return (
-      <img
-        src={thumbUrl}
-        alt={translate('gallery.preview.thumbnailAlt')}
-        className={`pointer-events-none h-full w-full object-center ${
-          props.fit === 'contain' ? 'object-contain' : 'object-cover'
-        }`}
-        data-fit={props.fit ?? 'cover'}
-      />
+    if (!deferUntilVisible) return;
+    const root = visibilityRoot.current;
+    if (!root) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisibility((current) => ({ visible: true, epoch: current.epoch + 1 }));
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const nextVisible = entries.some((entry) => entry.isIntersecting);
+        setVisibility((current) =>
+          current.visible === nextVisible
+            ? current
+            : { visible: nextVisible, epoch: current.epoch + 1 }
+        );
+      },
+      { rootMargin: '300px 0px' }
     );
-  }
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [deferUntilVisible]);
 
-  return <MediaThumbFallback item={item} showProjectHint={props.showProjectHint ?? true} />;
+  useEffect(() => {
+    if (!visible) return;
+    return loadThumbUrl(itemRef.current, (url) =>
+      setThumb({ epoch, identity: thumbnailIdentity, url })
+    );
+  }, [thumbnailIdentity, visible, epoch]);
+
+  const thumbUrl =
+    visible && thumb?.identity === thumbnailIdentity && thumb.epoch === epoch ? thumb.url : null;
+  const content = thumbUrl ? (
+    <img
+      src={thumbUrl}
+      alt={translate('gallery.preview.thumbnailAlt')}
+      className={`pointer-events-none h-full w-full object-center ${
+        props.fit === 'contain' ? 'object-contain' : 'object-cover'
+      }`}
+      data-fit={props.fit ?? 'cover'}
+    />
+  ) : (
+    <MediaThumbFallback item={item} showProjectHint={props.showProjectHint ?? true} />
+  );
+
+  return deferUntilVisible ? (
+    <div
+      ref={visibilityRoot}
+      className="pointer-events-none h-full w-full"
+      data-ui="gallery.thumb.visibility-root"
+    >
+      {content}
+    </div>
+  ) : (
+    content
+  );
 }
 
 function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean }) {

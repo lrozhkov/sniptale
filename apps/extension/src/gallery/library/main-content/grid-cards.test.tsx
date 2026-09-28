@@ -9,7 +9,7 @@ import {
   createVideoProjectItem,
 } from '../actions/test-support/index';
 import { translate } from '../../../platform/i18n';
-import { GRID_GAP } from '../constants';
+import { getGalleryGridCardLayout, GRID_GAP } from '../constants';
 
 vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n/format-bytes')>()),
@@ -19,8 +19,17 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
 
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
-  MediaThumb: (props: { assetId?: string; fit?: string; item?: { id: string } }) => (
-    <div data-fit={props.fit ?? 'cover'} data-ui="test.thumb">
+  MediaThumb: (props: {
+    assetId?: string;
+    deferUntilVisible?: boolean;
+    fit?: string;
+    item?: { id: string };
+  }) => (
+    <div
+      data-fit={props.fit ?? 'cover'}
+      data-deferred={String(props.deferUntilVisible ?? false)}
+      data-ui="test.thumb"
+    >
       {props.item?.id ?? props.assetId}
     </div>
   ),
@@ -32,6 +41,18 @@ import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+
+it.each(['compact-grid', 'large-grid'] as const)(
+  'reserves a readable landscape cover beside project details in %s',
+  (viewMode) => {
+    const layout = getGalleryGridCardLayout({
+      columnCount: 1,
+      gridWidth: viewMode === 'compact-grid' ? 220 : 320,
+      viewMode,
+    });
+    expect(layout.cardHeight - 144).toBeGreaterThanOrEqual(layout.cardWidth * (9 / 16));
+  }
+);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -112,6 +133,9 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
   expect(compactMetadata?.textContent).toContain('compact-size:512');
   expect(container?.textContent).toContain('alpha');
   expect(container?.textContent).not.toContain('plain.pngalpha');
+  expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
+    'contain'
+  );
 });
 
 it('keeps the vertical grid gap equal to the horizontal tile gap', () => {
@@ -138,7 +162,7 @@ it('keeps the vertical grid gap equal to the horizontal tile gap', () => {
   const firstHeight = Number.parseFloat(cards?.[0]?.style.height ?? '');
   const secondRowTop = Number.parseFloat(cards?.[2]?.style.top ?? '');
 
-  expect(firstHeight).toBeLessThan(300);
+  expect(firstHeight).toBeGreaterThan(300);
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
 });
 
@@ -168,7 +192,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
   const details = cards?.[0]?.querySelector<HTMLElement>('[data-ui="gallery.large.details"]');
   const metadata = cards?.[0]?.querySelector<HTMLElement>('[data-ui="gallery.large.metadata"]');
 
-  expect(firstHeight).toBeLessThan(360);
+  expect(firstHeight).toBeGreaterThan(360);
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
   expect(cards?.[0]?.className).toContain('flex flex-col');
   expect(details?.className).toContain('h-[72px]');
@@ -277,6 +301,9 @@ it('renders one composite grid card for raw recording tracks without a project',
   expect(recordingGroupCard).not.toBeNull();
   expect(recordingGroupCard?.className).toContain('rounded-[var(--sniptale-radius-lg)]');
   expect(container?.querySelectorAll('[data-ui="test.thumb"]')).toHaveLength(2);
+  expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
+    'contain'
+  );
   expect(container?.textContent).toContain('Экран или окно');
   expect(container?.textContent).toContain('Design review');
   expect(container?.textContent).toContain('Веб-камера');
@@ -527,6 +554,7 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   const kindIcon = container?.querySelector('[data-ui="test.icon"]');
   const thumbnail = container?.querySelector('[data-ui="test.thumb"]');
   expect(kindIcon?.closest('[role="cell"]')).not.toBe(thumbnail?.closest('[role="cell"]'));
+  expect(thumbnail?.getAttribute('data-deferred')).toBe('false');
 });
 
 it('keeps the Created table column limited to the creation date', () => {
@@ -722,6 +750,32 @@ it.each(['compact-grid', 'large-grid', 'list'] as const)(
       (button) => button.textContent === translate('gallery.preview.openInEditor')
     );
     expect(actions).toHaveLength(2);
+    if (viewMode === 'list') {
+      const header = container!.querySelector<HTMLElement>('[data-ui="gallery.list.header"]');
+      const rows = container!.querySelectorAll<HTMLElement>('[data-ui="gallery.list.row"]');
+      expect(header?.style.gridTemplateColumns).toBe(rows[0]?.style.gridTemplateColumns);
+      expect(rows[0]?.querySelectorAll(':scope > [role="cell"]')).toHaveLength(8);
+      expect(
+        rows[0]?.querySelector('[data-ui="gallery.list.source"]')?.nextElementSibling
+      ).not.toBeNull();
+      expect(actions[0]?.closest('[role="cell"]')).not.toBeNull();
+      expect(actions[0]?.className).toContain('max-w-[180px]');
+      expect(
+        [...container!.querySelectorAll('[data-ui="test.thumb"]')].map((thumb) =>
+          thumb.getAttribute('data-deferred')
+        )
+      ).toEqual(['true', 'true']);
+    } else {
+      expect(actions[0]?.className).toContain('w-full');
+      expect(
+        [...container!.querySelectorAll('[data-ui="test.thumb"]')].map((thumb) =>
+          thumb.getAttribute('data-deferred')
+        )
+      ).toEqual(['false', 'false']);
+      expect(
+        actions[0]?.closest('article')?.querySelector('[data-ui="gallery.grid.thumbnail-viewport"]')
+      ).not.toBeNull();
+    }
     act(() => actions.forEach((button) => button.click()));
     expect(onProjectOpen.mock.calls).toEqual([[video], [scenario]]);
     expect(container!.textContent).toContain(video.filename);

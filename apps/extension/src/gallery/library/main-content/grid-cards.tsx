@@ -26,11 +26,11 @@ function cx(...values: Array<string | false | null | undefined>) {
 
 const GALLERY_LIST_LAYOUT_STYLE = {
   gridTemplateColumns:
-    '32px 32px 48px minmax(160px, 1.35fr) 132px minmax(220px, 2fr) minmax(100px, 1fr) 88px',
+    '32px 32px 128px minmax(160px, 1.35fr) 132px minmax(220px, 2fr) minmax(100px, 1fr) 88px',
 } satisfies CSSProperties;
 
 const GALLERY_LIST_ROW_CLASS_NAME = [
-  'grid min-w-[1040px] items-center gap-3 px-3 py-2.5',
+  'grid min-w-[1120px] items-center gap-3 px-3 py-2.5',
   'border-b border-[var(--sniptale-color-border-soft)] last:border-b-0',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
@@ -140,7 +140,10 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
       className={cx(
         'relative overflow-hidden bg-[var(--sniptale-color-surface-canvas)]',
         isList
-          ? 'h-12 w-12 shrink-0 rounded-[var(--sniptale-radius-md)] border border-[var(--sniptale-color-border-soft)]'
+          ? [
+              'h-[72px] w-32 shrink-0 rounded-[var(--sniptale-radius-md)]',
+              'border border-[var(--sniptale-color-border-soft)]',
+            ].join(' ')
           : 'min-h-0 w-full flex-1'
       )}
       data-ui={isList ? undefined : 'gallery.grid.thumbnail-viewport'}
@@ -156,12 +159,9 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
       <MediaThumb
         showProjectHint={!isList}
         item={props.item}
-        fit={
-          props.viewMode === 'large-grid' ||
-          props.item.type === 'scenario' ||
-          props.item.type === 'video-project'
-            ? 'contain'
-            : 'cover'
+        fit="contain"
+        deferUntilVisible={
+          isList && (props.item.type === 'scenario' || props.item.type === 'video-project')
         }
       />
       {!isList && isGalleryPreviewUnavailable(props.item) ? (
@@ -307,6 +307,7 @@ function GalleryGridCard(props: GalleryGridCardProps) {
           <GalleryListDetails
             item={props.item}
             onPreviewOpen={props.onPreviewOpen}
+            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
             previewUnavailable={isGalleryPreviewUnavailable(props.item)}
             {...(isGalleryPreviewUnavailable(props.item) &&
             props.previewRecoveryAllowed &&
@@ -335,12 +336,14 @@ function GalleryGridCard(props: GalleryGridCardProps) {
           ) : null}
         </>
       )}
-      <GalleryProjectDetails
-        item={props.item}
-        viewMode={props.viewMode}
-        onPreviewOpen={props.onPreviewOpen}
-        {...(props.onProjectOpen ? { onOpen: props.onProjectOpen } : {})}
-      />
+      {!isList ? (
+        <GalleryProjectDetails
+          item={props.item}
+          viewMode={props.viewMode}
+          onPreviewOpen={props.onPreviewOpen}
+          {...(props.onProjectOpen ? { onOpen: props.onProjectOpen } : {})}
+        />
+      ) : null}
     </article>
   );
 }
@@ -469,8 +472,6 @@ function GalleryRecordingGroupGridCard(props: {
   const allSelected =
     selectableItems.length > 0 && selectableItems.every((item) => props.selectedIds.has(item.id));
   const firstItem = props.items[0];
-  const isCompact = props.viewMode === 'compact-grid';
-
   if (!firstItem) return null;
 
   return (
@@ -511,7 +512,7 @@ function GalleryRecordingGroupGridCard(props: {
               className="relative min-h-0 min-w-0 cursor-pointer overflow-hidden border-r
                 border-[var(--sniptale-color-border-soft)] last:border-r-0"
             >
-              <MediaThumb item={item} fit={isCompact ? 'cover' : 'contain'} />
+              <MediaThumb item={item} fit="contain" />
               <span
                 className="absolute inset-x-1.5 bottom-1.5 rounded-[6px]
                   bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_82%,transparent)]
@@ -571,7 +572,7 @@ export function GalleryMediaList(
   const units = buildGalleryListUnits(props.filteredItems);
 
   return (
-    <div className="min-w-[1040px]" role="table">
+    <div className="min-w-[1120px]" role="table">
       <div
         data-ui="gallery.list.header"
         style={GALLERY_LIST_LAYOUT_STYLE}
@@ -640,7 +641,7 @@ export function GalleryMediaList(
           >
             <div
               style={GALLERY_LIST_LAYOUT_STYLE}
-              className={cx('grid min-w-[1040px] items-center gap-3 px-3 py-2')}
+              className={cx('grid min-w-[1120px] items-center gap-3 px-3 py-2')}
               role="row"
             >
               <div

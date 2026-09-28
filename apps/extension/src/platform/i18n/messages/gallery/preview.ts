@@ -15,7 +15,7 @@ export const galleryPreviewMessages = defineMessageSource({
   editableProject: { ru: 'Можно продолжить редактирование', en: 'Ready to continue editing' },
   clips: { ru: 'Клипы', en: 'Clips' },
   tracks: { ru: 'Дорожки', en: 'Tracks' },
-  projectPreviewMissing: { ru: 'Превью ещё не сохранено', en: 'No saved preview yet' },
+  projectPreviewMissing: { ru: 'Нет изображения для превью', en: 'No image available for preview' },
   projectUnavailable: {
     ru: 'Проект недоступен для редактирования',
     en: 'Project unavailable for editing',
