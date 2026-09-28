@@ -177,6 +177,7 @@ const BLUR_STRENGTH_LABELS = [
   'content.toolbar.drawingBlurMedium',
   'content.toolbar.drawingBlurStrong',
 ] as const;
+const BLUR_PREVIEW_RADII = [0.35, 1.2, 2.6] as const;
 
 export function DrawingBlurStrengthOptions(props: {
   value: number;
@@ -185,19 +186,26 @@ export function DrawingBlurStrengthOptions(props: {
   return DRAWING_BLUR_STRENGTHS.map((amount, index) => {
     const label = translate(BLUR_STRENGTH_LABELS[index]!);
     return (
-      <ContentToolbarButton
+      <QuickOptionButton
         key={amount}
-        type="button"
         active={props.value === amount}
-        aria-label={`${translate('content.toolbar.drawingBlurStrength')}: ${label}, ${amount}px`}
-        aria-pressed={props.value === amount}
-        title={`${label} · ${amount}px`}
+        label={`${translate('content.toolbar.drawingBlurStrength')}: ${label}, ${amount}px`}
         dataUi={`content.toolbar.drawing-options.blur.amount-${amount}`}
-        className="!h-7 !min-h-7 !w-auto !min-w-0 shrink-0 !rounded-md !px-2 text-xs whitespace-nowrap"
         onClick={() => props.onChange(amount)}
       >
-        {label}
-      </ContentToolbarButton>
+        <svg aria-hidden viewBox="0 0 24 24" width="19" height="19" fill="none">
+          <rect x="2.5" y="2.5" width="19" height="19" rx="2" stroke="currentColor" />
+          <rect
+            x="7"
+            y="7"
+            width="10"
+            height="10"
+            fill="currentColor"
+            data-ui="drawing-blur-preview"
+            style={{ filter: `blur(${BLUR_PREVIEW_RADII[index]}px)` }}
+          />
+        </svg>
+      </QuickOptionButton>
     );
   });
 }

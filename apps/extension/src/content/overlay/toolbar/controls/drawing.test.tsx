@@ -550,7 +550,14 @@ it('shows strength choices and actions for a selected blur object', () => {
     panel?.querySelector<HTMLButtonElement>(
       '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
     )?.className
-  ).toContain('!w-auto');
+  ).toContain('aspect-square');
+  expect(
+    panel
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
+      )
+      ?.querySelector('[data-ui="drawing-blur-preview"]')
+  ).not.toBeNull();
   act(() =>
     panel
       ?.querySelector<HTMLButtonElement>(
