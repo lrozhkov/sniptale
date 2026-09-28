@@ -13,8 +13,13 @@ it('keeps the gesture origin clear while showing arrow direction and the blur re
     expect(svg).toContain('viewBox="0 0 32 32"');
     expect(svg).toContain('M5 0v3m0 4v3M0 5h3m4 0h3');
   }
-  expect(decodeURIComponent(resolveDrawingToolCursor('arrow'))).toContain('M14 14 27 27');
-  expect(decodeURIComponent(resolveDrawingToolCursor('arrow', true))).toContain('M27 27 14 14');
+  for (const fromTip of [false, true]) {
+    expect(decodeURIComponent(resolveDrawingToolCursor('arrow', fromTip))).toContain(
+      'M27 27 14 14m0 8v-8h8'
+    );
+  }
+  expect(decodeURIComponent(resolveDrawingToolCursor('arrow'))).not.toContain('stroke="#2563eb"');
+  expect(decodeURIComponent(resolveDrawingToolCursor('arrow', true))).toContain('stroke="#2563eb"');
   expect(decodeURIComponent(resolveDrawingToolCursor('blur'))).toContain(
     '<rect x="13" y="14" width="15" height="13"'
   );

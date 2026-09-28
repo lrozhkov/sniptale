@@ -8,12 +8,14 @@ const contactMark = [
   `<path d="${contactPath}" fill="none" stroke="white" stroke-width="3"/>`,
   `<path d="${contactPath}" fill="none" stroke="#172033" stroke-width="1.4"/>`,
 ].join('');
+const inwardArrowPath = 'M27 27 14 14m0 8v-8h8';
 const blurBounds = 'x="13" y="14" width="15" height="13" rx="2"';
+const roundedStroke = 'stroke-linecap="round" stroke-linejoin="round"';
 
-function arrowGlyph(path: string): string {
+function arrowGlyph(path: string, stroke = '#172033'): string {
   return [
-    `<path d="${path}" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`,
-    `<path d="${path}" fill="none" stroke="#172033" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
+    `<path d="${path}" fill="none" stroke="white" stroke-width="4" ${roundedStroke}/>`,
+    `<path d="${path}" fill="none" stroke="${stroke}" stroke-width="2" ${roundedStroke}/>`,
   ].join('');
 }
 
@@ -30,13 +32,13 @@ const art: Record<'pencil' | 'marker' | 'arrow' | 'arrowFromTip' | 'blur', Curso
     y: 20,
   },
   arrow: {
-    svg: `${contactMark}${arrowGlyph('M14 14 27 27m-8 0h8v-8')}`,
+    svg: `${contactMark}${arrowGlyph(inwardArrowPath)}`,
     x: 5,
     y: 5,
     size: 32,
   },
   arrowFromTip: {
-    svg: `${contactMark}${arrowGlyph('M27 27 14 14m0 8v-8h8')}`,
+    svg: `${contactMark}${arrowGlyph(inwardArrowPath, '#2563eb')}`,
     x: 5,
     y: 5,
     size: 32,
