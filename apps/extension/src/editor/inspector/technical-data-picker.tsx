@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Calendar, Link, Monitor } from 'lucide-react';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
@@ -9,6 +9,7 @@ import {
 } from '../controller/tools/technical-data';
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME, INSPECTOR_SECTION_LABEL_CLASS_NAME } from './chrome';
 import { cx } from '../chrome/ui';
+import { useTechnicalDataPreference } from './technical-data-preference';
 
 type TechnicalDataPickerVariant = 'compact' | 'expanded';
 
@@ -65,17 +66,8 @@ interface TechnicalDataOptionRowProps {
 
 interface TechnicalDataOptionListProps {
   selectedKinds: readonly EditorTechnicalDataKind[];
-  setSelectedKinds: React.Dispatch<React.SetStateAction<EditorTechnicalDataKind[]>>;
+  onToggleKind: (kind: EditorTechnicalDataKind) => void;
   variant: TechnicalDataPickerVariant;
-}
-
-function toggleTechnicalDataKind(
-  selectedKinds: readonly EditorTechnicalDataKind[],
-  kind: EditorTechnicalDataKind
-): EditorTechnicalDataKind[] {
-  return selectedKinds.includes(kind)
-    ? selectedKinds.filter((selectedKind) => selectedKind !== kind)
-    : [...selectedKinds, kind];
 }
 
 function getTechnicalDataLayoutLabel(layout: EditorTechnicalDataLayout): string {
@@ -88,7 +80,7 @@ function getTechnicalDataLayoutLabel(layout: EditorTechnicalDataLayout): string 
 
 function TechnicalDataLayoutToggle(props: {
   layout: EditorTechnicalDataLayout;
-  setLayout: React.Dispatch<React.SetStateAction<EditorTechnicalDataLayout>>;
+  onSelectLayout: (layout: EditorTechnicalDataLayout) => void;
 }) {
   return (
     <section className="space-y-2.5">
@@ -110,7 +102,7 @@ function TechnicalDataLayoutToggle(props: {
               'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-focus-ring)]',
               props.layout === layout ? selectedLayoutClassName : unselectedLayoutClassName
             )}
-            onClick={() => props.setLayout(layout)}
+            onClick={() => props.onSelectLayout(layout)}
           >
             {getTechnicalDataLayoutLabel(layout)}
           </button>
@@ -139,7 +131,7 @@ function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOpti
 
 function TechnicalDataOptionList({
   selectedKinds,
-  setSelectedKinds,
+  onToggleKind,
   variant,
 }: TechnicalDataOptionListProps) {
   return (
@@ -155,9 +147,7 @@ function TechnicalDataOptionList({
           <TechnicalDataOptionRow
             key={option.kind}
             checked={checked}
-            onToggle={() =>
-              setSelectedKinds((currentKinds) => toggleTechnicalDataKind(currentKinds, option.kind))
-            }
+            onToggle={() => onToggleKind(option.kind)}
             option={option}
             variant={variant}
           />
@@ -173,8 +163,8 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
 }) => {
   useAppLocale();
 
-  const [selectedKinds, setSelectedKinds] = useState<EditorTechnicalDataKind[]>([]);
-  const [layout, setLayout] = useState<EditorTechnicalDataLayout>('column');
+  const { layout, saveError, saveSelection, selectLayout, selectedKinds, toggleKind } =
+    useTechnicalDataPreference();
   const orderedKinds = useMemo(() => orderTechnicalDataKinds(selectedKinds), [selectedKinds]);
   const canInsert = orderedKinds.length > 0;
 
@@ -184,7 +174,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
     }
 
     onInsert(orderedKinds, layout);
-    setSelectedKinds([]);
+    saveSelection(orderedKinds);
   };
 
   return (
@@ -192,12 +182,17 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
       <section className="space-y-2.5">
         <TechnicalDataOptionList
           selectedKinds={selectedKinds}
-          setSelectedKinds={setSelectedKinds}
+          onToggleKind={toggleKind}
           variant={variant}
         />
       </section>
       {orderedKinds.length > 1 ? (
-        <TechnicalDataLayoutToggle layout={layout} setLayout={setLayout} />
+        <TechnicalDataLayoutToggle layout={layout} onSelectLayout={selectLayout} />
+      ) : null}
+      {saveError ? (
+        <p role="alert" className="text-xs text-[color:var(--sniptale-color-text-primary)]">
+          {translate('editor.compact.technicalDataPreferenceSaveFailed')}
+        </p>
       ) : null}
       {!canInsert ? (
         <p role="status" className="text-xs text-[color:var(--sniptale-color-text-secondary)]">

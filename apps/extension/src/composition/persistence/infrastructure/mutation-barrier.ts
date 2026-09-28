@@ -283,6 +283,7 @@ export type PersistenceMutationDomain =
   | 'screenshot-setup'
   | 'step-badge-presets'
   | 'surface-style-presets'
+  | 'technical-data-preference'
   | 'video-settings';
 
 export function runWithPersistenceDomainMutationLock<T>(

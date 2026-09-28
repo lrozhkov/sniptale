@@ -56,6 +56,7 @@ const localPreferenceKeys = [
   'sniptale_editor_export_settings',
   'sniptale_editor_workspace_defaults',
   'sniptale_editor_presets',
+  'sniptale_editor_technical_data_preference',
   'sniptale_drawing_palette',
   'sniptale_quick_actions',
   'sniptale_quick_actions_display_mode',

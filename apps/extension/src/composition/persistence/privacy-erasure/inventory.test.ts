@@ -41,6 +41,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).not.toContain('sniptale_video_settings');
   expect(plan.local).not.toContain('sniptale_screenshot_setup');
   expect(plan.local).not.toContain('sniptale_drawing_palette');
+  expect(plan.local).not.toContain('sniptale_editor_technical_data_preference');
   expect(plan.local).not.toContain('sniptale_gallery_saved_views');
   expect(plan.local).not.toContain(AI_PROVIDERS_KEY);
   expect(plan.local).not.toContain(AI_PROVIDER_SECRETS_KEY);
@@ -88,6 +89,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.local).toContain('sniptale_video_settings');
   expect(plan.local).toContain('sniptale_screenshot_setup');
   expect(plan.local).toContain('sniptale_drawing_palette');
+  expect(plan.local).toContain('sniptale_editor_technical_data_preference');
   expect(plan.local).toContain('sniptale_gallery_saved_views');
   expect(plan.local).toContain('sniptale.editor.command-palette');
   expect(plan.local).toContain('sniptale.gallery.command-palette');

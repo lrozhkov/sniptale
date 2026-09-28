@@ -43,10 +43,7 @@ export function createTechnicalDataTextObject(options: {
     bounds: {
       x: options.source.left + inset,
       y: options.source.top + inset,
-      width: Math.min(
-        getTechnicalDataTextWidth(technicalDataText, layout, options.textSettings),
-        availableWidth
-      ),
+      width: getTechnicalDataTextWidth(layout, availableWidth),
       height: 1,
     },
     text: technicalDataText,

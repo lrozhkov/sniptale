@@ -139,4 +139,8 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     ru: 'Добавить текст',
     en: 'Add text',
   },
+  technicalDataPreferenceSaveFailed: {
+    ru: 'Текст добавлен, но выбор не удалось сохранить. Повторите вставку позже.',
+    en: 'Text added, but your selection could not be saved. Try inserting again later.',
+  },
 });

@@ -150,3 +150,29 @@ it('reduces the font when column data fits the width but not the available heigh
   expect(drawing?.kind === 'text' ? drawing.fontSize : 20).toBeLessThan(20);
   expect((result.top ?? 0) + result.getScaledHeight()).toBeLessThanOrEqual(90);
 });
+
+it('uses the full available image width for a short technical-data row', () => {
+  const result = createTechnicalDataTextObject({
+    kinds: ['url', 'date'],
+    layout: 'row',
+    nextLabelIndex: 7,
+    prepareObject: vi.fn(),
+    source: {
+      displayHeight: 500,
+      displayWidth: 3000,
+      left: 0,
+      top: 0,
+    } as never,
+    sourceTitle: '',
+    sourceUrl: 'https://example.com',
+    textSettings: {
+      backgroundColor: null,
+      color: '#ffffff',
+      fontFamily: 'mono',
+      fontSize: 20,
+    },
+  });
+
+  expect(result.width).toBe(2960);
+  expect(result.left).toBe(20);
+});
