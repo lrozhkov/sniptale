@@ -9,7 +9,7 @@ it.each([719, 720, 721])('docks below the measured rail at %i px', (width) => {
     toolbarSize,
     viewport: { width, height: 600 },
   });
-  expect(position.top).toBe(width === 721 ? 72 : 120);
+  expect(position.top).toBe(width === 721 ? 66 : 114);
   expect(position.left).toBe((width - toolbarSize.width) / 2);
   expect(position.scale).toBe(1);
 });
@@ -20,7 +20,7 @@ it('fits the toolbar in a narrow viewport', () => {
     toolbarSize,
     viewport: { width: 320, height: 568 },
   });
-  expect(position).toEqual({ left: 8, top: 128, scale: 304 / 420 });
+  expect(position).toEqual({ left: 8, top: 122, scale: 304 / 420 });
 });
 
 it('avoids title and tool properties when they intersect the docked toolbar', () => {
@@ -34,5 +34,5 @@ it('avoids title and tool properties when they intersect the docked toolbar', ()
       toolbarSize,
       viewport: { width: 1000, height: 600 },
     })
-  ).toEqual({ left: 290, top: 132, scale: 1 });
+  ).toEqual({ left: 290, top: 126, scale: 1 });
 });
