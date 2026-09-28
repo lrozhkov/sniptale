@@ -11,6 +11,7 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
     arc: vi.fn(),
     beginPath: vi.fn(),
     clearRect: vi.fn(),
+    closePath: vi.fn(),
     clip: vi.fn(),
     fill: vi.fn(),
     fillRect: vi.fn(),
@@ -146,5 +147,92 @@ it('selects objects through a dragged area and extends the selection with Shift'
     canvas.dispatchEvent(pointer('pointerup', 110, 30, true));
   });
   expect(session.getSnapshot().selectedObjectIds).toEqual(['first', 'second']);
+  act(() => root.unmount());
+});
+
+it('fades selected shape controls and hides the cursor only during its pointer drag', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    bounds: { x: 20, y: 30, width: 100, height: 80 },
+    color: '#ef4444',
+    id: 'selected-shape',
+    kind: 'rectangle',
+    width: 4,
+  });
+  session.setActiveTool('select');
+  session.select('selected-shape');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  const canvas = host.querySelector<HTMLCanvasElement>('.sniptale-drawing-canvas')!;
+  const chrome = host.querySelector<HTMLCanvasElement>(
+    '[data-ui="content.drawing.selection-chrome"]'
+  );
+  expect(chrome).not.toBeNull();
+  expect(chrome?.style.pointerEvents).toBe('none');
+
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 20, 30)));
+  expect(canvas.style.cursor).toBe('none');
+  expect(chrome?.style.opacity).toBe('0');
+  expect(chrome?.style.transition).toContain('150ms');
+  act(() => canvas.dispatchEvent(pointer('pointermove', 60, 70)));
+  expect(canvas.style.cursor).toBe('none');
+  act(() => canvas.dispatchEvent(pointer('pointerup', 60, 70)));
+  expect(canvas.style.cursor).not.toBe('none');
+  expect(chrome?.style.opacity).toBe('1');
+  expect(chrome?.style.transition).toContain('50ms');
+
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 60, 70)));
+  act(() => window.dispatchEvent(new Event('blur')));
+  expect(canvas.style.cursor).not.toBe('none');
+  expect(chrome?.style.opacity).toBe('1');
+  act(() => root.unmount());
+});
+
+it('keeps text resize controls and cursor visible during a pointer drag', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    backgroundColor: null,
+    bounds: { x: 20, y: 30, width: 80, height: 40 },
+    color: '#111827',
+    fontSize: 20,
+    id: 'selected-text',
+    kind: 'text',
+    text: 'Short',
+  });
+  session.setActiveTool('text');
+  session.select('selected-text');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  const canvas = host.querySelector<HTMLCanvasElement>('.sniptale-drawing-canvas')!;
+  const chrome = host.querySelector<HTMLCanvasElement>(
+    '[data-ui="content.drawing.selection-chrome"]'
+  );
+
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 100, 50)));
+  expect(canvas.style.cursor).not.toBe('none');
+  expect(chrome?.style.opacity).toBe('1');
+  act(() => canvas.dispatchEvent(pointer('pointerup', 100, 50)));
   act(() => root.unmount());
 });

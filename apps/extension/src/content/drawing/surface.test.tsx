@@ -232,7 +232,7 @@ it('shows only two endpoint handles without a dashed selection box for an arrow'
     return event;
   };
   act(() => canvas?.dispatchEvent(endpointEvent('pointerdown')));
-  expect(canvas?.style.cursor).toBe('grabbing');
+  expect(canvas?.style.cursor).toBe('none');
   act(() => canvas?.dispatchEvent(endpointEvent('pointerup')));
   expect(canvas?.style.cursor).toBe('grab');
   act(() => {

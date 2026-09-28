@@ -17,10 +17,20 @@ export function drawDrawingFrame(args: {
   selectedIds: readonly string[];
   root: PageScrollRoot;
   showChrome: boolean;
+  renderObjects?: boolean;
   suppressText?: boolean;
   getObjectOpacity?: (objectId: string) => number;
 }): void {
-  const { canvas, objects, draft, selectedIds, root, showChrome, suppressText = false } = args;
+  const {
+    canvas,
+    objects,
+    draft,
+    selectedIds,
+    root,
+    showChrome,
+    renderObjects = true,
+    suppressText = false,
+  } = args;
   const ratio = Math.max(1, window.devicePixelRatio || 1);
   const width = window.innerWidth;
   const height = window.innerHeight;
@@ -44,13 +54,15 @@ export function drawDrawingFrame(args: {
     context.rect(rect.left, rect.top, rect.width, rect.height);
     context.clip();
   }
-  resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) => {
-    if (!suppressText || object.kind !== 'text')
-      renderDrawingObject(context, object, projection, {
-        opacity: args.getObjectOpacity?.(object.id) ?? 1,
-        ...(preview ? { preview: true } : {}),
-      });
-  });
+  if (renderObjects) {
+    resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) => {
+      if (!suppressText || object.kind !== 'text')
+        renderDrawingObject(context, object, projection, {
+          opacity: args.getObjectOpacity?.(object.id) ?? 1,
+          ...(preview ? { preview: true } : {}),
+        });
+    });
+  }
   if (showChrome && draft?.kind === 'marquee') {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
   }
