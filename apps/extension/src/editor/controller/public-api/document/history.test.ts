@@ -59,10 +59,11 @@ function createResetController(
   applyDocument = vi.fn(async () => undefined),
   publishHistoryDocument = vi.fn()
 ): EditorDocumentResetController {
+  const history = new SnapshotHistory(JSON.stringify(createEditorDocument('original')));
+  history.push(JSON.stringify(createEditorDocument('edited')));
   return {
     applyDocument,
-    history: new SnapshotHistory(JSON.stringify(createEditorDocument('original'))),
-    originalDocument: createEditorDocument('original'),
+    history,
     publishHistoryDocument,
   };
 }
@@ -73,7 +74,7 @@ beforeEach(() => {
   mocks.redoSnapshot.mockReturnValue(createEditorDocument('redo'));
 });
 
-it('applies available undo, redo, and original documents with expected history options', async () => {
+it('applies available undo, redo, and first-history documents with expected options', async () => {
   const applyDocument = vi.fn(async () => undefined);
   const historyController = createHistoryController(applyDocument);
   const resetController = createResetController(applyDocument);
@@ -113,7 +114,7 @@ it('ignores missing history documents', async () => {
   const historyController = createHistoryController(applyDocument);
   const resetController: EditorDocumentResetController = {
     applyDocument,
-    originalDocument: null,
+    history: null,
     publishHistoryDocument: vi.fn(),
   };
   mocks.undoSnapshot.mockReturnValueOnce(null);
@@ -126,7 +127,7 @@ it('ignores missing history documents', async () => {
   expect(applyDocument).not.toHaveBeenCalled();
 });
 
-it('keeps history actions on narrow history and original document slices', async () => {
+it('keeps history actions on narrow history slices', async () => {
   const applyDocument = vi.fn(async () => undefined);
   const historyController: EditorDocumentHistoryController = {
     applyDocument,
@@ -135,7 +136,7 @@ it('keeps history actions on narrow history and original document slices', async
   };
   const resetController: EditorDocumentResetController = {
     applyDocument,
-    originalDocument: createEditorDocument('original'),
+    history: null,
     publishHistoryDocument: vi.fn(),
   };
 
@@ -145,40 +146,38 @@ it('keeps history actions on narrow history and original document slices', async
 
   expect(mocks.undoSnapshot).toHaveBeenCalledWith(null);
   expect(mocks.redoSnapshot).toHaveBeenCalledWith(null);
-  expect(applyDocument).toHaveBeenCalledWith(createEditorDocument('original'), {
-    resetHistory: false,
-    updateOriginal: false,
-    preserveViewport: true,
-  });
+  expect(applyDocument).toHaveBeenCalledTimes(2);
 });
 
-it('records reset as one undoable snapshot and restores it with redo', async () => {
+it('returns to the first snapshot without creating an action and redoes edits in order', async () => {
   const original = createEditorDocument('original');
-  const edited = createEditorDocument('edited');
+  const firstEdit = createEditorDocument('first edit');
+  const secondEdit = createEditorDocument('second edit');
   const history = new SnapshotHistory(JSON.stringify(original));
-  history.push(JSON.stringify(edited));
+  history.push(JSON.stringify(firstEdit));
+  history.push(JSON.stringify(secondEdit));
   const applyDocument = vi.fn(async () => undefined);
   const publishHistoryDocument = vi.fn();
   const controller = { applyDocument, history, originalDocument: original, publishHistoryDocument };
   const actualHistory = await vi.importActual<typeof import('../../history')>('../../history');
-  mocks.undoSnapshot.mockImplementationOnce(actualHistory.undoEditorSnapshot);
-  mocks.redoSnapshot.mockImplementationOnce(actualHistory.redoEditorSnapshot);
+  mocks.redoSnapshot.mockImplementation(actualHistory.redoEditorSnapshot);
 
   await resetEditorControllerToOriginal(controller);
-  expect(history.getState()).toMatchObject({ canRedo: false, canUndo: true, index: 2, size: 3 });
+  expect(history.getState()).toMatchObject({ canRedo: true, canUndo: false, index: 0, size: 3 });
   expect(history.getState().current).toBe(JSON.stringify(original));
+  expect(applyDocument).toHaveBeenCalledTimes(1);
 
-  await undoEditorControllerSnapshot(controller);
-  expect(history.getState()).toMatchObject({ canRedo: true, canUndo: true, index: 1 });
-  expect(applyDocument).toHaveBeenLastCalledWith(edited, {
+  await redoEditorControllerSnapshot(controller);
+  expect(history.getState()).toMatchObject({ canRedo: true, canUndo: true, index: 1, size: 3 });
+  expect(applyDocument).toHaveBeenLastCalledWith(firstEdit, {
     resetHistory: false,
     updateOriginal: false,
     preserveViewport: true,
   });
 
   await redoEditorControllerSnapshot(controller);
-  expect(history.getState()).toMatchObject({ canRedo: false, canUndo: true, index: 2 });
-  expect(applyDocument).toHaveBeenLastCalledWith(original, {
+  expect(history.getState()).toMatchObject({ canRedo: false, canUndo: true, index: 2, size: 3 });
+  expect(applyDocument).toHaveBeenLastCalledWith(secondEdit, {
     resetHistory: false,
     updateOriginal: false,
     preserveViewport: true,
@@ -186,12 +185,34 @@ it('records reset as one undoable snapshot and restores it with redo', async () 
   expect(publishHistoryDocument).toHaveBeenCalledTimes(3);
 });
 
+it('keeps future edits after returning from a partially undone state', async () => {
+  const original = createEditorDocument('original');
+  const history = new SnapshotHistory(JSON.stringify(original));
+  history.push(JSON.stringify(createEditorDocument('first edit')));
+  history.push(JSON.stringify(createEditorDocument('second edit')));
+  history.undo();
+  const applyDocument = vi.fn(async () => undefined);
+
+  await resetEditorControllerToOriginal({
+    applyDocument,
+    history,
+    publishHistoryDocument: vi.fn(),
+  });
+
+  expect(history.getState()).toMatchObject({ index: 0, size: 3, canRedo: true });
+  expect(applyDocument).toHaveBeenCalledOnce();
+  history.redo();
+  expect(history.getState().current).toBe(JSON.stringify(createEditorDocument('first edit')));
+});
+
 it('leaves the preceding snapshot available when reset application fails', async () => {
   const original = createEditorDocument('original');
   const edited = createEditorDocument('edited');
   const history = new SnapshotHistory(JSON.stringify(original));
   history.push(JSON.stringify(edited));
-  let visibleDocument = edited.sourceName;
+  const latest = createEditorDocument('latest');
+  history.push(JSON.stringify(latest));
+  let visibleDocument = latest.sourceName;
   const applyDocument = vi.fn(async (document: EditorDocument) => {
     visibleDocument = document.sourceName;
     if (document.sourceName === original.sourceName) throw new Error('reset failed');
@@ -202,13 +223,25 @@ it('leaves the preceding snapshot available when reset application fails', async
     resetEditorControllerToOriginal({
       applyDocument,
       history,
-      originalDocument: original,
       publishHistoryDocument,
     })
   ).rejects.toThrow('reset failed');
-  expect(visibleDocument).toBe(edited.sourceName);
-  expect(history.getState()).toMatchObject({ canUndo: true, canRedo: false, index: 1, size: 2 });
-  expect(publishHistoryDocument).toHaveBeenCalledWith(edited);
+  expect(visibleDocument).toBe(latest.sourceName);
+  expect(history.getState()).toMatchObject({ canUndo: true, canRedo: false, index: 2, size: 3 });
+  expect(publishHistoryDocument).toHaveBeenCalledWith(latest);
+});
+
+it('does not move history when its earliest snapshot is invalid', async () => {
+  const history = new SnapshotHistory('not-json');
+  history.push(JSON.stringify(createEditorDocument('edited')));
+  const applyDocument = vi.fn(async () => undefined);
+  const publishHistoryDocument = vi.fn();
+
+  await resetEditorControllerToOriginal({ applyDocument, history, publishHistoryDocument });
+
+  expect(history.getState()).toMatchObject({ index: 1, size: 2, canRedo: false });
+  expect(applyDocument).not.toHaveBeenCalled();
+  expect(publishHistoryDocument).not.toHaveBeenCalled();
 });
 
 it('undoes a pending frame comment draft before restoring the document', async () => {

@@ -127,7 +127,7 @@ function createController() {
     applyDocument: vi.fn(async () => undefined),
     canvas: { getObjects: vi.fn(() => []), id: 'canvas' },
     canvasDocumentSize: { height: 80, width: 120 },
-    history: { id: 'history', push: vi.fn() },
+    history: { id: 'history', getState: vi.fn(() => ({ index: 0 })), push: vi.fn() },
     originalDocument: { id: 'original' },
     publishHistoryDocument: vi.fn(),
     renderToDataUrl: vi.fn(() => 'rendered'),
@@ -200,7 +200,6 @@ it('applies history documents only when a snapshot exists', async () => {
 
   mocks.undoMock.mockReturnValueOnce(null as any);
   mocks.redoMock.mockReturnValueOnce(null as any);
-  controller.originalDocument = null;
   await undoEditorControllerSnapshot(controller);
   await redoEditorControllerSnapshot(controller);
   await resetEditorControllerToOriginal(controller);
@@ -213,9 +212,5 @@ it('applies history documents only when a snapshot exists', async () => {
     { id: 'redo' },
     { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
-  expect(controller.applyDocument).toHaveBeenCalledWith(
-    { id: 'original' },
-    { resetHistory: false, updateOriginal: false, preserveViewport: true }
-  );
-  expect(controller.applyDocument).toHaveBeenCalledTimes(3);
+  expect(controller.applyDocument).toHaveBeenCalledTimes(2);
 });

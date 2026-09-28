@@ -71,16 +71,16 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Reset to original',
   },
   resetOriginalTitle: {
-    ru: 'Сбросить все изменения?',
-    en: 'Reset all changes?',
+    ru: 'Вернуться к началу истории?',
+    en: 'Return to the start of history?',
   },
   resetOriginalMessage: {
-    ru: 'Документ вернётся к исходному состоянию. Изменение можно отменить.',
-    en: 'The document will return to its original state. You can undo this change.',
+    ru: 'Документ перейдёт к самому раннему состоянию истории. Изменения можно вернуть кнопкой «Повторить».',
+    en: 'The document will return to the earliest state in history. You can restore edits with Redo.',
   },
   resetOriginalTooltip: {
-    ru: 'Вернуть документ к исходному состоянию. Изменение можно отменить.',
-    en: 'Return the document to its original state. You can undo this change.',
+    ru: 'Вернуться к началу истории. Изменения можно вернуть кнопкой «Повторить».',
+    en: 'Return to the start of history. You can restore edits with Redo.',
   },
   annotationFrame: {
     ru: 'Рамка',

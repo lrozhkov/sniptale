@@ -16,17 +16,10 @@ type EditorDocumentHistorySource = {
   canvas?: Canvas | null;
 };
 
-type EditorDocumentOriginalSource = {
-  originalDocument: EditorDocument | null;
-  history?: SnapshotHistory<string> | null;
-  canvas?: Canvas | null;
-};
-
 export type EditorDocumentHistoryController = EditorDocumentApplyTarget &
   EditorDocumentHistorySource;
 
-export type EditorDocumentResetController = EditorDocumentApplyTarget &
-  EditorDocumentOriginalSource;
+export type EditorDocumentResetController = EditorDocumentHistoryController;
 
 async function applyHistoryDocument(
   controller: EditorDocumentApplyTarget,
@@ -123,11 +116,22 @@ async function restoreHistoryDocument(
 export async function resetEditorControllerToOriginal(
   controller: EditorDocumentResetController
 ): Promise<void> {
-  return runEditorDocumentTransition(controller.canvas ?? controller.history ?? null, async () => {
+  return runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
     flushActiveFrameAnnotationDraft();
-    const document = controller.originalDocument;
-    if (!document) return;
-    const previousDocument = readCurrentEditorSnapshot(controller.history ?? null);
+    const history = controller.history;
+    const previousIndex = history?.getState().index ?? 0;
+    if (!history || previousIndex === 0) return;
+    const previousDocument = readCurrentEditorSnapshot(history);
+    if (!previousDocument) return;
+    for (let step = 0; step < previousIndex; step += 1) history.undo();
+    const restoreCursor = () => {
+      for (let step = 0; step < previousIndex; step += 1) history.redo();
+    };
+    const document = readCurrentEditorSnapshot(history);
+    if (!document) {
+      restoreCursor();
+      return;
+    }
     try {
       await controller.applyDocument(document, {
         resetHistory: false,
@@ -135,12 +139,14 @@ export async function resetEditorControllerToOriginal(
         preserveViewport: true,
       });
     } catch (error) {
-      if (previousDocument && (await restoreHistoryDocument(controller, previousDocument, error))) {
-        controller.publishHistoryDocument(previousDocument);
+      try {
+        await restoreHistoryDocument(controller, previousDocument, error);
+      } finally {
+        restoreCursor();
       }
+      controller.publishHistoryDocument(previousDocument);
       throw error;
     }
-    controller.history?.push(JSON.stringify(document));
     controller.publishHistoryDocument(document);
   });
 }

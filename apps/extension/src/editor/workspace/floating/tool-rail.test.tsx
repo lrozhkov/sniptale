@@ -306,7 +306,7 @@ it('stays centered when the left drawer opens', () => {
   expect(stack?.className).not.toContain('left-[23.75rem]');
 });
 
-it('routes undo and redo, then confirms irreversible reset before clearing history', async () => {
+it('routes undo and redo, then confirms a return to the start of history', async () => {
   const onBeforeSelectionAwareAction = vi.fn();
   renderToolRail(
     createProps({

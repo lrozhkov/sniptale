@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { translate } from '../../../platform/i18n';
 
 const mocks = vi.hoisted(() => ({
   fireActionMock: vi.fn((_label, callback: () => unknown) => callback()),
@@ -127,4 +128,22 @@ it('surfaces disabled undo and redo titles when history is unavailable', async (
   expect(disabledButtons).toHaveLength(3);
   expect(disabledButtons[0]?.title).toContain('·');
   expect(disabledButtons[1]?.title).toContain('·');
+});
+
+it('disables return to history start when the document is already there', async () => {
+  const { EditorToolbarUndoSection } = await import('./shared');
+
+  mountToolbar(
+    <EditorToolbarUndoSection
+      hasImage
+      history={{ canRedo: true, canUndo: false }}
+      onBeforeSelectionAwareAction={vi.fn()}
+    />
+  );
+
+  const buttons = container?.querySelectorAll<HTMLButtonElement>('button') ?? [];
+  expect(buttons[0]?.disabled).toBe(true);
+  expect(buttons[1]?.disabled).toBe(false);
+  expect(buttons[2]?.disabled).toBe(true);
+  expect(buttons[2]?.title).toBe(translate('editor.toolbar.resetOriginalTooltip'));
 });
