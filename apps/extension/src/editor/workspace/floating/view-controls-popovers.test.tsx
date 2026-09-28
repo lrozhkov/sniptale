@@ -98,7 +98,9 @@ it('shows workspace settings directly and passes save state through', () => {
       (button) => button.textContent === 'Save default'
     )?.disabled
   ).toBe(true);
-  expect(container.querySelector('[class*="overflow-y-auto"]')).not.toBeNull();
+  const scrollArea = container.querySelector('[class*="overflow-y-auto"]');
+  expect(scrollArea?.className).toContain('max-h-[calc(100dvh-5rem)]');
+  expect(scrollArea?.className).toContain('max-[720px]:max-h-[calc(100dvh-9rem)]');
   act(() => {
     Array.from(container?.querySelectorAll('button') ?? [])
       .find((button) => button.getAttribute('aria-label') === 'Show grid')
