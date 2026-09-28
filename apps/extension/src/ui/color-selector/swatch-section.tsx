@@ -3,6 +3,7 @@ import { CompactColorOption } from '../compact-inspector-controls/primitives';
 export function ColorSelectorSwatchSection(props: {
   colors: readonly string[];
   label: string;
+  showLabel?: boolean;
   selectedColor: string;
   title: string;
   onSelect: (color: string) => void;
@@ -15,9 +16,11 @@ export function ColorSelectorSwatchSection(props: {
 
   return (
     <div className="space-y-2">
-      <div className="text-[12px] font-semibold uppercase text-[var(--sniptale-color-text-secondary)]">
-        {props.label}
-      </div>
+      {props.showLabel === false ? null : (
+        <div className="text-[12px] font-semibold uppercase text-[var(--sniptale-color-text-secondary)]">
+          {props.label}
+        </div>
+      )}
       <div className={props.gridClassName ?? 'grid grid-cols-10 justify-items-center gap-1.5'}>
         {props.colors.map((color) => (
           <CompactColorOption

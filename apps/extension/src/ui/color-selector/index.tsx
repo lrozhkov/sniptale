@@ -59,6 +59,7 @@ type ColorSelectorPanelsProps = {
   floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
   formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
   normalizedPalette: readonly string[];
+  paletteInPicker: boolean;
   normalizedRecentColors: readonly string[];
   pickerOpen: boolean;
   title: string;
@@ -127,6 +128,8 @@ function ColorSelectorPickerLayer(
         color={props.draftColor}
         formatMode={props.formatMode}
         eyedropper={props.state.eyedropper}
+        palette={props.paletteInPicker ? props.normalizedPalette : []}
+        title={props.title}
         onApply={props.onApply}
         onCancel={props.onCancel}
         onColorChange={props.onColorChange}
@@ -173,6 +176,7 @@ function ColorSelectorBody(props: {
   floatingOwnerId: string;
   floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
   label: string;
+  paletteInPicker: boolean;
   pickerOnly: boolean;
   triggerVariant: NonNullable<CompactColorSelectorProps['triggerVariant']>;
   state: ReturnType<typeof useColorSelectorState>;
@@ -214,6 +218,7 @@ function ColorSelectorBody(props: {
         floatingPlacement={props.floatingPlacement}
         formatMode={props.state.formatMode}
         normalizedPalette={props.state.normalizedPalette}
+        paletteInPicker={props.paletteInPicker}
         normalizedRecentColors={props.state.normalizedRecentColors}
         pickerOpen={props.state.pickerOpen}
         title={props.title}
@@ -244,6 +249,7 @@ export function CompactColorSelector({
   onPreviewChange,
   onPreviewReset,
   palette = [],
+  paletteInPicker = false,
   pickerOnly = false,
   triggerVariant = 'value',
   recentColors = [],
@@ -285,6 +291,7 @@ export function CompactColorSelector({
       floatingOwnerId={floatingOwnerId}
       floatingPlacement={floatingPlacement}
       label={label}
+      paletteInPicker={paletteInPicker}
       pickerOnly={pickerOnly}
       triggerVariant={triggerVariant}
       state={state}

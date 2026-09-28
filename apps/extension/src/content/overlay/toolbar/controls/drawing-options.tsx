@@ -1,5 +1,12 @@
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
-import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+  type ReactNode,
+} from 'react';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import {
   DRAWING_ARROW_WIDTHS,
@@ -18,8 +25,6 @@ import {
   ArrowDrawDirectionOption,
   DrawingColorOptions,
   DrawingBlurStrengthOptions,
-  DrawingDeleteOption,
-  DrawingDeselectOption,
   DrawingOptionsDivider,
   DrawingShapeOptions,
   DrawingShapeFillOptions,
@@ -27,6 +32,7 @@ import {
   DrawingWidthOptions,
   MarkerOpacityOptions,
 } from '../../../../ui/drawing-tools/options';
+import { DrawingSelectionActions } from '../../../../ui/drawing-tools/selection-actions';
 import {
   resolveUpdatedQuickObject,
   type DrawingQuickToolUpdate as QuickToolUpdate,
@@ -47,27 +53,28 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
   Record<DrawingQuickOptionsTool, { height: number; width: number }>
 > = {
   horizontal: {
-    arrow: { height: 48, width: 574 },
+    arrow: { height: 48, width: 600 },
     blur: { height: 48, width: 336 },
-    marker: { height: 48, width: 534 },
-    pencil: { height: 48, width: 314 },
-    shape: { height: 48, width: 668 },
+    marker: { height: 48, width: 560 },
+    pencil: { height: 48, width: 340 },
+    shape: { height: 48, width: 694 },
     selection: { height: 48, width: 676 },
-    text: { height: 88, width: 676 },
+    text: { height: 48, width: 700 },
   },
   vertical: {
-    arrow: { height: 386, width: 136 },
+    arrow: { height: 290, width: 190 },
     blur: { height: 174, width: 136 },
-    marker: { height: 346, width: 136 },
-    pencil: { height: 266, width: 136 },
-    shape: { height: 482, width: 136 },
-    selection: { height: 482, width: 152 },
-    text: { height: 642, width: 152 },
+    marker: { height: 250, width: 190 },
+    pencil: { height: 170, width: 190 },
+    shape: { height: 365, width: 190 },
+    selection: { height: 365, width: 190 },
+    text: { height: 420, width: 190 },
   },
 };
 
 function useDrawingOptionsLayout(args: {
   displayMode: 'horizontal' | 'vertical';
+  hasSelection: boolean;
   tool: DrawingQuickOptionsTool;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
@@ -83,7 +90,10 @@ function useDrawingOptionsLayout(args: {
     };
   }, []);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
-  const menuWidth = Math.min(dimensions.width, Math.max(0, window.innerWidth - 16));
+  const menuWidth = Math.min(
+    dimensions.width + (args.hasSelection ? 270 : 0),
+    Math.max(0, window.innerWidth - 16)
+  );
   const placement = getToolbarMenuPosition(args.triggerRef.current, dimensions.height);
   const positioned = resolveToolbarFloatingMenuStyle({
     anchorEl: args.triggerRef.current,
@@ -116,6 +126,56 @@ function getDrawingOptionsLayoutClass(displayMode: 'horizontal' | 'vertical'): s
   return displayMode === 'vertical'
     ? 'flex flex-col items-center gap-2'
     : 'flex flex-row items-center gap-2';
+}
+
+function DrawingOptionsPair(props: {
+  children: ReactNode;
+  controller: ContentDrawingController;
+  displayMode: 'horizontal' | 'vertical';
+  layout: ReturnType<typeof useDrawingOptionsLayout>;
+  panelRef: RefObject<HTMLDivElement | null>;
+  selectedCount: number;
+  totalCount: number;
+  tool: DrawingQuickOptionsTool;
+}) {
+  return (
+    <div
+      data-ui="content.toolbar.drawing-options.pair"
+      className="absolute flex max-w-[calc(100vw-16px)] items-start gap-2 overflow-x-auto"
+      style={props.layout.style}
+    >
+      <ProductToolbarMenu
+        compact
+        className="sniptale-drawing-options-popover"
+        style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+      >
+        <div
+          ref={props.panelRef}
+          role="group"
+          aria-label={translate('content.toolbar.drawingOptions')}
+          data-ui={`content.toolbar.drawing-options.${props.tool}`}
+          className={getDrawingOptionsLayoutClass(props.displayMode)}
+        >
+          {props.children}
+        </div>
+      </ProductToolbarMenu>
+      <ProductToolbarMenu
+        compact
+        className="sniptale-drawing-options-popover"
+        style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+      >
+        <DrawingSelectionActions
+          canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
+          canDuplicate={props.selectedCount > 0}
+          canDelete={props.selectedCount > 0}
+          onMove={(direction) => props.controller.session.moveSelected(direction)}
+          onDuplicate={() => props.controller.session.duplicateSelected()}
+          onDelete={() => props.controller.session.deleteSelected()}
+          onDeselect={() => props.controller.session.select(null)}
+        />
+      </ProductToolbarMenu>
+    </div>
+  );
 }
 
 function resolveSelectedQuickObject(
@@ -292,7 +352,6 @@ function ToolbarDrawingSelectionOptions(props: {
   const vertical = props.displayMode === 'vertical';
   const strokeObjects = props.selected.filter(isStrokeColorObject);
   const hasSharedStrokeColor = strokeObjects.length === props.selected.length;
-  const hasProperties = Boolean(sharedTool || hasSharedStrokeColor);
   const first = selectedQuick[0] ?? null;
   return (
     <>
@@ -335,9 +394,6 @@ function ToolbarDrawingSelectionOptions(props: {
           }
         />
       ) : null}
-      {hasProperties ? <DrawingOptionsDivider vertical={vertical} /> : null}
-      <DrawingDeleteOption onClick={() => props.controller.session.deleteSelected()} />
-      <DrawingDeselectOption onClick={() => props.controller.session.select(null)} />
     </>
   );
 }
@@ -547,7 +603,12 @@ export function ToolbarDrawingOptions(props: {
 }) {
   const { controller, displayMode, snapshot, tool } = props;
   const panelRef = useRef<HTMLDivElement>(null);
-  const layout = useDrawingOptionsLayout({ displayMode, tool, triggerRef: props.triggerRef });
+  const layout = useDrawingOptionsLayout({
+    displayMode,
+    hasSelection: snapshot.selectedObjectIds.length > 0,
+    tool,
+    triggerRef: props.triggerRef,
+  });
   const selectedObject = snapshot.document.objects.find(
     (object) => object.id === snapshot.selectedObjectId
   );
@@ -556,33 +617,49 @@ export function ToolbarDrawingOptions(props: {
       snapshot.selectedObjectIds.includes(object.id)
     );
     return (
-      <ProductToolbarMenu
-        compact
-        className="sniptale-drawing-options-popover"
-        placement={layout.placement}
-        style={layout.style}
+      <DrawingOptionsPair
+        controller={controller}
+        displayMode={displayMode}
+        layout={layout}
+        panelRef={panelRef}
+        selectedCount={selected.length}
+        totalCount={snapshot.document.objects.length}
+        tool="selection"
       >
-        <div
-          ref={panelRef}
-          role="group"
-          aria-label={translate('content.toolbar.drawingOptions')}
-          data-ui="content.toolbar.drawing-options.selection"
-          className={getDrawingOptionsLayoutClass(displayMode)}
-        >
-          <ToolbarDrawingSelectionOptions
-            controller={controller}
-            displayMode={displayMode}
-            panelRef={panelRef}
-            selected={selected}
-            snapshot={snapshot}
-          />
-        </div>
-      </ProductToolbarMenu>
+        <ToolbarDrawingSelectionOptions
+          controller={controller}
+          displayMode={displayMode}
+          panelRef={panelRef}
+          selected={selected}
+          snapshot={snapshot}
+        />
+      </DrawingOptionsPair>
     );
   }
   if (tool === 'blur') {
     const selectedBlur = selectedObject?.kind === 'blur' ? selectedObject : null;
-    return (
+    const content = (
+      <DrawingBlurStrengthOptions
+        value={selectedBlur?.amount ?? (selectedBlur ? 10 : snapshot.defaults.blur.amount)}
+        onChange={(amount) => {
+          controller.session.setDefaults({ ...snapshot.defaults, blur: { amount } });
+          if (selectedBlur) controller.session.replaceObject({ ...selectedBlur, amount });
+        }}
+      />
+    );
+    return selectedBlur ? (
+      <DrawingOptionsPair
+        controller={controller}
+        displayMode={displayMode}
+        layout={layout}
+        panelRef={panelRef}
+        selectedCount={1}
+        totalCount={snapshot.document.objects.length}
+        tool="blur"
+      >
+        {content}
+      </DrawingOptionsPair>
+    ) : (
       <ProductToolbarMenu
         compact
         className="sniptale-drawing-options-popover"
@@ -596,20 +673,7 @@ export function ToolbarDrawingOptions(props: {
           data-ui="content.toolbar.drawing-options.blur"
           className={getDrawingOptionsLayoutClass(displayMode)}
         >
-          <DrawingBlurStrengthOptions
-            value={selectedBlur?.amount ?? (selectedBlur ? 10 : snapshot.defaults.blur.amount)}
-            onChange={(amount) => {
-              controller.session.setDefaults({ ...snapshot.defaults, blur: { amount } });
-              if (selectedBlur) controller.session.replaceObject({ ...selectedBlur, amount });
-            }}
-          />
-          {selectedBlur ? (
-            <>
-              <DrawingOptionsDivider vertical={displayMode === 'vertical'} />
-              <DrawingDeleteOption onClick={() => controller.session.deleteSelected()} />
-              <DrawingDeselectOption onClick={() => controller.session.select(null)} />
-            </>
-          ) : null}
+          {content}
         </div>
       </ProductToolbarMenu>
     );
@@ -618,6 +682,41 @@ export function ToolbarDrawingOptions(props: {
   const update = (next: QuickToolUpdate) =>
     updateQuickToolOption({ controller, selected, snapshot, tool, update: next });
 
+  const content =
+    tool === 'text' ? (
+      <DrawingTextToolOptions
+        controller={controller}
+        displayMode={displayMode}
+        panelRef={panelRef}
+        selected={selected?.kind === 'text' ? selected : null}
+        snapshot={snapshot}
+        update={update}
+      />
+    ) : (
+      <DrawingNonTextToolOptions
+        controller={controller}
+        displayMode={displayMode}
+        panelRef={panelRef}
+        selected={selected}
+        snapshot={snapshot}
+        tool={tool}
+        update={update}
+      />
+    );
+  if (selected)
+    return (
+      <DrawingOptionsPair
+        controller={controller}
+        displayMode={displayMode}
+        layout={layout}
+        panelRef={panelRef}
+        selectedCount={1}
+        totalCount={snapshot.document.objects.length}
+        tool={tool}
+      >
+        {content}
+      </DrawingOptionsPair>
+    );
   return (
     <ProductToolbarMenu
       compact
@@ -632,33 +731,7 @@ export function ToolbarDrawingOptions(props: {
         data-ui={`content.toolbar.drawing-options.${tool}`}
         className={getDrawingOptionsLayoutClass(displayMode)}
       >
-        {tool === 'text' ? (
-          <DrawingTextToolOptions
-            controller={controller}
-            displayMode={displayMode}
-            panelRef={panelRef}
-            selected={selected?.kind === 'text' ? selected : null}
-            snapshot={snapshot}
-            update={update}
-          />
-        ) : (
-          <DrawingNonTextToolOptions
-            controller={controller}
-            displayMode={displayMode}
-            panelRef={panelRef}
-            selected={selected}
-            snapshot={snapshot}
-            tool={tool}
-            update={update}
-          />
-        )}
-        {selected ? (
-          <>
-            <DrawingOptionsDivider vertical={displayMode === 'vertical'} />
-            <DrawingDeleteOption onClick={() => controller.session.deleteSelected()} />
-            <DrawingDeselectOption onClick={() => controller.session.select(null)} />
-          </>
-        ) : null}
+        {content}
       </div>
     </ProductToolbarMenu>
   );

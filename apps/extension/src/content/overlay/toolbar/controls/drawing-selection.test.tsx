@@ -64,10 +64,12 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
 
   const panel = host.querySelector('[data-ui="content.toolbar.drawing-options.selection"]');
   expect(panel?.querySelector('[data-ui*=".width-"]')).toBeNull();
-  expect(panel?.querySelector('[data-ui="content.toolbar.drawing-options.delete"]')).not.toBeNull();
-  expect(
-    panel?.querySelector('[data-ui="content.toolbar.drawing-options.deselect"]')
-  ).not.toBeNull();
+  expect(panel?.querySelector('[data-ui="drawing.selection.actions.delete"]')).toBeNull();
+  expect(host.querySelector('[data-ui="drawing.selection.actions.delete"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="content.toolbar.drawing-options.deselect"]')).not.toBeNull();
+  expect(host.querySelectorAll('.sniptale-drawing-options-popover')).toHaveLength(2);
+  expect(panel?.querySelectorAll('.grid-cols-5 button[title^="#"]')).toHaveLength(5);
+  expect(panel?.querySelector('.grid-cols-5')).not.toBeNull();
   act(() => panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
 
   expect(onDocumentCommit).toHaveBeenCalledTimes(1);
@@ -76,6 +78,31 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
       .getSnapshot()
       .document.objects.map((object) => ('color' in object ? object.color : null))
   ).toEqual(['#60a5fa', '#60a5fa']);
+  act(() => root.unmount());
+});
+
+it('moves and duplicates a selected page drawing from the separate action panel', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const commits = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit: commits });
+  for (const id of ['one', 'two']) {
+    session.commitObject({ id, kind: 'blur', bounds: { x: 0, y: 0, width: 10, height: 10 } });
+  }
+  session.setActiveTool('select');
+  session.select('one');
+  commits.mockClear();
+  const { host, root } = renderSelectionToolbar(session);
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.front"]')?.click()
+  );
+  expect(session.getSnapshot().document.objects.map((object) => object.id)).toEqual(['two', 'one']);
+  act(() =>
+    host
+      .querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.duplicate"]')
+      ?.click()
+  );
+  expect(session.getSnapshot().document.objects).toHaveLength(3);
+  expect(commits).toHaveBeenCalledTimes(2);
   act(() => root.unmount());
 });
 

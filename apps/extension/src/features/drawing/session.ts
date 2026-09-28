@@ -5,6 +5,8 @@ import {
   type DrawingTool,
   type DrawingToolDefaults,
 } from './model';
+import { createDrawingId } from './create';
+import { translateDrawingObject } from './geometry';
 
 export interface DrawingSessionSnapshot {
   readonly document: DrawingDocumentV1;
@@ -34,6 +36,8 @@ export interface DrawingSession {
   replaceObjects(objects: readonly DrawingObject[]): void;
   deleteObjects(objectIds: readonly string[]): void;
   deleteSelected(): void;
+  duplicateSelected(): void;
+  moveSelected(direction: 'front' | 'forward' | 'backward' | 'back'): void;
   clear(): void;
   dispose(): void;
 }
@@ -46,6 +50,28 @@ type DrawingSessionOptions = {
   onDocumentCommit: (commit: DrawingDocumentCommit) => boolean;
   onDispose?: () => void;
 };
+
+function reorderedDrawingObjects(
+  source: readonly DrawingObject[],
+  selected: ReadonlySet<string>,
+  direction: 'front' | 'forward' | 'backward' | 'back'
+): DrawingObject[] {
+  const objects = [...source];
+  if (direction === 'front' || direction === 'back') {
+    const chosen = objects.filter((object) => selected.has(object.id));
+    const rest = objects.filter((object) => !selected.has(object.id));
+    return direction === 'front' ? [...rest, ...chosen] : [...chosen, ...rest];
+  }
+  const step = direction === 'forward' ? 1 : -1;
+  const start = step === 1 ? objects.length - 2 : 1;
+  const end = step === 1 ? -1 : objects.length;
+  for (let index = start; index !== end; index -= step) {
+    if (selected.has(objects[index]!.id) && !selected.has(objects[index + step]!.id)) {
+      [objects[index], objects[index + step]] = [objects[index + step]!, objects[index]!];
+    }
+  }
+  return objects;
+}
 
 class DrawingSessionOwner implements DrawingSession {
   private document: DrawingDocumentV1;
@@ -197,6 +223,33 @@ class DrawingSessionOwner implements DrawingSession {
 
   deleteSelected() {
     this.deleteObjects(this.selectedObjectIds);
+  }
+
+  duplicateSelected() {
+    if (this.selectedObjectIds.length === 0) return;
+    const selected = new Set(this.selectedObjectIds);
+    const copies = this.document.objects
+      .filter((object) => selected.has(object.id))
+      .map((object) => ({
+        ...translateDrawingObject(object, { x: 12, y: 12 }),
+        id: createDrawingId(),
+      }));
+    if (copies.length === 0) return;
+    this.commitDocument(
+      { version: 1, objects: [...this.document.objects, ...copies] },
+      copies.map((object) => object.id)
+    );
+  }
+
+  moveSelected(direction: 'front' | 'forward' | 'backward' | 'back') {
+    if (this.selectedObjectIds.length === 0) return;
+    const objects = reorderedDrawingObjects(
+      this.document.objects,
+      new Set(this.selectedObjectIds),
+      direction
+    );
+    if (objects.every((object, index) => object === this.document.objects[index])) return;
+    this.commitDocument({ version: 1, objects });
   }
 
   deleteObjects(objectIds: readonly string[]) {

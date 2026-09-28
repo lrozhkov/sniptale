@@ -24,6 +24,8 @@ export interface CompactColorSelectorProps {
   onPreviewChange?: (value: string) => void;
   onPreviewReset?: (value: string) => void;
   palette?: readonly string[];
+  /** Show palette swatches above picker controls for compact drawing tool palettes. */
+  paletteInPicker?: boolean;
   pickerOnly?: boolean;
   recentColors?: readonly string[];
   title: string;

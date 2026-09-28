@@ -5,19 +5,22 @@ import { type CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorController } from '../../application/controller-context';
 import { EditorDrawingOptions } from '../../drawing/options';
+import { DrawingSelectionActions } from '../../../ui/drawing-tools/selection-actions';
+import { useEditorStore } from '../../state/useEditorStore';
+import {
+  canDeleteLayerSelection,
+  canDuplicateLayerSelection,
+  canReorderLayerSelection,
+} from '../../inspector/layers/helpers';
 import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
 import { ToolPropertiesButton } from './tool-properties-button';
 
-const TOOL_PROPERTIES_CLASS_NAME = floatingChromeClassNames(
-  ['absolute left-1/2 top-[4.5rem] z-40 flex -translate-x-1/2', 'max-h-[calc(100vh-8.5rem)]'].join(
-    ' '
-  ),
-  'flex-col overflow-visible !rounded-none',
-  'max-[720px]:left-3 max-[720px]:right-3',
-  'max-[720px]:max-h-none max-[720px]:translate-x-0 max-[720px]:flex-row'
-);
+const TOOL_PROPERTIES_PAIR_CLASS_NAME = [
+  'absolute left-1/2 z-40 flex max-w-[calc(100vw-24px)] -translate-x-1/2 items-start gap-2',
+  'max-[720px]:left-3 max-[720px]:right-3 max-[720px]:translate-x-0',
+].join(' ');
 
 function useToolRailPlacement(enabled: boolean) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -146,6 +149,7 @@ export function EditorFloatingToolPropertiesRail({
   selection,
 }: EditorFloatingToolPropertiesRailProps) {
   const controller = useEditorController();
+  const layers = useEditorStore((state) => state.layers);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const groups = useToolPropertyGroups(documentController.compactCommandGroups);
   const standardPropertiesEnabled = isToolPropertiesEnabled({
@@ -189,6 +193,7 @@ export function EditorFloatingToolPropertiesRail({
       collapsedDrawingOptionsTool !== activeDrawingTool
     );
   const enabled = standardPropertiesEnabled || drawingPropertiesEnabled;
+  const showSelectionActions = drawingPropertiesEnabled && selection.hasSelection;
   const placement = useToolRailPlacement(enabled);
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
 
@@ -204,35 +209,63 @@ export function EditorFloatingToolPropertiesRail({
 
   return (
     <div ref={rootRef} className="contents">
-      <FloatingChromeToolbar
-        dataUi="editor.floating.tool-properties"
+      <div
         ref={placement.panelRef}
-        className={TOOL_PROPERTIES_CLASS_NAME}
+        className={TOOL_PROPERTIES_PAIR_CLASS_NAME}
         style={{
           top: placement.top,
           maxHeight:
             placement.top === undefined ? undefined : `calc(100% - ${placement.top}px - 12px)`,
         }}
       >
-        {drawingOptionsTool ? (
-          <EditorDrawingOptions
-            onDirectionChange={() => controller.applyToolMode()}
-            onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
-            onClearSelection={() => controller.clearSelection()}
-            onDeleteSelection={() => controller.deleteSelection()}
-            selectedType={selection.selectedObjectType}
-            tool={drawingOptionsTool}
-          />
-        ) : (
-          <ToolPropertiesButtons
-            activeGroupId={activeGroupId}
-            groups={groups}
-            onToggle={(groupId) =>
-              setActiveGroupId((current) => (current === groupId ? null : groupId))
-            }
-          />
-        )}
-      </FloatingChromeToolbar>
+        <FloatingChromeToolbar
+          dataUi="editor.floating.tool-properties"
+          className={floatingChromeClassNames(
+            'min-w-0 max-w-full overflow-x-auto',
+            !showSelectionActions && '!rounded-none'
+          )}
+        >
+          {drawingOptionsTool ? (
+            <EditorDrawingOptions
+              onDirectionChange={() => controller.applyToolMode()}
+              onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
+              onClearSelection={() => controller.clearSelection()}
+              onDeleteSelection={() => controller.deleteSelection()}
+              selectedType={selection.selectedObjectType}
+              tool={drawingOptionsTool}
+            />
+          ) : (
+            <ToolPropertiesButtons
+              activeGroupId={activeGroupId}
+              groups={groups}
+              onToggle={(groupId) =>
+                setActiveGroupId((current) => (current === groupId ? null : groupId))
+              }
+            />
+          )}
+        </FloatingChromeToolbar>
+        {showSelectionActions ? (
+          <FloatingChromeToolbar
+            dataUi="editor.floating.selection-actions"
+            className="shrink-0 !rounded-none"
+          >
+            <DrawingSelectionActions
+              canReorder={canReorderLayerSelection(layers)}
+              canDuplicate={canDuplicateLayerSelection(layers)}
+              canDelete={canDeleteLayerSelection(layers)}
+              onMove={(direction) => {
+                if (direction === 'front') controller.bringSelectionToFront();
+                else if (direction === 'forward') controller.bringForwardSelection();
+                else if (direction === 'backward') controller.sendBackwardSelection();
+                else controller.sendSelectionToBack();
+              }}
+              onDuplicate={() => void controller.duplicateSelection()}
+              onDelete={() => controller.deleteSelection()}
+              onDeselect={() => controller.clearSelection()}
+            />
+          </FloatingChromeToolbar>
+        ) : null}
+      </div>
     </div>
   );
 }

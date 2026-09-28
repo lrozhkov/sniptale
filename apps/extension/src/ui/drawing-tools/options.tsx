@@ -5,14 +5,12 @@ import {
   Circle,
   PaintBucket,
   Square,
-  Trash2,
   Triangle,
   Type,
-  X,
 } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import type { ReactNode, RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
@@ -26,12 +24,14 @@ import {
   type DrawingShapeKind,
 } from '../../features/drawing/public';
 import { translate } from '../../platform/i18n';
+import {
+  loadRecentColors,
+  pushRecentColor,
+  subscribeRecentColors,
+} from '../../composition/persistence/recent-colors';
 
 type DrawingQuickOptionsTool = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text';
 
-const INACTIVE_OPTION_CLASS =
-  'border-[var(--sniptale-color-border-soft)] bg-transparent ' +
-  'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-hover)]';
 const DRAWING_COLOR_PICKER_CLASS = [
   '!h-7 !w-7 shrink-0',
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!h-7",
@@ -64,42 +64,6 @@ function QuickOptionButton(props: {
       onClick={props.onClick}
     >
       {props.children}
-    </ContentToolbarButton>
-  );
-}
-
-export function DrawingDeselectOption(props: { onClick: () => void }) {
-  const label = translate('content.toolbar.drawingDeselect');
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      data-ui="content.toolbar.drawing-options.deselect"
-      className={[
-        'flex h-7 w-7 items-center justify-center rounded-md border transition-colors',
-        INACTIVE_OPTION_CLASS,
-      ].join(' ')}
-      onClick={props.onClick}
-    >
-      <X aria-hidden size={16} />
-    </button>
-  );
-}
-
-export function DrawingDeleteOption(props: { onClick: () => void }) {
-  const label = translate('content.toolbar.drawingDelete');
-  return (
-    <ContentToolbarButton
-      type="button"
-      tone="danger"
-      aria-label={label}
-      title={label}
-      dataUi="content.toolbar.drawing-options.delete"
-      className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
-      onClick={props.onClick}
-    >
-      <Trash2 aria-hidden size={16} />
     </ContentToolbarButton>
   );
 }
@@ -348,14 +312,35 @@ export function DrawingColorOptions(props: {
   onSelect: (color: string) => void;
 }) {
   const Icon = props.icon;
-  const quickColors = props.colors
-    .filter((color) => color.toLowerCase() !== '#14b8a6' && color.toLowerCase() !== '#ec4899')
-    .slice(0, 8);
+  const [recentColors, setRecentColors] = useState<readonly string[]>([]);
+  const recentRevisionRef = useRef(0);
+  useEffect(() => {
+    let active = true;
+    const loadRevision = recentRevisionRef.current;
+    void loadRecentColors().then((colors) => {
+      if (active && recentRevisionRef.current === loadRevision) setRecentColors(colors);
+    });
+    const unsubscribe = subscribeRecentColors((colors) => {
+      recentRevisionRef.current += 1;
+      setRecentColors(colors);
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+  const quickColors = [...new Set([...recentColors, ...props.colors])].slice(0, 5);
+  const selectColor = (color: string) => {
+    props.onSelect(color);
+    recentRevisionRef.current += 1;
+    setRecentColors((current) => [color, ...current.filter((item) => item !== color)].slice(0, 10));
+    void pushRecentColor(color).catch(() => undefined);
+  };
   return (
     <div
       role="group"
       data-ui={props.dataUi}
-      className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
+      className="flex flex-row items-center gap-1.5"
       aria-label={props.label}
       title={props.label}
     >
@@ -366,11 +351,7 @@ export function DrawingColorOptions(props: {
           className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
         />
       ) : null}
-      <div
-        className={`grid gap-1.5 ${
-          props.vertical ? 'w-[38px] grid-cols-2' : 'w-[82px] grid-cols-4'
-        }`}
-      >
+      <div className="grid w-[104px] grid-cols-5 gap-1.5">
         {quickColors.map((color) => {
           const selectedValue =
             props.selectedValue === undefined ? props.value : props.selectedValue;
@@ -381,7 +362,7 @@ export function DrawingColorOptions(props: {
               active={active}
               aria-label={`${props.label}: ${color}`}
               aria-pressed={active}
-              onClick={() => props.onSelect(color)}
+              onClick={() => selectColor(color)}
               style={{ backgroundColor: color }}
               title={color}
             />
@@ -397,8 +378,10 @@ export function DrawingColorOptions(props: {
         label={props.label}
         title={props.label}
         value={props.value}
+        palette={props.colors}
+        paletteInPicker
         pickerOnly
-        onChange={props.onSelect}
+        onChange={selectColor}
       />
     </div>
   );

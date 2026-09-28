@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   )),
 }));
 const controller = {
+  clearSelection: vi.fn(),
   canvas: {
     off: vi.fn((event: string, handler: () => void) => listeners.get(event)?.delete(handler)),
     on: vi.fn((event: string, handler: () => void) => {
@@ -104,9 +105,8 @@ it('anchors current drawing tools and renders their shared options directly', ()
   const properties = container.querySelector<HTMLElement>(
     '[data-ui="editor.floating.tool-properties"]'
   );
-  expect(properties?.className).toContain('left-1/2');
-  expect(properties?.className).toContain('top-[4.5rem]');
-  expect(properties?.className).toContain('-translate-x-1/2');
+  expect(properties?.parentElement?.className).toContain('left-1/2');
+  expect(properties?.parentElement?.className).toContain('-translate-x-1/2');
 
   renderRail({
     activeTool: 'select',
@@ -187,6 +187,23 @@ it('keeps drawing options stable during canvas interaction and only honors an ex
   expect(container.querySelector('[data-ui="drawing-options.selection"]')).not.toBeNull();
 });
 
+it('places selection actions beside drawing properties and allows deselection', () => {
+  renderRail({
+    activeTool: 'select',
+    selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'pencil' },
+  });
+  const properties = container.querySelector('[data-ui="editor.floating.tool-properties"]');
+  const actions = container.querySelector('[data-ui="editor.floating.selection-actions"]');
+  expect(properties?.parentElement).toBe(actions?.parentElement);
+  expect(properties?.querySelector('[data-ui="drawing.selection.actions"]')).toBeNull();
+  act(() =>
+    actions
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing-options.deselect"]')
+      ?.click()
+  );
+  expect(controller.clearSelection).toHaveBeenCalledOnce();
+});
+
 it('keeps drawing options six pixels below the outer tool rail after viewport changes', () => {
   const toolbar = document.createElement('div');
   toolbar.dataset['ui'] = 'editor.floating.tool-rail';
@@ -195,9 +212,9 @@ it('keeps drawing options six pixels below the outer tool rail after viewport ch
   bounds.mockReturnValue(new DOMRect(20, 12, 400, 52));
   renderRail();
   const panel = container.querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]');
-  expect(panel?.style.top).toBe('70px');
+  expect(panel?.parentElement?.style.top).toBe('70px');
   bounds.mockReturnValue(new DOMRect(12, 136, 400, 94));
   act(() => window.dispatchEvent(new Event('resize')));
-  expect(panel?.style.top).toBe('236px');
+  expect(panel?.parentElement?.style.top).toBe('236px');
   toolbar.remove();
 });

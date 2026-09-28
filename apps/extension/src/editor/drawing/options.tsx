@@ -16,8 +16,6 @@ import {
   ArrowDrawDirectionOption,
   DrawingColorOptions,
   DrawingBlurStrengthOptions,
-  DrawingDeleteOption,
-  DrawingDeselectOption,
   DrawingOptionsDivider,
   DrawingShapeFillOptions,
   DrawingShapeOptions,
@@ -301,13 +299,6 @@ export function EditorDrawingOptions(props: {
         tool={props.tool}
         update={update}
       />
-      {selected ? (
-        <>
-          {props.tool === 'selection' ? null : <DrawingOptionsDivider vertical={false} />}
-          <DrawingDeselectOption onClick={props.onClearSelection} />
-          <DrawingDeleteOption onClick={props.onDeleteSelection} />
-        </>
-      ) : null}
     </div>
   );
 }

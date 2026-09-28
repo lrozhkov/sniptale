@@ -295,9 +295,9 @@ it('shows compact two-row text and background palettes with text-size controls',
   const backgroundPalette = panel?.querySelector<HTMLElement>(
     '[aria-label="content.toolbar.drawingTextBackground"]'
   );
-  expect(textPalette?.querySelector('.grid.grid-cols-4')).not.toBeNull();
-  expect(backgroundPalette?.querySelector('.grid.grid-cols-4')).not.toBeNull();
-  expect(textPalette?.querySelectorAll('.grid.grid-cols-4 button[title^="#"]')).toHaveLength(8);
+  expect(textPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
+  expect(backgroundPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
+  expect(textPalette?.querySelectorAll('.grid.grid-cols-5 button[title^="#"]')).toHaveLength(5);
   expect(textPalette?.querySelector('button[title="#14b8a6"]')).toBeNull();
   expect(textPalette?.querySelector('button[title="#ec4899"]')).toBeNull();
   expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
@@ -311,7 +311,7 @@ it('shows compact two-row text and background palettes with text-size controls',
       )
       ?.click()
   );
-  act(() => textPalette?.querySelector<HTMLButtonElement>('button[title="#ffffff"]')?.click());
+  act(() => textPalette?.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
   act(() =>
     backgroundPalette?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click()
   );
@@ -322,14 +322,14 @@ it('shows compact two-row text and background palettes with text-size controls',
   );
   expect(session.getSnapshot().defaults.text).toEqual({
     backgroundColor: '#60a5fa',
-    color: '#ffffff',
+    color: '#22c55e',
     fontFamily: 'serif',
     fontSize: 36,
   });
   const selectedTextColor =
-    textPalette?.querySelector<HTMLButtonElement>('button[title="#ffffff"]');
+    textPalette?.querySelector<HTMLButtonElement>('button[title="#22c55e"]');
   expect(selectedTextColor?.getAttribute('aria-label')).toBe(
-    'content.toolbar.drawingTextColor: #ffffff'
+    'content.toolbar.drawingTextColor: #22c55e'
   );
   expect(selectedTextColor?.getAttribute('aria-pressed')).toBe('true');
   act(() =>
@@ -488,15 +488,16 @@ it('reuses the Shapes panel to change the kind of a selected outline object', ()
   expect(
     panel?.closest('.relative')?.querySelector('[data-ui="content.toolbar.drawing.shape"]')
   ).toBeNull();
-  const deselect = panel?.querySelector<HTMLButtonElement>(
+  const deselect = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.deselect"]'
   );
-  const deleteSelected = panel?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.delete"]'
+  const deleteSelected = host.querySelector<HTMLButtonElement>(
+    '[data-ui="drawing.selection.actions.delete"]'
   );
   expect(deleteSelected).not.toBeNull();
   expect(deleteSelected?.className).toContain('sniptale-btn-danger');
-  expect(deleteSelected?.nextElementSibling).toBe(deselect);
+  expect(panel?.contains(deleteSelected ?? null)).toBe(false);
+  expect(deselect?.parentElement?.lastElementChild).toBe(deselect);
   act(() => deselect?.click());
   expect(session.getSnapshot().selectedObjectId).toBeNull();
   act(() => session.select('selected-shape'));
@@ -504,9 +505,7 @@ it('reuses the Shapes panel to change the kind of a selected outline object', ()
     host.querySelector('[data-ui="content.toolbar.drawing-options.shape.kind-parallelogram"]')
   ).toBeNull();
   act(() =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing-options.delete"]')
-      ?.click()
+    host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.delete"]')?.click()
   );
   expect(session.getSnapshot().document.objects).toHaveLength(0);
   expect(session.getSnapshot().selectedObjectId).toBeNull();
@@ -566,21 +565,20 @@ it('shows strength choices and actions for a selected blur object', () => {
       ?.click()
   );
   expect(session.getSnapshot().document.objects[0]).toMatchObject({ amount: 6 });
-  const deselect = panel?.querySelector<HTMLButtonElement>(
+  const deselect = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.deselect"]'
   );
-  const deleteSelected = panel?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.delete"]'
+  const deleteSelected = host.querySelector<HTMLButtonElement>(
+    '[data-ui="drawing.selection.actions.delete"]'
   );
-  expect(deleteSelected?.nextElementSibling).toBe(deselect);
+  expect(deleteSelected).not.toBeNull();
+  expect(deselect?.parentElement?.lastElementChild).toBe(deselect);
   expect(session.getSnapshot().selectedObjectId).toBe('selected-blur');
   act(() => deselect?.click());
   expect(session.getSnapshot().selectedObjectId).toBeNull();
   act(() => session.select('selected-blur'));
   act(() =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing-options.delete"]')
-      ?.click()
+    host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.delete"]')?.click()
   );
   expect(session.getSnapshot().document.objects).toHaveLength(0);
   act(() => root.unmount());
@@ -688,8 +686,8 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   expect(surface?.style.zIndex).toBe('2147483646');
   expect(panel?.classList).toContain('flex-col');
   const markerColorGroup = panel?.querySelector('[aria-label="content.toolbar.drawingColor"]');
-  expect(markerColorGroup?.classList).toContain('flex-col');
-  expect(markerColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-2');
+  expect(markerColorGroup?.classList).toContain('flex-row');
+  expect(markerColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
   const verticalDivider = panel?.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.divider"]'
   );
@@ -729,13 +727,13 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   const textColorGroup = textPanel?.querySelector(
     '[aria-label="content.toolbar.drawingTextColor"]'
   );
-  expect(textColorGroup?.classList).toContain('flex-col');
-  expect(textColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-2');
+  expect(textColorGroup?.classList).toContain('flex-row');
+  expect(textColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
   const textBackgroundGroup = textPanel?.querySelector(
     '[data-ui="content.toolbar.drawing-options.text.background-group"]'
   );
   expect(textBackgroundGroup?.classList).toContain('flex-col');
-  expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-2');
+  expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
   act(() => root.unmount());
 });
 

@@ -1,6 +1,7 @@
 import { PickerFooter } from './picker-sections';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { ColorEditorPanel } from './editor-panel';
+import { ColorSelectorSwatchSection } from './swatch-section';
 import type { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
 
 const PANEL_CLASS_NAME = [
@@ -17,6 +18,8 @@ type ColorSelectorPickerPopoverProps = {
   color: string;
   eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ColorSelectorFormatMode;
+  palette?: readonly string[];
+  title?: string;
   onApply: () => void;
   onCancel: () => void;
   onColorChange: (color: string) => void;
@@ -28,6 +31,18 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
   return (
     <div className={PANEL_CLASS_NAME} data-ui="shared.ui.color-selector.picker">
       <div className="space-y-1.5">
+        {props.palette?.length ? (
+          <div data-ui="shared.ui.color-selector.picker-palette" className="pb-2">
+            <ColorSelectorSwatchSection
+              colors={props.palette}
+              label=""
+              showLabel={false}
+              selectedColor={props.color}
+              title={props.title ?? ''}
+              onSelect={props.onColorChange}
+            />
+          </div>
+        ) : null}
         <ColorEditorPanel {...props} />
         <PickerFooter onApply={props.onApply} onCancel={props.onCancel} />
       </div>

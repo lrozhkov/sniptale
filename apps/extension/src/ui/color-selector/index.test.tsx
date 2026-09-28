@@ -105,6 +105,23 @@ async function openPalette() {
   await clickButton('Grid color');
 }
 
+it('shows an unlabeled palette above the picker controls for drawing tools', async () => {
+  renderSelector({ pickerOnly: true, paletteInPicker: true, recentColors: [], palette: PALETTE });
+  await openPicker();
+  const picker = document.querySelector('[data-ui="shared.ui.color-selector.picker"]');
+  expect(
+    picker?.querySelectorAll('[data-ui="shared.ui.color-selector.picker-palette"] button')
+  ).toHaveLength(10);
+  expect(picker?.textContent).not.toContain('shared.ui.colorSelectorPalette');
+  expect(picker?.textContent).not.toContain('shared.ui.colorSelectorRecentColors');
+});
+
+it('keeps the generic inspector picker free of the drawing palette', async () => {
+  renderSelector({ palette: PALETTE });
+  await openPicker();
+  expect(document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')).toBeNull();
+});
+
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
