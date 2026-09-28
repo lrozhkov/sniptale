@@ -286,7 +286,7 @@ export function EditorDrawingOptions(props: {
     <div
       ref={panelRef}
       data-ui="editor.drawing.options"
-      className="flex flex-row items-center gap-2 overflow-x-auto px-2 py-0.5"
+      className="flex h-7 flex-row items-center gap-2 overflow-x-auto px-1"
     >
       <ToolOptions
         arrowDrawFromTip={toolSettings.arrow.drawFromTip}

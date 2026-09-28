@@ -4,6 +4,8 @@ const mocks = vi.hoisted(() => ({
   applyEditorControllerLayerEffect: vi.fn(async () => undefined),
   applyEditorControllerLayerTransformation: vi.fn(async () => undefined),
   mergeEditorControllerSelectedLayers: vi.fn(async () => undefined),
+  groupSelectedEditorLayers: vi.fn(() => true),
+  ungroupSelectedEditorLayers: vi.fn(() => true),
   previewEditorControllerLayerEffect: vi.fn(),
   removeEditorControllerLayerEffect: vi.fn(),
   resetEditorControllerLayerEffectPreview: vi.fn(),
@@ -39,6 +41,11 @@ vi.mock('../../public-api/layer-raster-actions/merge', async (importOriginal) =>
   mergeEditorControllerSelectedLayers: mocks.mergeEditorControllerSelectedLayers,
 }));
 
+vi.mock('../../layer-actions/group', () => ({
+  groupSelectedEditorLayers: mocks.groupSelectedEditorLayers,
+  ungroupSelectedEditorLayers: mocks.ungroupSelectedEditorLayers,
+}));
+
 vi.mock('../../public-api/layer-raster-actions/effects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../public-api/layer-raster-actions/effects')>()),
   applyEditorControllerLayerEffect: mocks.applyEditorControllerLayerEffect,
@@ -57,6 +64,8 @@ import {
   applyLayerEffectForController,
   applyLayerTransformationForController,
   mergeSelectedLayersForController,
+  groupSelectedLayersForController,
+  ungroupSelectedLayersForController,
   previewLayerEffectForController,
   removeLayerEffectForController,
   renameLayerForController,
@@ -121,6 +130,15 @@ it('routes layer raster commands through the public api adapter', async () => {
     80
   );
   expect(mocks.mergeEditorControllerSelectedLayers).toHaveBeenCalledWith({ id: 'adapter' });
+});
+
+it('routes group commands through the public api adapter', () => {
+  const controller = createController();
+
+  expect(groupSelectedLayersForController(controller as never)).toBe(true);
+  expect(ungroupSelectedLayersForController(controller as never)).toBe(true);
+  expect(mocks.groupSelectedEditorLayers).toHaveBeenCalledWith({ id: 'adapter' });
+  expect(mocks.ungroupSelectedEditorLayers).toHaveBeenCalledWith({ id: 'adapter' });
 });
 
 it('routes layer effect commands through the public api adapter', async () => {

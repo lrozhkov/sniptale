@@ -14,7 +14,7 @@ vi.mock('./row', () => ({
   LayerRow: ({ layer }: { layer: { id: string } }) => <div data-ui={`mock.layer.${layer.id}`} />,
 }));
 
-it('renders layer header controls without insertion', () => {
+it('renders layer insertion before navigation in the header', () => {
   const onToggleAutoNavigateSelectedLayer = vi.fn();
   const markup = renderToStaticMarkup(
     <EditorInspectorLayersHeader
@@ -31,7 +31,8 @@ it('renders layer header controls without insertion', () => {
   expect(markup).toContain('editor.layers.auto-navigate');
   expect(markup).toContain('editor.toolbar.layerAutoNavigate');
   expect(markup).toContain('data-active="true"');
-  expect(markup).not.toContain('mock.insert');
+  expect(markup).toContain('mock.insert');
+  expect(markup.indexOf('mock.insert')).toBeLessThan(markup.indexOf('editor.layers.auto-navigate'));
   expect(markup).not.toContain('editor.layers.show-outside-canvas');
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('text-[12px] font-semibold uppercase');
@@ -70,7 +71,31 @@ it('renders layer rows or empty state with stable scroll classes', () => {
   expect(empty).toContain('editor.toolbar.noLayers');
 });
 
-it('keeps insertion out of the integrated header', () => {
+it('shows members beneath a selected group without generating thumbnails', () => {
+  const markup = renderToStaticMarkup(
+    <EditorInspectorLayersList
+      layers={[
+        {
+          id: 'group-1',
+          selected: true,
+          groupChildren: [
+            { id: 'child-1', name: 'Final Arrow', type: 'arrow', typeLabel: 'Arrow' },
+          ],
+        } as never,
+      ]}
+      dragOverLayerId={null}
+      setDraggedLayerId={vi.fn()}
+      setDragOverLayerId={vi.fn()}
+      onDrop={vi.fn()}
+      onOpenLayerEffects={vi.fn()}
+    />
+  );
+  expect(markup).toContain('editor.layers.group-children');
+  expect(markup).toContain('Final Arrow');
+  expect(markup).not.toContain('<img');
+});
+
+it('keeps insertion beside navigation in the integrated header', () => {
   const markup = renderToStaticMarkup(
     <EditorInspectorLayersHeader
       expanded
@@ -84,7 +109,7 @@ it('keeps insertion out of the integrated header', () => {
   expect(markup).toContain('editor.toolbar.layersTitle');
   expect(markup).toContain('editor.layers.auto-navigate');
   expect(markup).toContain('4 editor.toolbar.layerCountSuffix');
-  expect(markup).not.toContain('mock.insert');
+  expect(markup).toContain('mock.insert');
   expect(markup).not.toContain('lucide-layers-3');
-  expect(markup.match(/<button/g)).toHaveLength(1);
+  expect(markup.match(/<button/g)).toHaveLength(2);
 });

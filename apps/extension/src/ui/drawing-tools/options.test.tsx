@@ -1,8 +1,20 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { DrawingBlurStrengthOptions, DrawingShapeOptions, DrawingWidthOptions } from './options';
+import {
+  DrawingBlurStrengthOptions,
+  DrawingOptionsDivider,
+  DrawingShapeOptions,
+  DrawingWidthOptions,
+} from './options';
 
 describe('shared drawing option controls', () => {
+  it('keeps the text divider within the same horizontal button height', () => {
+    const horizontal = renderToStaticMarkup(<DrawingOptionsDivider extended vertical={false} />);
+    const vertical = renderToStaticMarkup(<DrawingOptionsDivider extended vertical />);
+    expect(horizontal).toContain('h-5 w-px');
+    expect(horizontal).not.toContain('h-9');
+    expect(vertical).toContain('h-px w-full');
+  });
   it('offers only the canonical quick shapes', () => {
     const markup = renderToStaticMarkup(
       <DrawingShapeOptions value="rectangle" onChange={vi.fn()} />

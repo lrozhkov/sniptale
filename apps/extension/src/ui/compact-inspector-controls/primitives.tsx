@@ -92,7 +92,7 @@ export function CompactColorOption({
       type={type ?? 'button'}
       {...props}
       className={cx(
-        'inline-flex h-7 w-7 items-center justify-center rounded-full border transition',
+        'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border transition-transform',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_90%,transparent)]',
         'bg-[color:var(--sniptale-color-surface-panel)]',
         'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-surface-panel)_52%,transparent)]',

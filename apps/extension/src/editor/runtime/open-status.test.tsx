@@ -72,3 +72,16 @@ it('ignores a stale failure after a newer open succeeds', async () => {
   });
   expect(consumer?.status).toBe('idle');
 });
+
+it('shows a distinct missing-original status while leaving the open action retryable', async () => {
+  await act(async () => {
+    await expect(
+      owner?.runOpen(async () => {
+        throw Object.assign(new Error('missing original'), { name: 'MissingEditorOriginalError' });
+      })
+    ).rejects.toThrow();
+  });
+  expect(consumer?.status).toBe('missing');
+  await act(async () => owner?.runOpen(async () => undefined));
+  expect(consumer?.status).toBe('idle');
+});

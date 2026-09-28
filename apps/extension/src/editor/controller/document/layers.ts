@@ -1,5 +1,5 @@
 import type { Canvas } from 'fabric';
-import { FabricImage, type FabricObject } from 'fabric';
+import { Group, type FabricObject } from 'fabric';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import {
   createObjectLabel,
@@ -9,23 +9,6 @@ import {
   isTransparentColor,
   isUserObject,
 } from '../../document/model';
-
-function resolveLayerPreviewDataUrl(object: FabricObject): string | null {
-  if (object.sniptaleBackgroundImageData) {
-    return object.sniptaleBackgroundImageData;
-  }
-
-  if (!(object instanceof FabricImage)) {
-    return null;
-  }
-
-  const imageElement = object.getElement();
-  if (imageElement instanceof HTMLImageElement) {
-    return imageElement.currentSrc || imageElement.src || null;
-  }
-
-  return imageElement instanceof HTMLCanvasElement ? imageElement.toDataURL() : null;
-}
 
 function resolveLayerPreviewColor(object: FabricObject): string | null {
   if (object.sniptaleBackgroundMode === 'color' && object.sniptaleBackgroundColor) {
@@ -84,7 +67,7 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
       reorderable: hasBrowserWindow && isSourceObject(object),
       type: object.sniptaleType ?? 'image',
       previewColor: resolveLayerPreviewColor(object),
-      previewDataUrl: resolveLayerPreviewDataUrl(object),
+      previewDataUrl: null,
       previewTransparent: isTransparentPreview(object),
       raster: object.sniptaleType === 'image' || object.sniptaleType === 'source-image',
       name:
@@ -98,6 +81,22 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
         hasBrowserWindow && isSourceObject(object)
           ? getEditorObjectTypeLabel('browser-frame')
           : getEditorObjectTypeLabel(object.sniptaleType ?? 'image'),
+      ...(object instanceof Group && object.sniptaleType === 'group'
+        ? {
+            groupSize: object.getObjects().length,
+            groupChildren: object
+              .getObjects()
+              .slice()
+              .reverse()
+              .map((child) => ({
+                id: child.sniptaleId ?? crypto.randomUUID(),
+                name:
+                  child.sniptaleLabel ?? getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
+                type: child.sniptaleType ?? 'image',
+                typeLabel: getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
+              })),
+          }
+        : {}),
       visible: object.visible !== false,
     }));
 }

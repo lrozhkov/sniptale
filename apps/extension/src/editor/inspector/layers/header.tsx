@@ -2,8 +2,10 @@ import React from 'react';
 import { ChevronDown, ChevronUp, Layers3, Minus, SquareMousePointer } from 'lucide-react';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
+import { getLayerIcon } from '../../chrome/tool-icons';
 import { cx } from '../../chrome/ui';
 import { LayerRow } from './row';
+import { LayerInsertImageControl } from './file-input';
 import { ACTIVE_LAYER_NAVIGATION_BORDER_CLASS_NAME } from './header.constants';
 import {
   EMPTY_STATE_CLASS_NAME,
@@ -86,6 +88,7 @@ function EditorInspectorLayersHeaderActions(props: {
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
+      <LayerInsertImageControl withLabel />
       <button
         type="button"
         title={translate('editor.toolbar.layerAutoNavigate')}
@@ -174,16 +177,42 @@ export function EditorInspectorLayersList({
     >
       {layers.length > 0 ? (
         layers.map((layer) => (
-          <LayerRow
-            key={layer.id}
-            layer={layer}
-            dragOverLayerId={dragOverLayerId}
-            setDraggedLayerId={setDraggedLayerId}
-            setDragOverLayerId={setDragOverLayerId}
-            onDrop={onDrop}
-            autoNavigateSelectedLayer={autoNavigateSelectedLayer}
-            onOpenLayerEffects={onOpenLayerEffects}
-          />
+          <div key={layer.id}>
+            <LayerRow
+              layer={layer}
+              dragOverLayerId={dragOverLayerId}
+              setDraggedLayerId={setDraggedLayerId}
+              setDragOverLayerId={setDragOverLayerId}
+              onDrop={onDrop}
+              autoNavigateSelectedLayer={autoNavigateSelectedLayer}
+              onOpenLayerEffects={onOpenLayerEffects}
+            />
+            {layer.selected && layer.groupChildren?.length ? (
+              <div
+                data-ui="editor.layers.group-children"
+                className="ml-4 border-l border-[color:var(--sniptale-color-border-soft)] pl-2"
+              >
+                {layer.groupChildren.map((child) => (
+                  <div
+                    key={child.id}
+                    title={child.name}
+                    className={[
+                      'flex min-h-7 items-center gap-2 truncate px-1 text-[11px]',
+                      'text-[color:var(--sniptale-color-text-secondary)]',
+                    ].join(' ')}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex size-4 shrink-0 items-center justify-center"
+                    >
+                      {getLayerIcon(child.type)}
+                    </span>
+                    <span className="truncate">{child.name}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
         ))
       ) : (
         <div className={EMPTY_STATE_CLASS_NAME}>{translate('editor.toolbar.noLayers')}</div>

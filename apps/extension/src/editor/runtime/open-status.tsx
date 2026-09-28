@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 
-export type EditorOpenStatus = 'idle' | 'loading' | 'error';
+export type EditorOpenStatus = 'idle' | 'loading' | 'error' | 'missing';
 
 const logger = createLogger({ namespace: 'EditorOpenStatus' });
 
@@ -22,8 +22,12 @@ export function useEditorOpenStatusOwner(initialStatus: EditorOpenStatus): Edito
       await action();
       if (revision.current === current) setStatus('idle');
     } catch (error) {
-      logger.error('Opening editor document failed', error);
-      if (revision.current === current) setStatus('error');
+      const missingFile =
+        error instanceof Error &&
+        (error.name === 'MissingEditorOriginalError' ||
+          error.name === 'MissingEditorDraftAssetError');
+      if (!missingFile) logger.error('Opening editor document failed', error);
+      if (revision.current === current) setStatus(missingFile ? 'missing' : 'error');
       throw error;
     }
   }, []);

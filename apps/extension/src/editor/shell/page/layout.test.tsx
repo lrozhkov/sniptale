@@ -50,7 +50,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function renderLayout(hasImage = true, openStatus: 'idle' | 'loading' | 'error' = 'idle') {
+async function renderLayout(
+  hasImage = true,
+  openStatus: 'idle' | 'loading' | 'error' | 'missing' = 'idle'
+) {
   await act(async () => {
     root?.render(
       <EditorPageLayout
@@ -77,6 +80,14 @@ it('shows a blocking loading status and a recoverable error without raw exceptio
     'alert'
   );
   expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
+});
+
+it('shows a specific missing-original message without blocking the empty canvas intake', async () => {
+  await renderLayout(false, 'missing');
+  expect(
+    container?.querySelector('[data-ui="editor.page.open-missing"]')?.getAttribute('role')
+  ).toBe('alert');
+  expect(container?.querySelector('[data-ui="editor.canvas.empty-dropzone"]')).not.toBeNull();
 });
 
 it('renders the canonical canvas, floating workspace, command palette, and extension slot', async () => {

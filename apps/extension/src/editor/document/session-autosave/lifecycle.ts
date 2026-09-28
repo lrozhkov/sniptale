@@ -5,6 +5,7 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   clearPendingAutosaveTimer,
+  clearPendingPresentationTimer,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
 } from './state';
@@ -16,6 +17,7 @@ export function activateAutosaveContext(
   options: { preserveHydratedDocument?: boolean } = {}
 ): void {
   clearPendingAutosaveTimer(state);
+  clearPendingPresentationTimer(state);
   if (!options.preserveHydratedDocument) {
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
@@ -85,6 +87,7 @@ export async function discardAutosaveDraft(
   _aggregateId?: string | null
 ): Promise<void> {
   clearPendingAutosaveTimer(state);
+  clearPendingPresentationTimer(state);
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
@@ -99,6 +102,7 @@ export async function discardAutosaveDraft(
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   clearPendingAutosaveTimer(state);
+  clearPendingPresentationTimer(state);
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();

@@ -82,6 +82,51 @@ function createDocument(sourceImageData: string) {
   return { ...createEditorDocumentFixture(), sourceImageData };
 }
 
+describe('deferred image presentation', () => {
+  it('defers and coalesces presentation work after durable saves', async () => {
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
+    autosave.activate({
+      aggregateId: 'image-1',
+      durableRevision: 0,
+      renderPresentation,
+      sourceTitle: null,
+      sourceUrl: null,
+    });
+
+    await autosave.persistSnapshot(() => createDocument('first'));
+    await autosave.persistSnapshot(() => createDocument('second'));
+    expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+    expect(renderPresentation).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_999);
+    expect(renderPresentation).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(renderPresentation).toHaveBeenCalledOnce();
+    expect(commitPresentationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedWorkspaceRevision: 2 })
+    );
+    autosave.dispose();
+  });
+
+  it('cancels a pending presentation render when the editor closes', async () => {
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
+    autosave.activate({
+      aggregateId: 'image-1',
+      durableRevision: 0,
+      renderPresentation,
+      sourceTitle: null,
+      sourceUrl: null,
+    });
+    await autosave.persistSnapshot(() => createDocument('first'));
+    autosave.dispose();
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(renderPresentation).not.toHaveBeenCalled();
+  });
+});
+
 describe('image aggregate autosave', () => {
   it('debounces to the latest document and advances the durable revision', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
@@ -222,6 +267,7 @@ describe('image aggregate autosave', () => {
     });
 
     await autosave.persistSnapshot(() => createDocument('presentation'));
+    await vi.advanceTimersByTimeAsync(3_000);
     await vi.waitFor(() => expect(commitPresentationMock).toHaveBeenCalledOnce());
     expect(commitPresentationMock).toHaveBeenCalledWith(
       expect.objectContaining({ aggregateId: 'image-1', expectedWorkspaceRevision: 1 })
@@ -229,6 +275,7 @@ describe('image aggregate autosave', () => {
 
     commitPresentationMock.mockRejectedValueOnce(new Error('render storage failed'));
     await autosave.persistSnapshot(() => createDocument('presentation-failure'));
+    await vi.advanceTimersByTimeAsync(3_000);
     await vi.waitFor(() =>
       expect(loggerWarnMock).toHaveBeenCalledWith(
         'Failed to update image presentation',
@@ -239,6 +286,7 @@ describe('image aggregate autosave', () => {
     loggerWarnMock.mockClear();
     commitPresentationMock.mockRejectedValueOnce(new StaleImageWorkspaceError('image-1'));
     await autosave.persistSnapshot(() => createDocument('stale-presentation'));
+    await vi.advanceTimersByTimeAsync(3_000);
     await vi.waitFor(() => expect(commitPresentationMock).toHaveBeenCalledTimes(3));
     expect(loggerWarnMock).not.toHaveBeenCalled();
   });
@@ -336,6 +384,7 @@ it('drops an obsolete gallery preview when another edit arrives during rendering
   });
 
   await autosave.persistSnapshot(() => createDocument('first'));
+  await vi.advanceTimersByTimeAsync(3_000);
   expect(renderPresentation).toHaveBeenCalledOnce();
   autosave.scheduleAutosave(createDocument('newer'));
   finishRender('data:image/png;base64,cHJldmlldw==');
@@ -394,6 +443,7 @@ it('skips an old preview after a newer edit has entered its write', async () => 
     sourceUrl: null,
   });
   await autosave.persistSnapshot(() => createDocument('first'));
+  await vi.advanceTimersByTimeAsync(3_000);
   commitWorkspaceMock.mockImplementationOnce(
     () =>
       new Promise((resolve) => {

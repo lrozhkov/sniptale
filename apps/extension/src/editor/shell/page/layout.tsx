@@ -94,6 +94,14 @@ export function EditorPageLayout(props: {
           </p>
         </div>
       ) : null}
+      {props.openStatus === 'missing' ? (
+        <div className={editorOpenErrorClassName} data-ui="editor.page.open-missing" role="alert">
+          <p className="font-semibold">{translate('editor.page.documentFileMissingTitle')}</p>
+          <p className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
+            {translate('editor.page.documentFileMissingHint')}
+          </p>
+        </div>
+      ) : null}
       {props.afterLayout}
     </div>
   );

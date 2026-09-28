@@ -75,7 +75,7 @@ export function DrawingOptionsDivider(props: { extended?: boolean; vertical: boo
       data-ui="content.toolbar.drawing-options.divider"
       className={[
         'shrink-0 bg-[var(--sniptale-color-border-soft)]',
-        props.vertical ? 'h-px w-full' : props.extended ? 'h-9 w-px' : 'h-5 w-px',
+        props.vertical ? 'h-px w-full' : 'h-5 w-px',
       ].join(' ')}
     />
   );

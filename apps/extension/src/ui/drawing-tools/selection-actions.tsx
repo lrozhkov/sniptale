@@ -11,7 +11,7 @@ function DrawingDeselectOption(props: { onClick: () => void }) {
       title={label}
       data-ui="content.toolbar.drawing-options.deselect"
       className={[
-        'flex h-7 w-7 items-center justify-center rounded-md border-0 bg-transparent',
+        'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent',
         'text-[var(--sniptale-color-text-secondary)] transition-colors',
         'hover:bg-[var(--sniptale-color-surface-hover)]',
         'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
@@ -39,7 +39,7 @@ export function DrawingSelectionActions(props: {
     { direction: 'back', icon: ChevronsDown, label: translate('editor.toolbar.backLayer') },
   ] as const;
   return (
-    <div data-ui="drawing.selection.actions" className="flex items-center gap-1 px-1 py-0.5">
+    <div data-ui="drawing.selection.actions" className="flex h-7 items-center gap-1">
       {moves.map(({ direction, icon: Icon, label }) => (
         <ContentToolbarButton
           key={direction}
@@ -54,7 +54,7 @@ export function DrawingSelectionActions(props: {
           <Icon aria-hidden size={16} />
         </ContentToolbarButton>
       ))}
-      <span className="mx-1 h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      <span className="mx-0.5 h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
       <ContentToolbarButton
         type="button"
         dataUi="drawing.selection.actions.duplicate"
@@ -78,7 +78,7 @@ export function DrawingSelectionActions(props: {
       >
         <Trash2 aria-hidden size={16} />
       </ContentToolbarButton>
-      <span className="mx-1 h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      <span className="mx-0.5 h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
       <DrawingDeselectOption onClick={props.onDeselect} />
     </div>
   );

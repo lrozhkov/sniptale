@@ -34,6 +34,7 @@ export {
   listAssetObjectIds,
   listWritingAssetIds,
   listReadyJournals,
+  MissingAssetObjectError,
   readAssetFile,
   releaseAssetReadyProtection,
   runWithAssetObjectLockIfAvailable,

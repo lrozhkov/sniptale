@@ -22,6 +22,14 @@ export const editorPageMessages = defineMessageSource({
     ru: 'Попробуйте открыть другой файл или повторите попытку. Исходный файл не изменён.',
     en: 'Try another file or try again. The original file has not been changed.',
   },
+  documentFileMissingTitle: {
+    ru: 'Файл документа не найден',
+    en: 'Document file not found',
+  },
+  documentFileMissingHint: {
+    ru: 'Часть данных отсутствует в локальном хранилище. Откройте файл снова с устройства или выберите другое изображение. Запись документа не удалена.',
+    en: 'Part of the document is missing from local storage. Open the file again from your device or choose another image. The document record was not deleted.',
+  },
   title: {
     ru: 'Добавьте изображение',
     en: 'Add an image',

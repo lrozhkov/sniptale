@@ -134,8 +134,8 @@ it('uses compact row shell tokens without changing the hover action structure', 
   renderRow();
   const row = container?.firstElementChild as HTMLDivElement | null;
 
-  expect(row?.className).toContain('rounded-[10px]');
-  expect(row?.className).toContain('var(--sniptale-color-surface-input)_62%');
+  expect(row?.className).toContain('rounded-[9px]');
+  expect(row?.className).toContain('var(--sniptale-color-surface-input)_42%');
   expect(row?.className).toContain('hover:border-[color:var(--sniptale-color-border-strong)]');
   expect(container?.querySelector('[data-testid="layer-action-rail"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="layer-expanded-actions"]')).not.toBeNull();

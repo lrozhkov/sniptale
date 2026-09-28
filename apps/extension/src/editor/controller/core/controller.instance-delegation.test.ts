@@ -67,6 +67,8 @@ async function exerciseSelectionDelegates(controller: any) {
   controller.toggleLayerLock('layer-1');
   controller.resizeLayer('layer-1', 100, 200);
   await controller.mergeSelectedLayers();
+  controller.groupSelectedLayers();
+  controller.ungroupSelectedLayers();
   await controller.applyLayerEffect('layer-1', {
     amount: 0.4,
     enabled: true,
@@ -138,6 +140,8 @@ function expectSelectionCoreDelegates(controller: any) {
     helperMocks.resizeCanvasForController,
     helperMocks.resizeImageForController,
     helperMocks.mergeSelectedLayersForController,
+    helperMocks.groupSelectedLayersForController,
+    helperMocks.ungroupSelectedLayersForController,
   ]) {
     expect(mock).toHaveBeenCalled();
   }

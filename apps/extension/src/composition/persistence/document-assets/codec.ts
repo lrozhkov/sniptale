@@ -4,6 +4,7 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { parseAssetRef, readAssetFile, writeBlobToAsset, type AssetRef } from '../assets';
+
 import type {
   HydratedEditorDocument,
   PersistedEditorAssetPointer,
@@ -11,6 +12,18 @@ import type {
   PersistedEditorDocumentV3,
   PreparedEditorDocument,
 } from './contracts';
+
+export class MissingEditorDocumentAssetError extends Error {
+  override name = 'MissingEditorDocumentAssetError';
+
+  constructor(assetId: string, kind: 'ref' | 'source' = 'ref') {
+    super(
+      kind === 'ref'
+        ? `Editor document asset ref is missing: ${assetId}.`
+        : `Editor document source image is missing: ${assetId}.`
+    );
+  }
+}
 
 const ASSET_URL_PREFIX = 'sniptale-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
@@ -264,14 +277,16 @@ export async function hydratePersistedEditorDocument(args: {
     for (const asset of args.document.assets) {
       if (urls.has(asset.assetId)) continue;
       const ref = refsById.get(asset.assetId);
-      if (!ref) throw new Error(`Editor document asset ref is missing: ${asset.assetId}.`);
+      if (!ref) throw new MissingEditorDocumentAssetError(asset.assetId);
       const file = await readAssetFile(ref, asset.role);
       const runtimeUrl = URL.createObjectURL(file);
       urls.set(asset.assetId, runtimeUrl);
       assetsByRuntimeUrl.set(runtimeUrl, ref);
     }
     const sourceImageData = urls.get(args.document.sourceImage.assetId);
-    if (!sourceImageData) throw new Error('Editor document source image is missing.');
+    if (!sourceImageData) {
+      throw new MissingEditorDocumentAssetError(args.document.sourceImage.assetId, 'source');
+    }
     const backgroundImageData = args.document.frame.backgroundImage
       ? (urls.get(args.document.frame.backgroundImage.assetId) ?? null)
       : null;

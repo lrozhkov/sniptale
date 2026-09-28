@@ -38,6 +38,14 @@ const activeWriterLockReleases = new Map<string, () => Promise<void>>();
 const activePublicationTransitionLeases = new Map<string, PersistenceMutationTransitionLease>();
 const readyProtectedAssetIds = new Set<string>();
 
+export class MissingAssetObjectError extends Error {
+  override name = 'MissingAssetObjectError';
+
+  constructor(assetId: string) {
+    super(`Asset object is missing: ${assetId}.`);
+  }
+}
+
 function defaultCreateId(): string {
   if (typeof crypto.randomUUID !== 'function') throw new Error('Secure asset IDs are unavailable.');
   return crypto.randomUUID();
@@ -484,7 +492,7 @@ export async function readAssetFile(
   options: AssetOpfsOptions = {}
 ): Promise<File> {
   const objects = await getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, false);
-  if (!objects) throw new Error(`Asset object is missing: ${ref.assetId}.`);
+  if (!objects) throw new MissingAssetObjectError(ref.assetId);
   const handle = await objects.getFileHandle(ref.assetId);
   const source = await handle.getFile();
   if (source.size !== ref.size) throw new Error(`Asset object size mismatch: ${ref.assetId}.`);

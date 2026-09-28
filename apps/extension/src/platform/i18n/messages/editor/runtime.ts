@@ -31,6 +31,10 @@ export const editorRuntimeMessages = defineMessageSource({
     ru: 'Фигура',
     en: 'Shape',
   },
+  group: {
+    ru: 'Группа',
+    en: 'Group',
+  },
   metaStampUrlLabel: {
     ru: 'URL страницы',
     en: 'Page URL',

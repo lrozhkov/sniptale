@@ -177,6 +177,17 @@ it('renders a non-interactive marker and touch-safe plane surface', () => {
   const { plane, planeRef } = renderPlane();
 
   expect(plane.className).toContain('touch-none');
+  expect(plane.className).toContain('cursor-pointer');
   expect(planeRef.current).toBe(plane);
   expect(plane.querySelector('.pointer-events-none')).not.toBeNull();
+});
+
+it('keeps the selection marker above both color gradients and visible at the corners', () => {
+  const { plane } = renderPlane({ saturation: 0, value: 1 });
+  const marker = plane.querySelector('[data-ui="shared.ui.color-selector.plane-marker"]');
+
+  expect(marker?.className).toContain('z-10');
+  expect(marker?.className).toContain('ring-');
+  expect((marker as HTMLElement).style.left).toBe('0%');
+  expect(plane.className).not.toContain('overflow-hidden');
 });

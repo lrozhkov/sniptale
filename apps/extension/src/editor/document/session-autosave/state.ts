@@ -17,6 +17,7 @@ export type EditorSessionAutosaveState = {
   autosaveRevision: number;
   pendingDocument: EditorDocument | null;
   pendingTimer: number;
+  presentationTimer: number;
   lastWriteError: unknown | null;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
@@ -31,6 +32,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     autosaveRevision: 0,
     pendingDocument: null,
     pendingTimer: 0,
+    presentationTimer: 0,
     lastWriteError: null,
     documentAssetsByRuntimeUrl: new Map(),
     releaseHydratedDocument: null,
@@ -45,4 +47,10 @@ export function clearPendingAutosaveTimer(state: EditorSessionAutosaveState): vo
 
   window.clearTimeout(state.pendingTimer);
   state.pendingTimer = 0;
+}
+
+export function clearPendingPresentationTimer(state: EditorSessionAutosaveState): void {
+  if (state.presentationTimer === 0) return;
+  window.clearTimeout(state.presentationTimer);
+  state.presentationTimer = 0;
 }

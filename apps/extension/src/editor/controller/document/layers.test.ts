@@ -235,7 +235,7 @@ it('keeps the source layer immutable even when it is currently unlocked', () => 
   );
 });
 
-it('collects preview metadata and effect counts for raster layers', () => {
+it('collects effect counts without retaining raster previews for the layer list', () => {
   vi.stubGlobal(
     'crypto',
     Object.assign(globalThis.crypto, {
@@ -249,7 +249,7 @@ it('collects preview metadata and effect counts for raster layers', () => {
     expect.objectContaining({
       effectCount: 1,
       id: 'image-1',
-      previewDataUrl: 'https://example.com/layer.png',
+      previewDataUrl: null,
       raster: true,
       type: 'image',
     })
@@ -270,7 +270,7 @@ it('falls back to stroke colors and generated ids when layer metadata is incompl
   );
 });
 
-it('uses solid fills and canvas previews when they are available', () => {
+it('does not serialize canvas layers while collecting the list', () => {
   const fillLayer = {
     fill: '#00ff99',
     getScaledHeight: () => 20,
@@ -280,13 +280,14 @@ it('uses solid fills and canvas previews when they are available', () => {
     sniptaleType: 'rectangle',
     visible: true,
   };
-  const [canvasLayer, shapeLayer] = collectLayers(
-    createCanvas([fillLayer, createCanvasPreviewLayer()])
-  );
+  const canvasPreviewLayer = createCanvasPreviewLayer();
+  const imageElement = canvasPreviewLayer.getElement() as HTMLCanvasElement;
+  const toDataUrl = vi.spyOn(imageElement, 'toDataURL');
+  const [canvasLayer, shapeLayer] = collectLayers(createCanvas([fillLayer, canvasPreviewLayer]));
 
   expect(canvasLayer).toEqual(
     expect.objectContaining({
-      previewDataUrl: 'data:image/png;base64,canvas-preview',
+      previewDataUrl: null,
     })
   );
   expect(shapeLayer).toEqual(
@@ -294,4 +295,5 @@ it('uses solid fills and canvas previews when they are available', () => {
       previewColor: '#00ff99',
     })
   );
+  expect(toDataUrl).not.toHaveBeenCalled();
 });

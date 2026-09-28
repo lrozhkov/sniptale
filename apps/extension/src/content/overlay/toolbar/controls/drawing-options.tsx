@@ -146,6 +146,7 @@ function DrawingOptionsPair(props: {
     >
       <ProductToolbarMenu
         compact
+        variant="drawing"
         className="sniptale-drawing-options-popover"
         style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
       >
@@ -161,6 +162,7 @@ function DrawingOptionsPair(props: {
       </ProductToolbarMenu>
       <ProductToolbarMenu
         compact
+        variant="drawing"
         className="sniptale-drawing-options-popover"
         style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
       >
@@ -662,6 +664,7 @@ export function ToolbarDrawingOptions(props: {
     ) : (
       <ProductToolbarMenu
         compact
+        variant="drawing"
         className="sniptale-drawing-options-popover"
         placement={layout.placement}
         style={layout.style}
@@ -720,6 +723,7 @@ export function ToolbarDrawingOptions(props: {
   return (
     <ProductToolbarMenu
       compact
+      variant="drawing"
       className="sniptale-drawing-options-popover"
       placement={layout.placement}
       style={layout.style}

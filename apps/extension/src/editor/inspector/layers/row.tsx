@@ -47,12 +47,7 @@ function LayerSelectionToggle({
       type="button"
       aria-pressed={layer.selected}
       title={translate('editor.toolbar.toggleLayerSelection')}
-      className={cx(
-        'shrink-0 rounded-[10px] transition',
-        layer.selected &&
-          'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_18%,transparent)]',
-        selectionToggleFocusClassName
-      )}
+      className={cx('shrink-0 rounded-[7px] transition', selectionToggleFocusClassName)}
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.preventDefault();

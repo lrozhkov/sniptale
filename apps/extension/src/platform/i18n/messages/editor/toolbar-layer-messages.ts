@@ -5,6 +5,14 @@ export const editorToolbarLayerMessages = defineMessageSource({
     ru: 'Объединить слои',
     en: 'Merge layers',
   },
+  groupLayers: {
+    ru: 'Сгруппировать слои',
+    en: 'Group layers',
+  },
+  ungroupLayers: {
+    ru: 'Разгруппировать слои',
+    en: 'Ungroup layers',
+  },
   duplicateLayer: {
     ru: 'Дублировать слой',
     en: 'Duplicate layer',

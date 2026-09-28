@@ -1,19 +1,13 @@
 import React from 'react';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
-import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { CompactInput } from '../../chrome/ui';
 
 const layerPrimaryTextClassName =
-  'block truncate pr-1 text-[13px] font-medium leading-5 text-[color:var(--sniptale-color-text-primary)]';
+  'block truncate pr-1 text-[12px] font-medium leading-5 text-[color:var(--sniptale-color-text-primary)]';
 
-const layerSecondaryTextClassName =
-  'block truncate pr-1 text-[10px] font-semibold uppercase text-[color:var(--sniptale-color-text-muted)]';
-
-function getLayerSecondaryText(layer: EditorLayerItem, effectsLabel: string): string {
-  return layer.effectCount > 0
-    ? `${layer.typeLabel} · ${layer.effectCount} ${effectsLabel}`
-    : layer.typeLabel;
+function getLayerDisplayName(layer: EditorLayerItem): string {
+  return layer.groupSize === undefined ? layer.name : `${layer.name} (${layer.groupSize})`;
 }
 
 function handleLayerNameDoubleClick(
@@ -72,8 +66,6 @@ export function LayerName(props: {
   editableName: ReturnType<typeof useEditableLayerName>;
   layer: EditorLayerItem;
 }) {
-  const effectsLabel = translate('editor.toolbar.layerEffectsAppliedShort');
-
   if (props.editableName.editingName) {
     return (
       <CompactInput
@@ -100,10 +92,7 @@ export function LayerName(props: {
       onDoubleClick={(event) => handleLayerNameDoubleClick(event, props.editableName.startEditing)}
       className="block min-w-0"
     >
-      <span className={layerPrimaryTextClassName}>{props.layer.name}</span>
-      <span className={layerSecondaryTextClassName}>
-        {getLayerSecondaryText(props.layer, effectsLabel)}
-      </span>
+      <span className={layerPrimaryTextClassName}>{getLayerDisplayName(props.layer)}</span>
     </span>
   );
 }

@@ -32,7 +32,8 @@ export type EditorObjectType =
   | 'image'
   | 'browser-frame'
   | 'meta-stamp'
-  | 'rich-shape';
+  | 'rich-shape'
+  | 'group';
 
 type BrowserFrameCanvasMode = 'resize' | 'keep-size';
 type BrowserFrameContentMode = 'push-down' | 'fit-content';
@@ -133,6 +134,8 @@ export interface EditorLayerItem {
   selected: boolean;
   selectedCount: number;
   typeLabel: string;
+  groupSize?: number;
+  groupChildren?: Array<{ id: string; name: string; type: EditorObjectType; typeLabel: string }>;
   visible: boolean;
 }
 

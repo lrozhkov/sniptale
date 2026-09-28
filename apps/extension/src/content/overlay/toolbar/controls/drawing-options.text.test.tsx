@@ -48,6 +48,8 @@ it('recomputes a selected text frame immediately when its typography changes', (
   act(() =>
     root.render(<ToolbarDrawingControls controller={controller} displayMode="horizontal" />)
   );
+  expect(host.querySelectorAll('.sniptale-drawing-options-menu')).toHaveLength(2);
+  expect(host.querySelector('[data-ui="drawing.selection.actions"]')?.className).toContain('h-7');
   const getText = () => {
     const object = session.getSnapshot().document.objects[0];
     if (object?.kind !== 'text') throw new Error('Expected selected text object');

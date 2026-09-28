@@ -11,11 +11,13 @@ import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   clearPendingAutosaveTimer,
+  clearPendingPresentationTimer,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
 } from './state';
 
 const EDITOR_AUTOSAVE_DEBOUNCE_MS = 2_000;
+const EDITOR_PRESENTATION_DEBOUNCE_MS = 3_000;
 const logger = createLogger({ namespace: 'EditorSession' });
 
 async function updateImagePresentation(
@@ -49,6 +51,20 @@ async function updateImagePresentation(
   }
 }
 
+function scheduleImagePresentation(
+  context: ActiveEditorSessionContext,
+  revision: number,
+  editRevision: number,
+  state: EditorSessionAutosaveState
+): void {
+  clearPendingPresentationTimer(state);
+  if (!context.renderPresentation) return;
+  state.presentationTimer = window.setTimeout(() => {
+    state.presentationTimer = 0;
+    void updateImagePresentation(context, revision, editRevision, state);
+  }, EDITOR_PRESENTATION_DEBOUNCE_MS);
+}
+
 export function setEditorSaveState(state: 'idle' | 'saving' | 'saved' | 'error'): void {
   useEditorStore.getState().setSaveState(state);
 }
@@ -79,7 +95,7 @@ async function persistEditorSessionDocument(args: {
       args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
     }
     args.state.lastWriteError = null;
-    void updateImagePresentation(args.context, result.revision, args.revision, args.state);
+    scheduleImagePresentation(args.context, result.revision, args.revision, args.state);
 
     if (
       args.state.activeContext?.aggregateId === args.context.aggregateId &&
@@ -120,6 +136,7 @@ function enqueueEditorSessionDocument(
   }
 
   const revision = ++state.autosaveRevision;
+  clearPendingPresentationTimer(state);
   state.hasUnsavedChanges = true;
   setEditorSaveErrorMessage(null);
   setEditorSaveState('saving');
@@ -146,6 +163,7 @@ export function queuePendingAutosave(
 ): void {
   if (!state.activeContext) return;
   state.autosaveRevision += 1;
+  clearPendingPresentationTimer(state);
   state.hasUnsavedChanges = true;
   if (!state.enabled) return;
 

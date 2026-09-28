@@ -21,6 +21,8 @@ export {
   applyLayerEffectForController,
   applyLayerTransformationForController,
   mergeSelectedLayersForController,
+  groupSelectedLayersForController,
+  ungroupSelectedLayersForController,
   previewLayerEffectForController,
   removeLayerEffectForController,
   renameLayerForController,

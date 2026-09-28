@@ -168,17 +168,19 @@ export function ColorPlane(props: ColorPlaneProps) {
       aria-valuenow={Math.round(props.value * 100)}
       onPointerDown={interactions.handlePointerDown}
       className={[
-        'relative h-36 overflow-hidden rounded-[12px] border',
-        'border-[color:var(--sniptale-color-border-soft)] touch-none',
+        'relative h-36 rounded-[12px] border',
+        'border-[color:var(--sniptale-color-border-soft)] touch-none cursor-pointer',
       ].join(' ')}
       style={{ backgroundColor: props.planeColor }}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff,transparent)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(0deg,#000,transparent)]" />
+      <div className="absolute inset-0 rounded-[11px] bg-[linear-gradient(90deg,#fff,transparent)]" />
+      <div className="absolute inset-0 rounded-[11px] bg-[linear-gradient(0deg,#000,transparent)]" />
       <div
+        data-ui="shared.ui.color-selector.plane-marker"
         className={[
-          'pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2',
-          'rounded-full border-2 border-white shadow',
+          'pointer-events-none absolute z-10 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2',
+          'rounded-full border-2 border-white bg-transparent ring-1 ring-black/70',
+          'shadow-[0_1px_3px_rgba(0,0,0,0.75)]',
         ].join(' ')}
         style={{
           left: `${props.saturation * 100}%`,

@@ -14,6 +14,7 @@ import {
   listAssetObjectIds,
   listReadyJournals,
   listWritingAssetIds,
+  MissingAssetObjectError,
   readAssetFile,
   releaseAssetReadyProtection,
   writeBlobToAsset,
@@ -536,7 +537,7 @@ it('reports absent storage as empty and fails closed when an object is missing',
       'missing.webm',
       harness.options
     )
-  ).rejects.toThrow('missing');
+  ).rejects.toBeInstanceOf(MissingAssetObjectError);
 });
 
 it('fails closed when OPFS directory enumeration is unavailable', async () => {

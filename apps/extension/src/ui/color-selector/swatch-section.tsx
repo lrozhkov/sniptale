@@ -30,7 +30,8 @@ export function ColorSelectorSwatchSection(props: {
             active={props.selectedColor.toLowerCase() === color.toLowerCase()}
             onClick={() => props.onSelect(color)}
             className={
-              props.optionClassName ?? 'h-auto w-full max-w-6 aspect-square hover:-translate-y-px'
+              props.optionClassName ??
+              'relative h-auto w-full max-w-6 aspect-square hover:z-10 hover:scale-110'
             }
             style={{ backgroundColor: color }}
           />

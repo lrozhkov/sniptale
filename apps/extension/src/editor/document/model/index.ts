@@ -126,6 +126,8 @@ export function getEditorObjectTypeLabel(type: EditorObjectType): string {
       return translate('editor.runtime.rectangle');
     case 'rich-shape':
       return translate('editor.runtime.richShape');
+    case 'group':
+      return translate('editor.runtime.group');
     case 'blur':
       return translate('editor.runtime.blur');
     case 'arrow':

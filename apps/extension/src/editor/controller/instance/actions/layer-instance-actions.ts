@@ -17,3 +17,7 @@ export {
   updateLayerEffectForController,
 } from './layer-instance-effect-actions';
 export { applyLayerTransformationForController } from './layer-instance-transform-actions';
+export {
+  groupSelectedLayersForController,
+  ungroupSelectedLayersForController,
+} from './layer-instance-group-actions';

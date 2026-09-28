@@ -106,6 +106,7 @@ it('keeps the color option button owner on the default button type', () => {
   const markup = renderToStaticMarkup(<CompactColorOption />);
 
   expect(markup).toContain('type="button"');
+  expect(markup).toContain('cursor-pointer');
   expect(markup).not.toContain('focus-visible:ring-2');
   expect(markup).not.toContain('var(--sniptale-color-accent)_66%');
 });
