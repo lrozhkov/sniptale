@@ -71,6 +71,7 @@ function GradientPrimaryControls({
   createId: PaintStopIdFactory;
   onSelectStop: (id: string) => void;
 }) {
+  const selectedIndex = gradient.stops.findIndex((stop) => stop.id === selected.id) + 1;
   const removeSelected = () => {
     const next = removeGradientStop(gradient, selected.id);
     onChange(next);
@@ -78,71 +79,90 @@ function GradientPrimaryControls({
     if (nextSelected) onSelectStop(nextSelected.id);
   };
   return (
-    <div className={`${SECTION_CLASS_NAME} flex items-center gap-2`}>
-      <label className="flex min-w-0 flex-1 items-center gap-2 text-xs">
-        {translate('highlighter.paintPicker.position')}
-        <div className="min-w-0 flex-1">
-          <GradientNumericField
-            label={translate('highlighter.paintPicker.position')}
-            min={0}
-            max={100}
-            value={Math.round(selected.position * 100)}
-            onChange={(value) =>
-              onChange(
-                updateGradientStop(gradient, selected.id, {
-                  position: value / 100,
-                })
-              )
-            }
-          />
+    <div
+      className={`${SECTION_CLASS_NAME} space-y-1.5`}
+      data-ui="shared.ui.paint-selector.stop-controls"
+    >
+      <div
+        className="flex min-w-0 items-center gap-2 text-xs font-medium"
+        data-ui="shared.ui.paint-selector.selected-stop"
+      >
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 shrink-0 rounded border border-[var(--sniptale-color-border-strong)]"
+          style={{ backgroundColor: selected.color }}
+        />
+        <span className="min-w-0 truncate">
+          {translate('highlighter.paintPicker.gradientStop')} {selectedIndex}/
+          {gradient.stops.length}
+        </span>
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2 text-xs">
+          {translate('highlighter.paintPicker.position')}
+          <div className="min-w-0 flex-1">
+            <GradientNumericField
+              label={translate('highlighter.paintPicker.position')}
+              min={0}
+              max={100}
+              value={Math.round(selected.position * 100)}
+              onChange={(value) =>
+                onChange(
+                  updateGradientStop(gradient, selected.id, {
+                    position: value / 100,
+                  })
+                )
+              }
+            />
+          </div>
+        </label>
+        <div className="flex shrink-0 items-center gap-1">
+          <ProductGlassIconButton
+            className="h-7! w-7!"
+            aria-label={translate('highlighter.paintPicker.addStop')}
+            disabled={gradient.stops.length >= MAX_GRADIENT_STOPS}
+            title={translate('highlighter.paintPicker.addStop')}
+            onClick={() => {
+              const neighbor = gradient.stops.find((stop) => stop.position > selected.position);
+              const position = neighbor
+                ? (selected.position + neighbor.position) / 2
+                : selected.position / 2;
+              const next = addGradientStop(gradient, position, createId);
+              const added = next.stops.find(
+                (stop) => !gradient.stops.some((old) => old.id === stop.id)
+              );
+              onChange(next);
+              if (added) onSelectStop(added.id);
+            }}
+          >
+            <Plus aria-hidden="true" size={14} />
+          </ProductGlassIconButton>
+          <ProductGlassIconButton
+            className="h-7! w-7!"
+            aria-label={translate('highlighter.paintPicker.reverse')}
+            onClick={() => onChange(reverseGradient(gradient))}
+            title={translate('highlighter.paintPicker.reverse')}
+          >
+            <ArrowLeftRight aria-hidden="true" size={14} />
+          </ProductGlassIconButton>
+          <ProductGlassIconButton
+            className="h-7! w-7!"
+            aria-label={translate('highlighter.paintPicker.distribute')}
+            onClick={() => onChange(distributeGradientStops(gradient))}
+            title={translate('highlighter.paintPicker.distribute')}
+          >
+            <AlignHorizontalDistributeCenter aria-hidden="true" size={14} />
+          </ProductGlassIconButton>
+          <ProductGlassIconButton
+            className="h-7! w-7!"
+            aria-label={translate('highlighter.paintPicker.removeStop')}
+            disabled={gradient.stops.length <= 2}
+            onClick={removeSelected}
+            title={translate('highlighter.paintPicker.removeStop')}
+          >
+            <Trash2 aria-hidden="true" size={14} />
+          </ProductGlassIconButton>
         </div>
-      </label>
-      <div className="flex items-center gap-1">
-        <ProductGlassIconButton
-          className="h-7! w-7!"
-          aria-label={translate('highlighter.paintPicker.addStop')}
-          disabled={gradient.stops.length >= MAX_GRADIENT_STOPS}
-          title={translate('highlighter.paintPicker.addStop')}
-          onClick={() => {
-            const neighbor = gradient.stops.find((stop) => stop.position > selected.position);
-            const position = neighbor
-              ? (selected.position + neighbor.position) / 2
-              : selected.position / 2;
-            const next = addGradientStop(gradient, position, createId);
-            const added = next.stops.find(
-              (stop) => !gradient.stops.some((old) => old.id === stop.id)
-            );
-            onChange(next);
-            if (added) onSelectStop(added.id);
-          }}
-        >
-          <Plus aria-hidden="true" size={14} />
-        </ProductGlassIconButton>
-        <ProductGlassIconButton
-          className="h-7! w-7!"
-          aria-label={translate('highlighter.paintPicker.reverse')}
-          onClick={() => onChange(reverseGradient(gradient))}
-          title={translate('highlighter.paintPicker.reverse')}
-        >
-          <ArrowLeftRight aria-hidden="true" size={14} />
-        </ProductGlassIconButton>
-        <ProductGlassIconButton
-          className="h-7! w-7!"
-          aria-label={translate('highlighter.paintPicker.distribute')}
-          onClick={() => onChange(distributeGradientStops(gradient))}
-          title={translate('highlighter.paintPicker.distribute')}
-        >
-          <AlignHorizontalDistributeCenter aria-hidden="true" size={14} />
-        </ProductGlassIconButton>
-        <ProductGlassIconButton
-          className="h-7! w-7!"
-          aria-label={translate('highlighter.paintPicker.removeStop')}
-          disabled={gradient.stops.length <= 2}
-          onClick={removeSelected}
-          title={translate('highlighter.paintPicker.removeStop')}
-        >
-          <Trash2 aria-hidden="true" size={14} />
-        </ProductGlassIconButton>
       </div>
     </div>
   );
@@ -328,10 +348,6 @@ export function GradientEditor(props: {
     props.gradient.stops[0]!;
   return (
     <div className="min-w-0 space-y-1.5">
-      <div>
-        <GradientRail {...props} onSelect={props.onSelectStop} />
-      </div>
-      {props.colorEditor}
       <GradientPrimaryControls
         createId={props.createId}
         gradient={props.gradient}
@@ -339,6 +355,10 @@ export function GradientEditor(props: {
         onChange={props.onChange}
         onSelectStop={props.onSelectStop}
       />
+      <div>
+        <GradientRail {...props} onSelect={props.onSelectStop} />
+      </div>
+      {props.colorEditor}
       <GradientGeometryControls gradient={props.gradient} onChange={props.onChange} />
       {props.showAdvancedControls !== false ? (
         <GradientAdvancedControls

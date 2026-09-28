@@ -135,3 +135,20 @@ it('switches between solid and every gradient mode through the headless operatio
   expect(conic).toMatchObject({ kind: 'gradient', gradient: { type: 'conic' } });
   expect(switchPaintMode(conic, 'solid', createId)).toMatchObject({ kind: 'solid' });
 });
+
+it('starts a new gradient at full opacity from a transparent solid without changing existing alpha', () => {
+  let id = 0;
+  const createId = () => `alpha-${++id}`;
+  const transparent = switchPaintMode(createSolidPaint('#12345600'), 'linear', createId);
+  expect(transparent.kind).toBe('gradient');
+  if (transparent.kind !== 'gradient') return;
+  expect(transparent.gradient.stops.map((stop) => stop.color)).toEqual(['#123456ff', '#123456ff']);
+
+  const translucent = switchPaintMode(createSolidPaint('#12345680'), 'linear', createId);
+  expect(translucent.kind).toBe('gradient');
+  if (translucent.kind !== 'gradient') return;
+  expect(translucent.gradient.stops.map((stop) => stop.color)).toEqual(['#12345680', '#12345680']);
+  expect(switchPaintMode(translucent, 'radial', createId)).toMatchObject({
+    gradient: { stops: translucent.gradient.stops },
+  });
+});

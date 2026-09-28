@@ -81,7 +81,41 @@ it('keeps one native eyedropper session active until a click selects the color',
   host.remove();
 });
 
-it('edits the selected stop below the rail, adds a selected stop and cancels the whole draft', () => {
+it('shows full opacity in the color editor when starting a gradient from transparent fill', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onPreviewChange = vi.fn();
+  act(() =>
+    root.render(
+      <CompactPaintSelector
+        label="Fill"
+        title="Fill"
+        value={createSolidPaint('#12345600')}
+        onChange={vi.fn()}
+        onPreviewChange={onPreviewChange}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button')!.click());
+  const popup = document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.popup"]')!;
+  act(() =>
+    popup.querySelector<HTMLButtonElement>('[aria-label="highlighter.paintPicker.linear"]')!.click()
+  );
+  expect(onPreviewChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      gradient: expect.objectContaining({
+        stops: expect.arrayContaining([expect.objectContaining({ color: '#123456ff' })]),
+      }),
+    })
+  );
+  const opacity = popup.querySelector<HTMLElement>('[data-ui="shared.ui.color-selector.opacity"]')!;
+  expect(opacity.querySelector('input')?.value).toBe('100');
+  act(() => root.unmount());
+  host.remove();
+});
+
+it('shows the selected stop and its controls above the rail, then edits and cancels the draft', () => {
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -118,13 +152,18 @@ it('edits the selected stop below the rail, adds a selected stop and cancels the
   const button = (label: string) =>
     popup.querySelector<HTMLButtonElement>(`[aria-label="highlighter.paintPicker.${label}"]`)!;
   const rail = popup.querySelector('[data-ui="shared.ui.paint-selector.rail"]')!;
+  const controls = popup.querySelector('[data-ui="shared.ui.paint-selector.stop-controls"]')!;
+  const selectedStop = popup.querySelector('[data-ui="shared.ui.paint-selector.selected-stop"]')!;
   const color = popup.querySelector('[data-ui="shared.ui.color-selector.editor-panel"]')!;
+  expect(controls.compareDocumentPosition(rail)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(rail.compareDocumentPosition(color)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(selectedStop.textContent).toContain('gradientStop 1/2');
   expect(
     document.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.layer"]')?.style.width
   ).toBe('328px');
   expect(button('removeStop').disabled).toBe(true);
   act(() => button('gradientStop 100%').click());
+  expect(selectedStop.textContent).toContain('gradientStop 2/2');
   expect(onPreviewChange).not.toHaveBeenCalled();
   const hex = popup.querySelector<HTMLInputElement>(
     'input[aria-label="shared.ui.colorSelectorHex"]'
@@ -149,6 +188,7 @@ it('edits the selected stop below the rail, adds a selected stop and cancels the
     popup.querySelectorAll('button[aria-label^="highlighter.paintPicker.gradientStop"]')
   ).toHaveLength(3);
   expect(button('gradientStop 50%').getAttribute('aria-pressed')).toBe('true');
+  expect(selectedStop.textContent).toContain('gradientStop 2/3');
   expect(button('removeStop').disabled).toBe(false);
   act(() => button('removeStop').click());
   expect(button('removeStop').disabled).toBe(true);

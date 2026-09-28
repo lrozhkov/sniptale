@@ -47,6 +47,7 @@ it('selects an inactive stop on first pointer down without changing its position
     )
   );
   const rail = host.querySelector<HTMLElement>('[data-ui="shared.ui.paint-selector.rail"] > div')!;
+  expect(rail.className).toContain('cursor-pointer');
   rail.getBoundingClientRect = () =>
     ({ left: 0, right: 200, top: 0, bottom: 56, width: 200, height: 56 }) as DOMRect;
   const second = host.querySelector<HTMLButtonElement>('[aria-label$="100%"]')!;
