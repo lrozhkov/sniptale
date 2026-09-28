@@ -80,7 +80,7 @@ describe('capture-surface browser window operations', () => {
     const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
     mocks.getWindow
       .mockResolvedValueOnce({ id: 3, ...maximized })
-      .mockResolvedValueOnce({ id: 3, ...expected });
+      .mockResolvedValue({ id: 3, ...expected });
 
     await expect(prepareWindowSize(3, 1280, 720)).resolves.toEqual({
       prior: maximized,
@@ -94,6 +94,25 @@ describe('capture-surface browser window operations', () => {
       width: expected.width,
       height: expected.height,
     });
+  });
+
+  it('waits for a maximized window to finish its native resize transition', async () => {
+    vi.useFakeTimers();
+    try {
+      const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
+      mocks.getWindow
+        .mockResolvedValueOnce({ id: 3, ...maximized })
+        .mockResolvedValueOnce({ id: 3, ...prior })
+        .mockResolvedValue({ id: 3, ...expected });
+
+      const prepared = await prepareWindowSize(3, 1280, 720);
+      const resize = applyPreparedWindowSize(3, prepared.prior, prepared.expected);
+      const result = expect(resize).resolves.toEqual(expected);
+      await vi.advanceTimersByTimeAsync(500);
+      await result;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fails closed when the window manager clamps requested bounds', async () => {
@@ -131,6 +150,47 @@ describe('capture-surface browser window operations', () => {
       height: maximized.height,
     });
     expect(mocks.updateWindow).toHaveBeenNthCalledWith(3, 3, { state: 'maximized' });
+  });
+
+  it('accepts Chrome-managed bounds after restoring the maximized state', async () => {
+    mocks.getWindow.mockResolvedValue({
+      id: 3,
+      ...maximized,
+      left: maximized.left - 8,
+      top: maximized.top - 8,
+      width: maximized.width + 16,
+      height: maximized.height + 16,
+    });
+
+    await expect(restoreWindowSnapshot(3, maximized)).resolves.toBeUndefined();
+  });
+
+  it('does not claim a maximized window was restored on another display', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.getWindow.mockResolvedValue({ id: 3, ...maximized, left: 2000 });
+      const failure = expect(restoreWindowSnapshot(3, maximized)).rejects.toThrow(
+        'restore-impossible'
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await failure;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('rejects a large shift even when maximized window bounds still overlap', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.getWindow.mockResolvedValue({ id: 3, ...maximized, left: maximized.left + 400 });
+      const failure = expect(restoreWindowSnapshot(3, maximized)).rejects.toThrow(
+        'restore-impossible'
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await failure;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

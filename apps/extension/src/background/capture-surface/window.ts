@@ -37,6 +37,20 @@ export function windowSnapshotsEqual(left: WindowSnapshot, right: WindowSnapshot
   );
 }
 
+function windowRestorationMatches(restored: WindowSnapshot, prior: WindowSnapshot): boolean {
+  if (prior.state === 'normal') return windowSnapshotsEqual(restored, prior);
+  if (restored.state !== prior.state) return false;
+  // Maximized/fullscreen bounds belong to Chrome and can include different frame insets.
+  // Allow only frame-sized drift. Large shifts, even on overlapping displays, remain conflicts.
+  const frameTolerance = 32;
+  return (
+    Math.abs(restored.left - prior.left) <= frameTolerance &&
+    Math.abs(restored.top - prior.top) <= frameTolerance &&
+    Math.abs(restored.width - prior.width) <= frameTolerance * 2 &&
+    Math.abs(restored.height - prior.height) <= frameTolerance * 2
+  );
+}
+
 export async function getWindowSnapshot(windowId: number): Promise<WindowSnapshot> {
   return requireWindowSnapshot(await browserWindows.get(windowId));
 }
@@ -67,6 +81,10 @@ export async function applyPreparedWindowSize(
   prior: WindowSnapshot,
   expected: WindowSnapshot
 ): Promise<WindowSnapshot> {
+  let lastBoundsChange = Date.now();
+  const unsubscribe = browserWindows.subscribeBoundsChanged((window) => {
+    if (window.id === windowId) lastBoundsChange = Date.now();
+  });
   try {
     if (prior.state !== 'normal') {
       await browserWindows.update(windowId, { state: 'normal' });
@@ -77,11 +95,19 @@ export async function applyPreparedWindowSize(
       width: expected.width,
       height: expected.height,
     });
-    const applied = await getWindowSnapshot(windowId);
-    if (!windowSnapshotsEqual(applied, expected)) {
-      throw new CaptureSurfaceMutationError('verification-failed', applied);
+    // Chrome can resolve update() before a maximized or fullscreen window has settled.
+    // Confirm the final bounds after a quiet period, within a bounded deadline.
+    lastBoundsChange = Date.now();
+    const deadline = lastBoundsChange + 2000;
+    let applied = await getWindowSnapshot(windowId);
+    while (Date.now() < deadline) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      applied = await getWindowSnapshot(windowId);
+      if (Date.now() - lastBoundsChange >= 250 && windowSnapshotsEqual(applied, expected)) {
+        return applied;
+      }
     }
-    return applied;
+    throw new CaptureSurfaceMutationError('verification-failed', applied);
   } catch (error) {
     if (error instanceof CaptureSurfaceMutationError) throw error;
     const observed = await getWindowSnapshot(windowId).catch(() => null);
@@ -90,6 +116,8 @@ export async function applyPreparedWindowSize(
       observed,
       { cause: error }
     );
+  } finally {
+    unsubscribe();
   }
 }
 
@@ -116,7 +144,7 @@ export async function restoreWindowSnapshot(windowId: number, snapshot: WindowSn
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
       if (Date.now() - lastBoundsChange < 250) continue;
       const restored = await getWindowSnapshot(windowId);
-      if (windowSnapshotsEqual(restored, snapshot)) return;
+      if (windowRestorationMatches(restored, snapshot)) return;
     }
     throw new Error('restore-impossible');
   } finally {

@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { EditorAnchoredAlert, EditorAnchoredConfirmPopover } from './anchored-feedback';
+import {
+  EditorAnchoredAlert,
+  EditorAnchoredConfirmPopover,
+  EditorAnchoredHistoryChoices,
+} from './anchored-feedback';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -101,6 +105,36 @@ it('opens history feedback above a toolbar anchored near the bottom of an HD vie
   const positioner = document.querySelector('[data-ui="test.confirm"]')?.parentElement;
   expect(positioner?.style.top).toBe('650px');
   expect(positioner?.getAttribute('style')).toContain('translateY(-100%)');
+});
+
+it('uses a hand cursor and rounded hover surface for both history choices', () => {
+  act(() => {
+    root.render(
+      <EditorAnchoredHistoryChoices
+        anchorEl={anchor}
+        canReturnToStart={false}
+        dataUi="test.history"
+        onClose={vi.fn()}
+        onRestoreOriginal={vi.fn()}
+        onReturnToStart={vi.fn()}
+        restoreDescription="Discard edits"
+        restoreLabel="Restore original"
+        returnDescription="Go to first action"
+        returnLabel="Return to start"
+        title="History"
+      />
+    );
+  });
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="test.history"] button'
+  )) {
+    expect(button.className).toContain('cursor-pointer');
+    expect(button.className).toContain('rounded-md');
+  }
+  expect(document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.disabled).toBe(
+    true
+  );
 });
 
 it.each([
