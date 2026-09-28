@@ -75,7 +75,7 @@ export function CaptureModeSelector({
           captureMode === mode ||
           (mode === CaptureMode.TAB && captureMode === CaptureMode.TAB_CROP);
         const label = translate(labelKey);
-        const hint = modeCapability.reason ?? translate(meta.hintKey);
+        const hint = translate(meta.hintKey);
 
         return (
           <ModeIconButton
@@ -86,6 +86,7 @@ export function CaptureModeSelector({
             active={isActive}
             animate={animate}
             disabled={!modeCapability.supported}
+            disabledReason={modeCapability.reason}
             accentClassName={meta.accentClassName}
             onClick={() => {
               if (modeCapability.supported && !isActive) {

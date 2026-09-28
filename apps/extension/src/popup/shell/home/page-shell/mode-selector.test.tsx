@@ -52,4 +52,10 @@ it('disables tab independently from desktop capture', async () => {
       ) as HTMLButtonElement
     ).disabled
   ).toBe(false);
+  const tab = getContainer()!.querySelector<HTMLButtonElement>(
+    '[aria-label="popup.home.captureTabLabel"]'
+  );
+  expect(tab?.textContent).toContain('popup.home.captureTabHint');
+  expect(tab?.textContent).not.toContain('blocked');
+  expect(tab?.title).toContain('blocked');
 });

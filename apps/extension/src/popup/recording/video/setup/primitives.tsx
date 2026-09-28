@@ -13,6 +13,7 @@ export function ModeIconButton({
   active,
   animate,
   disabled,
+  disabledReason,
   onClick,
   accentClassName,
 }: {
@@ -22,6 +23,7 @@ export function ModeIconButton({
   active: boolean;
   animate?: boolean;
   disabled?: boolean;
+  disabledReason?: string | null;
   onClick: () => void;
   accentClassName: string;
 }) {
@@ -35,6 +37,7 @@ export function ModeIconButton({
       onClick={onClick}
       accentClassName={accentClassName}
       {...(disabled === undefined ? {} : { disabled })}
+      {...(disabledReason === undefined ? {} : { disabledReason })}
     />
   );
 }

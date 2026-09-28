@@ -52,6 +52,25 @@ it('keeps inactive modes compact while the expanded content stays out of layout'
   expect(markup).toContain('title="Area. Choose an area"');
 });
 
+it('keeps the normal description visible while an unavailable reason stays in the title', () => {
+  const markup = renderToStaticMarkup(
+    <PopupExpandingModeButton
+      accentClassName="text-accent"
+      active
+      description="Capture the current tab"
+      disabled
+      disabledReason="Unavailable on extension pages"
+      icon={TestIcon}
+      label="Tab"
+      onClick={() => undefined}
+    />
+  );
+
+  expect(markup).toContain('>Capture the current tab</span>');
+  expect(markup).toContain('title="Tab. Unavailable on extension pages"');
+  expect(markup).toContain('disabled=""');
+});
+
 it('animates width while crossfading static compact and expanded layouts', () => {
   const markup = renderToStaticMarkup(
     <PopupExpandingModeButton

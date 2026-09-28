@@ -39,7 +39,8 @@ export function ScreenshotModeSelector(props: {
             key={option.mode}
             icon={option.icon}
             label={option.label}
-            description={disabledReason ?? translate(MODE_HINT_KEYS[option.mode])}
+            description={translate(MODE_HINT_KEYS[option.mode])}
+            disabledReason={disabledReason}
             active={props.mode === option.mode}
             animate={animate}
             disabled={Boolean(disabledReason)}

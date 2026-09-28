@@ -45,6 +45,7 @@ interface PopupExpandingModeButtonProps {
   animate?: boolean;
   description: string;
   disabled?: boolean;
+  disabledReason?: string | null;
   icon: ComponentType<{ className?: string }>;
   label: string;
   compact?: boolean;
@@ -88,6 +89,7 @@ export function PopupExpandingModeButton({
   animate = false,
   description,
   disabled = false,
+  disabledReason = null,
   icon: Icon,
   label,
   compact = false,
@@ -101,7 +103,7 @@ export function PopupExpandingModeButton({
       className={getButtonClassName(active, animate, disabled, compact)}
       disabled={disabled}
       onClick={onClick}
-      title={`${label}. ${description}`}
+      title={`${label}. ${disabled && disabledReason ? disabledReason : description}`}
     >
       <Icon
         className={cx(
