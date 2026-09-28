@@ -78,9 +78,7 @@ describe('ExportSelectionSectionShell', () => {
     expect(heading?.className).toContain('var(--sniptale-color-text-muted-strong)');
     expect(button.getAttribute('data-ui')).toBe('popup.export.selection-trigger');
     expect(button.textContent).not.toContain('t:popup.export.editButton');
-    expect(button.parentElement?.querySelector('svg')?.className.baseVal).toContain(
-      'group-hover:opacity-100'
-    );
+    expect(button.querySelector('svg')?.className.baseVal).toContain('group-hover:opacity-100');
     expect(settingsButton.parentElement).toBe(button.parentElement);
     expect(settingsButton.getAttribute('aria-label')).toBe('Selection settings');
     expect(drawer?.className).toContain('drawer-body');

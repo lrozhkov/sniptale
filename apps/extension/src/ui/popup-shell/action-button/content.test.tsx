@@ -15,7 +15,7 @@ it('renders the dimmed icon class when the action is disabled', () => {
     <PopupActionButtonIcon icon={TestIcon} iconClassName="text-brand" disabled />
   );
 
-  expect(markup).toContain('transition-colors');
+  expect(markup).toContain('transition-[color,filter]');
   expect(markup).toContain('text-[var(--sniptale-color-text-dim)]');
   expect(markup).not.toContain('text-brand');
 });
@@ -29,9 +29,11 @@ it('keeps the shared icon renderer ready for consumer hover color sync when enab
     />
   );
 
-  expect(markup).toContain('transition-colors');
+  expect(markup).toContain('transition-[color,filter]');
   expect(markup).toContain('text-brand');
   expect(markup).toContain('group-hover:text-accent');
+  expect(markup).toContain('group-hover:scale-110');
+  expect(markup).not.toContain('group-hover:-translate-y-px');
 });
 
 it('renders compact trailing content and screen-reader label when provided', () => {

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { GalleryThumbnails, Paintbrush, TvMinimalPlay, Upload } from 'lucide-react';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
@@ -26,6 +26,15 @@ function ShellIcon({ path }: { path: string }) {
         d={path}
         fill="none"
         stroke="currentColor"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        className="popup-react-shell__menu-icon-accent"
+        d={path}
+        fill="none"
+        stroke="var(--sniptale-color-accent, var(--popup-initial-accent))"
         strokeWidth={1.8}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -83,6 +92,16 @@ function PopupNavigation({
   locale: AppLocale;
   route: ReturnType<typeof usePopupRouteController>;
 }) {
+  const previousPage = useRef<PopupPage | null>(route.page);
+  const [menuEntrySide, setMenuEntrySide] = useState<'left' | 'right'>('left');
+  useLayoutEffect(() => {
+    if (route.page === 'menu' && previousPage.current && previousPage.current !== 'menu') {
+      setMenuEntrySide(
+        pages.findIndex(({ page }) => page === previousPage.current) < 2 ? 'left' : 'right'
+      );
+    }
+    previousPage.current = route.page;
+  }, [route.page]);
   return (
     <nav
       className="popup-react-shell__tabs"
@@ -93,7 +112,12 @@ function PopupNavigation({
         aria-hidden="true"
         className="popup-react-shell__tab-indicator"
         data-page={route.page ?? 'none'}
-      />
+        data-entry-side={menuEntrySide}
+      >
+        <svg aria-hidden="true" className="popup-react-shell__menu-ring" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="19" />
+        </svg>
+      </span>
       {pages.map(({ page: candidate, icon }) => (
         <button
           key={candidate}

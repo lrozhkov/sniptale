@@ -22,14 +22,17 @@ const BUTTON_ANIMATION_CLASS_NAME = [
   'transition-[flex-grow,background-color,border-color,color] duration-300',
   'ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
 ].join(' ');
-const COMPACT_LAYER_BASE_CLASS_NAME = [
-  'pointer-events-none absolute inset-0 text-center transition-transform duration-200 ease-out',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px group-disabled:translate-y-0',
-].join(' ');
+const COMPACT_LAYER_BASE_CLASS_NAME = ['pointer-events-none absolute inset-0 text-center'].join(
+  ' '
+);
 const EXPANDED_LAYER_BASE_CLASS_NAME = [
   'pointer-events-none absolute inset-y-0 left-2.5 flex w-[148px] items-center gap-2 text-left',
-  'transition-transform duration-200 ease-out motion-reduce:transition-none',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px group-disabled:translate-y-0',
+].join(' ');
+const MODE_ICON_CLASS_NAME = [
+  'transition-[transform,filter] duration-200 ease-out motion-reduce:transition-none',
+  'group-hover:scale-110 group-focus-visible:scale-110',
+  'group-hover:brightness-110 group-focus-visible:brightness-110',
+  'group-disabled:scale-100 group-disabled:brightness-100',
 ].join(' ');
 
 interface PopupExpandingModeButtonProps {
@@ -62,7 +65,7 @@ function getButtonClassName(
 function getCompactLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     COMPACT_LAYER_BASE_CLASS_NAME,
-    animate && 'transition-[opacity,transform] ease-out motion-reduce:transition-none',
+    animate && 'transition-opacity ease-out motion-reduce:transition-none',
     animate && (active ? 'duration-75' : 'duration-150'),
     active ? 'opacity-0' : 'opacity-100',
     animate && (active ? 'delay-0' : 'delay-200 motion-reduce:delay-0')
@@ -73,7 +76,7 @@ function getExpandedLayerClassName(active: boolean, animate: boolean, compact: b
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
     compact && 'right-2 w-auto gap-1.5',
-    animate && 'transition-[opacity,transform] ease-out motion-reduce:transition-none',
+    animate && 'transition-opacity ease-out motion-reduce:transition-none',
     animate && (active ? 'duration-150' : 'duration-75'),
     active ? 'opacity-100' : 'opacity-0',
     animate && (active ? 'delay-200 motion-reduce:delay-0' : 'delay-0')
@@ -102,7 +105,9 @@ export function PopupExpandingModeButton({
       title={`${label}. ${description}`}
     >
       <span aria-hidden="true" className={getCompactLayerClassName(active, animate)}>
-        <Icon className="absolute top-[7px] left-1/2 h-[19px] w-[19px] -translate-x-1/2" />
+        <span className="absolute inset-x-0 top-[7px] flex justify-center">
+          <Icon className={cx('h-[19px] w-[19px]', MODE_ICON_CLASS_NAME)} />
+        </span>
         <span className="absolute inset-x-1 bottom-[8px] block truncate text-[9px] font-medium leading-tight">
           {label}
         </span>
@@ -112,6 +117,7 @@ export function PopupExpandingModeButton({
         <Icon
           className={cx(
             'h-[19px] w-[19px] shrink-0',
+            MODE_ICON_CLASS_NAME,
             active && !disabled ? accentClassName : 'text-current'
           )}
         />

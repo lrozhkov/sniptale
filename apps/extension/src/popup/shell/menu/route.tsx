@@ -12,6 +12,8 @@ import {
   MonitorUp,
   Paintbrush,
   Pencil,
+  SwatchBook,
+  TextCursorInput,
   UnfoldVertical,
 } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
@@ -83,10 +85,22 @@ const pageToolActions = [
     hintKey: 'content.toolbar.highlighterEnable',
     mode: 'highlighter',
   },
+  {
+    icon: TextCursorInput,
+    labelKey: 'content.toolbar.quickEditLabel',
+    hintKey: 'content.toolbar.quickEditEnable',
+    mode: 'quick-edit',
+  },
+  {
+    icon: SwatchBook,
+    labelKey: 'content.toolbar.designReviewLabel',
+    hintKey: 'content.toolbar.designReviewEnable',
+    mode: 'design-review',
+  },
 ] as const;
 
 const MENU_SURFACE_CLASS_NAME = [
-  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border p-3',
+  'flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-3',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
@@ -105,16 +119,22 @@ const CAPTURE_ICON_CLASS_NAME = [
 ].join(' ');
 
 const WORKSPACE_BUTTON_CLASS_NAME = [
-  'flex min-h-[72px] min-w-0 flex-col items-center justify-center gap-2 rounded-[12px] border-0',
+  'group flex min-h-[64px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[12px] border-0',
   'bg-[var(--sniptale-color-surface-input)] px-1.5 py-2 text-center text-[10px] font-medium',
   'text-[var(--sniptale-color-text-primary)] transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'disabled:cursor-not-allowed disabled:opacity-50',
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
+const MENU_SMALL_ICON_CLASS_NAME = [
+  'h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]',
+  'transition-[transform,color] duration-180 ease-out motion-reduce:transition-none',
+  'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
+  'group-hover:text-[var(--sniptale-color-text-primary)] group-disabled:text-[var(--sniptale-color-text-secondary)]',
+].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'grid min-h-[58px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
+  'group grid min-h-[54px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
   'gap-1.5 rounded-[12px] border-0 bg-transparent px-1.5 py-1.5',
   'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
@@ -215,10 +235,14 @@ export function MenuRoute({
           onCapture={capture}
           onRecordTab={() => navigateToDescriptor({ page: 'video', videoMode: CaptureMode.TAB })}
         />
-        <div className="mt-auto shrink-0" data-ui="popup.menu.workspace">
+        <section className="mt-2 shrink-0" data-ui="popup.menu.tools">
+          <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.toolsLabel')}</h2>
+          <MenuPageTools disabledReason={disabledReason} onOpenToolbar={openToolbar} />
+        </section>
+        <section className="mt-auto shrink-0" data-ui="popup.menu.workspace">
           <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.workspaceTitle')}</h2>
-          <MenuWorkspace disabledReason={disabledReason} onOpenToolbar={openToolbar} />
-        </div>
+          <MenuWorkspace />
+        </section>
         {error ? (
           <p className="mt-2 text-[11px] text-[var(--sniptale-color-danger)]" role="alert">
             {error}
@@ -342,7 +366,7 @@ function MenuQuickScenarios(props: {
           title={scenario.title}
           onClick={scenario.onClick}
         >
-          <Icon className="h-[18px] w-[18px]" />
+          <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
           <span className="min-h-5 text-[9px] font-medium leading-[10px]">{label}</span>
         </button>
       ))}
@@ -350,7 +374,7 @@ function MenuQuickScenarios(props: {
   );
 }
 
-function MenuWorkspace({
+function MenuPageTools({
   disabledReason,
   onOpenToolbar,
 }: {
@@ -358,18 +382,7 @@ function MenuWorkspace({
   onOpenToolbar(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
-        <button
-          key={labelKey}
-          type="button"
-          className={WORKSPACE_BUTTON_CLASS_NAME}
-          onClick={onClick}
-        >
-          <Icon className="h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]" />
-          <span>{translate(labelKey)}</span>
-        </button>
-      ))}
+    <div className="grid grid-cols-4 gap-1.5">
       {pageToolActions.map(({ icon: Icon, labelKey, hintKey, mode }) => (
         <MenuToolbarButton
           key={mode}
@@ -385,6 +398,24 @@ function MenuWorkspace({
   );
 }
 
+function MenuWorkspace() {
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
+        <button
+          key={labelKey}
+          type="button"
+          className={WORKSPACE_BUTTON_CLASS_NAME}
+          onClick={onClick}
+        >
+          <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
+          <span>{translate(labelKey)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MenuToolbarButton({
   disabledReason,
   hintKey,
@@ -394,9 +425,9 @@ function MenuToolbarButton({
   onOpen,
 }: {
   disabledReason: string | null;
-  hintKey: 'content.toolbar.drawingEnable' | 'content.toolbar.highlighterEnable';
+  hintKey: (typeof pageToolActions)[number]['hintKey'];
   icon: ComponentType<{ className?: string }>;
-  labelKey: 'content.toolbar.drawingLabel' | 'content.toolbar.highlighterLabel';
+  labelKey: (typeof pageToolActions)[number]['labelKey'];
   mode: ToolbarWorkingMode;
   onOpen(mode: ToolbarWorkingMode): Promise<void>;
 }) {
@@ -409,7 +440,7 @@ function MenuToolbarButton({
       disabled={Boolean(disabledReason)}
       onClick={() => void onOpen(mode)}
     >
-      <Icon className="h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]" />
+      <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
       <span>{translate(labelKey)}</span>
     </button>
   );

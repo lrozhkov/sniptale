@@ -6,9 +6,8 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 }
 
 const INLINE_CURTAIN_BUTTON_CLASS_NAME = [
-  'group flex h-8 w-full min-w-0 items-center gap-2 rounded-[8px] px-2 text-left',
-  'text-[var(--sniptale-color-text-primary)] transition-colors',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_68%,transparent)]',
+  'flex h-8 w-full min-w-0 items-center gap-1 text-left',
+  'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const INLINE_CURTAIN_LABEL_CLASS_NAME = [
   'w-[88px] shrink-0 truncate text-[11px] font-medium',
@@ -149,7 +148,6 @@ export function InlineCurtainTrigger({
           {...(onSecondaryClick === undefined ? {} : { onClick: onSecondaryClick })}
         />
       ) : null}
-      <InlineCurtainChevron expanded={ariaExpanded} />
     </div>
   );
 }
@@ -178,7 +176,12 @@ function InlineCurtainPrimaryButton({
       aria-controls={ariaControls}
       aria-expanded={ariaExpanded}
       aria-label={ariaLabel}
-      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      className={[
+        'group flex h-8 min-w-0 flex-1 items-center gap-2 rounded-[8px] px-2 text-left',
+        'transition-colors',
+        'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_68%,transparent)]',
+        'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+      ].join(' ')}
       onClick={onClick}
     >
       <span className={INLINE_CURTAIN_LABEL_CLASS_NAME} title={label}>
@@ -187,6 +190,7 @@ function InlineCurtainPrimaryButton({
       <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={valueLabel}>
         {valueLabel}
       </span>
+      <InlineCurtainChevron expanded={ariaExpanded} />
     </button>
   );
 }

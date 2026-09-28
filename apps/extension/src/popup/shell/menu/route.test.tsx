@@ -164,6 +164,8 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     clickLabel('popup.home.scenarioEditorLabel');
     clickLabel('content.toolbar.drawingLabel');
     clickLabel('content.toolbar.highlighterLabel');
+    clickLabel('content.toolbar.quickEditLabel');
+    clickLabel('content.toolbar.designReviewLabel');
   });
 
   expect(mocks.openLibrary).toHaveBeenCalledWith();
@@ -182,19 +184,33 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
       ?.querySelector('svg')
       ?.getAttribute('class')
   ).toContain('lucide-scroll-text');
-  expect(mocks.openScreenshotMode.mock.calls).toEqual([['drawing'], ['highlighter']]);
-  expect(container.querySelector('[data-ui="popup.menu.workspace"]')?.className).toBe(
-    'mt-auto shrink-0'
+  expect(mocks.openScreenshotMode.mock.calls).toEqual([
+    ['drawing'],
+    ['highlighter'],
+    ['quick-edit'],
+    ['design-review'],
+  ]);
+  expect(container.querySelector('[data-ui="popup.menu.workspace"]')?.textContent).toContain(
+    'popup.home.workspaceTitle'
+  );
+  expect(container.querySelector('[data-ui="popup.menu.tools"]')?.textContent).toContain(
+    'popup.home.toolsLabel'
   );
   const toolButtons = [
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.drawing"]'),
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.highlighter"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.quick-edit"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.design-review"]'),
   ];
   expect(toolButtons.every((button) => button !== null)).toBe(true);
-  expect(toolButtons.every((button) => button?.className.includes('min-h-[72px]'))).toBe(true);
-  expect(container.querySelector('[data-ui="popup.menu.workspace"] .grid')?.className).toContain(
-    'grid-cols-3'
+  expect(toolButtons.every((button) => button?.className.includes('min-h-[64px]'))).toBe(true);
+  expect(container.querySelector('[data-ui="popup.menu.tools"] .grid')?.className).toContain(
+    'grid-cols-4'
   );
+  expect(container.querySelector('[data-ui="popup.menu.workspace"] .grid')?.className).toContain(
+    'grid-cols-4'
+  );
+  expect(container.querySelectorAll('[data-ui="popup.menu.workspace"] button')).toHaveLength(4);
   expect(toolButtons.every((button) => button?.className.includes('border-0'))).toBe(true);
   expect(
     toolButtons.every((button) =>
@@ -208,6 +224,11 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
       )
     )
   ).toBe(true);
+  expect(
+    toolButtons.every((button) =>
+      button?.querySelector('svg')?.getAttribute('class')?.includes('group-hover:scale-110')
+    )
+  ).toBe(true);
   expect(container.querySelector('[data-testid="menu-footer"]')).not.toBeNull();
 });
 
@@ -219,6 +240,8 @@ it('renders page tools as disabled when the active tab cannot run them', async (
   const buttons = [
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.drawing"]'),
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.highlighter"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.quick-edit"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.design-review"]'),
   ];
   expect(buttons.every((button) => button?.disabled)).toBe(true);
   expect(buttons.every((button) => button?.className.includes('disabled:opacity-50'))).toBe(true);

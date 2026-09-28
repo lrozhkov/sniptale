@@ -25,13 +25,14 @@ export function PopupActionButtonIcon({
       className={[
         'inline-flex h-5 w-5 shrink-0 items-center justify-center',
         'transition-transform duration-200 ease-out',
-        'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-        'group-disabled:translate-y-0 motion-reduce:transition-none',
+        'group-hover:scale-110 group-focus-visible:scale-110',
+        'group-disabled:scale-100 motion-reduce:transition-none',
       ].join(' ')}
     >
       <Icon
         className={cx(
-          'h-[18px] w-[18px] transition-colors',
+          'h-[18px] w-[18px] transition-[color,filter]',
+          'group-hover:brightness-110 group-focus-visible:brightness-110 group-disabled:brightness-100',
           disabled ? 'text-[var(--sniptale-color-text-dim)]' : iconClassName
         )}
       />
@@ -67,13 +68,7 @@ export function PopupActionButtonDefaultContent({
 }) {
   return (
     <>
-      <span
-        className={[
-          'min-w-0 text-left transition-transform duration-200 ease-out',
-          'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-          'group-disabled:translate-y-0 motion-reduce:transition-none',
-        ].join(' ')}
-      >
+      <span className={['min-w-0 text-left'].join(' ')}>
         <span className="block whitespace-normal leading-[1.05]">{label}</span>
         {subtitle ? (
           <span className={POPUP_ACTION_BUTTON_SUBTITLE_CLASS_NAME}>{subtitle}</span>
