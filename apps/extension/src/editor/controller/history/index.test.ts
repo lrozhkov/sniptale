@@ -76,6 +76,45 @@ it('stores repeated raster data once while keeping resize undo and redo loadable
   expect(redoEditorSnapshot(history)?.sourceImageData).toBe(resized);
 });
 
+it('restores only image fields without reviver traversal of the full snapshot', () => {
+  const image = `data:image/png;base64,${'A'.repeat(6_000)}`;
+  const background = `data:image/png;base64,${'B'.repeat(6_000)}`;
+  const favicon = `data:image/png;base64,${'C'.repeat(6_000)}`;
+  const first = {
+    ...createMockDocument(),
+    sourceImageData: image,
+    sourceName: 'sniptale-history-asset:0',
+    frame: { ...createMockDocument().frame, backgroundImageData: background },
+    browserFrame: {
+      title: 'Example',
+      url: 'https://example.com',
+      faviconDataUrl: favicon,
+      canvasMode: 'resize' as const,
+      contentMode: 'push-down' as const,
+    },
+    canvasJson: JSON.stringify({
+      objects: [
+        { src: image, type: 'image' },
+        { text: 'sniptale-history-asset:0', type: 'textbox' },
+      ],
+    }),
+  };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({
+    exportDocument: () => ({ ...first, sourceName: 'edited' }),
+    history,
+    muted: false,
+  });
+
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    expect(undoEditorSnapshot(history)).toEqual(first);
+    expect(parse.mock.calls.filter(([, reviver]) => typeof reviver === 'function')).toHaveLength(0);
+  } finally {
+    parse.mockRestore();
+  }
+});
+
 it('releases binary references after their snapshots leave the bounded history', () => {
   const source = (index: number) => `data:image/png;base64,${String(index).padStart(5_000, 'A')}`;
   const first = { ...createMockDocument(), sourceImageData: source(0) };
@@ -205,6 +244,16 @@ it('rejects malformed or invalid editor document snapshots', () => {
   remoteSourceHistory.push(JSON.stringify(createMockDocument()));
   expect(undoEditorSnapshot(remoteSourceHistory)).toBeNull();
   expect(remoteSourceHistory.getState().index).toBe(1);
+
+  const invalidCanvasHistory = createEditorSnapshotHistory(createMockDocument());
+  invalidCanvasHistory.reset(JSON.stringify({ ...createMockDocument(), canvasJson: '{invalid' }));
+  pushEditorSnapshotHistory({
+    exportDocument: () => createMockDocument(),
+    history: invalidCanvasHistory,
+    muted: false,
+  });
+  expect(undoEditorSnapshot(invalidCanvasHistory)).toBeNull();
+  expect(invalidCanvasHistory.getState().index).toBe(1);
 });
 
 it('round-trips frame comments and step numbers through editor history', () => {

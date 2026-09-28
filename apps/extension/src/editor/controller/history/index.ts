@@ -66,21 +66,47 @@ function encodeEditorSnapshot(
 }
 
 function decodeEditorSnapshot(value: string, assets?: EditorHistoryAssets): unknown {
-  if (!assets) return JSON.parse(value) as unknown;
-  return JSON.parse(value, (key, child: unknown) => {
-    if (key === 'canvasJson' && typeof child === 'string') {
-      return JSON.stringify(
-        JSON.parse(child, (canvasKey, canvasValue: unknown) =>
-          typeof canvasValue === 'string' && CANVAS_BINARY_FIELDS.has(canvasKey)
-            ? (assets.byToken.get(canvasValue) ?? canvasValue)
-            : canvasValue
-        ) as unknown
-      );
+  const document = JSON.parse(value) as unknown;
+  if (!assets || !isRecord(document)) return document;
+  restoreBinaryFields(document, DOCUMENT_BINARY_FIELDS, assets);
+  const canvasJson = document['canvasJson'];
+  if (typeof canvasJson === 'string') {
+    const canvas = JSON.parse(canvasJson) as unknown;
+    if (canvasJson.includes(HISTORY_BINARY_TOKEN_PREFIX)) {
+      restoreBinaryFields(canvas, CANVAS_BINARY_FIELDS, assets);
     }
-    return typeof child === 'string' && DOCUMENT_BINARY_FIELDS.has(key)
-      ? (assets.byToken.get(child) ?? child)
-      : child;
-  }) as unknown;
+    document['canvasJson'] = JSON.stringify(canvas);
+  }
+  return document;
+}
+
+function restoreBinaryFields(
+  root: unknown,
+  fieldNames: ReadonlySet<string>,
+  assets: EditorHistoryAssets
+): void {
+  const pending: unknown[] = [root];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (Array.isArray(current)) {
+      for (const child of current) {
+        if (typeof child === 'object' && child !== null) pending.push(child);
+      }
+      continue;
+    }
+    if (!isRecord(current)) continue;
+    for (const [key, child] of Object.entries(current)) {
+      if (typeof child === 'string' && fieldNames.has(key)) {
+        current[key] = assets.byToken.get(child) ?? child;
+      } else if (typeof child === 'object' && child !== null) {
+        pending.push(child);
+      }
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function pruneEditorHistoryAssets(
