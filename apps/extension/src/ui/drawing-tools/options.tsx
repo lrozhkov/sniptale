@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
@@ -24,17 +24,14 @@ import {
   type DrawingShapeKind,
 } from '../../features/drawing/public';
 import { translate } from '../../platform/i18n';
-import {
-  loadRecentColors,
-  pushRecentColor,
-  subscribeRecentColors,
-} from '../../composition/persistence/recent-colors';
+import { useQuickDrawingColors } from './quick-colors';
 
 type DrawingQuickOptionsTool = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text';
 
 const DRAWING_COLOR_PICKER_CLASS = [
   '!h-7 !w-7 shrink-0',
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!h-7",
+  "[&_[data-ui='shared.ui.color-selector.trigger']]:!border",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!gap-0",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!rounded-md",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!px-[5px]",
@@ -312,30 +309,12 @@ export function DrawingColorOptions(props: {
   onSelect: (color: string) => void;
 }) {
   const Icon = props.icon;
-  const [recentColors, setRecentColors] = useState<readonly string[]>([]);
-  const recentRevisionRef = useRef(0);
-  useEffect(() => {
-    let active = true;
-    const loadRevision = recentRevisionRef.current;
-    void loadRecentColors().then((colors) => {
-      if (active && recentRevisionRef.current === loadRevision) setRecentColors(colors);
-    });
-    const unsubscribe = subscribeRecentColors((colors) => {
-      recentRevisionRef.current += 1;
-      setRecentColors(colors);
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
-  const quickColors = [...new Set([...recentColors, ...props.colors])].slice(0, 5);
-  const selectColor = (color: string) => {
-    props.onSelect(color);
-    recentRevisionRef.current += 1;
-    setRecentColors((current) => [color, ...current.filter((item) => item !== color)].slice(0, 10));
-    void pushRecentColor(color).catch(() => undefined);
-  };
+  const { quickColors, selectColor } = useQuickDrawingColors(props.colors, props.onSelect);
+  const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
+  const pickerSelected =
+    selectedValue !== null &&
+    selectedValue !== '__transparent__' &&
+    !quickColors.some((color) => color.toLowerCase() === selectedValue.toLowerCase());
   return (
     <div
       role="group"
@@ -344,6 +323,25 @@ export function DrawingColorOptions(props: {
       aria-label={props.label}
       title={props.label}
     >
+      <CompactColorSelector
+        allowAlpha={props.allowAlpha ?? false}
+        allowTransparent={false}
+        className={[
+          DRAWING_COLOR_PICKER_CLASS,
+          pickerSelected
+            ? "[&_[data-ui='shared.ui.color-selector.trigger']]:!border-[var(--sniptale-color-accent-emphasis)]"
+            : "[&_[data-ui='shared.ui.color-selector.trigger']]:!border-[var(--sniptale-color-border-strong)]",
+        ].join(' ')}
+        floatingBoundaryRef={props.floatingBoundaryRef}
+        floatingPlacement={props.floatingPlacement}
+        label={props.label}
+        title={props.label}
+        value={props.value}
+        palette={props.colors}
+        paletteInPicker
+        pickerOnly
+        onChange={selectColor}
+      />
       {Icon ? (
         <Icon
           aria-hidden
@@ -351,10 +349,11 @@ export function DrawingColorOptions(props: {
           className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
         />
       ) : null}
-      <div className="grid w-[104px] grid-cols-5 gap-1.5">
+      <div
+        className="grid w-[104px] grid-cols-5 gap-1.5"
+        data-ui="content.toolbar.drawing-options.quick-colors"
+      >
         {quickColors.map((color) => {
-          const selectedValue =
-            props.selectedValue === undefined ? props.value : props.selectedValue;
           const active = selectedValue?.toLowerCase() === color.toLowerCase();
           return (
             <ProductGlassColorOption
@@ -369,20 +368,6 @@ export function DrawingColorOptions(props: {
           );
         })}
       </div>
-      <CompactColorSelector
-        allowAlpha={props.allowAlpha ?? false}
-        allowTransparent={false}
-        className={DRAWING_COLOR_PICKER_CLASS}
-        floatingBoundaryRef={props.floatingBoundaryRef}
-        floatingPlacement={props.floatingPlacement}
-        label={props.label}
-        title={props.label}
-        value={props.value}
-        palette={props.colors}
-        paletteInPicker
-        pickerOnly
-        onChange={selectColor}
-      />
     </div>
   );
 }

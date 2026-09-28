@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const persistence = vi.hoisted(() => ({
   load: vi.fn<() => Promise<string[]>>(),
+  pickerColor: '#123456',
   push: vi.fn(async () => [] as string[]),
-  subscribe: vi.fn(() => () => undefined),
+  subscribe: vi.fn<(listener: (colors: string[]) => void) => () => void>(() => () => undefined),
 }));
 
 vi.mock('../../composition/persistence/recent-colors', () => ({
@@ -15,7 +16,46 @@ vi.mock('../../composition/persistence/recent-colors', () => ({
   subscribeRecentColors: persistence.subscribe,
 }));
 
+vi.mock('../color-selector', () => ({
+  CompactColorSelector: ({
+    className,
+    onChange,
+  }: {
+    className: string;
+    onChange: (color: string) => void;
+  }) => (
+    <button
+      data-ui="test.color-picker"
+      className={className}
+      onClick={() => onChange(persistence.pickerColor)}
+    >
+      Picker
+    </button>
+  ),
+}));
+
 import { DrawingColorOptions } from './options';
+
+const palette = ['#f97316', '#60a5fa', '#22c55e', '#facc15', '#ef4444', '#111827'];
+
+beforeEach(() => {
+  persistence.pickerColor = '#123456';
+  persistence.load.mockResolvedValue([]);
+  persistence.push.mockResolvedValue([]);
+  persistence.subscribe.mockReturnValue(() => undefined);
+});
+
+afterEach(() => {
+  document.body.replaceChildren();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
+
+function visibleColors(host: HTMLElement) {
+  return Array.from(host.querySelectorAll<HTMLButtonElement>('.grid-cols-5 button')).map(
+    (button) => button.title
+  );
+}
 
 it('keeps a color picked before the saved recents finish loading at the front', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -33,7 +73,7 @@ it('keeps a color picked before the saved recents finish loading at the front', 
   act(() =>
     root.render(
       <DrawingColorOptions
-        colors={['#f97316', '#60a5fa', '#22c55e', '#facc15', '#ef4444', '#111827']}
+        colors={palette}
         floatingBoundaryRef={{ current: null }}
         floatingPlacement="auto"
         label="Line color"
@@ -45,8 +85,98 @@ it('keeps a color picked before the saved recents finish loading at the front', 
   act(() => host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
   expect(onSelect).toHaveBeenCalledWith('#60a5fa');
   await act(async () => finishLoad?.(['#ffffff', '#111827']));
-  expect(host.querySelector('.grid-cols-5 button')?.getAttribute('title')).toBe('#60a5fa');
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
   act(() => root.unmount());
   host.remove();
-  vi.unstubAllGlobals();
+});
+
+it('puts the picker first and keeps visible swatches in place while adding new colors', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const onSelect = vi.fn();
+  await act(async () =>
+    root.render(
+      <DrawingColorOptions
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        label="Line color"
+        value="#f97316"
+        onSelect={onSelect}
+      />
+    )
+  );
+
+  const group = host.querySelector('[role="group"]');
+  expect(group?.firstElementChild?.getAttribute('data-ui')).toBe('test.color-picker');
+  const picker = host.querySelector<HTMLButtonElement>('[data-ui="test.color-picker"]');
+  expect(picker?.className).toContain('border-strong');
+  act(() => host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
+
+  act(() => picker?.click());
+  expect(onSelect).toHaveBeenLastCalledWith('#123456');
+  expect(visibleColors(host)).toEqual([...palette.slice(0, 4), '#123456']);
+
+  act(() => host.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
+  expect(visibleColors(host)).toEqual([...palette.slice(0, 4), '#123456']);
+  persistence.pickerColor = '#abcdef';
+  act(() => picker?.click());
+  expect(visibleColors(host)).toEqual(['#f97316', '#60a5fa', '#22c55e', '#abcdef', '#123456']);
+
+  act(() =>
+    root.render(
+      <DrawingColorOptions
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        label="Line color"
+        value="#999999"
+        onSelect={onSelect}
+      />
+    )
+  );
+  expect(host.querySelector('[data-ui="test.color-picker"]')?.className).toContain(
+    'accent-emphasis'
+  );
+  act(() => root.unmount());
+});
+
+it('does not evict a newer color when an older storage notification arrives late', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let notify: ((colors: string[]) => void) | undefined;
+  persistence.subscribe.mockImplementation((listener) => {
+    notify = listener;
+    return () => undefined;
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <DrawingColorOptions
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        label="Line color"
+        value="#f97316"
+        onSelect={vi.fn()}
+      />
+    )
+  );
+  const picker = host.querySelector<HTMLButtonElement>('[data-ui="test.color-picker"]');
+  act(() => picker?.click());
+  persistence.pickerColor = '#abcdef';
+  act(() => picker?.click());
+  act(() => notify?.(['#123456']));
+  persistence.pickerColor = '#fedcba';
+  act(() => picker?.click());
+
+  expect(visibleColors(host)).toEqual(['#f97316', '#60a5fa', '#fedcba', '#abcdef', '#123456']);
+  act(() => notify?.(['#fedcba', '#abcdef', '#123456']));
+  act(() => notify?.(['#999999', '#fedcba', '#abcdef', '#123456']));
+  expect(visibleColors(host)).toEqual(['#f97316', '#999999', '#fedcba', '#abcdef', '#123456']);
+  act(() => root.unmount());
 });
