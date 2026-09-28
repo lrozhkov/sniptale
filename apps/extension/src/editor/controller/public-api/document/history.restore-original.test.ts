@@ -44,6 +44,22 @@ it('restores the immutable original and clears every undo and redo step', async 
   expect(publishHistoryDocument).toHaveBeenCalledWith(original);
 });
 
+it('does not queue a second autosave after explicitly persisting the original', async () => {
+  const original = createEditorDocument('raw source');
+  const history = new SnapshotHistory(JSON.stringify(createEditorDocument('edited')));
+  const publishHistoryDocument = vi.fn();
+  const persist = vi.fn(async () => undefined);
+
+  await restoreEditorControllerOriginalDocument(
+    { applyDocument: vi.fn(async () => undefined), history, publishHistoryDocument },
+    original,
+    persist
+  );
+
+  expect(persist).toHaveBeenCalledOnce();
+  expect(publishHistoryDocument).toHaveBeenCalledWith(original, { scheduleAutosave: false });
+});
+
 it('retains history and restores the visible document when applying the original fails', async () => {
   const original = createEditorDocument('raw source');
   const latest = createEditorDocument('latest edit');

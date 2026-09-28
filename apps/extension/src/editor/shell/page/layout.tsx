@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { LoaderCircle } from 'lucide-react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { translate } from '../../../platform/i18n';
 import { EditorCommandPalette } from '../command-palette';
 import { CanvasWrapper } from '../../workspace/canvas';
@@ -24,7 +26,7 @@ const editorOpenLoadingCardClassName = [
 ].join(' ');
 
 const editorOpenErrorClassName = [
-  'pointer-events-none absolute inset-x-4 top-4 z-50 mx-auto max-w-lg',
+  'absolute inset-x-4 top-4 z-50 mx-auto max-w-lg',
   'rounded-xl border border-[var(--sniptale-color-border-soft)] p-4 shadow-lg',
   'bg-[var(--sniptale-color-surface-panel)]',
   'text-[var(--sniptale-color-text-primary)]',
@@ -53,8 +55,23 @@ export function EditorPageLayout(props: {
   hasImage: boolean;
   openStatus: EditorOpenStatus;
   onCloseCommandPalette: () => void;
+  onRecoverOriginal: () => Promise<void>;
   afterLayout?: React.ReactNode;
 }) {
+  const [confirmRecovery, setConfirmRecovery] = useState(false);
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
+
+  const recoverOriginal = async () => {
+    setRecoveryFailed(false);
+    try {
+      await props.onRecoverOriginal();
+      setConfirmRecovery(false);
+    } catch (error) {
+      setRecoveryFailed(true);
+      throw error;
+    }
+  };
+
   return (
     <div
       data-ui="editor.page.root"
@@ -87,7 +104,11 @@ export function EditorPageLayout(props: {
         </div>
       ) : null}
       {props.openStatus === 'error' ? (
-        <div className={editorOpenErrorClassName} data-ui="editor.page.open-error" role="alert">
+        <div
+          className={`pointer-events-none ${editorOpenErrorClassName}`}
+          data-ui="editor.page.open-error"
+          role="alert"
+        >
           <p className="font-semibold">{translate('editor.page.openFailedTitle')}</p>
           <p className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
             {translate('editor.page.openFailedHint')}
@@ -100,7 +121,38 @@ export function EditorPageLayout(props: {
           <p className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
             {translate('editor.page.documentFileMissingHint')}
           </p>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            className="mt-3"
+            data-ui="editor.page.recover-original"
+            onClick={() => {
+              setRecoveryFailed(false);
+              setConfirmRecovery(true);
+            }}
+          >
+            {translate('editor.page.recoverOriginalAction')}
+          </ProductActionButton>
         </div>
+      ) : null}
+      {confirmRecovery && props.openStatus === 'missing' ? (
+        <ProductConfirmDialog
+          title={translate('editor.page.recoverOriginalTitle')}
+          message={
+            <>
+              {translate('editor.page.recoverOriginalMessage')}
+              {recoveryFailed ? (
+                <p className="mt-2 text-[var(--sniptale-color-text-danger)]" role="alert">
+                  {translate('editor.page.recoverOriginalFailed')}
+                </p>
+              ) : null}
+            </>
+          }
+          confirmText={translate('editor.page.recoverOriginalConfirm')}
+          cancelText={translate('editor.page.recoverOriginalCancel')}
+          onConfirm={recoverOriginal}
+          onCancel={() => setConfirmRecovery(false)}
+        />
       ) : null}
       {props.afterLayout}
     </div>

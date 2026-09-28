@@ -1,4 +1,6 @@
 import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
+import { getMediaLibraryEntry } from '../../../composition/persistence/media-library/index.library.ts';
+import { restoreImageAggregateOriginal } from '../../../composition/persistence/image-aggregates';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
 import { createImageEditorController, type ImageEditorController } from '../../controller';
 import { waitForEditorControllerCanvas } from '../../controller/canvas-ready';
@@ -85,6 +87,15 @@ export function resolveEditorPageSessionSeed() {
     locationState,
     aggregateId,
   };
+}
+
+/** Replaces a damaged workspace only in response to an explicit, confirmed recovery action. */
+export async function recoverMissingEditorPageDocument(): Promise<void> {
+  const aggregateId = readEditorPageLocationState().assetId;
+  if (!aggregateId) throw new Error('No library image is selected for recovery.');
+  const media = await getMediaLibraryEntry(aggregateId);
+  if (!media) throw new Error('The library image is unavailable for recovery.');
+  await restoreImageAggregateOriginal(aggregateId, media.workspaceRevision ?? 0);
 }
 
 export function createEditorPageServices(

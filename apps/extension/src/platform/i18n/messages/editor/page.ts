@@ -27,8 +27,23 @@ export const editorPageMessages = defineMessageSource({
     en: 'Document file not found',
   },
   documentFileMissingHint: {
-    ru: 'Часть данных отсутствует в локальном хранилище. Откройте файл снова с устройства или выберите другое изображение. Запись документа не удалена.',
-    en: 'Part of the document is missing from local storage. Open the file again from your device or choose another image. The document record was not deleted.',
+    ru: 'Часть данных отсутствует в локальном хранилище. Запись документа сохранена. Если исходный снимок доступен, его можно восстановить.',
+    en: 'Part of the document is missing from local storage. The document record remains. If the original capture is available, you can restore it.',
+  },
+  recoverOriginalAction: { ru: 'Восстановить оригинал', en: 'Restore original' },
+  recoverOriginalTitle: {
+    ru: 'Восстановить исходный снимок?',
+    en: 'Restore the original capture?',
+  },
+  recoverOriginalMessage: {
+    ru: 'Сохранённые правки и история этого документа будут заменены исходным снимком. Отменить это действие после подтверждения нельзя.',
+    en: 'Saved edits and history for this document will be replaced with the original capture. This cannot be undone after confirmation.',
+  },
+  recoverOriginalConfirm: { ru: 'Восстановить', en: 'Restore' },
+  recoverOriginalCancel: { ru: 'Отмена', en: 'Cancel' },
+  recoverOriginalFailed: {
+    ru: 'Не удалось открыть исходный снимок. Проверьте библиотеку и попробуйте ещё раз.',
+    en: 'Could not open the original capture. Check the library and try again.',
   },
   title: {
     ru: 'Добавьте изображение',

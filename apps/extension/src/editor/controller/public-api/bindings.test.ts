@@ -56,6 +56,9 @@ describe('editor-controller public api bindings', () => {
     adapter.nextLabelIndex('image');
     adapter.commitHistory();
     adapter.publishHistoryDocument({ id: 'restored' } as never);
+    adapter.publishHistoryDocument({ id: 'explicitly saved' } as never, {
+      scheduleAutosave: false,
+    });
     adapter.syncRuntimeState();
     adapter.ensureObjectReachable({ id: 'object' } as never);
     adapter.focusObjectInViewport({ id: 'object' } as never);
@@ -78,6 +81,7 @@ describe('editor-controller public api bindings', () => {
     adapter.clearCropSelection();
 
     expect(controller.autosaveService.scheduleAutosave).toHaveBeenCalledWith({ id: 'restored' });
+    expect(controller.autosaveService.scheduleAutosave).toHaveBeenCalledOnce();
     expect(controller.syncRuntimeState).toHaveBeenCalled();
 
     adapter.setCanvasDocumentSize({ height: 100, width: 200 } as never);

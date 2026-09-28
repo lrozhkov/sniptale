@@ -3,10 +3,24 @@ import { createEditorDocumentFixture } from '../document/page-session/document.t
 import { beginEditorDocumentOpenOperation } from '../document/file-actions/operation';
 import { useEditorStore } from '../state/useEditorStore';
 
-const readOriginal = vi.hoisted(() => vi.fn());
-vi.mock('../../composition/persistence/image-aggregates', () => ({
-  readImageAggregateOriginalDocument: readOriginal,
+const persistence = vi.hoisted(() => ({
+  commitPresentation: vi.fn(async () => undefined),
+  getBlob: vi.fn(async () => new Blob(['original'], { type: 'image/png' })),
+  readOriginal: vi.fn(),
+  thumbnail: vi.fn(async () => new Blob(['thumb'], { type: 'image/png' })),
 }));
+vi.mock('../../composition/persistence/image-aggregates', () => ({
+  commitImagePresentation: persistence.commitPresentation,
+  readImageAggregateOriginalDocument: persistence.readOriginal,
+}));
+vi.mock('../../composition/persistence/media-library/index.library', () => ({
+  getMediaAssetBlob: persistence.getBlob,
+}));
+vi.mock('../../platform/media-utils/image-thumbnail', () => ({
+  createImageThumbnailBlob: persistence.thumbnail,
+}));
+
+const readOriginal = persistence.readOriginal;
 
 import { restoreOriginalEditorImage } from './restore-original-image';
 
@@ -30,6 +44,43 @@ it('uses immutable asset bytes after reopening a persisted draft', async () => {
 
   expect(readOriginal).toHaveBeenCalledWith('image-1');
   expect(controller.restoreOriginalDocument).toHaveBeenCalledWith(original, expect.any(Function));
+});
+
+it('publishes the original preview at the committed workspace revision before completing restore', async () => {
+  useEditorStore.getState().setSessionId('image-1');
+  const original = createEditorDocumentFixture();
+  readOriginal.mockResolvedValue(original);
+  let revision = 7;
+  const controller = {
+    originalDocument: original,
+    autosaveService: { getDurableRevision: vi.fn(() => revision) },
+    restoreOriginalDocument: vi.fn(async () => {
+      revision = 8;
+    }),
+  };
+
+  await restoreOriginalEditorImage(controller, 'image-1');
+
+  expect(persistence.commitPresentation).toHaveBeenCalledWith({
+    aggregateId: 'image-1',
+    expectedWorkspaceRevision: 8,
+    previewBlob: expect.any(Blob),
+    thumbnailBlob: expect.any(Blob),
+  });
+});
+
+it('keeps the restored document when advisory preview generation fails', async () => {
+  useEditorStore.getState().setSessionId('image-1');
+  readOriginal.mockResolvedValue(createEditorDocumentFixture());
+  persistence.commitPresentation.mockRejectedValueOnce(new Error('preview unavailable'));
+  const controller = {
+    originalDocument: createEditorDocumentFixture(),
+    autosaveService: { getDurableRevision: () => 2 },
+    restoreOriginalDocument: vi.fn(async () => undefined),
+  };
+
+  await expect(restoreOriginalEditorImage(controller, 'image-1')).resolves.toBeUndefined();
+  expect(controller.restoreOriginalDocument).toHaveBeenCalledOnce();
 });
 
 it('uses the opening document before the first save and refuses a missing persisted original', async () => {

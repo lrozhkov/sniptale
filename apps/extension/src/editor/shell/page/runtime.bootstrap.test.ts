@@ -4,11 +4,30 @@ const {
   readEditorPageLocationStateMock,
   resolveEditorPageRestoreSourceMock,
   waitForEditorControllerCanvasMock,
+  getMediaLibraryEntryMock,
+  restoreImageAggregateOriginalMock,
 } = vi.hoisted(() => ({
   ensureEditorPageAggregateIdMock: vi.fn(),
   readEditorPageLocationStateMock: vi.fn(),
   resolveEditorPageRestoreSourceMock: vi.fn(),
   waitForEditorControllerCanvasMock: vi.fn(),
+  getMediaLibraryEntryMock: vi.fn(),
+  restoreImageAggregateOriginalMock: vi.fn(),
+}));
+
+vi.mock(
+  '../../../composition/persistence/media-library/index.library.ts',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/media-library/index.library.ts')
+    >()),
+    getMediaLibraryEntry: getMediaLibraryEntryMock,
+  })
+);
+
+vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
+  restoreImageAggregateOriginal: restoreImageAggregateOriginalMock,
 }));
 
 vi.mock('../../controller/canvas-ready', () => ({
@@ -26,6 +45,7 @@ import {
   createEditorPageServices,
   bootstrapEditorPageSession,
   openEditorBootstrapPayload,
+  recoverMissingEditorPageDocument,
 } from './runtime';
 import {
   createEditorPageAutosaveService,
@@ -195,6 +215,25 @@ async function verifiesAssetRestore() {
   expect(useEditorStore.getState().capturedAt).toBe(333);
 }
 
+async function verifiesExplicitRecovery() {
+  readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-1', bootstrapId: null });
+  getMediaLibraryEntryMock.mockResolvedValue({ id: 'image-1', workspaceRevision: 4 });
+  restoreImageAggregateOriginalMock.mockResolvedValue({ revision: 5 });
+
+  await recoverMissingEditorPageDocument();
+
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledOnce();
+  expect(restoreImageAggregateOriginalMock).toHaveBeenCalledWith('image-1', 4);
+}
+
+async function verifiesRecoveryRequiresExistingLibraryEntry() {
+  readEditorPageLocationStateMock.mockReturnValue({ assetId: 'image-1', bootstrapId: null });
+  getMediaLibraryEntryMock.mockResolvedValue(undefined);
+
+  await expect(recoverMissingEditorPageDocument()).rejects.toThrow();
+  expect(restoreImageAggregateOriginalMock).not.toHaveBeenCalled();
+}
+
 async function verifiesNewerBootstrapPayloadWinsOverLateRestoreResolution() {
   const controller = createEditorPageController();
   const autosaveService = createEditorPageAutosaveService();
@@ -248,6 +287,15 @@ describe('editor-page.runtime bootstrap flows', () => {
     readEditorPageLocationStateMock,
     waitForEditorControllerCanvasMock,
   });
+
+  it(
+    'restores a damaged document only after an explicit recovery action',
+    verifiesExplicitRecovery
+  );
+  it(
+    'preserves a damaged document when its library entry is absent',
+    verifiesRecoveryRequiresExistingLibraryEntry
+  );
 
   it(
     'opens bootstrap payloads through autosave activation, canvas readiness, and image open',

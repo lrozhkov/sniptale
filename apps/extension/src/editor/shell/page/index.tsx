@@ -13,6 +13,7 @@ import {
   flushEditorAutosaveIfNeeded,
   loadEditorPageDefaults,
   openEditorBootstrapPayload,
+  recoverMissingEditorPageDocument,
   type EditorPageServices,
 } from './runtime';
 import { useEditorStore } from '../../state/useEditorStore';
@@ -170,6 +171,12 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
             hasImage={hasImage}
             openStatus={openStatus.status}
             onCloseCommandPalette={() => setCommandPaletteOpen(false)}
+            onRecoverOriginal={async () => {
+              await recoverMissingEditorPageDocument();
+              await openStatus.runOpen(() =>
+                bootstrapEditorPageSession({ isCancelled: () => false, setPageTitle }, services)
+              );
+            }}
           />
         </EditorEmbedProvider>
       </EditorOpenStatusContext.Provider>

@@ -28,6 +28,21 @@ vi.mock('../../workspace/floating', () => ({
   ),
 }));
 
+vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
+  ProductConfirmDialog: ({
+    onConfirm,
+    onCancel,
+  }: {
+    onConfirm: () => void;
+    onCancel: () => void;
+  }) => (
+    <div data-ui="editor.page.recover-dialog">
+      <button onClick={onConfirm}>Confirm</button>
+      <button onClick={onCancel}>Cancel</button>
+    </div>
+  ),
+}));
+
 import { EditorPageLayout } from './layout';
 
 let container: HTMLDivElement | null = null;
@@ -52,7 +67,8 @@ afterEach(() => {
 
 async function renderLayout(
   hasImage = true,
-  openStatus: 'idle' | 'loading' | 'error' | 'missing' = 'idle'
+  openStatus: 'idle' | 'loading' | 'error' | 'missing' = 'idle',
+  onRecoverOriginal = vi.fn(async () => undefined)
 ) {
   await act(async () => {
     root?.render(
@@ -62,6 +78,7 @@ async function renderLayout(
         hasImage={hasImage}
         openStatus={openStatus}
         onCloseCommandPalette={vi.fn()}
+        onRecoverOriginal={onRecoverOriginal}
       />
     );
   });
@@ -80,6 +97,38 @@ it('shows a blocking loading status and a recoverable error without raw exceptio
     'alert'
   );
   expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
+});
+
+it('requires confirmation before replacing a missing document with its original', async () => {
+  const recover = vi.fn(async () => undefined);
+  await renderLayout(false, 'missing', recover);
+  const recoveryButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.page.recover-original"]'
+  );
+  expect(recoveryButton).not.toBeNull();
+  expect(recover).not.toHaveBeenCalled();
+
+  await act(async () => recoveryButton?.click());
+  expect(container?.querySelector('[data-ui="editor.page.recover-dialog"]')).not.toBeNull();
+  expect(recover).not.toHaveBeenCalled();
+
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.page.recover-dialog"] button:last-child')
+      ?.click();
+  });
+  expect(recover).not.toHaveBeenCalled();
+  expect(container?.querySelector('[data-ui="editor.page.recover-dialog"]')).toBeNull();
+
+  await act(async () => recoveryButton?.click());
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="editor.page.recover-dialog"] button:first-child'
+      )
+      ?.click();
+  });
+  expect(recover).toHaveBeenCalledTimes(1);
 });
 
 it('shows a specific missing-original message without blocking the empty canvas intake', async () => {

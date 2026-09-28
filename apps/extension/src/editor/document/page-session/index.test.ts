@@ -110,6 +110,25 @@ describe('stable editor aggregate identity', () => {
 });
 
 describe('editor aggregate restore', () => {
+  it('keeps a damaged workspace blocked even when the immutable original exists', async () => {
+    mocks.getEntry.mockResolvedValue({
+      id: 'image-1',
+      kind: 'image',
+      workspaceRevision: 3,
+      blob: new Blob(['original'], { type: 'image/png' }),
+    });
+    mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+    mocks.restore.mockRejectedValue(Object.assign(new Error('gone'), { name: 'NotFoundError' }));
+    const { resolveEditorPageRestoreSource } = await import('./');
+
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: null }, 'image-1', {
+        restoreDraft: mocks.restore,
+      })
+    ).rejects.toMatchObject({ name: 'MissingEditorDraftAssetError' });
+    expect(mocks.getEntry).not.toHaveBeenCalled();
+    expect(mocks.getBlob).not.toHaveBeenCalled();
+  });
   it('classifies absent OPFS objects and broken draft refs as missing local files', async () => {
     const { MissingAssetObjectError } = await import('../../../composition/persistence/assets');
     const { MissingEditorDocumentAssetError } =

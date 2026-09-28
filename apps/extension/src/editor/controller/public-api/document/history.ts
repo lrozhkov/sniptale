@@ -8,7 +8,10 @@ import type { Canvas } from 'fabric';
 
 type EditorDocumentApplyTarget = {
   applyDocument: (document: EditorDocument, options: ApplyDocumentOptions) => Promise<void>;
-  publishHistoryDocument: (document: EditorDocument) => void;
+  publishHistoryDocument: (
+    document: EditorDocument,
+    options?: { scheduleAutosave?: boolean }
+  ) => void;
 };
 
 type EditorDocumentHistorySource = {
@@ -176,6 +179,7 @@ export async function restoreEditorControllerOriginalDocument(
       throw error;
     }
     controller.history?.reset(JSON.stringify(original));
-    controller.publishHistoryDocument(original);
+    if (persist) controller.publishHistoryDocument(original, { scheduleAutosave: false });
+    else controller.publishHistoryDocument(original);
   });
 }
