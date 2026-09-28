@@ -49,6 +49,7 @@ beforeEach(() => {
   for (const key of Object.keys(disclosureValues)) delete disclosureValues[key];
   loadPreferenceMock.mockResolvedValue({ kinds: [], layout: 'column' });
   savePreferenceMock.mockResolvedValue(undefined);
+  useEditorStore.getState().updateTechnicalDataTextSettings({ backgroundColor: null });
 });
 
 afterEach(() => {
@@ -100,6 +101,14 @@ it('keeps page-data typography and colors separate from the text tool', async ()
   const ordinaryTextSettings = useEditorStore.getState().toolSettings.text;
   await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
 
+  const textColor = container
+    .querySelector('[role="group"][aria-label="content.toolbar.drawingTextColor"]')
+    ?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.drawing-options.quick-colors"] button'
+    );
+  const selectedTextColor = textColor?.title;
+  expect(selectedTextColor).toBeTruthy();
+
   act(() => {
     container
       .querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.font-handwritten"]')
@@ -107,30 +116,71 @@ it('keeps page-data typography and colors separate from the text tool', async ()
     container
       .querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.size-36"]')
       ?.click();
-    container
-      .querySelector<HTMLButtonElement>('[aria-label="content.toolbar.drawingTextColor: #ffffff"]')
-      ?.click();
-    container
-      .querySelector<HTMLButtonElement>(
-        '[aria-label="content.toolbar.drawingTextBackground: #ffffff"]'
-      )
-      ?.click();
+    textColor?.click();
+  });
+
+  const backgroundToggle = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+  );
+  expect(backgroundToggle?.getAttribute('aria-pressed')).toBe('false');
+  expect(
+    container.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+  ).toBeNull();
+  act(() => backgroundToggle?.click());
+  expect(backgroundToggle?.getAttribute('aria-pressed')).toBe('true');
+  const backgroundColor = container
+    .querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+    ?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.drawing-options.quick-colors"] button:nth-child(2)'
+    );
+  const selectedBackgroundColor = backgroundColor?.title;
+  expect(selectedBackgroundColor).toBeTruthy();
+  act(() => {
+    backgroundColor?.click();
   });
 
   expect(useEditorStore.getState().technicalDataTextSettings).toMatchObject({
     fontFamily: 'handwritten',
     fontSize: 36,
-    color: '#ffffff',
-    backgroundColor: '#ffffff',
+    color: selectedTextColor,
+    backgroundColor: selectedBackgroundColor,
   });
   expect(useEditorStore.getState().toolSettings.text).toBe(ordinaryTextSettings);
 
-  act(() =>
-    container
-      .querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.background-none"]')
-      ?.click()
-  );
+  act(() => backgroundToggle?.click());
   expect(useEditorStore.getState().technicalDataTextSettings.backgroundColor).toBeNull();
+  expect(
+    container.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+  ).toBeNull();
+  act(() => backgroundToggle?.click());
+  expect(useEditorStore.getState().technicalDataTextSettings.backgroundColor).toBe(
+    selectedBackgroundColor
+  );
+});
+
+it('keeps font and size beside their labels with readable controls and quiet color pickers', async () => {
+  await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
+
+  for (const [row, options, count] of [
+    ['font-row', 'font-options', 4],
+    ['size-row', 'size-options', 3],
+  ] as const) {
+    const rowElement = container.querySelector(`[data-ui="editor.technical-data.${row}"]`);
+    const buttons = rowElement?.querySelectorAll(
+      `[data-ui="editor.technical-data.${options}"] button`
+    );
+    expect(rowElement?.className).toContain('items-center');
+    expect(buttons).toHaveLength(count);
+    for (const button of buttons ?? []) expect(button.className).toContain('h-8');
+  }
+
+  const pickerTriggers = container.querySelectorAll('[data-ui="shared.ui.color-selector.trigger"]');
+  expect(pickerTriggers).toHaveLength(1);
+  for (const trigger of pickerTriggers) {
+    expect(trigger.closest('[data-ui="editor.technical-data.text-settings"]')?.className).toContain(
+      "[&_[data-ui='shared.ui.color-selector.trigger']]:!shadow-none"
+    );
+  }
 });
 
 it('offers layout only for multiple fields and inserts them in canonical order', async () => {

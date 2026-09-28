@@ -480,6 +480,10 @@ export function DrawingShapeFillOptions(props: DrawingFillOptionsProps) {
   return <DrawingFillOptions {...props} kind="shape" />;
 }
 
+export function DrawingTextBackgroundOptions(props: DrawingFillOptionsProps) {
+  return <DrawingFillOptions {...props} kind="text" />;
+}
+
 export function DrawingTextOptions(props: {
   backgroundColor: string | null;
   color: string;
