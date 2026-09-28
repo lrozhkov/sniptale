@@ -41,6 +41,12 @@ it('builds a clean document from retained source bytes after edits', async () =>
     canvasHeight: 80,
     sourceLeft: 0,
     sourceTop: 0,
+    frame: {
+      backgroundMode: 'color',
+      backgroundColor: 'transparent',
+      backgroundImageData: null,
+      layoutMode: 'fit-image',
+    },
   });
   expect(JSON.parse(document!.canvasJson)).toMatchObject({ objects: [] });
 });

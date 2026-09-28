@@ -30,7 +30,7 @@ export async function createOriginalImageDocument(
       paddingLeft: 0,
       backgroundMode: 'color',
       backgroundBlurAmount: 0,
-      backgroundColor: '#ffffff',
+      backgroundColor: 'transparent',
       backgroundGradientFrom: '#ffffff',
       backgroundGradientTo: '#ffffff',
       backgroundGradientAngle: 0,
