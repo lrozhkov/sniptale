@@ -168,6 +168,7 @@ function isDrawingOptionsTool(tool: EditorTool): boolean {
     tool === 'marker' ||
     tool === 'shape' ||
     tool === 'arrow' ||
+    tool === 'blur' ||
     tool === 'text'
   );
 }

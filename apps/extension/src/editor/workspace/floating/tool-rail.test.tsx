@@ -265,6 +265,20 @@ it('describes drawing modifiers and toggles options on a repeated active-tool cl
   expect(onToggleActiveToolOptions).toHaveBeenCalledWith('shape');
 });
 
+it('toggles blur options on a repeated click without reactivating the tool', () => {
+  const onToggleActiveToolOptions = vi.fn();
+  const props = createProps({
+    activeTool: 'blur',
+    isToolButtonActive: (tool) => tool === 'blur',
+  });
+  renderToolRail({ ...props, onToggleActiveToolOptions });
+
+  act(() => getToolButton('blur').click());
+
+  expect(onToggleActiveToolOptions).toHaveBeenCalledWith('blur');
+  expect(props.onActivateTool).not.toHaveBeenCalled();
+});
+
 it('uses a top-centered horizontal rail and a separate horizontal history panel', () => {
   renderToolRail(createProps());
 
