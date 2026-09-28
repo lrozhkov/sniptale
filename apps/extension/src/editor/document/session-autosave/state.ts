@@ -3,6 +3,7 @@ import type { AssetRef } from '../../../composition/persistence/assets';
 
 export interface ActiveEditorSessionContext {
   aggregateId: string;
+  capturedAt?: number;
   durableRevision: number;
   sourceUrl: string | null;
   sourceTitle: string | null;

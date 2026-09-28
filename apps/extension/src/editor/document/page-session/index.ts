@@ -25,16 +25,19 @@ interface EditorPageAssetRestoreSource {
   sourceFaviconUrl: string | null;
   sourceTitle: string;
   sourceUrl: string;
+  capturedAt: number | null;
 }
 
 interface EditorPageBootstrapRestoreSource {
   kind: 'bootstrap';
   payload: EditorBootstrapPayload;
+  capturedAt: number | null;
 }
 
 interface EditorPageDraftRestoreSource {
   kind: 'draft';
   entry: NonNullable<Awaited<ReturnType<EditorSessionAutosaveService['restoreDraft']>>>;
+  capturedAt: number | null;
 }
 
 interface EditorPageEmptyRestoreSource {
@@ -137,7 +140,20 @@ async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRest
     sourceFaviconUrl: asset?.sourceFavicon ?? null,
     sourceTitle: asset?.sourceTitle ?? asset?.filename ?? '',
     sourceUrl: asset?.sourceUrl ?? '',
+    capturedAt: asset?.createdAt ?? null,
   };
+}
+
+async function resolveOriginalCaptureTime(
+  aggregateId: string,
+  fallback: number | null
+): Promise<number | null> {
+  try {
+    const asset = await getMediaLibraryEntry(aggregateId);
+    return asset?.createdAt ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /**
@@ -154,6 +170,7 @@ export async function resolveEditorPageRestoreSource(
     return {
       kind: 'draft',
       entry: draftEntry,
+      capturedAt: await resolveOriginalCaptureTime(aggregateId, draftEntry.createdAt ?? null),
     };
   }
 
@@ -162,6 +179,10 @@ export async function resolveEditorPageRestoreSource(
     return {
       kind: 'bootstrap',
       payload: bootstrapPayload,
+      capturedAt: await resolveOriginalCaptureTime(
+        aggregateId,
+        bootstrapPayload.capturedAt ?? null
+      ),
     };
   }
 

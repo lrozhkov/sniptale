@@ -3,6 +3,7 @@ import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap
 import { createImageEditorController, type ImageEditorController } from '../../controller';
 import { waitForEditorControllerCanvas } from '../../controller/canvas-ready';
 import { beginEditorDocumentOpenOperation } from '../../document/file-actions/operation';
+import { useEditorStore } from '../../state/useEditorStore';
 import {
   createEditorSessionAutosaveService,
   type EditorSessionAutosaveService,
@@ -103,14 +104,17 @@ export function createEditorPageServices(
 export async function openEditorBootstrapPayload(
   payload: EditorBootstrapPayload,
   runtime: EditorPageSessionRuntime,
-  services: EditorPageServices
+  services: EditorPageServices,
+  restoredCapturedAt: number | null = null
 ): Promise<void> {
   beginEditorDocumentOpenOperation(services.controller);
   const bootstrapRevision = beginEditorPageBootstrapRevision(services);
   const { aggregateId } = resolveEditorPageSessionSeed();
+  const capturedAt = restoredCapturedAt ?? payload.capturedAt ?? Date.now();
 
   services.autosaveService.activate({
     aggregateId,
+    capturedAt,
     durableRevision: 0,
     renderPresentation: () =>
       services.controller.renderForExport(
@@ -140,6 +144,9 @@ export async function openEditorBootstrapPayload(
     if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
     const initialDocument = services.controller.exportDocument();
     await services.autosaveService.saveNow(() => initialDocument);
+    if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+      useEditorStore.getState().setCapturedAt(capturedAt);
+    }
     return;
   }
 
@@ -151,6 +158,9 @@ export async function openEditorBootstrapPayload(
   if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
   const initialDocument = services.controller.exportDocument();
   await services.autosaveService.saveNow(() => initialDocument);
+  if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+    useEditorStore.getState().setCapturedAt(capturedAt);
+  }
 }
 
 export async function bootstrapEditorPageSession(
@@ -195,16 +205,27 @@ export async function bootstrapEditorPageSession(
   if (restoreSource.kind === 'draft') {
     runtime.setPageTitle(restoreSource.entry.sourceTitle ?? '');
     await services.controller.loadDocument(restoreSource.entry.document);
+    if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+      useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
+    }
     return;
   }
 
   if (restoreSource.kind === 'bootstrap') {
-    await openEditorBootstrapPayload(restoreSource.payload, runtime, services);
+    await openEditorBootstrapPayload(
+      restoreSource.payload,
+      runtime,
+      services,
+      restoreSource.capturedAt
+    );
     return;
   }
 
   if (restoreSource.kind === 'asset') {
     await openRestoredEditorAsset(restoreSource, runtime, services);
+    if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
+      useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
+    }
   }
 }
 

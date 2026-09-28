@@ -62,8 +62,8 @@ async function renderMetaPanel() {
 
 function getOptionButtons() {
   return Array.from(
-    container?.querySelectorAll<HTMLButtonElement>(
-      '[aria-label="editor.compact.technicalDataFields"] button[aria-pressed]'
+    container?.querySelectorAll<HTMLInputElement>(
+      '[aria-label="editor.compact.technicalDataFields"] input[type="checkbox"]'
     ) ?? []
   );
 }
@@ -80,7 +80,7 @@ function getLayoutToggle() {
   );
 }
 
-function selectTechnicalDataInColumnOrder(options: HTMLButtonElement[]) {
+function selectTechnicalDataInColumnOrder(options: HTMLInputElement[]) {
   options[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   options[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   options[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -143,9 +143,9 @@ function getExactTextNodeCount(text: string): number {
   ).length;
 }
 
-function expectTechnicalDataRowsToBeFlat(options: HTMLButtonElement[]) {
+function expectTechnicalDataRowsToBeFlat(options: HTMLInputElement[]) {
   for (const option of options) {
-    expect(option.className).not.toContain('border ');
-    expect(option.className).not.toContain('border-[color');
+    expect(option.type).toBe('checkbox');
+    expect(option.closest('label')?.className).toContain('cursor-pointer');
   }
 }

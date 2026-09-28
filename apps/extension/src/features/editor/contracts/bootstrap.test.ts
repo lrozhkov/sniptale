@@ -14,6 +14,7 @@ describe('editor bootstrap payload boundary', () => {
         sourceFaviconUrl: null,
         title: 'Capture',
         url: 'https://example.com',
+        capturedAt: 1_700_000_000_000,
       })
     ).toBe(true);
   });
@@ -28,6 +29,8 @@ describe('editor bootstrap payload boundary', () => {
     { dataUrl: IMAGE_DATA_URL, sourceFaviconUrl: 1 },
     { dataUrl: IMAGE_DATA_URL, title: null },
     { dataUrl: IMAGE_DATA_URL, url: false },
+    { dataUrl: IMAGE_DATA_URL, capturedAt: -1 },
+    { dataUrl: IMAGE_DATA_URL, capturedAt: Number.NaN },
   ])('rejects malformed boundary fields: %j', (value) => {
     expect(isEditorBootstrapPayload(value)).toBe(false);
   });

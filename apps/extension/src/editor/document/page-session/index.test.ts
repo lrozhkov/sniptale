@@ -111,8 +111,14 @@ describe('stable editor aggregate identity', () => {
 
 describe('editor aggregate restore', () => {
   it('prefers the workspace for the aggregate', async () => {
-    const entry = { aggregateId: 'image-1', document: createEditorDocumentFixture(), revision: 2 };
+    const entry = {
+      aggregateId: 'image-1',
+      createdAt: 200,
+      document: createEditorDocumentFixture(),
+      revision: 2,
+    };
     mocks.restore.mockResolvedValue(entry);
+    mocks.getEntry.mockResolvedValue({ createdAt: 100 });
     const { resolveEditorPageRestoreSource } = await import('./');
     const isCurrent = vi.fn(() => true);
     await expect(
@@ -122,29 +128,42 @@ describe('editor aggregate restore', () => {
         { restoreDraft: mocks.restore },
         isCurrent
       )
-    ).resolves.toEqual({ kind: 'draft', entry });
+    ).resolves.toEqual({ kind: 'draft', entry, capturedAt: 100 });
     expect(mocks.restore).toHaveBeenCalledWith('image-1', isCurrent);
     expect(mocks.bootstrap).not.toHaveBeenCalled();
   });
 
   it('falls back to bootstrap and then immutable original', async () => {
     mocks.restore.mockResolvedValue(undefined);
-    mocks.bootstrap.mockResolvedValueOnce({ dataUrl: 'data:image/png;base64,YQ==' });
+    mocks.bootstrap.mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,YQ==',
+      capturedAt: 300,
+    });
+    mocks.getEntry.mockResolvedValueOnce({ createdAt: 250 });
     const { resolveEditorPageRestoreSource } = await import('./');
     await expect(
       resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: 'boot' }, 'image-2', {
         restoreDraft: mocks.restore,
       })
-    ).resolves.toEqual({ kind: 'bootstrap', payload: { dataUrl: 'data:image/png;base64,YQ==' } });
+    ).resolves.toEqual({
+      kind: 'bootstrap',
+      payload: { dataUrl: 'data:image/png;base64,YQ==', capturedAt: 300 },
+      capturedAt: 250,
+    });
 
     mocks.bootstrap.mockResolvedValueOnce(null);
     mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
-    mocks.getEntry.mockResolvedValue({ filename: 'original.png' });
+    mocks.getEntry.mockResolvedValue({ filename: 'original.png', createdAt: 150 });
     mocks.toDataUrl.mockResolvedValue('data:image/png;base64,b3JpZ2luYWw=');
     await expect(
       resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: null }, 'image-2', {
         restoreDraft: mocks.restore,
       })
-    ).resolves.toMatchObject({ kind: 'asset', assetId: 'image-2', filename: 'original.png' });
+    ).resolves.toMatchObject({
+      kind: 'asset',
+      assetId: 'image-2',
+      filename: 'original.png',
+      capturedAt: 150,
+    });
   });
 });

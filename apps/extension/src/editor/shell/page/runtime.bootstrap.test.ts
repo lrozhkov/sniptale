@@ -34,6 +34,7 @@ import {
   createEditorPageRuntime,
   setupEditorPageRuntimeBootstrapTestScope,
 } from './runtime.bootstrap.test-support';
+import { useEditorStore } from '../../state/useEditorStore';
 
 async function verifiesBootstrapPayloadOpen() {
   const controller = createEditorPageController();
@@ -45,6 +46,7 @@ async function verifiesBootstrapPayloadOpen() {
       dataUrl: 'data:image/png;base64,1',
       title: 'Example page',
       url: 'https://example.com',
+      capturedAt: 111,
     },
     runtime,
     { autosaveService, controller } as never
@@ -52,6 +54,7 @@ async function verifiesBootstrapPayloadOpen() {
 
   expect(autosaveService.activate).toHaveBeenCalledWith({
     aggregateId: 'session-1',
+    capturedAt: 111,
     durableRevision: 0,
     renderPresentation: expect.any(Function),
     sourceUrl: 'https://example.com',
@@ -69,6 +72,7 @@ async function verifiesBootstrapPayloadOpen() {
     sourceFaviconUrl: null,
   });
   expect(autosaveService.saveNow).toHaveBeenCalledWith(expect.any(Function));
+  expect(useEditorStore.getState().capturedAt).toBe(111);
   expect(controller.openImage.mock.invocationCallOrder[0]).toBeLessThan(
     autosaveService.saveNow.mock.invocationCallOrder[0]!
   );
@@ -122,7 +126,9 @@ async function verifiesDraftRestore() {
     entry: {
       document: { version: 2 },
       sourceTitle: 'Draft title',
+      createdAt: 222,
     },
+    capturedAt: 222,
   });
 
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
@@ -136,6 +142,7 @@ async function verifiesDraftRestore() {
   });
   expect(runtime.setPageTitle).toHaveBeenCalledWith('Draft title');
   expect(controller.loadDocument).toHaveBeenCalledWith({ version: 2 });
+  expect(useEditorStore.getState().capturedAt).toBe(222);
 }
 
 async function verifiesBootstrapRestore() {
@@ -150,12 +157,14 @@ async function verifiesBootstrapRestore() {
       title: 'Bootstrap title',
       url: 'https://bootstrap.example',
     },
+    capturedAt: 444,
   });
 
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
 
   expect(controller.loadDocument).toHaveBeenCalledWith(createEditorPageDocument());
   expect(controller.openImage).not.toHaveBeenCalled();
+  expect(useEditorStore.getState().capturedAt).toBe(444);
 }
 
 async function verifiesAssetRestore() {
@@ -169,6 +178,7 @@ async function verifiesAssetRestore() {
     filename: 'capture.png',
     sourceTitle: 'Asset title',
     sourceUrl: 'https://asset.example',
+    capturedAt: 333,
   });
 
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
@@ -182,6 +192,7 @@ async function verifiesAssetRestore() {
     browserFrameUrl: 'https://asset.example',
     pageTitle: 'Asset title',
   });
+  expect(useEditorStore.getState().capturedAt).toBe(333);
 }
 
 async function verifiesNewerBootstrapPayloadWinsOverLateRestoreResolution() {

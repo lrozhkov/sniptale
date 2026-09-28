@@ -70,6 +70,7 @@ async function resolveEditorSourceMetadata(sourceContext?: {
 
 async function persistEditorBootstrapId(payload: {
   dataUrl: string;
+  capturedAt: number;
   sourceFaviconUrl: string | null;
   url: string;
   title: string;
@@ -77,6 +78,7 @@ async function persistEditorBootstrapId(payload: {
   try {
     return await persistPendingEditorBootstrapPayload({
       dataUrl: payload.dataUrl,
+      capturedAt: payload.capturedAt,
       sourceFaviconUrl: payload.sourceFaviconUrl,
       url: payload.url,
       title: payload.title,
@@ -103,10 +105,12 @@ export async function openEditorWithImage(
     title?: string | null;
   }
 ): Promise<void> {
+  const capturedAt = Date.now();
   const { sourceFaviconUrl, sourceUrl, sourceTitle } =
     await resolveEditorSourceMetadata(sourceContext);
   const bootstrapId = await persistEditorBootstrapId({
     dataUrl,
+    capturedAt,
     sourceFaviconUrl,
     url: sourceUrl,
     title: sourceTitle,

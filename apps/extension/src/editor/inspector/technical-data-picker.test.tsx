@@ -4,11 +4,31 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EditorTechnicalDataPicker } from './technical-data-picker';
+import { useEditorStore } from '../state/useEditorStore';
 
 const { loadPreferenceMock, savePreferenceMock } = vi.hoisted(() => ({
   loadPreferenceMock: vi.fn(),
   savePreferenceMock: vi.fn(),
 }));
+
+const disclosureValues = vi.hoisted(() => ({}) as Record<string, unknown>);
+
+vi.mock('../../composition/persistence/inspector-disclosures/store', async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import('../../composition/persistence/inspector-disclosures/store')
+    >();
+  return {
+    ...original,
+    createInspectorDisclosureStore: () =>
+      original.createInspectorDisclosureStore({
+        get: async () => disclosureValues,
+        set: async (next) => {
+          Object.assign(disclosureValues, next);
+        },
+      }),
+  };
+});
 
 vi.mock('../persistence/ui-state/technical-data', () => ({
   loadEditorTechnicalDataPreference: loadPreferenceMock,
@@ -26,6 +46,7 @@ document.body.appendChild(container);
 const root = createRoot(container);
 
 beforeEach(() => {
+  for (const key of Object.keys(disclosureValues)) delete disclosureValues[key];
   loadPreferenceMock.mockResolvedValue({ kinds: [], layout: 'column' });
   savePreferenceMock.mockResolvedValue(undefined);
 });
@@ -35,19 +56,95 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+it('groups page fields as checkboxes and text styling in compact disclosures', async () => {
+  await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
+
+  expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
+  const disclosures = Array.from(
+    container.querySelectorAll<HTMLDetailsElement>('details[data-ui="editor.inspector.disclosure"]')
+  );
+  expect(disclosures.map((item) => item.querySelector('summary')?.textContent)).toEqual([
+    'editor.compact.technicalDataTextSettings',
+    'editor.compact.technicalDataFields',
+  ]);
+  expect(disclosures[0]?.open).toBe(true);
+  await act(async () => disclosures[0]?.querySelector('summary')?.click());
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(disclosures[0]?.open).toBe(false);
+  expect(Object.values(disclosureValues)).toContain(false);
+});
+
+it('remembers both disclosure choices after the picker remounts', async () => {
+  await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
+  const disclosures = Array.from(
+    container.querySelectorAll<HTMLDetailsElement>('details[data-ui="editor.inspector.disclosure"]')
+  );
+  expect(disclosures).toHaveLength(2);
+  await act(async () => disclosures[0]?.querySelector('summary')?.click());
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  expect(disclosures[0]?.open).toBe(false);
+  await act(async () => root.render(<></>));
+  await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
+  const restored = Array.from(
+    container.querySelectorAll<HTMLDetailsElement>('details[data-ui="editor.inspector.disclosure"]')
+  );
+  expect(restored[0]?.open).toBe(false);
+  expect(restored[1]?.open).toBe(true);
+});
+
+it('keeps page-data typography and colors separate from the text tool', async () => {
+  const ordinaryTextSettings = useEditorStore.getState().toolSettings.text;
+  await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
+
+  act(() => {
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.font-handwritten"]')
+      ?.click();
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.size-36"]')
+      ?.click();
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.toolbar.drawingTextColor: #ffffff"]')
+      ?.click();
+    container
+      .querySelector<HTMLButtonElement>(
+        '[aria-label="content.toolbar.drawingTextBackground: #ffffff"]'
+      )
+      ?.click();
+  });
+
+  expect(useEditorStore.getState().technicalDataTextSettings).toMatchObject({
+    fontFamily: 'handwritten',
+    fontSize: 36,
+    color: '#ffffff',
+    backgroundColor: '#ffffff',
+  });
+  expect(useEditorStore.getState().toolSettings.text).toBe(ordinaryTextSettings);
+
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="editor.technical-data.background-none"]')
+      ?.click()
+  );
+  expect(useEditorStore.getState().technicalDataTextSettings.backgroundColor).toBeNull();
+});
+
 it('offers layout only for multiple fields and inserts them in canonical order', async () => {
   const onInsert = vi.fn();
   await act(async () => root.render(<EditorTechnicalDataPicker onInsert={onInsert} />));
 
-  const buttons = Array.from(container.querySelectorAll('button'));
   expect(container.textContent).not.toContain('editor.compact.technicalDataLayoutRow');
 
   act(() => {
-    buttons
-      .find((button) => button.getAttribute('aria-label') === 'editor.compact.browser')
+    container
+      .querySelector<HTMLInputElement>('[data-ui="editor.technical-data.field-browser"]')
       ?.click();
-    buttons
-      .find((button) => button.getAttribute('aria-label') === 'editor.compact.pageUrl')
+    container
+      .querySelector<HTMLInputElement>('[data-ui="editor.technical-data.field-url"]')
       ?.click();
   });
 
@@ -90,12 +187,14 @@ it('restores the last inserted selection and layout on a new mount', async () =>
   const onInsert = vi.fn();
   await act(async () => root.render(<EditorTechnicalDataPicker onInsert={onInsert} />));
 
-  const date = container.querySelector<HTMLButtonElement>('[aria-label="editor.compact.dateTime"]');
-  const browser = container.querySelector<HTMLButtonElement>(
-    '[aria-label="editor.compact.browser"]'
+  const date = container.querySelector<HTMLInputElement>(
+    '[data-ui="editor.technical-data.field-date"]'
   );
-  expect(date?.getAttribute('aria-pressed')).toBe('true');
-  expect(browser?.getAttribute('aria-pressed')).toBe('true');
+  const browser = container.querySelector<HTMLInputElement>(
+    '[data-ui="editor.technical-data.field-browser"]'
+  );
+  expect(date?.checked).toBe(true);
+  expect(browser?.checked).toBe(true);
   expect(
     Array.from(container.querySelectorAll('button'))
       .find((button) => button.textContent === 'editor.compact.technicalDataLayoutRow')
@@ -117,22 +216,25 @@ it('preserves user changes made before the saved preference loads', async () => 
     })
   );
   act(() => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
-  const url = container.querySelector<HTMLButtonElement>('[aria-label="editor.compact.pageUrl"]');
+  const url = container.querySelector<HTMLInputElement>(
+    '[data-ui="editor.technical-data.field-url"]'
+  );
   act(() => url?.click());
   await act(async () => resolveLoad({ kinds: ['date'], layout: 'row' }));
-  expect(url?.getAttribute('aria-pressed')).toBe('true');
+  expect(url?.checked).toBe(true);
   expect(
-    container
-      .querySelector<HTMLButtonElement>('[aria-label="editor.compact.dateTime"]')
-      ?.getAttribute('aria-pressed')
-  ).toBe('false');
+    container.querySelector<HTMLInputElement>('[data-ui="editor.technical-data.field-date"]')
+      ?.checked
+  ).toBe(false);
 });
 
 it('reports when insertion succeeds but saving the preference fails', async () => {
   savePreferenceMock.mockRejectedValueOnce(new Error('quota'));
   await act(async () => root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} />));
   act(() =>
-    container.querySelector<HTMLButtonElement>('[aria-label="editor.compact.pageUrl"]')?.click()
+    container
+      .querySelector<HTMLInputElement>('[data-ui="editor.technical-data.field-url"]')
+      ?.click()
   );
   await act(async () => {
     Array.from(container.querySelectorAll('button'))

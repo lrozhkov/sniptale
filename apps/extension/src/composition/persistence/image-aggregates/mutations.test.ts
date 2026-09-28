@@ -288,16 +288,15 @@ it('saves scenario Library image edits without replacing the stored source', asy
 it('creates a missing revision-zero aggregate and rejects non-initial missing roots', async () => {
   const document = createEditorDocumentFixture();
   const puts = installTransaction({ sourceId: 'new-image' });
+  const input = { aggregateId: 'new-image', document, expectedRevision: 0, captureTime: 3 };
 
-  await expect(
-    commitImageWorkspace({ aggregateId: 'new-image', document, expectedRevision: 0 })
-  ).resolves.toMatchObject({
+  await expect(commitImageWorkspace(input)).resolves.toMatchObject({
     documentAssetsByRuntimeUrl: expect.any(Map),
     revision: 1,
     updatedAt: 10,
   });
   expect(puts.media).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'new-image', workspaceRevision: 0 })
+    expect.objectContaining({ id: 'new-image', createdAt: 3, workspaceRevision: 0 })
   );
   expect(puts.presentation).toHaveBeenCalledWith(
     expect.objectContaining({ aggregateId: 'new-image', presentationRevision: 0 })

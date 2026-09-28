@@ -66,6 +66,7 @@ async function persistEditorSessionDocument(args: {
   try {
     const result = await commitImageWorkspace({
       aggregateId: args.context.aggregateId,
+      ...(args.context.capturedAt === undefined ? {} : { captureTime: args.context.capturedAt }),
       document: args.document,
       expectedRevision: args.context.durableRevision,
       sourceUrl: args.context.sourceUrl,

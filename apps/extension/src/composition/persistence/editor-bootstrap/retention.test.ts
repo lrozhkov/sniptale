@@ -129,6 +129,7 @@ describe('editor-bootstrap retention persist flow', () => {
     await expect(
       persistEditorBootstrapPayload({
         dataUrl: 'data:image/png;base64,cGVyc2lzdGVk',
+        capturedAt: 3_000_000,
         document: createEditorDocument(),
         sourceFaviconUrl: 'https://persisted.test/favicon.ico',
       })
@@ -140,6 +141,7 @@ describe('editor-bootstrap retention persist flow', () => {
     expect(db.delete).toHaveBeenCalledWith('payloads', 'expired-entry');
     expect(db.delete).not.toHaveBeenCalledWith('payloads', 'fresh-entry');
     expect(db.put).toHaveBeenCalledWith('payloads', {
+      capturedAt: 3_000_000,
       createdAt: 4_000_000,
       dataUrl: 'data:image/png;base64,cGVyc2lzdGVk',
       document: createEditorDocument(),
@@ -155,6 +157,7 @@ describe('editor-bootstrap retention active consume flow', () => {
   it('consumes active persisted payloads', async () => {
     const db = createDb({
       persistedEntry: {
+        capturedAt: 3_000_000,
         createdAt: 4_000_000,
         dataUrl: 'data:image/png;base64,cmVzdG9yZWQ=',
         document: createEditorDocument(),
@@ -169,6 +172,7 @@ describe('editor-bootstrap retention active consume flow', () => {
     vi.spyOn(Date, 'now').mockReturnValue(4_100_000);
 
     await expect(consumePersistedEditorBootstrapPayload('bootstrap-id')).resolves.toEqual({
+      capturedAt: 3_000_000,
       dataUrl: 'data:image/png;base64,cmVzdG9yZWQ=',
       document: createEditorDocument(),
       sourceFaviconUrl: 'https://persisted.test/favicon.ico',

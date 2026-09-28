@@ -20,6 +20,7 @@ export function createTechnicalDataTextObject(options: {
   source: SourceState;
   sourceUrl: string;
   sourceTitle: string;
+  capturedAt?: number | null;
   nextLabelIndex: number;
   layout?: EditorTechnicalDataLayout;
   textSettings: DrawingToolDefaults['text'];
@@ -33,6 +34,7 @@ export function createTechnicalDataTextObject(options: {
     locale,
     sourceTitle: options.sourceTitle,
     sourceUrl: options.sourceUrl,
+    capturedAt: options.capturedAt ?? null,
   });
   const inset = getTechnicalDataTextInset(options.source);
   const availableWidth = Math.max(1, options.source.displayWidth - inset * 2);

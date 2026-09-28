@@ -117,6 +117,10 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     ru: 'Данные страницы',
     en: 'Page details',
   },
+  technicalDataTextSettings: {
+    ru: 'Параметры текста',
+    en: 'Text settings',
+  },
   technicalDataLayoutColumn: {
     ru: 'Столбец',
     en: 'Column',

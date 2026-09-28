@@ -87,6 +87,7 @@ describe('image aggregate autosave', () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const autosave = createEditorSessionAutosaveService();
     activate(autosave);
+    autosave.updateContext({ capturedAt: 3 });
     autosave.scheduleAutosave(createDocument('first'));
     const { useEditorStore } = await import('../../state/useEditorStore');
     expect(useEditorStore.getState().saveState).toBe('saving');
@@ -99,7 +100,12 @@ describe('image aggregate autosave', () => {
 
     expect(commitWorkspaceMock).toHaveBeenCalledTimes(1);
     expect(commitWorkspaceMock).toHaveBeenCalledWith(
-      expect.objectContaining({ aggregateId: 'image-1', document: latest, expectedRevision: 0 })
+      expect.objectContaining({
+        aggregateId: 'image-1',
+        captureTime: 3,
+        document: latest,
+        expectedRevision: 0,
+      })
     );
     expect(autosave.getDurableRevision()).toBe(1);
   });

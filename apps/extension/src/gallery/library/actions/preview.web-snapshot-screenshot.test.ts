@@ -78,6 +78,7 @@ it('opens web snapshot screenshots in the image editor', async () => {
   expect(validateWebSnapshotScreenshotBlobMock).toHaveBeenCalledWith(screenshotBlob);
   expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith(
     expect.objectContaining({
+      capturedAt: previewItem.createdAt,
       sourceFaviconUrl: null,
       title: 'Snapshot page',
       url: 'https://example.com/page',

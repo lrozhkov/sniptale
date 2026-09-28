@@ -27,6 +27,8 @@ export type EditorStoreSetters = Pick<
   | 'setSaveErrorMessage'
   | 'setSaveState'
   | 'setSessionId'
+  | 'setCapturedAt'
+  | 'updateTechnicalDataTextSettings'
   | 'setImageData'
   | 'setPageTitle'
   | 'setRichShapeToolSelection'
@@ -64,7 +66,16 @@ export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStore
     setCanvasCropMode: (canvasCropMode) => set({ canvasCropMode }),
     setSaveErrorMessage: (saveErrorMessage) => set({ saveErrorMessage }),
     setSaveState: (saveState) => set({ saveState }),
-    setSessionId: (sessionId) => set({ sessionId }),
+    setSessionId: (sessionId) =>
+      set((state) => ({
+        sessionId,
+        capturedAt: state.sessionId === sessionId ? state.capturedAt : null,
+      })),
+    setCapturedAt: (capturedAt) => set({ capturedAt }),
+    updateTechnicalDataTextSettings: (patch) =>
+      set((state) => ({
+        technicalDataTextSettings: { ...state.technicalDataTextSettings, ...patch },
+      })),
     setImageData: (imageData) => set({ imageData }),
     setPageTitle: (pageTitle) => set({ pageTitle }),
     setRichShapeToolSelection: (richShapeToolSelection) => set({ richShapeToolSelection }),

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Calendar, Link, Monitor } from 'lucide-react';
-import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
+import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import {
   orderTechnicalDataKinds,
   type EditorTechnicalDataLayout,
@@ -10,6 +10,8 @@ import {
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME, INSPECTOR_SECTION_LABEL_CLASS_NAME } from './chrome';
 import { cx } from '../chrome/ui';
 import { useTechnicalDataPreference } from './technical-data-preference';
+import { EditorInspectorDetails } from './grouped';
+import { EditorTechnicalDataTextSettings } from './technical-data-text-settings';
 
 type TechnicalDataPickerVariant = 'compact' | 'expanded';
 
@@ -61,13 +63,11 @@ interface TechnicalDataOptionRowProps {
   checked: boolean;
   onToggle: () => void;
   option: TechnicalDataOption;
-  variant: TechnicalDataPickerVariant;
 }
 
 interface TechnicalDataOptionListProps {
   selectedKinds: readonly EditorTechnicalDataKind[];
   onToggleKind: (kind: EditorTechnicalDataKind) => void;
-  variant: TechnicalDataPickerVariant;
 }
 
 function getTechnicalDataLayoutLabel(layout: EditorTechnicalDataLayout): string {
@@ -114,26 +114,27 @@ function TechnicalDataLayoutToggle(props: {
 
 function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOptionRowProps) {
   return (
-    <div data-inspector-toggle className="flex min-h-8 items-center justify-between gap-3">
-      <span className="flex min-w-0 items-center gap-2 text-xs text-[color:var(--sniptale-color-text-secondary)]">
-        {option.icon}
-        {translate(option.labelKey)}
-      </span>
-      <ProductGlassSwitch
-        on={checked}
-        aria-label={translate(option.labelKey)}
-        aria-pressed={checked}
-        onClick={onToggle}
+    <label
+      className={cx(
+        'flex min-h-8 cursor-pointer items-center gap-2.5 rounded-md px-1 text-xs',
+        'text-[color:var(--sniptale-color-text-secondary)]',
+        'hover:bg-[var(--sniptale-color-surface-hover)]'
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        className="sniptale-checkbox sniptale-checkbox-sm shrink-0"
+        data-ui={`editor.technical-data.field-${option.kind}`}
       />
-    </div>
+      {option.icon}
+      <span>{translate(option.labelKey)}</span>
+    </label>
   );
 }
 
-function TechnicalDataOptionList({
-  selectedKinds,
-  onToggleKind,
-  variant,
-}: TechnicalDataOptionListProps) {
+function TechnicalDataOptionList({ selectedKinds, onToggleKind }: TechnicalDataOptionListProps) {
   return (
     <div
       role="group"
@@ -149,7 +150,6 @@ function TechnicalDataOptionList({
             checked={checked}
             onToggle={() => onToggleKind(option.kind)}
             option={option}
-            variant={variant}
           />
         );
       })}
@@ -178,39 +178,52 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
   };
 
   return (
-    <div className="space-y-3">
-      <section className="space-y-2.5">
-        <TechnicalDataOptionList
-          selectedKinds={selectedKinds}
-          onToggleKind={toggleKind}
-          variant={variant}
-        />
-      </section>
-      {orderedKinds.length > 1 ? (
-        <TechnicalDataLayoutToggle layout={layout} onSelectLayout={selectLayout} />
-      ) : null}
-      {saveError ? (
-        <p role="alert" className="text-xs text-[color:var(--sniptale-color-text-primary)]">
-          {translate('editor.compact.technicalDataPreferenceSaveFailed')}
-        </p>
-      ) : null}
-      {!canInsert ? (
-        <p role="status" className="text-xs text-[color:var(--sniptale-color-text-secondary)]">
-          {translate('editor.compact.technicalDataPreviewEmpty')}
-        </p>
-      ) : null}
-      <button
-        type="button"
-        disabled={!canInsert}
-        onClick={handleInsert}
-        className={cx(
-          INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
-          'justify-center',
-          pickerButtonClassName[variant]
-        )}
-      >
-        {translate('editor.compact.technicalDataInsert')}
-      </button>
-    </div>
+    <InspectorDisclosurePreferences scope="editor:technical-data">
+      <div className="space-y-3">
+        <EditorInspectorDetails
+          label={translate('editor.compact.technicalDataTextSettings')}
+          preferenceId="text-settings"
+          initiallyOpen
+          level="section"
+        >
+          <EditorTechnicalDataTextSettings />
+        </EditorInspectorDetails>
+        <EditorInspectorDetails
+          label={translate('editor.compact.technicalDataFields')}
+          preferenceId="fields"
+          initiallyOpen
+          level="section"
+        >
+          <div className="space-y-2.5">
+            <TechnicalDataOptionList selectedKinds={selectedKinds} onToggleKind={toggleKind} />
+            {orderedKinds.length > 1 ? (
+              <TechnicalDataLayoutToggle layout={layout} onSelectLayout={selectLayout} />
+            ) : null}
+          </div>
+        </EditorInspectorDetails>
+        {saveError ? (
+          <p role="alert" className="text-xs text-[color:var(--sniptale-color-text-primary)]">
+            {translate('editor.compact.technicalDataPreferenceSaveFailed')}
+          </p>
+        ) : null}
+        {!canInsert ? (
+          <p role="status" className="text-xs text-[color:var(--sniptale-color-text-secondary)]">
+            {translate('editor.compact.technicalDataPreviewEmpty')}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          disabled={!canInsert}
+          onClick={handleInsert}
+          className={cx(
+            INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
+            'justify-center',
+            pickerButtonClassName[variant]
+          )}
+        >
+          {translate('editor.compact.technicalDataInsert')}
+        </button>
+      </div>
+    </InspectorDisclosurePreferences>
   );
 };

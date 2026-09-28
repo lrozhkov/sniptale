@@ -176,3 +176,27 @@ it('uses the full available image width for a short technical-data row', () => {
   expect(result.width).toBe(2960);
   expect(result.left).toBe(20);
 });
+
+it('starts a technical-data column wide enough for unwrapped labels on a large image', () => {
+  const result = createTechnicalDataTextObject({
+    kinds: ['url', 'date', 'browser'],
+    nextLabelIndex: 8,
+    prepareObject: vi.fn(),
+    source: {
+      displayHeight: 1000,
+      displayWidth: 1600,
+      left: 0,
+      top: 0,
+    } as never,
+    sourceTitle: '',
+    sourceUrl: 'https://example.com',
+    textSettings: {
+      backgroundColor: null,
+      color: '#ffffff',
+      fontFamily: 'mono',
+      fontSize: 20,
+    },
+  });
+
+  expect(result.width).toBe(640);
+});

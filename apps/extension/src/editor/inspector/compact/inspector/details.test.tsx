@@ -283,7 +283,7 @@ it('builds meta compact commands and leaves selection actions empty', () => {
   });
 
   const optionButtons = Array.from(
-    container.querySelectorAll<HTMLButtonElement>('[data-inspector-toggle] button')
+    container.querySelectorAll<HTMLInputElement>('[data-ui^="editor.technical-data.field-"]')
   );
   const addButton = Array.from(container.querySelectorAll('button')).find((button) =>
     button.hasAttribute('disabled')

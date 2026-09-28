@@ -77,8 +77,9 @@ export function insertEditorTechnicalDataObject(options: {
     source,
     sourceUrl: store.browserFrame.url.trim(),
     sourceTitle: store.pageTitle.trim(),
+    capturedAt: store.capturedAt,
     nextLabelIndex: nextLabelIndex('text'),
-    textSettings: store.toolSettings.text,
+    textSettings: store.technicalDataTextSettings,
     prepareObject,
   });
   canvas.add(text);

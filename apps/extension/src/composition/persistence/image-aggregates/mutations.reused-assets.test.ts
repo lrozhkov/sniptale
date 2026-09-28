@@ -147,6 +147,7 @@ it('journals, replays, and rolls back only newly staged assets in a mixed public
   document.frame.backgroundImageData = 'data:image/png;base64,Y2hhbmdlZA==';
   const input = {
     aggregateId: 'image-1',
+    captureTime: 3,
     document,
     expectedRevision: 2,
     reusableAssetsByRuntimeUrl: new Map([[runtimeSourceUrl, reusedRef]]),
@@ -160,6 +161,7 @@ it('journals, replays, and rolls back only newly staged assets in a mixed public
     'editor-source',
     'staged-1',
   ]);
+  expect(journal.payload.captureTime).toBe(3);
   expect(mocks.releaseProtection).toHaveBeenCalledWith(['staged-1']);
 
   mocks.initDB.mockResolvedValue({

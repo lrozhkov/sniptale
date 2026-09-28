@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   getStateMock: vi.fn(() => ({
     browserFrame: { url: ' https://example.test/path ' },
     pageTitle: ' Example title ',
+    capturedAt: 1_600_000_000_000,
     setInspector: vi.fn(),
+    technicalDataTextSettings: { fontFamily: 'mono', fontSize: 18 },
     toolSettings: { text: { calloutFormat: 'panel' } },
   })),
   removeEditorBrowserFrameSettingsMock: vi.fn(),
@@ -125,7 +127,9 @@ function setupPublicActionMocks() {
   mocks.getStateMock.mockReturnValue({
     browserFrame: { url: ' https://example.test/path ' },
     pageTitle: ' Example title ',
+    capturedAt: 1_600_000_000_000,
     setInspector: vi.fn(),
+    technicalDataTextSettings: { fontFamily: 'mono', fontSize: 18 },
     toolSettings: { text: { calloutFormat: 'panel' } },
   });
 }
@@ -192,7 +196,9 @@ function runTechnicalDataSuite() {
     mocks.getStateMock.mockReturnValue({
       browserFrame: { url: ' https://example.test/path ' },
       pageTitle: ' Example title ',
+      capturedAt: 1_600_000_000_000,
       setInspector,
+      technicalDataTextSettings: { fontFamily: 'mono', fontSize: 18 },
       toolSettings: { text: { calloutFormat: 'panel' } },
     });
     mocks.createTechnicalDataTextObjectMock.mockReturnValue(text);
@@ -215,7 +221,8 @@ function runTechnicalDataSuite() {
         nextLabelIndex: 7,
         sourceTitle: 'Example title',
         sourceUrl: 'https://example.test/path',
-        textSettings: expect.any(Object),
+        capturedAt: 1_600_000_000_000,
+        textSettings: { fontFamily: 'mono', fontSize: 18 },
       })
     );
     expect(canvas.add).toHaveBeenCalledWith(text);

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import {
   cleanupDom,
@@ -10,6 +10,11 @@ import {
   renderWithController,
   resetEditorStore,
 } from '../../../../../../tooling/test/harness/editor/ownership/helpers';
+
+vi.mock('../../persistence/ui-state/technical-data', () => ({
+  loadEditorTechnicalDataPreference: vi.fn().mockResolvedValue({ kinds: [], layout: 'column' }),
+  saveEditorTechnicalDataPreference: vi.fn().mockResolvedValue(undefined),
+}));
 
 async function renderSidebarForInspector(
   controller: ReturnType<typeof createControllerMock>,
@@ -87,13 +92,15 @@ async function expectMetaInspectorUsesController(
   await renderSidebarForInspector(controller, { activeTool: 'select', inspector: 'meta' });
 
   const technicalDataOptions = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('[data-inspector-toggle] button')
+    document.querySelectorAll<HTMLInputElement>('[data-ui^="editor.technical-data.field-"]')
   );
   const insertTechnicalDataButton = getButtonWithText(
     translate('editor.compact.technicalDataInsert')
   );
 
-  expect(insertTechnicalDataButton?.className).toContain('border-none');
+  expect(insertTechnicalDataButton?.className).toContain(
+    'border-[color:var(--sniptale-color-border-soft)]'
+  );
   expect(insertTechnicalDataButton?.className).toContain('text-[12px]');
 
   await act(async () => {

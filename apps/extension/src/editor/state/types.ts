@@ -64,7 +64,9 @@ interface EditorUiState {
   saveErrorMessage: string | null;
   saveState: 'idle' | 'saving' | 'saved' | 'error';
   sessionId: string | null;
+  capturedAt: number | null;
   toolSettings: EditorToolSettings;
+  technicalDataTextSettings: DrawingToolDefaults['text'];
   selectionToolSettings: EditorToolSettings;
   imageData: string | null;
   pageTitle: string;
@@ -99,6 +101,8 @@ interface EditorUiActions {
   setSaveErrorMessage: (message: string | null) => void;
   setSaveState: (saveState: EditorState['saveState']) => void;
   setSessionId: (sessionId: string | null) => void;
+  setCapturedAt: (capturedAt: number | null) => void;
+  updateTechnicalDataTextSettings: (patch: Partial<DrawingToolDefaults['text']>) => void;
   setImageData: (imageData: string | null) => void;
   setPageTitle: (pageTitle: string) => void;
   setRichShapeToolSelection: (selection: EditorRichShapeToolSelection | null) => void;

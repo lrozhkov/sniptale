@@ -65,6 +65,7 @@ interface PreparedImageWorkspaceInput extends Omit<
 
 export interface CommitImageWorkspaceInput {
   aggregateId: string;
+  captureTime?: number;
   document: EditorDocument;
   expectedRevision: number;
   imageContentState?: ImageContentState;
@@ -97,7 +98,7 @@ function createNewImageAggregateRoot(
   const filename = input.document.sourceName ?? 'Draft image';
   return {
     blob: prepared.originalBlob,
-    createdAt: now,
+    createdAt: input.captureTime ?? now,
     duration: null,
     filename,
     height: input.document.sourceHeight,
@@ -265,7 +266,7 @@ async function commitImageWorkspaceMutation(
   const revision = input.expectedRevision + 1;
   await workspaceStore.put({
     aggregateId: input.aggregateId,
-    createdAt: existing?.createdAt ?? now,
+    createdAt: existing?.createdAt ?? media.createdAt,
     document: input.document,
     revision,
     sourceTitle: input.sourceTitle ?? existing?.sourceTitle ?? media.sourceTitle,
@@ -374,6 +375,13 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
   ) {
     return null;
   }
+  const captureTime = value['captureTime'];
+  if (
+    captureTime !== undefined &&
+    (typeof captureTime !== 'number' || !Number.isFinite(captureTime) || captureTime < 0)
+  ) {
+    return null;
+  }
   const refs = value['refs'].map(parseAssetRef);
   if (refs.some((ref) => ref === null)) return null;
   const rawSourceGuard = value['sourceGuard'];
@@ -397,6 +405,7 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     aggregateId: value['aggregateId'],
     document,
     expectedRevision: value['expectedRevision'],
+    ...(captureTime === undefined ? {} : { captureTime }),
     refs: refs as AssetRef[],
     ...(value['imageContentState'] === undefined
       ? {}
