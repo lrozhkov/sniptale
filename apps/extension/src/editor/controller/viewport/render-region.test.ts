@@ -67,7 +67,7 @@ it('keeps a panned drawing at the same screen position while history restores th
   expect(viewport.scrollTop).toBe(2170);
 });
 
-it('covers the full right edge of a viewport with symmetric scrollbar gutters', () => {
+it('keeps painted backing beyond both visible edges while panning with scrollbar gutters', () => {
   const surface = document.createElement('div');
   const viewport = document.createElement('div');
   const element = document.createElement('canvas');
@@ -76,9 +76,19 @@ it('covers the full right edge of a viewport with symmetric scrollbar gutters', 
     clientLeft: { value: 15 },
     clientWidth: { value: 770 },
     clientHeight: { value: 580 },
+    offsetWidth: { value: 800 },
+    offsetHeight: { value: 600 },
   });
+  let surfaceLeft = -200;
+  let scale = 1;
   surface.getBoundingClientRect = () =>
-    ({ left: -3411, right: 785, top: 0, width: 4196, height: 4176 }) as DOMRect;
+    ({
+      left: surfaceLeft,
+      right: surfaceLeft + 4196 * scale,
+      top: 0,
+      width: 4196 * scale,
+      height: 4176 * scale,
+    }) as DOMRect;
   viewport.getBoundingClientRect = () =>
     ({ left: 0, right: 800, top: 0, width: 800, height: 600 }) as DOMRect;
 
@@ -86,8 +96,24 @@ it('covers the full right edge of a viewport with symmetric scrollbar gutters', 
   canvas.setRenderViewport(viewport, document.createElement('div'));
   canvas.setDocumentGeometry({ width: 100, height: 80 }, 2048);
 
-  expect(Number.parseFloat(canvas.wrapperEl.style.left)).toBe(3426);
-  expect(Number.parseFloat(canvas.wrapperEl.style.left) + canvas.width).toBe(4196);
+  const expectPaintedEdges = (leftInset: number, rightInset: number) => {
+    const wrapperLeft = surfaceLeft + Number.parseFloat(canvas.wrapperEl.style.left);
+    expect(wrapperLeft).toBeLessThanOrEqual(15 - leftInset);
+    expect(wrapperLeft + canvas.width).toBeGreaterThanOrEqual(785 + rightInset);
+    expect(wrapperLeft + canvas.viewportTransform[4]).toBeCloseTo(surfaceLeft + 2048 * scale);
+  };
+
+  expectPaintedEdges(2, 2);
+  surfaceLeft = -3381;
+  canvas.refreshVirtualViewport();
+  expectPaintedEdges(2, 2);
+  surfaceLeft = -3411;
+  canvas.refreshVirtualViewport();
+  expectPaintedEdges(2, 0);
+  scale = 0.75;
+  surfaceLeft = -200;
+  canvas.setPresentationScale(scale);
+  expectPaintedEdges(2, 2);
 });
 
 it('targets a selected lower layer through overlapping artwork until selection clears', () => {
@@ -224,9 +250,9 @@ it('keeps the interactive backing near the viewport instead of the scrollable wo
   canvas.setRenderViewport(viewport, stage);
   canvas.setDocumentGeometry({ width: 1920, height: 1080 }, 2048);
 
-  expect(canvas.getWidth()).toBe(800);
-  expect(canvas.getHeight()).toBe(600);
-  expect(canvas.lowerCanvasEl.width).toBeLessThanOrEqual(1600);
+  expect(canvas.getWidth()).toBe(804);
+  expect(canvas.getHeight()).toBe(604);
+  expect(canvas.lowerCanvasEl.width).toBeLessThanOrEqual(1608);
   expect(surface.style.width).toBe('6016px');
   expect(surface.style.height).toBe('5176px');
 });
@@ -252,7 +278,7 @@ it('adds scrollable crop workspace at an approached edge without increasing the 
   expect(canvas.getWorkspaceInsets().left).toBeGreaterThan(2048);
   expect(viewport.scrollLeft).toBeGreaterThan(0);
   expect(Number.parseFloat(surface.style.width)).toBeGreaterThan(initialWidth);
-  expect(canvas.getWidth()).toBe(800);
+  expect(canvas.getWidth()).toBe(804);
 });
 
 it('keeps the same workspace span across repeated canvas expansion applies', () => {
@@ -277,7 +303,7 @@ it('keeps the same workspace span across repeated canvas expansion applies', () 
   canvas.prepareWorkspaceForCrop({ left: -100, top: 0, width: 500, height: 80 });
   canvas.setDocumentGeometry({ width: 500, height: 80 }, 2048);
   expect(surface.style.width).toBe(initialWidth);
-  expect(canvas.getWidth()).toBe(800);
+  expect(canvas.getWidth()).toBe(804);
 });
 
 it('projects a far off-image object into the viewport after scrolling', () => {
@@ -303,8 +329,8 @@ it('projects a far off-image object into the viewport after scrolling', () => {
   canvas.upperCanvasEl.getBoundingClientRect = () =>
     ({ left: 0, top: 0, width: 800, height: 600 }) as DOMRect;
 
-  expect(canvas.wrapperEl.style.left).toBe('700px');
-  expect(canvas.viewportTransform).toEqual([1, 0, 0, 1, 1348, 2048]);
+  expect(canvas.wrapperEl.style.left).toBe('698px');
+  expect(canvas.viewportTransform).toEqual([1, 0, 0, 1, 1350, 2048]);
   expect(
     canvas.findTarget(new MouseEvent('mousemove', { clientX: 178, clientY: 113 })).target
   ).toBe(object);

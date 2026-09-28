@@ -13,6 +13,7 @@ const MAX_INTERACTIVE_BACKING_PIXELS = 4_000_000;
 const MAX_WORKSPACE_SIDE = 200_000;
 const WORKSPACE_EDGE_TRIGGER_PX = 160;
 const WORKSPACE_GROWTH_PX = 768;
+const RENDER_OVERSCAN_PX = 2;
 
 /** The backing canvas covers the scrollable workspace; interactive frames paint only its visible part. */
 export class EditorCanvas extends Canvas {
@@ -330,8 +331,12 @@ export class EditorCanvas extends Canvas {
     if (!surface) return;
     const scale = this.presentationScale;
     const { width: logicalWidth, height: logicalHeight } = this.updateWorkspaceSurface();
-    const width = Math.max(1, this.renderViewport.clientWidth);
-    const height = Math.max(1, this.renderViewport.clientHeight);
+    const width =
+      Math.max(1, this.renderViewport.clientWidth, this.renderViewport.offsetWidth) +
+      RENDER_OVERSCAN_PX * 2;
+    const height =
+      Math.max(1, this.renderViewport.clientHeight, this.renderViewport.offsetHeight) +
+      RENDER_OVERSCAN_PX * 2;
     const devicePixelRatio = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     this.enableRetinaScaling =
       width * height * devicePixelRatio ** 2 <= MAX_INTERACTIVE_BACKING_PIXELS;
@@ -343,14 +348,14 @@ export class EditorCanvas extends Canvas {
       0,
       Math.min(
         logicalWidth * scale - width,
-        viewportRect.left + this.renderViewport.clientLeft - surfaceRect.left
+        viewportRect.left - surfaceRect.left - RENDER_OVERSCAN_PX
       )
     );
     const top = Math.max(
       0,
       Math.min(
         logicalHeight * scale - height,
-        viewportRect.top + this.renderViewport.clientTop - surfaceRect.top
+        viewportRect.top - surfaceRect.top - RENDER_OVERSCAN_PX
       )
     );
     this.wrapperEl.style.left = `${left}px`;
