@@ -292,17 +292,28 @@ it('shows compact two-row text and background palettes with text-size controls',
   const textPalette = panel?.querySelector<HTMLElement>(
     '[aria-label="content.toolbar.drawingTextColor"]'
   );
-  const backgroundPalette = panel?.querySelector<HTMLElement>(
-    '[aria-label="content.toolbar.drawingTextBackground"]'
-  );
   expect(textPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
-  expect(backgroundPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
+  expect(
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+  ).toBeNull();
   expect(textPalette?.querySelectorAll('.grid.grid-cols-5 button[title^="#"]')).toHaveLength(5);
   expect(textPalette?.querySelector('button[title="#14b8a6"]')).toBeNull();
   expect(textPalette?.querySelector('button[title="#ec4899"]')).toBeNull();
-  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
+  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(1);
   expect(textPalette?.getAttribute('role')).toBe('group');
+
+  const backgroundToggle = panel?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+  );
+  expect(backgroundToggle?.getAttribute('aria-pressed')).toBe('false');
+  act(() => backgroundToggle?.click());
+  expect(session.getSnapshot().defaults.text.backgroundColor).toBe(DEFAULT_DRAWING_COLORS[0]);
+  const backgroundPalette = panel?.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.drawing-options.text.background-colors"]'
+  );
+  expect(backgroundPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
   expect(backgroundPalette?.getAttribute('role')).toBe('group');
+  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
 
   act(() =>
     panel
@@ -332,14 +343,13 @@ it('shows compact two-row text and background palettes with text-size controls',
     'content.toolbar.drawingTextColor: #22c55e'
   );
   expect(selectedTextColor?.getAttribute('aria-pressed')).toBe('true');
-  act(() =>
-    panel
-      ?.querySelector<HTMLButtonElement>(
-        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
-      )
-      ?.click()
-  );
+  act(() => backgroundToggle?.click());
   expect(session.getSnapshot().defaults.text.backgroundColor).toBeNull();
+  expect(
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+  ).toBeNull();
+  act(() => backgroundToggle?.click());
+  expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#60a5fa');
   act(() => root.unmount());
 });
 
@@ -656,6 +666,14 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
     '[data-ui="content.toolbar.drawing-options.text.background-group"]'
   );
   expect(textBackgroundGroup?.classList).toContain('flex-col');
+  expect(textBackgroundGroup?.querySelector('.grid')).toBeNull();
+  act(() =>
+    textBackgroundGroup
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+      )
+      ?.click()
+  );
   expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
   act(() => root.unmount());
 });

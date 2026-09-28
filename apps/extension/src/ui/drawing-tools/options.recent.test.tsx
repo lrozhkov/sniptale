@@ -138,7 +138,7 @@ it('puts the picker first and keeps visible swatches in place while adding new c
   const group = host.querySelector('[role="group"]');
   expect(group?.firstElementChild?.getAttribute('data-ui')).toBe('test.color-picker');
   const picker = host.querySelector<HTMLButtonElement>('[data-ui="test.color-picker"]');
-  expect(picker?.className).toContain('border-strong');
+  expect(picker?.className).toContain('border-transparent');
   act(() => host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
   expect(visibleColors(host)).toEqual(palette.slice(0, 5));
 
@@ -165,6 +165,9 @@ it('puts the picker first and keeps visible swatches in place while adding new c
     )
   );
   expect(host.querySelector('[data-ui="test.color-picker"]')?.className).toContain(
+    'border-transparent'
+  );
+  expect(host.querySelector('[data-ui="test.color-picker"]')?.className).not.toContain(
     'accent-emphasis'
   );
   act(() => root.unmount());

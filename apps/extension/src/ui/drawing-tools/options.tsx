@@ -1,13 +1,4 @@
-import {
-  ArrowDownLeft,
-  Ban,
-  Blend,
-  Circle,
-  PaintBucket,
-  Square,
-  Triangle,
-  Type,
-} from 'lucide-react';
+import { ArrowDownLeft, Blend, Circle, PaintBucket, Square, Triangle, Type } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
@@ -311,10 +302,6 @@ export function DrawingColorOptions(props: {
   const Icon = props.icon;
   const { quickColors, selectColor } = useQuickDrawingColors(props.colors, props.onSelect);
   const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
-  const pickerSelected =
-    selectedValue !== null &&
-    selectedValue !== '__transparent__' &&
-    !quickColors.some((color) => color.toLowerCase() === selectedValue.toLowerCase());
   return (
     <div
       role="group"
@@ -333,12 +320,7 @@ export function DrawingColorOptions(props: {
       <CompactColorSelector
         allowAlpha={props.allowAlpha ?? false}
         allowTransparent={false}
-        className={[
-          DRAWING_COLOR_PICKER_CLASS,
-          pickerSelected
-            ? "[&_[data-ui='shared.ui.color-selector.trigger']]:!border-[var(--sniptale-color-accent-emphasis)]"
-            : "[&_[data-ui='shared.ui.color-selector.trigger']]:!border-[var(--sniptale-color-border-strong)]",
-        ].join(' ')}
+        className={`${DRAWING_COLOR_PICKER_CLASS} [&_[data-ui='shared.ui.color-selector.trigger']]:!border-transparent`}
         floatingBoundaryRef={props.floatingBoundaryRef}
         floatingPlacement={props.floatingPlacement}
         label={props.label}
@@ -372,67 +354,106 @@ export function DrawingColorOptions(props: {
   );
 }
 
-export function DrawingShapeFillOptions(props: {
+type DrawingFillOptionsProps = {
   colors: readonly string[];
   floatingBoundaryRef: RefObject<HTMLElement | null>;
   floatingPlacement: 'auto' | 'side';
   value: string | null;
   vertical: boolean;
   onChange: (color: string | null) => void;
+};
+
+const DRAWING_FILL_UI = {
+  shape: {
+    group: 'content.toolbar.drawing-options.shape.fill',
+    toggle: 'content.toolbar.drawing-options.shape.fill-toggle',
+    emptyIcon: 'content.toolbar.drawing-options.shape.fill-empty-icon',
+    colors: 'content.toolbar.drawing-options.shape.fill-colors',
+    label: 'content.toolbar.drawingFillColor',
+    enable: 'content.toolbar.drawingEnableFill',
+    disable: 'content.toolbar.drawingDisableFill',
+  },
+  text: {
+    group: 'content.toolbar.drawing-options.text.background-group',
+    toggle: 'content.toolbar.drawing-options.text.background-none',
+    emptyIcon: 'content.toolbar.drawing-options.text.background-empty-icon',
+    colors: 'content.toolbar.drawing-options.text.background-colors',
+    label: 'content.toolbar.drawingTextBackground',
+    enable: 'content.toolbar.drawingTextBackground',
+    disable: 'content.toolbar.drawingNoBackground',
+  },
+} as const;
+
+function DrawingFillToggle(props: {
+  filled: boolean;
+  label: string;
+  dataUi: string;
+  emptyIconUi: string;
+  onClick: () => void;
 }) {
-  const label = translate('content.toolbar.drawingFillColor');
+  return (
+    <ContentToolbarButton
+      type="button"
+      tone="utility"
+      active={props.filled}
+      aria-pressed={props.filled}
+      aria-label={props.label}
+      title={props.label}
+      dataUi={props.dataUi}
+      className={[
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !border-transparent !p-0',
+        props.filled ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
+      ].join(' ')}
+      onClick={props.onClick}
+    >
+      {props.filled ? (
+        <PaintBucket aria-hidden size={19} />
+      ) : (
+        <svg
+          aria-hidden
+          data-ui={props.emptyIconUi}
+          viewBox="0 0 24 24"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="3.5" y="3.5" width="17" height="17" rx="2" strokeWidth="2" />
+          <path d="M4 20 20 4" strokeWidth="2.6" />
+        </svg>
+      )}
+    </ContentToolbarButton>
+  );
+}
+
+function DrawingFillOptions(props: DrawingFillOptionsProps & { kind: 'shape' | 'text' }) {
+  const ui = DRAWING_FILL_UI[props.kind];
+  const label = translate(ui.label);
   const filled = props.value !== null;
+  const toggleLabel = translate(filled ? ui.disable : ui.enable);
   const lastFillColorRef = useRef(props.value ?? props.colors[0] ?? '#000000');
   useEffect(() => {
     if (props.value !== null) lastFillColorRef.current = props.value;
   }, [props.value]);
   return (
     <div
-      data-ui="content.toolbar.drawing-options.shape.fill"
+      data-ui={ui.group}
       className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
     >
-      <ContentToolbarButton
-        type="button"
-        tone="utility"
-        active={filled}
-        aria-pressed={filled}
-        aria-label={translate(
-          filled ? 'content.toolbar.drawingDisableFill' : 'content.toolbar.drawingEnableFill'
-        )}
-        title={translate(
-          filled ? 'content.toolbar.drawingDisableFill' : 'content.toolbar.drawingEnableFill'
-        )}
-        dataUi="content.toolbar.drawing-options.shape.fill-toggle"
-        className={[
-          'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !border-transparent !p-0',
-          filled ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
-        ].join(' ')}
+      <DrawingFillToggle
+        filled={filled}
+        label={toggleLabel}
+        dataUi={ui.toggle}
+        emptyIconUi={ui.emptyIcon}
         onClick={() => props.onChange(filled ? null : lastFillColorRef.current)}
-      >
-        {filled ? (
-          <PaintBucket aria-hidden size={19} />
-        ) : (
-          <svg
-            aria-hidden
-            data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"
-            viewBox="0 0 24 24"
-            width="20"
-            height="20"
-            fill="none"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <rect x="3.5" y="3.5" width="17" height="17" rx="2" strokeWidth="2" />
-            <path d="M4 20 20 4" strokeWidth="2.6" />
-          </svg>
-        )}
-      </ContentToolbarButton>
+      />
       {filled ? (
         <DrawingColorOptions
           allowAlpha
           colors={props.colors}
-          dataUi="content.toolbar.drawing-options.shape.fill-colors"
+          dataUi={ui.colors}
           floatingBoundaryRef={props.floatingBoundaryRef}
           floatingPlacement={props.floatingPlacement}
           label={label}
@@ -444,6 +465,10 @@ export function DrawingShapeFillOptions(props: {
       ) : null}
     </div>
   );
+}
+
+export function DrawingShapeFillOptions(props: DrawingFillOptionsProps) {
+  return <DrawingFillOptions {...props} kind="shape" />;
 }
 
 export function DrawingTextOptions(props: {
@@ -491,30 +516,15 @@ export function DrawingTextOptions(props: {
         onSelect={props.onColorChange}
       />
       <DrawingOptionsDivider extended vertical={props.vertical} />
-      <div
-        data-ui="content.toolbar.drawing-options.text.background-group"
-        className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
-      >
-        <QuickOptionButton
-          active={props.backgroundColor === null}
-          dataUi="content.toolbar.drawing-options.text.background-none"
-          label={translate('content.toolbar.drawingNoBackground')}
-          onClick={() => props.onBackgroundColorChange(null)}
-        >
-          <Ban aria-hidden size={16} />
-        </QuickOptionButton>
-        <DrawingColorOptions
-          allowAlpha
-          colors={props.colors}
-          floatingBoundaryRef={props.floatingBoundaryRef}
-          floatingPlacement={props.floatingPlacement}
-          icon={PaintBucket}
-          label={translate('content.toolbar.drawingTextBackground')}
-          vertical={props.vertical}
-          value={props.backgroundColor ?? '__transparent__'}
-          onSelect={props.onBackgroundColorChange}
-        />
-      </div>
+      <DrawingFillOptions
+        kind="text"
+        colors={props.colors}
+        floatingBoundaryRef={props.floatingBoundaryRef}
+        floatingPlacement={props.floatingPlacement}
+        value={props.backgroundColor}
+        vertical={props.vertical}
+        onChange={props.onBackgroundColorChange}
+      />
       <DrawingOptionsDivider extended vertical={props.vertical} />
       {DRAWING_TEXT_SIZES.map((fontSize) => (
         <QuickOptionButton
