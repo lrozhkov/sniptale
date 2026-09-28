@@ -34,9 +34,7 @@ const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'max-[1439px]:justify-center'
 );
 
-const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames(
-  'flex-row overflow-visible max-[1439px]:-translate-x-24'
-);
+const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames('flex-row overflow-visible');
 
 const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'pencil',

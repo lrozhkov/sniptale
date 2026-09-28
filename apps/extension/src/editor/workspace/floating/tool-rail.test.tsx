@@ -301,14 +301,21 @@ it('uses a top-centered horizontal rail and a separate horizontal history panel'
   expect(history?.parentElement).toBe(stack);
 });
 
-it('moves history to the lower-left corner at HD width while keeping tools on top', () => {
-  renderToolRail(createProps());
+it('centers the expanded frame toolbar at HD width while keeping history in the lower-left corner', () => {
+  renderToolRail(
+    createProps({
+      activeTool: 'frame-annotation',
+      isToolButtonActive: (tool) => tool === 'frame-annotation',
+    })
+  );
 
   const stack = queryUi('editor.floating.tool-rail.stack');
   const rail = queryUi('editor.floating.tool-rail');
   const history = queryUi('editor.floating.tool-rail.history');
+  expect(queryUi('content.toolbar.future-frame-callout')).not.toBeNull();
+  expect(stack?.className).toContain('max-[1439px]:justify-center');
   expect(stack?.className).toContain('max-[1439px]:!translate-none');
-  expect(rail?.className).toContain('max-[1439px]:-translate-x-24');
+  expect(rail?.className).not.toContain('max-[1439px]:-translate-x-24');
   expect(history?.className).toContain('max-[1439px]:!fixed');
   expect(history?.className).toContain('max-[1439px]:!left-3');
   expect(history?.className).toContain('max-[1439px]:!top-auto');
