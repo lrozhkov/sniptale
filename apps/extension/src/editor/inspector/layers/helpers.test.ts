@@ -55,6 +55,9 @@ describe('editor layers sidebar selection capabilities', () => {
     expect(canDeleteLayerSelection([regularLayer] as never)).toBe(true);
     expect(canDeleteLayerSelection([sourceLayer] as never)).toBe(false);
     expect(canReorderLayerSelection([lockedLayer] as never)).toBe(false);
+    expect(
+      canReorderLayerSelection([{ ...sourceLayer, locked: true, reorderable: true }] as never)
+    ).toBe(true);
     expect(canMergeLayerSelection([regularLayer, lockedLayer] as never)).toBe(false);
     expect(canDuplicateLayerSelection([lockedLayer] as never)).toBe(false);
     expect(canDeleteLayerSelection([lockedLayer] as never)).toBe(false);

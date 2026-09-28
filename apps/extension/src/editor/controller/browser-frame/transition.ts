@@ -41,8 +41,7 @@ function resolveNextBrowserFrameScene(
 
 export async function runBrowserFrameTransition(
   context: BrowserFrameTransitionContext,
-  nextBrowserFrame: BrowserFrameState,
-  ensureFrameOnTop: boolean
+  nextBrowserFrame: BrowserFrameState
 ): Promise<boolean> {
   const { canvas, canvasDocumentSize, zoomLevel } = context;
   const nextScene = resolveNextBrowserFrameScene(context, nextBrowserFrame);
@@ -72,9 +71,7 @@ export async function runBrowserFrameTransition(
     context.viewportDevicePixelRatioBaseline
   );
   context.ensureReachableObjects();
-  if (ensureFrameOnTop) {
-    context.ensureBrowserFrameOnTop();
-  }
+  context.ensureBrowserFrameOnTop();
   canvas.requestRenderAll();
   return true;
 }

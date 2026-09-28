@@ -174,8 +174,9 @@ it('logs browser-frame and editor trace events through the shared logger', () =>
   });
 });
 
-it('keeps the browser-frame header above the scene when one exists', () => {
-  const header = { setCoords: vi.fn() };
+it('keeps browser chrome attached to the source without placing it above every annotation', () => {
+  const header = { set: vi.fn(), setCoords: vi.fn() };
+  const source = { dirty: false };
   const canvas = createProjectCanvas();
 
   ensureEditorBrowserFrameOnTop(null);
@@ -186,11 +187,26 @@ it('keeps the browser-frame header above the scene when one exists', () => {
   expect(canvas.bringObjectToFront).not.toHaveBeenCalled();
 
   mocks.findBrowserFrameHeaderMock.mockReturnValueOnce(header);
+  mocks.getSourceObjectMock.mockReturnValueOnce(source);
+  canvas.getObjects.mockReturnValueOnce([source, header] as never);
   ensureEditorBrowserFrameOnTop(canvas as never);
 
-  expect(canvas.bringObjectToFront).toHaveBeenCalledWith(header);
-  expect(canvas.bringObjectToFront).toHaveBeenCalledTimes(1);
+  expect(canvas.bringObjectToFront).not.toHaveBeenCalled();
+  expect(canvas.moveObjectTo).toHaveBeenCalledWith(header, 1);
+  expect(header.set).toHaveBeenCalledWith({ visible: false, selectable: false, evented: false });
   expect(header.setCoords).toHaveBeenCalledOnce();
+});
+
+it('detaches browser chrome from the source after the frame is removed', () => {
+  const source = { dirty: false, sniptaleBrowserHeader: { image: {}, displayHeight: 86 } };
+  const canvas = createProjectCanvas();
+  mocks.findBrowserFrameHeaderMock.mockReturnValueOnce(null);
+  mocks.getSourceObjectMock.mockReturnValueOnce(source);
+
+  ensureEditorBrowserFrameOnTop(canvas as never);
+
+  expect(source.sniptaleBrowserHeader).toBeUndefined();
+  expect(source.dirty).toBe(true);
 });
 
 it('relayouts the scene and applies the next canvas size', () => {

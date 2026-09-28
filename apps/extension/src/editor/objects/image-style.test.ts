@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../features/editor/document/constants';
 import type { EditorImageSettings } from '../../features/editor/document/image-types';
 import { applyImageSettings } from './image-style';
+import { attachBrowserHeaderToImage } from './image-frame';
 
 function createObject() {
   const object = {
@@ -299,5 +300,53 @@ it('renders zero-radius image borders on the outer edge', () => {
   expect(context.moveTo).toHaveBeenCalledWith(-80, -62);
   expect(context.lineTo).toHaveBeenCalledWith(80, -62);
   expect(context.setLineDash).toHaveBeenCalledWith([]);
+  expect(context.stroke).toHaveBeenCalledOnce();
+});
+
+it('renders chrome and source through one rounded window contour and outer border', () => {
+  const baseRender = vi.fn();
+  const image = createObject() as ReturnType<typeof createObject> & {
+    _render: typeof baseRender;
+    sniptaleType: string;
+  };
+  image._render = baseRender;
+  image.sniptaleType = 'source-image';
+  const header = { width: 160, height: 86 } as HTMLImageElement;
+  const context = {
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    clip: vi.fn(),
+    drawImage: vi.fn(),
+    fill: vi.fn(),
+    lineTo: vi.fn(),
+    moveTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    rect: vi.fn(),
+    restore: vi.fn(),
+    roundRect: vi.fn(),
+    save: vi.fn(),
+    setLineDash: vi.fn(),
+    shadowBlur: 18,
+    shadowColor: '#abcdef',
+    shadowOffsetX: 4,
+    shadowOffsetY: 5,
+    stroke: vi.fn(),
+  };
+  applyImageSettings(image as never, {
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    radius: 12,
+    shadow: 45,
+    strokeWidth: 4,
+    opacity: 0.6,
+  });
+  attachBrowserHeaderToImage(image as never, header, 86);
+  image._render(context as never);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  expect(baseRender).toHaveBeenCalledOnce();
+  expect(context.clip).toHaveBeenCalledTimes(2);
+  expect(context.clip).toHaveBeenCalledWith('evenodd');
+  expect(context.roundRect).toHaveBeenCalledWith(-80, -232, 160, 292, 12);
+  expect(context.fill).toHaveBeenCalledOnce();
+  expect(context.moveTo).toHaveBeenCalledWith(-68, -232);
   expect(context.stroke).toHaveBeenCalledOnce();
 });

@@ -122,8 +122,29 @@ it('finds user layers and source layers through the canvas helpers', () => {
 
   expect(findObjectById(canvas, 'annotation-1')).toBe(annotation);
   expect(findObjectById(canvas, 'missing')).toBeUndefined();
-  expect(getLayerObjects(canvas)).toEqual([sourceImage, annotation, browserHeader]);
+  expect(getLayerObjects(canvas)).toEqual([sourceImage, annotation]);
   expect(getSourceObject(canvas)).toBe(sourceImage);
+});
+
+it('projects a browser window as one source layer instead of a separate chrome layer', () => {
+  const source = { ...createSourceImage(), sniptaleLocked: false };
+  const header = {
+    sniptaleId: 'browser-header',
+    sniptaleRole: 'annotation',
+    sniptaleType: 'browser-frame',
+    visible: true,
+  };
+  const layers = collectLayers(createCanvas([createBackgroundLayer(), source, header]));
+  expect(layers.map((layer) => layer.id)).toEqual(['source-image', 'background-1']);
+  expect(layers[0]).toEqual(
+    expect.objectContaining({
+      immutable: true,
+      reorderable: true,
+      name: expect.any(String),
+      typeLabel: expect.any(String),
+    })
+  );
+  expect(layers[0]?.name).toBe(layers[0]?.typeLabel);
 });
 
 it('uses scaled dimensions and fallback layer names when object metadata is incomplete', () => {

@@ -122,6 +122,7 @@ export interface EditorLayerItem {
   effects: EditorRasterEffect[];
   id: string;
   immutable?: boolean;
+  reorderable?: boolean;
   type: EditorObjectType;
   previewColor: string | null;
   previewDataUrl: string | null;

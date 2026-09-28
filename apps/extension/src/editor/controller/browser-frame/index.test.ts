@@ -244,7 +244,7 @@ function runBrowserFrameRollbackSuite() {
 }
 
 function runRemoveBrowserFrameSuite() {
-  it('removes the browser frame without re-raising frame decorations', async () => {
+  it('removes the browser frame and detaches its source rendering', async () => {
     const options = createOptions();
 
     await expect(removeEditorBrowserFrame(options)).resolves.toBe(true);
@@ -259,7 +259,7 @@ function runRemoveBrowserFrameSuite() {
         preserveCanvasSize: false,
       }
     );
-    expect(options.ensureBrowserFrameOnTop).not.toHaveBeenCalled();
+    expect(options.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
     expect(options.setBrowserFrame).toHaveBeenCalledWith(
       expect.objectContaining({
         title: '',

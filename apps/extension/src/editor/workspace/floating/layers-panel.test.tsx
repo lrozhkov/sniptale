@@ -189,7 +189,9 @@ it('expands when the already selected collapsed mode is clicked', () => {
 it('renders only the selected settings body instead of the layers list', () => {
   renderPanel({ inspector: 'browser-frame' });
 
-  expect(container?.querySelector('[data-ui="mock.settings-content"]')).not.toBeNull();
+  const settings = container?.querySelector('[data-ui="mock.settings-content"]');
+  expect(settings).not.toBeNull();
+  expect(settings?.parentElement?.className).toContain('overflow-y-auto');
   expect(container?.querySelector('[data-ui="mock.layers"]')).toBeNull();
   expect(mocks.content).toHaveBeenCalledWith(
     expect.objectContaining({

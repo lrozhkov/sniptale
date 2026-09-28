@@ -5,6 +5,7 @@ import {
   createObjectLabel,
   getEditorObjectTypeLabel,
   isSourceObject,
+  isBrowserFrameObject,
   isTransparentColor,
   isUserObject,
 } from '../../document/model';
@@ -50,7 +51,9 @@ export function findObjectById(canvas: Canvas | null, id: string): FabricObject 
 }
 
 export function getLayerObjects(canvas: Canvas | null): FabricObject[] {
-  return (canvas?.getObjects?.() ?? []).filter(isUserObject);
+  return (canvas?.getObjects?.() ?? []).filter(
+    (object) => isUserObject(object) && !isBrowserFrameObject(object)
+  );
 }
 
 export function getSourceObject(canvas: Canvas | null): FabricObject | undefined {
@@ -65,6 +68,7 @@ export function getObjectDimensions(object: FabricObject): { width: number; heig
 }
 
 export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
+  const hasBrowserWindow = (canvas?.getObjects?.() ?? []).some(isBrowserFrameObject);
   const activeIds = new Set(
     (canvas?.getActiveObjects?.() ?? []).map((object) => object.sniptaleId)
   );
@@ -77,16 +81,23 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
       effects: (object.sniptaleEffects ?? []).map((effect) => ({ ...effect })),
       id: object.sniptaleId ?? crypto.randomUUID(),
       immutable: Boolean(object.sniptaleType === 'source-image'),
+      reorderable: hasBrowserWindow && isSourceObject(object),
       type: object.sniptaleType ?? 'image',
       previewColor: resolveLayerPreviewColor(object),
       previewDataUrl: resolveLayerPreviewDataUrl(object),
       previewTransparent: isTransparentPreview(object),
       raster: object.sniptaleType === 'image' || object.sniptaleType === 'source-image',
-      name: object.sniptaleLabel ?? createObjectLabel(object.sniptaleType ?? 'image', 1),
+      name:
+        hasBrowserWindow && isSourceObject(object)
+          ? getEditorObjectTypeLabel('browser-frame')
+          : (object.sniptaleLabel ?? createObjectLabel(object.sniptaleType ?? 'image', 1)),
       locked: Boolean(object.sniptaleLocked),
       selected: Boolean(object.sniptaleId && activeIds.has(object.sniptaleId)),
       selectedCount,
-      typeLabel: getEditorObjectTypeLabel(object.sniptaleType ?? 'image'),
+      typeLabel:
+        hasBrowserWindow && isSourceObject(object)
+          ? getEditorObjectTypeLabel('browser-frame')
+          : getEditorObjectTypeLabel(object.sniptaleType ?? 'image'),
       visible: object.visible !== false,
     }));
 }

@@ -97,7 +97,7 @@ export function isUserObject(object: FabricObject): boolean {
 }
 
 export function isEditableObject(object: FabricObject): boolean {
-  return isUserObject(object);
+  return isUserObject(object) && !isBrowserFrameObject(object);
 }
 
 export function isSourceObject(object: FabricObject): boolean {

@@ -1,5 +1,11 @@
 import type { Canvas } from 'fabric';
-import { isEditableObject, isSourceObject } from '../../../document/model';
+import {
+  isBackgroundObject,
+  isBrowserFrameObject,
+  isEditableObject,
+  isFrameObject,
+  isSourceObject,
+} from '../../../document/model';
 
 type LayerReorderObject = ReturnType<Canvas['getObjects']>[number];
 type LayerReorderObjects = ReturnType<Canvas['getObjects']>;
@@ -9,9 +15,10 @@ export function moveLayerSelection(canvas: Canvas | null, direction: 1 | -1): bo
     return false;
   }
 
-  const objects = canvas.getObjects();
+  const objects = canvas.getObjects().filter((object) => !isBrowserFrameObject(object));
+  const hasBrowserWindow = canvas.getObjects().some(isBrowserFrameObject);
   const activeObjects = canvas.getActiveObjects().filter(isEditableObject);
-  if (activeObjects.length === 0 || hasLockedObject(activeObjects)) {
+  if (activeObjects.length === 0 || hasLockedObject(activeObjects, hasBrowserWindow)) {
     return false;
   }
 
@@ -26,7 +33,7 @@ export function moveLayerSelection(canvas: Canvas | null, direction: 1 | -1): bo
   if (direction > 0) {
     moveSelectionForward(nextOrder, selectedIds);
   } else {
-    moveSelectionBackward(nextOrder, selectedIds);
+    moveSelectionBackward(nextOrder, selectedIds, hasBrowserWindow);
   }
 
   applyLayerOrder(canvas, nextOrder);
@@ -38,25 +45,30 @@ export function moveLayerSelectionToEdge(canvas: Canvas | null, edge: 'front' | 
     return false;
   }
 
-  const objects = canvas.getObjects();
+  const objects = canvas.getObjects().filter((object) => !isBrowserFrameObject(object));
+  const hasBrowserWindow = canvas.getObjects().some(isBrowserFrameObject);
   const activeObjects = getEditableLayerSelection(canvas);
   if (
     activeObjects.length === 0 ||
     activeObjects.length === objects.length ||
-    hasLockedObject(activeObjects)
+    hasLockedObject(activeObjects, hasBrowserWindow)
   ) {
     return false;
   }
 
   const selectedIds = createSelectedLayerIds(activeObjects);
   const remainingObjects = objects.filter((object) => !isSelectedLayerObject(selectedIds, object));
+  const selectedWindow = hasBrowserWindow && activeObjects.some(isSourceObject);
+  const baseObjects = selectedWindow
+    ? remainingObjects.filter((object) => isFrameObject(object) || isBackgroundObject(object))
+    : remainingObjects.filter(isSourceObject);
   const nextOrder =
     edge === 'front'
       ? [...remainingObjects, ...activeObjects]
       : [
-          ...remainingObjects.filter(isSourceObject),
+          ...baseObjects,
           ...activeObjects,
-          ...remainingObjects.filter((object) => !isSourceObject(object)),
+          ...remainingObjects.filter((object) => !baseObjects.includes(object)),
         ];
 
   applyLayerOrder(canvas, nextOrder);
@@ -73,8 +85,10 @@ function getEditableLayerSelection(canvas: Canvas) {
     .sort((left, right) => objects.indexOf(left) - objects.indexOf(right));
 }
 
-function hasLockedObject(objects: LayerReorderObjects) {
-  return objects.some((object) => object.sniptaleLocked);
+function hasLockedObject(objects: LayerReorderObjects, hasBrowserWindow: boolean) {
+  return objects.some(
+    (object) => object.sniptaleLocked && !(hasBrowserWindow && isSourceObject(object))
+  );
 }
 
 function createSelectedLayerIds(objects: LayerReorderObjects): Set<string> {
@@ -97,7 +111,13 @@ function isLayerId(value: string | undefined): value is string {
 }
 
 function applyLayerOrder(canvas: Canvas, objects: LayerReorderObjects): void {
-  objects.forEach((object, index) => {
+  const header = canvas.getObjects().find(isBrowserFrameObject);
+  const source = objects.find(isSourceObject);
+  const physicalOrder =
+    header && source
+      ? objects.flatMap((object) => (object === source ? [object, header] : [object]))
+      : objects;
+  physicalOrder.forEach((object, index) => {
     canvas.moveObjectTo(object, index);
   });
 }
@@ -118,11 +138,20 @@ function moveSelectionForward(objects: LayerReorderObjects, selectedIds: Set<str
   }
 }
 
-function moveSelectionBackward(objects: LayerReorderObjects, selectedIds: Set<string>) {
+function moveSelectionBackward(
+  objects: LayerReorderObjects,
+  selectedIds: Set<string>,
+  hasBrowserWindow: boolean
+) {
   for (let index = 1; index < objects.length; index += 1) {
     const previous = objects[index - 1];
     const current = objects[index];
-    if (!previous || !current || isSourceObject(previous)) {
+    if (
+      !previous ||
+      !current ||
+      isBackgroundObject(previous) ||
+      (isSourceObject(previous) && !hasBrowserWindow)
+    ) {
       continue;
     }
     if (

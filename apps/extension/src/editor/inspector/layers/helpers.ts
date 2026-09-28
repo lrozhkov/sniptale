@@ -5,15 +5,12 @@ function getSelectedLayers(layers: EditorLayerItem[]) {
   return layers.filter((layer) => layer.selected);
 }
 
-function canMutateSelectedLayers(layers: EditorLayerItem[]) {
+export function canReorderLayerSelection(layers: EditorLayerItem[]) {
   const selectedLayers = getSelectedLayers(layers);
   return (
-    selectedLayers.length > 0 && selectedLayers.every((layer) => !layer.locked && !layer.immutable)
+    selectedLayers.length > 0 &&
+    selectedLayers.every((layer) => layer.reorderable || (!layer.locked && !layer.immutable))
   );
-}
-
-export function canReorderLayerSelection(layers: EditorLayerItem[]) {
-  return canMutateSelectedLayers(layers);
 }
 
 export function canMergeLayerSelection(layers: EditorLayerItem[]) {

@@ -868,19 +868,38 @@ test('editor exact browser-frame harness stays visually stable', async ({ page, 
       });
     })
     .toBe(true);
+  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
   await page.evaluate(() => {
     window.__sniptaleEditorHarness?.setZoomLevel(1244 / 1920);
   });
   await expect
     .poll(async () => {
-      return sceneSurface.evaluate((element) => Math.round(element.getBoundingClientRect().width));
+      return sceneSurface.evaluate((element) => {
+        const workspaceWidth = element.getBoundingClientRect().width;
+        const imageWidthPercent = Number.parseFloat(
+          element.style.getPropertyValue('--editor-workspace-image-width')
+        );
+        return Math.round((workspaceWidth * imageWidthPercent) / 100);
+      });
     })
     .toBe(1244);
   await page.evaluate(() => {
     window.__sniptaleEditorHarness?.clearSelection();
   });
 
-  await expect(sceneSurface).toHaveScreenshot('editor-browser-frame-exact.png');
+  const imageBounds = await sceneSurface.evaluate((element) => {
+    const workspace = element.getBoundingClientRect();
+    const percent = (name: string) => Number.parseFloat(element.style.getPropertyValue(name)) / 100;
+    return {
+      x: workspace.x + workspace.width * percent('--editor-workspace-image-left'),
+      y: workspace.y + workspace.height * percent('--editor-workspace-image-top') - 1,
+      width: Math.round(workspace.width * percent('--editor-workspace-image-width')),
+      height: Math.round(workspace.height * percent('--editor-workspace-image-height')) + 1,
+    };
+  });
+  expect(await page.screenshot({ clip: imageBounds })).toMatchSnapshot(
+    'editor-browser-frame-exact.png'
+  );
 });
 
 test('editor frame utility opens from the floating layers navigation', async ({

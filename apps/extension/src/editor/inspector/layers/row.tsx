@@ -187,6 +187,7 @@ function LayerInlineActionsSlot(props: {
   expandedActionsVisible: boolean;
   autoNavigateSelectedLayer: boolean;
   isImmutable: boolean;
+  isDragDisabled: boolean;
   layer: EditorLayerItem;
   onOpenLayerEffects: LayerEffectOpener;
 }) {
@@ -199,7 +200,7 @@ function LayerInlineActionsSlot(props: {
         editableName={props.editableName}
         hidden={hideLayerName}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
-        isImmutable={props.isImmutable || props.layer.locked}
+        isImmutable={props.isDragDisabled}
         layer={props.layer}
       />
       <LayerExpandedActions
@@ -257,7 +258,7 @@ export function LayerRow(props: {
   onOpenLayerEffects: LayerEffectOpener;
 }) {
   const isImmutable = Boolean(props.layer.immutable);
-  const isDragDisabled = isImmutable || props.layer.locked;
+  const isDragDisabled = !props.layer.reorderable && (isImmutable || props.layer.locked);
   const editableName = useEditableLayerName(props.layer);
   const expandedActionsVisibility = useExpandedActionsVisibility();
   const dragHandlers = createLayerDragHandlers({
@@ -287,6 +288,7 @@ export function LayerRow(props: {
         expandedActionsVisible={expandedActionsVisibility.expandedActionsVisible}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer === true}
         isImmutable={isImmutable}
+        isDragDisabled={isDragDisabled}
         layer={props.layer}
         onOpenLayerEffects={props.onOpenLayerEffects}
       />

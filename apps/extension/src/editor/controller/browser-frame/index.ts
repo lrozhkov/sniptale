@@ -22,7 +22,7 @@ export async function applyEditorBrowserFrame(options: ApplyBrowserFrameOptions)
     canvasDocumentSize: context.canvasDocumentSize,
     source: context.source,
   });
-  const applied = await runBrowserFrameTransition(context, next, true);
+  const applied = await runBrowserFrameTransition(context, next);
   if (!applied) {
     return false;
   }
@@ -50,7 +50,7 @@ export async function removeEditorBrowserFrame(
     canvasDocumentSize: context.canvasDocumentSize,
     source: context.source,
   });
-  const applied = await runBrowserFrameTransition(context, next, false);
+  const applied = await runBrowserFrameTransition(context, next);
   if (!applied) {
     return false;
   }

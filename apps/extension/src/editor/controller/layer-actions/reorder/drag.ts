@@ -1,6 +1,6 @@
 import type { Canvas } from 'fabric';
 import { getLayerObjects } from '../../document/layers';
-import { isSourceObject } from '../../../document/model';
+import { isBackgroundObject, isBrowserFrameObject, isSourceObject } from '../../../document/model';
 
 export function reorderLayerObjects(
   canvas: Canvas | null,
@@ -12,6 +12,7 @@ export function reorderLayerObjects(
   }
 
   const layers = getLayerObjects(canvas).slice().reverse();
+  const hasBrowserWindow = canvas.getObjects().some(isBrowserFrameObject);
   const draggedIndex = layers.findIndex((object) => object.sniptaleId === draggedId);
   const targetIndex = layers.findIndex((object) => object.sniptaleId === targetId);
   if (draggedIndex === -1 || targetIndex === -1) {
@@ -23,21 +24,30 @@ export function reorderLayerObjects(
   if (!dragged) {
     return false;
   }
-  if (dragged.sniptaleLocked || isSourceObject(dragged)) {
+  if (
+    (dragged.sniptaleLocked || isSourceObject(dragged)) &&
+    !(hasBrowserWindow && isSourceObject(dragged))
+  ) {
     return false;
   }
   const target = layers[targetIndex];
-  if (!target || isSourceObject(target)) {
+  if (
+    !target ||
+    (isSourceObject(target) && !hasBrowserWindow) ||
+    (isSourceObject(dragged) && isBackgroundObject(target))
+  ) {
     return false;
   }
   next.splice(targetIndex, 0, dragged);
 
-  next
+  const header = canvas.getObjects().find(isBrowserFrameObject);
+  const physicalOrder = next
     .slice()
     .reverse()
-    .forEach((object, index) => {
-      canvas.moveObjectTo(object, index);
-    });
+    .flatMap((object) => (header && isSourceObject(object) ? [object, header] : [object]));
+  physicalOrder.forEach((object, index) => {
+    canvas.moveObjectTo(object, index);
+  });
 
   return true;
 }
