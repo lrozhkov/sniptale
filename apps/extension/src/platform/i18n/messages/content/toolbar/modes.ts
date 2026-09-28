@@ -156,6 +156,8 @@ export const contentToolbarModesMessages = defineMessageSource({
   drawingNoBackground: { ru: 'Без фона', en: 'No background' },
   drawingFillColor: { ru: 'Цвет заливки', en: 'Fill color' },
   drawingNoFill: { ru: 'Без заливки', en: 'No fill' },
+  drawingEnableFill: { ru: 'Включить заливку', en: 'Enable fill' },
+  drawingDisableFill: { ru: 'Убрать заливку', en: 'Remove fill' },
   drawingColor: { ru: 'Цвет', en: 'Color' },
   drawingWidth: { ru: 'Толщина', en: 'Width' },
   drawingOpacity: { ru: 'Прозрачность', en: 'Opacity' },

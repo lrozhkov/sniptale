@@ -42,6 +42,12 @@ const DRAWING_COLOR_PICKER_CLASS = [
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span:last-child]:hidden",
 ].join(' ');
 
+const DRAWING_FILL_SLASH_CLASS = [
+  'pointer-events-none absolute left-0 top-1/2 h-0.5 w-5',
+  '-rotate-45 rounded-full bg-current',
+  'shadow-[0_0_0_1px_var(--sniptale-color-surface-panel)]',
+].join(' ');
+
 function QuickOptionButton(props: {
   active: boolean;
   children: ReactNode;
@@ -396,32 +402,60 @@ export function DrawingShapeFillOptions(props: {
   onChange: (color: string | null) => void;
 }) {
   const label = translate('content.toolbar.drawingFillColor');
+  const filled = props.value !== null;
+  const lastFillColorRef = useRef(props.value ?? props.colors[0] ?? '#000000');
+  useEffect(() => {
+    if (props.value !== null) lastFillColorRef.current = props.value;
+  }, [props.value]);
   return (
     <div
       data-ui="content.toolbar.drawing-options.shape.fill"
       className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
     >
-      <QuickOptionButton
-        active={props.value === null}
-        dataUi="content.toolbar.drawing-options.shape.fill-none"
-        label={translate('content.toolbar.drawingNoFill')}
-        onClick={() => props.onChange(null)}
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        active={filled}
+        aria-pressed={filled}
+        aria-label={translate(
+          filled ? 'content.toolbar.drawingDisableFill' : 'content.toolbar.drawingEnableFill'
+        )}
+        title={translate(
+          filled ? 'content.toolbar.drawingDisableFill' : 'content.toolbar.drawingEnableFill'
+        )}
+        dataUi="content.toolbar.drawing-options.shape.fill-toggle"
+        className={[
+          'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !border-transparent !p-0',
+          filled ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
+        ].join(' ')}
+        onClick={() => props.onChange(filled ? null : lastFillColorRef.current)}
       >
-        <Ban aria-hidden size={17} />
-      </QuickOptionButton>
-      <DrawingColorOptions
-        allowAlpha
-        colors={props.colors}
-        dataUi="content.toolbar.drawing-options.shape.fill-colors"
-        floatingBoundaryRef={props.floatingBoundaryRef}
-        floatingPlacement={props.floatingPlacement}
-        icon={PaintBucket}
-        label={label}
-        selectedValue={props.value}
-        vertical={props.vertical}
-        value={props.value ?? props.colors[0] ?? '#000000'}
-        onSelect={props.onChange}
-      />
+        <span className="relative flex size-5 items-center justify-center">
+          <PaintBucket aria-hidden size={17} />
+          {!filled ? (
+            <span
+              aria-hidden
+              data-ui="content.toolbar.drawing-options.shape.fill-slash"
+              className={DRAWING_FILL_SLASH_CLASS}
+            />
+          ) : null}
+        </span>
+      </ContentToolbarButton>
+      {filled ? (
+        <DrawingColorOptions
+          allowAlpha
+          colors={props.colors}
+          dataUi="content.toolbar.drawing-options.shape.fill-colors"
+          floatingBoundaryRef={props.floatingBoundaryRef}
+          floatingPlacement={props.floatingPlacement}
+          icon={PaintBucket}
+          label={label}
+          selectedValue={props.value}
+          vertical={props.vertical}
+          value={props.value ?? lastFillColorRef.current}
+          onSelect={props.onChange}
+        />
+      ) : null}
     </div>
   );
 }
