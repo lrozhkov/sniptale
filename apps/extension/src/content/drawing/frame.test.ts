@@ -43,6 +43,34 @@ it.each(['move', 'resize'] as const)(
   }
 );
 
+it('resolves a multi-selection draft with work proportional to its objects', () => {
+  const committed: DrawingObject[] = Array.from({ length: 200 }, (_, index) => ({
+    bounds: { x: index, y: index, width: 20, height: 20 },
+    id: `object-${index}`,
+    kind: 'blur',
+  }));
+  let draftIdReads = 0;
+  const moved: DrawingObject[] = committed.slice(100).map((object) => ({
+    ...object,
+    bounds: { x: 500, y: 500, width: 20, height: 20 },
+    get id() {
+      draftIdReads += 1;
+      return object.id;
+    },
+  }));
+  const draft: PointerDraft = {
+    kind: 'move-selection',
+    start: { x: 0, y: 0 },
+    originals: committed.slice(100),
+    objects: moved,
+  };
+
+  const renderables = resolveDrawingFrameRenderables(committed, draft);
+
+  expect(renderables.map(({ object }) => object)).toEqual([...committed.slice(0, 100), ...moved]);
+  expect(draftIdReads).toBeLessThanOrEqual(moved.length * 2);
+});
+
 it('keeps committed objects and appends a lightweight create preview', () => {
   const draft: PointerDraft = {
     kind: 'create',
