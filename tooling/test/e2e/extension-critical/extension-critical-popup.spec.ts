@@ -285,6 +285,22 @@ test('popup menu and tools use stable tiles without clipping the footer', async 
   const tools = page.locator('[data-ui="popup.menu.tools"]');
   const workspace = page.locator('[data-ui="popup.menu.workspace"]');
   const footer = menu.locator('footer');
+  const menuLayout = await menu.evaluate((element) => {
+    const surface = element.querySelector('section');
+    if (!surface) throw new Error('Menu surface is unavailable');
+    const groups = [...surface.children].map((child) => child.getBoundingClientRect());
+    return {
+      clientHeight: surface.clientHeight,
+      scrollHeight: surface.scrollHeight,
+      gaps: groups.slice(1).map((group, index) => group.top - groups[index]!.bottom),
+    };
+  });
+  expect(menuLayout.scrollHeight).toBeLessThanOrEqual(menuLayout.clientHeight + 1);
+  expect(Math.max(...menuLayout.gaps) - Math.min(...menuLayout.gaps)).toBeLessThan(2);
+  expect(await tools.evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe('1px');
+  expect(await workspace.evaluate((element) => getComputedStyle(element).borderTopWidth)).toBe(
+    '1px'
+  );
   await expect(tools.locator('button')).toHaveCount(4);
   await expect(workspace).toContainText('Приложения');
   await expect(workspace).toBeVisible();
@@ -385,6 +401,36 @@ test('popup mode keeps one icon while expanding a hovered option', async ({ page
   expect(await icon.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain(
     'left'
   );
+});
+
+test('video mode descriptions keep one line throughout the width transition', async ({
+  page,
+  hostOrigin,
+}) => {
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+    storage: { sniptale_popup_startup: QUICK_ACTIONS_STARTUP },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  await page.locator('[data-ui="popup.app.tabs"] button[data-page="video"]').click();
+  const screenLabel = translate('popup.video.modeScreenLabel', 'ru');
+  const screen = page.getByRole('button', { name: screenLabel, exact: true });
+  await expect(screen).toBeEnabled();
+  const heights = await screen.evaluate(async (button) => {
+    const description = button.lastElementChild?.lastElementChild?.lastElementChild;
+    if (!(description instanceof HTMLElement)) throw new Error('Mode description is unavailable');
+    button.click();
+    const samples: number[] = [];
+    for (let frame = 0; frame < 24; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      samples.push(description.getBoundingClientRect().height);
+    }
+    return samples;
+  });
+  await expect(screen).toHaveAttribute('aria-pressed', 'true');
+  expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1);
 });
 
 test('top navigation fills hovered icons in the direction of the underline', async ({

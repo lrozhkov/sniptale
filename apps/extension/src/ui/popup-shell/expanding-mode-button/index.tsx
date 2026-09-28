@@ -122,7 +122,7 @@ export function PopupExpandingModeButton({
       <span aria-hidden="true" className={getExpandedLayerClassName(active, animate)}>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[11px] font-semibold leading-tight">{label}</span>
-          <span className="mt-0.5 line-clamp-2 block text-[8px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
+          <span className="mt-0.5 block truncate text-[8px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">
             {description}
           </span>
         </span>

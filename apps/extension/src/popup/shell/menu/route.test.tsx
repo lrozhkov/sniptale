@@ -224,7 +224,13 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     'popup.home.videoEditorLabel',
     'popup.home.scenarioEditorLabel',
   ]);
-  expect(container.querySelector('[data-ui="popup.menu.workspace"]')?.className).toContain('mt-2');
+  expect(container.querySelector('[data-ui="popup.menu.route"] > section')?.className).toContain(
+    'justify-between'
+  );
+  for (const selector of ['[data-ui="popup.menu.tools"]', '[data-ui="popup.menu.workspace"]']) {
+    expect(container.querySelector(selector)?.className).toContain('border-t');
+    expect(container.querySelector(selector)?.className).toContain('pt-2');
+  }
   expect(
     [
       ...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.menu.workspace"] button'),

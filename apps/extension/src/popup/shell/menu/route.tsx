@@ -100,7 +100,7 @@ const pageToolActions = [
 ] as const;
 
 const MENU_SURFACE_CLASS_NAME = [
-  'flex min-h-0 flex-1 flex-col overflow-y-auto rounded-[16px] border p-3',
+  'flex min-h-0 flex-1 flex-col justify-between overflow-y-auto rounded-[16px] border p-3',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
@@ -137,6 +137,10 @@ const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
 const SECTION_HEADING_CLASS_NAME = [
   'mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
   'text-[var(--sniptale-color-text-muted-strong)]',
+].join(' ');
+const DIVIDED_SECTION_CLASS_NAME = [
+  'shrink-0 border-t pt-2',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
 ].join(' ');
 const CAPTURE_LABEL_CLASS_NAME = [
   'whitespace-nowrap text-[9px] font-semibold leading-none',
@@ -205,7 +209,7 @@ export function MenuRoute({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3" data-ui="popup.menu.route">
       <section className={MENU_SURFACE_CLASS_NAME}>
-        <header className="mb-2.5 shrink-0 px-0.5">
+        <header className="shrink-0 px-0.5">
           <h1 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('popup.home.menuTitle')}
           </h1>
@@ -227,11 +231,11 @@ export function MenuRoute({
           onCapture={capture}
           onRecordTab={() => navigateToDescriptor({ page: 'video', videoMode: CaptureMode.TAB })}
         />
-        <section className="mt-2 shrink-0" data-ui="popup.menu.tools">
+        <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.tools">
           <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.toolsLabel')}</h2>
           <MenuPageTools disabledReason={disabledReason} onOpenToolbar={openToolbar} />
         </section>
-        <section className="mt-2 shrink-0" data-ui="popup.menu.workspace">
+        <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.workspace">
           <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.workspaceTitle')}</h2>
           <MenuWorkspace />
         </section>
@@ -348,7 +352,7 @@ function MenuQuickScenarios(props: {
   ];
 
   return (
-    <div className="mt-2 grid grid-cols-4 gap-1">
+    <div className="grid grid-cols-4 gap-1">
       {scenarios.map(({ icon: Icon, label, ...scenario }) => (
         <button
           key={label}
