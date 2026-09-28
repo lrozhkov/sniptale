@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { ActiveSelection, Canvas, Point } from 'fabric';
+import { ActiveSelection, Canvas, Group, Point, Rect } from 'fabric';
 import { expect, it } from 'vitest';
 import { createEditorDrawingFabricObject } from '../vector';
 import {
@@ -100,4 +100,17 @@ it('applies drawing chrome without box controls to drawing multi-selection', () 
   expect(selection.borderDashArray).toEqual([4, 3]);
   expect(selection.hasControls).toBe(false);
   canvas.dispose();
+});
+
+it('uses the blue drawing selection chrome for an editable layer group', () => {
+  const group = new Group([new Rect({ width: 40, height: 30 })]);
+  group.sniptaleType = 'group';
+  group.borderColor = '#f97316';
+
+  applyEditorDrawingInteractionControls(group);
+
+  expect(group.borderColor).toBe('#2563eb');
+  expect(group.cornerStrokeColor).toBe('#2563eb');
+  expect(group.borderDashArray).toEqual([4, 3]);
+  expect(group.hasControls).toBe(true);
 });

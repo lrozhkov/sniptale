@@ -2,14 +2,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 const actionMocks = vi.hoisted(() => ({
   nudgeEditorSelectionMock: vi.fn(() => true),
+  selectEditorLayerByIdMock: vi.fn(() => true),
 }));
 
 vi.mock('../public-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../public-actions')>()),
   nudgeEditorSelection: actionMocks.nudgeEditorSelectionMock,
+  selectEditorLayerById: actionMocks.selectEditorLayerByIdMock,
 }));
 
-import { nudgeEditorControllerSelection } from './layer-selection-actions';
+import {
+  nudgeEditorControllerSelection,
+  selectEditorControllerLayer,
+} from './layer-selection-actions';
 
 function createController() {
   return {
@@ -22,6 +27,24 @@ function createController() {
 }
 
 describe('editor-controller public api layer selection actions', () => {
+  it('switches to the cursor only after a layer is successfully selected', () => {
+    const controller = {
+      ...createController(),
+      activeTool: 'shape',
+      lastLayerSelectionAnchorId: null,
+      setLastLayerSelectionAnchorId: vi.fn(),
+      switchToSelectTool: vi.fn(),
+    };
+
+    actionMocks.selectEditorLayerByIdMock.mockReturnValueOnce(false).mockReturnValueOnce(true);
+    selectEditorControllerLayer(controller as never, 'missing-layer');
+    expect(controller.switchToSelectTool).not.toHaveBeenCalled();
+
+    selectEditorControllerLayer(controller as never, 'layer-1');
+    expect(controller.switchToSelectTool).toHaveBeenCalledOnce();
+    expect(controller.setLastLayerSelectionAnchorId).toHaveBeenCalledWith('layer-1');
+  });
+
   it('forwards selection nudge callbacks into the action seam', () => {
     const controller = createController();
 

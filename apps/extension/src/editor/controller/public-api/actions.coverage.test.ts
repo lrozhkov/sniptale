@@ -2,9 +2,15 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   deleteSelectionMock: vi.fn(),
-  duplicateSelectionMock: vi.fn(async () => undefined),
+  duplicateSelectionMock: vi.fn(
+    async (_options: {
+      prepareObject: (object: { sniptaleId: string }) => void;
+      nextLabelIndex: (type: string) => number;
+    }) => undefined
+  ),
   insertEditorImageObjectMock: vi.fn(async () => undefined),
   insertEditorTechnicalDataObjectMock: vi.fn(),
+  nudgeEditorSelectionMock: vi.fn(() => true),
   reorderEditorLayerMock: vi.fn(),
   resizeEditorLayerByIdMock: vi.fn(),
   resizeEditorLayerWithRasterizeMock: vi.fn(),
@@ -19,6 +25,7 @@ vi.mock('../public-actions', async (importOriginal) => ({
   duplicateEditorSelection: mocks.duplicateSelectionMock,
   insertEditorImageObject: mocks.insertEditorImageObjectMock,
   insertEditorTechnicalDataObject: mocks.insertEditorTechnicalDataObjectMock,
+  nudgeEditorSelection: mocks.nudgeEditorSelectionMock,
   reorderEditorLayer: mocks.reorderEditorLayerMock,
   resizeEditorLayerById: mocks.resizeEditorLayerByIdMock,
   selectEditorLayerById: mocks.selectEditorLayerByIdMock,
@@ -33,6 +40,7 @@ vi.mock('../layer-effects/raster-mutations/resize', () => ({
 import {
   deleteEditorControllerSelection,
   duplicateEditorControllerSelection,
+  nudgeEditorControllerSelection,
   insertEditorControllerImage,
   insertEditorControllerTechnicalData,
   reorderEditorControllerLayer,
@@ -55,6 +63,7 @@ function createController() {
     prepareObject: vi.fn(),
     sendFrameObjectsToBack: vi.fn(),
     setLastLayerSelectionAnchorId: vi.fn(),
+    switchToSelectTool: vi.fn(),
     setSource: vi.fn(),
     source: { id: 'source' },
     syncRuntimeState: vi.fn(),
@@ -63,14 +72,25 @@ function createController() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.selectEditorLayerByIdMock.mockReturnValue(true);
 });
 
 it('forwards selection and layer actions into the public action seams', async () => {
   const controller = createController();
+  mocks.duplicateSelectionMock.mockImplementationOnce(async (options) => {
+    options.prepareObject({ sniptaleId: 'copy' });
+    options.nextLabelIndex('image');
+  });
+  mocks.reorderEditorLayerMock.mockImplementationOnce((options) => {
+    options.sendFrameObjectsToBack();
+    options.commitHistory();
+    options.syncRuntimeState();
+  });
 
   deleteEditorControllerSelection(controller);
   await duplicateEditorControllerSelection(controller);
   reorderEditorControllerLayer(controller, 'dragged', 'target');
+  expect(nudgeEditorControllerSelection(controller, { deltaX: 1, deltaY: 2 })).toBe(true);
   selectEditorControllerLayer(controller, 'layer-1');
   toggleEditorControllerLayerVisibility(controller, 'layer-1');
   toggleEditorControllerLayerLock(controller, 'layer-1');
@@ -90,6 +110,12 @@ it('forwards selection and layer actions into the public action seams', async ()
   expect(mocks.selectEditorLayerByIdMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'layer-1' })
   );
+  expect(controller.switchToSelectTool).toHaveBeenCalledOnce();
+  expect(controller.prepareObject).toHaveBeenCalledWith({ sniptaleId: 'copy' });
+  expect(controller.nextLabelIndex).toHaveBeenCalledWith('image');
+  expect(controller.sendFrameObjectsToBack).toHaveBeenCalledOnce();
+  expect(controller.commitHistory).toHaveBeenCalledOnce();
+  expect(controller.syncRuntimeState).toHaveBeenCalledOnce();
   expect(mocks.toggleEditorLayerVisibilityMock).toHaveBeenCalledOnce();
   expect(mocks.toggleEditorLayerLockStateMock).toHaveBeenCalledOnce();
   expect(mocks.resizeEditorLayerWithRasterizeMock).toHaveBeenCalledWith(
@@ -101,4 +127,14 @@ it('forwards selection and layer actions into the public action seams', async ()
   expect(mocks.insertEditorTechnicalDataObjectMock).toHaveBeenCalledWith(
     expect.objectContaining({ kinds: ['url'] })
   );
+});
+
+it('keeps the current tool when a layer cannot be selected', () => {
+  const controller = createController();
+  mocks.selectEditorLayerByIdMock.mockReturnValueOnce(false);
+
+  selectEditorControllerLayer(controller, 'missing-layer');
+
+  expect(controller.switchToSelectTool).not.toHaveBeenCalled();
+  expect(controller.setLastLayerSelectionAnchorId).not.toHaveBeenCalled();
 });

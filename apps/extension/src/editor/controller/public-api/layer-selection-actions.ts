@@ -66,7 +66,7 @@ export function selectEditorControllerLayer(
   id: string,
   options: { additive?: boolean; focusViewport?: boolean; range?: boolean; toggle?: boolean } = {}
 ): void {
-  selectEditorLayerById({
+  const selected = selectEditorLayerById({
     canvas: controller.canvas,
     id,
     selectionOptions: {
@@ -75,5 +75,7 @@ export function selectEditorControllerLayer(
     },
     ...createLayerSelectionBindings(controller),
   });
+  if (!selected) return;
+  controller.switchToSelectTool();
   controller.setLastLayerSelectionAnchorId(id);
 }

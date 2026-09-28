@@ -16,7 +16,7 @@ export function selectEditorLayerById(options: {
   focusObjectInViewport: (object: FabricObject) => void;
   commitHistory: () => void;
   syncRuntimeState: () => void;
-}): void {
+}): boolean {
   const recovered = selectLayerObject(
     options.canvas,
     options.id,
@@ -25,7 +25,7 @@ export function selectEditorLayerById(options: {
     options.focusObjectInViewport
   );
   if (recovered === null) {
-    return;
+    return false;
   }
 
   if (options.canvas instanceof EditorCanvas) {
@@ -39,4 +39,5 @@ export function selectEditorLayerById(options: {
     options.commitHistory();
   }
   options.syncRuntimeState();
+  return true;
 }
