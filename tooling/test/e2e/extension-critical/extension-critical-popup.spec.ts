@@ -359,6 +359,79 @@ test('popup menu starts with a complete ring and no entrance animation', async (
   ).toBe(0);
 });
 
+test('popup mode keeps one icon while expanding a hovered option', async ({ page, hostOrigin }) => {
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+    storage: { sniptale_popup_startup: QUICK_ACTIONS_STARTUP },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  const tabMode = page.getByRole('button', {
+    name: translate('popup.home.captureTabLabel', 'ru'),
+    exact: true,
+  });
+  await expect(tabMode).toBeVisible();
+  const icon = tabMode.locator(':scope > svg');
+  await expect(icon).toHaveCount(1);
+  await icon.evaluate((element) => {
+    element.dataset['motionIdentity'] = 'same';
+  });
+  await tabMode.hover();
+  await expect.poll(() => icon.evaluate((element) => getComputedStyle(element).scale)).toBe('1.1');
+  await tabMode.click();
+  await expect(tabMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(icon).toHaveAttribute('data-motion-identity', 'same');
+  expect(await icon.evaluate((element) => getComputedStyle(element).transitionProperty)).toContain(
+    'left'
+  );
+});
+
+test('top navigation fills hovered icons in the direction of the underline', async ({
+  page,
+  hostOrigin,
+}) => {
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+    storage: { sniptale_popup_startup: QUICK_ACTIONS_STARTUP },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  const nav = page.locator('[data-ui="popup.app.tabs"]');
+  const video = nav.locator('button[data-page="video"]');
+  const screenshot = nav.locator('button[data-page="screenshots"]');
+  await expect(screenshot).toHaveAttribute('data-active', 'true');
+  await video.hover();
+  await expect
+    .poll(() =>
+      video
+        .locator('.popup-react-shell__tab-icon')
+        .evaluate((element) => getComputedStyle(element).transform)
+    )
+    .not.toBe('none');
+  await video.click();
+  await expect(video).toHaveAttribute('data-entry-side', 'left');
+  expect(
+    await video
+      .locator('.popup-react-shell__tab-icon-accent')
+      .evaluate((element) => getComputedStyle(element).animationName)
+  ).toBe('popup-tab-icon-fill-from-left');
+  const accentColor = await video
+    .locator('.popup-react-shell__tab-icon-accent')
+    .evaluate((element) => getComputedStyle(element).color);
+  await expect
+    .poll(() => video.evaluate((element) => getComputedStyle(element).color))
+    .toBe(accentColor);
+  await screenshot.click();
+  await expect(screenshot).toHaveAttribute('data-entry-side', 'right');
+  expect(
+    await screenshot
+      .locator('.popup-react-shell__tab-icon-accent')
+      .evaluate((element) => getComputedStyle(element).animationName)
+  ).toBe('popup-tab-icon-fill-from-right');
+});
+
 test('popup page access choice hides page actions and unlocks after activation', async ({
   page,
   hostOrigin,

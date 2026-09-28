@@ -53,6 +53,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     centered?: boolean;
     label: string;
     disabled: boolean;
+    iconClassName: string;
     icon: ComponentType<{ className?: string }>;
     onClick(): void;
   }) => {
@@ -60,6 +61,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     return (
       <button
         className={props.centered ? 'justify-center' : 'justify-start'}
+        data-icon-class={props.iconClassName}
         disabled={props.disabled}
         onClick={props.onClick}
       >
@@ -108,6 +110,18 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
   expect(captureButton?.className).toContain('justify-start');
+  for (const label of [
+    'popup.home.captureButtonLabel',
+    'popup.home.imageEditorLabel',
+    'popup.home.libraryLabel',
+  ]) {
+    const button = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
+      (candidate) => candidate.textContent === label
+    );
+    expect(button?.dataset['iconClass']).toContain(
+      'group-hover:text-[var(--sniptale-color-accent)]'
+    );
+  }
   expect(
     [...(getContainer()?.querySelectorAll('button') ?? [])]
       .find((button) => button.textContent === 'popup.home.imageEditorLabel')

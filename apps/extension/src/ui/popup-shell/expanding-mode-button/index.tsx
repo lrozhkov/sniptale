@@ -26,13 +26,17 @@ const COMPACT_LAYER_BASE_CLASS_NAME = ['pointer-events-none absolute inset-0 tex
   ' '
 );
 const EXPANDED_LAYER_BASE_CLASS_NAME = [
-  'pointer-events-none absolute inset-y-0 left-2.5 right-2 flex min-w-0 items-center gap-2 text-left',
+  'pointer-events-none absolute inset-y-0 left-[38px] right-2 flex min-w-0 items-center text-left',
 ].join(' ');
 const MODE_ICON_CLASS_NAME = [
-  'transition-[transform,filter] duration-200 ease-out motion-reduce:transition-none',
+  'absolute h-[19px] w-[19px]',
   'group-hover:scale-110 group-focus-visible:scale-110',
   'group-hover:brightness-110 group-focus-visible:brightness-110',
   'group-disabled:scale-100 group-disabled:brightness-100',
+].join(' ');
+const MODE_ICON_ANIMATION_CLASS_NAME = [
+  'transition-[left,top,translate,color,filter,scale] duration-300',
+  'ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
 ].join(' ');
 
 interface PopupExpandingModeButtonProps {
@@ -65,21 +69,16 @@ function getButtonClassName(
 function getCompactLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     COMPACT_LAYER_BASE_CLASS_NAME,
-    animate && 'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
-    active ? 'opacity-0' : 'opacity-100',
-    active ? '-translate-x-1' : 'translate-x-0',
-    animate && (active ? 'delay-0' : 'delay-60 motion-reduce:delay-0')
+    animate && 'transition-opacity duration-150 ease-out motion-reduce:transition-none',
+    active ? 'opacity-0' : 'opacity-100'
   );
 }
 
-function getExpandedLayerClassName(active: boolean, animate: boolean, compact: boolean): string {
+function getExpandedLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
-    compact && 'gap-1.5',
-    animate && 'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
-    active ? 'opacity-100' : 'opacity-0',
-    active ? 'translate-x-0' : 'translate-x-1',
-    animate && 'delay-0'
+    animate && 'transition-opacity duration-150 ease-out motion-reduce:transition-none',
+    active ? 'opacity-100' : 'opacity-0'
   );
 }
 
@@ -104,23 +103,23 @@ export function PopupExpandingModeButton({
       onClick={onClick}
       title={`${label}. ${description}`}
     >
+      <Icon
+        className={cx(
+          MODE_ICON_CLASS_NAME,
+          animate && MODE_ICON_ANIMATION_CLASS_NAME,
+          active
+            ? 'left-2.5 top-1/2 translate-x-0 -translate-y-1/2'
+            : 'left-1/2 top-[7px] -translate-x-1/2 translate-y-0',
+          active && !disabled ? accentClassName : 'text-current'
+        )}
+      />
       <span aria-hidden="true" className={getCompactLayerClassName(active, animate)}>
-        <span className="absolute inset-x-0 top-[7px] flex justify-center">
-          <Icon className={cx('h-[19px] w-[19px]', MODE_ICON_CLASS_NAME)} />
-        </span>
         <span className="absolute inset-x-1 bottom-[8px] block truncate text-[9px] font-medium leading-tight">
           {label}
         </span>
       </span>
 
-      <span aria-hidden="true" className={getExpandedLayerClassName(active, animate, compact)}>
-        <Icon
-          className={cx(
-            'h-[19px] w-[19px] shrink-0',
-            MODE_ICON_CLASS_NAME,
-            active && !disabled ? accentClassName : 'text-current'
-          )}
-        />
+      <span aria-hidden="true" className={getExpandedLayerClassName(active, animate)}>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[11px] font-semibold leading-tight">{label}</span>
           <span className="mt-0.5 line-clamp-2 block text-[8px] leading-[1.25] text-[var(--sniptale-color-text-muted)]">

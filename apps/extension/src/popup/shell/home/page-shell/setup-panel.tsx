@@ -14,6 +14,12 @@ import { openImageEditor, openLibrary } from '../../navigation/actions';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
 
+const HOVER_ACCENT_ICON_CLASS_NAME = [
+  'text-[var(--sniptale-color-text-secondary)]',
+  'group-hover:text-[var(--sniptale-color-accent)]',
+  'group-focus-visible:text-[var(--sniptale-color-accent)]',
+].join(' ');
+
 export function ScreenshotSetupPanel(props: {
   config: ScreenshotCaptureConfig;
   viewportPresets: ViewportPreset[];
@@ -61,7 +67,7 @@ export function ScreenshotSetupPanel(props: {
           <PopupActionButton
             icon={ImageEditorIcon}
             label={translate('popup.home.imageEditorLabel')}
-            iconClassName="text-[var(--sniptale-color-text-secondary)]"
+            iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
             compact
             title={translate('popup.home.imageEditorTitle')}
             onClick={openImageEditor}
@@ -69,7 +75,7 @@ export function ScreenshotSetupPanel(props: {
           <PopupActionButton
             icon={Images}
             label={translate('popup.home.libraryLabel')}
-            iconClassName="text-[var(--sniptale-color-text-secondary)]"
+            iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
             compact
             title={translate('popup.home.libraryTitle')}
             onClick={() => openLibrary('screenshot')}

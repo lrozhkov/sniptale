@@ -67,12 +67,16 @@ function QuickActionListItemIcon({
     <span
       className={cx(
         getQuickActionListIconClassName(density),
-        'text-[var(--sniptale-color-text-secondary)]'
+        'text-[var(--sniptale-color-text-secondary)]',
+        'transition-[scale,color] duration-180 ease-out motion-reduce:transition-none',
+        'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
+        'group-hover:text-[var(--sniptale-color-accent)]',
+        'group-focus-visible:text-[var(--sniptale-color-accent)]'
       )}
     >
       <DynamicIcon
         name={action.icon}
-        color={disabled ? 'var(--sniptale-color-text-dim)' : 'var(--sniptale-color-text-secondary)'}
+        {...(disabled ? { color: 'var(--sniptale-color-text-dim)' } : {})}
       />
     </span>
   );
@@ -165,7 +169,7 @@ export function QuickActionListItem({
       onTriggerAction={onTriggerAction}
       className={cx(
         getQuickActionListButtonClassName(density),
-        'shadow-none transition-colors',
+        'group shadow-none transition-colors',
         disabled ? disabledQuickActionListItemClassName : enabledQuickActionListItemClassName
       )}
     >

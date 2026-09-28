@@ -130,15 +130,27 @@ it('records which side the menu ring is entered from', async () => {
   const indicator = container.querySelector<HTMLElement>('.popup-react-shell__tab-indicator');
   expect(indicator?.dataset['entrySide']).toBe('left');
   expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('left');
+  expect(
+    container.querySelector<HTMLButtonElement>('button[data-page="menu"]')?.dataset['entrySide']
+  ).toBe('left');
   expect(indicator?.querySelector('.popup-react-shell__menu-ring circle')).not.toBeNull();
   expect(
     container.querySelector('button[data-page="menu"] .popup-react-shell__menu-icon-accent')
   ).not.toBeNull();
 
   await select('export');
+  expect(
+    container.querySelector<HTMLButtonElement>('button[data-page="export"]')?.dataset['entrySide']
+  ).toBe('left');
+  expect(
+    container.querySelectorAll('button[data-page="export"] .popup-react-shell__tab-icon svg')
+  ).toHaveLength(2);
   await select('menu');
   expect(indicator?.dataset['entrySide']).toBe('right');
   expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('right');
+  expect(
+    container.querySelector<HTMLButtonElement>('button[data-page="menu"]')?.dataset['entrySide']
+  ).toBe('right');
   await vi.waitFor(() => expect(mocks.saveLastPage).toHaveBeenCalledTimes(3));
 });
 

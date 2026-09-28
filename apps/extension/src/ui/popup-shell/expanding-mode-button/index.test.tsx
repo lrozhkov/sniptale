@@ -43,7 +43,7 @@ it('keeps inactive modes compact while the expanded content stays out of layout'
   expect(markup).toContain('opacity-0');
   expect(markup).toContain('group-hover:scale-110');
   expect(markup).not.toContain('group-hover:-translate-y-px');
-  expect(markup).toContain('absolute inset-y-0 left-2.5 right-2 flex');
+  expect(markup).toContain('absolute inset-y-0 left-[38px] right-2 flex');
   expect(markup).toContain('Choose an area');
   expect(markup).toContain('title="Area. Choose an area"');
 });
@@ -62,8 +62,8 @@ it('animates width while crossfading static compact and expanded layouts', () =>
   );
 
   expect(markup).toContain('transition-[flex-grow,background-color,border-color,color]');
-  expect(markup).toContain('transition-[opacity,transform]');
-  expect(markup).toContain('justify-center');
+  expect(markup).toContain('transition-[left,top,translate,color,filter,scale]');
+  expect(markup).toContain('top-1/2');
   expect(markup).toContain('left-2.5');
   expect(markup).not.toContain('w-[148px]');
   expect(markup).not.toContain('transition-[left,transform,color]');
@@ -75,5 +75,5 @@ it('animates width while crossfading static compact and expanded layouts', () =>
   expect(markup).toContain('group-hover:scale-110');
   expect(markup).not.toContain('group-hover:-translate-y-px');
   expect(markup).not.toContain('transition-[left,transform,color]');
-  expect(markup.match(/<svg/g)).toHaveLength(2);
+  expect(markup.match(/<svg/g)).toHaveLength(1);
 });

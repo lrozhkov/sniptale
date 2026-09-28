@@ -11,8 +11,8 @@ const POPUP_ACTION_BUTTON_PRIMARY_CLASS_NAME = [
   'text-[var(--sniptale-color-text-primary-strong)] shadow-none',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_48%,transparent)]',
   'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_52%,transparent)]',
-  'hover:text-[var(--sniptale-color-accent-emphasis)]',
-  'focus-visible:text-[var(--sniptale-color-accent-emphasis)] active:translate-y-px',
+  'hover:text-[var(--sniptale-color-text-primary-strong)]',
+  'focus-visible:text-[var(--sniptale-color-text-primary-strong)] active:translate-y-px',
 ].join(' ');
 
 const POPUP_ACTION_BUTTON_SECONDARY_CLASS_NAME = [
