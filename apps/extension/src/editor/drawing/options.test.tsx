@@ -6,13 +6,31 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  colorOptions: vi.fn((props: { floatingPlacement: string; vertical: boolean }) => (
-    <span
-      data-placement={props.floatingPlacement}
-      data-ui="mock.color-options"
-      data-vertical={String(props.vertical)}
-    />
-  )),
+  colorOptions: vi.fn(
+    (props: {
+      floatingPlacement: string;
+      vertical: boolean;
+      onPreview?: (color: string) => void;
+      onSelect: (color: string) => void;
+    }) => (
+      <span
+        data-placement={props.floatingPlacement}
+        data-ui="mock.color-options"
+        data-vertical={String(props.vertical)}
+      >
+        <button
+          type="button"
+          data-ui="mock.preview-color"
+          onClick={() => props.onPreview?.('#abcdef')}
+        />
+        <button
+          type="button"
+          data-ui="mock.apply-color"
+          onClick={() => props.onSelect('#abcdef')}
+        />
+      </span>
+    )
+  ),
   divider: vi.fn((props: { vertical: boolean }) => (
     <span data-ui="mock.divider" data-vertical={String(props.vertical)} />
   )),
@@ -55,6 +73,7 @@ vi.mock('../../ui/drawing-tools/options', () => ({
 
 const storeState = {
   updateDrawingToolSettings: vi.fn(),
+  updateSelectionDrawingToolSettings: vi.fn(),
   selectionToolSettings: {},
   toolSettings: {
     blur: { amount: 20 },
@@ -69,6 +88,46 @@ const storeState = {
     pencil: { color: '#111111', width: 4 },
   },
 };
+
+it('previews a selected pencil color without committing, then applies it once', async () => {
+  storeState.updateDrawingToolSettings.mockClear();
+  storeState.updateSelectionDrawingToolSettings.mockClear();
+  Object.assign(storeState.selectionToolSettings, storeState.toolSettings);
+  const onPreviewSelection = vi.fn();
+  const onApplyToSelection = vi.fn();
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <EditorDrawingOptions
+        onApplyToSelection={onApplyToSelection}
+        onPreviewSelection={onPreviewSelection}
+        onDirectionChange={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        selectedType="pencil"
+        tool="pencil"
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="mock.preview-color"]')?.click()
+  );
+  expect(storeState.updateSelectionDrawingToolSettings).toHaveBeenCalledWith('pencil', {
+    color: '#abcdef',
+  });
+  expect(onPreviewSelection).toHaveBeenCalledOnce();
+  expect(onApplyToSelection).not.toHaveBeenCalled();
+  expect(storeState.updateDrawingToolSettings).not.toHaveBeenCalled();
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="mock.apply-color"]')?.click()
+  );
+  expect(onApplyToSelection).toHaveBeenCalledOnce();
+  expect(storeState.updateDrawingToolSettings).toHaveBeenCalledWith('pencil', {
+    color: '#abcdef',
+  });
+  await act(async () => root.unmount());
+});
 
 vi.mock('../state/useEditorStore', () => ({
   useEditorStore: Object.assign(
@@ -93,6 +152,7 @@ it('shows strong blur by default and updates its strength', async () => {
     root.render(
       <EditorDrawingOptions
         onApplyToSelection={vi.fn()}
+        onPreviewSelection={vi.fn()}
         onDirectionChange={vi.fn()}
         onClearSelection={vi.fn()}
         onDeleteSelection={vi.fn()}
@@ -112,6 +172,7 @@ it('renders editor tool settings as a horizontal toolbar like content drawing mo
   const markup = renderToStaticMarkup(
     <EditorDrawingOptions
       onApplyToSelection={vi.fn()}
+      onPreviewSelection={vi.fn()}
       onDirectionChange={vi.fn()}
       onClearSelection={vi.fn()}
       onDeleteSelection={vi.fn()}
@@ -136,6 +197,7 @@ it.each([
   const markup = renderToStaticMarkup(
     <EditorDrawingOptions
       onApplyToSelection={vi.fn()}
+      onPreviewSelection={vi.fn()}
       onDirectionChange={vi.fn()}
       onClearSelection={vi.fn()}
       onDeleteSelection={vi.fn()}
@@ -154,6 +216,7 @@ it('shows the arrow direction toggle and its pressed state beside arrow profiles
   const markup = renderToStaticMarkup(
     <EditorDrawingOptions
       onApplyToSelection={vi.fn()}
+      onPreviewSelection={vi.fn()}
       onDirectionChange={vi.fn()}
       onClearSelection={vi.fn()}
       onDeleteSelection={vi.fn()}
@@ -176,6 +239,7 @@ it('updates the direction setting and refreshes the canvas mode on toggle', asyn
     root.render(
       <EditorDrawingOptions
         onApplyToSelection={vi.fn()}
+        onPreviewSelection={vi.fn()}
         onDirectionChange={onDirectionChange}
         onClearSelection={vi.fn()}
         onDeleteSelection={vi.fn()}

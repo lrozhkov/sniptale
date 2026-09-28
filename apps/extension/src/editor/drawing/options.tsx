@@ -61,6 +61,7 @@ function PencilOptions(props: {
   settings: DrawingToolDefaults['pencil'];
   common: DrawingColorContext;
   update: DrawingSettingsUpdate;
+  preview: DrawingSettingsUpdate;
 }) {
   return (
     <>
@@ -69,6 +70,7 @@ function PencilOptions(props: {
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
         onSelect={(color) => props.update('pencil', { color })}
+        onPreview={(color) => props.preview('pencil', { color })}
       />
       <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
@@ -85,6 +87,7 @@ function MarkerOptions(props: {
   settings: DrawingToolDefaults['marker'];
   common: DrawingColorContext;
   update: DrawingSettingsUpdate;
+  preview: DrawingSettingsUpdate;
 }) {
   return (
     <>
@@ -93,6 +96,7 @@ function MarkerOptions(props: {
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
         onSelect={(color) => props.update('marker', { color })}
+        onPreview={(color) => props.preview('marker', { color })}
       />
       <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
@@ -114,6 +118,7 @@ function ShapeOptions(props: {
   settings: DrawingToolDefaults['shape'];
   common: DrawingColorContext;
   update: DrawingSettingsUpdate;
+  preview: DrawingSettingsUpdate;
 }) {
   return (
     <>
@@ -134,12 +139,14 @@ function ShapeOptions(props: {
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
         onSelect={(color) => props.update('shape', { color })}
+        onPreview={(color) => props.preview('shape', { color })}
       />
       <DrawingOptionsDivider vertical={false} />
       <DrawingShapeFillOptions
         {...props.common}
         value={props.settings.fillColor}
         onChange={(fillColor) => props.update('shape', { fillColor })}
+        onPreview={(fillColor) => props.preview('shape', { fillColor })}
       />
     </>
   );
@@ -151,6 +158,7 @@ function ArrowOptions(props: {
   onDirectionChange: (value: boolean) => void;
   common: DrawingColorContext;
   update: DrawingSettingsUpdate;
+  preview: DrawingSettingsUpdate;
 }) {
   return (
     <>
@@ -159,6 +167,7 @@ function ArrowOptions(props: {
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
         onSelect={(color) => props.update('arrow', { color })}
+        onPreview={(color) => props.preview('arrow', { color })}
       />
       <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
@@ -190,6 +199,7 @@ function ToolOptions(props: {
   settings: DrawingToolDefaults;
   tool: DrawingOptionsTool;
   update: DrawingSettingsUpdate;
+  preview: DrawingSettingsUpdate;
 }) {
   switch (props.tool) {
     case 'pencil':
@@ -198,6 +208,7 @@ function ToolOptions(props: {
           common={props.common}
           settings={props.settings.pencil}
           update={props.update}
+          preview={props.preview}
         />
       );
     case 'marker':
@@ -206,11 +217,17 @@ function ToolOptions(props: {
           common={props.common}
           settings={props.settings.marker}
           update={props.update}
+          preview={props.preview}
         />
       );
     case 'shape':
       return (
-        <ShapeOptions common={props.common} settings={props.settings.shape} update={props.update} />
+        <ShapeOptions
+          common={props.common}
+          settings={props.settings.shape}
+          update={props.update}
+          preview={props.preview}
+        />
       );
     case 'arrow':
       return (
@@ -220,6 +237,7 @@ function ToolOptions(props: {
           onDirectionChange={props.onDirectionChange}
           settings={props.settings.arrow}
           update={props.update}
+          preview={props.preview}
         />
       );
     case 'text':
@@ -229,6 +247,8 @@ function ToolOptions(props: {
           {...props.settings.text}
           onBackgroundColorChange={(backgroundColor) => props.update('text', { backgroundColor })}
           onColorChange={(color) => props.update('text', { color })}
+          onColorPreview={(color) => props.preview('text', { color })}
+          onBackgroundColorPreview={(backgroundColor) => props.preview('text', { backgroundColor })}
           onFontFamilyChange={(fontFamily) => props.update('text', { fontFamily })}
           onFontSizeChange={(fontSize) => props.update('text', { fontSize })}
         />
@@ -248,6 +268,7 @@ function ToolOptions(props: {
 export function EditorDrawingOptions(props: {
   onDirectionChange: () => void;
   onApplyToSelection: () => void;
+  onPreviewSelection: () => void;
   onClearSelection: () => void;
   onDeleteSelection: () => void;
   selectedType: string | null | undefined;
@@ -275,6 +296,15 @@ export function EditorDrawingOptions(props: {
     }
   };
 
+  const preview = <Tool extends ConfigurableTool>(
+    tool: Tool,
+    patch: Partial<DrawingToolDefaults[Tool]>
+  ) => {
+    if (!selected) return;
+    useEditorStore.getState().updateSelectionDrawingToolSettings(tool, patch);
+    props.onPreviewSelection();
+  };
+
   const common = {
     colors,
     floatingBoundaryRef: panelRef,
@@ -298,6 +328,7 @@ export function EditorDrawingOptions(props: {
         settings={values}
         tool={props.tool}
         update={update}
+        preview={preview}
       />
     </div>
   );

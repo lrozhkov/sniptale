@@ -21,9 +21,13 @@ vi.mock('../color-selector', () => ({
   CompactColorSelector: ({
     className,
     onChange,
+    onPreviewChange,
+    onPreviewReset,
   }: {
     className: string;
     onChange: (color: string) => void;
+    onPreviewChange?: (color: string) => void;
+    onPreviewReset?: (color: string) => void;
   }) => (
     <button
       data-ui="test.color-picker"
@@ -31,6 +35,20 @@ vi.mock('../color-selector', () => ({
       onClick={() => onChange(persistence.pickerColor)}
     >
       Picker
+      <span
+        data-ui="test.preview"
+        onClick={(event) => {
+          event.stopPropagation();
+          onPreviewChange?.('#abcdef');
+        }}
+      />
+      <span
+        data-ui="test.cancel"
+        onClick={(event) => {
+          event.stopPropagation();
+          onPreviewReset?.('#123456');
+        }}
+      />
     </button>
   ),
 }));
@@ -38,6 +56,35 @@ vi.mock('../color-selector', () => ({
 import { DrawingColorOptions } from './options';
 
 const palette = ['#f97316', '#60a5fa', '#22c55e', '#facc15', '#ef4444', '#111827'];
+
+it('forwards picker preview and rollback without selecting a quick color', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const onSelect = vi.fn();
+  const onPreview = vi.fn();
+  const onPreviewReset = vi.fn();
+  await act(async () =>
+    root.render(
+      <DrawingColorOptions
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        label="Line color"
+        value="#123456"
+        onSelect={onSelect}
+        onPreview={onPreview}
+        onPreviewReset={onPreviewReset}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLElement>('[data-ui="test.preview"]')?.click());
+  act(() => host.querySelector<HTMLElement>('[data-ui="test.cancel"]')?.click());
+  expect(onPreview).toHaveBeenCalledWith('#abcdef');
+  expect(onPreviewReset).toHaveBeenCalledWith('#123456');
+  expect(onSelect).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
 
 beforeEach(() => {
   persistence.pickerColor = '#123456';

@@ -102,6 +102,13 @@ it('applies an alpha channel from the text background color picker', () => {
   const backgroundGroup = host.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.text.background-group"]'
   )!;
+  act(() =>
+    backgroundGroup
+      .querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+      )
+      ?.click()
+  );
   act(() => backgroundGroup.querySelector<HTMLButtonElement>('button[title="#ef4444"]')?.click());
   act(() =>
     backgroundGroup

@@ -298,10 +298,13 @@ export function DrawingColorOptions(props: {
   vertical?: boolean;
   value: string;
   onSelect: (color: string) => void;
+  onPreview?: (color: string) => void;
+  onPreviewReset?: (color: string) => void;
 }) {
   const Icon = props.icon;
   const { quickColors, selectColor } = useQuickDrawingColors(props.colors, props.onSelect);
   const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
+  const previewReset = props.onPreviewReset ?? props.onPreview;
   return (
     <div
       role="group"
@@ -330,6 +333,8 @@ export function DrawingColorOptions(props: {
         paletteInPicker
         pickerOnly
         onChange={selectColor}
+        {...(props.onPreview ? { onPreviewChange: props.onPreview } : {})}
+        {...(previewReset ? { onPreviewReset: previewReset } : {})}
       />
       <div
         className="grid w-[104px] grid-cols-5 gap-1.5"
@@ -361,6 +366,8 @@ type DrawingFillOptionsProps = {
   value: string | null;
   vertical: boolean;
   onChange: (color: string | null) => void;
+  onPreview?: (color: string) => void;
+  onPreviewReset?: (color: string) => void;
 };
 
 const DRAWING_FILL_UI = {
@@ -461,6 +468,8 @@ function DrawingFillOptions(props: DrawingFillOptionsProps & { kind: 'shape' | '
           vertical={props.vertical}
           value={props.value ?? lastFillColorRef.current}
           onSelect={props.onChange}
+          {...(props.onPreview ? { onPreview: props.onPreview } : {})}
+          {...(props.onPreviewReset ? { onPreviewReset: props.onPreviewReset } : {})}
         />
       ) : null}
     </div>
@@ -482,6 +491,10 @@ export function DrawingTextOptions(props: {
   vertical: boolean;
   onBackgroundColorChange: (color: string | null) => void;
   onColorChange: (color: string) => void;
+  onColorPreview?: (color: string) => void;
+  onColorPreviewReset?: (color: string) => void;
+  onBackgroundColorPreview?: (color: string) => void;
+  onBackgroundColorPreviewReset?: (color: string) => void;
   onFontSizeChange: (fontSize: number) => void;
   onFontFamilyChange: (fontFamily: DrawingFontFamily) => void;
 }) {
@@ -514,6 +527,8 @@ export function DrawingTextOptions(props: {
         vertical={props.vertical}
         value={props.color}
         onSelect={props.onColorChange}
+        {...(props.onColorPreview ? { onPreview: props.onColorPreview } : {})}
+        {...(props.onColorPreviewReset ? { onPreviewReset: props.onColorPreviewReset } : {})}
       />
       <DrawingOptionsDivider extended vertical={props.vertical} />
       <DrawingFillOptions
@@ -524,6 +539,10 @@ export function DrawingTextOptions(props: {
         value={props.backgroundColor}
         vertical={props.vertical}
         onChange={props.onBackgroundColorChange}
+        {...(props.onBackgroundColorPreview ? { onPreview: props.onBackgroundColorPreview } : {})}
+        {...(props.onBackgroundColorPreviewReset
+          ? { onPreviewReset: props.onBackgroundColorPreviewReset }
+          : {})}
       />
       <DrawingOptionsDivider extended vertical={props.vertical} />
       {DRAWING_TEXT_SIZES.map((fontSize) => (

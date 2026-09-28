@@ -34,6 +34,10 @@ export interface DrawingSession {
   commitObject(object: DrawingObject, options?: { select?: boolean }): void;
   replaceObject(object: DrawingObject): void;
   replaceObjects(objects: readonly DrawingObject[]): void;
+  /** Show temporary object changes without publishing a document commit. */
+  previewObjects(objects: readonly DrawingObject[]): void;
+  /** Restore the committed document after a temporary object preview. */
+  clearObjectPreview(): void;
   deleteObjects(objectIds: readonly string[]): void;
   deleteSelected(): void;
   duplicateSelected(): void;
@@ -75,6 +79,7 @@ function reorderedDrawingObjects(
 
 class DrawingSessionOwner implements DrawingSession {
   private document: DrawingDocumentV1;
+  private previewDocument: DrawingDocumentV1 | null = null;
   private activeTool: DrawingTool = 'pencil';
   private selectedObjectIds: readonly string[] = [];
   private defaults: DrawingToolDefaults;
@@ -106,12 +111,17 @@ class DrawingSessionOwner implements DrawingSession {
 
   private replayDocument = (next: DrawingDocumentV1) => {
     if (this.disposed) return false;
+    const hadPreview = this.previewDocument !== null;
+    this.previewDocument = null;
     if (next !== this.document) this.applyDocument(next, []);
+    else if (hadPreview) this.emit();
     return true;
   };
 
   private commitDocument(next: DrawingDocumentV1, nextSelectedIds = this.selectedObjectIds) {
     if (next === this.document || this.disposed || this.commitInProgress) return;
+    const hadPreview = this.previewDocument !== null;
+    this.previewDocument = null;
     const before = this.document;
     const beforeSelectedIds = this.selectedObjectIds;
     const revisionBeforeCommit = this.revision;
@@ -128,6 +138,7 @@ class DrawingSessionOwner implements DrawingSession {
     } catch (error) {
       this.document = before;
       this.selectedObjectIds = beforeSelectedIds;
+      if (hadPreview) this.emit();
       throw error;
     } finally {
       this.commitInProgress = false;
@@ -135,6 +146,7 @@ class DrawingSessionOwner implements DrawingSession {
     if (accepted !== true) {
       this.document = before;
       this.selectedObjectIds = beforeSelectedIds;
+      if (hadPreview) this.emit();
       return;
     }
     if (this.revision === revisionBeforeCommit) this.emit();
@@ -142,7 +154,7 @@ class DrawingSessionOwner implements DrawingSession {
 
   getSnapshot(): DrawingSessionSnapshot {
     return {
-      document: this.document,
+      document: this.previewDocument ?? this.document,
       activeTool: this.activeTool,
       selectedObjectIds: this.selectedObjectIds,
       selectedObjectId: this.selectedObjectIds.at(-1) ?? null,
@@ -158,6 +170,7 @@ class DrawingSessionOwner implements DrawingSession {
 
   setActiveTool(tool: DrawingTool) {
     if (this.activeTool === tool) return;
+    this.previewDocument = null;
     this.activeTool = tool;
     if (tool !== 'select') this.selectedObjectIds = [];
     this.emit();
@@ -180,6 +193,7 @@ class DrawingSessionOwner implements DrawingSession {
       this.selectedObjectIds.every((selectedId, index) => selectedId === next[index])
     )
       return;
+    this.previewDocument = null;
     this.selectedObjectIds = next;
     this.emit();
   }
@@ -219,6 +233,21 @@ class DrawingSessionOwner implements DrawingSession {
       return replacement;
     });
     if (changed) this.commitDocument({ version: 1, objects });
+  }
+
+  previewObjects(replacements: readonly DrawingObject[]) {
+    if (this.disposed || replacements.length === 0) return;
+    const byId = new Map(replacements.map((object) => [object.id, object]));
+    const objects = this.document.objects.map((object) => byId.get(object.id) ?? object);
+    if (objects.every((object, index) => object === this.document.objects[index])) return;
+    this.previewDocument = { version: 1, objects };
+    this.emit();
+  }
+
+  clearObjectPreview() {
+    if (!this.previewDocument) return;
+    this.previewDocument = null;
+    this.emit();
   }
 
   deleteSelected() {
@@ -274,6 +303,7 @@ class DrawingSessionOwner implements DrawingSession {
     this.options.onDispose?.();
     this.listeners.clear();
     this.document = EMPTY_DOCUMENT;
+    this.previewDocument = null;
     this.selectedObjectIds = [];
   }
 }
