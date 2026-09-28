@@ -42,12 +42,6 @@ const DRAWING_COLOR_PICKER_CLASS = [
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span:last-child]:hidden",
 ].join(' ');
 
-const DRAWING_FILL_SLASH_CLASS = [
-  'pointer-events-none absolute left-0 top-1/2 h-0.5 w-5',
-  '-rotate-45 rounded-full bg-current',
-  'shadow-[0_0_0_1px_var(--sniptale-color-surface-panel)]',
-].join(' ');
-
 function QuickOptionButton(props: {
   active: boolean;
   children: ReactNode;
@@ -430,16 +424,24 @@ export function DrawingShapeFillOptions(props: {
         ].join(' ')}
         onClick={() => props.onChange(filled ? null : lastFillColorRef.current)}
       >
-        <span className="relative flex size-5 items-center justify-center">
-          <PaintBucket aria-hidden size={17} />
-          {!filled ? (
-            <span
-              aria-hidden
-              data-ui="content.toolbar.drawing-options.shape.fill-slash"
-              className={DRAWING_FILL_SLASH_CLASS}
-            />
-          ) : null}
-        </span>
+        {filled ? (
+          <PaintBucket aria-hidden size={19} />
+        ) : (
+          <svg
+            aria-hidden
+            data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3.5" y="3.5" width="17" height="17" rx="2" strokeWidth="2" />
+            <path d="M4 20 20 4" strokeWidth="2.6" />
+          </svg>
+        )}
       </ContentToolbarButton>
       {filled ? (
         <DrawingColorOptions
@@ -448,7 +450,6 @@ export function DrawingShapeFillOptions(props: {
           dataUi="content.toolbar.drawing-options.shape.fill-colors"
           floatingBoundaryRef={props.floatingBoundaryRef}
           floatingPlacement={props.floatingPlacement}
-          icon={PaintBucket}
           label={label}
           selectedValue={props.value}
           vertical={props.vertical}

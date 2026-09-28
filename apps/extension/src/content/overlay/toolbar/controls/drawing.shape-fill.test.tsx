@@ -53,7 +53,10 @@ it('uses one Shapes panel for outline, width, and alpha-aware fill controls', as
       ?.getAttribute('aria-pressed')
   ).toBe('false');
   expect(
-    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-slash"]')
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"]')
+  ).not.toBeNull();
+  expect(
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"] rect')
   ).not.toBeNull();
   expect(
     panel
@@ -100,11 +103,14 @@ it('uses one Shapes panel for outline, width, and alpha-aware fill controls', as
   expect(session.getSnapshot().defaults.shape.fillColor).toBe(DEFAULT_DRAWING_COLORS[0]);
   expect(fillToggle?.getAttribute('aria-pressed')).toBe('true');
   expect(
-    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-slash"]')
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"]')
   ).toBeNull();
   expect(
     panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-colors"]')
   ).not.toBeNull();
+  expect(
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-colors"] > svg')
+  ).toBeNull();
   expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
   const fillBlue = panel?.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.shape.fill-colors"] button[title="#60a5fa"]'
