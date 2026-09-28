@@ -222,7 +222,7 @@ function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>)
   expect(pageRoot?.className).not.toContain('h-screen');
   expect(pageRoot?.className).toContain('p-3');
   expect(container?.querySelector('[data-ui="test.header"]')?.parentElement?.className).toContain(
-    'gap-3'
+    'gap-2'
   );
   expect(container?.querySelector('[data-ui="test.sidebar"]')?.parentElement?.className).toContain(
     'gap-3'

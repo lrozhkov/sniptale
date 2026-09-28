@@ -145,7 +145,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onDismiss={props.onActiveImportDismiss}
         />
       ) : null}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
         {props.state.filters.trashMode ? (
           <h1 className="shrink-0 text-xl font-semibold">{translate('gallery.app.trashTitle')}</h1>
         ) : (
