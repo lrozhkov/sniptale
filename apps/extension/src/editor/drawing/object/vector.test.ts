@@ -65,6 +65,27 @@ describe('Fabric drawing adapter', () => {
     expect(context.fill).toHaveBeenCalledTimes(4);
   });
 
+  it('removes invisible Fabric stroke geometry from a prepared saved text box', () => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'saved-text',
+        kind: 'text',
+        bounds: { x: 10, y: 15, width: 120, height: 40 },
+        text: 'Saved text',
+        color: '#111',
+        backgroundColor: null,
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    object.set({ strokeWidth: 1 });
+
+    applyEditorDrawingTextVisuals(object);
+
+    expect(object.strokeWidth).toBe(0);
+  });
+
   it('expands a new text box while typing until the shared working-area limit', () => {
     const object = createEditorDrawingFabricObject(
       {

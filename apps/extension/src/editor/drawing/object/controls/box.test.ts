@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { Canvas, FabricObject, util, type Transform } from 'fabric';
+import { Canvas, FabricObject, Textbox, util, type Transform } from 'fabric';
 import { expect, it } from 'vitest';
 import { createDrawingBoxControls, createDrawingTextControls } from './box';
 import { canonicalizeModifiedEditorDrawingSelection } from '../canonicalize';
@@ -28,10 +28,10 @@ function createCircle() {
 
 function dragResize(
   object: FabricObject,
-  corner: 'mr' | 'mb' | 'br',
+  corner: 'ml' | 'mr' | 'mb' | 'br',
   x: number,
   y: number,
-  originX: 'left' | 'center',
+  originX: 'left' | 'center' | 'right',
   originY: 'top' | 'center'
 ) {
   const transform: Transform = {
@@ -131,6 +131,75 @@ it('limits drawing text to width resize handles and rotation', () => {
   const object = new FabricObject({ sniptaleType: 'text' });
 
   expect(Object.keys(createDrawingTextControls(object))).toEqual(['ml', 'mr', 'mtr']);
+});
+
+it('keeps the text top steady while a side handle changes wrapping width', () => {
+  let object = createEditorDrawingFabricObject(
+    {
+      backgroundColor: null,
+      bounds: { x: 20, y: 30, width: 180, height: 40 },
+      color: '#111',
+      fontFamily: 'sans',
+      fontSize: 24,
+      id: 'width-drag-text',
+      kind: 'text',
+      text: 'A line of text that wraps when its width changes',
+    },
+    1
+  );
+  if (!(object instanceof Textbox)) throw new Error('Expected a text box');
+  const canvas = new Canvas(document.createElement('canvas'));
+  canvas.add(object);
+  object.controls = createDrawingTextControls(object);
+  object.setCoords();
+  const originalTop = object.top;
+  const originalHeight = object.height;
+
+  for (const x of [150, 130, 110]) {
+    expect(dragResize(object, 'mr', x, 60, 'left', 'center')).toBe(true);
+    expect(object.top).toBeCloseTo(originalTop, 4);
+    const replacement = canonicalizeModifiedEditorDrawingSelection({
+      canvas,
+      object,
+      prepareObject: () => undefined,
+      source: null,
+    })?.[0];
+    if (!(replacement instanceof Textbox)) throw new Error('Expected text replacement');
+    expect(replacement.top).toBeCloseTo(originalTop, 4);
+    object = replacement;
+    object.controls = createDrawingTextControls(object);
+  }
+  expect(object.width).not.toBe(180);
+  expect(object.height).not.toBe(originalHeight);
+  canvas.dispose();
+});
+
+it('keeps the opposite top corner fixed when resizing text from the left', () => {
+  const object = createEditorDrawingFabricObject(
+    {
+      backgroundColor: null,
+      bounds: { x: 20, y: 30, width: 180, height: 40 },
+      color: '#111',
+      fontFamily: 'sans',
+      fontSize: 24,
+      id: 'left-width-drag-text',
+      kind: 'text',
+      text: 'A line of text that wraps when its width changes',
+    },
+    1
+  );
+  if (!(object instanceof Textbox)) throw new Error('Expected a text box');
+  const canvas = new Canvas(document.createElement('canvas'));
+  canvas.add(object);
+  object.controls = createDrawingTextControls(object);
+  object.setCoords();
+  const rightTop = object.getPointByOrigin('right', 'top');
+
+  expect(dragResize(object, 'ml', 60, 60, 'right', 'center')).toBe(true);
+
+  expect(object.getPointByOrigin('right', 'top').x).toBeCloseTo(rightTop.x, 4);
+  expect(object.getPointByOrigin('right', 'top').y).toBeCloseTo(rightTop.y, 4);
+  canvas.dispose();
 });
 
 it('keeps corner resize cursors diagonal on elongated drawings and follows rotation', () => {

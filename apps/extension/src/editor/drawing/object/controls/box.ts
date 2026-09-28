@@ -61,6 +61,13 @@ function createProportionalSideScale(axis: 'x' | 'y'): TransformActionHandler {
 
 const scaleXProportionally = createProportionalSideScale('x');
 const scaleYProportionally = createProportionalSideScale('y');
+const changeTextWidth = controlsUtils.wrapWithFireEvent('resizing', ((_event, transform, x, y) => {
+  const { target, originX } = transform;
+  const anchor = target.getPositionByOrigin(originX, 'top');
+  const changed = controlsUtils.changeObjectWidth(_event, transform, x, y);
+  target.setPositionByOrigin(anchor, transform.originX, 'top');
+  return changed;
+}) satisfies TransformActionHandler);
 
 function resolveBoxActionHandler(object: FabricObject, key: BoxControlKey) {
   if (key === 'tl' || key === 'tr' || key === 'br' || key === 'bl') {
@@ -82,7 +89,7 @@ function resolveBoxActionHandler(object: FabricObject, key: BoxControlKey) {
     return scale;
   }
   if (key === 'ml' || key === 'mr') {
-    if (object.sniptaleType === 'text') return controlsUtils.changeWidth;
+    if (object.sniptaleType === 'text') return changeTextWidth;
     return (
       event: Parameters<typeof controlsUtils.scalingX>[0],
       transform: Parameters<typeof controlsUtils.scalingX>[1],

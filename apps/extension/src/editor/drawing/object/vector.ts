@@ -197,7 +197,7 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
     textbox._wrapText = (lines, width) =>
       adapter.wrapText(lines, Math.max(1, width - DRAWING_TEXT_HORIZONTAL_PADDING));
   }
-  textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR });
+  textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR, strokeWidth: 0 });
   textbox._renderTextLinesBackground = (context) =>
     renderEditorDrawingTextBackground(textbox, context);
   textbox.initDimensions();
