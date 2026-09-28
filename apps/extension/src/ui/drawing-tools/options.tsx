@@ -323,6 +323,13 @@ export function DrawingColorOptions(props: {
       aria-label={props.label}
       title={props.label}
     >
+      {Icon ? (
+        <Icon
+          aria-hidden
+          size={16}
+          className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
+        />
+      ) : null}
       <CompactColorSelector
         allowAlpha={props.allowAlpha ?? false}
         allowTransparent={false}
@@ -342,13 +349,6 @@ export function DrawingColorOptions(props: {
         pickerOnly
         onChange={selectColor}
       />
-      {Icon ? (
-        <Icon
-          aria-hidden
-          size={16}
-          className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
-        />
-      ) : null}
       <div
         className="grid w-[104px] grid-cols-5 gap-1.5"
         data-ui="content.toolbar.drawing-options.quick-colors"

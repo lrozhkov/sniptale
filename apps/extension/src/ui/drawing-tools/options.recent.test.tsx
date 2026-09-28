@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { Type } from 'lucide-react';
 
 const persistence = vi.hoisted(() => ({
   load: vi.fn<() => Promise<string[]>>(),
@@ -56,6 +57,31 @@ function visibleColors(host: HTMLElement) {
     (button) => button.title
   );
 }
+
+it('places the text color icon before its picker', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <DrawingColorOptions
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        icon={Type}
+        label="Text color"
+        value="#f97316"
+        onSelect={vi.fn()}
+      />
+    )
+  );
+  const group = host.querySelector('[role="group"]');
+  expect(group?.firstElementChild?.classList.contains('lucide-type')).toBe(true);
+  expect(group?.children[1]?.getAttribute('data-ui')).toBe('test.color-picker');
+  act(() => root.unmount());
+  host.remove();
+});
 
 it('keeps a color picked before the saved recents finish loading at the front', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
