@@ -9,8 +9,8 @@ const BUTTON_BASE_CLASS_NAME = [
   'rounded-[12px] border',
 ].join(' ');
 const BUTTON_ACTIVE_CLASS_NAME = [
-  'grow-[1.9] border-[var(--sniptale-color-border-accent-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_26%,transparent)]',
+  'grow-[1.9] border-[var(--sniptale-color-border-soft)]',
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_46%,transparent)]',
   'text-left text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 const BUTTON_INACTIVE_CLASS_NAME = [
@@ -65,10 +65,10 @@ function getButtonClassName(
 function getCompactLayerClassName(active: boolean, animate: boolean): string {
   return cx(
     COMPACT_LAYER_BASE_CLASS_NAME,
-    animate && 'transition-opacity ease-out motion-reduce:transition-none',
-    animate && (active ? 'duration-75' : 'duration-150'),
+    animate && 'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
     active ? 'opacity-0' : 'opacity-100',
-    animate && (active ? 'delay-0' : 'delay-200 motion-reduce:delay-0')
+    active ? '-translate-x-1' : 'translate-x-0',
+    animate && (active ? 'delay-0' : 'delay-60 motion-reduce:delay-0')
   );
 }
 
@@ -76,10 +76,10 @@ function getExpandedLayerClassName(active: boolean, animate: boolean, compact: b
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
     compact && 'right-2 w-auto gap-1.5',
-    animate && 'transition-opacity ease-out motion-reduce:transition-none',
-    animate && (active ? 'duration-150' : 'duration-75'),
+    animate && 'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
     active ? 'opacity-100' : 'opacity-0',
-    animate && (active ? 'delay-200 motion-reduce:delay-0' : 'delay-0')
+    active ? 'translate-x-0' : 'translate-x-1',
+    animate && (active ? 'delay-60 motion-reduce:delay-0' : 'delay-0')
   );
 }
 

@@ -230,6 +230,25 @@ test('popup center menu icon stays centered through hover, press, and focus', as
   };
 
   await expectCentered();
+  const ring = page.locator('.popup-react-shell__menu-ring');
+  await button.click();
+  const indicator = page.locator('.popup-react-shell__tab-indicator');
+  await expect(indicator).toHaveAttribute('data-page', 'menu');
+  await indicator.evaluate(async (element) => {
+    await Promise.all(
+      element.getAnimations({ subtree: true }).map((animation) => animation.finished)
+    );
+  });
+  const ringBox = await ring.boundingBox();
+  const buttonBox = await button.boundingBox();
+  if (!ringBox || !buttonBox) throw new Error('Menu ring geometry is unavailable');
+  expect(
+    Math.abs(ringBox.x + ringBox.width / 2 - (buttonBox.x + buttonBox.width / 2))
+  ).toBeLessThan(0.6);
+  expect(
+    Math.abs(ringBox.y + ringBox.height / 2 - (buttonBox.y + buttonBox.height / 2))
+  ).toBeLessThan(0.6);
+  expect(await indicator.evaluate((element) => getComputedStyle(element).boxShadow)).toBe('none');
   await button.hover();
   await icon.evaluate(async (element) => {
     await Promise.all(element.getAnimations().map((animation) => animation.finished));
@@ -257,8 +276,11 @@ test('popup menu and tools use stable tiles without clipping the footer', async 
   await page.locator('[data-ui="popup.app.tabs"] button[data-page="menu"]').click();
 
   const menu = page.locator('[data-ui="popup.menu.route"]');
+  const tools = page.locator('[data-ui="popup.menu.tools"]');
   const workspace = page.locator('[data-ui="popup.menu.workspace"]');
   const footer = menu.locator('footer');
+  await expect(tools.locator('button')).toHaveCount(4);
+  await expect(workspace).toContainText('Приложения');
   await expect(workspace).toBeVisible();
   await expect(footer).toBeVisible();
   const workspaceBox = await workspace.boundingBox();
@@ -267,6 +289,12 @@ test('popup menu and tools use stable tiles without clipping the footer', async 
   expect(workspaceBox.y + workspaceBox.height).toBeLessThan(footerBox.y);
 
   const imageEditor = workspace.getByRole('button', { name: POPUP_IMAGE_EDITOR_LABEL });
+  const quickAction = menu.getByRole('button', {
+    name: translate('popup.home.quickEditTabLabel', 'ru'),
+  });
+  expect(await imageEditor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+    await quickAction.evaluate((element) => getComputedStyle(element).backgroundColor)
+  );
   const before = await imageEditor.boundingBox();
   const restingBackground = await imageEditor.evaluate(
     (element) => getComputedStyle(element).backgroundColor

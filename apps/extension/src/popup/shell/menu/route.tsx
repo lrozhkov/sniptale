@@ -118,14 +118,6 @@ const CAPTURE_ICON_CLASS_NAME = [
   'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
 ].join(' ');
 
-const WORKSPACE_BUTTON_CLASS_NAME = [
-  'group flex min-h-[64px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-[12px] border-0',
-  'bg-[var(--sniptale-color-surface-input)] px-1.5 py-2 text-center text-[10px] font-medium',
-  'text-[var(--sniptale-color-text-primary)] transition-colors',
-  'hover:bg-[var(--sniptale-color-surface-hover)]',
-  'disabled:cursor-not-allowed disabled:opacity-50',
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
-].join(' ');
 const MENU_SMALL_ICON_CLASS_NAME = [
   'h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]',
   'transition-[transform,color] duration-180 ease-out motion-reduce:transition-none',
@@ -382,7 +374,7 @@ function MenuPageTools({
   onOpenToolbar(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div className="grid grid-cols-4 gap-1">
       {pageToolActions.map(({ icon: Icon, labelKey, hintKey, mode }) => (
         <MenuToolbarButton
           key={mode}
@@ -400,16 +392,18 @@ function MenuPageTools({
 
 function MenuWorkspace() {
   return (
-    <div className="grid grid-cols-4 gap-1.5">
+    <div className="grid grid-cols-4 gap-1">
       {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
         <button
           key={labelKey}
           type="button"
-          className={WORKSPACE_BUTTON_CLASS_NAME}
+          className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
           onClick={onClick}
         >
           <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-          <span>{translate(labelKey)}</span>
+          <span className="min-h-5 text-[9px] font-medium leading-[10px]">
+            {translate(labelKey)}
+          </span>
         </button>
       ))}
     </div>
@@ -434,14 +428,14 @@ function MenuToolbarButton({
   return (
     <button
       type="button"
-      className={`${WORKSPACE_BUTTON_CLASS_NAME} w-full`}
+      className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
       data-ui={`popup.menu.tool-action.${mode}`}
       title={disabledReason ?? translate(hintKey)}
       disabled={Boolean(disabledReason)}
       onClick={() => void onOpen(mode)}
     >
       <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
-      <span>{translate(labelKey)}</span>
+      <span className="min-h-5 text-[9px] font-medium leading-[10px]">{translate(labelKey)}</span>
     </button>
   );
 }

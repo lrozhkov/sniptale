@@ -164,8 +164,7 @@ body {
   fill: none;
   stroke: var(--sniptale-color-accent, var(--popup-initial-accent));
   stroke-width: 1.5px;
-  stroke-dasharray: 120;
-  stroke-dashoffset: 0;
+  stroke-dasharray: 100 100;
 }
 
 .popup-react-shell__tab-indicator[data-page='screenshots'] {
@@ -179,15 +178,12 @@ body {
 }
 
 .popup-react-shell__tab-indicator[data-page='menu'] {
-  bottom: 6px;
+  bottom: 5px;
   left: 50%;
   width: 40px;
   height: 40px;
-  border-width: 1px;
-  border-color: transparent;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--popup-initial-accent) 22%, transparent),
-    0 4px 12px color-mix(in srgb, var(--popup-initial-accent) 14%, transparent);
+  border-width: 0;
+  box-shadow: none;
   opacity: 1;
   transition-delay: 0ms, 80ms, 80ms, 80ms, 160ms, 160ms, 160ms, 0ms;
 }
@@ -196,7 +192,7 @@ body {
   opacity: 1;
 }
 
-.popup-react-shell__tabs[data-animate='true']
+.popup-react-shell__tabs:is([data-menu-entry='left'], [data-menu-entry='right'])
   .popup-react-shell__tab-indicator[data-page='menu']
   .popup-react-shell__menu-ring
   circle {
@@ -204,19 +200,19 @@ body {
 }
 
 .popup-react-shell__tab-indicator[data-entry-side='left'] .popup-react-shell__menu-ring {
-  transform: rotate(180deg);
+  transform: rotate(90deg) scaleY(-1);
 }
 
 .popup-react-shell__tab-indicator[data-entry-side='right'] .popup-react-shell__menu-ring {
-  transform: scaleY(-1);
+  transform: rotate(90deg);
 }
 
 @keyframes popup-menu-ring-draw {
   from {
-    stroke-dashoffset: 120;
+    stroke-dasharray: 0 100;
   }
   to {
-    stroke-dashoffset: 0;
+    stroke-dasharray: 100 100;
   }
 }
 
@@ -299,7 +295,7 @@ body {
   clip-path: inset(0 0 0 0);
 }
 
-.popup-react-shell__tabs[data-animate='true']
+.popup-react-shell__tabs:is([data-menu-entry='left'], [data-menu-entry='right'])
   button[data-page='menu'][data-active='true']
   .popup-react-shell__menu-icon-accent {
   animation: popup-menu-icon-fill 300ms ease-out 110ms both;

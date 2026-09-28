@@ -62,12 +62,14 @@ it('animates width while crossfading static compact and expanded layouts', () =>
   );
 
   expect(markup).toContain('transition-[flex-grow,background-color,border-color,color]');
-  expect(markup).toContain('transition-opacity');
+  expect(markup).toContain('transition-[opacity,transform]');
   expect(markup).toContain('justify-center');
   expect(markup).toContain('left-2.5');
   expect(markup).toContain('w-[148px]');
   expect(markup).not.toContain('transition-[left,transform,color]');
-  expect(markup).toContain('delay-200');
+  expect(markup).not.toContain('delay-200');
+  expect(markup).toContain('delay-60');
+  expect(markup).not.toContain('var(--sniptale-color-accent-soft)');
   expect(markup).toContain('motion-reduce:transition-none');
   expect(markup).not.toContain('scale-95');
   expect(markup).toContain('group-hover:scale-110');

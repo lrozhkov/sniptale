@@ -93,12 +93,14 @@ function PopupNavigation({
   route: ReturnType<typeof usePopupRouteController>;
 }) {
   const previousPage = useRef<PopupPage | null>(route.page);
-  const [menuEntrySide, setMenuEntrySide] = useState<'left' | 'right'>('left');
+  const [menuEntrySide, setMenuEntrySide] = useState<'left' | 'right' | 'none'>('none');
   useLayoutEffect(() => {
     if (route.page === 'menu' && previousPage.current && previousPage.current !== 'menu') {
       setMenuEntrySide(
         pages.findIndex(({ page }) => page === previousPage.current) < 2 ? 'left' : 'right'
       );
+    } else if (route.page !== 'menu') {
+      setMenuEntrySide('none');
     }
     previousPage.current = route.page;
   }, [route.page]);
@@ -106,6 +108,7 @@ function PopupNavigation({
     <nav
       className="popup-react-shell__tabs"
       data-animate={route.hasCommittedNavigation ? 'true' : 'false'}
+      data-menu-entry={route.page === 'menu' ? menuEntrySide : 'none'}
       data-ui="popup.app.tabs"
     >
       <span
@@ -115,7 +118,7 @@ function PopupNavigation({
         data-entry-side={menuEntrySide}
       >
         <svg aria-hidden="true" className="popup-react-shell__menu-ring" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="19" />
+          <circle cx="20" cy="20" r="19" pathLength="100" />
         </svg>
       </span>
       {pages.map(({ page: candidate, icon }) => (

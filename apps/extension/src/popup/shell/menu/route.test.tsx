@@ -203,7 +203,10 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.design-review"]'),
   ];
   expect(toolButtons.every((button) => button !== null)).toBe(true);
-  expect(toolButtons.every((button) => button?.className.includes('min-h-[64px]'))).toBe(true);
+  const quickScenario = container.querySelector<HTMLButtonElement>(
+    '[title="popup.home.quickEditTabHint"]'
+  );
+  expect(toolButtons.every((button) => button?.className === quickScenario?.className)).toBe(true);
   expect(container.querySelector('[data-ui="popup.menu.tools"] .grid')?.className).toContain(
     'grid-cols-4'
   );
@@ -211,6 +214,11 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     'grid-cols-4'
   );
   expect(container.querySelectorAll('[data-ui="popup.menu.workspace"] button')).toHaveLength(4);
+  expect(
+    [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.menu.workspace"] button'),
+    ].every((button) => button.className === quickScenario?.className)
+  ).toBe(true);
   expect(toolButtons.every((button) => button?.className.includes('border-0'))).toBe(true);
   expect(
     toolButtons.every((button) =>
@@ -244,7 +252,7 @@ it('renders page tools as disabled when the active tab cannot run them', async (
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.design-review"]'),
   ];
   expect(buttons.every((button) => button?.disabled)).toBe(true);
-  expect(buttons.every((button) => button?.className.includes('disabled:opacity-50'))).toBe(true);
+  expect(buttons.every((button) => button?.className.includes('disabled:opacity-45'))).toBe(true);
   act(() => buttons.forEach((button) => button?.click()));
   expect(mocks.openScreenshotMode).not.toHaveBeenCalled();
 });

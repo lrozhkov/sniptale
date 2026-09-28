@@ -129,6 +129,7 @@ it('records which side the menu ring is entered from', async () => {
   await select('menu');
   const indicator = container.querySelector<HTMLElement>('.popup-react-shell__tab-indicator');
   expect(indicator?.dataset['entrySide']).toBe('left');
+  expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('left');
   expect(indicator?.querySelector('.popup-react-shell__menu-ring circle')).not.toBeNull();
   expect(
     container.querySelector('button[data-page="menu"] .popup-react-shell__menu-icon-accent')
@@ -137,7 +138,22 @@ it('records which side the menu ring is entered from', async () => {
   await select('export');
   await select('menu');
   expect(indicator?.dataset['entrySide']).toBe('right');
+  expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('right');
   await vi.waitFor(() => expect(mocks.saveLastPage).toHaveBeenCalledTimes(3));
+});
+
+it('opens directly on menu with a completed, non-animated ring', async () => {
+  const Route = () => <div data-testid="route" />;
+  mocks.coordinator.mockResolvedValue({ page: 'menu' });
+  mocks.loadRoute.mockResolvedValue(Route);
+  const { PopupApp } = await import('./index');
+  await act(async () => root.render(<PopupApp />));
+  await vi.waitFor(() => expect(container.querySelector('[data-testid="route"]')).not.toBeNull());
+
+  const indicator = container.querySelector<HTMLElement>('.popup-react-shell__tab-indicator');
+  expect(indicator?.dataset['page']).toBe('menu');
+  expect(indicator?.dataset['entrySide']).toBe('none');
+  expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('none');
 });
 
 it('keeps current content until a cold navigation commits and only then persists it', async () => {
