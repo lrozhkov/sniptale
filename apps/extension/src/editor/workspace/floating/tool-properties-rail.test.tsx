@@ -113,6 +113,7 @@ it('anchors current drawing tools and renders their shared options directly', ()
   expect(properties?.parentElement?.className).toContain('left-1/2');
   expect(properties?.parentElement?.className).toContain('-translate-x-1/2');
   expect(properties?.className).not.toContain('!rounded-none');
+  expect(properties?.className).toContain('overflow-y-hidden');
 
   renderRail({
     activeTool: 'select',
@@ -129,6 +130,9 @@ it('shows blur settings immediately when the blur tool is selected', () => {
 
 it('keeps retained step command groups interactive and dismissible', () => {
   renderRail({ activeTool: 'step' });
+  expect(
+    container.querySelector<HTMLElement>('[data-ui="editor.floating.tool-properties"]')?.className
+  ).not.toContain('overflow-y-hidden');
   const button = container.querySelector<HTMLButtonElement>(
     '[data-ui="editor.floating.tool-properties.group.fill"]'
   );

@@ -183,6 +183,9 @@ it('renders editor tool settings as a horizontal toolbar like content drawing mo
 
   expect(markup).toContain('flex-row');
   expect(markup).not.toContain('flex-col');
+  expect(markup).toContain('overflow-x-auto overflow-y-hidden');
+  expect(markup).toContain('[&amp;_button:active]:!transform-none');
+  expect(markup).toContain('[&amp;_button:active]:!translate-y-0');
   expect(markup).toContain('data-ui="mock.divider" data-vertical="false"');
   expect(markup).toContain(
     'data-placement="auto" data-ui="mock.color-options" data-vertical="false"'

@@ -39,6 +39,11 @@ type DrawingColorContext = {
   vertical: false;
 };
 
+const EDITOR_DRAWING_OPTIONS_CLASS_NAME = [
+  'flex h-7 flex-row items-center gap-2 overflow-x-auto overflow-y-hidden px-1',
+  '[&_button:active]:!transform-none [&_button:active]:!translate-y-0',
+].join(' ');
+
 function useDrawingPalette() {
   const [colors, setColors] = useState<readonly string[]>(
     () => createDefaultDrawingPaletteState().colors
@@ -316,7 +321,7 @@ export function EditorDrawingOptions(props: {
     <div
       ref={panelRef}
       data-ui="editor.drawing.options"
-      className="flex h-7 flex-row items-center gap-2 overflow-x-auto px-1"
+      className={EDITOR_DRAWING_OPTIONS_CLASS_NAME}
     >
       <ToolOptions
         arrowDrawFromTip={toolSettings.arrow.drawFromTip}

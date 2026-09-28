@@ -225,7 +225,7 @@ export function EditorFloatingToolPropertiesRail({
       >
         <FloatingChromeToolbar
           dataUi="editor.floating.tool-properties"
-          className="min-w-0 max-w-full overflow-x-auto"
+          className={`min-w-0 max-w-full overflow-x-auto ${drawingOptionsTool ? 'overflow-y-hidden' : ''}`}
         >
           {drawingOptionsTool ? (
             <EditorDrawingOptions
