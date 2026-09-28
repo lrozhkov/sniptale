@@ -91,7 +91,7 @@ function useDrawingOptionsLayout(args: {
   }, []);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
   const menuWidth = Math.min(
-    dimensions.width + (args.hasSelection ? 270 : 0),
+    dimensions.width + (args.hasSelection ? 294 : 0),
     Math.max(0, window.innerWidth - 16)
   );
   const placement = getToolbarMenuPosition(args.triggerRef.current, dimensions.height);

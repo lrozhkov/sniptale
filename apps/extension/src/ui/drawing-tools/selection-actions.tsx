@@ -1,4 +1,15 @@
-import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Copy, Trash2, X } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsDown,
+  ChevronsUp,
+  Copy,
+  Group,
+  Layers3,
+  Trash2,
+  Ungroup,
+  X,
+} from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../platform/i18n';
 
@@ -23,6 +34,50 @@ function DrawingDeselectOption(props: { onClick: () => void }) {
   );
 }
 
+interface LayerCombinationActions {
+  canGroup: boolean;
+  canMerge: boolean;
+  canUngroup: boolean;
+  showMerge: boolean;
+  onGroup: () => void;
+  onMerge: () => void;
+  onUngroup: () => void;
+}
+
+function DrawingLayerCombinationActions(props: LayerCombinationActions) {
+  const groupLabel = translate(
+    props.canUngroup ? 'editor.toolbar.ungroupLayers' : 'editor.toolbar.groupLayers'
+  );
+  return (
+    <>
+      {props.showMerge ? (
+        <ContentToolbarButton
+          type="button"
+          dataUi="drawing.selection.actions.merge"
+          aria-label={translate('editor.toolbar.mergeLayers')}
+          title={translate('editor.toolbar.mergeLayers')}
+          disabled={!props.canMerge}
+          className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+          onClick={props.onMerge}
+        >
+          <Layers3 aria-hidden size={16} />
+        </ContentToolbarButton>
+      ) : null}
+      <ContentToolbarButton
+        type="button"
+        dataUi={`drawing.selection.actions.${props.canUngroup ? 'ungroup' : 'group'}`}
+        aria-label={groupLabel}
+        title={groupLabel}
+        disabled={!props.canGroup && !props.canUngroup}
+        className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 !rounded-md !p-0"
+        onClick={props.canUngroup ? props.onUngroup : props.onGroup}
+      >
+        {props.canUngroup ? <Ungroup aria-hidden size={16} /> : <Group aria-hidden size={16} />}
+      </ContentToolbarButton>
+    </>
+  );
+}
+
 export function DrawingSelectionActions(props: {
   canReorder: boolean;
   canDuplicate: boolean;
@@ -31,6 +86,7 @@ export function DrawingSelectionActions(props: {
   onDuplicate: () => void;
   onDelete: () => void;
   onDeselect: () => void;
+  layerCombination?: LayerCombinationActions;
 }) {
   const moves = [
     { direction: 'front', icon: ChevronsUp, label: translate('editor.toolbar.frontLayer') },
@@ -39,7 +95,7 @@ export function DrawingSelectionActions(props: {
     { direction: 'back', icon: ChevronsDown, label: translate('editor.toolbar.backLayer') },
   ] as const;
   return (
-    <div data-ui="drawing.selection.actions" className="flex h-7 items-center gap-1">
+    <div data-ui="drawing.selection.actions" className="flex h-7 items-center gap-2">
       {moves.map(({ direction, icon: Icon, label }) => (
         <ContentToolbarButton
           key={direction}
@@ -54,7 +110,10 @@ export function DrawingSelectionActions(props: {
           <Icon aria-hidden size={16} />
         </ContentToolbarButton>
       ))}
-      <span className="mx-0.5 h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      <span className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      {props.layerCombination ? (
+        <DrawingLayerCombinationActions {...props.layerCombination} />
+      ) : null}
       <ContentToolbarButton
         type="button"
         dataUi="drawing.selection.actions.duplicate"
@@ -78,7 +137,7 @@ export function DrawingSelectionActions(props: {
       >
         <Trash2 aria-hidden size={16} />
       </ContentToolbarButton>
-      <span className="mx-0.5 h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      <span className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
       <DrawingDeselectOption onClick={props.onDeselect} />
     </div>
   );

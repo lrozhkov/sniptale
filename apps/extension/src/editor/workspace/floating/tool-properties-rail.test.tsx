@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EditorTool } from '../../../features/editor/document/types';
 import type { CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
+import { useEditorStore } from '../../state/useEditorStore';
 
 const listeners = new Map<string, Set<() => void>>();
 const mocks = vi.hoisted(() => ({
@@ -15,6 +16,9 @@ const mocks = vi.hoisted(() => ({
 }));
 const controller = {
   clearSelection: vi.fn(),
+  groupSelectedLayers: vi.fn(),
+  mergeSelectedLayers: vi.fn(),
+  ungroupSelectedLayers: vi.fn(),
   canvas: {
     off: vi.fn((event: string, handler: () => void) => listeners.get(event)?.delete(handler)),
     on: vi.fn((event: string, handler: () => void) => {
@@ -96,6 +100,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  useEditorStore.setState({ layers: [] });
   vi.unstubAllGlobals();
 });
 
@@ -107,6 +112,7 @@ it('anchors current drawing tools and renders their shared options directly', ()
   );
   expect(properties?.parentElement?.className).toContain('left-1/2');
   expect(properties?.parentElement?.className).toContain('-translate-x-1/2');
+  expect(properties?.className).not.toContain('!rounded-none');
 
   renderRail({
     activeTool: 'select',
@@ -196,12 +202,95 @@ it('places selection actions beside drawing properties and allows deselection', 
   const actions = container.querySelector('[data-ui="editor.floating.selection-actions"]');
   expect(properties?.parentElement).toBe(actions?.parentElement);
   expect(properties?.querySelector('[data-ui="drawing.selection.actions"]')).toBeNull();
+  expect(actions?.querySelector('[data-ui="drawing.selection.actions.group"]')).toBeNull();
+  expect(actions?.querySelector('[data-ui="drawing.selection.actions.merge"]')).toBeNull();
   act(() =>
     actions
       ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing-options.deselect"]')
       ?.click()
   );
   expect(controller.clearSelection).toHaveBeenCalledOnce();
+});
+
+it('rounds both tool panels and exposes group and merge for multiple selected layers', () => {
+  useEditorStore.setState({
+    layers: [
+      { id: 'first', type: 'shape', selected: true, locked: false, immutable: false },
+      { id: 'second', type: 'shape', selected: true, locked: false, immutable: false },
+    ] as never,
+  });
+  renderRail({
+    activeTool: 'select',
+    selection: {
+      hasSelection: true,
+      selectedObjectCount: 2,
+      selectedObjectType: null,
+      selectedObjectsAreDrawing: true,
+    },
+  });
+  const properties = container.querySelector('[data-ui="editor.floating.tool-properties"]');
+  const actions = container.querySelector('[data-ui="editor.floating.selection-actions"]');
+  expect(properties?.className).not.toContain('!rounded-none');
+  expect(actions?.className).not.toContain('!rounded-none');
+  expect(actions?.querySelector('[data-ui="drawing.selection.actions"]')?.className).toContain(
+    'gap-2'
+  );
+  act(() =>
+    actions
+      ?.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.group"]')
+      ?.click()
+  );
+  act(() =>
+    actions
+      ?.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.merge"]')
+      ?.click()
+  );
+  expect(controller.groupSelectedLayers).toHaveBeenCalledOnce();
+  expect(controller.mergeSelectedLayers).toHaveBeenCalledOnce();
+});
+
+it('uses layer selection guards and offers ungroup for a selected group', () => {
+  useEditorStore.setState({
+    layers: [
+      { id: 'first', type: 'shape', selected: true, locked: true },
+      { id: 'second', type: 'shape', selected: true, locked: false },
+    ] as never,
+  });
+  renderRail({
+    activeTool: 'select',
+    selection: {
+      hasSelection: true,
+      selectedObjectCount: 2,
+      selectedObjectsAreDrawing: true,
+    },
+  });
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.group"]')
+      ?.disabled
+  ).toBe(true);
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.merge"]')
+      ?.disabled
+  ).toBe(true);
+
+  useEditorStore.setState({
+    layers: [{ id: 'group', type: 'group', selected: true, locked: false }] as never,
+  });
+  renderRail({
+    activeTool: 'select',
+    selection: {
+      hasSelection: true,
+      selectedObjectCount: 1,
+      selectedObjectsAreDrawing: true,
+    },
+  });
+  const ungroup = container.querySelector<HTMLButtonElement>(
+    '[data-ui="drawing.selection.actions.ungroup"]'
+  );
+  expect(ungroup?.disabled).toBe(false);
+  expect(container.querySelector('[data-ui="drawing.selection.actions.merge"]')).toBeNull();
+  act(() => ungroup?.click());
+  expect(controller.ungroupSelectedLayers).toHaveBeenCalledOnce();
 });
 
 it('keeps drawing options six pixels below the outer tool rail after viewport changes', () => {

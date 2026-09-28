@@ -19,6 +19,7 @@
 
 .sniptale-popover-menu.sniptale-drawing-options-menu {
   padding: 6px;
+  border-radius: 14px;
   border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 46%, transparent) !important;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--sniptale-color-overlay) 8%, transparent) !important;
 }

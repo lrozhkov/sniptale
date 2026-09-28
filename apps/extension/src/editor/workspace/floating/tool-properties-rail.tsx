@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
-import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
+import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { type CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorController } from '../../application/controller-context';
@@ -10,7 +10,10 @@ import { useEditorStore } from '../../state/useEditorStore';
 import {
   canDeleteLayerSelection,
   canDuplicateLayerSelection,
+  canGroupLayerSelection,
+  canMergeLayerSelection,
   canReorderLayerSelection,
+  canUngroupLayerSelection,
 } from '../../inspector/layers/helpers';
 import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
@@ -194,6 +197,8 @@ export function EditorFloatingToolPropertiesRail({
     );
   const enabled = standardPropertiesEnabled || drawingPropertiesEnabled;
   const showSelectionActions = drawingPropertiesEnabled && selection.hasSelection;
+  const selectedLayerCount = layers.filter((layer) => layer.selected).length;
+  const canUngroup = canUngroupLayerSelection(layers);
   const placement = useToolRailPlacement(enabled);
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
 
@@ -220,10 +225,7 @@ export function EditorFloatingToolPropertiesRail({
       >
         <FloatingChromeToolbar
           dataUi="editor.floating.tool-properties"
-          className={floatingChromeClassNames(
-            'min-w-0 max-w-full overflow-x-auto',
-            !showSelectionActions && '!rounded-none'
-          )}
+          className="min-w-0 max-w-full overflow-x-auto"
         >
           {drawingOptionsTool ? (
             <EditorDrawingOptions
@@ -245,14 +247,24 @@ export function EditorFloatingToolPropertiesRail({
           )}
         </FloatingChromeToolbar>
         {showSelectionActions ? (
-          <FloatingChromeToolbar
-            dataUi="editor.floating.selection-actions"
-            className="shrink-0 !rounded-none"
-          >
+          <FloatingChromeToolbar dataUi="editor.floating.selection-actions" className="shrink-0">
             <DrawingSelectionActions
               canReorder={canReorderLayerSelection(layers)}
               canDuplicate={canDuplicateLayerSelection(layers)}
               canDelete={canDeleteLayerSelection(layers)}
+              {...(selectedLayerCount > 1 || canUngroup
+                ? {
+                    layerCombination: {
+                      canGroup: canGroupLayerSelection(layers),
+                      canMerge: canMergeLayerSelection(layers),
+                      canUngroup,
+                      showMerge: selectedLayerCount > 1,
+                      onGroup: () => controller.groupSelectedLayers(),
+                      onMerge: () => void controller.mergeSelectedLayers(),
+                      onUngroup: () => controller.ungroupSelectedLayers(),
+                    },
+                  }
+                : {})}
               onMove={(direction) => {
                 if (direction === 'front') controller.bringSelectionToFront();
                 else if (direction === 'forward') controller.bringForwardSelection();
