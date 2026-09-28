@@ -29,12 +29,12 @@ export type { EditorFloatingDocumentController } from './document-bar-types';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
   'absolute left-3 top-3 z-50 flex max-w-[calc(100vw-1.5rem)]',
-  'items-center overflow-visible max-[720px]:right-3'
+  'items-center overflow-visible'
 );
 
 const DOCUMENT_TITLE_CLASS_NAME = [
   'flex min-w-[8rem] max-w-[18rem] max-[1799px]:max-w-[11rem] items-center px-2.5',
-  'max-[720px]:min-w-0 max-[720px]:max-w-[9.5rem]',
+  'max-[1499px]:min-w-0 max-[1499px]:max-w-[6rem]',
 ].join(' ');
 
 const DOCUMENT_PROMOTION_BUTTON_CLASS_NAME = [

@@ -10,7 +10,7 @@ import { EditorHistoryResetPopover, type EditorHistoryResetMode } from './histor
 
 const TOOL_HISTORY_CONTROLS_CLASS_NAME = floatingChromeClassNames(
   'flex-row items-center gap-1.5 p-1.5',
-  'min-[721px]:absolute min-[721px]:left-[calc(100%+0.75rem)] min-[721px]:top-0'
+  'absolute left-[calc(100%+0.75rem)] top-0'
 );
 
 export function EditorFloatingToolHistoryControls(props: {

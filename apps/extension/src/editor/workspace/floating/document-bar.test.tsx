@@ -30,6 +30,9 @@ it('centers the document title without a storage badge and keeps the library ico
   expect(getButton('editor.floating.document-bar.title').parentElement?.className).toContain(
     'items-center'
   );
+  expect(getButton('editor.floating.document-bar.title').parentElement?.className).toContain(
+    'max-[1499px]:max-w-[6rem]'
+  );
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.className).not.toContain('!bg-');
   expect(promote.className).toContain('!text-[var(--sniptale-color-warning)]');
@@ -50,9 +53,7 @@ it('centers the document title without a storage badge and keeps the library ico
   expect(controller.onSaveImageAs).toHaveBeenCalledOnce();
   expect(controller.onCopyRenderedImage).toHaveBeenCalledOnce();
   expect(controller.onExportSession).not.toHaveBeenCalled();
-  expect(getButton('editor.floating.document-bar.save-button').className).toContain(
-    'max-[720px]:!hidden'
-  );
+  expect(getButton('editor.floating.document-bar.save-button').className).toContain('shrink-0');
   expect(
     getButton('editor.floating.document-bar.copy-button').getAttribute('data-copy-status')
   ).toBe('saved');

@@ -882,6 +882,57 @@ for (const extensionPage of builtExtensionPages) {
   });
 }
 
+test('image editor keeps the complete top toolbar on one row at HD and scrolls below it', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${hostOrigin}/tooling/test/harness/editor.html`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.locator('[data-ui="editor.floating.document-bar"]')).toBeVisible();
+  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toBeHidden();
+
+  const measure = () =>
+    page.evaluate(() => {
+      const bounds = (name: string) => {
+        const element = document.querySelector(`[data-ui="${name}"]`);
+        if (!element) throw new Error(`Missing editor toolbar group: ${name}`);
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top };
+      };
+      return {
+        documentBar: bounds('editor.floating.document-bar'),
+        rail: bounds('editor.floating.tool-rail'),
+        history: bounds('editor.floating.tool-rail.history'),
+        view: bounds('editor.floating.view-controls'),
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      };
+    });
+
+  const hd = await measure();
+  expect(hd.documentBar.right).toBeLessThan(hd.rail.left);
+  expect(hd.rail.right).toBeLessThan(hd.history.left);
+  expect(hd.history.right).toBeLessThan(hd.view.left);
+  expect(hd.view.right).toBeLessThanOrEqual(1280);
+  expect(Math.max(hd.documentBar.top, hd.rail.top, hd.history.top, hd.view.top)).toBeLessThan(16);
+  expect(hd.documentWidth).toBe(1280);
+
+  await page.setViewportSize({ width: 700, height: 720 });
+  const narrow = await measure();
+  expect(narrow.documentWidth).toBe(1280);
+  expect(narrow.viewportWidth).toBe(700);
+  for (const group of ['documentBar', 'rail', 'history', 'view'] as const) {
+    expect(narrow[group]).toEqual(hd[group]);
+  }
+  await expect(page.locator('[data-ui="editor.floating.document-bar.save-button"]')).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.scrollLeft = 580;
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollLeft)).toBe(580);
+});
+
 test('content runtime is not injected before explicit site access', async ({
   page,
   hostOrigin,

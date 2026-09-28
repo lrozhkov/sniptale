@@ -29,14 +29,10 @@ import { DocumentAutosaveStatus } from './document-autosave-status';
 
 const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-start gap-3',
-  'max-[720px]:left-3 max-[720px]:right-3 max-[720px]:translate-x-0',
-  'max-[720px]:flex-wrap'
+  'max-[1499px]:left-[calc(50%-6rem)]'
 );
 
-const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames(
-  'flex-row overflow-visible',
-  'max-[720px]:flex-wrap max-[720px]:content-start max-[720px]:gap-1'
-);
+const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames('flex-row overflow-visible');
 
 const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'pencil',
@@ -91,13 +87,7 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   });
 
   return (
-    <div
-      data-ui="editor.floating.tool-rail.stack"
-      className={floatingChromeClassNames(
-        TOOL_RAIL_STACK_CLASS_NAME,
-        'min-[721px]:max-[1439px]:!top-[4.75rem] max-[720px]:!top-[8.5rem]'
-      )}
-    >
+    <div data-ui="editor.floating.tool-rail.stack" className={TOOL_RAIL_STACK_CLASS_NAME}>
       <FloatingChromeToolbar
         aria-label={translate('shared.ui.commandPaletteToolsSection')}
         className={TOOL_RAIL_CLASS_NAME}

@@ -140,6 +140,9 @@ it('opens combined workspace and grid settings and the map below the top-right t
     container?.querySelector('[data-ui="editor.floating.view-controls.stack"]')?.className
   ).toContain('z-50');
   expect(
+    container?.querySelector('[data-ui="editor.floating.view-controls.stack"]')?.className
+  ).not.toContain('max-[720px]:top-[4.75rem]');
+  expect(
     container?.querySelector('[data-ui="editor.floating.view-controls.popover.workspace"]')
   ).not.toBeNull();
   expect(container?.textContent).toContain('#F2F4F7');

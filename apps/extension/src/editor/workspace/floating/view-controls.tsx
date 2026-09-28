@@ -14,8 +14,7 @@ const VIEW_CONTROLS_STACK_CLASS_NAME = floatingChromeClassNames(
     'max-w-[calc(100vw-1.5rem-var(--editor-floating-edge-right,0px))]',
   ].join(' '),
   'flex-col items-end gap-3',
-  'overflow-visible',
-  'max-[720px]:top-[4.75rem]'
+  'overflow-visible'
 );
 
 const VIEW_CONTROLS_CLASS_NAME = floatingChromeClassNames(

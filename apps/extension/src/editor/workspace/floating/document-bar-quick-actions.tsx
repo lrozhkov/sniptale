@@ -20,7 +20,7 @@ import { useEditorStore } from '../../state/useEditorStore';
 import { closeEditorPageDocument } from '../../workflows/close-page-document';
 import { EditorAnchoredConfirmPopover } from './anchored-feedback';
 
-const QUICK_ACTION_BUTTON_CLASS_NAME = 'max-[720px]:!hidden';
+const QUICK_ACTION_BUTTON_CLASS_NAME = 'shrink-0';
 const COPY_FEEDBACK_BUTTON_CLASS_NAME = [
   QUICK_ACTION_BUTTON_CLASS_NAME,
   'data-[copy-status=saved]:scale-105 data-[copy-status=saved]:text-[var(--sniptale-color-success)]',

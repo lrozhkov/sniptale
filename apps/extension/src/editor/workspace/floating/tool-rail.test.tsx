@@ -276,23 +276,24 @@ it('uses a top-centered horizontal rail and a separate horizontal history panel'
   expect(stack?.className).toContain('left-1/2');
   expect(stack?.className).toContain('top-3');
   expect(stack?.className).toContain('-translate-x-1/2');
+  expect(stack?.className).not.toContain('max-[1439px]:!top-[4.75rem]');
   expect(rail?.className).toContain('flex-row');
   expect(rail?.getAttribute('aria-label')).toBe(translate('shared.ui.commandPaletteToolsSection'));
   const history = queryUi('editor.floating.tool-rail.history');
   expect(history?.className).toContain('flex-row');
-  expect(history?.className).toContain('min-[721px]:absolute');
-  expect(history?.className).toContain('min-[721px]:left-[calc(100%+0.75rem)]');
+  expect(history?.className).toContain('absolute');
+  expect(history?.className).toContain('left-[calc(100%+0.75rem)]');
   expect(stack?.firstElementChild).toBe(rail);
   expect(history?.parentElement).toBe(stack);
 });
 
-it('wraps the mobile rail instead of clipping hidden tools beyond the viewport', () => {
+it('keeps the tool rail in one row for page-level horizontal scrolling', () => {
   renderToolRail(createProps());
 
   const rail = container?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-rail"]');
   const divider = queryUi('editor.floating.tool-rail.divider.before-frame');
 
-  expect(rail?.className).toContain('max-[720px]:flex-wrap');
+  expect(rail?.className).not.toContain('max-[720px]:flex-wrap');
   expect(rail?.className).toContain('overflow-visible');
   expect(divider).not.toBeNull();
   expect(divider?.className).not.toContain('max-[720px]:hidden');

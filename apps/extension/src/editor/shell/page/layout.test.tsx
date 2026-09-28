@@ -84,6 +84,7 @@ it('renders the canonical canvas, floating workspace, command palette, and exten
 
   const pageRoot = container?.querySelector('[data-ui="editor.page.root"]');
   expect(pageRoot?.className).toContain('relative h-screen');
+  expect(pageRoot?.className).toContain('min-w-[1280px]');
   expect(pageRoot?.className).toContain('bg-[var(--sniptale-color-surface-canvas)]');
   expect(container?.querySelector('[data-ui="editor.canvas.layer"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="editor.floating-workspace"]')?.textContent).toBe(

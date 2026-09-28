@@ -12,7 +12,7 @@ import { EditorFloatingWorkspace } from '../../workspace/floating';
 import type { EditorOpenStatus } from '../../runtime/open-status';
 
 const EDITOR_PAGE_ROOT_CLASS_NAME = [
-  'sniptale-extension-surface relative h-screen min-h-0 overflow-hidden',
+  'sniptale-extension-surface relative h-screen min-h-0 min-w-[1280px] overflow-hidden',
   'bg-[var(--sniptale-color-surface-canvas)]',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
