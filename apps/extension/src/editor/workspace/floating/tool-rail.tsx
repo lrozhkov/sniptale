@@ -29,10 +29,14 @@ import { DocumentAutosaveStatus } from './document-autosave-status';
 
 const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-start gap-3',
-  'max-[1499px]:left-[calc(50%-6rem)]'
+  'max-[1499px]:left-[calc(50%-6rem)]',
+  'max-[1439px]:!left-0 max-[1439px]:!right-0 max-[1439px]:!translate-none',
+  'max-[1439px]:justify-center'
 );
 
-const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames('flex-row overflow-visible');
+const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames(
+  'flex-row overflow-visible max-[1439px]:-translate-x-24'
+);
 
 const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'pencil',

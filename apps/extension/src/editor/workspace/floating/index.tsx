@@ -13,6 +13,7 @@ import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
 import { EditorFloatingViewControls } from './view-controls';
 import { getFloatingWorkspaceEdgeInsetStyle, useFloatingWorkspaceEdgeInsets } from './edge-insets';
 import { useFloatingLayersPreferenceState } from './preferences';
+import { installEditorToastHostAdapter } from './toast-host';
 
 function useDismissedLeftDrawer(activeTool: EditorTool) {
   const [dismissedLeftDrawerTool, setDismissedLeftDrawerTool] = useState<EditorTool | null>(null);
@@ -199,6 +200,7 @@ function EditorFloatingRoutedPanels({
 }
 
 export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
+  useEffect(() => installEditorToastHostAdapter(), []);
   const toolbarProps = useEditorToolbarController(hasImage);
   const edgeInsets = useFloatingWorkspaceEdgeInsets(hasImage);
   const {

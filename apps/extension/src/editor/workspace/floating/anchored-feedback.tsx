@@ -21,10 +21,12 @@ function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number)
       window.innerWidth - resolvedWidth - margin
     )
   );
+  const above = anchor.top > window.innerHeight / 2;
   return {
     left,
     position: 'fixed',
-    top: Math.max(anchor.bottom, toolbarBottom ?? anchor.bottom) + gap,
+    top: above ? anchor.top - gap : Math.max(anchor.bottom, toolbarBottom ?? anchor.bottom) + gap,
+    ...(above ? { transform: 'translateY(-100%)' } : {}),
     width: resolvedWidth,
     zIndex: 2147483647,
   };

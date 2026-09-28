@@ -84,6 +84,25 @@ it('renders a compact anchored destructive dialog and confirms once while pendin
   expect(confirm?.disabled).toBe(false);
 });
 
+it('opens history feedback above a toolbar anchored near the bottom of an HD viewport', () => {
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+    bottom: 688,
+    height: 32,
+    left: 24,
+    right: 56,
+    top: 656,
+    width: 32,
+    x: 24,
+    y: 656,
+    toJSON: () => ({}),
+  });
+  vi.stubGlobal('innerHeight', 720);
+  renderConfirm();
+  const positioner = document.querySelector('[data-ui="test.confirm"]')?.parentElement;
+  expect(positioner?.style.top).toBe('650px');
+  expect(positioner?.getAttribute('style')).toContain('translateY(-100%)');
+});
+
 it.each([
   ['reset', 'en', 'light', 'Reset to original?', 'Discard all edits?'],
   ['reset', 'ru', 'dark', 'Сбросить?', 'Удалить все изменения?'],

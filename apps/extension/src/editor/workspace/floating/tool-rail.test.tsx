@@ -301,6 +301,20 @@ it('uses a top-centered horizontal rail and a separate horizontal history panel'
   expect(history?.parentElement).toBe(stack);
 });
 
+it('moves history to the lower-left corner at HD width while keeping tools on top', () => {
+  renderToolRail(createProps());
+
+  const stack = queryUi('editor.floating.tool-rail.stack');
+  const rail = queryUi('editor.floating.tool-rail');
+  const history = queryUi('editor.floating.tool-rail.history');
+  expect(stack?.className).toContain('max-[1439px]:!translate-none');
+  expect(rail?.className).toContain('max-[1439px]:-translate-x-24');
+  expect(history?.className).toContain('max-[1439px]:!fixed');
+  expect(history?.className).toContain('max-[1439px]:!left-3');
+  expect(history?.className).toContain('max-[1439px]:!top-auto');
+  expect(history?.className).toContain('max-[1439px]:!bottom-');
+});
+
 it('keeps the tool rail in one row for page-level horizontal scrolling', () => {
   renderToolRail(createProps());
 

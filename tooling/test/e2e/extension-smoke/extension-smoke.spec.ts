@@ -882,7 +882,7 @@ for (const extensionPage of builtExtensionPages) {
   });
 }
 
-test('image editor keeps the complete top toolbar on one row at HD and scrolls below it', async ({
+test('image editor docks history below the top toolbar at HD and scrolls below it', async ({
   page,
   hostOrigin,
 }) => {
@@ -899,7 +899,7 @@ test('image editor keeps the complete top toolbar on one row at HD and scrolls b
         const element = document.querySelector(`[data-ui="${name}"]`);
         if (!element) throw new Error(`Missing editor toolbar group: ${name}`);
         const rect = element.getBoundingClientRect();
-        return { left: rect.left, right: rect.right, top: rect.top };
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
       };
       return {
         documentBar: bounds('editor.floating.document-bar'),
@@ -913,11 +913,28 @@ test('image editor keeps the complete top toolbar on one row at HD and scrolls b
 
   const hd = await measure();
   expect(hd.documentBar.right).toBeLessThan(hd.rail.left);
-  expect(hd.rail.right).toBeLessThan(hd.history.left);
-  expect(hd.history.right).toBeLessThan(hd.view.left);
+  expect(hd.rail.right).toBeLessThan(hd.view.left);
   expect(hd.view.right).toBeLessThanOrEqual(1280);
-  expect(Math.max(hd.documentBar.top, hd.rail.top, hd.history.top, hd.view.top)).toBeLessThan(16);
+  expect(Math.max(hd.documentBar.top, hd.rail.top, hd.view.top)).toBeLessThan(16);
+  expect(hd.history.left).toBe(12);
+  expect(hd.history.right).toBeLessThan(hd.rail.left);
+  expect(hd.history.bottom).toBe(708);
   expect(hd.documentWidth).toBe(1280);
+
+  await page.locator('[data-ui="editor.floating.tool-rail.history.reset"]').click();
+  const historyChoices = page.locator(
+    '[data-ui="editor.floating.tool-rail.history.reset-choices"]'
+  );
+  await expect(historyChoices).toBeVisible();
+  const choicesBounds = await historyChoices.boundingBox();
+  expect(choicesBounds).not.toBeNull();
+  expect(choicesBounds!.y + choicesBounds!.height).toBeLessThan(hd.history.top);
+  await page.keyboard.press('Escape');
+
+  await page.setViewportSize({ width: 1600, height: 720 });
+  const wide = await measure();
+  expect(wide.rail.right).toBeLessThan(wide.history.left);
+  expect(wide.history.top).toBeLessThan(16);
 
   await page.setViewportSize({ width: 700, height: 720 });
   const narrow = await measure();
