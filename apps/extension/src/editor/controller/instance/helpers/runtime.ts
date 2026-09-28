@@ -1,5 +1,5 @@
 import type { EditorControllerInstance } from '../types';
-import { setZoomCenteredForController } from '../actions/scene';
+import { zoomToFitForController } from '../actions/scene';
 import {
   applyEditorControllerToolMode,
   commitEditorHistory,
@@ -101,6 +101,6 @@ export function switchToSelectToolForController(controller: EditorControllerInst
 
 export function scheduleZoomToFitForController(controller: EditorControllerInstance): void {
   scheduleEditorControllerZoomToFit(() => {
-    setZoomCenteredForController(controller, 1);
+    zoomToFitForController(controller);
   });
 }
