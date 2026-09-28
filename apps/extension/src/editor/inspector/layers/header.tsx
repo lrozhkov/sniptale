@@ -28,7 +28,7 @@ const HEADER_NAVIGATION_BUTTON_CLASS_NAME =
   ` ${ACTIVE_LAYER_NAVIGATION_BORDER_CLASS_NAME}` +
   ' data-[active=true]:bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_8%,transparent)]' +
   ' data-[active=true]:text-[color:var(--sniptale-color-accent-emphasis)]';
-const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-2 px-2 pb-6 pt-3';
+const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-2 pb-6 pt-3';
 
 type EditorInspectorLayersListProps = {
   layers: EditorLayerItem[];
@@ -47,7 +47,7 @@ function getListViewportClassName(args: { reserveScrollbarGutter: boolean; scrol
   return cx(
     LIST_VIEWPORT_BASE_CLASS_NAME,
     args.scrollable ? 'overflow-y-auto' : 'overflow-y-hidden',
-    args.reserveScrollbarGutter && '[scrollbar-gutter:stable_both-edges]'
+    args.reserveScrollbarGutter ? 'pl-2 pr-0.5 [scrollbar-gutter:stable]' : 'px-2'
   );
 }
 

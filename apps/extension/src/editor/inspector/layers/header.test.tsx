@@ -67,7 +67,8 @@ it('renders layer rows or empty state with stable scroll classes', () => {
 
   expect(rows).toContain('mock.layer.layer-1');
   expect(rows).toContain('overflow-y-auto');
-  expect(rows).toContain('[scrollbar-gutter:stable_both-edges]');
+  expect(rows).toContain('pl-2 pr-0.5 [scrollbar-gutter:stable]');
+  expect(rows).not.toContain('[scrollbar-gutter:stable_both-edges]');
   expect(empty).toContain('editor.toolbar.noLayers');
 });
 
