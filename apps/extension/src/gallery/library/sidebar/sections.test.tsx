@@ -73,7 +73,6 @@ it('renders folder actions, highlights the active folder, and forwards selection
   expect(activeButton?.className).toContain(
     'focus-visible:ring-[var(--sniptale-color-text-primary)]'
   );
-  expect(activeButton?.className).not.toContain('accent');
   expect(container?.textContent).toContain('7');
   expect(findButton(translate('gallery.preview.folderExport'))).toBeDefined();
   expect(findButton(translate('gallery.preview.folderVideoProject'))).toBeDefined();
@@ -281,7 +280,6 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   const labels = Array.from(container?.querySelectorAll('label') ?? []);
   const selectedLabel = labels.find((label) => label.textContent?.includes('beta'));
   expect(selectedLabel?.className).toContain('relative');
-  expect(selectedLabel?.className).toContain('has-[:focus-visible]:ring-1');
   expect(selectedLabel?.className).not.toContain('focus-within:ring-2');
   expect(selectedLabel?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   expect(selectedLabel?.className).toContain('hover:bg-[var(--sniptale-color-surface-hover)]');

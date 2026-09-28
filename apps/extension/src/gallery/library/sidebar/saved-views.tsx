@@ -29,10 +29,15 @@ export function GallerySavedViewRows(
           <div
             key={view.id}
             className={cx(
-              'group relative h-8 rounded-[7px] text-xs transition-colors',
+              'group relative h-8 rounded-[7px] border text-xs transition-colors',
               active
-                ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary-strong)]'
+                ? [
+                    'border-[var(--sniptale-color-border-accent-strong)]',
+                    'bg-[var(--sniptale-color-surface-hover)]',
+                    'text-[var(--sniptale-color-text-primary-strong)]',
+                  ].join(' ')
                 : [
+                    'border-transparent hover:border-[var(--sniptale-color-border-soft)]',
                     'text-[var(--sniptale-color-text-secondary)]',
                     'hover:bg-[var(--sniptale-color-surface-hover)]',
                     'hover:text-[var(--sniptale-color-text-primary)]',

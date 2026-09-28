@@ -15,10 +15,10 @@ function cx(...values: Array<string | false | null | undefined>): string {
 }
 
 const facetOptionRowClassName = [
-  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] px-1.5',
+  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border px-1.5',
   'transition-colors hover:bg-[var(--sniptale-color-surface-hover)]',
-  'has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-inset',
-  'has-[:focus-visible]:ring-[var(--sniptale-color-text-primary)]',
+  'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset',
+  'has-[:focus-visible]:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
 
 const facetSummaryClassName = [
@@ -87,7 +87,7 @@ export function GalleryFolderList({
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
                 'focus-visible:ring-[var(--sniptale-color-text-primary)]',
                 active
-                  ? 'border-[var(--sniptale-color-border-strong)]' +
+                  ? 'border-[var(--sniptale-color-border-accent-strong)]' +
                       ' bg-[var(--sniptale-color-surface-hover)]' +
                       ' text-[var(--sniptale-color-text-primary-strong)]'
                   : 'border-transparent text-[var(--sniptale-color-text-secondary)]' +
@@ -172,6 +172,9 @@ function GalleryFacetOptionRow(props: {
       aria-disabled={props.disabled || undefined}
       className={cx(
         facetOptionRowClassName,
+        props.checked
+          ? 'border-[var(--sniptale-color-border-accent-strong)]'
+          : 'border-transparent hover:border-[var(--sniptale-color-border-soft)]',
         props.checked && 'bg-[var(--sniptale-color-surface-hover)]',
         props.disabled && 'cursor-default opacity-55 hover:bg-transparent'
       )}

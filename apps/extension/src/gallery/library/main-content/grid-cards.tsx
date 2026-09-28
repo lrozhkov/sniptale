@@ -19,6 +19,7 @@ import { translate } from '../../../platform/i18n';
 import { Clock3, Image as ImageIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
+import { getGallerySelectionButtonClassName } from './selection-button-style';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -31,7 +32,8 @@ const GALLERY_LIST_LAYOUT_STYLE = {
 
 const GALLERY_LIST_ROW_CLASS_NAME = [
   'grid min-w-[1120px] items-center gap-3 px-3 py-2.5',
-  'border-b border-[var(--sniptale-color-border-soft)] last:border-b-0',
+  'border border-[var(--sniptale-color-border-soft)]',
+  'data-[selected=true]:border-[var(--sniptale-color-border-accent-strong)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
@@ -106,28 +108,9 @@ function getGalleryGridCardClassName(
         ].join(' '),
     selected
       ? viewMode === 'list'
-        ? 'bg-[var(--sniptale-color-accent-soft)]'
+        ? 'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)]'
         : 'border-[var(--sniptale-color-border-accent-strong)]'
-      : viewMode !== 'list' &&
-          'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
-  );
-}
-
-function getGallerySelectionButtonClassName(selected: boolean, alwaysVisible = false) {
-  return cx(
-    'flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border text-xs font-semibold transition',
-    selected
-      ? [
-          'border-[var(--sniptale-color-border-accent-strong)]',
-          'bg-[var(--sniptale-color-accent-soft)]',
-          'text-[var(--sniptale-color-accent-emphasis)]',
-        ].join(' ')
-      : [
-          'border-[var(--sniptale-color-border-soft)]',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]',
-          'text-[var(--sniptale-color-text-primary)]',
-          alwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-        ].join(' ')
+      : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
   );
 }
 
@@ -272,6 +255,7 @@ function GalleryGridCard(props: GalleryGridCardProps) {
       className={getGalleryGridCardClassName(props.selected, props.viewMode)}
       role={isList ? 'row' : undefined}
       data-ui={isList ? 'gallery.list.row' : undefined}
+      data-selected={isList ? props.selected : undefined}
     >
       {isList ? (
         <>
@@ -630,13 +614,21 @@ export function GalleryMediaList(
           (item) => isGalleryMediaItem(item) && Boolean(item.recordingGroupView?.projectId)
         );
         const projectName = unit.items.find(isGalleryMediaItem)?.recordingGroupView?.projectName;
+        const selectableItems = unit.items.filter(isGallerySelectableItem);
+        const allSelected =
+          selectableItems.length > 0 &&
+          selectableItems.every((item) => props.selectedIds.has(item.id));
 
         return (
           <div
             key={unit.groupId}
-            className="my-2 overflow-hidden rounded-[8px] border
-              border-[var(--sniptale-color-border-accent-soft)]
-              bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_28%,transparent)]"
+            className={cx(
+              'my-2 overflow-hidden rounded-[8px] border',
+              'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_28%,transparent)]',
+              allSelected
+                ? 'border-[var(--sniptale-color-border-accent-strong)]'
+                : 'border-[var(--sniptale-color-border-accent-soft)]'
+            )}
             role="rowgroup"
           >
             <div
