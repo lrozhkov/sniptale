@@ -63,7 +63,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('keeps workspace settings in one collapsible section and passes save state through', () => {
+it('shows workspace settings directly and passes save state through', () => {
   const updateWorkspace = vi.fn();
   const saveWorkspaceColorAsDefault = vi.fn();
   container = document.createElement('div');
@@ -90,8 +90,7 @@ it('keeps workspace settings in one collapsible section and passes save state th
   );
 
   expect(container.querySelectorAll('section')).toHaveLength(1);
-  const heading = container.querySelector<HTMLButtonElement>('h2 button');
-  expect(heading?.getAttribute('aria-expanded')).toBe('true');
+  expect(container.querySelector('h2 button')).toBeNull();
   expect(container.textContent).toContain('#f2f4f7');
   expect(container.textContent).toContain('Could not save');
   expect(
@@ -111,9 +110,5 @@ it('keeps workspace settings in one collapsible section and passes save state th
   expect(updateWorkspace).toHaveBeenCalledWith({ gridEnabled: true });
   expect(updateWorkspace).toHaveBeenCalledWith({ gridSnapEnabled: true });
   expect(saveWorkspaceColorAsDefault).not.toHaveBeenCalled();
-  act(() => heading?.click());
-  expect(heading?.getAttribute('aria-expanded')).toBe('false');
-  expect(container.textContent).not.toContain('#f2f4f7');
-  act(() => heading?.click());
   expect(container.textContent).toContain('#f2f4f7');
 });

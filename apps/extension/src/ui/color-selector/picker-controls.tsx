@@ -61,8 +61,9 @@ export function PickerNumericInputField(props: {
   return (
     <NumericValueField
       className={[
-        'h-7! w-full min-w-0 rounded-[var(--sniptale-radius-sm)]! px-1.5',
+        'h-7! w-full min-w-0 rounded-[var(--sniptale-radius-sm)]! px-1!',
         'border-[color:var(--sniptale-color-border-soft)] bg-transparent',
+        '[&>span:last-child]:opacity-100 [&>span:last-child>button]:w-4',
       ].join(' ')}
       label={props.ariaLabel}
       max={props.max}
@@ -115,7 +116,7 @@ export function PickerManualColorField(props: {
 
 export function PickerFooter(props: { onApply: () => void; onCancel: () => void }) {
   return (
-    <div className="grid grid-cols-2 gap-2 bg-[var(--sniptale-color-surface-panel)] py-1">
+    <div className="grid grid-cols-2 gap-2 py-1">
       <button type="button" onClick={props.onCancel} className={TEXT_ACTION_CLASS_NAME}>
         {translate('shared.ui.colorSelectorCancel')}
       </button>

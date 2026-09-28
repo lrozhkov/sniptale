@@ -105,7 +105,7 @@ it('renders picker and palette content in floating layers under the trigger', ()
   ) as HTMLDivElement | null;
   expect(pickerLayer?.className).toContain('fixed');
   expect(pickerLayer?.dataset['floatingUiRoot']).toBe('true');
-  expect(pickerLayer?.style.width).toBe('328px');
+  expect(pickerLayer?.style.width).toBe('280px');
   expect(container!.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
   expect(document.body.querySelector('[data-ui="shared.ui.color-selector.picker"]')).not.toBeNull();
 

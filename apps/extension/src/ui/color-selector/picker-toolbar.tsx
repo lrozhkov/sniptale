@@ -24,7 +24,7 @@ function TransparentPreviewButton(props: { onClick: () => void; resolvedColor: s
       data-ui="shared.ui.color-selector.transparent"
       onClick={props.onClick}
       className={[
-        'relative inline-flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden',
+        'relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden',
         'rounded-[var(--sniptale-radius-sm)] border',
         'border-[color:var(--sniptale-color-border-soft)] bg-transparent shadow-none outline-none transition',
         'hover:border-[color:var(--sniptale-color-border-strong)] hover:brightness-105',

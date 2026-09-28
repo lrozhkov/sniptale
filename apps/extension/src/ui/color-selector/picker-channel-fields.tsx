@@ -36,7 +36,7 @@ export function PickerRgbFields(props: {
   red: number | string;
 }) {
   return (
-    <div className="grid items-center gap-1 @min-[260px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
+    <div className="grid items-center gap-1 @min-[240px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
       <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerChannelFieldGrid
         fields={[
@@ -75,7 +75,7 @@ export function PickerHslFields(props: {
   saturation: number | string;
 }) {
   return (
-    <div className="grid items-center gap-1 @min-[260px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
+    <div className="grid items-center gap-1 @min-[240px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
       <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerChannelFieldGrid
         fields={[

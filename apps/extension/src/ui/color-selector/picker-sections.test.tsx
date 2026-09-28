@@ -67,6 +67,9 @@ it('renders the toolbar and wires hue plus eyedropper handlers', () => {
   expect(markup).toContain('width="18"');
   expect(markup).toContain('height="18"');
   expect(markup).toContain('aria-label="shared.ui.colorSelectorTransparent"');
+  expect(markup).toMatch(
+    /data-ui="shared\.ui\.color-selector\.transparent"[^>]*class="[^"]*cursor-pointer/
+  );
   expect(markup).toContain('data-ui="shared.ui.color-selector.eyedropper"');
   expect(markup).toContain('cursor-pointer');
   expect(markup).toContain('disabled:cursor-not-allowed');
@@ -150,7 +153,7 @@ it('renders the manual hex field and rgb fields with wired handlers', () => {
   expect(onBlueChange).toHaveBeenCalledWith('33');
 });
 
-it('renders the footer with quiet matte action styling', () => {
+it('renders the footer without an opaque backing', () => {
   const onApply = vi.fn();
   const onCancel = vi.fn();
 
@@ -165,7 +168,7 @@ it('renders the footer with quiet matte action styling', () => {
 
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onApply).toHaveBeenCalledOnce();
-  expect(footer.props.className).toContain('sticky bottom-0');
+  expect(footer.props.className).not.toContain('bg-[var(--sniptale-color-surface-panel)]');
   expect(footerButtons[0]?.props.className).toContain('text-xs font-medium');
   expect(footerButtons[0]?.props.className).toContain('bg-transparent');
   expect(footerButtons[1]?.props.className).toContain('text-xs font-medium');
