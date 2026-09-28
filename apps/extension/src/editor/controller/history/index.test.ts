@@ -1,4 +1,4 @@
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import { createMockDocument } from '../instance/bindings/test-fixtures-document';
@@ -94,6 +94,60 @@ it('releases binary references after their snapshots leave the bounded history',
   expect(history.getCurrent()).toContain('sniptale-history-asset:81');
   expect(undoEditorSnapshot(history)?.sourceImageData).toBe(source(80));
   expect(redoEditorSnapshot(history)?.sourceImageData).toBe(source(0));
+});
+
+it('does not reparse retained snapshots when committing into a full history', () => {
+  const first = createMockDocument();
+  const history = createEditorSnapshotHistory(first);
+  for (let index = 1; index < 80; index += 1) {
+    pushEditorSnapshotHistory({
+      exportDocument: () => ({ ...first, sourceName: `edit-${index}` }),
+      history,
+      muted: false,
+    });
+  }
+
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    pushEditorSnapshotHistory({
+      exportDocument: () => ({ ...first, sourceName: 'latest' }),
+      history,
+      muted: false,
+    });
+    expect(parse.mock.calls.length).toBeLessThan(5);
+  } finally {
+    parse.mockRestore();
+  }
+});
+
+it('releases image data from a discarded redo branch', () => {
+  const source = (value: string) => `data:image/png;base64,${value.repeat(5_000)}`;
+  const first = { ...createMockDocument(), sourceImageData: source('A') };
+  const history = createEditorSnapshotHistory(first);
+  for (const value of ['B', 'C']) {
+    pushEditorSnapshotHistory({
+      exportDocument: () => ({ ...first, sourceImageData: source(value) }),
+      history,
+      muted: false,
+    });
+  }
+
+  expect(undoEditorSnapshot(history)?.sourceImageData).toBe(source('B'));
+  pushEditorSnapshotHistory({
+    exportDocument: () => ({ ...first, sourceImageData: source('D') }),
+    history,
+    muted: false,
+  });
+  expect(redoEditorSnapshot(history)).toBeNull();
+  pushEditorSnapshotHistory({
+    exportDocument: () => ({ ...first, sourceImageData: source('C') }),
+    history,
+    muted: false,
+  });
+
+  expect(history.getCurrent()).toContain('sniptale-history-asset:4');
+  expect(undoEditorSnapshot(history)?.sourceImageData).toBe(source('D'));
+  expect(redoEditorSnapshot(history)?.sourceImageData).toBe(source('C'));
 });
 
 it('drops previous image bytes when restoring the original resets history', () => {

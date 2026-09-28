@@ -18,12 +18,18 @@ const DOCUMENT_BINARY_FIELDS = new Set([
 type EditorHistoryAssets = {
   byUrl: Map<string, string>;
   byToken: Map<string, string>;
+  tokensBySnapshot: Map<string, Set<string>>;
   nextId: number;
 };
 
 const historyAssets = new WeakMap<SnapshotHistory<string>, EditorHistoryAssets>();
 
-function encodeBinary(value: unknown, key: string, assets: EditorHistoryAssets): unknown {
+function encodeBinary(
+  value: unknown,
+  key: string,
+  assets: EditorHistoryAssets,
+  tokens: Set<string>
+): unknown {
   if (
     typeof value !== 'string' ||
     !value.startsWith('data:') ||
@@ -33,21 +39,29 @@ function encodeBinary(value: unknown, key: string, assets: EditorHistoryAssets):
     return value;
   }
   const existing = assets.byUrl.get(value);
-  if (existing) return existing;
+  if (existing) {
+    tokens.add(existing);
+    return existing;
+  }
   const token = `${HISTORY_BINARY_TOKEN_PREFIX}${assets.nextId++}`;
   assets.byUrl.set(value, token);
   assets.byToken.set(token, value);
+  tokens.add(token);
   return token;
 }
 
-function encodeEditorSnapshot(document: EditorDocument, assets: EditorHistoryAssets): string {
+function encodeEditorSnapshot(
+  document: EditorDocument,
+  assets: EditorHistoryAssets,
+  tokens: Set<string>
+): string {
   return JSON.stringify(document, (key, value: unknown) => {
     if (key === 'canvasJson' && typeof value === 'string') {
       return JSON.stringify(JSON.parse(value) as unknown, (canvasKey, canvasValue: unknown) =>
-        encodeBinary(canvasValue, canvasKey, assets)
+        encodeBinary(canvasValue, canvasKey, assets, tokens)
       );
     }
-    return encodeBinary(value, key, assets);
+    return encodeBinary(value, key, assets, tokens);
   });
 }
 
@@ -73,30 +87,13 @@ function pruneEditorHistoryAssets(
   history: SnapshotHistory<string>,
   assets: EditorHistoryAssets
 ): void {
+  const retainedSnapshots = new Set(history.getSnapshots());
+  for (const snapshot of assets.tokensBySnapshot.keys()) {
+    if (!retainedSnapshots.has(snapshot)) assets.tokensBySnapshot.delete(snapshot);
+  }
   const retained = new Set<string>();
-  for (const snapshot of history.getSnapshots()) {
-    JSON.parse(snapshot, (key, child: unknown) => {
-      if (key === 'canvasJson' && typeof child === 'string') {
-        JSON.parse(child, (canvasKey, canvasValue: unknown) => {
-          if (
-            CANVAS_BINARY_FIELDS.has(canvasKey) &&
-            typeof canvasValue === 'string' &&
-            assets.byToken.has(canvasValue)
-          ) {
-            retained.add(canvasValue);
-          }
-          return canvasValue;
-        });
-      }
-      if (
-        DOCUMENT_BINARY_FIELDS.has(key) &&
-        typeof child === 'string' &&
-        assets.byToken.has(child)
-      ) {
-        retained.add(child);
-      }
-      return child;
-    });
+  for (const tokens of assets.tokensBySnapshot.values()) {
+    for (const token of tokens) retained.add(token);
   }
   for (const [token, url] of assets.byToken) {
     if (retained.has(token)) continue;
@@ -106,8 +103,16 @@ function pruneEditorHistoryAssets(
 }
 
 export function createEditorSnapshotHistory(document: EditorDocument): SnapshotHistory<string> {
-  const assets: EditorHistoryAssets = { byUrl: new Map(), byToken: new Map(), nextId: 0 };
-  const history = new SnapshotHistory<string>(encodeEditorSnapshot(document, assets));
+  const assets: EditorHistoryAssets = {
+    byUrl: new Map(),
+    byToken: new Map(),
+    tokensBySnapshot: new Map(),
+    nextId: 0,
+  };
+  const tokens = new Set<string>();
+  const snapshot = encodeEditorSnapshot(document, assets, tokens);
+  const history = new SnapshotHistory<string>(snapshot);
+  assets.tokensBySnapshot.set(snapshot, tokens);
   historyAssets.set(history, assets);
   return history;
 }
@@ -117,7 +122,15 @@ export function resetEditorSnapshotHistory(
   document: EditorDocument
 ): void {
   const assets = historyAssets.get(history);
-  history.reset(assets ? encodeEditorSnapshot(document, assets) : JSON.stringify(document));
+  const tokens = new Set<string>();
+  const snapshot = assets
+    ? encodeEditorSnapshot(document, assets, tokens)
+    : JSON.stringify(document);
+  history.reset(snapshot);
+  if (assets) {
+    assets.tokensBySnapshot.clear();
+    assets.tokensBySnapshot.set(snapshot, tokens);
+  }
   if (assets) pruneEditorHistoryAssets(history, assets);
 }
 
@@ -195,11 +208,12 @@ export function pushEditorSnapshotHistory(options: {
   }
 
   const assets = historyAssets.get(options.history);
-  options.history.push(
-    assets
-      ? encodeEditorSnapshot(options.exportDocument(), assets)
-      : JSON.stringify(options.exportDocument())
-  );
+  const tokens = new Set<string>();
+  const snapshot = assets
+    ? encodeEditorSnapshot(options.exportDocument(), assets, tokens)
+    : JSON.stringify(options.exportDocument());
+  options.history.push(snapshot);
+  if (assets) assets.tokensBySnapshot.set(snapshot, tokens);
   if (assets) pruneEditorHistoryAssets(options.history, assets);
   return true;
 }
