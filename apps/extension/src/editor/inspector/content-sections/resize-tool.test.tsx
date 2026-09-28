@@ -298,8 +298,12 @@ it('leaves crop mode from the secondary cancel action', () => {
   const controller = createController();
   renderResizeTool(controller);
 
+  const cancel = getButton(translate('common.actions.cancel'));
+  expect(cancel.parentElement?.className).toContain('grid-cols-[auto_minmax(0,1fr)]');
+  expect(cancel.className).toContain('!w-auto');
+
   act(() => {
-    getButton(translate('common.actions.cancel')).click();
+    cancel.click();
   });
 
   expect(controller.cancelCropMode).toHaveBeenCalledOnce();

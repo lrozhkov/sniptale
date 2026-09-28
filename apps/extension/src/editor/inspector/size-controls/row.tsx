@@ -33,7 +33,10 @@ export function SizeControlsRow(props: SizeControlsRowProps) {
     <div
       {...sizePanelProps}
       data-ui={props.dataUi}
-      className={['grid grid-cols-2 items-end gap-x-2 gap-y-1', props.className]
+      className={[
+        'grid grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)] items-end gap-1.5',
+        props.className,
+      ]
         .filter(Boolean)
         .join(' ')}
     >
@@ -44,6 +47,7 @@ export function SizeControlsRow(props: SizeControlsRowProps) {
         max={props.maxWidth}
         onChange={props.onWidthChange}
       />
+      <AspectToggle compact checked={props.locked} onClick={props.onToggleLock} />
       <SizeControlInput
         {...heightInputProps}
         label={translate('editor.compact.heightDimension')}
@@ -51,7 +55,6 @@ export function SizeControlsRow(props: SizeControlsRowProps) {
         max={props.maxHeight}
         onChange={props.onHeightChange}
       />
-      <AspectToggle compact checked={props.locked} onClick={props.onToggleLock} />
     </div>
   );
 }

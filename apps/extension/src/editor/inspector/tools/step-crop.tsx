@@ -28,7 +28,14 @@ export function renderCropControlsSection(props: {
             : translate('editor.compact.cropWaitingDescription')}
         </div>
       </PanelSection>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+        <button
+          type="button"
+          className={cx(props.secondaryPanelButtonClassName, '!w-auto px-3')}
+          onClick={() => props.controller.cancelCropMode()}
+        >
+          {translate('editor.compact.cancel')}
+        </button>
         <button
           type="button"
           className={cx(
@@ -43,13 +50,6 @@ export function renderCropControlsSection(props: {
           disabled={!props.cropReady}
         >
           {translate('editor.compact.apply')}
-        </button>
-        <button
-          type="button"
-          className={props.secondaryPanelButtonClassName}
-          onClick={() => props.controller.cancelCropMode()}
-        >
-          {translate('editor.compact.cancel')}
         </button>
       </div>
     </div>

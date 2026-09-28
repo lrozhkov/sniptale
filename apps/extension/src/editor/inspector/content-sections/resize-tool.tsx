@@ -16,7 +16,7 @@ import {
 import { useCanvasResizePreview } from './resize-tool-preview';
 import {
   INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
-  INSPECTOR_SECONDARY_BUTTON_CLASS_NAME,
+  INSPECTOR_INLINE_BUTTON_CLASS_NAME,
   INSPECTOR_SECTION_SURFACE_CLASS_NAME,
 } from '../chrome';
 import { SizeControlsRow } from '../size-controls';
@@ -208,11 +208,11 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
           {translate('editor.compact.cropSizeExceedsCanvas')}
         </p>
       ) : null}
-      <div className={isCanvasMode ? 'grid grid-cols-2 gap-2' : undefined}>
+      <div className={isCanvasMode ? 'grid grid-cols-[auto_minmax(0,1fr)] gap-2' : undefined}>
         {isCanvasMode ? (
           <button
             type="button"
-            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
+            className={`${INSPECTOR_INLINE_BUTTON_CLASS_NAME} !w-auto px-3`}
             onClick={() => props.controller.cancelCropMode()}
           >
             {translate('common.actions.cancel')}

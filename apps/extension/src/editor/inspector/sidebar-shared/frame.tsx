@@ -1,8 +1,8 @@
 import React from 'react';
-import { Link2 } from 'lucide-react';
+import { Link2, Unlink2 } from 'lucide-react';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
-import { EditorIconButton, cx } from '../../chrome/ui';
+import { cx } from '../../chrome/ui';
 
 export function getAspectRatio(width: number, height: number): number | null {
   if (width <= 0 || height <= 0) {
@@ -41,19 +41,40 @@ type AspectToggleProps = {
   onClick: () => void;
 };
 
+const COMPACT_ASPECT_LOCKED_CLASS_NAME = [
+  'border-[color:var(--sniptale-color-border-strong)]',
+  'bg-[color:var(--sniptale-color-surface-hover)]',
+  'text-[color:var(--sniptale-color-text-primary)]',
+].join(' ');
+const COMPACT_ASPECT_UNLOCKED_CLASS_NAME = [
+  'border-transparent bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
+  'hover:text-[color:var(--sniptale-color-text-primary)]',
+].join(' ');
+
 function CompactAspectToggle({ checked, onClick }: AspectToggleProps) {
   const title = translate('editor.compact.keepAspectRatio');
   return (
-    <EditorIconButton
+    <button
+      type="button"
       title={title}
+      aria-label={title}
       aria-pressed={checked}
-      active={checked}
-      className="col-span-2 h-8 w-fit max-w-full justify-self-start gap-1.5 px-2 text-xs font-medium"
+      data-ui="editor.size-controls.aspect-toggle"
+      className={cx(
+        'inline-flex h-8 w-9 cursor-pointer items-center justify-center rounded-[9px] border',
+        'transition-colors hover:bg-[color:var(--sniptale-color-surface-hover)]',
+        'focus-visible:outline-2 focus-visible:outline-offset-2',
+        'focus-visible:outline-[color:var(--sniptale-color-focus-ring)]',
+        checked ? COMPACT_ASPECT_LOCKED_CLASS_NAME : COMPACT_ASPECT_UNLOCKED_CLASS_NAME
+      )}
       onClick={onClick}
     >
-      <Link2 size={16} strokeWidth={2} aria-hidden="true" className="shrink-0" />
-      <span>{title}</span>
-    </EditorIconButton>
+      {checked ? (
+        <Link2 size={16} strokeWidth={2} aria-hidden="true" />
+      ) : (
+        <Unlink2 size={16} strokeWidth={2} aria-hidden="true" />
+      )}
+    </button>
   );
 }
 

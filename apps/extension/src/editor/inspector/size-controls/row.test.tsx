@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 function registerOrderTest() {
-  it('aligns two dimension fields before a labeled aspect toggle', () => {
+  it('places an icon-only aspect toggle between the labeled dimensions', () => {
     renderRow();
 
     const row = container?.querySelector('[data-ui="editor.size-controls.row"]');
@@ -77,13 +77,14 @@ function registerOrderTest() {
     expect(rowChildren[0]?.querySelector('[aria-label="editor.compact.widthDimension"]')).not.toBe(
       null
     );
+    expect(rowChildren[1]?.getAttribute('aria-pressed')).toBe('true');
+    expect(rowChildren[1]?.getAttribute('aria-label')).toBe('editor.compact.keepAspectRatio');
+    expect(rowChildren[1]?.textContent).toBe('');
+    expect(rowChildren[1]?.querySelector('.lucide-link-2')).not.toBeNull();
     expect(
-      rowChildren[1]?.querySelector('[aria-label="editor.compact.heightDimension"]')
+      rowChildren[2]?.querySelector('[aria-label="editor.compact.heightDimension"]')
     ).not.toBeNull();
-    expect(row?.className).toContain('grid-cols-2');
-    expect(rowChildren[2]?.className).toContain('col-span-2');
-    expect(rowChildren[2]?.getAttribute('aria-pressed')).toBe('true');
-    expect(rowChildren[2]?.textContent).toContain('editor.compact.keepAspectRatio');
+    expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)]');
   });
 }
 
