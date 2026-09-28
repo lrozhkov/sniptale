@@ -24,6 +24,7 @@ function patchSourceImage(
     sourceImage: {
       ...normalizeEditorImageSettings(props.frameDraft.sourceImage),
       ...patch,
+      opacity: 1,
     },
   });
 }
@@ -93,16 +94,7 @@ export function EditorInspectorFrameSourceImageBasics(
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
 
   return (
-    <div className="space-y-3">
-      <SourceImageRangeSection
-        label={translate('editor.compact.opacity')}
-        max={1}
-        step={0.05}
-        value={settings.opacity}
-        valueText={getPercentValue(settings.opacity)}
-        fractionalPercent
-        onChange={(opacity) => patchSourceImage(props, { opacity })}
-      />
+    <div className="space-y-3" data-ui="editor.frame.source-basics">
       <SourceImageRangeSection
         label={translate('editor.compact.cornerRadius')}
         max={80}
@@ -119,7 +111,7 @@ export function EditorInspectorFrameSourceImageEffects(
 ) {
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 border-t border-[var(--sniptale-color-border-soft)] pt-3">
       <SourceImageShadowSection props={props} settings={settings} />
       <SourceImageBorderSection props={props} settings={settings} />
     </div>
@@ -132,64 +124,43 @@ function SourceImageShadowSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <EditorInspectorDetails
-      preferenceId="frame:source-image-shadow"
-      level="group"
-      label={translate('highlighter.editor.shadowLabel')}
-    >
-      <div className="space-y-3">
-        <SourceImageRangeControl
-          label={translate('editor.compact.shadowSize')}
-          max={100}
-          value={settings.shadow}
-          valueText={`${settings.shadow}%`}
-          onChange={(shadow) => patchSourceImage(props, { shadow })}
-        />
-        <ColorField
-          title={translate('highlighter.editor.shadowLabel')}
-          label={translate('editor.compact.shadowColor')}
-          value={settings.shadowColor ?? settings.strokeColor}
-          recentColors={props.recentColors}
-          palette={props.shapeStrokePalette ?? []}
-          onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-          onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-          onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor })}
-        />
-        <SourceImageShadowGeometry props={props} settings={settings} />
-      </div>
-    </EditorInspectorDetails>
-  );
-}
-
-function SourceImageShadowGeometry(args: {
-  props: EditorInspectorFrameSourceImageFieldsProps;
-  settings: EditorImageSettings;
-}) {
-  const { props, settings } = args;
-  return (
-    <>
+    <section className="space-y-2.5" data-ui="editor.frame.source-glow">
+      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate('editor.scene.glowLabel')}
+      </h3>
       <SourceImageRangeControl
-        label={translate('editor.compact.shadowAngle')}
-        max={360}
-        value={settings.shadowAngle ?? 90}
-        valueText={`${Math.round(settings.shadowAngle ?? 90)}°`}
-        onChange={(shadowAngle) => patchSourceImage(props, { shadowAngle })}
+        label={translate('editor.scene.glowSize')}
+        max={100}
+        value={settings.shadow}
+        valueText={`${settings.shadow}%`}
+        onChange={(shadow) => patchSourceImage(props, { shadow })}
       />
-      <SourceImageRangeControl
-        label={translate('editor.compact.shadowDistance')}
-        max={64}
-        value={settings.shadowDistance ?? 4}
-        valueText={`${Math.round(settings.shadowDistance ?? 4)}px`}
-        onChange={(shadowDistance) => patchSourceImage(props, { shadowDistance })}
-      />
-      <SourceImageRangeControl
-        label={translate('editor.compact.shadowBlur')}
-        max={64}
-        value={settings.shadowBlur ?? 12}
-        valueText={`${Math.round(settings.shadowBlur ?? 12)}px`}
-        onChange={(shadowBlur) => patchSourceImage(props, { shadowBlur })}
-      />
-    </>
+      <EditorInspectorDetails
+        preferenceId="frame:source-image-shadow"
+        level="group"
+        label={translate('editor.scene.glowAdvanced')}
+      >
+        <div className="space-y-3">
+          <ColorField
+            title={translate('editor.scene.glowLabel')}
+            label={translate('editor.compact.shadowColor')}
+            value={settings.shadowColor ?? settings.strokeColor}
+            recentColors={props.recentColors}
+            palette={props.shapeStrokePalette ?? []}
+            onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
+            onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
+            onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor })}
+          />
+          <SourceImageRangeControl
+            label={translate('editor.compact.shadowBlur')}
+            max={128}
+            value={settings.shadowBlur ?? 12}
+            valueText={`${Math.round(settings.shadowBlur ?? 12)}px`}
+            onChange={(shadowBlur) => patchSourceImage(props, { shadowBlur })}
+          />
+        </div>
+      </EditorInspectorDetails>
+    </section>
   );
 }
 
@@ -199,30 +170,35 @@ function SourceImageBorderSection(args: {
 }) {
   const { props, settings } = args;
   return (
-    <EditorInspectorDetails
-      preferenceId="frame:source-image-border"
-      level="group"
-      label={translate('editor.compact.blurBorder')}
-    >
-      <div className="space-y-3">
-        <SelectField
-          label={translate('highlighter.editor.styleLabel')}
-          value={settings.strokeStyle}
-          onChange={(strokeStyle: EditorImageSettings['strokeStyle']) =>
-            patchSourceImage(props, { strokeStyle })
-          }
-          options={props.lineStyleOptions ?? DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS}
-        />
-        <SourceImageRangeControl
-          label={translate('editor.compact.blurStrokeWidth')}
-          max={24}
-          value={settings.strokeWidth}
-          valueText={`${settings.strokeWidth}px`}
-          onChange={(strokeWidth) => patchSourceImage(props, { strokeWidth })}
-        />
-        <SourceImageBorderColor props={props} settings={settings} />
-      </div>
-    </EditorInspectorDetails>
+    <section className="space-y-2.5" data-ui="editor.frame.source-border">
+      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate('editor.compact.blurBorder')}
+      </h3>
+      <SourceImageRangeControl
+        label={translate('editor.compact.blurStrokeWidth')}
+        max={24}
+        value={settings.strokeWidth}
+        valueText={`${settings.strokeWidth}px`}
+        onChange={(strokeWidth) => patchSourceImage(props, { strokeWidth })}
+      />
+      <EditorInspectorDetails
+        preferenceId="frame:source-image-border"
+        level="group"
+        label={translate('editor.scene.borderAdvanced')}
+      >
+        <div className="space-y-3">
+          <SelectField
+            label={translate('highlighter.editor.styleLabel')}
+            value={settings.strokeStyle}
+            onChange={(strokeStyle: EditorImageSettings['strokeStyle']) =>
+              patchSourceImage(props, { strokeStyle })
+            }
+            options={props.lineStyleOptions ?? DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS}
+          />
+          <SourceImageBorderColor props={props} settings={settings} />
+        </div>
+      </EditorInspectorDetails>
+    </section>
   );
 }
 

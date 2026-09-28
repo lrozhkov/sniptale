@@ -71,14 +71,12 @@ it('offers four independently editable sides without short inline sliders', asyn
   });
 });
 
-it('reveals only the hovered padding slider from its label and hides it on leave', async () => {
+it('reveals the hovered inline padding slider and hides it on leave', async () => {
   const row = container.querySelector<HTMLElement>(
     '[data-ui="shared.ui.compact-inspector.numeric-row"]'
   );
   expect(row?.dataset['rangeVisible']).toBe('false');
-  const label = container.querySelector<HTMLElement>(
-    '[data-ui="shared.linked-padding-fields"] > div:first-child span'
-  );
+  const label = container.querySelector<HTMLElement>('[data-padding-hover="top"]');
   await act(async () => {
     label?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
   });

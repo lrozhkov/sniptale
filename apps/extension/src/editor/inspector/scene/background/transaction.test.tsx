@@ -51,9 +51,11 @@ it('restores the pre-open legacy frame value when a preview echo is cancelled', 
     host.querySelector<HTMLButtonElement>('[data-ui="shared.ui.paint-selector.trigger"]')?.click()
   );
   await act(nextFrame);
-  const paletteColor = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
-    (button) => button.getAttribute('aria-label')?.endsWith('#123456')
-  );
+  const paletteColor = Array.from(
+    document.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="shared.ui.paint-selector.popup"] button'
+    )
+  ).find((button) => button.getAttribute('aria-label')?.endsWith('#123456'));
   expect(paletteColor).toBeDefined();
   act(() => paletteColor?.click());
   expect(host.querySelector('[data-testid="background-color"]')?.textContent).toBe('#123456ff');

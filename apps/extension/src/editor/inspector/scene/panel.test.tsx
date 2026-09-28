@@ -201,18 +201,12 @@ afterEach(async () => {
 });
 
 function expectFramePanelSections() {
-  expect(container?.querySelectorAll('nav button')).toHaveLength(2);
+  expect(container?.querySelector('nav')).toBeNull();
   expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="padding-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="source-image-basics"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="source-image-effects"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="source-image-effects"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
-}
-
-async function selectSection(index: number) {
-  await act(async () =>
-    container?.querySelectorAll<HTMLButtonElement>('nav button')[index]?.click()
-  );
 }
 
 async function clickFramePanelActions() {
@@ -245,8 +239,7 @@ it('wires the inspector scene panel sections and actions', async () => {
     clickPanelButton('[data-testid="placement-section"] button');
     clickPanelButton('[data-testid="padding-section"] button');
   });
-  await selectSection(1);
-  expect(container?.querySelector('[data-testid="background-fill-section"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="source-image-effects"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
 

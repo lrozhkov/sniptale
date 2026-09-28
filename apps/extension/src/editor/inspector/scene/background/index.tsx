@@ -8,7 +8,6 @@ import {
 import { createEditorGradientColorStopColor } from '../../../../features/editor/document/gradient';
 import { translate } from '../../../../platform/i18n';
 import { CompactPaintSelector } from '../../../../ui/paint-selector';
-import { ColorSelectorSwatchSection } from '../../../../ui/color-selector/swatch-section';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
 import type { EditorInspectorFrameBackgroundEditorProps } from './shared';
 
@@ -55,6 +54,44 @@ function paintToFramePatch(paint: Paint) {
   };
 }
 
+function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorProps) {
+  const stops = normalizeEditorFrameGradientColorStops(props.frameDraft);
+  return (
+    <div
+      data-ui="editor.frame.gradient-presets"
+      className="grid grid-cols-5 gap-1.5"
+      role="group"
+      aria-label={translate('editor.compact.frameBackgroundModeGradient')}
+    >
+      {props.gradientPresets.slice(0, 10).map((preset) => {
+        const active =
+          props.frameDraft.backgroundGradientAngle === preset.angle &&
+          stops[0]?.color === preset.from &&
+          stops.at(-1)?.color === preset.to;
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            aria-label={preset.label}
+            title={preset.label}
+            aria-pressed={active}
+            className={[
+              'h-8 min-w-0 cursor-pointer rounded-md border',
+              'border-[var(--sniptale-color-border-soft)] transition-transform hover:scale-105',
+              'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+              active ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
+            ].join(' ')}
+            style={{
+              backgroundImage: `linear-gradient(${preset.angle}deg, ${preset.from}, ${preset.to})`,
+            }}
+            onClick={() => props.applyGradientPreset(preset)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function EditorInspectorFrameBackgroundFillEditor(
   props: EditorInspectorFrameBackgroundEditorProps
 ): ReactElement {
@@ -65,9 +102,12 @@ export function EditorInspectorFrameBackgroundFillEditor(
 
   return (
     <div className="space-y-3">
+      {props.frameDraft.backgroundMode === 'gradient' && props.gradientPresets.length > 0 ? (
+        <FrameGradientPresetChoices {...props} />
+      ) : null}
       <CompactPaintSelector
         triggerVariant="swatch"
-        allowedModes={['solid', 'linear']}
+        allowedModes={props.frameDraft.backgroundMode === 'gradient' ? ['linear'] : ['solid']}
         showGradientAdvancedControls={false}
         title={translate('editor.scene.sceneBackgroundTitle')}
         label={translate('editor.scene.sceneBackgroundLabel')}
@@ -83,22 +123,6 @@ export function EditorInspectorFrameBackgroundFillEditor(
           )
         }
       />
-      {props.frameBackgroundPalette.length > 0 ? (
-        <div data-ui="editor.frame.quick-colors">
-          <ColorSelectorSwatchSection
-            colors={props.frameBackgroundPalette.slice(0, 8)}
-            gridClassName="grid grid-cols-8 gap-1.5"
-            label={translate('shared.ui.colorSelectorPalette')}
-            selectedColor={
-              props.frameDraft.backgroundMode === 'color' ? props.frameDraft.backgroundColor : ''
-            }
-            title={translate('editor.scene.sceneBackgroundTitle')}
-            onSelect={(backgroundColor) =>
-              props.applyFramePatch({ backgroundColor, backgroundMode: 'color' })
-            }
-          />
-        </div>
-      ) : null}
     </div>
   );
 }

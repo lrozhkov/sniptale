@@ -1,4 +1,5 @@
 import { translate } from '../../../platform/i18n';
+import { normalizeEditorImageSettings } from '../../../features/editor/document/image-types';
 import type {
   EditorLayerEffectCategory,
   EditorRasterEffect,
@@ -135,7 +136,14 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
       DimensionInput,
       backgroundImageInputRef: args.backgroundImageInputRef,
       importSessionInputRef: args.importSessionInputRef,
-      onApplyFrame: () => args.controller.applyFrameSettings(args.frameDraft),
+      onApplyFrame: () =>
+        args.controller.applyFrameSettings({
+          ...args.frameDraft,
+          sourceImage: {
+            ...normalizeEditorImageSettings(args.frameDraft.sourceImage),
+            opacity: 1,
+          },
+        }),
       onExportSession: () => actionRailHandlers.exportSession(),
       onImportSession: () => args.importSessionInputRef.current?.click(),
       onOpenImage: () => args.openImageInputRef.current?.click(),

@@ -30,6 +30,12 @@ export const DEFAULT_EDITOR_IMAGE_SETTINGS: EditorImageSettings = {
   strokeWidth: 0,
 };
 
+export function resolveEditorSourceImageGlowBlur(settings: EditorImageSettings): number {
+  const blur = Math.max(0, settings.shadowBlur ?? 12);
+  const size = Math.min(100, Math.max(0, settings.shadow));
+  return blur + size * 0.75;
+}
+
 function normalizeUnit(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value)
     ? Math.min(1, Math.max(0, value))

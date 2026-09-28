@@ -13,6 +13,22 @@ export const editorSceneMessages = defineMessageSource({
     ru: 'Дополнительно',
     en: 'Additional',
   },
+  glowLabel: {
+    ru: 'Свечение',
+    en: 'Glow',
+  },
+  glowSize: {
+    ru: 'Размер свечения',
+    en: 'Glow size',
+  },
+  glowAdvanced: {
+    ru: 'Параметры свечения',
+    en: 'Glow options',
+  },
+  borderAdvanced: {
+    ru: 'Параметры рамки',
+    en: 'Border options',
+  },
   placementSection: {
     ru: 'Размещение',
     en: 'Placement',

@@ -1,5 +1,8 @@
 import type { FabricObject } from 'fabric';
-import type { EditorImageSettings } from '../../features/editor/document/image-types';
+import {
+  resolveEditorSourceImageGlowBlur,
+  type EditorImageSettings,
+} from '../../features/editor/document/image-types';
 import { hexToRgba } from '../document/model';
 import { traceCanvasRoundedRect } from './canvas-rounded-rect';
 import { createObjectFactoryStrokeDashArray } from './stroke-dash';
@@ -83,7 +86,7 @@ function renderOuterSourceImageShadow(
   const radius = Math.min(Math.max(0, settings.radius), width / 2, height / 2);
   const margin = Math.max(
     256,
-    (settings.shadowBlur ?? 12) * 4 + (settings.shadowDistance ?? 4) + settings.strokeWidth
+    resolveEditorSourceImageGlowBlur(settings) * 4 + settings.strokeWidth
   );
 
   ctx.save();

@@ -10,16 +10,15 @@ type BackgroundModeProps = Pick<
 export function EditorInspectorFrameBackgroundModeControl(props: BackgroundModeProps) {
   return (
     <SegmentedRow
-      columns={2}
+      columns={3}
       ariaLabel={translate('editor.scene.backgroundTypeSection')}
       options={[
-        { value: 'fill', label: translate('editor.scene.backgroundFillMode') },
+        { value: 'color', label: translate('editor.compact.frameBackgroundModeColor') },
+        { value: 'gradient', label: translate('editor.compact.frameBackgroundModeGradient') },
         { value: 'image', label: translate('editor.compact.frameBackgroundModeImage') },
       ]}
-      value={props.frameDraft.backgroundMode === 'image' ? 'image' : 'fill'}
-      onChange={(value) =>
-        props.setBackgroundMode(value === 'image' ? 'image' : props.lastFillModeRef.current)
-      }
+      value={props.frameDraft.backgroundMode}
+      onChange={props.setBackgroundMode}
     />
   );
 }

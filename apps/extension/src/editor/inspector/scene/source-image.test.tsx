@@ -120,9 +120,13 @@ it('keeps core source image geometry visible and expands shadow and border setti
   expect(
     Array.from(container?.querySelectorAll('details') ?? []).every((group) => group.open)
   ).toBe(true);
-  expect(applyFramePatch).toHaveBeenCalledWith(
-    expect.objectContaining({ sourceImage: expect.objectContaining({ opacity: 0.5 }) })
-  );
+  expect(
+    container?.querySelector(
+      '[data-ui="editor.frame.source-basics"] [aria-label="' +
+        translate('editor.compact.opacity') +
+        '"]'
+    )
+  ).toBeNull();
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({ sourceImage: expect.objectContaining({ strokeStyle: 'dot' }) })
   );
@@ -145,9 +149,7 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   );
   const shadow = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('[data-testid="range"]') ?? []
-  ).find(
-    (element) => element.getAttribute('aria-label') === translate('editor.compact.shadowSize')
-  );
+  ).find((element) => element.getAttribute('aria-label') === translate('editor.scene.glowSize'));
   expect(shadow?.dataset['value']).toBe('35');
   expect(shadow?.dataset['max']).toBe('100');
   await act(async () => shadow?.click());
@@ -168,9 +170,16 @@ it('gives shadow and border separate collapsible groups', async () => {
   const groups = Array.from(container?.querySelectorAll('details') ?? []);
   expect(groups).toHaveLength(2);
   expect(groups.map((group) => group.querySelector('summary')?.textContent)).toEqual([
-    translate('highlighter.editor.shadowLabel'),
-    translate('editor.compact.blurBorder'),
+    translate('editor.scene.glowAdvanced'),
+    translate('editor.scene.borderAdvanced'),
   ]);
+  expect(container?.textContent).toContain(translate('editor.scene.glowLabel'));
+  expect(
+    container?.querySelector('[aria-label="' + translate('editor.compact.shadowAngle') + '"]')
+  ).toBeNull();
+  expect(
+    container?.querySelector('[aria-label="' + translate('editor.compact.shadowDistance') + '"]')
+  ).toBeNull();
   expect(groups.every((group) => !group.open)).toBe(true);
   await act(async () => {
     groups[0]?.setAttribute('open', '');

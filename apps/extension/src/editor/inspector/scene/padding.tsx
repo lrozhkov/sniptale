@@ -67,16 +67,7 @@ export function FramePaddingFields(props: {
       onBlurCapture={(event) => setFocusedSide(readPaddingHoverSide(event.relatedTarget))}
     >
       <ProductGlassLinkedPaddingFields
-        fieldLayout="stacked"
-        renderUniformField={({ onChange, value }) => (
-          <PaddingValue
-            label={translate('highlighter.editor.paddingLabel')}
-            value={value}
-            onChange={onChange}
-            side="all"
-            revealSlider={hoveredSide === 'all' || focusedSide === 'all'}
-          />
-        )}
+        fieldLayout="inline"
         labels={{
           padding: translate('highlighter.editor.paddingLabel'),
           top: translate('highlighter.editor.paddingTop'),

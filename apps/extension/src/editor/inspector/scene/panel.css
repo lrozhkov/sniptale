@@ -2,11 +2,3 @@
   padding: 0;
   scrollbar-gutter: stable;
 }
-
-[data-ui='editor.frame.categories'] > div {
-  padding: 12px 12px 16px;
-}
-
-[data-ui='editor.frame.categories'] [data-ui='shared.categorized-inspector.section-heading'] {
-  margin-bottom: 16px;
-}

@@ -1,7 +1,11 @@
 import { expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../features/editor/document/constants';
 import type { EditorImageSettings } from '../../features/editor/document/image-types';
-import { applyImageSettings } from './image-style';
+import {
+  applyImageSettings,
+  isImageLayerStyleObject,
+  readImageSettingsFromObject,
+} from './image-style';
 import { attachBrowserHeaderToImage } from './image-frame';
 
 function createObject() {
@@ -75,6 +79,87 @@ it('keeps shadow color independent from image border color fallback', () => {
 
   expect((object as Record<string, unknown>)['sniptaleImageShadowColor']).toBe(
     DEFAULT_EDITOR_IMAGE_SETTINGS.shadowColor
+  );
+});
+
+it('grows the centered source-image glow substantially across the size range', () => {
+  const object = Object.assign(createObject(), { sniptaleType: 'source-image' });
+  applyImageSettings(object as never, { ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 20 });
+  const smallBlur = (object as unknown as { shadow?: { blur: number } }).shadow?.blur ?? 0;
+  applyImageSettings(object as never, { ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 100 });
+  const glow = (
+    object as unknown as {
+      shadow: { blur: number; offsetX: number; offsetY: number };
+    }
+  ).shadow;
+  expect(glow.blur).toBeGreaterThan(smallBlur * 3);
+  expect(glow.offsetX).toBe(0);
+  expect(glow.offsetY).toBe(0);
+});
+
+it('retains independent shadow geometry for ordinary image layers', () => {
+  const object = Object.assign(createObject(), { sniptaleType: 'image' });
+  applyImageSettings(object as never, {
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    shadow: 40,
+    shadowBlur: 28,
+    shadowDistance: 9,
+  });
+  const shadow = (
+    object as unknown as {
+      shadow: { blur: number; offsetY: number };
+    }
+  ).shadow;
+  expect(shadow.blur).toBe(28);
+  expect(shadow.offsetY).toBe(9);
+
+  const defaults: EditorImageSettings = {
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    shadow: 40,
+  };
+  Reflect.deleteProperty(defaults, 'shadowBlur');
+  Reflect.deleteProperty(defaults, 'shadowDistance');
+  applyImageSettings(object as never, defaults);
+  const defaultShadow = (
+    object as unknown as {
+      shadow: { blur: number; offsetY: number };
+    }
+  ).shadow;
+  expect(defaultShadow.blur).toBe(12);
+  expect(defaultShadow.offsetY).toBe(4);
+});
+
+it('round-trips styled source-image settings while retaining defaults for a legacy image', () => {
+  const source = Object.assign(createObject(), { sniptaleType: 'source-image' });
+  const styled: EditorImageSettings = {
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    borderPresetId: 'custom',
+    opacity: 1,
+    radius: 18,
+    shadow: 70,
+    shadowAngle: 45,
+    shadowBlur: 22,
+    shadowColor: '#abcdef',
+    shadowDistance: 10,
+    strokeColor: '#123456',
+    strokeOpacity: 0.6,
+    strokeStyle: 'dashed',
+    strokeWidth: 3,
+  };
+  applyImageSettings(source as never, styled);
+  expect(readImageSettingsFromObject(source as never)).toMatchObject(styled);
+  expect(isImageLayerStyleObject(source as never)).toBe(true);
+  expect(isImageLayerStyleObject({ sniptaleType: 'image' } as never)).toBe(true);
+  expect(
+    isImageLayerStyleObject({
+      sniptaleType: 'background',
+      sniptaleBackgroundMode: 'image',
+    } as never)
+  ).toBe(true);
+  expect(isImageLayerStyleObject({ sniptaleType: 'background' } as never)).toBe(false);
+  expect(isImageLayerStyleObject({ sniptaleImageRadius: 4 } as never)).toBe(true);
+  expect(readImageSettingsFromObject(createObject() as never)).toMatchObject(
+    DEFAULT_EDITOR_IMAGE_SETTINGS
   );
 });
 

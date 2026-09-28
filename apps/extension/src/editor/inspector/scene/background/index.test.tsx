@@ -145,19 +145,8 @@ it('renders the solid color branch and forwards color updates', async () => {
   );
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
-  ).toBe('solid,linear');
-  expect(container?.querySelectorAll('[data-ui="editor.frame.quick-colors"] button')).toHaveLength(
-    1
-  );
-  await act(async () => {
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.quick-colors"] button')
-      ?.click();
-  });
-  expect(applyFramePatch).toHaveBeenCalledWith({
-    backgroundColor: '#111111',
-    backgroundMode: 'color',
-  });
+  ).toBe('solid');
+  expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
 
   await act(async () => {
     (container?.querySelectorAll('button')[0] as HTMLButtonElement | undefined)?.click();
@@ -198,6 +187,19 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   expect(container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-kind')).toBe(
     'gradient'
   );
+  expect(
+    container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
+  ).toBe('linear');
+  expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
+  expect(
+    container?.querySelectorAll('[data-ui="editor.frame.gradient-presets"] button')
+  ).toHaveLength(1);
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.gradient-presets"] button')
+      ?.click();
+  });
+  expect(applyGradientPreset).toHaveBeenCalledOnce();
 
   await act(async () => {
     (
@@ -205,7 +207,7 @@ it('renders the gradient branch and forwards gradient actions', async () => {
     )?.click();
   });
 
-  expect(applyGradientPreset).not.toHaveBeenCalled();
+  expect(applyGradientPreset).toHaveBeenCalledOnce();
   expect(previewFramePatch).not.toHaveBeenCalled();
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({
