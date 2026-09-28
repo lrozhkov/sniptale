@@ -5,6 +5,14 @@ function sentence(...parts: string[]) {
 }
 
 export const editorSceneMessages = defineMessageSource({
+  backgroundPanelSection: {
+    ru: 'Фон и изображение',
+    en: 'Background and image',
+  },
+  additionalSection: {
+    ru: 'Дополнительно',
+    en: 'Additional',
+  },
   placementSection: {
     ru: 'Размещение',
     en: 'Placement',

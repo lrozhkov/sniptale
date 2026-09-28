@@ -146,6 +146,18 @@ it('renders the solid color branch and forwards color updates', async () => {
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
   ).toBe('solid,linear');
+  expect(container?.querySelectorAll('[data-ui="editor.frame.quick-colors"] button')).toHaveLength(
+    1
+  );
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.quick-colors"] button')
+      ?.click();
+  });
+  expect(applyFramePatch).toHaveBeenCalledWith({
+    backgroundColor: '#111111',
+    backgroundMode: 'color',
+  });
 
   await act(async () => {
     (container?.querySelectorAll('button')[0] as HTMLButtonElement | undefined)?.click();

@@ -1,8 +1,12 @@
+[data-ui='editor.inspector.content']:has([data-ui='editor.frame-panel']) {
+  padding: 0;
+  scrollbar-gutter: stable;
+}
+
 [data-ui='editor.frame.categories'] > div {
-  padding: 6px 10px 10px 6px;
+  padding: 12px 12px 16px;
 }
 
 [data-ui='editor.frame.categories'] [data-ui='shared.categorized-inspector.section-heading'] {
-  min-height: 24px;
-  margin-bottom: 4px;
+  margin-bottom: 16px;
 }

@@ -10,6 +10,47 @@ function LayerStyleProbe(props: { anchor: HTMLElement | null; open: boolean }) {
   return <output data-style={JSON.stringify(style)} />;
 }
 
+function TallLayerStyleProbe(props: { anchor: HTMLElement }) {
+  const layerRef = useRef(document.createElement('div'));
+  const style = useColorSelectorLayerStyle(
+    props.anchor,
+    true,
+    'auto',
+    null,
+    layerRef,
+    'palette',
+    680
+  );
+  return <output data-style={JSON.stringify(style)} />;
+}
+
+it('opens a tall paint selector above when the lower space would truncate it', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(900);
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(900);
+  const anchor = document.createElement('button');
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+    bottom: 510,
+    height: 20,
+    left: 300,
+    right: 320,
+    top: 490,
+    width: 20,
+    x: 300,
+    y: 490,
+    toJSON: () => ({}),
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<TallLayerStyleProbe anchor={anchor} />));
+  expect(host.querySelector('output')?.dataset['style']).toContain('translateY(-100%)');
+  act(() => root.unmount());
+  host.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
 it('contains wheel input inside the floating color surface', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const container = document.createElement('div');

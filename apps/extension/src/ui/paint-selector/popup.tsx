@@ -90,7 +90,15 @@ function PaintSelectorLayer(
   const [section, setSection] = useState<PaintSelectorSection>('paint');
   const theme = useResolvedPortalTheme(props.rootRef.current);
   const layerStyle = resolvePaintSelectorLayerStyle(
-    useColorSelectorLayerStyle(props.rootRef.current, props.open),
+    useColorSelectorLayerStyle(
+      props.rootRef.current,
+      props.open,
+      'auto',
+      null,
+      props.layerRef,
+      'palette',
+      680
+    ),
     props.rootRef.current
   );
   const { layerRef, open: _open, ownerId, rootRef: _rootRef, ...popupProps } = props;

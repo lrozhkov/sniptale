@@ -73,7 +73,8 @@ vi.mock('./background/blur', () => ({
 }));
 
 vi.mock('./source-image', () => ({
-  EditorInspectorFrameSourceImageFields: () => <div data-testid="source-image-section" />,
+  EditorInspectorFrameSourceImageBasics: () => <div data-testid="source-image-basics" />,
+  EditorInspectorFrameSourceImageEffects: () => <div data-testid="source-image-effects" />,
 }));
 
 vi.mock('./padding', async (importOriginal) => ({
@@ -200,10 +201,11 @@ afterEach(async () => {
 });
 
 function expectFramePanelSections() {
-  expect(container?.querySelectorAll('nav button')).toHaveLength(3);
+  expect(container?.querySelectorAll('nav button')).toHaveLength(2);
   expect(container?.querySelector('[data-testid="background-fill-section"]')).not.toBeNull();
-  expect(container?.querySelector('[data-testid="padding-section"]')).toBeNull();
-  expect(container?.querySelector('[data-testid="source-image-section"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="padding-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="source-image-basics"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="source-image-effects"]')).toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
 }
 
@@ -239,14 +241,13 @@ it('wires the inspector scene panel sections and actions', async () => {
 
   expectFramePanelSections();
   await clickFramePanelActions();
-  await selectSection(1);
   await act(async () => {
     clickPanelButton('[data-testid="placement-section"] button');
     clickPanelButton('[data-testid="padding-section"] button');
   });
+  await selectSection(1);
   expect(container?.querySelector('[data-testid="background-fill-section"]')).toBeNull();
-  await selectSection(2);
-  expect(container?.querySelector('[data-testid="source-image-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="source-image-effects"]')).not.toBeNull();
   expect(container?.querySelector('[data-testid="apply-button"]')).not.toBeNull();
 
   expect(previewSection).toHaveBeenCalled();

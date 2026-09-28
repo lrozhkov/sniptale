@@ -8,6 +8,7 @@ import {
 import { createEditorGradientColorStopColor } from '../../../../features/editor/document/gradient';
 import { translate } from '../../../../platform/i18n';
 import { CompactPaintSelector } from '../../../../ui/paint-selector';
+import { ColorSelectorSwatchSection } from '../../../../ui/color-selector/swatch-section';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
 import type { EditorInspectorFrameBackgroundEditorProps } from './shared';
 
@@ -63,23 +64,41 @@ export function EditorInspectorFrameBackgroundFillEditor(
   }
 
   return (
-    <CompactPaintSelector
-      triggerVariant="swatch"
-      allowedModes={['solid', 'linear']}
-      showGradientAdvancedControls={false}
-      title={translate('editor.scene.sceneBackgroundTitle')}
-      label={translate('editor.scene.sceneBackgroundLabel')}
-      value={transactionValue ?? frameToPaint(props.frameDraft)}
-      recentColors={props.recentColors}
-      palette={props.frameBackgroundPalette}
-      onChange={(paint) => props.applyFramePatch(paintToFramePatch(paint))}
-      onPreviewChange={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
-      onPreviewReset={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
-      onOpenChange={(open) =>
-        setTransactionValue((current) =>
-          open ? (current ?? frameToPaint(props.frameDraft)) : null
-        )
-      }
-    />
+    <div className="space-y-3">
+      <CompactPaintSelector
+        triggerVariant="swatch"
+        allowedModes={['solid', 'linear']}
+        showGradientAdvancedControls={false}
+        title={translate('editor.scene.sceneBackgroundTitle')}
+        label={translate('editor.scene.sceneBackgroundLabel')}
+        value={transactionValue ?? frameToPaint(props.frameDraft)}
+        recentColors={props.recentColors}
+        palette={props.frameBackgroundPalette}
+        onChange={(paint) => props.applyFramePatch(paintToFramePatch(paint))}
+        onPreviewChange={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
+        onPreviewReset={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
+        onOpenChange={(open) =>
+          setTransactionValue((current) =>
+            open ? (current ?? frameToPaint(props.frameDraft)) : null
+          )
+        }
+      />
+      {props.frameBackgroundPalette.length > 0 ? (
+        <div data-ui="editor.frame.quick-colors">
+          <ColorSelectorSwatchSection
+            colors={props.frameBackgroundPalette.slice(0, 8)}
+            gridClassName="grid grid-cols-8 gap-1.5"
+            label={translate('shared.ui.colorSelectorPalette')}
+            selectedColor={
+              props.frameDraft.backgroundMode === 'color' ? props.frameDraft.backgroundColor : ''
+            }
+            title={translate('editor.scene.sceneBackgroundTitle')}
+            onSelect={(backgroundColor) =>
+              props.applyFramePatch({ backgroundColor, backgroundMode: 'color' })
+            }
+          />
+        </div>
+      ) : null}
+    </div>
   );
 }

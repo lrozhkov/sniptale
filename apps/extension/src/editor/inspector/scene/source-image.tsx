@@ -79,6 +79,17 @@ function resolveSourceImageNumericUnit(valueText: string): '' | '%' | 'deg' | 'p
 export function EditorInspectorFrameSourceImageFields(
   props: EditorInspectorFrameSourceImageFieldsProps
 ) {
+  return (
+    <div className="space-y-3">
+      <EditorInspectorFrameSourceImageBasics {...props} />
+      <EditorInspectorFrameSourceImageEffects {...props} />
+    </div>
+  );
+}
+
+export function EditorInspectorFrameSourceImageBasics(
+  props: EditorInspectorFrameSourceImageFieldsProps
+) {
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
 
   return (
@@ -99,6 +110,16 @@ export function EditorInspectorFrameSourceImageFields(
         valueText={`${settings.radius}px`}
         onChange={(radius) => patchSourceImage(props, { radius })}
       />
+    </div>
+  );
+}
+
+export function EditorInspectorFrameSourceImageEffects(
+  props: EditorInspectorFrameSourceImageFieldsProps
+) {
+  const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
+  return (
+    <div className="space-y-3">
       <SourceImageShadowSection props={props} settings={settings} />
       <SourceImageBorderSection props={props} settings={settings} />
     </div>

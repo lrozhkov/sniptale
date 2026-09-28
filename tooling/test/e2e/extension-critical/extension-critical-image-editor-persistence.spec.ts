@@ -440,15 +440,27 @@ test('inspector numeric and paint controls retain shared hover, focus and Escape
   await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
   await waitForEditorReady(page);
   await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
-  const paddingInput = page.locator('[data-padding-side="top"] input').first();
+  const framePanel = page.locator('[data-ui="editor.frame-panel"]');
+  const categoryRail = framePanel.locator('nav');
+  await expect(categoryRail.locator('button')).toHaveCount(2);
+  await expect(framePanel.locator('[data-section="background"]')).toBeVisible();
+  await expect(framePanel.locator('[data-ui="editor.frame.quick-colors"] button')).toHaveCount(8);
+  const panelBounds = await framePanel.boundingBox();
+  const railBounds = await categoryRail.boundingBox();
+  expect(panelBounds).not.toBeNull();
+  expect(railBounds).not.toBeNull();
+  expect(railBounds!.x).toBe(panelBounds!.x);
+  const firstNavButtonBounds = await categoryRail.locator('button').first().boundingBox();
+  expect(firstNavButtonBounds).not.toBeNull();
+  const leftRailInset = firstNavButtonBounds!.x - railBounds!.x;
+  const rightRailInset =
+    railBounds!.x + railBounds!.width - firstNavButtonBounds!.x - firstNavButtonBounds!.width;
+  expect(Math.abs(leftRailInset - rightRailInset)).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-frame-background-panel.png` });
   const actions = page.locator('[data-ui="editor.frame-panel"] > [data-ui="editor.frame.actions"]');
-  await expect(paddingInput).toBeInViewport();
-  const paddingBounds = await paddingInput.boundingBox();
   const actionBounds = await actions.boundingBox();
-  expect(paddingBounds).not.toBeNull();
   expect(actionBounds).not.toBeNull();
-  expect(paddingBounds!.y + paddingBounds!.height).toBeLessThanOrEqual(actionBounds!.y);
-  await page.locator('[data-section="source-image"] > details > summary').click();
+  expect(actionBounds!.y).toBeGreaterThan(railBounds!.y);
   const field = page.getByRole('textbox', { name: 'Скругление углов', exact: true });
   const row = page
     .locator('[data-ui="shared.ui.compact-inspector.numeric-row"]')
@@ -480,5 +492,9 @@ test('inspector numeric and paint controls retain shared hover, focus and Escape
   await page.keyboard.press('Escape');
   await expect(page.locator('[data-ui="shared.ui.paint-selector.popup"]')).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  await categoryRail.locator('button').nth(1).click();
+  await expect(framePanel.locator('[data-section="background"]')).toHaveCount(0);
+  await expect(framePanel.locator('[data-section="additional"] details')).toHaveCount(2);
+  await page.screenshot({ path: `${EVIDENCE_DIR}/editor-frame-additional-panel.png` });
   await page.close();
 });

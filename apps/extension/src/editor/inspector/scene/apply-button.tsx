@@ -8,13 +8,12 @@ export function FrameApplyButton(props: { onApplyFrame: () => void; onCancelFram
   return (
     <div
       className={[
-        'grid gap-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-3',
-        props.onCancelFrame ? 'grid-cols-2' : 'grid-cols-1',
+        'flex justify-end gap-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-3',
       ].join(' ')}
     >
       {props.onCancelFrame ? (
         <button
-          className={getControlSecondaryButtonClassName()}
+          className={`${getControlSecondaryButtonClassName()} min-w-24`}
           onClick={props.onCancelFrame}
           type="button"
         >
@@ -22,7 +21,7 @@ export function FrameApplyButton(props: { onApplyFrame: () => void; onCancelFram
         </button>
       ) : null}
       <button
-        className={getControlPrimaryButtonClassName()}
+        className={`${getControlPrimaryButtonClassName()} min-w-24`}
         onClick={props.onApplyFrame}
         type="button"
       >
