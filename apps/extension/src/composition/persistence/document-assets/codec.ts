@@ -273,54 +273,48 @@ export async function hydratePersistedEditorDocument(args: {
   }
   const urls = new Map<string, string>();
   const assetsByRuntimeUrl = new Map<string, AssetRef>();
-  try {
-    for (const asset of args.document.assets) {
-      if (urls.has(asset.assetId)) continue;
-      const ref = refsById.get(asset.assetId);
-      if (!ref) throw new MissingEditorDocumentAssetError(asset.assetId);
-      const file = await readAssetFile(ref, asset.role);
-      const runtimeUrl = URL.createObjectURL(file);
-      urls.set(asset.assetId, runtimeUrl);
-      assetsByRuntimeUrl.set(runtimeUrl, ref);
-    }
-    const sourceImageData = urls.get(args.document.sourceImage.assetId);
-    if (!sourceImageData) {
-      throw new MissingEditorDocumentAssetError(args.document.sourceImage.assetId, 'source');
-    }
-    const backgroundImageData = args.document.frame.backgroundImage
-      ? (urls.get(args.document.frame.backgroundImage.assetId) ?? null)
-      : null;
-    const faviconDataUrl = args.document.browserFrame?.favicon
-      ? (urls.get(args.document.browserFrame.favicon.assetId) ?? null)
-      : null;
-    const parsedCanvas: unknown = JSON.parse(args.document.canvasJson);
-    const canvasJson = JSON.stringify(await hydrateCanvasValue(parsedCanvas, urls));
-    const { backgroundImage: _backgroundImage, ...frame } = args.document.frame;
-    const browserFrame = args.document.browserFrame
-      ? (() => {
-          const { favicon: _favicon, ...metadata } = args.document.browserFrame;
-          return { ...metadata, faviconDataUrl };
-        })()
-      : undefined;
-    return {
-      assetsByRuntimeUrl,
-      document: projectEditorDocumentV2(args.document, {
-        backgroundImageData,
-        browserFrame,
-        canvasJson,
-        frame,
-        sourceImageData,
-      }),
-      release() {
-        for (const url of urls.values()) URL.revokeObjectURL(url);
-        urls.clear();
-        assetsByRuntimeUrl.clear();
-      },
-    };
-  } catch (error) {
-    for (const url of urls.values()) URL.revokeObjectURL(url);
-    throw error;
+  for (const asset of args.document.assets) {
+    if (urls.has(asset.assetId)) continue;
+    const ref = refsById.get(asset.assetId);
+    if (!ref) throw new MissingEditorDocumentAssetError(asset.assetId);
+    const file = await readAssetFile(ref, asset.role);
+    const runtimeUrl = await blobToDataUrl(file);
+    urls.set(asset.assetId, runtimeUrl);
+    assetsByRuntimeUrl.set(runtimeUrl, ref);
   }
+  const sourceImageData = urls.get(args.document.sourceImage.assetId);
+  if (!sourceImageData) {
+    throw new MissingEditorDocumentAssetError(args.document.sourceImage.assetId, 'source');
+  }
+  const backgroundImageData = args.document.frame.backgroundImage
+    ? (urls.get(args.document.frame.backgroundImage.assetId) ?? null)
+    : null;
+  const faviconDataUrl = args.document.browserFrame?.favicon
+    ? (urls.get(args.document.browserFrame.favicon.assetId) ?? null)
+    : null;
+  const parsedCanvas: unknown = JSON.parse(args.document.canvasJson);
+  const canvasJson = JSON.stringify(await hydrateCanvasValue(parsedCanvas, urls));
+  const { backgroundImage: _backgroundImage, ...frame } = args.document.frame;
+  const browserFrame = args.document.browserFrame
+    ? (() => {
+        const { favicon: _favicon, ...metadata } = args.document.browserFrame;
+        return { ...metadata, faviconDataUrl };
+      })()
+    : undefined;
+  return {
+    assetsByRuntimeUrl,
+    document: projectEditorDocumentV2(args.document, {
+      backgroundImageData,
+      browserFrame,
+      canvasJson,
+      frame,
+      sourceImageData,
+    }),
+    release() {
+      urls.clear();
+      assetsByRuntimeUrl.clear();
+    },
+  };
 }
 
 function projectEditorDocumentV2(

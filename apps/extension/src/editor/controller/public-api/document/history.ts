@@ -1,7 +1,12 @@
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import type { ApplyDocumentOptions } from '../../core/types';
-import { readCurrentEditorSnapshot, redoEditorSnapshot, undoEditorSnapshot } from '../../history';
+import {
+  readCurrentEditorSnapshot,
+  redoEditorSnapshot,
+  resetEditorSnapshotHistory,
+  undoEditorSnapshot,
+} from '../../history';
 import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft-coordinator';
 import { runEditorDocumentTransition } from '../../history/transition-queue';
 import type { Canvas } from 'fabric';
@@ -178,7 +183,7 @@ export async function restoreEditorControllerOriginalDocument(
       }
       throw error;
     }
-    controller.history?.reset(JSON.stringify(original));
+    if (controller.history) resetEditorSnapshotHistory(controller.history, original);
     if (persist) controller.publishHistoryDocument(original, { scheduleAutosave: false });
     else controller.publishHistoryDocument(original);
   });

@@ -55,6 +55,11 @@ export class SnapshotHistory<T> {
     return cloneHistorySnapshot(this.readSnapshot(this.index));
   }
 
+  /** Returns retained snapshots for owners that keep resources outside the snapshot stack. */
+  getSnapshots(): T[] {
+    return this.stack.map((snapshot) => cloneHistorySnapshot(snapshot));
+  }
+
   reset(snapshot: T): SnapshotHistoryState<T> {
     this.stack = [cloneHistorySnapshot(snapshot)];
     this.index = 0;

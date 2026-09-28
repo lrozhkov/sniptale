@@ -60,6 +60,24 @@ it('does not queue a second autosave after explicitly persisting the original', 
   expect(publishHistoryDocument).toHaveBeenCalledWith(original, { scheduleAutosave: false });
 });
 
+it('applies the original when no undo history has been initialized', async () => {
+  const original = createEditorDocument('raw source');
+  const applyDocument = vi.fn(async () => undefined);
+  const publishHistoryDocument = vi.fn();
+
+  await restoreEditorControllerOriginalDocument(
+    { applyDocument, history: null, publishHistoryDocument },
+    original
+  );
+
+  expect(applyDocument).toHaveBeenCalledWith(original, {
+    resetHistory: false,
+    updateOriginal: false,
+    preserveViewport: true,
+  });
+  expect(publishHistoryDocument).toHaveBeenCalledWith(original);
+});
+
 it('retains history and restores the visible document when applying the original fails', async () => {
   const original = createEditorDocument('raw source');
   const latest = createEditorDocument('latest edit');

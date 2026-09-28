@@ -17,6 +17,7 @@ import {
   createEditorSnapshotHistory,
   pushEditorSnapshotHistory,
   redoEditorSnapshot,
+  resetEditorSnapshotHistory,
   undoEditorSnapshot,
 } from './';
 
@@ -43,6 +44,88 @@ it('undoes and redoes edits to a hydrated document with a runtime blob source', 
 
   expect(undoEditorSnapshot(history)).toEqual(first);
   expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
+it('stores repeated raster data once while keeping resize undo and redo loadable', () => {
+  const source = `data:image/png;base64,${'A'.repeat(12_000)}`;
+  const resized = `data:image/png;base64,${'B'.repeat(12_000)}`;
+  const first = {
+    ...createMockDocument(),
+    sourceImageData: source,
+    canvasJson: JSON.stringify({ objects: [{ src: source, type: 'image' }] }),
+  };
+  const history = createEditorSnapshotHistory(first);
+  for (let index = 0; index < 50; index += 1) {
+    pushEditorSnapshotHistory({
+      exportDocument: () => ({ ...first, sourceName: `edit-${index}` }),
+      history,
+      muted: false,
+    });
+    expect(history.getCurrent().length).toBeLessThan(1_000);
+  }
+  pushEditorSnapshotHistory({
+    exportDocument: () => ({ ...first, sourceImageData: resized, sourceName: 'resized' }),
+    history,
+    muted: false,
+  });
+
+  expect(history.getCurrent().length).toBeLessThan(1_000);
+  expect(undoEditorSnapshot(history)?.sourceImageData).toBe(source);
+  expect(JSON.parse(undoEditorSnapshot(history)!.canvasJson).objects[0].src).toBe(source);
+  expect(redoEditorSnapshot(history)?.sourceImageData).toBe(source);
+  expect(redoEditorSnapshot(history)?.sourceImageData).toBe(resized);
+});
+
+it('releases binary references after their snapshots leave the bounded history', () => {
+  const source = (index: number) => `data:image/png;base64,${String(index).padStart(5_000, 'A')}`;
+  const first = { ...createMockDocument(), sourceImageData: source(0) };
+  const history = createEditorSnapshotHistory(first);
+
+  for (let index = 1; index <= 80; index += 1) {
+    pushEditorSnapshotHistory({
+      exportDocument: () => ({ ...first, sourceImageData: source(index) }),
+      history,
+      muted: false,
+    });
+  }
+  pushEditorSnapshotHistory({ exportDocument: () => first, history, muted: false });
+
+  expect(history.getSnapshots()).toHaveLength(80);
+  expect(history.getCurrent()).toContain('sniptale-history-asset:81');
+  expect(undoEditorSnapshot(history)?.sourceImageData).toBe(source(80));
+  expect(redoEditorSnapshot(history)?.sourceImageData).toBe(source(0));
+});
+
+it('drops previous image bytes when restoring the original resets history', () => {
+  const source = `data:image/png;base64,${'A'.repeat(5_000)}`;
+  const original = `data:image/png;base64,${'B'.repeat(5_000)}`;
+  const first = { ...createMockDocument(), sourceImageData: source };
+  const history = createEditorSnapshotHistory(first);
+
+  resetEditorSnapshotHistory(history, { ...first, sourceImageData: original });
+  pushEditorSnapshotHistory({ exportDocument: () => first, history, muted: false });
+
+  expect(history.getCurrent()).toContain('sniptale-history-asset:2');
+  expect(undoEditorSnapshot(history)?.sourceImageData).toBe(original);
+  expect(redoEditorSnapshot(history)?.sourceImageData).toBe(source);
+});
+
+it('does not retain expired image bytes for a filename resembling a history token', () => {
+  const oldSource = `data:image/png;base64,${'A'.repeat(5_000)}`;
+  const newSource = `data:image/png;base64,${'B'.repeat(5_000)}`;
+  const first = { ...createMockDocument(), sourceImageData: oldSource };
+  const history = createEditorSnapshotHistory(first);
+
+  resetEditorSnapshotHistory(history, {
+    ...first,
+    sourceImageData: newSource,
+    sourceName: 'sniptale-history-asset:0',
+  });
+  pushEditorSnapshotHistory({ exportDocument: () => first, history, muted: false });
+
+  expect(history.getCurrent()).toContain('sniptale-history-asset:2');
+  expect(undoEditorSnapshot(history)?.sourceName).toBe('sniptale-history-asset:0');
+  expect(redoEditorSnapshot(history)?.sourceImageData).toBe(oldSource);
 });
 
 it('rejects malformed or invalid editor document snapshots', () => {
