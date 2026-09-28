@@ -53,7 +53,6 @@ async function undoEditorControllerSnapshotInTurn(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
   flushActiveFrameAnnotationDraft();
-  const previousDocument = readCurrentEditorSnapshot(controller.history);
   const document = undoEditorSnapshot(controller.history);
   try {
     await applyHistoryDocument(controller, document, {
@@ -62,10 +61,7 @@ async function undoEditorControllerSnapshotInTurn(
       preserveViewport: true,
     });
   } catch (error) {
-    if (await restoreHistoryDocument(controller, previousDocument, error)) {
-      controller.history?.redo();
-      if (previousDocument) controller.publishHistoryDocument(previousDocument);
-    }
+    await restoreFailedHistoryStep(controller, error, 'redo');
     throw error;
   }
   if (document) controller.publishHistoryDocument(document);
@@ -83,7 +79,6 @@ async function redoEditorControllerSnapshotInTurn(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
   flushActiveFrameAnnotationDraft();
-  const previousDocument = readCurrentEditorSnapshot(controller.history);
   const document = redoEditorSnapshot(controller.history);
   try {
     await applyHistoryDocument(controller, document, {
@@ -92,13 +87,33 @@ async function redoEditorControllerSnapshotInTurn(
       preserveViewport: true,
     });
   } catch (error) {
-    if (await restoreHistoryDocument(controller, previousDocument, error)) {
-      controller.history?.undo();
-      if (previousDocument) controller.publishHistoryDocument(previousDocument);
-    }
+    await restoreFailedHistoryStep(controller, error, 'undo');
     throw error;
   }
   if (document) controller.publishHistoryDocument(document);
+}
+
+async function restoreFailedHistoryStep(
+  controller: EditorDocumentHistoryController,
+  error: unknown,
+  reverse: 'undo' | 'redo'
+): Promise<void> {
+  const history = controller.history;
+  if (!history) return;
+  const returnToFailedStep = () => {
+    if (reverse === 'redo') history.undo();
+    else history.redo();
+  };
+  if (reverse === 'redo') history.redo();
+  else history.undo();
+  let restored = false;
+  try {
+    const previousDocument = readCurrentEditorSnapshot(history);
+    restored = await restoreHistoryDocument(controller, previousDocument, error);
+    if (restored && previousDocument) controller.publishHistoryDocument(previousDocument);
+  } finally {
+    if (!restored) returnToFailedStep();
+  }
 }
 
 async function restoreHistoryDocument(

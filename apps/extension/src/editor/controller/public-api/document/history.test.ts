@@ -294,6 +294,31 @@ it('restores a drawn scene from an in-memory hydrated workspace snapshot', async
   expect(history.getState().canRedo).toBe(true);
 });
 
+it('does not decode the current snapshot on a successful undo or redo', async () => {
+  const original = createEditorDocument('original');
+  const edited = createEditorDocument('edited');
+  const history = new SnapshotHistory(JSON.stringify(original));
+  history.push(JSON.stringify(edited));
+  const actualHistory = await vi.importActual<typeof import('../../history')>('../../history');
+  mocks.undoSnapshot.mockImplementationOnce(actualHistory.undoEditorSnapshot);
+  mocks.redoSnapshot.mockImplementationOnce(actualHistory.redoEditorSnapshot);
+  const controller = {
+    applyDocument: vi.fn(async () => undefined),
+    history,
+    publishHistoryDocument: vi.fn(),
+  };
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    await undoEditorControllerSnapshot(controller);
+    expect(parse).toHaveBeenCalledTimes(1);
+    parse.mockClear();
+    await redoEditorControllerSnapshot(controller);
+    expect(parse).toHaveBeenCalledTimes(1);
+  } finally {
+    parse.mockRestore();
+  }
+});
+
 it('restores the history cursor when document application fails', async () => {
   const original = createEditorDocument('original');
   const edited = createEditorDocument('edited');
@@ -351,4 +376,49 @@ it('restores the redo cursor when document application fails', async () => {
   expect(history.getState().current).toBe(JSON.stringify(original));
   expect(history.getState().canRedo).toBe(true);
   expect(publishedIndexes).toEqual([0]);
+});
+
+it.each(['undo', 'redo'] as const)(
+  'keeps the attempted %s cursor when recovery also fails',
+  async (direction) => {
+    const original = createEditorDocument('original');
+    const edited = createEditorDocument('edited');
+    const history = new SnapshotHistory(JSON.stringify(original));
+    history.push(JSON.stringify(edited));
+    if (direction === 'redo') history.undo();
+    const actualHistory = await vi.importActual<typeof import('../../history')>('../../history');
+    if (direction === 'undo') {
+      mocks.undoSnapshot.mockImplementationOnce(actualHistory.undoEditorSnapshot);
+    } else {
+      mocks.redoSnapshot.mockImplementationOnce(actualHistory.redoEditorSnapshot);
+    }
+    const controller = {
+      applyDocument: vi.fn(async () => {
+        throw new Error('canvas load failed');
+      }),
+      history,
+      publishHistoryDocument: vi.fn(),
+    };
+
+    await expect(
+      direction === 'undo'
+        ? undoEditorControllerSnapshot(controller)
+        : redoEditorControllerSnapshot(controller)
+    ).rejects.toThrow('Editor history restoration failed');
+    expect(history.getState().index).toBe(direction === 'undo' ? 0 : 1);
+    expect(controller.publishHistoryDocument).not.toHaveBeenCalled();
+  }
+);
+
+it('propagates an undo application failure without an available history', async () => {
+  const controller = {
+    applyDocument: vi.fn(async () => {
+      throw new Error('canvas load failed');
+    }),
+    history: null,
+    publishHistoryDocument: vi.fn(),
+  };
+
+  await expect(undoEditorControllerSnapshot(controller)).rejects.toThrow('canvas load failed');
+  expect(controller.applyDocument).toHaveBeenCalledOnce();
 });
