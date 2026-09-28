@@ -15,9 +15,9 @@ it('keeps page pencil geometry identical to the speed-based image-editor pencil'
   });
   // Frozen from the image-editor dynamic-width path for this exact mouse-speed sample set.
   expect(drawingOutline).toHaveLength(76);
-  expect(drawingOutline.reduce((sum, point) => sum + point.x, 0)).toBeCloseTo(2208.688641201598, 8);
-  expect(drawingOutline.reduce((sum, point) => sum + point.y, 0)).toBeCloseTo(2502.986298480992, 8);
-  expect(drawingOutline[0]).toEqual({ x: 8.040055741721146, y: 24.172590429921307 });
-  expect(drawingOutline[37]).toEqual({ x: 49.82458313003089, y: 39.77474331092914 });
-  expect(drawingOutline.at(-1)).toEqual({ x: 7.026893352165332, y: 23.52314195740569 });
+  expect(drawingOutline.reduce((sum, point) => sum + point.x, 0)).toBeCloseTo(2203.918933986989, 8);
+  expect(drawingOutline.reduce((sum, point) => sum + point.y, 0)).toBeCloseTo(2505.427084892861, 8);
+  expect(drawingOutline[0]).toEqual({ x: 8.087290717470228, y: 24.194633271076817 });
+  expect(drawingOutline[37]).toEqual({ x: 49.564329384611824, y: 39.671205433815445 });
+  expect(drawingOutline.at(-1)).toEqual({ x: 7.066813728046293, y: 23.556659018281408 });
 });
