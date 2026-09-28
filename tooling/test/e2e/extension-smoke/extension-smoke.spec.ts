@@ -948,6 +948,18 @@ test('image editor docks history below the top toolbar at HD and scrolls below i
     document.documentElement.scrollLeft = 580;
   });
   expect(await page.evaluate(() => document.documentElement.scrollLeft)).toBe(580);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => {
+    document.documentElement.scrollLeft = 0;
+  });
+  await page.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+  await expect(page.locator('[data-ui="content.toolbar.future-frame-callout"]')).toBeVisible();
+  const expanded = await measure();
+  expect((expanded.rail.left + expanded.rail.right) / 2).toBeCloseTo(640, 0);
+  expect(expanded.documentBar.right).toBeLessThan(expanded.rail.left);
+  expect(expanded.rail.right).toBeLessThan(expanded.view.left);
+  expect(expanded.documentWidth).toBe(1280);
 });
 
 test('content runtime is not injected before explicit site access', async ({
