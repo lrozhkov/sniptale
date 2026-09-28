@@ -94,6 +94,7 @@ function startBlur(
   const drawing: Extract<DrawingObject, { kind: 'blur' }> = {
     id: `drawing-${crypto.randomUUID()}`,
     kind: 'blur',
+    amount: useEditorStore.getState().toolSettings.blur.amount,
     bounds: { x: point.x, y: point.y, width: 1, height: 1 },
   };
   const object = createEditorDrawingBlurObject({

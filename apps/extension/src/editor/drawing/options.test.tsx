@@ -33,6 +33,14 @@ vi.mock('../../ui/drawing-tools/options', () => ({
   ),
   ArrowWidthModeOptions: () => <span data-ui="mock.arrow-mode-options" />,
   DrawingColorOptions: mocks.colorOptions,
+  DrawingBlurStrengthOptions: (props: { value: number; onChange: (value: number) => void }) => (
+    <button
+      type="button"
+      data-ui="mock.blur-strength"
+      data-value={props.value}
+      onClick={() => props.onChange(2)}
+    />
+  ),
   DrawingDeleteOption: () => null,
   DrawingDeselectOption: () => null,
   DrawingOptionsDivider: mocks.divider,
@@ -49,6 +57,7 @@ const storeState = {
   updateDrawingToolSettings: vi.fn(),
   selectionToolSettings: {},
   toolSettings: {
+    blur: { amount: 20 },
     arrow: {
       color: '#333333',
       design: 'standard' as const,
@@ -75,6 +84,29 @@ vi.mock('../../composition/persistence/drawing-palette', () => ({
 }));
 
 import { EditorDrawingOptions } from './options';
+
+it('shows strong blur by default and updates its strength', async () => {
+  storeState.updateDrawingToolSettings.mockClear();
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <EditorDrawingOptions
+        onApplyToSelection={vi.fn()}
+        onDirectionChange={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        selectedType={null}
+        tool="blur"
+      />
+    )
+  );
+  const button = host.querySelector<HTMLButtonElement>('[data-ui="mock.blur-strength"]');
+  expect(button?.dataset['value']).toBe('20');
+  await act(async () => button?.click());
+  expect(storeState.updateDrawingToolSettings).toHaveBeenCalledWith('blur', { amount: 2 });
+  await act(async () => root.unmount());
+});
 
 it('renders editor tool settings as a horizontal toolbar like content drawing mode', () => {
   const markup = renderToStaticMarkup(

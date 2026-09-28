@@ -513,7 +513,7 @@ it('reuses the Shapes panel to change the kind of a selected outline object', ()
   act(() => root.unmount());
 });
 
-it('shows only deselect and delete actions for a selected blur object', () => {
+it('shows strength choices and actions for a selected blur object', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
@@ -543,7 +543,22 @@ it('shows only deselect and delete actions for a selected blur object', () => {
   expect(
     panel?.closest('.relative')?.querySelector('[data-ui="content.toolbar.drawing.select"]')
   ).not.toBeNull();
-  expect(panel?.children).toHaveLength(2);
+  expect(
+    panel?.querySelectorAll('[data-ui^="content.toolbar.drawing-options.blur.amount-"]')
+  ).toHaveLength(3);
+  expect(
+    panel?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
+    )?.className
+  ).toContain('!w-auto');
+  act(() =>
+    panel
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
+      )
+      ?.click()
+  );
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ amount: 6 });
   const deselect = panel?.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.deselect"]'
   );

@@ -13,7 +13,9 @@ vi.mock('../../objects/annotation/blur/object', async (importOriginal) => ({
   updateBlurObject: vi.fn(),
 }));
 
-import { createEditorDrawingBlurObject } from './blur';
+import { createEditorDrawingBlurObject, refreshEditorDrawingBlurObject } from './blur';
+import { createBlurObject, updateBlurObject } from '../../objects/annotation/blur/object';
+import { getBlurSettings } from '../../objects/annotation/blur/object/settings';
 import { canonicalizeModifiedEditorDrawingSelection } from './canonicalize';
 import { readEditorDrawingObject } from './metadata';
 
@@ -31,6 +33,34 @@ it('reconstructs rotated blur geometry around the shared bounds center', () => {
 
   expect(object.getCenterPoint()).toMatchObject({ x: 130, y: 80 });
   expect(object.angle).toBe(30);
+});
+
+it('passes saved strength to the blur renderer and keeps legacy drawings at 10', () => {
+  const source = createTypedTestFixture<SourceState>({});
+  const drawing = {
+    id: 'blur-2',
+    kind: 'blur' as const,
+    bounds: { x: 0, y: 0, width: 20, height: 20 },
+    amount: 20,
+  };
+  const object = createEditorDrawingBlurObject({ drawing, labelIndex: 1, source });
+  expect(vi.mocked(createBlurObject)).toHaveBeenCalledWith(
+    expect.objectContaining({ settings: expect.objectContaining({ amount: 20 }) })
+  );
+  refreshEditorDrawingBlurObject(object);
+  expect(getBlurSettings(object).amount).toBe(20);
+  expect(vi.mocked(updateBlurObject)).toHaveBeenCalledWith(object, {
+    settings: expect.objectContaining({ amount: 20 }),
+  });
+  const old = createEditorDrawingBlurObject({
+    drawing: { id: 'old', kind: 'blur', bounds: drawing.bounds },
+    labelIndex: 2,
+    source,
+  });
+  expect(getBlurSettings(old).amount).toBe(10);
+  expect(vi.mocked(createBlurObject)).toHaveBeenLastCalledWith(
+    expect.objectContaining({ settings: expect.objectContaining({ amount: 10 }) })
+  );
 });
 
 it('canonicalizes combined blur move-scale-rotate without legacy bounding-box inflation', () => {

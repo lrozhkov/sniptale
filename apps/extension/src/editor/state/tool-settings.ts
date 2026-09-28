@@ -34,6 +34,7 @@ export function createHydrateDefaultsAction(set: EditorStoreSet): EditorHydrateD
         marker: options.toolSettings?.marker ? merged.marker : state.toolSettings.marker,
         shape: options.toolSettings?.shape ? merged.shape : state.toolSettings.shape,
         arrow: options.toolSettings?.arrow ? merged.arrow : state.toolSettings.arrow,
+        blur: options.toolSettings?.blur ? merged.blur : state.toolSettings.blur,
         text: options.toolSettings?.text ? merged.text : state.toolSettings.text,
       };
 
@@ -88,6 +89,7 @@ function mergeToolSettings(
     marker: { ...base.marker, ...overrides.marker },
     shape: { ...base.shape, ...overrides.shape },
     arrow: { ...base.arrow, ...overrides.arrow },
+    blur: { ...base.blur, ...overrides.blur },
     text: { ...base.text, ...overrides.text },
     step: { ...base.step, ...overrides.step },
     image: { ...base.image, ...overrides.image },

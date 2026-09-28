@@ -1,7 +1,11 @@
 import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
 import type { EditorObjectType } from '../../../../features/editor/document/types';
 import type { EditorToolSettings } from '../../../../features/editor/document/tool-settings-types';
-import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import {
+  readEditorDrawingObject,
+  writeEditorDrawingObject,
+} from '../../../drawing/object/metadata';
+import { refreshEditorDrawingBlurObject } from '../../../drawing/object/blur';
 import { replaceEditorDrawingFabricGeometry } from '../../../drawing/object/vector';
 import { applyStepSettings } from './annotation';
 import { applyImageLayerSettings } from './image';
@@ -91,8 +95,16 @@ export function applySelectionToolSettingsToObjects(
     case 'shape':
     case 'arrow':
     case 'text':
-    case 'blur':
       replaceDrawingObjectsOnCanvas(canvas, objects, selectionToolSettings, prepareObject);
+      return;
+    case 'blur':
+      objects.forEach((object) => {
+        const drawing = readEditorDrawingObject(object);
+        if (drawing?.kind !== 'blur') return;
+        writeEditorDrawingObject(object, { ...drawing, amount: selectionToolSettings.blur.amount });
+        refreshEditorDrawingBlurObject(object);
+      });
+      canvas.requestRenderAll();
       return;
     case 'step':
       applyStepSettings(objects, selectionToolSettings.step);

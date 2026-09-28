@@ -158,6 +158,27 @@ describe('drawing selection settings', () => {
     expect(mocks.replaceEditorDrawingFabricGeometry).not.toHaveBeenCalled();
   });
 
+  it('writes the chosen strength into a selected blur drawing', () => {
+    const object = new Rect();
+    const surface = createCanvasWithObject(object);
+    mocks.readEditorDrawingObject.mockReturnValueOnce({
+      id: 'blur-1',
+      kind: 'blur',
+      bounds: { x: 0, y: 0, width: 20, height: 20 },
+      amount: 20,
+    });
+
+    applySelectionToolSettingsToObjects(surface, [object], 'blur', {
+      ...settings,
+      blur: { amount: 2 },
+    });
+
+    expect(JSON.parse(object.sniptaleDrawingJson ?? '{}')).toMatchObject({
+      object: { id: 'blur-1', amount: 2 },
+    });
+    expect(surface.remove).not.toHaveBeenCalled();
+  });
+
   it('preserves selected layer indices and interleaving during a mass update', () => {
     const first = new Rect();
     const between = new Rect();

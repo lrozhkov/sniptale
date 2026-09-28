@@ -29,7 +29,7 @@ export function createDrawingObject(
         width: defaults.arrow.width,
       };
     case 'blur':
-      return { id, kind: 'blur', bounds };
+      return { id, kind: 'blur', bounds, amount: defaults.blur.amount };
     case 'select':
     case 'text':
       return null;

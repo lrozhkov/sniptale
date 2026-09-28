@@ -17,6 +17,7 @@ import {
   ArrowWidthModeOptions,
   ArrowDrawDirectionOption,
   DrawingColorOptions,
+  DrawingBlurStrengthOptions,
   DrawingDeleteOption,
   DrawingDeselectOption,
   DrawingOptionsDivider,
@@ -47,7 +48,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
 > = {
   horizontal: {
     arrow: { height: 48, width: 574 },
-    blur: { height: 48, width: 80 },
+    blur: { height: 48, width: 336 },
     marker: { height: 48, width: 534 },
     pencil: { height: 48, width: 314 },
     shape: { height: 48, width: 668 },
@@ -56,7 +57,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
   },
   vertical: {
     arrow: { height: 386, width: 136 },
-    blur: { height: 80, width: 48 },
+    blur: { height: 174, width: 136 },
     marker: { height: 346, width: 136 },
     pencil: { height: 266, width: 136 },
     shape: { height: 482, width: 136 },
@@ -236,6 +237,7 @@ export function resolveDrawingQuickOptionsTool(
     return 'shape';
   }
   return snapshot.activeTool === 'pencil' ||
+    snapshot.activeTool === 'blur' ||
     snapshot.activeTool === 'marker' ||
     snapshot.activeTool === 'shape' ||
     snapshot.activeTool === 'arrow' ||
@@ -579,6 +581,7 @@ export function ToolbarDrawingOptions(props: {
     );
   }
   if (tool === 'blur') {
+    const selectedBlur = selectedObject?.kind === 'blur' ? selectedObject : null;
     return (
       <ProductToolbarMenu
         compact
@@ -593,8 +596,20 @@ export function ToolbarDrawingOptions(props: {
           data-ui="content.toolbar.drawing-options.blur"
           className={getDrawingOptionsLayoutClass(displayMode)}
         >
-          <DrawingDeleteOption onClick={() => controller.session.deleteSelected()} />
-          <DrawingDeselectOption onClick={() => controller.session.select(null)} />
+          <DrawingBlurStrengthOptions
+            value={selectedBlur?.amount ?? (selectedBlur ? 10 : snapshot.defaults.blur.amount)}
+            onChange={(amount) => {
+              controller.session.setDefaults({ ...snapshot.defaults, blur: { amount } });
+              if (selectedBlur) controller.session.replaceObject({ ...selectedBlur, amount });
+            }}
+          />
+          {selectedBlur ? (
+            <>
+              <DrawingOptionsDivider vertical={displayMode === 'vertical'} />
+              <DrawingDeleteOption onClick={() => controller.session.deleteSelected()} />
+              <DrawingDeselectOption onClick={() => controller.session.select(null)} />
+            </>
+          ) : null}
         </div>
       </ProductToolbarMenu>
     );

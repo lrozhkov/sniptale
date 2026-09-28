@@ -33,6 +33,7 @@ function diffPreferences(
     ...(samePreference(before.marker, after.marker) ? {} : { marker: after.marker }),
     ...(samePreference(before.shape, after.shape) ? {} : { shape: after.shape }),
     ...(samePreference(before.arrow, after.arrow) ? {} : { arrow: after.arrow }),
+    ...(samePreference(before.blur, after.blur) ? {} : { blur: after.blur }),
     ...(samePreference(before.text, after.text) ? {} : { text: after.text }),
   };
 }
@@ -46,12 +47,15 @@ function mergePreferences(
     marker: { ...defaults.marker, ...patch.marker },
     shape: { ...defaults.shape, ...patch.shape },
     arrow: { ...defaults.arrow, ...patch.arrow },
+    blur: { ...defaults.blur, ...patch.blur },
     text: { ...defaults.text, ...patch.text },
   };
 }
 
 function hasPatch(patch: DrawingToolPreferencesPatch): boolean {
-  return Boolean(patch.pencil || patch.marker || patch.shape || patch.arrow || patch.text);
+  return Boolean(
+    patch.pencil || patch.marker || patch.shape || patch.arrow || patch.blur || patch.text
+  );
 }
 
 function removeAcknowledged(
@@ -71,6 +75,7 @@ function removeAcknowledged(
     ...(patch.arrow && !samePreference(patch.arrow, authoritative.arrow)
       ? { arrow: patch.arrow }
       : {}),
+    ...(patch.blur && !samePreference(patch.blur, authoritative.blur) ? { blur: patch.blur } : {}),
     ...(patch.text && !samePreference(patch.text, authoritative.text) ? { text: patch.text } : {}),
   };
 }
@@ -91,6 +96,9 @@ function removeApplied(
       : {}),
     ...(pending.arrow && (!applied.arrow || !samePreference(pending.arrow, applied.arrow))
       ? { arrow: pending.arrow }
+      : {}),
+    ...(pending.blur && (!applied.blur || !samePreference(pending.blur, applied.blur))
+      ? { blur: pending.blur }
       : {}),
     ...(pending.text && (!applied.text || !samePreference(pending.text, applied.text))
       ? { text: pending.text }

@@ -15,6 +15,7 @@ import {
   ArrowWidthModeOptions,
   ArrowDrawDirectionOption,
   DrawingColorOptions,
+  DrawingBlurStrengthOptions,
   DrawingDeleteOption,
   DrawingDeselectOption,
   DrawingOptionsDivider,
@@ -235,6 +236,12 @@ function ToolOptions(props: {
         />
       );
     case 'blur':
+      return (
+        <DrawingBlurStrengthOptions
+          value={props.settings.blur.amount}
+          onChange={(amount) => props.update('blur', { amount })}
+        />
+      );
     case 'selection':
       return null;
   }
@@ -296,9 +303,7 @@ export function EditorDrawingOptions(props: {
       />
       {selected ? (
         <>
-          {props.tool === 'blur' || props.tool === 'selection' ? null : (
-            <DrawingOptionsDivider vertical={false} />
-          )}
+          {props.tool === 'selection' ? null : <DrawingOptionsDivider vertical={false} />}
           <DrawingDeselectOption onClick={props.onClearSelection} />
           <DrawingDeleteOption onClick={props.onDeleteSelection} />
         </>

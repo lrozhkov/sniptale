@@ -128,7 +128,16 @@ function isDrawingObject(value: unknown): value is DrawingObject {
       isPositiveSize(value['width'])
     );
   }
-  if (value['kind'] === 'blur') return isBounds(value['bounds']) && hasValidRotation(value);
+  if (value['kind'] === 'blur')
+    return (
+      isBounds(value['bounds']) &&
+      hasValidRotation(value) &&
+      (value['amount'] === undefined ||
+        (typeof value['amount'] === 'number' &&
+          Number.isFinite(value['amount']) &&
+          value['amount'] >= 0 &&
+          value['amount'] <= 25))
+    );
   if (value['kind'] === 'text') {
     return (
       isBounds(value['bounds']) &&

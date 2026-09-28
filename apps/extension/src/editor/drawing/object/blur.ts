@@ -3,7 +3,7 @@ import { DEFAULT_BLUR_SETTINGS } from '../../../features/highlighter/style/publi
 import type { SourceState } from '../../document/model/source-state';
 import { createBlurObject, updateBlurObject } from '../../objects/annotation/blur/object';
 import type { DrawingObject } from '../../../features/drawing/public';
-import { writeEditorDrawingObject } from './metadata';
+import { readEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 const REMOVED_BLUR_METADATA_KEYS = [
   'sniptaleBlurAmount',
@@ -31,7 +31,7 @@ export function createEditorDrawingBlurObject(args: {
     id: args.drawing.id,
     labelIndex: args.labelIndex,
     left: bounds.x,
-    settings: DEFAULT_BLUR_SETTINGS,
+    settings: { ...DEFAULT_BLUR_SETTINGS, amount: args.drawing.amount ?? 10 },
     source: args.source,
     top: bounds.y,
     width: bounds.width,
@@ -53,6 +53,12 @@ export function createEditorDrawingBlurObject(args: {
 }
 
 export function refreshEditorDrawingBlurObject(object: FabricObject): void {
-  updateBlurObject(object, { settings: DEFAULT_BLUR_SETTINGS });
+  const drawing = readEditorDrawingObject(object);
+  updateBlurObject(object, {
+    settings: {
+      ...DEFAULT_BLUR_SETTINGS,
+      amount: drawing?.kind === 'blur' ? (drawing.amount ?? 10) : 10,
+    },
+  });
   clearLegacyBlurMetadata(object);
 }

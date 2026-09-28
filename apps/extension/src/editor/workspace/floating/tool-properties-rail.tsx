@@ -169,6 +169,7 @@ export function EditorFloatingToolPropertiesRail({
     activeTool === 'marker' ||
     activeTool === 'shape' ||
     activeTool === 'arrow' ||
+    activeTool === 'blur' ||
     activeTool === 'text'
       ? activeTool
       : null;

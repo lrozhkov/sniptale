@@ -22,6 +22,13 @@ describe('shared drawing creation', () => {
     expect(createDrawingObject('text', start, 10, defaults)).toBeNull();
   });
 
+  it('creates blur with the selected strength, strong by default', () => {
+    expect(createDrawingObject('blur', start, 10, defaults)).toMatchObject({ amount: 20 });
+    expect(
+      createDrawingObject('blur', start, 10, { ...defaults, blur: { amount: 2 } })
+    ).toMatchObject({ amount: 2 });
+  });
+
   it('keeps shape-only aspect locking without changing the pointer-down origin', () => {
     const shape = createDrawingObject('shape', start, 10, defaults)!;
     expect(

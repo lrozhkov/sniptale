@@ -71,6 +71,40 @@ function pointer(type: string, x: number, y: number, shiftKey = false) {
   return event;
 }
 
+it('renders the selected blur strength and preserves legacy strength', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    id: 'strong',
+    kind: 'blur',
+    amount: 20,
+    bounds: { x: 0, y: 0, width: 30, height: 30 },
+  });
+  session.commitObject({
+    id: 'legacy',
+    kind: 'blur',
+    bounds: { x: 40, y: 0, width: 30, height: 30 },
+  });
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#ef4444'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  const filters = [...host.querySelectorAll<HTMLElement>('div')]
+    .map((element) => element.style.backdropFilter)
+    .filter(Boolean);
+  expect(filters).toContain('blur(20px)');
+  expect(filters).toContain('blur(10px)');
+  act(() => root.unmount());
+});
+
 it('selects objects through a dragged area and extends the selection with Shift', () => {
   const session = createDrawingSession({ onDocumentCommit: () => true });
   session.commitObject({

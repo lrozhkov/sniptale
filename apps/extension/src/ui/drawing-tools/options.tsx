@@ -16,6 +16,7 @@ import type { ReactNode, RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
+  DRAWING_BLUR_STRENGTHS,
   DRAWING_TEXT_FONT_FAMILIES,
   DRAWING_TEXT_SIZES,
   resolveDrawingTextFontFamily,
@@ -167,6 +168,36 @@ export function MarkerOpacityOptions(props: { value: number; onChange: (value: n
       >
         <Blend aria-hidden size={17} style={{ opacity: value }} />
       </QuickOptionButton>
+    );
+  });
+}
+
+const BLUR_STRENGTH_LABELS = [
+  'content.toolbar.drawingBlurWeak',
+  'content.toolbar.drawingBlurMedium',
+  'content.toolbar.drawingBlurStrong',
+] as const;
+
+export function DrawingBlurStrengthOptions(props: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return DRAWING_BLUR_STRENGTHS.map((amount, index) => {
+    const label = translate(BLUR_STRENGTH_LABELS[index]!);
+    return (
+      <ContentToolbarButton
+        key={amount}
+        type="button"
+        active={props.value === amount}
+        aria-label={`${translate('content.toolbar.drawingBlurStrength')}: ${label}, ${amount}px`}
+        aria-pressed={props.value === amount}
+        title={`${label} · ${amount}px`}
+        dataUi={`content.toolbar.drawing-options.blur.amount-${amount}`}
+        className="!h-7 !min-h-7 !w-auto !min-w-0 shrink-0 !rounded-md !px-2 text-xs whitespace-nowrap"
+        onClick={() => props.onChange(amount)}
+      >
+        {label}
+      </ContentToolbarButton>
     );
   });
 }

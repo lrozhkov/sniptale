@@ -116,6 +116,11 @@ it('anchors current drawing tools and renders their shared options directly', ()
   expect(container.querySelector('[data-ui="drawing-options.blur"]')).not.toBeNull();
 });
 
+it('shows blur settings immediately when the blur tool is selected', () => {
+  renderRail({ activeTool: 'blur', documentController: { compactCommandGroups: [] } });
+  expect(container.querySelector('[data-ui="drawing-options.blur"]')).not.toBeNull();
+});
+
 it('keeps retained step command groups interactive and dismissible', () => {
   renderRail({ activeTool: 'step' });
   const button = container.querySelector<HTMLButtonElement>(

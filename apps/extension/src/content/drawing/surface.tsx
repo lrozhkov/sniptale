@@ -648,7 +648,7 @@ function DrawingBlurLayer(props: {
           top,
           width: bounds.width,
           height: bounds.height,
-          backdropFilter: 'blur(10px)',
+          backdropFilter: `blur(${object.kind === 'blur' ? (object.amount ?? 10) : 10}px)`,
           opacity: props.getObjectOpacity?.(object.id) ?? 1,
           transform: `rotate(${getDrawingObjectRotation(object)}deg)`,
           transformOrigin: 'center',

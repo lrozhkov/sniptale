@@ -54,6 +54,19 @@ function fabricObject(object: DrawingObject) {
 }
 
 describe('editor drawing import boundary', () => {
+  it('accepts saved blur strength and rejects malformed strength', () => {
+    const blur = objects[4]!;
+    if (blur.kind !== 'blur') throw new Error('Expected blur fixture');
+    expect(
+      parseEditorDrawingMetadata(fabricObject({ ...blur, amount: 20 }).sniptaleDrawingJson)
+    ).toMatchObject({ amount: 20 });
+    for (const amount of [-1, 26, '20', null]) {
+      expect(
+        parseEditorDrawingMetadata(JSON.stringify({ version: 1, object: { ...blur, amount } }))
+      ).toBeNull();
+    }
+    expect(parseEditorDrawingMetadata(fabricObject(blur).sniptaleDrawingJson)).toEqual(blur);
+  });
   it('accepts every current shared drawing kind and parses its metadata', () => {
     expect(() =>
       assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: objects.map(fabricObject) }))

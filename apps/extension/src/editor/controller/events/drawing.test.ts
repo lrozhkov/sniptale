@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   state: {
     canvasCropMode: 'crop',
     toolSettings: {
+      blur: { amount: 20 },
       arrow: { drawFromTip: false },
       text: {
         backgroundColor: null,

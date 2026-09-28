@@ -1,5 +1,6 @@
 import {
   DRAWING_ARROW_WIDTHS,
+  DRAWING_BLUR_STRENGTHS,
   DRAWING_MARKER_OPACITIES,
   DRAWING_MARKER_WIDTHS,
   DRAWING_OUTLINE_WIDTHS,
@@ -41,13 +42,14 @@ export function cloneDrawingToolDefaults(defaults: DrawingToolDefaults): Drawing
     marker: { ...defaults.marker },
     shape: { ...defaults.shape },
     arrow: { ...defaults.arrow },
+    blur: { ...defaults.blur },
     text: { ...defaults.text },
   };
 }
 
-function parseDefaults(value: unknown): DrawingToolDefaults | null {
+function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingToolDefaults | null {
   if (!isRecord(value)) return null;
-  const { pencil, marker, shape, arrow, text } = value;
+  const { pencil, marker, shape, arrow, blur, text } = value;
   if (
     !isRecord(pencil) ||
     !isColor(pencil['color']) ||
@@ -71,6 +73,10 @@ function parseDefaults(value: unknown): DrawingToolDefaults | null {
     !(arrow['drawFromTip'] === undefined || typeof arrow['drawFromTip'] === 'boolean') ||
     typeof arrow['dynamicWidth'] !== 'boolean' ||
     !isNumberOption(arrow['width'], DRAWING_ARROW_WIDTHS) ||
+    !(
+      blur === undefined ||
+      (isRecord(blur) && isNumberOption(blur['amount'], DRAWING_BLUR_STRENGTHS))
+    ) ||
     !isRecord(text) ||
     !isColor(text['color']) ||
     !(text['backgroundColor'] === null || isColorWithOptionalAlpha(text['backgroundColor'])) ||
@@ -99,6 +105,8 @@ function parseDefaults(value: unknown): DrawingToolDefaults | null {
       dynamicWidth: arrow['dynamicWidth'],
       width: arrow['width'],
     },
+    blur:
+      blur === undefined ? { ...fallback.blur } : { amount: (blur as { amount: number }).amount },
     text: {
       backgroundColor: text['backgroundColor'],
       color: text['color'],
@@ -118,7 +126,7 @@ export function parseDrawingToolPreferences(
   if (!isRecord(value) || value['schemaVersion'] !== 1) {
     return { defaults: cloneDrawingToolDefaults(fallback), unsafeForWrite: true };
   }
-  const defaults = parseDefaults(value['defaults']);
+  const defaults = parseDefaults(value['defaults'], fallback);
   return defaults
     ? { defaults, unsafeForWrite: false }
     : { defaults: cloneDrawingToolDefaults(fallback), unsafeForWrite: true };

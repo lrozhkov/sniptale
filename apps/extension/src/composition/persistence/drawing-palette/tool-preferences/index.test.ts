@@ -51,6 +51,24 @@ it('restores every tool parameter but has no active-tool field', async () => {
   expect(restored).not.toHaveProperty('activeTool');
 });
 
+it('loads legacy preferences without blur and validates persisted blur levels', async () => {
+  const { blur: _blur, ...legacy } = customized;
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: { schemaVersion: 1, defaults: legacy },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toMatchObject({
+    ...legacy,
+    blur: { amount: 20 },
+  });
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: {
+      schemaVersion: 1,
+      defaults: { ...customized, blur: { amount: 99 } },
+    },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toEqual(fallback);
+});
+
 it('loads older arrow preferences without a direction field and rejects malformed direction', async () => {
   const oldArrow = { ...customized.arrow };
   delete (oldArrow as { drawFromTip?: boolean }).drawFromTip;

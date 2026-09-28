@@ -19,6 +19,7 @@ function getEditorDrawingToolDefaults(): DrawingToolDefaults {
     marker: settings.marker,
     shape: settings.shape,
     arrow: settings.arrow,
+    blur: settings.blur,
     text: settings.text,
   };
 }

@@ -8,9 +8,11 @@ import { syncStepSelectionSettings } from '../sync-step';
 
 function syncDrawingSelection(object: FabricObject): void {
   const drawing = readEditorDrawingObject(object);
-  if (!drawing || drawing.kind === 'blur') return;
+  if (!drawing) return;
   const store = useEditorStore.getState();
-  if (drawing.kind === 'pencil') {
+  if (drawing.kind === 'blur') {
+    store.updateSelectionDrawingToolSettings('blur', { amount: drawing.amount ?? 10 });
+  } else if (drawing.kind === 'pencil') {
     store.updateSelectionDrawingToolSettings('pencil', {
       color: drawing.color,
       width: drawing.width,

@@ -47,6 +47,7 @@ function mergeDrawingToolPreferences(
     marker: { ...current.marker, ...patch.marker },
     shape: { ...current.shape, ...patch.shape },
     arrow: { ...current.arrow, ...patch.arrow },
+    blur: { ...current.blur, ...patch.blur },
     text: { ...current.text, ...patch.text },
   };
 }
