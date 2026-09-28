@@ -65,16 +65,10 @@ function LayerSelectionToggle({
 
 function LayerTriggerContent(props: {
   editableName: ReturnType<typeof useEditableLayerName>;
-  hidden: boolean;
   layer: EditorLayerItem;
 }) {
   return (
-    <span
-      className={cx(
-        'min-w-0 w-full flex-1 overflow-hidden',
-        props.hidden && 'pointer-events-none opacity-0'
-      )}
-    >
+    <span className="min-w-0 w-full flex-1 overflow-hidden">
       <LayerName layer={props.layer} editableName={props.editableName} />
     </span>
   );
@@ -82,17 +76,12 @@ function LayerTriggerContent(props: {
 
 function LayerEditingShell(props: {
   editableName: ReturnType<typeof useEditableLayerName>;
-  hidden: boolean;
   layer: EditorLayerItem;
   triggerClassName: string;
 }) {
   return (
     <div className={cx(props.triggerClassName, 'cursor-default hover:bg-transparent')}>
-      <LayerTriggerContent
-        editableName={props.editableName}
-        hidden={props.hidden}
-        layer={props.layer}
-      />
+      <LayerTriggerContent editableName={props.editableName} layer={props.layer} />
     </div>
   );
 }
@@ -100,7 +89,6 @@ function LayerEditingShell(props: {
 function LayerButtonTrigger(props: {
   dragHandlers: LayerButtonDragHandlers;
   editableName: ReturnType<typeof useEditableLayerName>;
-  hidden: boolean;
   autoNavigateSelectedLayer: boolean;
   isImmutable: boolean;
   layer: EditorLayerItem;
@@ -126,14 +114,10 @@ function LayerButtonTrigger(props: {
           props.editableName.startEditing();
         }
       }}
-      className={cx(props.triggerClassName, props.hidden && 'pointer-events-none')}
+      className={props.triggerClassName}
       title={props.layer.name}
     >
-      <LayerTriggerContent
-        editableName={props.editableName}
-        hidden={props.hidden}
-        layer={props.layer}
-      />
+      <LayerTriggerContent editableName={props.editableName} layer={props.layer} />
     </button>
   );
 }
@@ -141,7 +125,6 @@ function LayerButtonTrigger(props: {
 function LayerTrigger(props: {
   dragHandlers: LayerButtonDragHandlers;
   editableName: ReturnType<typeof useEditableLayerName>;
-  hidden: boolean;
   autoNavigateSelectedLayer: boolean;
   isImmutable: boolean;
   layer: EditorLayerItem;
@@ -156,7 +139,6 @@ function LayerTrigger(props: {
     return (
       <LayerEditingShell
         editableName={props.editableName}
-        hidden={props.hidden}
         layer={props.layer}
         triggerClassName={triggerClassName}
       />
@@ -167,7 +149,6 @@ function LayerTrigger(props: {
     <LayerButtonTrigger
       dragHandlers={props.dragHandlers}
       editableName={props.editableName}
-      hidden={props.hidden}
       autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
       isImmutable={props.isImmutable}
       layer={props.layer}
@@ -186,14 +167,11 @@ function LayerInlineActionsSlot(props: {
   layer: EditorLayerItem;
   onOpenLayerEffects: LayerEffectOpener;
 }) {
-  const hideLayerName = props.expandedActionsVisible && !props.editableName.editingName;
-
   return (
-    <div className="relative min-w-0 w-full overflow-hidden">
+    <div className="flex min-w-0 w-full items-center overflow-hidden">
       <LayerTrigger
         dragHandlers={props.dragHandlers}
         editableName={props.editableName}
-        hidden={hideLayerName}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
         isImmutable={props.isDragDisabled}
         layer={props.layer}

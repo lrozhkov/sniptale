@@ -132,18 +132,17 @@ afterEach(() => {
 });
 
 describe('LayerExpandedActions visibility layout', () => {
-  it('splits the hover label from the vertically centered action row', () => {
+  it('keeps actions beside the layer name without a duplicate hover label', () => {
     const longName = 'A very long imported screenshot layer name';
     renderExpandedActions({ layer: { ...LAYER, name: longName } });
     const menu = container?.querySelector('[data-ui="editor.layers.expanded-actions"]');
     const label = container?.querySelector('[data-ui="editor.layers.expanded-label"]');
     const row = container?.querySelector('[data-ui="editor.layers.expanded-actions-row"]');
 
-    expect(menu?.className).toContain('absolute');
-    expect(label?.textContent).toBe(longName);
-    expect(label?.className).toContain('truncate');
-    expect(row?.className).toContain('-translate-y-1/2');
-    expect(container?.textContent).not.toContain('Image · 1');
+    expect(menu?.className).toContain('shrink-0');
+    expect(menu?.className).not.toContain('absolute');
+    expect(label).toBeNull();
+    expect(row?.className).toContain('items-center');
   });
 
   it('stays hidden while editing or until hover requests it', () => {

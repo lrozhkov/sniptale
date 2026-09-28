@@ -1,5 +1,3 @@
-import type React from 'react';
-import { translate } from '../../../platform/i18n';
 import { EditorInspectorFrameBackgroundFillEditor } from './background';
 import { EditorInspectorFrameBackgroundModeControl } from './placement/background';
 import { EditorInspectorFramePlacementSection } from './placement';
@@ -12,19 +10,6 @@ import {
   EditorInspectorFrameSourceImageEffects,
 } from './source-image';
 import './panel.css';
-
-function FrameFieldGroup(props: { children: React.ReactNode; title?: string }) {
-  return (
-    <div className="space-y-2.5">
-      {props.title ? (
-        <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {props.title}
-        </h3>
-      ) : null}
-      {props.children}
-    </div>
-  );
-}
 
 function sourceImageProps(props: EditorInspectorFramePanelProps) {
   return {
@@ -42,7 +27,7 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
   return (
     <div data-ui="editor.frame-panel" className="min-w-0">
       <div className="space-y-4 px-3 pt-3">
-        <FrameFieldGroup title={translate('editor.scene.backgroundTypeSection')}>
+        <div className="space-y-2.5">
           <EditorInspectorFrameBackgroundModeControl
             frameDraft={props.frameDraft}
             lastFillModeRef={props.lastFillModeRef}
@@ -68,8 +53,8 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
               applyFramePatch={props.applyFramePatch}
             />
           ) : null}
-        </FrameFieldGroup>
-        <FrameFieldGroup>
+        </div>
+        <div className="space-y-2.5">
           <EditorInspectorFramePlacementSection
             hideHeader
             frameDraft={props.frameDraft}
@@ -82,15 +67,12 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
             hideHeader
             setFrameDraft={props.setFrameDraft}
           />
-        </FrameFieldGroup>
+        </div>
         <EditorInspectorFrameSourceImageBasics {...sourceImageProps(props)} />
         <EditorInspectorFrameSourceImageEffects {...sourceImageProps(props)} />
       </div>
       <div data-ui="editor.frame.actions" className="px-3 pb-3 pt-2">
-        <FrameApplyButton
-          onApplyFrame={props.onApplyFrame}
-          {...(props.onCancelFrame === undefined ? {} : { onCancelFrame: props.onCancelFrame })}
-        />
+        <FrameApplyButton onApplyFrame={props.onApplyFrame} />
       </div>
     </div>
   );

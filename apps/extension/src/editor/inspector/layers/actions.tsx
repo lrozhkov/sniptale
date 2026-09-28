@@ -11,14 +11,8 @@ import { LayerMutationButtons } from './mutation-buttons';
 import type { EditorLayerEffectsOpenHandler } from './types';
 
 const LAYER_ACTION_BUTTON_CLASS_NAME = 'h-[26px] w-[26px] shrink-0';
-const expandedActionsClassName =
-  'pointer-events-none absolute inset-y-0 right-0 z-10 min-w-0 max-w-full';
-const expandedActionsLabelClassName =
-  'pointer-events-none absolute right-1.5 top-1/2 max-w-full -translate-y-[calc(100%+3px)] ' +
-  'truncate text-right text-[9px] font-medium leading-[10px] ' +
-  'text-[color:var(--sniptale-color-text-muted)]';
-const expandedActionsRowClassName =
-  'pointer-events-auto absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-0.5';
+const expandedActionsClassName = 'flex min-w-0 shrink-0 items-center pr-1.5';
+const expandedActionsRowClassName = 'flex items-center gap-0.5';
 const DEFAULT_LAYER_EFFECT_BUTTON_TARGETS: Record<
   EditorLayerEffectCategory,
   EditorLayerEffectCommandId | null
@@ -190,9 +184,6 @@ export function LayerExpandedActions(props: {
       onMouseDown={(event) => event.stopPropagation()}
       onClick={(event) => event.stopPropagation()}
     >
-      <span data-ui="editor.layers.expanded-label" className={expandedActionsLabelClassName}>
-        {props.layer.name}
-      </span>
       <div data-ui="editor.layers.expanded-actions-row" className={expandedActionsRowClassName}>
         <LayerEffectButtons
           autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}

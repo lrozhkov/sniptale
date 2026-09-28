@@ -177,3 +177,24 @@ it('offers stacked full-width fields without changing inline consumers', async (
   expect(fields).toHaveLength(4);
   for (const field of fields) expect(field.parentElement?.className).toContain('grid-cols-1');
 });
+
+it('keeps the linked value beside its label and places the full-row control below', async () => {
+  await act(async () =>
+    root.render(
+      <ProductGlassLinkedPaddingFields
+        fieldLayout="full-row"
+        labels={labels}
+        padding={{ top: 4, right: 4, bottom: 4, left: 4 }}
+        onChange={vi.fn()}
+        renderUniformField={() => <input aria-label="Padding range" type="range" />}
+        renderValueField={({ label }) => <input aria-label={label} type="text" />}
+      />
+    )
+  );
+  const fields = container.querySelector('[data-ui="shared.linked-padding-fields"]');
+  expect(fields?.firstElementChild?.querySelector('input[type="text"]')).not.toBeNull();
+  expect(fields?.querySelector('input[type="range"]')?.parentElement).toBe(fields);
+  expect(fields?.querySelector('[data-padding-link="all"]')?.parentElement).toBe(
+    fields?.firstElementChild
+  );
+});

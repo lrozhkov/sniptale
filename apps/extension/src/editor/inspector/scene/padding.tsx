@@ -7,7 +7,7 @@ import {
   ProductGlassLinkedPaddingFields,
   type ProductGlassLinkedPaddingValue,
 } from '@sniptale/ui/product-glass-controls';
-import { NumericRow } from '../../chrome/ui';
+import { CompactRange, NumericRow, NumericValueField } from '../../chrome/ui';
 import { PanelSection } from './shared';
 
 type PaddingHoverSide = keyof ProductGlassLinkedPaddingValue | 'all';
@@ -67,7 +67,7 @@ export function FramePaddingFields(props: {
       onBlurCapture={(event) => setFocusedSide(readPaddingHoverSide(event.relatedTarget))}
     >
       <ProductGlassLinkedPaddingFields
-        fieldLayout="inline"
+        fieldLayout="full-row"
         labels={{
           padding: translate('highlighter.editor.paddingLabel'),
           top: translate('highlighter.editor.paddingTop'),
@@ -79,9 +79,21 @@ export function FramePaddingFields(props: {
         }}
         padding={selectFramePadding(props.frameDraft)}
         onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
-        renderValueField={({ label, onChange, side, value }) => (
+        renderUniformField={({ onChange, value }) => (
+          <CompactRange
+            aria-label={translate('highlighter.editor.paddingLabel')}
+            min={0}
+            max={256}
+            step={1}
+            value={Math.min(256, value)}
+            onChange={(event) => onChange(Number(event.currentTarget.value))}
+            onValueCommit={onChange}
+          />
+        )}
+        renderValueField={({ compact, label, onChange, side, value }) => (
           <div className="min-w-0" data-padding-side={side}>
             <PaddingValue
+              compact={compact}
               label={label}
               value={value}
               onChange={onChange}
@@ -96,6 +108,7 @@ export function FramePaddingFields(props: {
 }
 
 function PaddingValue(props: {
+  compact: boolean;
   label: string;
   value: number;
   onChange: (value: number) => void;
@@ -104,18 +117,31 @@ function PaddingValue(props: {
 }) {
   return (
     <div className="min-w-0" data-padding-hover={props.side}>
-      <NumericRow
-        labelVisible={false}
-        label={props.label}
-        max={4096}
-        min={0}
-        onCommitValue={props.onChange}
-        onPreviewValue={props.onChange}
-        unit="px"
-        value={props.value}
-        scrub={{ min: 0, max: 256, step: 1, value: Math.min(256, props.value) }}
-        revealScrub={props.revealSlider}
-      />
+      {props.compact ? (
+        <NumericValueField
+          className="w-full!"
+          focusAppearance="quiet"
+          label={props.label}
+          max={4096}
+          min={0}
+          onCommitValue={props.onChange}
+          onPreviewValue={props.onChange}
+          unit="px"
+          value={props.value}
+        />
+      ) : (
+        <NumericRow
+          label={props.label}
+          max={4096}
+          min={0}
+          onCommitValue={props.onChange}
+          onPreviewValue={props.onChange}
+          unit="px"
+          value={props.value}
+          scrub={{ min: 0, max: 256, step: 1, value: Math.min(256, props.value) }}
+          revealScrub={props.revealSlider}
+        />
+      )}
     </div>
   );
 }

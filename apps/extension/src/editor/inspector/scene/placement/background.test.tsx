@@ -31,7 +31,7 @@ const FRAME: EditorFrameSettings = {
 };
 const lastFillModeRef: { current: 'color' | 'gradient' } = { current: 'color' };
 
-const SEGMENTED_SELECTOR = "[data-ui='shared.ui.compact-inspector.segmented-row']";
+const SEGMENTED_SELECTOR = "[data-ui='editor.frame.background-mode']";
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -82,6 +82,7 @@ it('exposes color, gradient, and image as independent background modes', async (
   );
 
   expect(segmentedGroup()?.getAttribute('aria-label')).toBe('Background type');
+  expect(segmentedGroup()?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   expect(segmentedButtons().map((button) => button.textContent)).toEqual([
     'Color',
     'Gradient',

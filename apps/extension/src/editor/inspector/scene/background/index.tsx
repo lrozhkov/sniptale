@@ -59,11 +59,11 @@ function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorP
   return (
     <div
       data-ui="editor.frame.gradient-presets"
-      className="grid grid-cols-5 gap-1.5"
+      className="grid grid-cols-3 gap-1.5"
       role="group"
       aria-label={translate('editor.compact.frameBackgroundModeGradient')}
     >
-      {props.gradientPresets.slice(0, 10).map((preset) => {
+      {props.gradientPresets.map((preset) => {
         const active =
           props.frameDraft.backgroundGradientAngle === preset.angle &&
           stops[0]?.color === preset.from &&

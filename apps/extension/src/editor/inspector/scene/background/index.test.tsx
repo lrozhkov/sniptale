@@ -171,7 +171,13 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   await renderUi(
     <EditorInspectorFrameBackgroundFillEditor
       frameDraft={{ ...FRAME, backgroundMode: 'gradient' }}
-      gradientPresets={[{ id: 'preset-1', label: 'Preset 1', from: '#000', to: '#fff', angle: 45 }]}
+      gradientPresets={Array.from({ length: 6 }, (_, index) => ({
+        id: `preset-${index}`,
+        label: `Preset ${index}`,
+        from: '#000',
+        to: '#fff',
+        angle: 45,
+      }))}
       frameBackgroundPalette={['#111111']}
       frameBackgroundImageFitOptions={[{ value: 'cover', label: 'Cover' }]}
       recentColors={['#222222']}
@@ -191,9 +197,9 @@ it('renders the gradient branch and forwards gradient actions', async () => {
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
   ).toBe('linear');
   expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
-  expect(
-    container?.querySelectorAll('[data-ui="editor.frame.gradient-presets"] button')
-  ).toHaveLength(1);
+  const presets = container?.querySelector('[data-ui="editor.frame.gradient-presets"]');
+  expect(presets?.className).toContain('grid-cols-3');
+  expect(presets?.querySelectorAll('button')).toHaveLength(6);
   await act(async () => {
     container
       ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.gradient-presets"] button')

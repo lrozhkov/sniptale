@@ -125,9 +125,6 @@ function SourceImageShadowSection(args: {
   const { props, settings } = args;
   return (
     <section className="space-y-2.5" data-ui="editor.frame.source-glow">
-      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {translate('editor.scene.glowLabel')}
-      </h3>
       <SourceImageRangeControl
         label={translate('editor.scene.glowSize')}
         max={100}
@@ -135,31 +132,16 @@ function SourceImageShadowSection(args: {
         valueText={`${settings.shadow}%`}
         onChange={(shadow) => patchSourceImage(props, { shadow })}
       />
-      <EditorInspectorDetails
-        preferenceId="frame:source-image-shadow"
-        level="group"
-        label={translate('editor.scene.glowAdvanced')}
-      >
-        <div className="space-y-3">
-          <ColorField
-            title={translate('editor.scene.glowLabel')}
-            label={translate('editor.compact.shadowColor')}
-            value={settings.shadowColor ?? settings.strokeColor}
-            recentColors={props.recentColors}
-            palette={props.shapeStrokePalette ?? []}
-            onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-            onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-            onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor })}
-          />
-          <SourceImageRangeControl
-            label={translate('editor.compact.shadowBlur')}
-            max={128}
-            value={settings.shadowBlur ?? 12}
-            valueText={`${Math.round(settings.shadowBlur ?? 12)}px`}
-            onChange={(shadowBlur) => patchSourceImage(props, { shadowBlur })}
-          />
-        </div>
-      </EditorInspectorDetails>
+      <ColorField
+        title={translate('editor.compact.shadowColor')}
+        label={translate('editor.compact.shadowColor')}
+        value={settings.shadowColor ?? settings.strokeColor}
+        recentColors={props.recentColors}
+        palette={props.shapeStrokePalette ?? []}
+        onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
+        onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
+        onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor })}
+      />
     </section>
   );
 }
@@ -171,9 +153,6 @@ function SourceImageBorderSection(args: {
   const { props, settings } = args;
   return (
     <section className="space-y-2.5" data-ui="editor.frame.source-border">
-      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {translate('editor.compact.blurBorder')}
-      </h3>
       <SourceImageRangeControl
         label={translate('editor.compact.blurStrokeWidth')}
         max={24}

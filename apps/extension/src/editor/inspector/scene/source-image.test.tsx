@@ -158,7 +158,7 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   );
 });
 
-it('gives shadow and border separate collapsible groups', async () => {
+it('shows shadow controls directly and keeps only border details collapsible', async () => {
   await renderUi(
     <EditorInspectorFrameSourceImageFields
       applyFramePatch={vi.fn()}
@@ -168,22 +168,24 @@ it('gives shadow and border separate collapsible groups', async () => {
   );
 
   const groups = Array.from(container?.querySelectorAll('details') ?? []);
-  expect(groups).toHaveLength(2);
+  expect(groups).toHaveLength(1);
   expect(groups.map((group) => group.querySelector('summary')?.textContent)).toEqual([
-    translate('editor.scene.glowAdvanced'),
     translate('editor.scene.borderAdvanced'),
   ]);
-  expect(container?.textContent).toContain(translate('editor.scene.glowLabel'));
+  expect(container?.textContent).not.toContain(translate('editor.scene.glowLabel'));
+  expect(container?.querySelector('[data-testid="color"]')).not.toBeNull();
+  expect(
+    container?.querySelector('[aria-label="' + translate('editor.compact.shadowBlur') + '"]')
+  ).toBeNull();
   expect(
     container?.querySelector('[aria-label="' + translate('editor.compact.shadowAngle') + '"]')
   ).toBeNull();
   expect(
     container?.querySelector('[aria-label="' + translate('editor.compact.shadowDistance') + '"]')
   ).toBeNull();
-  expect(groups.every((group) => !group.open)).toBe(true);
+  expect(groups[0]?.open).toBe(false);
   await act(async () => {
     groups[0]?.setAttribute('open', '');
   });
   expect(groups[0]?.open).toBe(true);
-  expect(groups[1]?.open).toBe(false);
 });

@@ -141,15 +141,19 @@ it('uses compact row shell tokens without changing the hover action structure', 
   expect(container?.querySelector('[data-testid="layer-expanded-actions"]')).not.toBeNull();
 });
 
-it('hides the layer title while inline actions are visible', () => {
+it('keeps the truncated layer title beside visible inline actions', () => {
   renderRow();
   const row = container?.firstElementChild as HTMLDivElement | null;
   const trigger = container?.querySelector('button[title="Layer 1"]') as HTMLButtonElement | null;
 
   act(() => row?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
 
-  expect(trigger?.className).toContain('pointer-events-none');
+  expect(trigger?.className).not.toContain('pointer-events-none');
+  expect(trigger?.querySelector('span')?.className).toContain('overflow-hidden');
   expect(trigger?.textContent).toContain('Layer 1');
+  expect(
+    container?.querySelector('[data-testid="layer-expanded-actions"]')?.getAttribute('data-visible')
+  ).toBe('true');
 });
 
 it('keeps the trigger non-button while editing so rename can own focus', () => {

@@ -102,15 +102,10 @@ vi.mock('./padding', async (importOriginal) => ({
 }));
 
 vi.mock('./apply-button', () => ({
-  FrameApplyButton: (props: { onApplyFrame: () => void; onCancelFrame?: () => void }) => {
+  FrameApplyButton: (props: { onApplyFrame: () => void }) => {
     applyButton(props);
     return (
       <div data-testid="apply-button">
-        {props.onCancelFrame ? (
-          <button type="button" data-testid="cancel-frame" onClick={props.onCancelFrame}>
-            cancel-frame
-          </button>
-        ) : null}
         <button type="button" data-testid="apply-frame" onClick={props.onApplyFrame}>
           apply-frame
         </button>
@@ -217,9 +212,6 @@ async function clickFramePanelActions() {
       ?.querySelector('[data-testid="apply-button"]')
       ?.querySelector('[data-testid="apply-frame"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    container
-      ?.querySelector('[data-testid="cancel-frame"]')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
 
@@ -251,7 +243,7 @@ it('wires the inspector scene panel sections and actions', async () => {
   expect(setBackgroundMode).toHaveBeenCalledWith('color');
   expect(setFrameDraft).toHaveBeenCalledTimes(1);
   expect(onApplyFrame).toHaveBeenCalledTimes(1);
-  expect(onCancelFrame).toHaveBeenCalledTimes(1);
+  expect(onCancelFrame).not.toHaveBeenCalled();
 });
 
 it('renders scene controls without the template wrapper when no state is provided', async () => {

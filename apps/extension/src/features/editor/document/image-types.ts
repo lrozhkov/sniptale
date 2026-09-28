@@ -21,7 +21,7 @@ export const DEFAULT_EDITOR_IMAGE_SETTINGS: EditorImageSettings = {
   radius: 0,
   shadow: 0,
   shadowAngle: 90,
-  shadowBlur: 12,
+  shadowBlur: 0,
   shadowColor: '#475569',
   shadowDistance: 4,
   strokeColor: '#475569',
@@ -31,7 +31,7 @@ export const DEFAULT_EDITOR_IMAGE_SETTINGS: EditorImageSettings = {
 };
 
 export function resolveEditorSourceImageGlowBlur(settings: EditorImageSettings): number {
-  const blur = Math.max(0, settings.shadowBlur ?? 12);
+  const blur = Math.max(0, settings.shadowBlur ?? 0);
   const size = Math.min(100, Math.max(0, settings.shadow));
   return blur + size * 0.75;
 }
@@ -79,7 +79,7 @@ export function normalizeEditorImageSettings(
     radius: normalizeNumber(settings?.radius, fallback.radius),
     shadow: normalizeNumber(settings?.shadow, fallback.shadow),
     shadowAngle: normalizeNumber(settings?.shadowAngle, fallback.shadowAngle ?? 90),
-    shadowBlur: normalizeNumber(settings?.shadowBlur, fallback.shadowBlur ?? 12),
+    shadowBlur: normalizeNumber(settings?.shadowBlur, 0),
     shadowColor: normalizeColor(
       settings?.shadowColor,
       fallback.shadowColor ?? fallback.strokeColor

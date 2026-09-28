@@ -18,8 +18,8 @@ export const editorSceneMessages = defineMessageSource({
     en: 'Glow',
   },
   glowSize: {
-    ru: 'Размер свечения',
-    en: 'Glow size',
+    ru: 'Размер тени',
+    en: 'Shadow size',
   },
   glowAdvanced: {
     ru: 'Параметры свечения',

@@ -32,7 +32,7 @@ function arePaddingValuesEqual(
 
 export interface ProductGlassLinkedPaddingFieldsProps {
   /** Stack labels above full-width controls in narrow inspectors. */
-  fieldLayout?: 'inline' | 'stacked';
+  fieldLayout?: 'inline' | 'stacked' | 'full-row';
   labels: Record<PaddingSide, string> & {
     padding: string;
     link: string;
@@ -86,11 +86,12 @@ function ExpandedAxisGroup(props: {
 }) {
   const sides = AXIS_SIDES[props.axis];
   const visibleSides = props.linked ? [sides[0]] : sides;
+  const fullRow = props.shared.fieldLayout === 'full-row';
   return (
     <div
       className={[
         'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
-        'border border-[var(--sniptale-color-border-soft)] px-2 py-1',
+        fullRow ? 'py-0.5' : 'border border-[var(--sniptale-color-border-soft)] px-2 py-1',
       ].join(' ')}
       data-padding-axis={props.axis}
     >
@@ -98,23 +99,28 @@ function ExpandedAxisGroup(props: {
         {visibleSides.map((side) => (
           <div
             className={
-              props.shared.fieldLayout === 'stacked'
+              fullRow || props.shared.fieldLayout === 'stacked'
                 ? 'grid min-w-0 grid-cols-1 gap-1'
                 : 'grid grid-cols-[minmax(5rem,0.7fr)_minmax(0,1fr)] items-center gap-2'
             }
             key={side}
           >
-            <span
-              data-padding-hover={side}
-              className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]"
-            >
-              {props.linked
-                ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
-                : props.shared.labels[side]}
-            </span>
+            {fullRow ? null : (
+              <span
+                data-padding-hover={side}
+                className="truncate text-[11px] text-[var(--sniptale-color-text-secondary)]"
+              >
+                {props.linked
+                  ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
+                  : props.shared.labels[side]}
+              </span>
+            )}
             {props.shared.renderValueField({
               compact: false,
-              label: props.shared.labels[side],
+              label:
+                fullRow && props.linked
+                  ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
+                  : props.shared.labels[side],
               onChange: (value) => props.onSideChange(side, value),
               side,
               value: props.padding[side],
@@ -203,13 +209,24 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
   return (
     <div className="grid gap-1.5" data-ui="shared.linked-padding-fields">
       <div className="flex min-w-0 items-center gap-1.5">
-        <div className="min-w-0 flex-1 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
+        <div
+          className={[
+            'min-w-0 flex-1 font-semibold text-[var(--sniptale-color-text-secondary)]',
+            props.fieldLayout === 'full-row' ? 'text-[12px]' : 'text-[11px]',
+          ].join(' ')}
+        >
           <span className="truncate" data-padding-hover="all">
             {props.labels.padding}
           </span>
         </div>
-        {!expanded && !props.renderUniformField ? (
-          <div className="w-[4.75rem] rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-0.5">
+        {!expanded && (!props.renderUniformField || props.fieldLayout === 'full-row') ? (
+          <div
+            className={
+              props.fieldLayout === 'full-row'
+                ? 'w-[4.75rem]'
+                : 'w-[4.75rem] rounded-[9px] border border-[var(--sniptale-color-border-soft)] p-0.5'
+            }
+          >
             {props.renderValueField({
               compact: true,
               label: props.labels.top,
