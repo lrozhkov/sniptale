@@ -403,7 +403,7 @@ test('popup mode keeps one icon while expanding a hovered option', async ({ page
   );
 });
 
-test('video mode descriptions keep one line throughout the width transition', async ({
+test('video mode descriptions stay fully readable throughout the width transition', async ({
   page,
   hostOrigin,
 }) => {
@@ -431,6 +431,27 @@ test('video mode descriptions keep one line throughout the width transition', as
   });
   await expect(screen).toHaveAttribute('aria-pressed', 'true');
   expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1);
+  const textLayout = await screen.evaluate((button) => {
+    const description = button.lastElementChild?.lastElementChild?.lastElementChild;
+    if (!(description instanceof HTMLElement)) throw new Error('Mode description is unavailable');
+    return {
+      height: description.clientHeight,
+      scrollHeight: description.scrollHeight,
+      width: description.clientWidth,
+      scrollWidth: description.scrollWidth,
+      textOverflow: getComputedStyle(description).textOverflow,
+      right: description.getBoundingClientRect().right,
+      buttonRight: button.getBoundingClientRect().right,
+      bottom: description.getBoundingClientRect().bottom,
+      buttonBottom: button.getBoundingClientRect().bottom,
+    };
+  });
+  expect(textLayout.height).toBeGreaterThan(10);
+  expect(textLayout.scrollHeight).toBeLessThanOrEqual(textLayout.height + 1);
+  expect(textLayout.scrollWidth).toBeLessThanOrEqual(textLayout.width + 1);
+  expect(textLayout.textOverflow).not.toBe('ellipsis');
+  expect(textLayout.right).toBeLessThan(textLayout.buttonRight - 4);
+  expect(textLayout.bottom).toBeLessThan(textLayout.buttonBottom - 4);
 });
 
 test('top navigation fills hovered icons in the direction of the underline', async ({
