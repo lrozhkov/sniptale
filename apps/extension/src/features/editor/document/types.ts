@@ -174,6 +174,7 @@ export interface EditorHistoryState {
 
 export interface EditorWorkspaceSettings {
   backgroundColor: string;
+  hideSelectionWhileDragging: boolean;
   gridEnabled: boolean;
   gridSnapEnabled: boolean;
   magnetEnabled: boolean;

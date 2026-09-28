@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import { Control } from 'fabric';
+import { useEditorStore } from '../../../../state/useEditorStore';
 import { patchEdgeControl } from '../../../document/interaction-border-controls';
 import {
   disposeEditorSelectionChrome,
@@ -19,6 +20,111 @@ it('keeps selection controls bounded in screen pixels across editor zoom', () =>
     borderWidth: 1.35,
     guideWidth: 1,
   });
+});
+
+it('fades controls for a selected shape during a pointer gesture and restores them on release', () => {
+  useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.appendChild(upperCanvasEl);
+  upperCanvasEl.style.cursor = 'move';
+  upperCanvasEl.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+  const object = {
+    sniptaleType: 'shape',
+    hasBorders: false,
+    hasControls: false,
+    controls: {},
+    getCoords: () => [],
+  };
+  const listeners = new Map<string, (event?: any) => void>();
+  const canvas = {
+    upperCanvasEl,
+    getWidth: () => 100,
+    getHeight: () => 100,
+    getActiveObject: () => object,
+    setCursor: (cursor: string) => {
+      upperCanvasEl.style.cursor = cursor;
+    },
+    on: (name: string, handler: (event?: any) => void) => {
+      listeners.set(name, handler);
+      return () => listeners.delete(name);
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+  );
+  const controls = container.querySelector(
+    '[data-ui="editor.canvas.selection-controls"]'
+  ) as SVGGElement;
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  expect(controls.style.opacity).toBe('0');
+  expect(controls.style.transition).toContain('150ms');
+  expect(upperCanvasEl.style.cursor).toBe('none');
+  canvas.setCursor('move');
+  expect(upperCanvasEl.style.cursor).toBe('none');
+
+  canvas.setCursor('grab');
+
+  listeners.get('mouse:up')?.();
+  expect(controls.style.opacity).toBe('1');
+  expect(controls.style.transition).toContain('50ms');
+  expect(upperCanvasEl.style.cursor).toBe('grab');
+
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  window.dispatchEvent(new Event('blur'));
+  expect(controls.style.opacity).toBe('1');
+  disposeEditorSelectionChrome(canvas as never);
+});
+
+it('leaves text selection visible and respects the workspace switch', () => {
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.appendChild(upperCanvasEl);
+  upperCanvasEl.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+  const object = {
+    sniptaleType: 'text',
+    hasBorders: false,
+    hasControls: false,
+    controls: {},
+    getCoords: () => [],
+  };
+  const listeners = new Map<string, (event?: any) => void>();
+  const canvas = {
+    upperCanvasEl,
+    getWidth: () => 100,
+    getHeight: () => 100,
+    getActiveObject: () => object,
+    setCursor: (cursor: string) => {
+      upperCanvasEl.style.cursor = cursor;
+    },
+    on: (name: string, handler: (event?: any) => void) => {
+      listeners.set(name, handler);
+      return () => listeners.delete(name);
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+  );
+  const controls = container.querySelector(
+    '[data-ui="editor.canvas.selection-controls"]'
+  ) as SVGGElement;
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  expect(controls.style.opacity).not.toBe('0');
+  object.sniptaleType = 'shape';
+  useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: false });
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  expect(controls.style.opacity).not.toBe('0');
+  expect(upperCanvasEl.style.cursor).not.toBe('none');
+  listeners.get('mouse:up')?.();
+  useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  canvas.setCursor('move');
+  expect(controls.style.opacity).toBe('0');
+  expect(upperCanvasEl.style.cursor).toBe('none');
+  disposeEditorSelectionChrome(canvas as never);
+  expect(upperCanvasEl.style.cursor).toBe('move');
 });
 
 it('renders selection and magnet as sharp vectors while preserving the Fabric hit surface', () => {

@@ -204,6 +204,7 @@ it('builds workspace color commands with a separate save-default action', () => 
   expect(workspaceCommands.map((command) => command.id)).toEqual([
     'workspace-background',
     'workspace-presets',
+    'workspace-selection-visibility',
   ]);
   expect(workspaceControl.onPreviewChange).toEqual(expect.any(Function));
 

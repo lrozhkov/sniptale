@@ -2,6 +2,7 @@ import { translate } from '../../../platform/i18n';
 import { ColorField, cx } from '../../chrome/ui';
 import { WorkspaceDefaultAction } from '../workspace-color/default-action';
 import { PanelSection } from './shared';
+import { SelectionVisibilitySetting } from './selection-visibility';
 
 export function WorkspacePanelBody(props: {
   applyWorkspaceColor: (color: string) => Promise<void> | void;
@@ -24,6 +25,7 @@ export function WorkspacePanelBody(props: {
         matchesDefault={props.workspaceColorMatchesDefault}
         onSaveAsDefault={props.saveWorkspaceColorAsDefault}
       />
+      <SelectionVisibilitySetting />
     </div>
   );
 }

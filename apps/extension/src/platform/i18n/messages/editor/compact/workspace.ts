@@ -9,6 +9,14 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     ru: 'Цвет рабочей зоны',
     en: 'Workspace color',
   },
+  hideSelectionWhileDragging: {
+    ru: 'Скрывать рамку при перетаскивании',
+    en: 'Hide selection frame while dragging',
+  },
+  selectionVisibilitySaveFailed: {
+    ru: 'Не удалось сохранить настройку',
+    en: 'Could not save this setting',
+  },
   workspaceBacking: {
     ru: 'Фон рабочей зоны',
     en: 'Workspace background',

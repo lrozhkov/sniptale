@@ -65,6 +65,7 @@ it('keeps magnet snapping active while selected objects move outside select mode
     getCropGuide: () => null,
     getWorkspace: () => ({
       backgroundColor: '#ffffff',
+      hideSelectionWhileDragging: true,
       gridColor: '#d1d5db',
       gridEnabled: false,
       gridSize: 24,

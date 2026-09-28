@@ -50,20 +50,52 @@ function registerDocumentDefaultsTests() {
     useEditorStore.getState().updateWorkspaceDefaults(DEFAULT_EDITOR_WORKSPACE_DEFAULTS);
     useEditorStore.getState().resetDocumentState();
 
-    useEditorStore.getState().hydrateWorkspaceDefaults({ backgroundColor: '#111111' });
-    expect(useEditorStore.getState().workspaceDefaults).toEqual({ backgroundColor: '#111111' });
+    useEditorStore
+      .getState()
+      .hydrateWorkspaceDefaults({ backgroundColor: '#111111', hideSelectionWhileDragging: true });
+    expect(useEditorStore.getState().workspaceDefaults).toEqual({
+      backgroundColor: '#111111',
+      hideSelectionWhileDragging: true,
+    });
     expect(useEditorStore.getState().workspace.backgroundColor).toBe('#111111');
 
     useEditorStore.getState().updateWorkspace({ backgroundColor: '#222222' });
-    useEditorStore.getState().hydrateWorkspaceDefaults({ backgroundColor: '#333333' });
+    useEditorStore
+      .getState()
+      .hydrateWorkspaceDefaults({ backgroundColor: '#333333', hideSelectionWhileDragging: true });
 
-    expect(useEditorStore.getState().workspaceDefaults).toEqual({ backgroundColor: '#333333' });
+    expect(useEditorStore.getState().workspaceDefaults).toEqual({
+      backgroundColor: '#333333',
+      hideSelectionWhileDragging: true,
+    });
     expect(useEditorStore.getState().workspace.backgroundColor).toBe('#222222');
 
     useEditorStore.getState().resetDocumentState();
 
     expect(useEditorStore.getState().workspace.backgroundColor).toBe('#333333');
     expect(useEditorStore.getState().workspaceBackgroundEdited).toBe(false);
+  });
+
+  it('keeps a local visibility choice when an older startup read resolves later', () => {
+    useEditorStore.getState().updateWorkspaceDefaults(DEFAULT_EDITOR_WORKSPACE_DEFAULTS);
+    useEditorStore.getState().resetDocumentState();
+    useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: false });
+    useEditorStore.getState().hydrateWorkspaceDefaults({
+      backgroundColor: '#123456',
+      hideSelectionWhileDragging: true,
+    });
+
+    expect(useEditorStore.getState().workspace.hideSelectionWhileDragging).toBe(false);
+    expect(useEditorStore.getState().workspaceDefaults.hideSelectionWhileDragging).toBe(true);
+    expect(useEditorStore.getState().workspace.backgroundColor).toBe('#123456');
+    expect(useEditorStore.getState().workspaceSelectionVisibilityEdited).toBe(true);
+    useEditorStore.getState().updateWorkspaceDefaults({
+      backgroundColor: '#123456',
+      hideSelectionWhileDragging: false,
+    });
+    useEditorStore.getState().resetDocumentState();
+    expect(useEditorStore.getState().workspace.hideSelectionWhileDragging).toBe(false);
+    useEditorStore.setState({ workspaceSelectionVisibilityEdited: false });
   });
 
   it('keeps synchronized drawing defaults during later page-default hydration', () => {

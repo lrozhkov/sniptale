@@ -85,16 +85,25 @@ function createWorkspaceDefaultsHydrator(
 ): EditorStoreToolActions['hydrateWorkspaceDefaults'] {
   return (defaults) =>
     set((state) => {
-      const workspaceDefaults = { ...state.workspaceDefaults, ...defaults };
+      const workspaceDefaults = {
+        ...state.workspaceDefaults,
+        ...defaults,
+        hideSelectionWhileDragging: state.workspaceSelectionVisibilityEdited
+          ? state.workspaceDefaults.hideSelectionWhileDragging
+          : defaults.hideSelectionWhileDragging,
+      };
 
       return {
         workspaceDefaults,
-        workspace: state.workspaceBackgroundEdited
-          ? state.workspace
-          : {
-              ...state.workspace,
-              backgroundColor: workspaceDefaults.backgroundColor,
-            },
+        workspace: {
+          ...state.workspace,
+          backgroundColor: state.workspaceBackgroundEdited
+            ? state.workspace.backgroundColor
+            : workspaceDefaults.backgroundColor,
+          hideSelectionWhileDragging: state.workspaceSelectionVisibilityEdited
+            ? state.workspace.hideSelectionWhileDragging
+            : workspaceDefaults.hideSelectionWhileDragging,
+        },
       };
     });
 }
@@ -125,6 +134,9 @@ export function createEditorStoreLayoutActions(set: EditorStoreSet): EditorStore
       set((state) => ({
         workspace: createObjectPatch<EditorWorkspaceSettings>(state.workspace, patch),
         ...(patch.backgroundColor === undefined ? {} : { workspaceBackgroundEdited: true }),
+        ...(patch.hideSelectionWhileDragging === undefined
+          ? {}
+          : { workspaceSelectionVisibilityEdited: true }),
       })),
     updateViewport: (patch) =>
       set((state) => ({

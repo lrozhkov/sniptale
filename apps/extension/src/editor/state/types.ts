@@ -83,6 +83,7 @@ interface EditorDocumentState {
   workspace: EditorWorkspaceSettings;
   workspaceDefaults: EditorWorkspaceDefaults;
   workspaceBackgroundEdited: boolean;
+  workspaceSelectionVisibilityEdited: boolean;
 }
 
 interface EditorUiActions {

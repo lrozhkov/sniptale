@@ -12,6 +12,7 @@ import {
 } from '../../workspace-color/compact-workspace-content';
 import { EditorTechnicalDataPicker } from '../../technical-data-picker';
 import { cx } from '../../../chrome/ui';
+import { SelectionVisibilitySetting } from '../../environment/selection-visibility';
 
 function buildGridPaletteButtons(params: InspectorCommandParams) {
   return params.gridColorPalette.map((color) => (
@@ -113,6 +114,13 @@ export function buildWorkspaceCompactCommands(params: InspectorCommandParams): C
           </div>
         </CompactCommandField>
       ),
+    },
+    {
+      id: 'workspace-selection-visibility',
+      icon: 'preset',
+      title: translate('editor.compact.hideSelectionWhileDragging'),
+      trigger: <EyeOff size={15} strokeWidth={2} />,
+      content: <SelectionVisibilitySetting />,
     },
   ];
 }

@@ -44,9 +44,34 @@ it('loads valid defaults and falls back from malformed storage payloads', async 
       sniptale_editor_workspace_defaults: 'bad',
     });
 
-  await expect(loadEditorWorkspaceDefaults()).resolves.toEqual({ backgroundColor: '#abcdef' });
+  await expect(loadEditorWorkspaceDefaults()).resolves.toEqual({
+    backgroundColor: '#abcdef',
+    hideSelectionWhileDragging: true,
+  });
   await expect(loadEditorWorkspaceDefaults()).resolves.toEqual(DEFAULT_EDITOR_WORKSPACE_DEFAULTS);
   await expect(loadEditorWorkspaceDefaults()).resolves.toEqual(DEFAULT_EDITOR_WORKSPACE_DEFAULTS);
+});
+
+it('preserves an explicit visibility choice and rejects malformed values', async () => {
+  browserStorageLocalGetMock
+    .mockResolvedValueOnce({
+      sniptale_editor_workspace_defaults: {
+        backgroundColor: '#ABCDEF',
+        hideSelectionWhileDragging: false,
+      },
+    })
+    .mockResolvedValueOnce({
+      sniptale_editor_workspace_defaults: {
+        backgroundColor: '#ABCDEF',
+        hideSelectionWhileDragging: 'false',
+      },
+    });
+  await expect(loadEditorWorkspaceDefaults()).resolves.toMatchObject({
+    hideSelectionWhileDragging: false,
+  });
+  await expect(loadEditorWorkspaceDefaults()).resolves.toMatchObject({
+    hideSelectionWhileDragging: true,
+  });
 });
 
 it('persists patched defaults and rejects failed writes', async () => {
@@ -56,9 +81,13 @@ it('persists patched defaults and rejects failed writes', async () => {
 
   await expect(patchEditorWorkspaceDefaults({ backgroundColor: '#111111' })).resolves.toEqual({
     backgroundColor: '#111111',
+    hideSelectionWhileDragging: true,
   });
   expect(browserStorageLocalSetMock).toHaveBeenCalledWith({
-    sniptale_editor_workspace_defaults: { backgroundColor: '#111111' },
+    sniptale_editor_workspace_defaults: {
+      backgroundColor: '#111111',
+      hideSelectionWhileDragging: true,
+    },
   });
 
   browserStorageLocalSetMock.mockRejectedValueOnce(new Error('write failed'));
@@ -95,6 +124,9 @@ it('serializes default writes so older updates cannot finish after newer writes'
 
   expect(browserStorageLocalSetMock).toHaveBeenCalledTimes(2);
   releaseWrites.shift()?.();
-  await expect(second).resolves.toEqual({ backgroundColor: '#222222' });
+  await expect(second).resolves.toEqual({
+    backgroundColor: '#222222',
+    hideSelectionWhileDragging: true,
+  });
   expect(storedColor).toBe('#222222');
 });

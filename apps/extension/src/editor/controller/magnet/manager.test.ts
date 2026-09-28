@@ -117,6 +117,7 @@ function createManagerHarness(options: {
     getCropGuide: () => state.cropGuide,
     getWorkspace: () => ({
       backgroundColor: '#ffffff',
+      hideSelectionWhileDragging: true,
       gridColor: '#d1d5db',
       gridEnabled: false,
       gridSize: 24,

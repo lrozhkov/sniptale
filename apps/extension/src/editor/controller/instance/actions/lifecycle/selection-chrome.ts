@@ -1,6 +1,7 @@
 import type { Canvas, Control, FabricObject } from 'fabric';
 import type { EditorMagnetManager } from '../../../magnet';
 import { isEditorHiddenEdgeControl } from '../../../document/interaction-border-controls';
+import { mountSelectionVisibility } from './selection-visibility';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const CORNERS = ['tl', 'tr', 'br', 'bl'];
@@ -39,7 +40,7 @@ function screenScale(canvas: Canvas): number {
   return width > 0 && displayedWidth > 0 ? displayedWidth / width : 1;
 }
 
-function appendSelectionBorder(svg: SVGSVGElement, object: FabricObject, zoom: number): void {
+function appendSelectionBorder(svg: SVGElement, object: FabricObject, zoom: number): void {
   const corners = object.getCoords();
   if (!object.hasBorders || corners.length !== 4) return;
   const [a, b, c, d, offsetX, offsetY] = object.canvas?.viewportTransform ?? [1, 0, 0, 1, 0, 0];
@@ -101,7 +102,7 @@ function updateControlHitGeometry(
 }
 
 function appendSelectionControl(
-  svg: SVGSVGElement,
+  svg: SVGElement,
   object: FabricObject,
   key: string,
   point: { x: number; y: number },
@@ -146,7 +147,7 @@ function appendSelectionControl(
 }
 
 function appendSelection(
-  svg: SVGSVGElement,
+  svg: SVGElement,
   object: FabricObject,
   zoom: number,
   touchedControls: Set<Control>
@@ -217,6 +218,9 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   });
   container.appendChild(svg);
   Reflect.set(canvas, 'skipControlsDrawing', true);
+  const selection = svgElement('g', {});
+  selection.setAttribute('data-ui', 'editor.canvas.selection-controls');
+  const disposeVisibility = mountSelectionVisibility(canvas, selection);
   const touchedControls = new Set<Control>();
   const render = (event?: { ctx: CanvasRenderingContext2D }) => {
     if (event && event.ctx !== canvas.getContext()) return;
@@ -225,17 +229,18 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     if (width <= 0 || height <= 0) return;
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
     const zoom = screenScale(canvas);
-    svg.replaceChildren();
+    selection.replaceChildren();
     const activeObject = canvas.getActiveObject();
-    if (activeObject) appendSelection(svg, activeObject, zoom, touchedControls);
+    if (activeObject) appendSelection(selection, activeObject, zoom, touchedControls);
     const guides = svgElement('g', {
       transform: `matrix(${(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]).join(' ')})`,
     });
     appendGuides(guides, magnet, zoom * (canvas.viewportTransform?.[0] ?? 1));
-    svg.appendChild(guides);
+    svg.replaceChildren(selection, guides);
   };
   const unsubscribe = canvas.on('after:render', render);
   mountedChrome.set(canvas, () => {
+    disposeVisibility();
     unsubscribe();
     svg.remove();
     for (const control of touchedControls) {

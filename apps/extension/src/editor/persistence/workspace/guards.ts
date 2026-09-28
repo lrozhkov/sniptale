@@ -6,10 +6,12 @@ import {
 
 export interface EditorWorkspaceDefaults {
   backgroundColor: string;
+  hideSelectionWhileDragging: boolean;
 }
 
 export const DEFAULT_EDITOR_WORKSPACE_DEFAULTS: EditorWorkspaceDefaults = {
   backgroundColor: DEFAULT_EDITOR_WORKSPACE_SETTINGS.backgroundColor,
+  hideSelectionWhileDragging: DEFAULT_EDITOR_WORKSPACE_SETTINGS.hideSelectionWhileDragging,
 };
 
 function isEditorWorkspaceColor(value: unknown): value is string {
@@ -25,5 +27,9 @@ export function parseStoredEditorWorkspaceDefaults(value: unknown): EditorWorksp
     backgroundColor: isEditorWorkspaceColor(value['backgroundColor'])
       ? value['backgroundColor'].toLowerCase()
       : DEFAULT_EDITOR_WORKSPACE_DEFAULTS.backgroundColor,
+    hideSelectionWhileDragging:
+      typeof value['hideSelectionWhileDragging'] === 'boolean'
+        ? value['hideSelectionWhileDragging']
+        : DEFAULT_EDITOR_WORKSPACE_DEFAULTS.hideSelectionWhileDragging,
   };
 }

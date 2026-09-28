@@ -80,6 +80,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   workspace: DEFAULT_EDITOR_WORKSPACE_SETTINGS,
   workspaceDefaults: DEFAULT_EDITOR_WORKSPACE_DEFAULTS,
   workspaceBackgroundEdited: false,
+  workspaceSelectionVisibilityEdited: false,
   ...createEditorStoreActions(set, {
     initialSelection,
     initialHistory,

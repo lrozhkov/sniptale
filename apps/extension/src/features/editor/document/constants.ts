@@ -80,6 +80,7 @@ export function normalizeBrowserFrameState(
 
 export const DEFAULT_EDITOR_WORKSPACE_SETTINGS: EditorWorkspaceSettings = {
   backgroundColor: DEFAULT_COLOR_WORKSPACE,
+  hideSelectionWhileDragging: true,
   gridEnabled: false,
   gridSnapEnabled: false,
   magnetEnabled: false,

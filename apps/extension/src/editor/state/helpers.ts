@@ -215,6 +215,7 @@ function createWorkspaceSettingsFromDefaults(
   return {
     ...DEFAULT_EDITOR_WORKSPACE_SETTINGS,
     backgroundColor: defaults.backgroundColor,
+    hideSelectionWhileDragging: defaults.hideSelectionWhileDragging,
   };
 }
 
