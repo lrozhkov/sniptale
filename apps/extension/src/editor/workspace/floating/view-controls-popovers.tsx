@@ -3,6 +3,7 @@ import { buildGridCompactCommands } from '../../inspector/compact/inspector/work
 import type { InspectorCommandParams } from '../../inspector/compact/inspector/command-types';
 import { CompactWorkspaceColorPanel } from '../../inspector/workspace-color/compact-workspace-content';
 import { translate } from '../../../platform/i18n';
+import { SelectionVisibilitySetting } from '../../inspector/environment/selection-visibility';
 import { renderFloatingToolbarCommandBody } from './canvas-toolbar-command-groups';
 
 type FloatingWorkspacePopoverController = Omit<InspectorCommandParams, 'hasImage'> &
@@ -32,14 +33,15 @@ export function CompactWorkspacePopoverContent({
     <div
       className={[
         'sniptale-inspector-surface editor-inspector-surface',
-        'max-h-[calc(100dvh-5rem)] max-[720px]:max-h-[calc(100dvh-9rem)]',
-        'overflow-y-auto overscroll-contain',
+        'max-h-[calc(100dvh-6.5rem)] max-[720px]:max-h-[calc(100dvh-10.5rem)]',
+        'overflow-y-auto overscroll-contain pb-3',
       ].join(' ')}
     >
       <section aria-label={translate('editor.toolbar.viewSettings')}>
         <div className="space-y-3">
           <CompactWorkspaceColorPanel params={params} />
           <div className="space-y-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
+            <SelectionVisibilitySetting />
             {commands.map((command) => (
               <div key={command.id}>
                 {command.active === undefined ? (

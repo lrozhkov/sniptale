@@ -94,13 +94,18 @@ it('shows workspace settings directly and passes save state through', () => {
   expect(container.textContent).toContain('#f2f4f7');
   expect(container.textContent).toContain('Could not save');
   expect(
+    container.querySelector('[data-ui="editor.workspace.selection-visibility"]')
+  ).not.toBeNull();
+  expect(
     Array.from(container.querySelectorAll('button')).find(
       (button) => button.textContent === 'Save default'
     )?.disabled
   ).toBe(true);
-  const scrollArea = container.querySelector('[class*="overflow-y-auto"]');
-  expect(scrollArea?.className).toContain('max-h-[calc(100dvh-5rem)]');
-  expect(scrollArea?.className).toContain('max-[720px]:max-h-[calc(100dvh-9rem)]');
+  const workspaceSurface = container.querySelector('.editor-inspector-surface');
+  expect(workspaceSurface?.className).toContain('overflow-y-auto');
+  expect(workspaceSurface?.className).toContain('pb-3');
+  expect(workspaceSurface?.className).toContain('max-h-[calc(100dvh-6.5rem)]');
+  expect(workspaceSurface?.className).toContain('max-[720px]:max-h-[calc(100dvh-10.5rem)]');
   act(() => {
     Array.from(container?.querySelectorAll('button') ?? [])
       .find((button) => button.getAttribute('aria-label') === 'Show grid')

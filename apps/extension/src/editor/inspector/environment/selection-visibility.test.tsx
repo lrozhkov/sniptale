@@ -23,20 +23,22 @@ it('persists the visibility switch and restores it if storage rejects the change
   const root = createRoot(host);
   useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
   await act(async () => root.render(<SelectionVisibilitySetting />));
-  const checkbox = host.querySelector('input[type="checkbox"]') as HTMLInputElement;
-  expect(checkbox.checked).toBe(true);
+  const toggle = host.querySelector(
+    '[data-ui="editor.workspace.selection-visibility"] button'
+  ) as HTMLButtonElement;
+  expect(toggle.getAttribute('aria-pressed')).toBe('true');
 
   patchDefaults.mockResolvedValueOnce({
     backgroundColor: '#ffffff',
     hideSelectionWhileDragging: false,
   });
-  await act(async () => checkbox.click());
+  await act(async () => toggle.click());
   expect(patchDefaults).toHaveBeenCalledWith({ hideSelectionWhileDragging: false });
-  expect(checkbox.checked).toBe(false);
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
 
   patchDefaults.mockRejectedValueOnce(new Error('storage unavailable'));
-  await act(async () => checkbox.click());
-  expect(checkbox.checked).toBe(false);
+  await act(async () => toggle.click());
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
 
   await act(async () => root.unmount());

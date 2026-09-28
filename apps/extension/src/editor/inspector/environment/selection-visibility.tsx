@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
 import { patchEditorWorkspaceDefaults } from '../../persistence/workspace';
 import { useEditorStore } from '../../state/useEditorStore';
@@ -28,17 +29,19 @@ export function SelectionVisibilitySetting() {
   };
 
   return (
-    <div className="space-y-1">
-      <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
-        <span>{translate('editor.compact.hideSelectionWhileDragging')}</span>
-        <input
-          type="checkbox"
-          checked={enabled}
+    <div data-ui="editor.workspace.selection-visibility" className="space-y-1">
+      <div data-inspector-toggle className="flex min-h-8 items-center justify-between gap-3">
+        <span className="min-w-0 text-xs">
+          {translate('editor.compact.hideSelectionWhileDragging')}
+        </span>
+        <ProductGlassSwitch
+          aria-label={translate('editor.compact.hideSelectionWhileDragging')}
+          aria-pressed={enabled}
+          on={enabled}
           disabled={pending}
-          onChange={() => void toggle()}
-          className="accent-[color:var(--sniptale-color-accent)]"
+          onClick={() => void toggle()}
         />
-      </label>
+      </div>
       {error && (
         <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
           {translate('editor.compact.selectionVisibilitySaveFailed')}
