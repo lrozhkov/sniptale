@@ -29,6 +29,48 @@ it('routes arrow drawings to endpoint controls without a bounding box', () => {
   expect(object.lockRotation).toBe(true);
 });
 
+it('keeps Fabric control hit coordinates in sync when arrow and text controls change on canvas', () => {
+  const drawings = [
+    createEditorDrawingFabricObject(
+      {
+        color: '#f97316',
+        dynamicWidth: false,
+        end: { x: 120, y: 60 },
+        id: 'arrow-controls',
+        kind: 'arrow',
+        start: { x: 10, y: 10 },
+        width: 8,
+      },
+      1
+    ),
+    createEditorDrawingFabricObject(
+      {
+        bounds: { height: 80, width: 140, x: 10, y: 20 },
+        color: '#111111',
+        backgroundColor: null,
+        fontFamily: 'sans',
+        fontSize: 24,
+        id: 'text-controls',
+        kind: 'text',
+        text: 'Hello',
+      },
+      2
+    ),
+  ];
+
+  for (const object of drawings) {
+    const canvas = new Canvas(document.createElement('canvas'));
+    canvas.add(object);
+    canvas.setActiveObject(object);
+    object.setCoords();
+    applyEditorDrawingInteractionControls(object);
+
+    expect(() => object.findControl(new Point(0, 0))).not.toThrow();
+    expect(Object.keys(object.oCoords)).toEqual(Object.keys(object.controls));
+    canvas.dispose();
+  }
+});
+
 it('targets a diagonal arrow near its visible stroke without claiming empty bounding-box corners', () => {
   const canvas = new Canvas(document.createElement('canvas'), { targetFindTolerance: 5 });
   canvas.setDimensions({ width: 240, height: 220 });

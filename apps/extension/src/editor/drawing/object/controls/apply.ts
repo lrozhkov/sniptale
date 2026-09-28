@@ -16,10 +16,12 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
     object.controls = createDrawingArrowControls();
     syncDrawingArrowControlAnchors(object, drawing);
     object.set({ hasBorders: false, lockRotation: true, perPixelTargetFind: true });
+    object.setCoords();
     return;
   }
   object.controls =
     drawing.kind === 'text' ? createDrawingTextControls(object) : createDrawingBoxControls(object);
+  object.setCoords();
 }
 
 export function applyEditorDrawingActiveSelectionChrome(object: FabricObject | undefined): void {
