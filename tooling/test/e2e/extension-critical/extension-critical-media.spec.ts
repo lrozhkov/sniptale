@@ -902,6 +902,48 @@ test('editor exact browser-frame harness stays visually stable', async ({ page, 
   );
 });
 
+test('editor layers stop below the map navigator with a matching toolbar gap', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    editorBootstrapPayload: createExactBrowserFrameHarnessPayload(),
+  });
+  await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
+  const resizeHandle = page.locator('[data-ui="editor.floating.layers.resize-handle"]');
+  await expect(resizeHandle).toBeVisible();
+  await resizeHandle.evaluate((handle) => {
+    handle.setPointerCapture = () => undefined;
+    handle.hasPointerCapture = () => false;
+    handle.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientY: 400 })
+    );
+    window.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 0 }));
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
+  });
+
+  const layersPanel = page.locator('[data-ui="editor.floating.layers-panel"]');
+  await expect
+    .poll(async () =>
+      Number.parseFloat(await layersPanel.evaluate((element) => element.style.height))
+    )
+    .toBeGreaterThan(400);
+  const closedTop = (await layersPanel.boundingBox())!.y;
+  await page.locator('[data-ui="editor.floating.view-controls.map"]').click();
+  const mapPopover = page.locator('[data-ui="editor.floating.view-controls.popover.map"]');
+  await expect(mapPopover).toBeVisible();
+  const toolbar = (await page.locator('[data-ui="editor.floating.view-controls"]').boundingBox())!;
+  const map = (await mapPopover.boundingBox())!;
+  const openTop = (await layersPanel.boundingBox())!.y;
+  expect(Math.abs(openTop - closedTop)).toBeLessThanOrEqual(1);
+  const topGap = map.y - (toolbar.y + toolbar.height);
+  const bottomGap = openTop - (map.y + map.height);
+  expect(Math.abs(topGap - bottomGap)).toBeLessThanOrEqual(1);
+});
+
 test('editor frame utility opens from the floating layers navigation', async ({
   page,
   hostOrigin,

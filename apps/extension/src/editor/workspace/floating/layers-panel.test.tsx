@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useEditorStore } from '../../state/useEditorStore';
 import { EditorFloatingLayersPanel } from './layers-panel';
 
 const mocks = vi.hoisted(() => ({
@@ -37,6 +38,8 @@ vi.mock('../../inspector/sidebar-expanded-content/helpers', () => ({
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let toolbar: HTMLDivElement | null = null;
+const initialViewport = useEditorStore.getState().viewport;
 
 const onHeightRatioChangeMock = vi.fn();
 
@@ -94,7 +97,37 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  toolbar?.remove();
+  toolbar = null;
+  useEditorStore.setState({ viewport: initialViewport });
   vi.unstubAllGlobals();
+});
+
+it('stops at the map navigator boundary whether the navigator is open or closed', () => {
+  toolbar = document.createElement('div');
+  toolbar.dataset['ui'] = 'editor.floating.view-controls';
+  toolbar.getBoundingClientRect = vi.fn(() => ({ width: 240, bottom: 55 }) as DOMRect);
+  document.body.appendChild(toolbar);
+  useEditorStore.setState({
+    viewport: { ...initialViewport, canvasWidth: 1920, canvasHeight: 1080 },
+  });
+
+  renderPanel({ heightRatio: 1 });
+  const panel = container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]');
+  expect(panel?.style.height).toBe('495px');
+
+  const openMap = document.createElement('div');
+  openMap.dataset['ui'] = 'editor.floating.view-controls.popover.map';
+  toolbar.appendChild(openMap);
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(panel?.style.height).toBe('495px');
+
+  act(() => {
+    useEditorStore.setState({
+      viewport: { ...initialViewport, canvasWidth: 1080, canvasHeight: 1920 },
+    });
+  });
+  expect(panel?.style.height).toBe('479px');
 });
 
 it('renders resizable expanded layers panel with the current layers content', () => {
