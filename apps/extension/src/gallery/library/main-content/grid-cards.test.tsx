@@ -426,40 +426,6 @@ it('does not present a stale video-project thumbnail as actively updating', () =
   expect(container?.textContent).not.toContain(translate('gallery.app.updatingPreview'));
 });
 
-it('dims a stale media thumbnail and centers the preview update status on its frame', () => {
-  const item = createMediaItem({
-    id: 'stale-image',
-    filename: 'stale.png',
-    presentationRevision: 1,
-    workspaceRevision: 2,
-  });
-
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={[item]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
-        gridWidth={400}
-        onPreviewOpen={vi.fn()}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-        viewMode="large-grid"
-        visibleItems={[item]}
-      />
-    );
-  });
-
-  const overlay = container?.querySelector<HTMLElement>(
-    '[data-ui="gallery.grid.preview-updating"]'
-  );
-  expect(overlay?.textContent).toContain(translate('gallery.app.updatingPreview'));
-  expect(overlay?.className).toContain('absolute inset-0');
-  expect(overlay?.parentElement?.dataset['ui']).toBe('gallery.grid.thumbnail-viewport');
-  expect(container?.querySelector('[data-ui="gallery.large.details"]')?.textContent).not.toContain(
-    translate('gallery.app.updatingPreview')
-  );
-});
-
 function expectCompactGridPointerCursors(
   previewButton: HTMLButtonElement,
   selectionButton: HTMLButtonElement | undefined

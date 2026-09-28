@@ -29,6 +29,9 @@ const mocks = vi.hoisted(() => ({
   autosaveActivate: vi.fn(),
   autosaveRebindAggregate: vi.fn(),
   autosaveLastWriteError: null as unknown,
+  autosavePresentationError: false,
+  autosavePresentationRetryBlocked: false,
+  autosaveRetryPresentation: vi.fn(async () => undefined),
   autosaveEnabled: true,
   autosaveSetEnabled: vi.fn((enabled: boolean) => {
     mocks.autosaveEnabled = enabled;
@@ -90,6 +93,9 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
       setEnabled: mocks.autosaveSetEnabled,
       getDurableRevision: vi.fn(() => 1),
       getLastWriteError: vi.fn(() => mocks.autosaveLastWriteError),
+      hasPresentationError: vi.fn(() => mocks.autosavePresentationError),
+      isPresentationRetryBlocked: vi.fn(() => mocks.autosavePresentationRetryBlocked),
+      retryPresentation: mocks.autosaveRetryPresentation,
     },
     clearSelection: mocks.clearSelection,
     closeDocument: vi.fn(),
@@ -195,6 +201,8 @@ beforeEach(() => {
   mocks.embed.onApply = null;
   mocks.embed.onClose = null;
   mocks.autosaveLastWriteError = null;
+  mocks.autosavePresentationError = false;
+  mocks.autosavePresentationRetryBlocked = false;
   mocks.autosaveEnabled = true;
   mocks.getMediaLibraryEntry.mockResolvedValue({
     lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },

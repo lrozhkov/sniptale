@@ -61,6 +61,14 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Обновляем превью…',
     en: 'Updating preview…',
   },
+  previewUnavailable: {
+    ru: 'Превью недоступно',
+    en: 'Preview unavailable',
+  },
+  openEditorToRetryPreview: {
+    ru: 'Открыть редактор для повтора превью',
+    en: 'Open editor to retry preview',
+  },
   storageTitle: {
     ru: 'Хранилище',
     en: 'Storage',

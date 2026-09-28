@@ -1,5 +1,6 @@
 import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library/index.library.ts';
+import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import { restoreImageAggregateOriginal } from '../../../composition/persistence/image-aggregates';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
 import { createImageEditorController, type ImageEditorController } from '../../controller';
@@ -77,6 +78,32 @@ async function openRestoredEditorAsset(
     pageTitle: restoreSource.sourceTitle,
     sourceFaviconUrl: restoreSource.sourceFaviconUrl,
   });
+}
+
+async function openRestoredEditorDraft(
+  restoreSource: Extract<
+    Awaited<ReturnType<typeof resolveEditorPageRestoreSource>>,
+    { kind: 'draft' }
+  >,
+  aggregateId: string,
+  runtime: EditorPageSessionRuntime,
+  services: EditorPageServices,
+  bootstrapRevision: number
+): Promise<void> {
+  runtime.setPageTitle(restoreSource.entry.sourceTitle ?? '');
+  await services.controller.loadDocument(restoreSource.entry.document);
+  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+  useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
+
+  const durableRevision = services.autosaveService.getDurableRevision();
+  if (durableRevision === null) return;
+  const presentation = await getAggregatePresentation({ id: aggregateId, kind: 'image' }).catch(
+    () => null
+  );
+  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+  if (presentation?.presentationRevision !== durableRevision) {
+    void services.autosaveService.retryPresentation().catch(() => undefined);
+  }
 }
 
 export function resolveEditorPageSessionSeed() {
@@ -214,11 +241,7 @@ export async function bootstrapEditorPageSession(
   }
 
   if (restoreSource.kind === 'draft') {
-    runtime.setPageTitle(restoreSource.entry.sourceTitle ?? '');
-    await services.controller.loadDocument(restoreSource.entry.document);
-    if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
-      useEditorStore.getState().setCapturedAt(restoreSource.capturedAt);
-    }
+    await openRestoredEditorDraft(restoreSource, aggregateId, runtime, services, bootstrapRevision);
     return;
   }
 

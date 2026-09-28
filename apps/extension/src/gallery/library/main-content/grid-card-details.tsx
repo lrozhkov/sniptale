@@ -10,6 +10,49 @@ interface GalleryCardDetailsProps {
   onPreviewOpen: (item: GalleryItem) => void;
 }
 
+export function isGalleryPreviewUnavailable(item: GalleryItem): boolean {
+  return (
+    isGalleryMediaItem(item) &&
+    item.source.kind === 'screenshot' &&
+    item.workspaceRevision !== undefined &&
+    item.presentationRevision !== undefined &&
+    item.presentationRevision !== item.workspaceRevision
+  );
+}
+
+export function GalleryPreviewRecovery(props: { onOpen?: () => void }) {
+  return (
+    <div
+      className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-2
+        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_75%,transparent)]"
+      data-ui="gallery.preview-unavailable"
+    >
+      <span
+        className="rounded-[var(--sniptale-radius-sm)] border
+          border-[var(--sniptale-color-border-soft)]
+          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_88%,transparent)]
+          px-2.5 py-1.5 text-xs font-medium text-[var(--sniptale-color-text-primary)] shadow-sm"
+      >
+        {translate('gallery.app.previewUnavailable')}
+      </span>
+      {props.onOpen ? (
+        <button
+          type="button"
+          className="rounded-[var(--sniptale-radius-sm)] border
+          border-[var(--sniptale-color-border-strong)]
+          bg-[var(--sniptale-color-surface-panel)] p-1 text-xs
+          text-[var(--sniptale-color-text-primary)]
+          focus-visible:outline-none focus-visible:ring-2
+          focus-visible:ring-[var(--sniptale-color-focus-ring)]"
+          onClick={props.onOpen}
+        >
+          {translate('gallery.app.openEditorToRetryPreview')}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 const FILENAME_DISTINGUISHING_TAIL_LENGTH = 12;
 
 function splitFilenameForDisplay(filename: string) {
@@ -98,7 +141,9 @@ function getGallerySourcePresentation(item: GalleryItem) {
   };
 }
 
-export function GalleryListDetails(props: GalleryCardDetailsProps) {
+export function GalleryListDetails(
+  props: GalleryCardDetailsProps & { previewUnavailable?: boolean; onRetryPreview?: () => void }
+) {
   const tagsLabel = props.item.tags.join(', ');
   const dateLabel = formatDate(props.item.createdAt);
   const source = getGallerySourcePresentation(props.item);
@@ -125,19 +170,35 @@ export function GalleryListDetails(props: GalleryCardDetailsProps) {
       >
         {dateLabel}
       </div>
-      <button
-        type="button"
-        onClick={() => props.onPreviewOpen(props.item)}
-        className="min-w-0 text-left"
-        title={props.item.filename}
-        aria-label={props.item.filename}
-        role="cell"
-      >
-        <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-          <GalleryFilenameLabel filename={props.item.filename} />
-        </div>
-        <GalleryRecordingGroupLabel item={props.item} />
-      </button>
+      <div className="min-w-0" role="cell">
+        <button
+          type="button"
+          onClick={() => props.onPreviewOpen(props.item)}
+          className="block min-w-0 text-left"
+          title={props.item.filename}
+          aria-label={props.item.filename}
+        >
+          <div className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+            <GalleryFilenameLabel filename={props.item.filename} />
+          </div>
+          <GalleryRecordingGroupLabel item={props.item} />
+        </button>
+        {props.previewUnavailable ? (
+          <div className="flex items-center gap-2 text-xs">
+            <span role="status">{translate('gallery.app.previewUnavailable')}</span>
+            {props.onRetryPreview ? (
+              <button
+                type="button"
+                onClick={props.onRetryPreview}
+                className="font-semibold text-[var(--sniptale-color-accent-emphasis)] underline
+              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]"
+              >
+                {translate('gallery.app.openEditorToRetryPreview')}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
       <div
         className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
         title={tagsLabel || undefined}

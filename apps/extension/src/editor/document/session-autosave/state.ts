@@ -12,6 +12,7 @@ export interface ActiveEditorSessionContext {
 
 export type EditorSessionAutosaveState = {
   activeContext: ActiveEditorSessionContext | null;
+  contextGeneration: number;
   enabled: boolean;
   hasUnsavedChanges: boolean;
   autosaveRevision: number;
@@ -19,6 +20,9 @@ export type EditorSessionAutosaveState = {
   pendingTimer: number;
   presentationTimer: number;
   lastWriteError: unknown | null;
+  presentationError: boolean;
+  presentationRetryBlocked: boolean;
+  presentationRetryPromise: Promise<void> | null;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
   writeChain: Promise<void>;
@@ -27,6 +31,7 @@ export type EditorSessionAutosaveState = {
 export function createAutosaveState(): EditorSessionAutosaveState {
   return {
     activeContext: null,
+    contextGeneration: 0,
     enabled: true,
     hasUnsavedChanges: false,
     autosaveRevision: 0,
@@ -34,6 +39,9 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     pendingTimer: 0,
     presentationTimer: 0,
     lastWriteError: null,
+    presentationError: false,
+    presentationRetryBlocked: false,
+    presentationRetryPromise: null,
     documentAssetsByRuntimeUrl: new Map(),
     releaseHydratedDocument: null,
     writeChain: Promise.resolve(),

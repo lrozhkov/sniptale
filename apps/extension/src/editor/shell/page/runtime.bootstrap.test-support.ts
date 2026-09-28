@@ -24,6 +24,8 @@ export function createEditorPageAutosaveService() {
     saveNow: vi.fn(async (produceDocument: () => unknown) => {
       produceDocument();
     }),
+    getDurableRevision: vi.fn((): number | null => null),
+    retryPresentation: vi.fn(async () => undefined),
     updateContext: vi.fn(),
   };
 }

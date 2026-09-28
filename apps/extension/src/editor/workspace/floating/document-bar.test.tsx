@@ -5,6 +5,34 @@ import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
 import type { EditorFloatingDocumentController } from './document-bar';
+
+it('shows a retry action when preview generation fails after the workspace was saved', async () => {
+  mocks.autosavePresentationError = true;
+  storeState.value.saveState = 'error';
+  renderDocumentBar(createProps());
+  await act(async () => Promise.resolve());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+    translate('editor.documentActions.previewErrorDescription')
+  );
+  const retry = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')
+  ).find((button) => button.textContent === translate('editor.documentActions.retryPreview'));
+  expect(retry).toBeDefined();
+  await act(async () => retry?.click());
+  expect(mocks.autosaveRetryPresentation).toHaveBeenCalledOnce();
+});
+
+it('explains how to make a dirty document safe for preview retry', async () => {
+  mocks.autosavePresentationError = true;
+  mocks.autosavePresentationRetryBlocked = true;
+  mocks.autosaveEnabled = false;
+  storeState.value.saveState = 'error';
+  renderDocumentBar(createProps());
+  await act(async () => Promise.resolve());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+    translate('editor.documentActions.previewRequiresSavedDocument')
+  );
+});
 import {
   container,
   mocks,

@@ -25,8 +25,12 @@ export function activateAutosaveContext(
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
+  state.presentationError = false;
+  state.presentationRetryBlocked = false;
   state.hasUnsavedChanges = false;
   state.activeContext = context;
+  state.contextGeneration += 1;
+  state.presentationRetryPromise = null;
   if (!options.preserveHydratedDocument) state.enabled = true;
   useEditorStore.getState().setSessionId(context.aggregateId);
 }
@@ -93,8 +97,12 @@ export async function discardAutosaveDraft(
   state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
+  state.presentationError = false;
+  state.presentationRetryBlocked = false;
   state.hasUnsavedChanges = false;
   state.activeContext = null;
+  state.contextGeneration += 1;
+  state.presentationRetryPromise = null;
   state.enabled = true;
   useEditorStore.getState().setSessionId(null);
   setEditorSaveState('idle');
@@ -108,4 +116,6 @@ export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.activeContext = null;
+  state.contextGeneration += 1;
+  state.presentationRetryPromise = null;
 }

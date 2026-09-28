@@ -272,6 +272,18 @@ function useGalleryLibrarySubscriptions({
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const reconcile = () => {
+      if (document.visibilityState === 'visible') void refresh();
+    };
+    window.addEventListener('focus', reconcile);
+    document.addEventListener('visibilitychange', reconcile);
+    return () => {
+      window.removeEventListener('focus', reconcile);
+      document.removeEventListener('visibilitychange', reconcile);
+    };
+  }, [refresh]);
+
   useEffect(
     () => subscribeToMediaHubEvents(createMediaHubEventHandler(onBanner, refresh)),
     [onBanner, refresh]

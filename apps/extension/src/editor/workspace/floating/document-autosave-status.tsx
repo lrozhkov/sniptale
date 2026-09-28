@@ -15,6 +15,8 @@ export function DocumentAutosaveStatus() {
   const saveState = useEditorStore((state) => state.saveState);
   const [enabled, setEnabled] = useState(() => service?.isEnabled() ?? true);
   const conflict = service?.getLastWriteError() instanceof StaleImageWorkspaceError;
+  const presentationError = service?.hasPresentationError() ?? false;
+  const presentationRetryBlocked = service?.isPresentationRetryBlocked() ?? false;
   const state = conflict
     ? 'conflict'
     : saveState === 'error'
@@ -52,6 +54,16 @@ export function DocumentAutosaveStatus() {
               {translate('editor.documentActions.reloadLatest')}
             </ProductActionButton>
           </>
+        ) : presentationError ? (
+          <ProductActionButton
+            compact
+            tone="primary"
+            disabled={saveState === 'saving'}
+            aria-busy={saveState === 'saving'}
+            onClick={() => void service?.retryPresentation().catch(() => undefined)}
+          >
+            {translate('editor.documentActions.retryPreview')}
+          </ProductActionButton>
         ) : null
       }
       labels={{
@@ -63,8 +75,18 @@ export function DocumentAutosaveStatus() {
         dirty: translate('common.states.dirty'),
         saving: translate('common.states.saving'),
         saved: translate('common.states.saved'),
-        error: translate('editor.documentActions.saveErrorTitle'),
-        errorDescription: translate('editor.documentActions.saveErrorDescription'),
+        error: translate(
+          presentationError
+            ? 'gallery.app.previewUnavailable'
+            : 'editor.documentActions.saveErrorTitle'
+        ),
+        errorDescription: translate(
+          presentationError
+            ? presentationRetryBlocked
+              ? 'editor.documentActions.previewRequiresSavedDocument'
+              : 'editor.documentActions.previewErrorDescription'
+            : 'editor.documentActions.saveErrorDescription'
+        ),
         conflict: translate('editor.documentActions.conflictDescription'),
         close: translate('common.actions.close'),
       }}

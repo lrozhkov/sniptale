@@ -15,6 +15,7 @@ import {
   saveEditorSessionSnapshot,
   setEditorSaveState,
 } from './persistence';
+import { retryImagePresentation } from './presentation';
 import {
   clearPendingAutosaveTimer,
   createAutosaveState,
@@ -40,6 +41,9 @@ export interface EditorSessionAutosaveService {
   discardDraft: (aggregateId?: string | null) => Promise<void>;
   getDurableRevision: () => number | null;
   getLastWriteError: () => unknown | null;
+  hasPresentationError: () => boolean;
+  isPresentationRetryBlocked: () => boolean;
+  retryPresentation: () => Promise<void>;
   dispose: () => void;
 }
 
@@ -73,6 +77,9 @@ function createEditorSessionAutosaveActions(
     discardDraft: (aggregateId) => discardAutosaveDraft(state, aggregateId),
     getDurableRevision: () => state.activeContext?.durableRevision ?? null,
     getLastWriteError: () => state.lastWriteError,
+    hasPresentationError: () => state.presentationError,
+    isPresentationRetryBlocked: () => state.presentationRetryBlocked,
+    retryPresentation: () => retryImagePresentation(state),
     dispose: () => disposeAutosaveState(state),
   };
 }

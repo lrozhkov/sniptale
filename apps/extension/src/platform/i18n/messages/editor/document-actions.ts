@@ -69,6 +69,18 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'Последние правки не сохранены. Не закрывайте вкладку. Скачайте изображение через панель, чтобы сохранить результат.',
     en: 'Your latest edits have not been saved. Keep this tab open. Download the image from the toolbar to keep your work.',
   },
+  previewErrorDescription: {
+    ru: 'Не удалось обновить превью. Сохранённый документ не затронут.',
+    en: 'Could not update the preview. Your saved document is safe.',
+  },
+  previewRequiresSavedDocument: {
+    ru: 'Сначала сохраните правки или дождитесь окончания сохранения. Если автосохранение выключено, включите его или отмените несохранённые правки. Затем повторите обновление превью.',
+    en: 'Save your edits or wait for saving to finish. If autosave is off, enable it or discard unsaved edits. Then retry the preview.',
+  },
+  retryPreview: {
+    ru: 'Повторить превью',
+    en: 'Retry preview',
+  },
   reloadLatest: {
     ru: 'Загрузить актуальную версию',
     en: 'Reload latest',

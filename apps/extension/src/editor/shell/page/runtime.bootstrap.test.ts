@@ -6,6 +6,7 @@ const {
   waitForEditorControllerCanvasMock,
   getMediaLibraryEntryMock,
   restoreImageAggregateOriginalMock,
+  getAggregatePresentationMock,
 } = vi.hoisted(() => ({
   ensureEditorPageAggregateIdMock: vi.fn(),
   readEditorPageLocationStateMock: vi.fn(),
@@ -13,6 +14,14 @@ const {
   waitForEditorControllerCanvasMock: vi.fn(),
   getMediaLibraryEntryMock: vi.fn(),
   restoreImageAggregateOriginalMock: vi.fn(),
+  getAggregatePresentationMock: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/aggregate-presentations')
+  >()),
+  getAggregatePresentation: getAggregatePresentationMock,
 }));
 
 vi.mock(
@@ -165,6 +174,28 @@ async function verifiesDraftRestore() {
   expect(useEditorStore.getState().capturedAt).toBe(222);
 }
 
+async function verifiesDraftPreviewRetryAfterHydration() {
+  const controller = createEditorPageController();
+  const autosaveService = createEditorPageAutosaveService();
+  const runtime = createEditorPageRuntime();
+  autosaveService.getDurableRevision.mockReturnValue(4);
+  getAggregatePresentationMock.mockResolvedValue({ presentationRevision: 3 });
+  resolveEditorPageRestoreSourceMock.mockResolvedValue({
+    kind: 'draft',
+    entry: { document: { version: 2 }, sourceTitle: 'Draft' },
+    capturedAt: 1,
+  });
+  await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
+  expect(autosaveService.retryPresentation).toHaveBeenCalledOnce();
+  expect(controller.loadDocument.mock.invocationCallOrder[0]).toBeLessThan(
+    getAggregatePresentationMock.mock.invocationCallOrder[0]!
+  );
+  expect(controller.loadDocument.mock.invocationCallOrder[0]).toBeLessThan(
+    autosaveService.retryPresentation.mock.invocationCallOrder[0]!
+  );
+  expect(autosaveService.saveNow).not.toHaveBeenCalled();
+}
+
 async function verifiesBootstrapRestore() {
   const controller = createEditorPageController();
   const autosaveService = createEditorPageAutosaveService();
@@ -310,6 +341,10 @@ describe('editor-page.runtime bootstrap flows', () => {
     verifiesCancelledBootstrapPayloadOpen
   );
   it('restores draft sessions through loadDocument', verifiesDraftRestore);
+  it(
+    'retries a stale restored preview only after document hydration',
+    verifiesDraftPreviewRetryAfterHydration
+  );
   it(
     'routes bootstrap restore sources through the bootstrap payload opener',
     verifiesBootstrapRestore

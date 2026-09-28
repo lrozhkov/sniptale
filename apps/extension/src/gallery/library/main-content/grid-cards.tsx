@@ -8,7 +8,12 @@ import {
   getRecordingGroupRoleLabel,
   MediaThumb,
 } from '../ui';
-import { GalleryGridDetails, GalleryListDetails } from './grid-card-details';
+import {
+  GalleryGridDetails,
+  GalleryListDetails,
+  GalleryPreviewRecovery,
+  isGalleryPreviewUnavailable,
+} from './grid-card-details';
 import type { GalleryMainContentProps } from './types';
 import { translate } from '../../../platform/i18n';
 import { Clock3, Image as ImageIcon } from 'lucide-react';
@@ -17,16 +22,6 @@ import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-b
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
-}
-
-function isGalleryPreviewUpdating(item: GalleryItem): boolean {
-  return (
-    (!isGalleryMediaItem(item) || item.source.kind === 'screenshot') &&
-    item.kind !== 'video-project' &&
-    item.workspaceRevision !== undefined &&
-    item.presentationRevision !== undefined &&
-    item.presentationRevision !== item.workspaceRevision
-  );
 }
 
 const GALLERY_LIST_LAYOUT_STYLE = {
@@ -49,6 +44,7 @@ type GalleryGridCardProps = {
   item: GalleryItem;
   onPreviewOpen: GalleryPreviewOpenHandler;
   onProjectOpen?: (item: GalleryItem) => void;
+  previewRecoveryAllowed: boolean;
   onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
   selected: boolean;
   style?: { height?: string; left?: string; top?: string; width?: string };
@@ -135,12 +131,7 @@ function getGallerySelectionButtonClassName(selected: boolean, alwaysVisible = f
   );
 }
 
-function GalleryGridCardMedia(
-  props: Pick<
-    GalleryGridCardProps,
-    'item' | 'onPreviewOpen' | 'onToggleSelection' | 'selected' | 'viewMode'
-  >
-) {
+function GalleryGridCardMedia(props: GalleryGridCardProps) {
   const isList = props.viewMode === 'list';
   const canSelect = isGallerySelectableItem(props.item);
 
@@ -173,21 +164,12 @@ function GalleryGridCardMedia(
             : 'cover'
         }
       />
-      {!isList && isGalleryPreviewUpdating(props.item) ? (
-        <div
-          className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center
-            bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_58%,transparent)]"
-          data-ui="gallery.grid.preview-updating"
-        >
-          <span
-            className="rounded-[var(--sniptale-radius-sm)] border
-              border-[var(--sniptale-color-border-soft)]
-              bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_88%,transparent)]
-              px-2.5 py-1.5 text-xs font-medium text-[var(--sniptale-color-text-primary)] shadow-sm"
-          >
-            {translate('gallery.app.updatingPreview')}
-          </span>
-        </div>
+      {!isList && isGalleryPreviewUnavailable(props.item) ? (
+        <GalleryPreviewRecovery
+          {...(props.previewRecoveryAllowed && props.onProjectOpen
+            ? { onOpen: () => props.onProjectOpen?.(props.item) }
+            : {})}
+        />
       ) : null}
       {!isList && props.item.tags.length > 0 ? (
         <div
@@ -316,17 +298,30 @@ function GalleryGridCard(props: GalleryGridCardProps) {
           <GalleryGridCardMedia
             item={props.item}
             onPreviewOpen={props.onPreviewOpen}
+            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+            previewRecoveryAllowed={props.previewRecoveryAllowed}
             onToggleSelection={props.onToggleSelection}
             selected={props.selected}
             viewMode={props.viewMode}
           />
-          <GalleryListDetails item={props.item} onPreviewOpen={props.onPreviewOpen} />
+          <GalleryListDetails
+            item={props.item}
+            onPreviewOpen={props.onPreviewOpen}
+            previewUnavailable={isGalleryPreviewUnavailable(props.item)}
+            {...(isGalleryPreviewUnavailable(props.item) &&
+            props.previewRecoveryAllowed &&
+            props.onProjectOpen
+              ? { onRetryPreview: () => props.onProjectOpen?.(props.item) }
+              : {})}
+          />
         </>
       ) : (
         <>
           <GalleryGridCardMedia
             item={props.item}
             onPreviewOpen={props.onPreviewOpen}
+            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+            previewRecoveryAllowed={props.previewRecoveryAllowed}
             onToggleSelection={props.onToggleSelection}
             selected={props.selected}
             viewMode={props.viewMode}
@@ -564,6 +559,7 @@ function GalleryRecordingGroupGridCard(props: {
 export function GalleryMediaList(
   props: Pick<
     GalleryMainContentProps,
+    | 'trashMode'
     | 'filteredItems'
     | 'onPreviewOpen'
     | 'onRecordingGroupOpen'
@@ -624,6 +620,7 @@ export function GalleryMediaList(
               {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
               onToggleSelection={props.onToggleSelection}
               selected={props.selectedIds.has(unit.item.id)}
+              previewRecoveryAllowed={!props.trashMode}
               viewMode="list"
             />
           );
@@ -680,6 +677,7 @@ export function GalleryMediaList(
                 {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
                 onToggleSelection={props.onToggleSelection}
                 selected={props.selectedIds.has(item.id)}
+                previewRecoveryAllowed={!props.trashMode}
                 viewMode="list"
               />
             ))}
@@ -723,6 +721,7 @@ function resolveGalleryGridCardStyle(args: {
 export function GalleryGridCanvas(
   props: Pick<
     GalleryMainContentProps,
+    | 'trashMode'
     | 'filteredItems'
     | 'gridMetrics'
     | 'gridWidth'
@@ -785,6 +784,7 @@ export function GalleryGridCanvas(
             {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
             onToggleSelection={onToggleSelection}
             selected={selectedIds.has(item.id)}
+            previewRecoveryAllowed={!props.trashMode}
             style={style}
             viewMode={viewMode}
           />

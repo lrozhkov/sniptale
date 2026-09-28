@@ -1,14 +1,9 @@
 import { commitImageWorkspace } from '../../../composition/persistence/image-aggregates';
-import {
-  commitImagePresentation,
-  StaleImageWorkspaceError,
-} from '../../../composition/persistence/image-aggregates';
 import type { EditorDocument } from '../../../features/editor/document/types';
-import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
-import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { useEditorStore } from '../../state/useEditorStore';
+import { scheduleImagePresentation } from './presentation';
 import {
   clearPendingAutosaveTimer,
   clearPendingPresentationTimer,
@@ -17,53 +12,7 @@ import {
 } from './state';
 
 const EDITOR_AUTOSAVE_DEBOUNCE_MS = 2_000;
-const EDITOR_PRESENTATION_DEBOUNCE_MS = 3_000;
 const logger = createLogger({ namespace: 'EditorSession' });
-
-async function updateImagePresentation(
-  context: ActiveEditorSessionContext,
-  revision: number,
-  editRevision: number,
-  state: EditorSessionAutosaveState
-): Promise<void> {
-  if (!context.renderPresentation) return;
-  const isCurrent = () =>
-    state.activeContext?.aggregateId === context.aggregateId &&
-    state.activeContext.durableRevision === revision &&
-    state.autosaveRevision === editRevision &&
-    state.pendingDocument === null;
-  if (!isCurrent()) return;
-  try {
-    const previewBlob = await dataUrlToBlob(await context.renderPresentation());
-    if (!isCurrent()) return;
-    const thumbnailBlob = await createImageThumbnailBlob(previewBlob);
-    if (!isCurrent()) return;
-    await commitImagePresentation({
-      aggregateId: context.aggregateId,
-      expectedWorkspaceRevision: revision,
-      previewBlob,
-      thumbnailBlob,
-    });
-  } catch (error) {
-    if (!(error instanceof StaleImageWorkspaceError)) {
-      logger.warn('Failed to update image presentation', error);
-    }
-  }
-}
-
-function scheduleImagePresentation(
-  context: ActiveEditorSessionContext,
-  revision: number,
-  editRevision: number,
-  state: EditorSessionAutosaveState
-): void {
-  clearPendingPresentationTimer(state);
-  if (!context.renderPresentation) return;
-  state.presentationTimer = window.setTimeout(() => {
-    state.presentationTimer = 0;
-    void updateImagePresentation(context, revision, editRevision, state);
-  }, EDITOR_PRESENTATION_DEBOUNCE_MS);
-}
 
 export function setEditorSaveState(state: 'idle' | 'saving' | 'saved' | 'error'): void {
   useEditorStore.getState().setSaveState(state);
@@ -95,6 +44,8 @@ async function persistEditorSessionDocument(args: {
       args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
     }
     args.state.lastWriteError = null;
+    args.state.presentationError = false;
+    args.state.presentationRetryBlocked = false;
     scheduleImagePresentation(args.context, result.revision, args.revision, args.state);
 
     if (
@@ -107,6 +58,8 @@ async function persistEditorSessionDocument(args: {
     }
   } catch (error) {
     args.state.lastWriteError = error;
+    args.state.presentationError = false;
+    args.state.presentationRetryBlocked = false;
     logger.error('Failed to persist draft', error);
 
     if (

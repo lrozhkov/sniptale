@@ -130,6 +130,27 @@ it('loads library state and reacts to media-hub events', async () => {
   expect(onBanner).toHaveBeenCalledWith('warning');
 });
 
+it('reconciles a mounted library when its tab regains focus', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  const initialReads = loadGalleryLibrarySnapshotMock.mock.calls.length;
+  loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
+    estimate: { usage: 10, quota: 20 },
+    nextItems: [createMediaItem({ id: 'asset-1', presentationRevision: 2, workspaceRevision: 2 })],
+  });
+  act(() => window.dispatchEvent(new Event('focus')));
+  await flushLibraryState();
+  expect(loadGalleryLibrarySnapshotMock).toHaveBeenCalledTimes(initialReads + 1);
+  expect(values.at(-1)?.items[0]).toEqual(
+    expect.objectContaining({ presentationRevision: 2, workspaceRevision: 2 })
+  );
+});
+
 it('reports library refresh failures through the gallery banner without throwing', async () => {
   const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
   const onBanner = vi.fn<(message: string) => void>();
