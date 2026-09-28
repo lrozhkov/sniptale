@@ -1,22 +1,26 @@
 import { expect, it } from 'vitest';
 import { resolveDrawingToolCursor } from './cursors';
 
-it('uses the same contact point for SVG cursor art and its CSS hotspot', () => {
-  const expected = [
-    ['pencil', false, '4 20', 'M4 20'],
-    ['marker', false, '4 20', 'm4 20'],
-    ['arrow', false, '12 4', 'M12 4v16'],
-    ['arrow', true, '12 20', 'M12 4v16'],
-    ['blur', false, '12 20', 'M12 3'],
-  ] as const;
-
-  for (const [tool, fromTip, hotspot, art] of expected) {
+it('keeps the gesture origin clear while showing arrow direction and the blur region', () => {
+  for (const [tool, fromTip] of [
+    ['arrow', false],
+    ['arrow', true],
+    ['blur', false],
+  ] as const) {
     const cursor = resolveDrawingToolCursor(tool, fromTip);
-    expect(cursor).toContain(`) ${hotspot}, crosshair`);
-    expect(decodeURIComponent(cursor)).toContain(art);
+    const svg = decodeURIComponent(cursor);
+    expect(cursor).toContain(') 5 5, crosshair');
+    expect(svg).toContain('viewBox="0 0 32 32"');
+    expect(svg).toContain('M5 0v3m0 4v3M0 5h3m4 0h3');
   }
-  expect(decodeURIComponent(resolveDrawingToolCursor('arrow'))).toContain('cy="4"');
-  expect(decodeURIComponent(resolveDrawingToolCursor('arrow', true))).toContain('cy="20"');
+  expect(decodeURIComponent(resolveDrawingToolCursor('arrow'))).toContain('M14 14 27 27');
+  expect(decodeURIComponent(resolveDrawingToolCursor('arrow', true))).toContain('M27 27 14 14');
+  expect(decodeURIComponent(resolveDrawingToolCursor('blur'))).toContain(
+    '<rect x="13" y="14" width="15" height="13"'
+  );
+  expect(resolveDrawingToolCursor('arrow')).not.toBe(resolveDrawingToolCursor('arrow', true));
+  expect(resolveDrawingToolCursor('pencil')).toContain(') 4 20, crosshair');
+  expect(resolveDrawingToolCursor('marker')).toContain(') 4 20, crosshair');
   expect(resolveDrawingToolCursor('shape')).toBe('crosshair');
   expect(resolveDrawingToolCursor('text')).toBe('text');
   expect(resolveDrawingToolCursor('select')).toBe('default');
