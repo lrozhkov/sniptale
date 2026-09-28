@@ -10,7 +10,7 @@ function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number)
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }
   const margin = 12;
-  const gap = 12;
+  const gap = 6;
   const resolvedWidth = Math.min(width, window.innerWidth - margin * 2);
   const anchor = anchorEl.getBoundingClientRect();
   const toolbarBottom = anchorEl.closest('.sniptale-toolbar-root')?.getBoundingClientRect().bottom;
@@ -154,6 +154,85 @@ export function EditorAnchoredConfirmPopover(props: {
             {props.confirmText}
           </ProductActionButton>
         </div>
+      </div>
+    </ContentPopoverAdapter>
+  );
+}
+
+export function EditorAnchoredHistoryChoices(props: {
+  anchorEl: HTMLElement | null;
+  canReturnToStart: boolean;
+  dataUi: string;
+  onClose: () => void;
+  onRestoreOriginal: () => void;
+  onReturnToStart: () => void;
+  restoreDescription: string;
+  restoreLabel: string;
+  returnDescription: string;
+  returnLabel: string;
+  title: string;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const style = useAnchoredPopoverPosition(props.anchorEl, 320);
+  useAnchoredDialogLifecycle({
+    anchorEl: props.anchorEl,
+    initialFocusSelector: props.canReturnToStart
+      ? '[data-history-start="true"]'
+      : '[data-history-original="true"]',
+    onClose: props.onClose,
+    popoverRef,
+  });
+  const rowClass = [
+    'w-full rounded-none px-3 py-2 text-left',
+    'hover:bg-[var(--sniptale-color-surface-hover)]',
+    'focus-visible:outline focus-visible:outline-2',
+    'focus-visible:outline-[var(--sniptale-color-accent)]',
+    'disabled:cursor-not-allowed disabled:opacity-50',
+  ].join(' ');
+  return (
+    <ContentPopoverAdapter
+      anchorEl={props.anchorEl}
+      className="sniptale-content-popover--compact !rounded-none !w-[320px]"
+      dataUi={props.dataUi}
+      isOpen
+      popoverRef={popoverRef}
+      style={style}
+    >
+      <div role="dialog" aria-labelledby={`${props.dataUi}.title`} className="p-1">
+        <div
+          id={`${props.dataUi}.title`}
+          className="px-3 py-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]"
+        >
+          {props.title}
+        </div>
+        <button
+          type="button"
+          className={rowClass}
+          data-history-start="true"
+          disabled={!props.canReturnToStart}
+          onClick={props.onReturnToStart}
+        >
+          <span className="block text-sm text-[var(--sniptale-color-text-primary)]">
+            {props.returnLabel}
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+            {props.returnDescription}
+          </span>
+        </button>
+        <div className="mx-3 my-1 border-t border-[var(--sniptale-color-border)]" />
+        <button
+          type="button"
+          className={rowClass}
+          data-history-original="true"
+          onClick={props.onRestoreOriginal}
+        >
+          <span className="block text-sm text-[var(--sniptale-color-danger)]">
+            {props.restoreLabel}
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+            {props.restoreDescription}
+          </span>
+        </button>
       </div>
     </ContentPopoverAdapter>
   );

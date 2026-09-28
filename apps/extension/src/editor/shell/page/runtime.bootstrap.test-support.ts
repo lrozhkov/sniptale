@@ -21,6 +21,9 @@ export function createEditorPageAutosaveService() {
     flushAutosave: vi.fn(async (produceDocument?: () => unknown) => {
       produceDocument?.();
     }),
+    saveNow: vi.fn(async (produceDocument: () => unknown) => {
+      produceDocument();
+    }),
     updateContext: vi.fn(),
   };
 }

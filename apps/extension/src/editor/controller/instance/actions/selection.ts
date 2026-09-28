@@ -10,6 +10,7 @@ export {
   previewSelectionSettingsForController,
   redoForController,
   resetToOriginalForController,
+  restoreOriginalDocumentForController,
   undoForController,
 } from './selection-document-actions';
 export {

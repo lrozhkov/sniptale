@@ -125,7 +125,7 @@ it.each([
   const surface = document.querySelector<HTMLElement>(`[data-ui="${consumer}.confirm"]`);
   const positioner = surface?.parentElement;
   const dialog = surface?.querySelector<HTMLElement>('[role="alertdialog"]');
-  expect(positioner?.style.top).toBe('72px');
+  expect(positioner?.style.top).toBe('66px');
   expect(dialog?.className).toContain('p-2');
   expect(dialog?.className).toContain('space-y-4');
   expect(dialog?.querySelector('p')?.className).toContain('mt-2');

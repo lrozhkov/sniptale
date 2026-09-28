@@ -139,6 +139,7 @@ describe('ImageEditorControllerBase', () => {
           removeBrowserFrame: vi.fn(async () => undefined),
           reorderLayer: vi.fn(),
           resetToOriginal: vi.fn(async () => undefined),
+          restoreOriginalDocument: vi.fn(async () => undefined),
           resetZoom: vi.fn(),
           resetLayerEffectPreview: vi.fn(),
           renameLayer: vi.fn(),

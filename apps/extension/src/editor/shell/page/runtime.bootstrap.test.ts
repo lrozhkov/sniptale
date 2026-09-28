@@ -68,6 +68,10 @@ async function verifiesBootstrapPayloadOpen() {
     pageTitle: 'Example page',
     sourceFaviconUrl: null,
   });
+  expect(autosaveService.saveNow).toHaveBeenCalledWith(expect.any(Function));
+  expect(controller.openImage.mock.invocationCallOrder[0]).toBeLessThan(
+    autosaveService.saveNow.mock.invocationCallOrder[0]!
+  );
 }
 
 async function verifiesBootstrapPayloadDocumentOpen() {
@@ -88,6 +92,7 @@ async function verifiesBootstrapPayloadDocumentOpen() {
   );
 
   expect(controller.loadDocument).toHaveBeenCalledWith(document);
+  expect(autosaveService.saveNow).toHaveBeenCalledWith(expect.any(Function));
   expect(controller.openImage).not.toHaveBeenCalled();
 }
 

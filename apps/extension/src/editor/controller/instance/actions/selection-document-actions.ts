@@ -5,8 +5,10 @@ import {
   previewEditorSelectionSettingsViaController,
   redoEditorControllerSnapshot,
   resetEditorControllerToOriginal,
+  restoreEditorControllerOriginalDocument,
   undoEditorControllerSnapshot,
 } from '../../public-api';
+import type { EditorDocument } from '../../../../features/editor/document/types';
 import {
   applyEditorTextSelectionStyle,
   type EditorTextInlineStyleCommand,
@@ -40,6 +42,20 @@ export async function resetToOriginalForController(
   controller: EditorControllerInstance
 ): Promise<void> {
   await resetEditorControllerToOriginal(controller.getPublicApiAdapter());
+}
+
+export async function restoreOriginalDocumentForController(
+  controller: EditorControllerInstance,
+  original: EditorDocument,
+  isCurrent: () => boolean
+): Promise<void> {
+  const autosaveService = controller.autosaveService;
+  await restoreEditorControllerOriginalDocument(
+    controller.getPublicApiAdapter(),
+    original,
+    autosaveService ? () => autosaveService.saveNow(() => controller.exportDocument()) : undefined,
+    isCurrent
+  );
 }
 
 export function deleteSelectionForController(controller: EditorControllerInstance): void {

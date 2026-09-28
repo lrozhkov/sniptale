@@ -8,6 +8,9 @@ const mocks = vi.hoisted(() => ({
   previewEditorSelectionSettingsViaController: vi.fn(),
   redoEditorControllerSnapshot: vi.fn(async () => undefined),
   resetEditorControllerToOriginal: vi.fn(async () => undefined),
+  restoreEditorControllerOriginalDocument: vi.fn(
+    async (_controller: unknown, _original: unknown, _persist?: () => Promise<void>) => undefined
+  ),
   undoEditorControllerSnapshot: vi.fn(async () => undefined),
 }));
 
@@ -19,6 +22,7 @@ vi.mock('../../public-api', async (importOriginal) => ({
   previewEditorSelectionSettingsViaController: mocks.previewEditorSelectionSettingsViaController,
   redoEditorControllerSnapshot: mocks.redoEditorControllerSnapshot,
   resetEditorControllerToOriginal: mocks.resetEditorControllerToOriginal,
+  restoreEditorControllerOriginalDocument: mocks.restoreEditorControllerOriginalDocument,
   undoEditorControllerSnapshot: mocks.undoEditorControllerSnapshot,
 }));
 
@@ -35,6 +39,7 @@ import {
   previewSelectionSettingsForController,
   redoForController,
   resetToOriginalForController,
+  restoreOriginalDocumentForController,
   undoForController,
 } from './selection-document-actions';
 
@@ -46,6 +51,38 @@ function createController() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+it.each([true, false])('routes original restoration with autosave=%s', async (withAutosave) => {
+  const original = { id: 'raw-source' };
+  const snapshot = { id: 'restored' };
+  const saveNow = vi.fn(async (serialize: () => unknown) => {
+    serialize();
+  });
+  const controller = {
+    getPublicApiAdapter: vi.fn(() => ({ id: 'adapter' })),
+    autosaveService: withAutosave ? { saveNow } : null,
+    exportDocument: vi.fn(() => snapshot),
+  };
+
+  const isCurrent = () => true;
+  await restoreOriginalDocumentForController(controller as never, original as never, isCurrent);
+
+  expect(mocks.restoreEditorControllerOriginalDocument).toHaveBeenCalledWith(
+    { id: 'adapter' },
+    original,
+    withAutosave ? expect.any(Function) : undefined,
+    isCurrent
+  );
+  const persist = mocks.restoreEditorControllerOriginalDocument.mock.calls[0]?.[2];
+  if (withAutosave) {
+    await persist?.();
+    expect(saveNow).toHaveBeenCalledOnce();
+    expect(controller.exportDocument).toHaveBeenCalledOnce();
+  } else {
+    expect(saveNow).not.toHaveBeenCalled();
+    expect(controller.exportDocument).not.toHaveBeenCalled();
+  }
 });
 
 it('routes document selection commands through the public api adapter', async () => {

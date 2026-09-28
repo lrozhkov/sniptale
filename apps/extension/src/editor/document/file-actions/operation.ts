@@ -11,6 +11,11 @@ export function beginEditorDocumentOpenOperation(controller: object): EditorDocu
   return { controller, revision };
 }
 
+/** Captures document-open ownership without starting a new open operation. */
+export function captureEditorDocumentOpenOperation(controller: object): EditorDocumentOpenToken {
+  return { controller, revision: controllerOpenRevisions.get(controller) ?? 0 };
+}
+
 export function isCurrentEditorDocumentOpenOperation(token: EditorDocumentOpenToken): boolean {
-  return controllerOpenRevisions.get(token.controller) === token.revision;
+  return (controllerOpenRevisions.get(token.controller) ?? 0) === token.revision;
 }

@@ -79,8 +79,36 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'The document will return to the earliest state in history. You can restore edits with Redo.',
   },
   resetOriginalTooltip: {
-    ru: 'Вернуться к началу истории. Изменения можно вернуть кнопкой «Повторить».',
-    en: 'Return to the start of history. You can restore edits with Redo.',
+    ru: 'История и оригинал изображения',
+    en: 'History and original image',
+  },
+  historyChoicesTitle: {
+    ru: 'Вернуть изображение',
+    en: 'Revert image',
+  },
+  historyStart: {
+    ru: 'К началу истории',
+    en: 'To the start of history',
+  },
+  historyStartDescription: {
+    ru: 'К самому раннему доступному шагу. Правки можно повторить.',
+    en: 'Go to the earliest available step. Edits can be redone.',
+  },
+  restoreOriginal: {
+    ru: 'Восстановить оригинал',
+    en: 'Restore original',
+  },
+  restoreOriginalDescription: {
+    ru: 'Вернуть исходный файл и удалить всю историю правок.',
+    en: 'Restore the source file and delete all edit history.',
+  },
+  restoreOriginalTitle: {
+    ru: 'Восстановить оригинал?',
+    en: 'Restore the original?',
+  },
+  restoreOriginalMessage: {
+    ru: 'Документ вернётся к исходному снимку или файлу. Вся история правок будет удалена без возможности отмены.',
+    en: 'The document will return to the source capture or file. All edit history will be permanently deleted.',
   },
   annotationFrame: {
     ru: 'Рамка',

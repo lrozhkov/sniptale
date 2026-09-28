@@ -2,6 +2,7 @@ import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
 import { createImageEditorController, type ImageEditorController } from '../../controller';
 import { waitForEditorControllerCanvas } from '../../controller/canvas-ready';
+import { beginEditorDocumentOpenOperation } from '../../document/file-actions/operation';
 import {
   createEditorSessionAutosaveService,
   type EditorSessionAutosaveService,
@@ -104,6 +105,7 @@ export async function openEditorBootstrapPayload(
   runtime: EditorPageSessionRuntime,
   services: EditorPageServices
 ): Promise<void> {
+  beginEditorDocumentOpenOperation(services.controller);
   const bootstrapRevision = beginEditorPageBootstrapRevision(services);
   const { aggregateId } = resolveEditorPageSessionSeed();
 
@@ -135,6 +137,9 @@ export async function openEditorBootstrapPayload(
 
   if (payload.document) {
     await services.controller.loadDocument(payload.document);
+    if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+    const initialDocument = services.controller.exportDocument();
+    await services.autosaveService.saveNow(() => initialDocument);
     return;
   }
 
@@ -143,12 +148,16 @@ export async function openEditorBootstrapPayload(
     pageTitle: payload.title ?? '',
     sourceFaviconUrl: payload.sourceFaviconUrl ?? null,
   });
+  if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
+  const initialDocument = services.controller.exportDocument();
+  await services.autosaveService.saveNow(() => initialDocument);
 }
 
 export async function bootstrapEditorPageSession(
   runtime: EditorPageSessionRuntime,
   services: EditorPageServices
 ): Promise<void> {
+  beginEditorDocumentOpenOperation(services.controller);
   const bootstrapRevision = beginEditorPageBootstrapRevision(services);
   const { aggregateId, locationState } = resolveEditorPageSessionSeed();
 

@@ -150,3 +150,32 @@ export async function resetEditorControllerToOriginal(
     controller.publishHistoryDocument(document);
   });
 }
+
+/** Replaces the document with its immutable source and discards the entire edit history. */
+export async function restoreEditorControllerOriginalDocument(
+  controller: EditorDocumentResetController,
+  original: EditorDocument,
+  persist?: () => Promise<void>,
+  isCurrent: () => boolean = () => true
+): Promise<void> {
+  return runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
+    if (!isCurrent()) throw new Error('Editor document changed during restoration.');
+    flushActiveFrameAnnotationDraft();
+    const previousDocument = readCurrentEditorSnapshot(controller.history);
+    try {
+      await controller.applyDocument(original, {
+        resetHistory: false,
+        updateOriginal: false,
+        preserveViewport: true,
+      });
+      await persist?.();
+    } catch (error) {
+      if (await restoreHistoryDocument(controller, previousDocument, error)) {
+        controller.publishHistoryDocument(previousDocument!);
+      }
+      throw error;
+    }
+    controller.history?.reset(JSON.stringify(original));
+    controller.publishHistoryDocument(original);
+  });
+}

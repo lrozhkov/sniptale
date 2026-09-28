@@ -5,7 +5,10 @@ import type { EditorSessionAutosaveService } from '../document/session-autosave'
 import type { EditorDocument } from '../../features/editor/document/types';
 
 interface LocalImageDraftController extends EditorDocumentOpenPort {
-  autosaveService: Pick<EditorSessionAutosaveService, 'activate' | 'flushAutosave'> | null;
+  autosaveService: Pick<
+    EditorSessionAutosaveService,
+    'activate' | 'flushAutosave' | 'saveNow'
+  > | null;
   exportDocument(): EditorDocument;
   isDocumentReadyForExport(): boolean;
   renderForExport(
@@ -33,7 +36,7 @@ export function openLocalImageAsEditorDraft(
         await autosaveService.flushAutosave(() => controller.exportDocument());
       }
     },
-    onOpened: () => {
+    onOpened: async () => {
       const autosaveService = controller.autosaveService;
       if (!autosaveService) return;
       beginEditorPageLocalDraft({
@@ -42,6 +45,8 @@ export function openLocalImageAsEditorDraft(
           controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
         sourceTitle: file.name,
       });
+      const initialDocument = controller.exportDocument();
+      await autosaveService.saveNow(() => initialDocument);
     },
   });
 }

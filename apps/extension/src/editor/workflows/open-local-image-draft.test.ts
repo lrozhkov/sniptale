@@ -26,7 +26,14 @@ function createController(
   autosaveService: Pick<EditorSessionAutosaveService, 'activate' | 'flushAutosave'> | null
 ) {
   return {
-    autosaveService,
+    autosaveService: autosaveService
+      ? {
+          ...autosaveService,
+          saveNow: vi.fn(async (serialize: () => unknown) => {
+            serialize();
+          }),
+        }
+      : null,
     canvas: null,
     loadDocument: vi.fn(async () => undefined),
     openImage: vi.fn(async () => undefined),
@@ -46,11 +53,11 @@ it('flushes the current draft and creates the new identity only after the image 
       draftController: { openImage: (dataUrl: string, sourceName: string) => Promise<void> },
       selectedFile: File,
       _setImageData: unknown,
-      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => void }
+      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => Promise<void> }
     ) => {
       await lifecycle.beforeOpen();
       await draftController.openImage('data:image/png;base64,YQ==', selectedFile.name);
-      lifecycle.onOpened();
+      await lifecycle.onOpened();
     }
   );
 
@@ -63,11 +70,17 @@ it('flushes the current draft and creates the new identity only after the image 
   expect(controller.openImage.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.beginDraft.mock.invocationCallOrder[0]!
   );
+  const initialSave = controller.autosaveService?.saveNow;
+  expect(initialSave).toBeDefined();
+  expect(mocks.beginDraft.mock.invocationCallOrder[0]).toBeLessThan(
+    initialSave!.mock.invocationCallOrder[0]!
+  );
   expect(mocks.beginDraft).toHaveBeenCalledWith({
     autosaveService: controller.autosaveService,
     renderPresentation: expect.any(Function),
     sourceTitle: 'local.png',
   });
+  expect(controller.autosaveService?.saveNow).toHaveBeenCalledWith(expect.any(Function));
   const renderPresentation = mocks.beginDraft.mock.calls[0]?.[0].renderPresentation;
   await renderPresentation();
   expect(controller.renderForExport).toHaveBeenCalledWith(
@@ -80,27 +93,24 @@ it('opens the first local image without exporting the empty start page', async (
   const flushAutosave = vi.fn(async (serialize: () => unknown) => void serialize());
   const controller = createController({ activate: vi.fn(), flushAutosave });
   controller.isDocumentReadyForExport.mockReturnValue(false);
-  controller.exportDocument.mockImplementation(() => {
-    throw new Error('Editor is not initialized yet');
-  });
   const file = new File(['image'], 'first.png', { type: 'image/png' });
   mocks.openFile.mockImplementation(
     async (
       draftController: { openImage: (dataUrl: string, sourceName: string) => Promise<void> },
       selectedFile: File,
       _setImageData: unknown,
-      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => void }
+      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => Promise<void> }
     ) => {
       await lifecycle.beforeOpen();
       await draftController.openImage('data:image/png;base64,YQ==', selectedFile.name);
-      lifecycle.onOpened();
+      await lifecycle.onOpened();
     }
   );
 
   await openLocalImageAsEditorDraft(controller, file, vi.fn());
 
   expect(flushAutosave).not.toHaveBeenCalled();
-  expect(controller.exportDocument).not.toHaveBeenCalled();
+  expect(controller.exportDocument).toHaveBeenCalledOnce();
   expect(controller.openImage).toHaveBeenCalledOnce();
   expect(mocks.beginDraft).toHaveBeenCalledOnce();
 });
@@ -113,11 +123,11 @@ it('fails instead of opening an unpersisted local document without autosave', as
       draftController: { openImage: (dataUrl: string, sourceName: string) => Promise<void> },
       selectedFile: File,
       _setImageData: unknown,
-      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => void }
+      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => Promise<void> }
     ) => {
       await lifecycle.beforeOpen();
       await draftController.openImage('data:image/png;base64,YQ==', selectedFile.name);
-      lifecycle.onOpened();
+      await lifecycle.onOpened();
     }
   );
 
@@ -148,11 +158,11 @@ it('retains the current session identity when decoding the replacement fails', a
       draftController: { openImage: (dataUrl: string, name: string) => Promise<void> },
       _file: File,
       _setImageData: unknown,
-      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => void }
+      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => Promise<void> }
     ) => {
       await lifecycle.beforeOpen();
       await draftController.openImage('data:image/png;base64,YQ==', file.name);
-      lifecycle.onOpened();
+      await lifecycle.onOpened();
     }
   );
 

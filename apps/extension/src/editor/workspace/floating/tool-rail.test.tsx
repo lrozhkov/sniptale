@@ -19,6 +19,9 @@ const controller = vi.hoisted(() => ({
   resetToOriginal: vi.fn(async () => undefined),
   undo: vi.fn(async () => undefined),
 }));
+const restoreOriginalEditorImage = vi.hoisted(() => vi.fn(async () => undefined));
+
+vi.mock('../../workflows/restore-original-image', () => ({ restoreOriginalEditorImage }));
 
 vi.mock('../../application/controller-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/controller-context')>()),
@@ -306,7 +309,7 @@ it('stays centered when the left drawer opens', () => {
   expect(stack?.className).not.toContain('left-[23.75rem]');
 });
 
-it('routes undo and redo, then confirms a return to the start of history', async () => {
+it('routes undo and redo, then returns to the first retained history step from one menu', async () => {
   const onBeforeSelectionAwareAction = vi.fn();
   renderToolRail(
     createProps({
@@ -329,37 +332,67 @@ it('routes undo and redo, then confirms a return to the start of history', async
   });
 
   expect(controller.resetToOriginal).not.toHaveBeenCalled();
-  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
-  expect(document.body.textContent).toContain(translate('editor.toolbar.resetOriginalMessage'));
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(document.body.textContent).toContain(translate('editor.toolbar.historyStartDescription'));
 
-  await act(async () => getDialogButton(translate('editor.toolbar.resetOriginal')).click());
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.click()
+  );
 
   expect(onBeforeSelectionAwareAction).toHaveBeenCalledTimes(3);
   expect(controller.clearSelection).toHaveBeenCalledTimes(3);
   expect(controller.undo).toHaveBeenCalledOnce();
   expect(controller.redo).toHaveBeenCalledOnce();
   expect(controller.resetToOriginal).toHaveBeenCalledOnce();
-  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
 
-it('cancels reset without mutating the document', () => {
+it('confirms original restoration separately and can return to the menu', async () => {
   renderToolRail(createProps({ history: { canRedo: false, canUndo: true, index: 1, size: 2 } }));
 
   act(() => getHistoryButton('reset').click());
+  act(() => document.querySelector<HTMLButtonElement>('[data-history-original="true"]')?.click());
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
   act(() => getDialogButton(translate('common.actions.cancel')).click());
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  act(() => document.querySelector<HTMLButtonElement>('[data-history-original="true"]')?.click());
+  await act(async () => getDialogButton(translate('editor.toolbar.restoreOriginal')).click());
 
-  expect(controller.clearSelection).not.toHaveBeenCalled();
+  expect(controller.clearSelection).toHaveBeenCalledOnce();
   expect(controller.resetToOriginal).not.toHaveBeenCalled();
+  expect(restoreOriginalEditorImage).toHaveBeenCalledOnce();
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 });
 
-it('disables reset at the original history index and keeps the warning tooltip available', () => {
+it('allows original restoration when the retained history is already at its first step', () => {
   renderToolRail(createProps({ history: { canRedo: true, canUndo: false, index: 0, size: 2 } }));
 
   const reset = getHistoryButton('reset');
-  expect(reset.disabled).toBe(true);
+  expect(reset.disabled).toBe(false);
   expect(reset.title).toBe(translate('editor.toolbar.resetOriginalTooltip'));
   expect(reset.getAttribute('aria-label')).toBe(translate('editor.toolbar.resetOriginalTooltip'));
+  act(() => reset.click());
+  expect(document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.disabled).toBe(
+    true
+  );
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-history-original="true"]')?.disabled
+  ).toBe(false);
+});
+
+it('closes the history choices when its single toolbar button is clicked again', () => {
+  renderToolRail(createProps({ history: { canRedo: false, canUndo: false, index: 0, size: 1 } }));
+
+  const reset = getHistoryButton('reset');
+  act(() => reset.click());
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(reset.getAttribute('aria-expanded')).toBe('true');
+
+  act(() => reset.click());
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(reset.getAttribute('aria-expanded')).toBe('false');
+  expect(getHistoryButton('undo').disabled).toBe(true);
+  expect(getHistoryButton('redo').disabled).toBe(true);
 });
 
 it('keeps document-required controls disabled before an image is loaded', () => {
@@ -367,6 +400,7 @@ it('keeps document-required controls disabled before an image is loaded', () => 
   renderToolRail(props);
 
   expect(getToolButton('text').disabled).toBe(true);
+  expect(getHistoryButton('reset').disabled).toBe(true);
   const frame = getContentFrameButton('future-frame-style');
   expect(frame.disabled).toBe(true);
   act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));

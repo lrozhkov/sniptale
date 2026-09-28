@@ -1,6 +1,5 @@
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { EditorDocument } from '../../../features/editor/document/types';
-import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -26,6 +25,7 @@ import {
   StaleImageWorkspaceError,
 } from './errors';
 import { getMediaLibraryEntry } from '../media-library/index.library';
+import { createOriginalImageDocument } from './original-document';
 import { readImageWorkspace } from '../image-workspaces/read';
 import { getAggregatePresentation } from '../aggregate-presentations';
 import {
@@ -588,46 +588,6 @@ function assertEditableImageRoot(
     throw new ImageAggregateNotFoundError(aggregateId);
   }
   return media as MediaLibraryEntry & { blob: Blob };
-}
-
-async function createOriginalImageDocument(
-  media: ReturnType<typeof assertEditableImageRoot>
-): Promise<EditorDocument> {
-  const width = media.width;
-  const height = media.height;
-  if (!width || !height) throw new ImageAggregateNotFoundError(media.id);
-  return {
-    version: 2,
-    sourceImageData: await blobToDataUrl(media.blob),
-    sourceName: media.originalFilename,
-    sourceWidth: width,
-    sourceHeight: height,
-    canvasWidth: width,
-    canvasHeight: height,
-    sourceLeft: 0,
-    sourceTop: 0,
-    sourceDisplayWidth: width,
-    sourceDisplayHeight: height,
-    frame: {
-      browserMode: false,
-      paddingTop: 0,
-      paddingRight: 0,
-      paddingBottom: 0,
-      paddingLeft: 0,
-      backgroundMode: 'color',
-      backgroundBlurAmount: 0,
-      backgroundColor: '#ffffff',
-      backgroundGradientFrom: '#ffffff',
-      backgroundGradientTo: '#ffffff',
-      backgroundGradientAngle: 0,
-      backgroundImageData: null,
-      backgroundImageFit: 'cover',
-      layoutMode: 'fit-image',
-      browserTitle: '',
-      browserUrl: '',
-    },
-    canvasJson: JSON.stringify({ version: '7.2.0', objects: [] }),
-  };
 }
 
 export async function restoreImageAggregateOriginal(

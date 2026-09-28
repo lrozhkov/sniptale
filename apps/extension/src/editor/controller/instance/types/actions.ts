@@ -40,6 +40,7 @@ export interface EditorControllerInstanceDocumentActions {
   undo(): Promise<void>;
   redo(): Promise<void>;
   resetToOriginal(): Promise<void>;
+  restoreOriginalDocument(original: EditorDocument, isCurrent: () => boolean): Promise<void>;
 }
 
 export interface EditorControllerInstanceLifecycleActions {

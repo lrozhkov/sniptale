@@ -1,4 +1,5 @@
 import type { EditorTextInlineStyleCommand } from '../text-formatting';
+import type { EditorDocument } from '../../../features/editor/document/types';
 import type { EditorSelectionNudge } from '../tools/nudge';
 import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../tools/technical-data';
 import {
@@ -16,6 +17,7 @@ import {
   previewSelectionSettingsForController,
   redoForController,
   resetToOriginalForController,
+  restoreOriginalDocumentForController,
   sendBackwardSelectionForController,
   sendSelectionToBackForController,
   undoForController,
@@ -45,6 +47,10 @@ export abstract class ImageEditorControllerSelectionActions extends ImageEditorC
 
   async resetToOriginal() {
     await resetToOriginalForController(this.getControllerInstance());
+  }
+
+  async restoreOriginalDocument(original: EditorDocument, isCurrent: () => boolean) {
+    await restoreOriginalDocumentForController(this.getControllerInstance(), original, isCurrent);
   }
 
   deleteSelection() {
