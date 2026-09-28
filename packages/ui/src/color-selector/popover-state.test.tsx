@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { hsvToHex } from './helpers';
@@ -105,6 +105,39 @@ it('keeps sticky hue on grayscale colors and preserves it when moving off graysc
       value: grayscaleValue,
     })
   );
+});
+
+it('keeps the plane marker at the pointer position when controlled colors become black', () => {
+  let picker: ReturnType<typeof usePickerColorState> | null = null;
+  const getPicker = () => {
+    if (!picker) throw new Error('Picker not mounted');
+    return picker;
+  };
+  let select: (selection: { saturation: number; value: number }) => void;
+  let setExternalColor: (color: string) => void;
+  const Harness = () => {
+    const [color, setColor] = useState('#ff0000');
+    picker = usePickerColorState(color);
+    select = (selection) => setColor(getPicker().handlePlaneSelectionChange(selection));
+    setExternalColor = setColor;
+    return null;
+  };
+  act(() => root?.render(<Harness />));
+
+  act(() => select({ saturation: 1, value: 0 }));
+  expect(getPicker().resolvedColor).toBe('#000000');
+  expect(getPicker().saturation).toBe(1);
+  expect(getPicker().value).toBe(0);
+
+  act(() => select({ saturation: 0, value: 0 }));
+  expect(getPicker().resolvedColor).toBe('#000000');
+  expect(getPicker().saturation).toBe(0);
+  expect(getPicker().value).toBe(0);
+
+  act(() => setExternalColor('#00ff00'));
+  expect(getPicker().resolvedColor).toBe('#00ff00');
+  expect(getPicker().saturation).toBe(1);
+  expect(getPicker().value).toBe(1);
 });
 
 it('preserves explicit hue when grayscale updates arrive through resolved colors', () => {
