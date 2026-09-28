@@ -154,6 +154,8 @@ it('opens directly on menu with a completed, non-animated ring', async () => {
   expect(indicator?.dataset['page']).toBe('menu');
   expect(indicator?.dataset['entrySide']).toBe('none');
   expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('none');
+  expect(container.querySelector('nav')?.dataset['animate']).toBe('false');
+  expect(indicator?.querySelector('circle')?.getAttribute('pathLength')).toBe('100');
 });
 
 it('keeps current content until a cold navigation commits and only then persists it', async () => {

@@ -217,6 +217,17 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
   expect(
     [
       ...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.menu.workspace"] button'),
+    ].map((button) => button.textContent)
+  ).toEqual([
+    'popup.home.libraryLabel',
+    'popup.home.imageEditorLabel',
+    'popup.home.videoEditorLabel',
+    'popup.home.scenarioEditorLabel',
+  ]);
+  expect(container.querySelector('[data-ui="popup.menu.workspace"]')?.className).toContain('mt-2');
+  expect(
+    [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.menu.workspace"] button'),
     ].every((button) => button.className === quickScenario?.className)
   ).toBe(true);
   expect(toolButtons.every((button) => button?.className.includes('border-0'))).toBe(true);

@@ -61,16 +61,18 @@ const tools: ReadonlyArray<{
 ];
 
 const TOOL_BUTTON_CLASS_NAME = [
-  'flex h-12 min-h-12 w-full min-w-0 shrink-0 flex-row items-center gap-2.5 rounded-[12px] border-0',
+  'group flex h-12 min-h-12 w-full min-w-0 shrink-0 flex-row items-center gap-2.5 rounded-[12px] border-0',
   'bg-[var(--sniptale-color-surface-input)] px-3 py-1 text-left transition-colors',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-45',
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 
 const OPEN_TOOLBAR_CLASS_NAME = [TOOL_BUTTON_CLASS_NAME, 'h-[50px] min-h-[50px]'].join(' ');
-const TOOL_ICON_CLASS_NAME = [
-  'flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px]',
-  'bg-[var(--sniptale-color-surface-hover)]',
+const TOOL_ICON_CLASS_NAME = ['flex h-7 w-7 shrink-0 items-center justify-center'].join(' ');
+const TOOL_GLYPH_CLASS_NAME = [
+  'h-5 w-5 text-[var(--sniptale-color-text-secondary)]',
+  'transition-transform duration-180 ease-out motion-reduce:transition-none',
+  'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
 ].join(' ');
 const TOOL_GROUP_HEADING_CLASS_NAME = [
   'mb-1 px-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
@@ -94,7 +96,7 @@ function ToolButton(props: {
       onClick={() => props.onOpen(props.tool.mode)}
     >
       <span className={TOOL_ICON_CLASS_NAME}>
-        <Icon className="h-5 w-5 text-[var(--sniptale-color-text-secondary)]" />
+        <Icon className={TOOL_GLYPH_CLASS_NAME} />
       </span>
       <span className="min-w-0">
         <span className="block text-[11px] font-semibold leading-tight text-[var(--sniptale-color-text-primary)]">

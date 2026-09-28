@@ -26,7 +26,7 @@ const COMPACT_LAYER_BASE_CLASS_NAME = ['pointer-events-none absolute inset-0 tex
   ' '
 );
 const EXPANDED_LAYER_BASE_CLASS_NAME = [
-  'pointer-events-none absolute inset-y-0 left-2.5 flex w-[148px] items-center gap-2 text-left',
+  'pointer-events-none absolute inset-y-0 left-2.5 right-2 flex min-w-0 items-center gap-2 text-left',
 ].join(' ');
 const MODE_ICON_CLASS_NAME = [
   'transition-[transform,filter] duration-200 ease-out motion-reduce:transition-none',
@@ -75,11 +75,11 @@ function getCompactLayerClassName(active: boolean, animate: boolean): string {
 function getExpandedLayerClassName(active: boolean, animate: boolean, compact: boolean): string {
   return cx(
     EXPANDED_LAYER_BASE_CLASS_NAME,
-    compact && 'right-2 w-auto gap-1.5',
+    compact && 'gap-1.5',
     animate && 'transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
     active ? 'opacity-100' : 'opacity-0',
     active ? 'translate-x-0' : 'translate-x-1',
-    animate && (active ? 'delay-60 motion-reduce:delay-0' : 'delay-0')
+    animate && 'delay-0'
   );
 }
 

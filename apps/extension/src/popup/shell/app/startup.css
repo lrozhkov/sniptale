@@ -137,6 +137,13 @@ body {
     opacity 120ms ease;
 }
 
+.popup-react-shell__tabs[data-animate='false'] .popup-react-shell__tab-indicator,
+.popup-react-shell__tabs[data-animate='false'] .popup-react-shell__tab-indicator::after,
+.popup-react-shell__tabs[data-animate='false'] button,
+.popup-react-shell__tabs[data-animate='false'] button svg {
+  transition: none;
+}
+
 .popup-react-shell__tab-indicator::after {
   position: absolute;
   right: 0;
@@ -163,8 +170,9 @@ body {
 .popup-react-shell__menu-ring circle {
   fill: none;
   stroke: var(--sniptale-color-accent, var(--popup-initial-accent));
-  stroke-width: 1.5px;
-  stroke-dasharray: 100 100;
+  stroke-width: 1.8px;
+  stroke-linecap: round;
+  stroke-dasharray: 102 100;
 }
 
 .popup-react-shell__tab-indicator[data-page='screenshots'] {
@@ -212,7 +220,7 @@ body {
     stroke-dasharray: 0 100;
   }
   to {
-    stroke-dasharray: 100 100;
+    stroke-dasharray: 102 100;
   }
 }
 
@@ -282,6 +290,7 @@ body {
 
 .popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
   color: var(--popup-initial-active-text);
+  border-color: transparent;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
 }
 

@@ -34,6 +34,12 @@ const QUICK_ACTIONS_STARTUP = {
   lastExportDestination: 'export',
 } as const;
 
+const MENU_STARTUP = {
+  selection: 'menu',
+  lastPage: 'menu',
+  lastExportDestination: 'export',
+} as const;
+
 async function openPopupHarness(page: Page, hostOrigin: string) {
   const runtimeErrors: string[] = [];
   page.on('pageerror', (error) => {
@@ -285,8 +291,11 @@ test('popup menu and tools use stable tiles without clipping the footer', async 
   await expect(footer).toBeVisible();
   const workspaceBox = await workspace.boundingBox();
   const footerBox = await footer.boundingBox();
+  const toolsBox = await tools.boundingBox();
   if (!workspaceBox || !footerBox) throw new Error('Menu layout geometry is unavailable');
   expect(workspaceBox.y + workspaceBox.height).toBeLessThan(footerBox.y);
+  if (!toolsBox) throw new Error('Menu row geometry is unavailable');
+  expect(workspaceBox.y - (toolsBox.y + toolsBox.height)).toBeLessThan(24);
 
   const imageEditor = workspace.getByRole('button', { name: POPUP_IMAGE_EDITOR_LABEL });
   const quickAction = menu.getByRole('button', {
@@ -309,9 +318,45 @@ test('popup menu and tools use stable tiles without clipping the footer', async 
   await page.locator('[data-ui="popup.app.tabs"] button[data-page="tools"]').click();
   const tool = page.locator('[data-ui="popup.home.tools.drawing"]');
   await expect(tool).toBeVisible();
+  await tool.evaluate((element) => element.removeAttribute('disabled'));
   const toolBefore = await tool.boundingBox();
+  const toolIcon = tool.locator('svg');
+  const restingIconTransform = await toolIcon.evaluate(
+    (element) => getComputedStyle(element).scale
+  );
   await tool.hover();
   expect(await tool.boundingBox()).toEqual(toolBefore);
+  await expect
+    .poll(() => toolIcon.evaluate((element) => getComputedStyle(element).scale))
+    .not.toBe(restingIconTransform);
+});
+
+test('popup menu starts with a complete ring and no entrance animation', async ({
+  page,
+  hostOrigin,
+}) => {
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: { [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE },
+    storage: { sniptale_popup_startup: MENU_STARTUP },
+  });
+  await openPopupHarness(page, hostOrigin);
+  await page.addStyleTag({ url: `${hostOrigin}/assets/index.css` });
+  const nav = page.locator('[data-ui="popup.app.tabs"]');
+  const indicator = nav.locator('.popup-react-shell__tab-indicator');
+  await expect(indicator).toHaveAttribute('data-page', 'menu');
+  await expect(nav).toHaveAttribute('data-animate', 'false');
+  expect(await indicator.evaluate((element) => getComputedStyle(element).transitionDuration)).toBe(
+    '0s'
+  );
+  expect(
+    await indicator
+      .locator('circle')
+      .evaluate((element) => getComputedStyle(element).strokeDasharray)
+  ).toBe('102px, 100px');
+  expect(
+    await indicator.locator('circle').evaluate((element) => element.getAnimations().length)
+  ).toBe(0);
 });
 
 test('popup page access choice hides page actions and unlocks after activation', async ({

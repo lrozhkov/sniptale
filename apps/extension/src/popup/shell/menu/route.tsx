@@ -63,8 +63,8 @@ function buildCaptureConfig(
 
 const workspaceActions = [
   { icon: Images, labelKey: 'popup.home.libraryLabel', onClick: () => openLibrary() },
-  { icon: Film, labelKey: 'popup.home.videoEditorLabel', onClick: openVideoEditor },
   { icon: ImageEditorIcon, labelKey: 'popup.home.imageEditorLabel', onClick: openImageEditor },
+  { icon: Film, labelKey: 'popup.home.videoEditorLabel', onClick: openVideoEditor },
   {
     icon: ScenarioEditorIcon,
     labelKey: 'popup.home.scenarioEditorLabel',
@@ -135,7 +135,7 @@ const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 const SECTION_HEADING_CLASS_NAME = [
-  'mb-2 text-[10px] font-semibold uppercase tracking-[0.08em]',
+  'mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
   'text-[var(--sniptale-color-text-muted-strong)]',
 ].join(' ');
 const CAPTURE_LABEL_CLASS_NAME = [
@@ -231,7 +231,7 @@ export function MenuRoute({
           <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.toolsLabel')}</h2>
           <MenuPageTools disabledReason={disabledReason} onOpenToolbar={openToolbar} />
         </section>
-        <section className="mt-auto shrink-0" data-ui="popup.menu.workspace">
+        <section className="mt-2 shrink-0" data-ui="popup.menu.workspace">
           <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.workspaceTitle')}</h2>
           <MenuWorkspace />
         </section>

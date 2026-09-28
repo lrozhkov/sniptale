@@ -43,7 +43,7 @@ it('keeps inactive modes compact while the expanded content stays out of layout'
   expect(markup).toContain('opacity-0');
   expect(markup).toContain('group-hover:scale-110');
   expect(markup).not.toContain('group-hover:-translate-y-px');
-  expect(markup).toContain('absolute inset-y-0 left-2.5 flex w-[148px]');
+  expect(markup).toContain('absolute inset-y-0 left-2.5 right-2 flex');
   expect(markup).toContain('Choose an area');
   expect(markup).toContain('title="Area. Choose an area"');
 });
@@ -65,10 +65,10 @@ it('animates width while crossfading static compact and expanded layouts', () =>
   expect(markup).toContain('transition-[opacity,transform]');
   expect(markup).toContain('justify-center');
   expect(markup).toContain('left-2.5');
-  expect(markup).toContain('w-[148px]');
+  expect(markup).not.toContain('w-[148px]');
   expect(markup).not.toContain('transition-[left,transform,color]');
   expect(markup).not.toContain('delay-200');
-  expect(markup).toContain('delay-60');
+  expect(markup).not.toContain('delay-60');
   expect(markup).not.toContain('var(--sniptale-color-accent-soft)');
   expect(markup).toContain('motion-reduce:transition-none');
   expect(markup).not.toContain('scale-95');
