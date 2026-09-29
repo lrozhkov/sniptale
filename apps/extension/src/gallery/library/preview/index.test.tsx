@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createScenarioExportItem, createVideoProjectItem } from '../actions/test-support/index';
+import {
+  createMediaItem,
+  createScenarioExportItem,
+  createVideoProjectItem,
+} from '../actions/test-support/index';
 import { PreviewPanel } from './index';
 import type { PreviewPanelProps } from './types';
 
@@ -22,6 +26,12 @@ vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
   formatDate: formatDateMock,
   getGalleryItemKindLabel: getGalleryItemKindLabelMock,
+}));
+
+vi.mock('../../video-review', () => ({
+  VideoReview: (props: { aggregateId: string }) => (
+    <div data-ui="preview.videoReview">{props.aggregateId}</div>
+  ),
 }));
 
 vi.mock('./media', () => ({
@@ -364,18 +374,36 @@ it('keeps keyboard focus within a collapsed Trash preview', () => {
   expect(document.activeElement).toBe(close);
 });
 
-it('keeps focus on Restore when navigating between keyed Trash previews', async () => {
+it('keeps focus on Restore when navigating between Trash previews in one session', async () => {
   const first = createProps({ trashMode: true, onRestoreTrash: vi.fn(async () => true) });
-  act(() => root?.render(<PreviewPanel key="first" {...first} />));
+  act(() => root?.render(<PreviewPanel {...first} />));
   const second = createProps({
     ...first,
     item: { ...first.item, id: 'asset-2', filename: 'next.png' },
   });
-  await act(async () => root?.render(<PreviewPanel key="second" {...second} />));
+  await act(async () => root?.render(<PreviewPanel {...second} />));
   await Promise.resolve();
   expect(document.activeElement).toBe(
     container?.querySelector('[data-ui="gallery.preview.restore"]')
   );
+});
+
+it('resets video review mode when the unkeyed preview changes items', () => {
+  const video = createMediaItem({
+    id: 'video-a',
+    filename: 'first.webm',
+    kind: 'recording',
+    mimeType: 'video/webm',
+  });
+  render(createProps({ item: video, initialMode: 'edit' }));
+  expect(container?.querySelector('[data-ui="preview.videoReview"]')?.textContent).toBe('video-a');
+
+  render(createProps({ item: { ...createProps().item, id: 'image-b' } }));
+  expect(container?.querySelector('[data-ui="preview.videoReview"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.media"]')).not.toBeNull();
+
+  render(createProps({ item: video }));
+  expect(container?.querySelector('[data-ui="preview.videoReview"]')).toBeNull();
 });
 
 it('navigates adjacent media with arrow keys but preserves arrow editing inside fields', () => {

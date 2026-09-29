@@ -187,7 +187,6 @@ function renderPreviewOverlayPanel(
 ) {
   return (
     <PreviewPanel
-      key={previewItem.id}
       trashMode={Boolean(
         props.state.filters.trashMode || previewItem.lifecycle?.trashedAt !== undefined
       )}

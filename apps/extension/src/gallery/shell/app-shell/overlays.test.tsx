@@ -11,11 +11,13 @@ const {
   importConflictPropsMock,
   mediaImportConflictPropsMock,
   previewPanelPropsMock,
+  previewPanelReal,
 } = vi.hoisted(() => ({
   confirmDialogPropsMock: vi.fn(),
   importConflictPropsMock: vi.fn(),
   mediaImportConflictPropsMock: vi.fn(),
   previewPanelPropsMock: vi.fn(),
+  previewPanelReal: { enabled: false },
 }));
 
 vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) => ({
@@ -44,12 +46,16 @@ vi.mock('../../library/modals/media-import-conflict-content', () => ({
   },
 }));
 
-vi.mock('../../library/preview', () => ({
-  PreviewPanel: (props: unknown) => {
-    previewPanelPropsMock(props);
-    return <div data-ui="test.preview-panel" />;
-  },
-}));
+vi.mock('../../library/preview', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../library/preview')>();
+  return {
+    PreviewPanel: (props: Parameters<typeof actual.PreviewPanel>[0]) => {
+      previewPanelPropsMock(props);
+      if (previewPanelReal.enabled) return <actual.PreviewPanel {...props} />;
+      return <div data-ui="test.preview-panel" />;
+    },
+  };
+});
 
 import { GalleryOverlays } from './overlays';
 
@@ -204,10 +210,78 @@ async function invokePreviewCallbacks(previewProps: PreviewOverlayProps) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  previewPanelReal.enabled = false;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('keeps the real zoom toolbar mounted while navigating to a loading image', () => {
+  previewPanelReal.enabled = true;
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  vi.stubGlobal(
+    'Image',
+    class {
+      naturalWidth = 1600;
+      naturalHeight = 900;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    }
+  );
+  const first = createMediaItem({ id: 'zoom-first', kind: 'image', mimeType: 'image/png' });
+  const second = createMediaItem({ id: 'zoom-second', kind: 'image', mimeType: 'image/png' });
+  const props = createLayoutProps();
+  props.state = createGalleryState({
+    previewItem: first,
+    previewUrl: 'blob:first',
+    filteredItems: [first, second],
+  });
+  props.state.preview.session.loadStatus = 'ready';
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  const image = container?.querySelector('img');
+  if (image) {
+    Object.defineProperties(image, {
+      naturalWidth: { configurable: true, value: 1600 },
+      naturalHeight: { configurable: true, value: 900 },
+    });
+    act(() => image.dispatchEvent(new Event('load')));
+  }
+  const toolbar = container?.querySelector<HTMLInputElement>(
+    '[data-ui="gallery.preview.zoomSlider"]'
+  );
+  expect(toolbar).not.toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(toolbar, '1.5');
+    toolbar?.dispatchEvent(new Event('input', { bubbles: true }));
+    toolbar?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const lock = toolbar?.closest('.group')?.querySelector<HTMLButtonElement>('[aria-pressed]');
+  expect(lock?.disabled).toBe(false);
+  act(() => lock?.click());
+  expect(lock?.getAttribute('aria-pressed')).toBe('true');
+
+  props.state = createGalleryState({
+    previewItem: second,
+    previewUrl: null,
+    filteredItems: [first, second],
+  });
+  props.state.preview.session.loadStatus = 'loading';
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(toolbar);
+  expect(toolbar?.value).toBe('1.5');
+  expect(toolbar?.disabled).toBe(true);
+  expect(lock?.disabled).toBe(true);
+  expect(lock?.getAttribute('aria-pressed')).toBe('true');
 });
 
 afterEach(() => {

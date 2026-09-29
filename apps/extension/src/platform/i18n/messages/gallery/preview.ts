@@ -168,12 +168,16 @@ export const galleryPreviewMessages = defineMessageSource({
     en: 'Reset zoom',
   },
   lockZoom: {
-    ru: 'Зафиксировать масштаб',
-    en: 'Lock zoom',
+    ru: 'Сохранять выбранный масштаб при переключении материалов',
+    en: 'Keep the chosen zoom when switching items',
   },
   unlockZoom: {
-    ru: 'Снять фиксацию масштаба',
-    en: 'Unlock zoom',
+    ru: 'Использовать автоматический масштаб для новых материалов',
+    en: 'Use automatic zoom for new items',
+  },
+  zoomLockToggle: {
+    ru: 'Сохранять масштаб при переключении материалов',
+    en: 'Keep zoom when switching items',
   },
   zoomSlider: {
     ru: 'Масштаб изображения',

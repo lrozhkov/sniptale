@@ -123,6 +123,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -157,6 +158,76 @@ it('shows item-scoped loading, missing, and load-error feedback without an old m
   expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
     'gallery.preview.mediaUnavailable'
   );
+});
+
+it('keeps zoom controls in place through delayed loading and unavailable image feedback', () => {
+  vi.useFakeTimers();
+  const first = createItem({ id: 'first' });
+  const next = createItem({ id: 'next' });
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: first, previewUrl: 'blob:first', previewLoadStatus: 'ready' })}
+    />
+  );
+  const slider = container?.querySelector<HTMLInputElement>(
+    '[data-ui="gallery.preview.zoomSlider"]'
+  );
+  expect(slider).not.toBeNull();
+
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: next, previewUrl: null, previewLoadStatus: 'loading' })}
+    />
+  );
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
+  expect(slider?.disabled).toBe(true);
+  expect(container?.querySelector('img')).toBeNull();
+  act(() => vi.advanceTimersByTime(320));
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
+  expect(container?.querySelector('img')).toBeNull();
+
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: next, previewUrl: null, previewLoadStatus: 'missing' })}
+    />
+  );
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
+  expect(slider?.disabled).toBe(true);
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'gallery.preview.mediaMissing'
+  );
+  vi.useRealTimers();
+});
+
+it('ignores an obsolete image preload during rapid A to B to C navigation', () => {
+  const first = createItem({ id: 'first' });
+  const second = createItem({ id: 'second' });
+  const third = createItem({ id: 'third' });
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: first, previewUrl: 'blob:first', previewLoadStatus: 'ready' })}
+    />
+  );
+  const slider = container?.querySelector('[data-ui="gallery.preview.zoomSlider"]');
+  ImagePreloaderStub.deferLoad = true;
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: second, previewUrl: 'blob:second', previewLoadStatus: 'ready' })}
+    />
+  );
+  const secondPreload = ImagePreloaderStub.instances.at(-1);
+  renderNode(
+    <PreviewMedia
+      {...createProps({ item: third, previewUrl: 'blob:third', previewLoadStatus: 'ready' })}
+    />
+  );
+  const thirdPreload = ImagePreloaderStub.instances.at(-1);
+  act(() => secondPreload?.onload?.());
+  expect(container?.querySelector('img')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
+  act(() => thirdPreload?.onload?.());
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:third');
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
 });
 
 it('reports image decode failure for the current item and clears it for another URL', () => {

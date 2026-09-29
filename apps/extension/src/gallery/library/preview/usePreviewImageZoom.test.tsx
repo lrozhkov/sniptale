@@ -213,6 +213,20 @@ it('switches between different image proportions at fit scale without an interme
   ).toEqual([]);
 });
 
+it('fits a portrait image inside the padded narrow preview content area', () => {
+  renderHook({ enabled: true, resetKey: 'narrow-portrait' });
+  const element = setContainerSize(368, 500);
+  element.style.padding = '112px 16px 16px';
+
+  act(() => {
+    latestValue?.image.handleImageLoad(createImageLoadEvent(400, 1600));
+    triggerResize();
+  });
+
+  expect(latestValue?.image.style).toEqual({ width: '93px', height: '372px' });
+  expect(latestValue?.controls.zoom).toBe(0.2325);
+});
+
 it('holds the chosen image scale across different sizes and returns to fit when unlocked', () => {
   renderHook({ enabled: true, resetKey: 'wide', naturalSize: { width: 1600, height: 900 } });
   setContainerSize(800, 600);
@@ -360,6 +374,10 @@ it('skips wheel zoom when disabled, falls back to element dimensions, and discon
 it('pans a zoomed image with pointer drag while keeping the viewport fixed', () => {
   renderHook({ enabled: true, resetKey: 'drag' });
   const element = setContainerSize(800, 600);
+  act(() => {
+    latestValue?.image.handleImageLoad(createImageLoadEvent(1600, 900));
+    triggerResize();
+  });
   element.scrollLeft = 120;
   element.scrollTop = 80;
   element.setPointerCapture = vi.fn();
@@ -396,6 +414,33 @@ it('pans a zoomed image with pointer drag while keeping the viewport fixed', () 
       pointerId: 7,
     } as Parameters<NonNullable<typeof latestValue>['viewport']['handlePointerEnd']>[0]);
   });
+  expect(latestValue?.viewport.isPanning).toBe(false);
+  expect(element.releasePointerCapture).toHaveBeenCalledWith(7);
+});
+
+it('releases an active pan when the next image starts loading', () => {
+  renderHook({ enabled: true, resetKey: 'first' });
+  const element = setContainerSize(800, 600);
+  element.setPointerCapture = vi.fn();
+  element.hasPointerCapture = vi.fn(() => true);
+  element.releasePointerCapture = vi.fn();
+  act(() => {
+    latestValue?.image.handleImageLoad(createImageLoadEvent(1600, 900));
+    triggerResize();
+    latestValue?.controls.zoomIn();
+  });
+  act(() => {
+    latestValue?.viewport.handlePointerDown({
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+      currentTarget: element,
+      pointerId: 7,
+    } as Parameters<NonNullable<typeof latestValue>['viewport']['handlePointerDown']>[0]);
+  });
+  expect(latestValue?.viewport.isPanning).toBe(true);
+
+  renderHook({ enabled: false, resetKey: 'first' });
   expect(latestValue?.viewport.isPanning).toBe(false);
   expect(element.releasePointerCapture).toHaveBeenCalledWith(7);
 });

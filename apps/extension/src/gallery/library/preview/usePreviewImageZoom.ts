@@ -178,9 +178,7 @@ function calculatePreviewImageFitSize(natural: PreviewSize, container: PreviewSi
     return natural;
   }
 
-  const availableWidth = Math.max(1, container.width - PREVIEW_IMAGE_FIT_HORIZONTAL_INSET);
-  const availableHeight = Math.max(1, container.height - PREVIEW_IMAGE_FIT_VERTICAL_INSET);
-  const ratio = Math.min(availableWidth / natural.width, availableHeight / natural.height, 1);
+  const ratio = Math.min(container.width / natural.width, container.height / natural.height, 1);
   return {
     width: Math.round(natural.width * ratio),
     height: Math.round(natural.height * ratio),
@@ -192,9 +190,20 @@ function readContainerSize(container: HTMLDivElement | null): PreviewSize | null
     return null;
   }
 
+  const style = getComputedStyle(container);
+  const horizontalPadding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const verticalPadding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+
   return {
-    width: container.clientWidth,
-    height: container.clientHeight,
+    width: container.clientWidth
+      ? Math.max(
+          1,
+          container.clientWidth - (horizontalPadding || PREVIEW_IMAGE_FIT_HORIZONTAL_INSET)
+        )
+      : 0,
+    height: container.clientHeight
+      ? Math.max(1, container.clientHeight - (verticalPadding || PREVIEW_IMAGE_FIT_VERTICAL_INSET))
+      : 0,
   };
 }
 
@@ -258,8 +267,16 @@ function usePreviewImagePan(input: {
 }) {
   const [isPanning, setIsPanning] = useState(false);
   const panStartRef = useRef({ clientX: 0, clientY: 0, scrollLeft: 0, scrollTop: 0 });
+  const activePointerRef = useRef<{ container: HTMLDivElement; pointerId: number } | null>(null);
 
-  useEffect(() => setIsPanning(false), [input.enabled, input.resetKey]);
+  useEffect(() => {
+    const active = activePointerRef.current;
+    if (active?.container.hasPointerCapture(active.pointerId)) {
+      active.container.releasePointerCapture(active.pointerId);
+    }
+    activePointerRef.current = null;
+    setIsPanning(false);
+  }, [input.enabled, input.resetKey]);
 
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -269,6 +286,7 @@ function usePreviewImagePan(input: {
 
       const container = event.currentTarget;
       container.setPointerCapture(event.pointerId);
+      activePointerRef.current = { container, pointerId: event.pointerId };
       panStartRef.current = {
         clientX: event.clientX,
         clientY: event.clientY,
@@ -295,6 +313,7 @@ function usePreviewImagePan(input: {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    activePointerRef.current = null;
     setIsPanning(false);
   }, []);
 
@@ -388,8 +407,8 @@ export function usePreviewImageZoom(
     }
   }, [resetKey, zoomLocked]);
 
-  usePreviewWheelZoom({ containerRef, enabled, requestScale, scaleRef });
-  const imagePan = usePreviewImagePan({ enabled, isZoomedFromFit, resetKey });
+  usePreviewWheelZoom({ containerRef, enabled: enabled && ready, requestScale, scaleRef });
+  const imagePan = usePreviewImagePan({ enabled: enabled && ready, isZoomedFromFit, resetKey });
 
   return {
     controls: {

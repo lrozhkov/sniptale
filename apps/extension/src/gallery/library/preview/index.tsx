@@ -172,14 +172,23 @@ function handlePreviewKeyDown(
 
 export function PreviewPanel(props: PreviewPanelProps) {
   const { item, navigation, onClose } = props;
-  const [review, setReview] = useState(
-    () =>
-      !props.trashMode &&
-      props.initialMode === 'edit' &&
-      isGalleryMediaItem(item) &&
-      item.mimeType.startsWith('video/')
-  );
+  const initialReview =
+    !props.trashMode &&
+    props.initialMode === 'edit' &&
+    isGalleryMediaItem(item) &&
+    item.mimeType.startsWith('video/');
+  const [reviewState, setReviewState] = useState(() => ({
+    itemId: item.id,
+    active: initialReview,
+  }));
+  const review = reviewState.itemId === item.id ? reviewState.active : initialReview;
   const opener = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setReviewState((current) =>
+      current.itemId === item.id ? current : { itemId: item.id, active: initialReview }
+    );
+  }, [initialReview, item.id]);
 
   useEffect(() => {
     if (review) return;
@@ -196,7 +205,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
         aggregateId={item.id}
         onClose={onClose}
         onBack={() => {
-          setReview(false);
+          setReviewState({ itemId: item.id, active: false });
           requestAnimationFrame(() => {
             const button = document.querySelector<HTMLButtonElement>(
               '[data-ui="gallery.videoReview.enter"]'
@@ -214,7 +223,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
         if (props.trashMode) return;
         opener.current =
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        setReview(true);
+        setReviewState({ itemId: item.id, active: true });
       }}
     />
   );
@@ -240,7 +249,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
         (opener?.isConnected ? opener : fallback)?.focus();
       });
     };
-  }, [props.trashMode]);
+  }, [props.trashMode, item.id]);
 
   return (
     <div
