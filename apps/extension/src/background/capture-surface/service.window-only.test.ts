@@ -151,23 +151,34 @@ describe('window-only capture-surface application', () => {
     expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
   });
 
-  it('rolls back when the tab raster does not follow the correction', async () => {
-    let current = applied;
+  it('keeps an owned Full HD window when Chromium ignores the optional raster correction', async () => {
+    const fullHd = { ...preset, height: 1080, id: 'window-full-hd', width: 1920 };
+    const fullHdWindow = { ...prior, height: 1080, width: 1920 };
+    mocks.loadSettings.mockResolvedValue({ viewportPresets: [fullHd] });
+    mocks.prepareWindowSize.mockResolvedValue({ expected: fullHdWindow, prior });
+    let current = fullHdWindow;
     mocks.getWindowSnapshot.mockImplementation(async () => current);
     mocks.getWindowWorkArea.mockImplementation(async () => ({
       snapshot: current,
-      workArea: { width: 1920, height: 1040 },
+      workArea: { width: 2560, height: 1440 },
     }));
     mocks.applyPreparedWindowSize.mockImplementation(async (_id, _prior, next) => {
       current = next;
       return next;
     });
-    const measure = vi.fn(async () => ({ width: 1280, height: 633, scale: 1, windowId: 3 }));
-    await expect(
-      new DefaultCaptureSurfaceService().apply(
-        request({ owner: 'video', context: 'video-tab', measureVideoViewport: measure })
-      )
-    ).rejects.toMatchObject({ code: 'verification-failed' });
+    const measure = vi.fn(async () => ({ width: 1920, height: 993, scale: 1, windowId: 3 }));
+    const service = new DefaultCaptureSurfaceService();
+    const binding = await service.apply(
+      request({
+        owner: 'video',
+        context: 'video-tab',
+        measureVideoViewport: measure,
+        presetId: fullHd.id,
+      })
+    );
+    expect(binding).toMatchObject({ width: 1920, height: 1079 });
+    expect(current).toMatchObject({ width: 1920, height: 1079 });
+    await service.release(binding);
     expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
   });
 

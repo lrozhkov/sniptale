@@ -42,20 +42,25 @@ const fixture = vi.hoisted(() => {
 });
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: vi.fn() }));
-vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
-  loadSettings: fixture.load,
-  patchLocalStoragePolicy: fixture.patch,
-  subscribeToSettingsChanges: (listener: Parameters<typeof fixture.listeners.add>[0]) => {
-    fixture.listeners.add(listener);
-    return () => fixture.listeners.delete(listener);
-  },
-}));
+vi.mock(
+  '../../../../apps/extension/src/composition/persistence/settings',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../apps/extension/src/composition/persistence/settings')
+    >()),
+    loadSettings: fixture.load,
+    patchLocalStoragePolicy: fixture.patch,
+    subscribeToSettingsChanges: (listener: Parameters<typeof fixture.listeners.add>[0]) => {
+      fixture.listeners.add(listener);
+      return () => fixture.listeners.delete(listener);
+    },
+  })
+);
 
-import { useStoragePolicyState } from './use-storage-policy-state';
-import { useTrashRetentionPolicy } from '../../../../gallery/state/useTrashRetentionPolicy';
-import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../../composition/persistence/library-lifecycle';
-import { StaleLocalStoragePolicyError } from '../../../../composition/persistence/settings';
+import { useStoragePolicyState } from '../../../../apps/extension/src/settings/sections/capture/storage-drafts/use-storage-policy-state';
+import { useTrashRetentionPolicy } from '../../../../apps/extension/src/gallery/state/useTrashRetentionPolicy';
+import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../../apps/extension/src/composition/persistence/library-lifecycle';
+import { StaleLocalStoragePolicyError } from '../../../../apps/extension/src/composition/persistence/settings';
 
 it('keeps Settings and Gallery Trash on one policy across edits, failure, retry and reopen', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

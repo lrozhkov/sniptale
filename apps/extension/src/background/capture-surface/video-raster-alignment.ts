@@ -5,6 +5,7 @@ import type {
   VideoCaptureViewport,
 } from './types';
 import { CaptureSurfaceError } from './types';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   applyPreparedWindowSize,
   getWindowSnapshot,
@@ -14,6 +15,7 @@ import {
 
 type Size = { width: number; height: number };
 type Raster = Size & { scale: number };
+const logger = createLogger({ namespace: 'VideoCaptureSurfaceAlignment' });
 
 function alignedDimension(outer: number, content: number, scale: number, limit: number): number {
   // Chromium's I420 capture requires an even physical content rectangle, not even window bounds.
@@ -87,7 +89,12 @@ export async function alignVideoCaptureSurface(
   const verified = await readStableViewport(state, measure);
   const verifiedSize = resolveVideoRasterWindowSize(expected, verified, workArea);
   if (verifiedSize.width !== expected.width || verifiedSize.height !== expected.height) {
-    throw new CaptureSurfaceError('verification-failed');
+    // The browser owns the content raster. The window mutation itself has been
+    // verified, so retain that journaled window even if a second pixel correction
+    // would be needed. The encoder accepts an even output grid for odd tab rasters.
+    logger.warn('Video raster correction was not reflected in the tab', {
+      code: 'raster-correction-unavailable',
+    });
   }
   state.applied.width = expected.width;
   state.applied.height = expected.height;

@@ -1,6 +1,7 @@
 import { CaptureMode, type CaptureSource } from '@sniptale/runtime-contracts/video/types/types';
 import { enrichCaptureSourceWithTabInfo } from '../capture-source';
 import type { ResolveCaptureSourceDeps } from './preflight.resolve.types';
+import { classifyTabCaptureFailure, VideoRecordingStartFailure } from './start-failure';
 
 export async function resolveTabCaptureSource(
   tabId: number | null,
@@ -45,9 +46,7 @@ export async function resolveTabCaptureSource(
     deps.logger.debug('Capture source resolved', resolvedSource.mode);
     return resolvedSource;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    await deps.notifyStartFailed(message);
-    return null;
+    throw new VideoRecordingStartFailure(classifyTabCaptureFailure(error));
   }
 }
 

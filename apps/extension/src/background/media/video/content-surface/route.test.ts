@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   waitForOffscreenReady: vi.fn(),
   updateRecordingSettings: vi.fn(),
   getTab: vi.fn(),
+  getAllFrames: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/browser/action', () => ({
@@ -31,6 +32,9 @@ vi.mock('@sniptale/platform/browser/action', () => ({
 }));
 vi.mock('@sniptale/platform/browser/tabs', () => ({
   browserTabs: { get: mocks.getTab },
+}));
+vi.mock('@sniptale/platform/browser/web-navigation', () => ({
+  browserWebNavigation: { getAllFrames: mocks.getAllFrames },
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -111,6 +115,7 @@ import {
   ensureVideoRecordingSurfaceLeaseHydrated,
   requestVideoRecordingSurface,
   resetVideoRecordingSurfaceLeaseForTests,
+  updateVideoRecordingSurface,
 } from './surface-lease';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -122,6 +127,7 @@ beforeEach(() => {
   resetVideoRecordingSurfaceLeaseForTests();
   mocks.ensureHeadroom.mockResolvedValue(undefined);
   mocks.getTab.mockResolvedValue({ active: true, windowId: 7 });
+  mocks.getAllFrames.mockResolvedValue([{ frameId: 0, documentId: 'doc-12' }]);
   mocks.openPopup.mockResolvedValue(undefined);
   mocks.ensureOffscreenDocument.mockResolvedValue(false);
   mocks.waitForOffscreenReady.mockResolvedValue(undefined);
@@ -156,7 +162,7 @@ it('starts only a saved TAB recording and returns a surface token', async () => 
     },
     resolvedTabId: 12,
     sendResponse,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
 
@@ -165,7 +171,8 @@ it('starts only a saved TAB recording and returns a surface token', async () => 
     DEFAULT_VIDEO_SETTINGS,
     CaptureMode.TAB,
     'preset-1',
-    'https://example.test/page'
+    'https://example.test/page',
+    'doc-12'
   );
   expect(sendResponse).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -182,6 +189,36 @@ it('starts only a saved TAB recording and returns a surface token', async () => 
   ).toEqual(sendResponse.mock.calls[0]?.[0]);
 });
 
+it('rejects a same-URL reload before recording side effects', async () => {
+  mocks.getAllFrames
+    .mockResolvedValueOnce([{ frameId: 0, documentId: 'doc-12' }])
+    .mockResolvedValueOnce([{ frameId: 0, documentId: 'doc-after-reload' }]);
+  const response = await routeStartWithoutSender('https://example.test/page');
+
+  expect(response).toEqual({ success: false, failureCode: 'stale-context' });
+  expect(mocks.startRecording).not.toHaveBeenCalled();
+});
+
+it('does not clear an active surface lease on a duplicate start', async () => {
+  const lease = await requestVideoRecordingSurface({
+    entry: 'manual',
+    recordingId: 'recording-live',
+    tabId: 12,
+  });
+  await updateVideoRecordingSurface(lease.surfaceSessionId, { lifecycle: 'ready' });
+  mocks.startRecording.mockResolvedValueOnce({ result: 'already-active' });
+
+  const response = await routeStartWithoutSender('https://example.test/page');
+  const current = await ensureVideoRecordingSurfaceLeaseHydrated();
+
+  expect(response).toMatchObject({
+    failureCode: 'already-active',
+    success: false,
+    snapshot: { recordingId: 'recording-live' },
+  });
+  expect(current).toMatchObject({ recordingId: 'recording-live', lifecycle: 'ready' });
+});
+
 it('preserves manual surface authority while start is pending so cancel-start remains valid', async () => {
   const lease = await requestVideoRecordingSurface({ entry: 'manual', tabId: 12 });
   let resolveStart!: (value: { result: 'accepted'; recordingId: string }) => void;
@@ -196,7 +233,7 @@ it('preserves manual surface authority while start is pending so cancel-start re
     },
     resolvedTabId: 12,
     sendResponse: started,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await vi.waitFor(() => expect(mocks.startRecording).toHaveBeenCalledOnce());
 
@@ -238,7 +275,7 @@ it('rejects stale document commands before invoking recording controls', async (
     },
     resolvedTabId: 12,
     sendResponse,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
 
@@ -263,7 +300,7 @@ it('rejects a camera offer from the document generation invalidated by navigatio
     },
     resolvedTabId: 12,
     sendResponse,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
 
@@ -291,7 +328,7 @@ it('revalidates an accepted camera offer after asynchronous peer creation', asyn
     },
     resolvedTabId: 12,
     sendResponse,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await vi.waitFor(() => expect(mocks.sendRuntimeMessage).toHaveBeenCalledOnce());
   await beginVideoRecordingSurfaceRebind(12);
@@ -395,7 +432,7 @@ it('activates and releases the manual surface with matching authority', async ()
     },
     resolvedTabId: 12,
     sendResponse: activated,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
   const response = activated.mock.calls[0]?.[0];
@@ -410,7 +447,7 @@ it('activates and releases the manual surface with matching authority', async ()
     },
     resolvedTabId: 12,
     sendResponse: released,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
   expect(released).toHaveBeenCalledWith({ success: true, result: 'released' });
@@ -431,7 +468,7 @@ it('restores toolbar persistence when a hidden active surface is manually reopen
     },
     resolvedTabId: 12,
     sendResponse: activated,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
 
@@ -464,7 +501,7 @@ it('routes valid camera offer and close commands through the stable offscreen pe
     },
     resolvedTabId: 12,
     sendResponse: offerResponse,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
   expect(offerResponse).toHaveBeenCalledWith({ success: true, sdp: 'answer-sdp' });
@@ -480,7 +517,7 @@ it('routes valid camera offer and close commands through the stable offscreen pe
     },
     resolvedTabId: 12,
     sendResponse: closeResponse,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
   expect(closeResponse).toHaveBeenCalledWith({ success: true, result: 'closed' });
@@ -688,7 +725,7 @@ it('rejects toolbar visibility commands with a mismatched recording binding', as
 
 it('surfaces unavailable presets, failed starts, and missing sender authority', async () => {
   await expect(routeStartWithoutSender()).resolves.toEqual(
-    expect.objectContaining({ success: false })
+    expect.objectContaining({ success: false, failureCode: 'stale-context' })
   );
 
   mocks.resolvePreset.mockResolvedValueOnce(null);
@@ -700,11 +737,11 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
     },
     resolvedTabId: 12,
     sendResponse: unavailable,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
   expect(unavailable).toHaveBeenCalledWith(
-    expect.objectContaining({ success: false, error: expect.stringContaining('preset') })
+    expect.objectContaining({ success: false, failureCode: 'invalid-source' })
   );
 
   mocks.resolvePreset.mockResolvedValueOnce('preset-1');
@@ -717,11 +754,11 @@ it('surfaces unavailable presets, failed starts, and missing sender authority', 
     },
     resolvedTabId: 12,
     sendResponse: failed,
-    sender: { url: 'https://example.test/page' },
+    sender: { url: 'https://example.test/page', documentId: 'doc-12' },
   });
   await flush();
   expect(failed).toHaveBeenCalledWith(
-    expect.objectContaining({ success: false, error: 'capture failed' })
+    expect.objectContaining({ success: false, failureCode: 'internal-error' })
   );
 });
 
@@ -735,7 +772,7 @@ it('opens the video popup when a previous recording must be resolved', async () 
 
   expect(response).toEqual(
     expect.objectContaining({
-      error: 'Resolve the previous recording before starting another.',
+      failureCode: 'already-active',
       success: false,
     })
   );
@@ -751,7 +788,7 @@ async function routeStartWithoutSender(senderUrl?: string) {
     },
     resolvedTabId: 12,
     sendResponse: response,
-    sender: senderUrl ? { url: senderUrl } : undefined,
+    sender: senderUrl ? { url: senderUrl, documentId: 'doc-12' } : undefined,
   });
   await flush();
   return response.mock.calls[0]?.[0];

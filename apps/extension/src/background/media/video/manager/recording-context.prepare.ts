@@ -14,6 +14,7 @@ import {
 import { getVideoRecordingId } from '../session-state';
 import { ensureOffscreenDocumentReady } from './preflight.offscreen';
 import { captureViewportsEqual, readTabCaptureViewport } from '../capture-viewport';
+import { ensureCurrentRecordingDocument } from './start-failure';
 
 type RecordingContext = {
   captureMode: CaptureMode;
@@ -38,8 +39,9 @@ export async function initializeRecordingContext(props: {
   settings: VideoRecordingSettings;
   tabId: number | null;
   viewportPresetId: string | null;
+  ownerDocumentId?: string;
 }): Promise<RecordingContext | null> {
-  const { captureMode, settings, tabId, viewportPresetId } = props;
+  const { captureMode, settings, tabId, viewportPresetId, ownerDocumentId } = props;
   const recordingId = getVideoRecordingId();
   if (!recordingId) throw new Error('Recording session ID is missing');
 
@@ -88,6 +90,7 @@ export async function initializeRecordingContext(props: {
 
   const viewport = await prepareContentSurfaceOrAbort(tabId, captureMode, settings, recordingId);
   if (viewport === null) return null;
+  if (ownerDocumentId) await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
   // The stream ID is intentionally acquired only after the final surface and crop UI are ready.
   const captureSource = await resolveCaptureSourceForMode(tabId, tab, captureMode, settings);
   if (!captureSource) return null;

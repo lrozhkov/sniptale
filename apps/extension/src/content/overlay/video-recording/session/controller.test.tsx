@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   disposeDrawing: vi.fn(),
   drawingClear: vi.fn(),
   getAutoHideDelay: vi.fn(() => 0),
+  loggerWarn: vi.fn(),
   release: vi.fn(),
   requestAnswer: vi.fn(),
   runtimeListener: null as null | ((state: Record<string, unknown>) => void),
@@ -56,6 +57,10 @@ vi.mock('../../toolbar/video-recording/drawing-session', async (importOriginal) 
     setAutoHideDelay: mocks.setAutoHideDelay,
     setClockRunning: mocks.setClockRunning,
   }),
+}));
+
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ debug: vi.fn(), error: vi.fn(), log: vi.fn(), warn: mocks.loggerWarn }),
 }));
 
 import { useVideoRecordingSurfaceController } from './controller';
@@ -182,6 +187,51 @@ it('surfaces start failure and rolls back rejected media toggles', async () => {
     await expect(controller.onCameraEnabledChange(false)).rejects.toThrow('stale');
   });
   expect(controller.state.cameraEnabled).toBe(true);
+});
+
+it.each([
+  'permission-required',
+  'stale-context',
+  'invalid-source',
+  'already-active',
+  'internal-error',
+] as const)('shows a safe %s start diagnostic', async (failureCode) => {
+  mocks.start.mockResolvedValue({
+    success: false,
+    failureCode,
+    error: 'private browser error https://example.test/secret',
+  });
+
+  await act(async () => controller.onStart(new Event('click')));
+
+  expect(controller.state.error).toBeTruthy();
+  expect(controller.state.error).not.toContain('private browser error');
+  expect(mocks.loggerWarn).toHaveBeenCalledWith('Saved tab recording start was rejected', {
+    code: failureCode,
+  });
+});
+
+it('preserves an active recording when a duplicate start is rejected', async () => {
+  const active = {
+    ...snapshot,
+    recordingId: 'recording-1',
+    status: VideoRecordingStatus.RECORDING,
+  };
+  act(() => mocks.surfaceListener?.(active, 'token-1'));
+  mocks.start.mockResolvedValue({
+    success: false,
+    failureCode: 'already-active',
+    snapshot: active,
+    surfaceToken: 'token-1',
+  });
+
+  await act(async () => controller.onStart(new Event('click')));
+
+  expect(controller.state).toMatchObject({
+    phase: 'recording',
+    recordingId: 'recording-1',
+    error: expect.any(String),
+  });
 });
 
 it('waits for the authoritative camera snapshot before mounting preview', async () => {

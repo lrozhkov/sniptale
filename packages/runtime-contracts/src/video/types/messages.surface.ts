@@ -21,6 +21,26 @@ export type VideoRecordingSurfaceLifecycle =
 
 export type VideoRecordingSurfaceEntry = 'manual' | 'popup';
 
+export const VIDEO_RECORDING_START_FAILURE_CODES = [
+  'permission-required',
+  'stale-context',
+  'invalid-source',
+  'viewport-too-large',
+  'viewport-verification-failed',
+  'already-active',
+  'duplicate-preparing',
+  'cancelled',
+  'internal-error',
+] as const;
+
+export type VideoRecordingStartFailureCode = (typeof VIDEO_RECORDING_START_FAILURE_CODES)[number];
+
+export function isVideoRecordingStartFailureCode(
+  value: unknown
+): value is VideoRecordingStartFailureCode {
+  return VIDEO_RECORDING_START_FAILURE_CODES.some((code) => code === value);
+}
+
 export interface VideoRecordingSurfaceSnapshot {
   autoFadeDelay: VideoAutoFadeDelay;
   surfaceSessionId: string;

@@ -9,13 +9,14 @@ import { beginPreparedRecording } from './flow';
 import { scheduleRecordingStartActivationWatchdog } from './start-activation-watchdog';
 import { enableControlledCursorCapture } from '../runtime/manager/controlled-cursor/messages';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import type { VideoRecordingStartFailureCode } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 const logger = createLogger({ namespace: 'BackgroundVideoStartDelivery' });
 
 export type RecordingStartResult =
   | { cameraLaunchToken?: string; controlToken: string; recordingId: string; result: 'accepted' }
   | { result: 'already-active' | 'cancelled' | 'duplicate-preparing' }
-  | { error: string; result: 'failed' };
+  | { error: string; failureCode?: VideoRecordingStartFailureCode; result: 'failed' };
 
 export async function finalizeAcceptedRecordingStart(
   recordingId: string,

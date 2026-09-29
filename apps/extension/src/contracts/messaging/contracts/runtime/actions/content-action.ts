@@ -33,6 +33,7 @@ import {
   isActivateVideoRecordingSurfaceMessage,
   isStartSavedTabVideoRecordingMessage,
   isVideoRecordingSurfaceSnapshot,
+  isVideoRecordingStartFailureCode,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 function isLibraryDestinationRequestedMarker(value: unknown): value is true {
@@ -102,6 +103,7 @@ export const contentActionRuntimeContracts = {
           surfaceSessionId: isString,
           surfaceToken: isString,
           snapshot: isVideoRecordingSurfaceSnapshot,
+          failureCode: isVideoRecordingStartFailureCode,
         },
       })
     ),

@@ -36,6 +36,11 @@ import {
   type RecordingSourceBinding,
 } from '../offscreen-recording-stop';
 import { readStoredVideoPostRecordResult } from '../../../storage/video/post-record-result';
+import {
+  classifyCaptureSurfaceStartFailure,
+  ensureCurrentRecordingDocument,
+  VideoRecordingStartFailure,
+} from './start-failure';
 
 const logger = createLogger({ namespace: 'BackgroundVideoManager' });
 
@@ -67,7 +72,8 @@ export async function startRecording(
   settings: VideoRecordingSettings,
   captureMode: CaptureMode = CaptureMode.TAB,
   viewportPresetId: string | null = null,
-  ownerSenderUrl?: string
+  ownerSenderUrl?: string,
+  ownerDocumentId?: string
 ): Promise<RecordingStartResult> {
   if (!ownerSenderUrl) {
     return { error: 'Unauthorized recording control sender', result: 'failed' };
@@ -84,7 +90,8 @@ export async function startRecording(
       settings,
       captureMode,
       viewportPresetId,
-      ownerSenderUrl
+      ownerSenderUrl,
+      ownerDocumentId
     );
   } finally {
     releaseStartPermit();
@@ -96,7 +103,8 @@ async function startRecordingWithPermit(
   settings: VideoRecordingSettings,
   captureMode: CaptureMode,
   viewportPresetId: string | null,
-  ownerSenderUrl: string
+  ownerSenderUrl: string,
+  ownerDocumentId?: string
 ): Promise<RecordingStartResult> {
   try {
     await waitForVideoCaptureSurfaceRecovery();
@@ -142,14 +150,24 @@ async function startRecordingWithPermit(
       settings: sanitizedSettings,
       tabId,
       viewportPresetId,
+      ...(ownerDocumentId === undefined ? {} : { ownerDocumentId }),
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const failureCode =
+      error instanceof VideoRecordingStartFailure
+        ? error.code
+        : classifyCaptureSurfaceStartFailure(error);
     try {
-      await notifyRecordingStartFailed(errorMessage, {
+      await notifyRecordingStartFailed(failureCode ?? errorMessage, {
+        ...(failureCode ? { diagnosticCode: failureCode } : {}),
         retainAuthority: requiresRecordingAuthorityRetention(error),
       });
-      return { error: errorMessage, result: 'failed' };
+      return {
+        error: failureCode ?? errorMessage,
+        ...(failureCode ? { failureCode } : {}),
+        result: 'failed',
+      };
     } catch (releaseError) {
       const releaseMessage =
         releaseError instanceof Error ? releaseError.message : String(releaseError);
@@ -165,8 +183,9 @@ async function executeRecordingStart(props: {
   settings: VideoRecordingSettings;
   tabId: number | undefined;
   viewportPresetId: string | null;
+  ownerDocumentId?: string;
 }): Promise<RecordingStartResult> {
-  const { tabId, captureMode, ownerSenderUrl, viewportPresetId, settings } = props;
+  const { tabId, captureMode, ownerSenderUrl, viewportPresetId, settings, ownerDocumentId } = props;
   if (captureMode !== CaptureMode.CAMERA && tabId === undefined) {
     throw new Error('No tab ID');
   }
@@ -177,14 +196,18 @@ async function executeRecordingStart(props: {
   let preparedBindingPersisted = false;
   let sourceBinding: RecordingSourceBinding | null = null;
   setVideoRecordingId(recordingId);
-  logger.log('Starting recording', { captureMode, recordingId, tabId: tabId ?? null });
+  logger.log('Starting recording', { captureMode });
 
   try {
+    if (ownerDocumentId && tabId !== undefined) {
+      await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
+    }
     const context = await initializeRecordingContext({
       captureMode,
       settings,
       tabId: tabId ?? null,
       viewportPresetId,
+      ...(ownerDocumentId === undefined ? {} : { ownerDocumentId }),
     });
     if (!context) {
       await releaseVideoCaptureSurface(recordingId);
@@ -192,6 +215,9 @@ async function executeRecordingStart(props: {
       return { result: 'cancelled' };
     }
     preparedContextRequiresDisposal = true;
+    if (ownerDocumentId && tabId !== undefined) {
+      await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
+    }
     sourceBinding = {
       generation: context.generation,
       recordingId,
@@ -240,6 +266,10 @@ async function executeRecordingStart(props: {
       await releaseVideoCaptureSurface(recordingId);
       rollbackRecordingStartState();
       return { result: 'cancelled' };
+    }
+
+    if (ownerDocumentId && tabId !== undefined) {
+      await ensureCurrentRecordingDocument(tabId, ownerDocumentId);
     }
 
     return await finalizeAcceptedRecordingStart(

@@ -12,7 +12,7 @@ const CAPACITY_PROFILES = Object.freeze({
     typecheck: { memoryMiB: 5120 },
     tests: { memoryMiB: 4096 },
     lint: { cpuTokens: 1, memoryMiB: 3072 },
-    graph: { cpuTokens: 1, memoryMiB: 1536 },
+    graph: { cpuTokens: 1, memoryMiB: 2048 },
     light: { cpuTokens: 1, memoryMiB: 1024 },
   }),
   full: Object.freeze({

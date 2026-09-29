@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { ContextMenuSettings, QuickAction, ViewportPreset } from './index';
 
 /** Stable block identities shared by settings, transfer and browser menu projection. */
 export const CONTEXT_MENU_ITEMS = [
@@ -270,11 +269,13 @@ export function createRecommendedContextMenuSettings(): Record<
   };
 }
 
-export type ContextMenuQuickActionInventory = readonly Pick<QuickAction, 'id' | 'status'>[];
-export type ContextMenuViewportPresetInventory = readonly Pick<
-  ViewportPreset,
-  'id' | 'enabled' | 'target' | 'order'
->[];
+export type ContextMenuQuickActionInventory = readonly { id: string; status: boolean }[];
+export type ContextMenuViewportPresetInventory = readonly {
+  id: string;
+  enabled: boolean;
+  target: 'window';
+  order: number;
+}[];
 
 /** Inventory availability affects projection, never the validity of a saved reference. */
 export function isContextMenuCommandAvailable(
@@ -346,7 +347,7 @@ function projectedBlock(
 
 /** Pure read projection. Legacy booleans apply only until an explicit v2 layout is saved. */
 export function resolveContextMenuTree(
-  settings: ContextMenuSettings,
+  settings: ReturnType<typeof createRecommendedContextMenuSettings>,
   quickActions: ContextMenuQuickActionInventory,
   viewportPresets: ContextMenuViewportPresetInventory
 ): ContextMenuTree {

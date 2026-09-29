@@ -19,6 +19,34 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Не удалось выполнить действие с записью. Повторите попытку.',
     en: 'The recording action failed. Try again.',
   },
+  videoRecordingStartPermissionRequired: {
+    ru: 'Chrome не разрешил захват вкладки. Откройте Sniptale через значок расширения и повторите запуск.',
+    en: 'Chrome did not allow tab capture. Open Sniptale from the extension icon and try again.',
+  },
+  videoRecordingStartStaleContext: {
+    ru: 'Страница изменилась. Обновите панель инструментов и повторите запуск.',
+    en: 'The page changed. Refresh the toolbar and try again.',
+  },
+  videoRecordingStartInvalidSource: {
+    ru: 'Эту вкладку нельзя записать. Выберите поддерживаемую страницу.',
+    en: 'This tab cannot be recorded. Choose a supported page.',
+  },
+  videoRecordingStartViewportTooLarge: {
+    ru: 'Выбранный размер окна не помещается на экране. Выберите другой размер в разделе «Видео».',
+    en: 'The selected window size does not fit on this display. Choose another size in Video settings.',
+  },
+  videoRecordingStartViewportVerificationFailed: {
+    ru: 'Chrome не смог применить выбранный размер окна. Выберите другой размер в разделе «Видео» и повторите запуск.',
+    en: 'Chrome could not apply the selected window size. Choose another size in Video settings and try again.',
+  },
+  videoRecordingStartAlreadyActive: {
+    ru: 'Запись уже запущена. Управляйте текущей записью.',
+    en: 'A recording is already running. Use the current recording controls.',
+  },
+  videoRecordingStartCancelled: {
+    ru: 'Запуск записи отменён. Можно повторить попытку.',
+    en: 'Recording start was cancelled. You can try again.',
+  },
   viewportConflictError: {
     ru: VIEWPORT_CONFLICT_ERROR_RU,
     en: VIEWPORT_CONFLICT_ERROR_EN,

@@ -6,6 +6,7 @@ const {
   beginPreparedRecordingMock,
   clearActiveVideoRecordingLeaseMock,
   finalizeRecordingStartMock,
+  getAllFramesMock,
   initializeRecordingContextMock,
   hasActiveVideoRecordingSessionMock,
   issuePreparedVideoRecordingLeaseMock,
@@ -24,6 +25,7 @@ const {
   beginPreparedRecordingMock: vi.fn(),
   clearActiveVideoRecordingLeaseMock: vi.fn(),
   finalizeRecordingStartMock: vi.fn(),
+  getAllFramesMock: vi.fn(),
   initializeRecordingContextMock: vi.fn(),
   hasActiveVideoRecordingSessionMock: vi.fn(),
   issuePreparedVideoRecordingLeaseMock: vi.fn(),
@@ -41,6 +43,9 @@ const {
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
   createLogger: () => ({ log: vi.fn(), warn: vi.fn() }),
+}));
+vi.mock('@sniptale/platform/browser/web-navigation', () => ({
+  browserWebNavigation: { getAllFrames: getAllFramesMock },
 }));
 vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/runtime-messaging')>()),
@@ -114,6 +119,7 @@ beforeEach(() => {
   runCountdownMock.mockResolvedValue(true);
   beginPreparedRecordingMock.mockResolvedValue(undefined);
   finalizeRecordingStartMock.mockResolvedValue('stream-instance-1');
+  getAllFramesMock.mockResolvedValue([{ frameId: 0, documentId: 'document-17' }]);
   releaseVideoCaptureSurfaceMock.mockResolvedValue(undefined);
   readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   waitForVideoCaptureSurfaceRecoveryMock.mockResolvedValue(undefined);
@@ -162,6 +168,60 @@ it('fails closed before preparation when no recording owner sender is provided',
 
   expect(beginVideoRecordingPreparationMock).not.toHaveBeenCalled();
   expect(initializeRecordingContextMock).not.toHaveBeenCalled();
+});
+
+it('does not dispatch an offscreen start after the initiating document reloads', async () => {
+  getAllFramesMock
+    .mockResolvedValueOnce([{ frameId: 0, documentId: 'document-17' }])
+    .mockResolvedValueOnce([{ frameId: 0, documentId: 'reloaded-document' }]);
+
+  const result = await startRecording(
+    17,
+    settings,
+    CaptureMode.TAB,
+    null,
+    'https://example.test/page',
+    'document-17'
+  );
+
+  expect(result).toEqual({
+    error: 'stale-context',
+    failureCode: 'stale-context',
+    result: 'failed',
+  });
+  expect(finalizeRecordingStartMock).not.toHaveBeenCalled();
+  expect(notifyRecordingStartFailedMock).toHaveBeenCalledWith('stale-context', {
+    diagnosticCode: 'stale-context',
+    retainAuthority: false,
+  });
+});
+
+it('rejects a reload during countdown before dispatching the prepared recording', async () => {
+  let finishCountdown!: (ready: boolean) => void;
+  runCountdownMock.mockReturnValueOnce(
+    new Promise<boolean>((resolve) => {
+      finishCountdown = resolve;
+    })
+  );
+  const start = startRecording(
+    17,
+    settings,
+    CaptureMode.TAB,
+    null,
+    'https://example.test/page',
+    'document-17'
+  );
+  await vi.waitFor(() => expect(runCountdownMock).toHaveBeenCalledOnce());
+  getAllFramesMock.mockResolvedValue([{ frameId: 0, documentId: 'reloaded-document' }]);
+  finishCountdown(true);
+
+  await expect(start).resolves.toMatchObject({
+    failureCode: 'stale-context',
+    result: 'failed',
+  });
+  expect(beginPreparedRecordingMock).not.toHaveBeenCalled();
+  expect(clearActiveVideoRecordingLeaseMock).toHaveBeenCalledWith('recording-1');
+  expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1');
 });
 
 it('issues an owner-bound control lease before accepting a recording start', async () => {

@@ -1,6 +1,9 @@
 import type { MessageType } from '../../message-types';
 import type { VideoMessageType } from '../../../video/messages';
-import type { VideoRecordingSurfaceActivation } from '../../../video/types/messages.surface';
+import type {
+  VideoRecordingStartFailureCode,
+  VideoRecordingSurfaceActivation,
+} from '../../../video/types/messages.surface';
 import type { RuntimeMessageResponse } from '../response';
 import type {
   DesktopScreenshotSelection,
@@ -92,7 +95,9 @@ export type RuntimeContentActionRequestByType = {
 };
 
 export type RuntimeContentActionResponseByType = {
-  [VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]: RuntimeMessageResponse<VideoRecordingSurfaceActivation>;
+  [VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING]: RuntimeMessageResponse<
+    VideoRecordingSurfaceActivation & { failureCode?: VideoRecordingStartFailureCode }
+  >;
   [VideoMessageType.ACTIVATE_VIDEO_RECORDING_SURFACE]: RuntimeMessageResponse<VideoRecordingSurfaceActivation>;
   [MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_ACTIVATION_KEY]: RuntimeMessageResponse<{
     activationKey?: ContentPrivilegedActionActivationKey;
