@@ -19,6 +19,17 @@ type GalleryFiltersState = ReturnType<typeof useGalleryFilterState>;
 type GalleryLibraryState = ReturnType<typeof useGalleryLibraryState>;
 type GalleryViewportState = ReturnType<typeof useGalleryViewportState>;
 
+const TRASH_ACTIVE_TAGS: string[] = [];
+const TRASH_FACET_FILTERS: GalleryFiltersState['state']['facetFilters'] = {
+  created: [],
+  duration: [],
+  format: [],
+  resolution: [],
+  size: [],
+  source: [],
+  updated: [],
+};
+
 function getGalleryStoragePressureClass(storageInfo: GalleryLibraryState['storageInfo']) {
   return getActiveStorageBarClass(
     storageInfo?.pressure === 'healthy' ? 'normal' : storageInfo?.pressure
@@ -50,7 +61,7 @@ function getDerivedFilteredGalleryItems(args: {
   facetFilters: GalleryFiltersState['state']['facetFilters'];
   folderFilter: GalleryFiltersState['state']['folderFilter'];
   items: GalleryLibraryState['items'];
-  search: GalleryFiltersState['state']['search'];
+  search: GalleryFiltersState['state']['appliedSearch'];
   scope: GalleryFiltersState['state']['scope'];
   sortMode: GalleryFiltersState['state']['sortMode'];
 }) {
@@ -121,7 +132,7 @@ function useGalleryFilterDerivedState(props: {
         facetFilters: filters.state.facetFilters,
         folderFilter: filters.state.folderFilter,
         items: library.items,
-        search: filters.state.search,
+        search: filters.state.appliedSearch,
         scope: filters.state.scope,
         sortMode: filters.state.sortMode,
       }),
@@ -129,7 +140,7 @@ function useGalleryFilterDerivedState(props: {
       filters.state.activeTags,
       filters.state.facetFilters,
       filters.state.folderFilter,
-      filters.state.search,
+      filters.state.appliedSearch,
       filters.state.scope,
       filters.state.sortMode,
       library.items,
@@ -187,16 +198,8 @@ export function useGalleryDerivedState(props: {
         ...filters,
         state: {
           ...filters.state,
-          activeTags: [],
-          facetFilters: {
-            created: [],
-            duration: [],
-            format: [],
-            resolution: [],
-            size: [],
-            source: [],
-            updated: [],
-          },
+          activeTags: TRASH_ACTIVE_TAGS,
+          facetFilters: TRASH_FACET_FILTERS,
           folderFilter: 'all' as const,
           scope: 'all' as const,
         },

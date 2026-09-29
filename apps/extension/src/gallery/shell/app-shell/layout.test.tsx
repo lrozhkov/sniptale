@@ -97,6 +97,7 @@ function createLayoutProps() {
     onResetFilters: vi.fn(),
     onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),
@@ -196,6 +197,24 @@ it('wires sidebar/main/overlay sections and normalizes storage info branches', (
   });
 
   expect(headerPropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ storageInfo: null }));
+});
+
+it('keeps the raw query in the header while the main content uses the applied query', () => {
+  const props = createLayoutProps();
+  props.state = createGalleryState({ search: 'unfinished query' });
+  props.state.filters.appliedSearch = 'previous query';
+
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+
+  expect(headerPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      search: 'unfinished query',
+      onSearchCommit: props.onSearchCommit,
+    })
+  );
+  expect(mainContentPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ search: 'previous query' })
+  );
 });
 
 it('passes all selected local media files to the dedicated import action', () => {

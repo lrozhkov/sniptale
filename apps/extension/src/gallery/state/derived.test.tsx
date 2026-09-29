@@ -71,6 +71,7 @@ function createProbeProps(
         setFolderFilter: vi.fn(),
         setFacetFilter: vi.fn(),
         setSearch: vi.fn(),
+        commitSearch: vi.fn(),
         setScope: vi.fn(),
         setTrashMode: vi.fn(),
         setSelectedIds: vi.fn(),
@@ -96,6 +97,7 @@ function createProbeProps(
         savedViewsLoadFailed: false,
         savedViewsLoaded: true,
         search: 'capture',
+        appliedSearch: 'capture',
         scope: 'library',
         trashMode: false,
         selectedIds: new Set(['asset-1']),
@@ -230,5 +232,31 @@ it('partitions trash before normal facets, counts, selection and search; trash i
       folderFilter: 'all',
       activeTags: [],
     })
+  );
+});
+
+it.each([false, true])('keeps the %s mode selector idle for raw search edits', (trashMode) => {
+  const props = createProbeProps('healthy');
+  props.filters.state.trashMode = trashMode;
+  act(() => root?.render(<HookProbe {...props} />));
+  const initialCalls = selectorMocks.getFilteredGalleryItems.mock.calls.length;
+
+  for (const search of ['c', 'ca', 'cap']) {
+    props.filters.state.search = search;
+    act(() => root?.render(<HookProbe {...props} />));
+  }
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenCalledTimes(initialCalls);
+
+  props.filters.state.appliedSearch = 'cap';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenCalledTimes(initialCalls + 1);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ search: 'cap' })
+  );
+
+  props.filters.state.sortMode = 'oldest';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ search: 'cap', sortMode: 'oldest' })
   );
 });

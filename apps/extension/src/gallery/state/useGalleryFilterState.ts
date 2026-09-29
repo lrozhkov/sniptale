@@ -12,6 +12,7 @@ import {
   type GalleryFilterPreferences,
 } from './filter-preferences';
 import { useGallerySavedViewState } from './useGallerySavedViewState';
+import { useGallerySearchState } from './useGallerySearchState';
 
 const GALLERY_FOLDERS = new Set<FolderFilter>([
   'all',
@@ -78,11 +79,17 @@ export function useGalleryFilterState() {
   const [filterPreferences, setFilterPreferences] = useState(getInitialFilterPreferences);
   const filterPreferencesRef = useRef(filterPreferences);
   const [sortMode, setSortMode] = useState<SortMode>('newest');
-  const [librarySearch, setLibrarySearch] = useState('');
-  const [trashSearch, setTrashSearch] = useState('');
-  const [trashMode, setTrashMode] = useState(false);
+  const searchState = useGallerySearchState();
+  const { switchTrashMode: switchSearchTrashMode } = searchState.actions;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionTagDraft, setSelectionTagDraft] = useState('');
+  const switchTrashMode = useCallback(
+    (value: boolean) => {
+      switchSearchTrashMode(value);
+      setSelectedIds(new Set());
+    },
+    [switchSearchTrashMode]
+  );
   const updateFilterPreferences = useCallback(
     (update: (value: GalleryFilterPreferences) => GalleryFilterPreferences) => {
       const next = update(filterPreferencesRef.current);
@@ -137,11 +144,9 @@ export function useGalleryFilterState() {
           }));
         }
       },
-      setTrashMode: (value: boolean) => {
-        setTrashMode(value);
-        setSelectedIds(new Set());
-      },
-      setSearch: trashMode ? setTrashSearch : setLibrarySearch,
+      setTrashMode: switchTrashMode,
+      setSearch: searchState.actions.setSearch,
+      commitSearch: searchState.actions.commitSearch,
       setScope,
       setSelectedIds,
       setSelectionTagDraft,
@@ -152,8 +157,9 @@ export function useGalleryFilterState() {
       activeTags: filterPreferences.activeTags,
       facetFilters: filterPreferences.facetFilters,
       folderFilter: filterPreferences.folderFilter,
-      search: trashMode ? trashSearch : librarySearch,
-      trashMode,
+      search: searchState.state.search,
+      appliedSearch: searchState.state.appliedSearch,
+      trashMode: searchState.state.trashMode,
       scope: filterPreferences.scope,
       selectedIds,
       selectionTagDraft,

@@ -20,7 +20,7 @@ import type {
   SortMode,
 } from './types';
 import { isGalleryMediaItem, type GalleryItem } from '../library/items';
-import { formatDate } from '../library/ui';
+import { createGalleryDateFormatter } from '../library/ui/date';
 import { getGalleryDateBucketLabel } from './date-facets';
 import {
   SIZE_BUCKETS,
@@ -246,13 +246,16 @@ export function getFilteredScenarioProjects(args: {
   sortMode: SortMode;
 }) {
   const normalizedSearch = args.search.trim().toLowerCase();
+  const matchesDate = createDateSearchMatcher(normalizedSearch);
   const result = args.projects.filter((project) => {
     if (!normalizedSearch) {
       return true;
     }
 
-    return [project.name, formatDate(project.createdAt), formatDate(project.updatedAt)].some(
-      (value) => value.toLowerCase().includes(normalizedSearch)
+    return (
+      project.name.toLowerCase().includes(normalizedSearch) ||
+      matchesDate(project.createdAt) ||
+      matchesDate(project.updatedAt)
     );
   });
 
@@ -279,6 +282,20 @@ export function getAllGalleryTags(items: GalleryItem[]): string[] {
   return Array.from(new Set(items.flatMap((item) => item.tags))).sort(compareStrings);
 }
 
+function createDateSearchMatcher(search: string): (timestamp: number) => boolean {
+  const formattedDates = new Map<number, string>();
+  let dateFormatter: Intl.DateTimeFormat | undefined;
+  return (timestamp) => {
+    let formatted = formattedDates.get(timestamp);
+    if (formatted === undefined) {
+      dateFormatter ??= createGalleryDateFormatter();
+      formatted = dateFormatter.format(timestamp).toLowerCase();
+      formattedDates.set(timestamp, formatted);
+    }
+    return formatted.includes(search);
+  };
+}
+
 export function getFilteredGalleryItems(args: {
   activeTags: string[];
   facetFilters?: GalleryFacetFilters;
@@ -291,6 +308,7 @@ export function getFilteredGalleryItems(args: {
 }): GalleryItem[] {
   const now = args.now ?? Date.now();
   const normalizedSearch = args.search.trim().toLowerCase();
+  const matchesDate = createDateSearchMatcher(normalizedSearch);
   const scope = args.scope ?? 'library';
   const taggedItems = args.items.filter((item) =>
     matchesLibraryFilters(
@@ -312,15 +330,14 @@ export function getFilteredGalleryItems(args: {
       return true;
     }
 
-    return [
-      item.filename,
-      item.sourceTitle ?? '',
-      item.sourceUrl ?? '',
-      item.mimeType,
-      ...item.tags,
-      formatDate(item.createdAt),
-      formatDate(item.updatedAt),
-    ].some((value) => value.toLowerCase().includes(normalizedSearch));
+    return (
+      [item.filename, item.sourceTitle ?? '', item.sourceUrl ?? '', item.mimeType].some((value) =>
+        value.toLowerCase().includes(normalizedSearch)
+      ) ||
+      item.tags.some((tag) => tag.toLowerCase().includes(normalizedSearch)) ||
+      matchesDate(item.createdAt) ||
+      matchesDate(item.updatedAt)
+    );
   });
 
   result.sort((left, right) => {

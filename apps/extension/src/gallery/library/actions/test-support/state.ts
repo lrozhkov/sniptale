@@ -121,6 +121,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
       savedViewsLoadFailed: false,
       savedViewsLoaded: true,
       search: overrides.search ?? '',
+      appliedSearch: overrides.search ?? '',
       scope: overrides.filters?.scope ?? 'all',
       sortMode: overrides.sortMode ?? 'newest',
       ...overrides.filters,

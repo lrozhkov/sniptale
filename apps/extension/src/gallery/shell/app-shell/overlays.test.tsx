@@ -110,6 +110,7 @@ function createLayoutProps() {
     onResetFilters: vi.fn(),
     onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),

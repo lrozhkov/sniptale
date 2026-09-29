@@ -296,6 +296,7 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onSavedViewSelect: controller.actions.filters.selectSavedView,
     onUpdateSavedView: controller.actions.filters.updateSavedView,
     onSearchChange: controller.actions.filters.setSearch,
+    onSearchCommit: controller.actions.filters.commitSearch,
     onSortModeChange: controller.actions.filters.setSortMode,
     onViewModeChange: props.setViewMode,
     ...buildGalleryPreviewHandlers(actions, controller, props.messaging),

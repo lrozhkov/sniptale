@@ -8,7 +8,7 @@ import {
   Video,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { formatDateTime, getCurrentLocale, translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
 import type { RecordingGroupMemberRole } from '../../../features/media-hub/recording-groups';
 import { ensureGalleryItemThumbnail, type GalleryItem, type GalleryItemKind } from '../items';
@@ -87,19 +87,7 @@ export function getRecordingGroupRoleLabel(role: RecordingGroupMemberRole): stri
   }
 }
 
-export function formatDate(timestamp: number): string {
-  return formatDateTime(
-    timestamp,
-    {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    },
-    getCurrentLocale()
-  );
-}
+export { formatDate } from './date';
 
 export function getKindIcon(kind: GalleryItemKind) {
   switch (kind) {

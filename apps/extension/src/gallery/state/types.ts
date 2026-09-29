@@ -74,6 +74,7 @@ interface GalleryAppFilterState {
   folderFilter: FolderFilter;
   sortMode: SortMode;
   search: string;
+  appliedSearch: string;
   scope: GalleryScope;
   activeTags: string[];
   facetFilters: GalleryFacetFilters;
@@ -154,6 +155,7 @@ interface GalleryAppFilterActions {
   setFolderFilter: Dispatch<SetStateAction<FolderFilter>>;
   setSortMode: Dispatch<SetStateAction<SortMode>>;
   setSearch: Dispatch<SetStateAction<string>>;
+  commitSearch: (value: string) => void;
   setScope: Dispatch<SetStateAction<GalleryScope>>;
   setActiveTags: Dispatch<SetStateAction<string[]>>;
   setFacetFilter: (id: GalleryFacetFilterId, values: string[]) => void;

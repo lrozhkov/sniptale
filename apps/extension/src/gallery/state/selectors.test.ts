@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
+import { formatDateTime } from '@sniptale/platform/i18n/format';
 import type { GalleryItem } from '../library/items';
+import { createGalleryDateFormatter, formatDate } from '../library/ui/date';
 import {
   createScenarioExportItem,
   createScenarioItem,
@@ -244,6 +246,51 @@ it('filters tagged items, narrows by folder/search, and sorts by age or size', (
     })
   ).toEqual(['recording']);
 });
+
+it('matches both displayed dates after text fields miss', () => {
+  const createdAt = Date.UTC(2025, 0, 2, 10, 15);
+  const updatedAt = Date.UTC(2025, 7, 19, 16, 45);
+  const item = createItem({ id: 'dated', createdAt, updatedAt });
+  const galleryArgs = {
+    activeTags: [],
+    folderFilter: 'all' as const,
+    items: [item],
+    sortMode: 'newest' as const,
+  };
+  const project = {
+    availability: 'available' as const,
+    id: 'dated-project',
+    name: 'Untitled',
+    createdAt,
+    updatedAt,
+  };
+
+  for (const timestamp of [createdAt, updatedAt]) {
+    const search = formatDate(timestamp).toUpperCase();
+    expect(getFilteredIds({ ...galleryArgs, search })).toEqual(['dated']);
+    expect(
+      getFilteredScenarioProjects({ projects: [project], search, sortMode: 'newest' }).map(
+        (result) => result.id
+      )
+    ).toEqual(['dated-project']);
+  }
+
+  expect(getFilteredIds({ ...galleryArgs, search: 'no matching field or date' })).toEqual([]);
+});
+
+it.each(['en', 'ru'] as const)(
+  'reuses the exact Gallery date formatting for %s searches',
+  (locale) => {
+    const timestamp = Date.UTC(2025, 7, 19, 16, 45);
+    const expected = formatDateTime(
+      timestamp,
+      { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' },
+      locale
+    );
+    expect(createGalleryDateFormatter(locale).format(timestamp)).toBe(expected);
+    expect(() => createGalleryDateFormatter(locale).format(Number.NaN)).toThrow(RangeError);
+  }
+);
 
 it('shows saved items and drafts together by default while preserving explicit scope filters', () => {
   const saved = createItem({ id: 'saved' });

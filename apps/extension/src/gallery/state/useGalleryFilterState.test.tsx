@@ -96,6 +96,73 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('commits the latest active search after idle and cancels an older query', () => {
+  vi.useFakeTimers();
+  try {
+    renderHook();
+    act(() => latestValue?.actions.setSearch('first'));
+    expect(latestValue?.state).toMatchObject({ search: 'first', appliedSearch: '' });
+    act(() => vi.advanceTimersByTime(200));
+    act(() => latestValue?.actions.setSearch('second'));
+    act(() => vi.advanceTimersByTime(249));
+    expect(latestValue?.state.appliedSearch).toBe('');
+    act(() => vi.advanceTimersByTime(1));
+    expect(latestValue?.state.appliedSearch).toBe('second');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('commits Enter and an empty input immediately, cancelling pending work', () => {
+  vi.useFakeTimers();
+  try {
+    renderHook();
+    act(() => latestValue?.actions.setSearch('draft'));
+    act(() => latestValue?.actions.commitSearch('entered'));
+    expect(latestValue?.state).toMatchObject({ search: 'entered', appliedSearch: 'entered' });
+    act(() => latestValue?.actions.setSearch(''));
+    expect(latestValue?.state).toMatchObject({ search: '', appliedSearch: '' });
+    act(() => vi.advanceTimersByTime(500));
+    expect(latestValue?.state.appliedSearch).toBe('');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('preserves per-mode drafts and schedules a pending draft when returning', () => {
+  vi.useFakeTimers();
+  try {
+    renderHook();
+    act(() => latestValue?.actions.setSearch('library draft'));
+    act(() => latestValue?.actions.setTrashMode(true));
+    act(() => latestValue?.actions.setSearch('trash draft'));
+    act(() => latestValue?.actions.setTrashMode(false));
+    expect(latestValue?.state).toMatchObject({ search: 'library draft', appliedSearch: '' });
+    act(() => vi.advanceTimersByTime(250));
+    expect(latestValue?.state.appliedSearch).toBe('library draft');
+    act(() => latestValue?.actions.setTrashMode(true));
+    expect(latestValue?.state).toMatchObject({ search: 'trash draft', appliedSearch: '' });
+    act(() => vi.advanceTimersByTime(250));
+    expect(latestValue?.state.appliedSearch).toBe('trash draft');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('cancels the pending search on unmount', () => {
+  vi.useFakeTimers();
+  try {
+    renderHook();
+    act(() => latestValue?.actions.setSearch('pending'));
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    act(() => root?.unmount());
+    root = null;
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it('starts with canonical gallery filter defaults', () => {
   const value = renderHook();
 

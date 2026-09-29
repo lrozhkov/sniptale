@@ -343,6 +343,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Поиск в Библиотеке',
     en: 'Search Library',
   },
+  clearSearch: {
+    ru: 'Очистить поиск',
+    en: 'Clear search',
+  },
   scopeLabel: {
     ru: 'Фильтр по типу хранения',
     en: 'Storage type filter',

@@ -85,6 +85,7 @@ export interface GalleryAppLayoutProps {
   onImportMediaClick: () => void;
   onImportWebSnapshotClick?: () => void;
   onSearchChange: Dispatch<SetStateAction<string>>;
+  onSearchCommit: (value: string) => void;
   onSortModeChange: Dispatch<SetStateAction<SortMode>>;
   onViewModeChange: Dispatch<SetStateAction<GalleryViewMode>>;
   onBannerDismiss: () => void;

@@ -109,6 +109,7 @@ function configureFilterHookMock() {
       },
       folderFilter: 'all',
       search: 'needle',
+      appliedSearch: 'needle',
       scope: 'temporary',
       selectedIds: currentSelectedIds,
       selectionTagDraft: 'batch-tag',

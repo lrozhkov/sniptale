@@ -87,6 +87,7 @@ function createControllerActions(
       setFolderFilter: () => undefined,
       setFacetFilter: () => undefined,
       setSearch: () => undefined,
+      commitSearch: () => undefined,
       setScope: () => undefined,
       setSortMode: () => undefined,
       updateSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),

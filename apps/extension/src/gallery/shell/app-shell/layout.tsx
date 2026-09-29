@@ -101,7 +101,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       gridWidth={state.derived.gridWidth}
       gridViewportRef={gridViewportRef}
       isLoading={state.storage.isLoading}
-      search={state.filters.search}
+      search={state.filters.appliedSearch}
       scope={state.filters.scope}
       selectedIds={state.selection.selectedIds}
       selectedItems={state.selection.selectedItems}
@@ -164,6 +164,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onDeleteAll={() => props.onDeleteMany(props.state.derived.allItems)}
           onExportBackup={props.onExportBackup}
           onSearchChange={props.onSearchChange}
+          onSearchCommit={props.onSearchCommit}
           onImportBackupClick={props.onImportBackupClick}
           onImportMediaClick={props.onImportMediaClick}
           {...(props.onImportWebSnapshotClick

@@ -7,7 +7,6 @@ import {
   HardDrive,
   Images,
   LayoutGrid,
-  Search,
   Settings2,
   ShieldAlert,
   Trash2,
@@ -22,6 +21,7 @@ import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { GalleryViewMode } from '../types';
 import type { GalleryMainContentProps } from './types';
 import { GallerySelectionBar } from './selection-bar';
+import { GalleryHeaderSearchField } from './header-search';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -308,45 +308,6 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
   );
 }
 
-function GalleryHeaderSearchField(props: {
-  folderFilter: GalleryMainContentProps['folderFilter'];
-  trashMode?: boolean;
-  search: string;
-  onSearchChange: GalleryMainContentProps['onSearchChange'];
-}) {
-  return (
-    <label
-      className="flex min-w-0 items-center gap-2.5 border
-        border-[var(--sniptale-color-border-soft)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_78%,transparent)]
-        h-8 w-36 shrink-0 rounded-[8px] px-2.5
-        transition-[width,border-color,background-color] duration-200 ease-out
-        focus-within:w-48 focus-within:border-[var(--sniptale-color-border-accent-strong)]
-        motion-reduce:transition-none"
-      data-ui="gallery.header.search"
-    >
-      <Search className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]" />
-      <input
-        aria-label={translate(
-          props.trashMode ? 'gallery.app.trashSearchLabel' : 'gallery.app.searchLabel'
-        )}
-        value={props.search}
-        onChange={(event) => props.onSearchChange(event.target.value)}
-        placeholder={
-          props.trashMode
-            ? translate('gallery.app.trashSearchPlaceholder')
-            : props.folderFilter === 'scenario'
-              ? translate('gallery.app.scenarioSearchPlaceholder')
-              : translate('gallery.app.searchPlaceholder')
-        }
-        className="w-full bg-transparent text-sm text-[var(--sniptale-color-text-primary)]
-          outline-none placeholder:text-[var(--sniptale-color-text-muted)]
-          focus:placeholder:text-transparent"
-      />
-    </label>
-  );
-}
-
 function GalleryHeaderSortControl(
   props: Pick<GalleryMainContentProps, 'folderFilter' | 'onSortModeChange' | 'sortMode'>
 ) {
@@ -466,7 +427,10 @@ function GalleryHeaderControls(
     | 'trashMode'
     | 'viewMode'
   > &
-    GalleryHeaderStorageProps & { stackWhenNarrow: boolean }
+    GalleryHeaderStorageProps & {
+      onSearchCommit: (value: string) => void;
+      stackWhenNarrow: boolean;
+    }
 ) {
   return (
     <div
@@ -482,6 +446,7 @@ function GalleryHeaderControls(
         trashMode={Boolean(props.trashMode)}
         search={props.search}
         onSearchChange={props.onSearchChange}
+        onSearchCommit={props.onSearchCommit}
       />
       <GalleryHeaderSortControl
         folderFilter={props.trashMode ? 'all' : props.folderFilter}
@@ -545,7 +510,7 @@ export function GalleryHeader(
     | 'trashMode'
     | 'viewMode'
   > &
-    GalleryHeaderStorageProps
+    GalleryHeaderStorageProps & { onSearchCommit: (value: string) => void }
 ) {
   const hasSelection = !props.trashMode && props.selectedItems.length > 0;
 

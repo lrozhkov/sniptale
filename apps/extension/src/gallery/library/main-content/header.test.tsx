@@ -83,6 +83,7 @@ function renderHeader(props: Partial<Parameters<typeof GalleryHeader>[0]> = {}) 
     onImportBackupClick: vi.fn(),
     onImportMediaClick: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),

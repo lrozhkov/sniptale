@@ -146,6 +146,7 @@ function configureGalleryOwnerMocks(
       activeTags: [],
       folderFilter: scope === 'temporary' ? 'recording' : 'all',
       search: '',
+      appliedSearch: '',
       scope,
       selectedIds: new Set(),
       selectionTagDraft: '',
