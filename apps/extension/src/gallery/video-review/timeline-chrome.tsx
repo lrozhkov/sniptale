@@ -5,7 +5,7 @@ import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dial
 import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
-import { Play, BetweenHorizontalStart, Undo2, Redo2, StickyNote } from 'lucide-react';
+import { Play, Pause, BetweenHorizontalStart, Undo2, Redo2, StickyNote } from 'lucide-react';
 import { useState, type ReactNode, type CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
@@ -80,21 +80,14 @@ export function ReviewToolbar(props: {
           label={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
-          toolbarPriority={3}
-          toolbarLabel={translate(
-            props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
-          )}
           onClick={props.onPlay}
           className={plain}
           aria-pressed={props.playing}
         >
           {props.playing ? (
-            <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden="true">
-              <rect x="4" y="3" width="2" height="10" />
-              <rect x="10" y="3" width="2" height="10" />
-            </svg>
+            <Pause size={16} strokeWidth={2.2} aria-hidden="true" />
           ) : (
-            <Play size={16} strokeWidth={2.2} />
+            <Play size={16} strokeWidth={2.2} aria-hidden="true" />
           )}
         </ReviewButton>
         <span className="whitespace-nowrap text-xs font-semibold tabular-nums">

@@ -3404,6 +3404,16 @@ for (const variant of [
           name: translate('videoEditor.app.recordAudioPause', variant.locale),
         })
       ).toBeVisible();
+      const playback = dialog.locator('[data-toolbar-transport] button').first();
+      await expect(playback).toHaveAttribute(
+        'aria-label',
+        translate('gallery.videoReview.pause', variant.locale)
+      );
+      await expect(playback.locator('svg.lucide-pause')).toHaveCount(1);
+      await expect(playback.locator('[data-review-toolbar-label]')).toHaveCount(0);
+      await page.screenshot({
+        path: testInfo.outputPath(`voiceover-recording-${variant.locale}-${variant.theme}.png`),
+      });
       await strip
         .getByRole('button', {
           name: translate('videoEditor.app.recordAudioPause', variant.locale),
@@ -3414,6 +3424,11 @@ for (const variant of [
           name: translate('videoEditor.app.recordAudioResume', variant.locale),
         })
       ).toBeVisible();
+      await expect(playback).toHaveAttribute(
+        'aria-label',
+        translate('gallery.videoReview.play', variant.locale)
+      );
+      await expect(playback.locator('svg.lucide-play')).toHaveCount(1);
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-paused-${variant.locale}-${variant.theme}.png`),
       });

@@ -61,6 +61,23 @@ it('shows hundredths in playback time with correct minute rollover', () => {
   );
 });
 
+it('keeps the transport icon-only and stable while its accessible Play/Pause action changes', () => {
+  const { host, props } = renderTimeline();
+  const play = host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.play"]')!;
+  expect(play.title).toBe('gallery.videoReview.play');
+  expect(play.textContent).toBe('');
+  expect(play.querySelector('svg.lucide-play')).not.toBeNull();
+  expect(play.getAttribute('data-review-toolbar-button')).toBeNull();
+  act(() => play.click());
+  expect(props.onPlay).toHaveBeenCalledOnce();
+  renderTimeline({ playing: true });
+  const pause = host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.pause"]')!;
+  expect(pause.title).toBe('gallery.videoReview.pause');
+  expect(pause.textContent).toBe('');
+  expect(pause.querySelector('svg.lucide-pause')).not.toBeNull();
+  expect(pause.className).toBe(play.className);
+});
+
 function planeWithMetrics(host: HTMLDivElement) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
