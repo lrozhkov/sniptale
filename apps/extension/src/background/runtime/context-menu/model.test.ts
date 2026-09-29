@@ -1,36 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { type ContextMenuSettings, type QuickAction } from '../../../contracts/settings';
+import type { ContextMenuSettings, QuickAction, ViewportPreset } from '../../../contracts/settings';
+import { buildContextMenuDescriptors, resolveContextMenuDynamicState } from './model';
 import {
-  CONTEXT_MENU_EXPORT_ID,
-  CONTEXT_MENU_EXPORT_SEPARATOR_ID,
   CONTEXT_MENU_ROOT_ID,
-  CONTEXT_MENU_SCREENSHOTS_ID,
-  CONTEXT_MENU_SETTINGS_ID,
-  CONTEXT_MENU_SETTINGS_SEPARATOR_ID,
-  CONTEXT_MENU_VIDEO_ID,
   CONTEXT_MENU_VIDEO_PRESET_ID,
-  CONTEXT_MENU_VIDEO_WINDOW_ID,
-  CONTEXT_MENU_WINDOW_RESIZE_ID,
   buildContextMenuWindowResizePresetId,
-  parseContextMenuWindowResizePresetId,
 } from './constants';
-import {
-  CONTEXT_MENU_PAGE_LINK_ID,
-  CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID,
-  CONTEXT_MENU_PAGE_LINK_PLAIN_ID,
-  CONTEXT_MENU_PAGE_LINK_RICH_ID,
-} from './page-link/constants';
-import {
-  buildContextMenuDescriptors,
-  getContextMenuContexts,
-  getEnabledContextMenuQuickActions,
-  hasVisibleContextMenuItems,
-  resolveContextMenuDynamicState,
-} from './model';
 
-function createContextMenuSettings(
-  overrides: Partial<ContextMenuSettings> = {}
-): ContextMenuSettings {
+const quickActions = [
+  {
+    id: 'first',
+    name: 'First',
+    status: true,
+    icon: 'Camera',
+    screenshotMode: 'visible',
+    exitAfterCapture: true,
+    imageFormat: 'png',
+    imageQuality: 100,
+  },
+] as QuickAction[];
+const presets = [
+  {
+    id: 'window-hd',
+    name: 'Window HD',
+    kind: 'user',
+    enabled: true,
+    height: 720,
+    width: 1280,
+    order: 0,
+    target: 'window',
+  },
+] as ViewportPreset[];
+function settings(layout?: ContextMenuSettings['layout']): ContextMenuSettings {
   return {
     enabled: true,
     showScreenshots: true,
@@ -42,263 +43,192 @@ function createContextMenuSettings(
     showPageLinkCopy: true,
     showWindowResize: true,
     showSettings: true,
-    ...overrides,
+    ...(layout ? { layout } : {}),
   };
 }
-
-const viewportPresets = [
-  {
-    kind: 'user' as const,
-    enabled: true,
-    height: 720,
-    id: 'window-hd',
-    name: 'Window HD',
-    order: 0,
-    target: 'window' as const,
-    width: 1280,
-  },
-  {
-    kind: 'user' as const,
-    enabled: false,
-    height: 900,
-    id: 'disabled-window',
-    name: 'Disabled window',
-    order: 1,
-    target: 'window' as const,
-    width: 1440,
-  },
-];
-
-function buildDescriptors(settings = createContextMenuSettings()) {
-  return buildContextMenuDescriptors({ quickActions: [], settings, viewportPresets });
-}
-
-function createQuickAction(id: string, status = true): QuickAction {
-  return {
-    id,
-    exitAfterCapture: true,
-    icon: 'Camera',
-    imageFormat: 'png',
-    imageQuality: 100,
-    name: id,
-    screenshotMode: 'visible',
-    status,
-  };
-}
-
-function createTab(url: string): chrome.tabs.Tab {
+function tab(url: string): chrome.tabs.Tab {
   return { id: 7, url } as chrome.tabs.Tab;
 }
 
-function verifySettingsSeparatorPlacement() {
-  const withSettings = buildDescriptors();
-  const settingsOnly = buildDescriptors(
-    createContextMenuSettings({
-      showExport: false,
-      showGallery: false,
-      showPageLinkCopy: false,
-      showImageEditor: false,
-      showScreenshots: false,
-      showVideo: false,
-      showVideoEditor: false,
-      showWindowResize: false,
-    })
-  );
+const tree = {
+  version: 2 as const,
+  nodes: [
+    { type: 'command' as const, command: 'sniptale.settings', enabled: true },
+    {
+      type: 'section' as const,
+      id: 'tools',
+      title: 'Tools',
+      enabled: true,
+      children: [
+        { type: 'command' as const, command: 'sniptale.video.window', enabled: true },
+        { type: 'command' as const, command: 'sniptale.video.preset', enabled: true },
+        {
+          type: 'command' as const,
+          command: 'sniptale.screenshots.quick-action.first',
+          enabled: true,
+        },
+        { type: 'command' as const, command: 'sniptale.page-link.rich', enabled: true },
+        {
+          type: 'command' as const,
+          command: buildContextMenuWindowResizePresetId('window-hd'),
+          enabled: true,
+        },
+      ],
+    },
+    { type: 'command' as const, command: 'sniptale.gallery', enabled: true },
+  ],
+};
 
-  expect(withSettings.some((item) => item.id === CONTEXT_MENU_SETTINGS_SEPARATOR_ID)).toBe(true);
-  expect(settingsOnly.some((item) => item.id === CONTEXT_MENU_SETTINGS_SEPARATOR_ID)).toBe(false);
-  expect(settingsOnly.some((item) => item.id === CONTEXT_MENU_SETTINGS_ID)).toBe(true);
-}
-
-function verifyQuickActionSubmenuFiltering() {
-  const descriptors = buildContextMenuDescriptors({
-    quickActions: [createQuickAction('enabled'), createQuickAction('disabled', false)],
-    settings: createContextMenuSettings(),
-    viewportPresets,
+describe('context menu projection', () => {
+  it('emits v2 leaves in exact saved order with one parent section and stable dispatch ids', () => {
+    const descriptors = buildContextMenuDescriptors({
+      settings: settings(tree),
+      quickActions,
+      viewportPresets: presets,
+    });
+    expect(descriptors.map(({ id, parentId }) => [id, parentId])).toEqual([
+      [CONTEXT_MENU_ROOT_ID, undefined],
+      ['sniptale.settings', CONTEXT_MENU_ROOT_ID],
+      ['sniptale.section.tools', CONTEXT_MENU_ROOT_ID],
+      ['sniptale.video.window', 'sniptale.section.tools'],
+      ['sniptale.video.preset', 'sniptale.section.tools'],
+      ['sniptale.screenshots.quick-action.first', 'sniptale.section.tools'],
+      ['sniptale.page-link.rich', 'sniptale.section.tools'],
+      [buildContextMenuWindowResizePresetId('window-hd'), 'sniptale.section.tools'],
+      ['sniptale.gallery', CONTEXT_MENU_ROOT_ID],
+    ]);
+    expect(new Set(descriptors.map((item) => item.id)).size).toBe(descriptors.length);
   });
 
-  expect(descriptors.some((item) => item.id === 'sniptale.screenshots.quick-actions')).toBe(false);
-  expect(descriptors).toContainEqual(
-    expect.objectContaining({
-      id: 'sniptale.screenshots.quick-action.enabled',
-      parentId: CONTEXT_MENU_SCREENSHOTS_ID,
-    })
-  );
-  expect(descriptors.some((item) => item.id === 'sniptale.screenshots.quick-action.disabled')).toBe(
-    false
-  );
-}
-
-function verifyPageLinkCopyDescriptors() {
-  const descriptors = buildDescriptors();
-  const disabledDescriptors = buildDescriptors(
-    createContextMenuSettings({ showPageLinkCopy: false })
-  );
-
-  expect(descriptors).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        id: CONTEXT_MENU_PAGE_LINK_ID,
-        parentId: CONTEXT_MENU_ROOT_ID,
+  it('omits unavailable dynamic references and empty or disabled sections', () => {
+    const descriptors = buildContextMenuDescriptors({
+      settings: settings({
+        version: 2,
+        nodes: [
+          {
+            type: 'section',
+            id: 'missing',
+            title: 'Missing',
+            enabled: true,
+            children: [
+              {
+                type: 'command',
+                command: 'sniptale.screenshots.quick-action.first',
+                enabled: true,
+              },
+            ],
+          },
+          {
+            type: 'section',
+            id: 'disabled',
+            title: 'Disabled',
+            enabled: false,
+            children: [{ type: 'command', command: 'sniptale.gallery', enabled: true }],
+          },
+        ],
       }),
-      expect.objectContaining({
-        id: CONTEXT_MENU_PAGE_LINK_RICH_ID,
-        parentId: CONTEXT_MENU_PAGE_LINK_ID,
-      }),
-      expect.objectContaining({
-        id: CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID,
-        parentId: CONTEXT_MENU_PAGE_LINK_ID,
-      }),
-      expect.objectContaining({
-        id: CONTEXT_MENU_PAGE_LINK_PLAIN_ID,
-        parentId: CONTEXT_MENU_PAGE_LINK_ID,
-      }),
-    ])
-  );
-  expect(disabledDescriptors.some((item) => item.id === CONTEXT_MENU_PAGE_LINK_ID)).toBe(false);
-}
-
-function verifyDescriptorsOmitUndefinedFields() {
-  const descriptors = buildContextMenuDescriptors({
-    quickActions: [createQuickAction('enabled')],
-    settings: createContextMenuSettings(),
-    viewportPresets,
-  });
-  const rootDescriptor = descriptors.find((item) => item.id === CONTEXT_MENU_ROOT_ID);
-  const exportSeparatorDescriptor = descriptors.find(
-    (item) => item.id === CONTEXT_MENU_EXPORT_SEPARATOR_ID
-  );
-
-  expect(rootDescriptor).toEqual({
-    id: CONTEXT_MENU_ROOT_ID,
-    title: 'Sniptale',
-  });
-  expect(rootDescriptor && 'parentId' in rootDescriptor).toBe(false);
-  expect(rootDescriptor && 'type' in rootDescriptor).toBe(false);
-  expect(exportSeparatorDescriptor).toEqual({
-    id: CONTEXT_MENU_EXPORT_SEPARATOR_ID,
-    parentId: CONTEXT_MENU_EXPORT_ID,
-    type: 'separator',
-  });
-  expect(exportSeparatorDescriptor && 'title' in exportSeparatorDescriptor).toBe(false);
-}
-
-function verifyRestrictedPageVisibility() {
-  const updates = resolveContextMenuDynamicState({
-    hasVideoPreset: true,
-    settings: createContextMenuSettings(),
-    tab: createTab('chrome://extensions'),
-  });
-
-  expect(updates[CONTEXT_MENU_SCREENSHOTS_ID]?.visible).toBe(false);
-  expect(updates[CONTEXT_MENU_EXPORT_ID]?.visible).toBe(false);
-  expect(updates[CONTEXT_MENU_PAGE_LINK_ID]?.visible).toBe(false);
-  expect(updates[CONTEXT_MENU_VIDEO_ID]?.visible).toBe(true);
-  expect(updates[CONTEXT_MENU_VIDEO_WINDOW_ID]?.enabled).toBe(true);
-  expect(updates[CONTEXT_MENU_VIDEO_PRESET_ID]?.enabled).toBe(false);
-}
-
-function verifyPresetVisibilityWithoutResolvedPreset() {
-  const updates = resolveContextMenuDynamicState({
-    hasVideoPreset: false,
-    settings: createContextMenuSettings(),
-    tab: createTab('https://example.test'),
-  });
-
-  expect(updates[CONTEXT_MENU_VIDEO_PRESET_ID]?.enabled).toBe(false);
-  expect(updates[CONTEXT_MENU_VIDEO_ID]?.visible).toBe(true);
-}
-
-function verifyContextMenuContextsAndQuickActionFiltering() {
-  expect(getContextMenuContexts()).toEqual(['all']);
-  expect(
-    getEnabledContextMenuQuickActions([
-      createQuickAction('enabled'),
-      createQuickAction('disabled', false),
-    ])
-  ).toEqual([createQuickAction('enabled')]);
-}
-
-function verifyVisibleItemDetection() {
-  expect(
-    hasVisibleContextMenuItems({
       quickActions: [],
-      settings: createContextMenuSettings({
-        showExport: false,
-        showGallery: false,
-        showPageLinkCopy: false,
-        showImageEditor: false,
-        showScreenshots: false,
-        showSettings: false,
-        showVideo: false,
-        showVideoEditor: false,
-        showWindowResize: false,
+      viewportPresets: [],
+    });
+    expect(descriptors).toEqual([{ id: CONTEXT_MENU_ROOT_ID, title: 'Sniptale' }]);
+  });
+
+  it('projects missing and v1 layouts with inventories and explicit legacy visibility', () => {
+    const legacy = buildContextMenuDescriptors({
+      settings: settings(),
+      quickActions,
+      viewportPresets: presets,
+    });
+    expect(legacy.some((item) => item.id === 'sniptale.screenshots.quick-action.first')).toBe(true);
+    expect(
+      legacy.some((item) => item.id === buildContextMenuWindowResizePresetId('window-hd'))
+    ).toBe(true);
+    const v1 = buildContextMenuDescriptors({
+      settings: settings({
+        version: 1,
+        sections: [
+          {
+            id: 'root',
+            title: '',
+            items: [
+              'showSettings',
+              'showScreenshots',
+              'showVideo',
+              'showExport',
+              'showImageEditor',
+              'showVideoEditor',
+              'showGallery',
+              'showPageLinkCopy',
+              'showWindowResize',
+            ],
+          },
+        ],
       }),
-      viewportPresets,
-    })
-  ).toBe(false);
-}
-
-function verifyWindowResizeDescriptors() {
-  const descriptors = buildDescriptors();
-  const disabledDescriptors = buildDescriptors(
-    createContextMenuSettings({ showWindowResize: false })
-  );
-
-  expect(descriptors).toContainEqual({
-    id: CONTEXT_MENU_WINDOW_RESIZE_ID,
-    parentId: CONTEXT_MENU_ROOT_ID,
-    title: 'Изменить размер окна',
+      quickActions,
+      viewportPresets: presets,
+    });
+    expect(v1[1]?.id).toBe('sniptale.settings');
+    expect(v1.some((item) => item.id === 'sniptale.screenshots.quick-action.first')).toBe(true);
+    const disabled = buildContextMenuDescriptors({
+      settings: { ...settings(), showScreenshots: false },
+      quickActions,
+      viewportPresets: presets,
+    });
+    expect(disabled.some((item) => item.id === 'sniptale.screenshots.quick-action.first')).toBe(
+      false
+    );
+    const v2 = buildContextMenuDescriptors({
+      settings: { ...settings(tree), showVideo: false },
+      quickActions,
+      viewportPresets: presets,
+    });
+    expect(v2.some((item) => item.id === 'sniptale.video.window')).toBe(true);
   });
-  expect(descriptors).toContainEqual({
-    id: buildContextMenuWindowResizePresetId('window-hd'),
-    parentId: CONTEXT_MENU_WINDOW_RESIZE_ID,
-    title: 'Window HD · 1280 × 720',
-  });
-  expect(descriptors.some((item) => item.id.includes('disabled-window'))).toBe(false);
-  expect(disabledDescriptors.some((item) => item.id === CONTEXT_MENU_WINDOW_RESIZE_ID)).toBe(false);
-}
 
-describe('context menu model', () => {
-  it(
-    'adds the bottom settings separator only when settings are shown after primary items',
-    verifySettingsSeparatorPlacement
-  );
-  it(
-    'places enabled quick actions directly under screenshots without a submenu',
-    verifyQuickActionSubmenuFiltering
-  );
-  it('adds fixed page-link copy format descriptors when enabled', verifyPageLinkCopyDescriptors);
-  it(
-    'adds only enabled browser-window presets to the window-size submenu',
-    verifyWindowResizeDescriptors
-  );
-  it(
-    'omits undefined descriptor fields from root and separator entries',
-    verifyDescriptorsOmitUndefinedFields
-  );
-  it(
-    'hides screenshots and export on restricted pages and keeps window recording available',
-    verifyRestrictedPageVisibility
-  );
-  it(
-    'disables preset capture when no resolved viewport preset exists',
-    verifyPresetVisibilityWithoutResolvedPreset
-  );
-  it(
-    'returns the shared menu contexts and only enabled quick actions',
-    verifyContextMenuContextsAndQuickActionFiltering
-  );
-  it('round-trips escaped window preset ids and rejects malformed ids', () => {
+  it('retains every supported legacy quick action before an oversized tree can be explicitly saved', () => {
+    const actions = Array.from({ length: 100 }, (_, index) => ({
+      ...quickActions[0]!,
+      id: `action-${index}`,
+      name: `Action ${index}`,
+    }));
+    actions.push({ ...quickActions[0]!, id: 'legacy / id', name: 'Legacy action' });
+    const descriptors = buildContextMenuDescriptors({
+      settings: settings(),
+      quickActions: actions,
+      viewportPresets: [],
+    });
     expect(
-      parseContextMenuWindowResizePresetId(buildContextMenuWindowResizePresetId('custom / size'))
-    ).toBe('custom / size');
+      descriptors.filter((item) => item.id.startsWith('sniptale.screenshots.quick-action.'))
+    ).toHaveLength(101);
     expect(
-      parseContextMenuWindowResizePresetId('sniptale.window-resize.preset.%E0%A4%A')
-    ).toBeNull();
+      descriptors.some((item) => item.id === 'sniptale.screenshots.quick-action.legacy / id')
+    ).toBe(true);
   });
-  it(
-    'reports when there are no visible context menu items beyond the root',
-    verifyVisibleItemDetection
-  );
+
+  it('applies capability visibility to every emitted leaf and derives section visibility', () => {
+    const descriptors = buildContextMenuDescriptors({
+      settings: settings(tree),
+      quickActions,
+      viewportPresets: presets,
+    });
+    const restricted = resolveContextMenuDynamicState({
+      descriptors,
+      hasVideoPreset: false,
+      tab: tab('chrome://extensions'),
+    });
+    expect(restricted['sniptale.screenshots.quick-action.first']).toEqual({
+      visible: false,
+      enabled: false,
+    });
+    expect(restricted['sniptale.page-link.rich']).toEqual({ visible: false, enabled: false });
+    expect(restricted[CONTEXT_MENU_VIDEO_PRESET_ID]).toEqual({ visible: false, enabled: false });
+    expect(restricted['sniptale.video.window']).toEqual({ visible: true, enabled: true });
+    expect(restricted['sniptale.section.tools']).toEqual({ visible: true, enabled: true });
+    const regular = resolveContextMenuDynamicState({
+      descriptors,
+      hasVideoPreset: false,
+      tab: tab('https://example.test'),
+    });
+    expect(regular[CONTEXT_MENU_VIDEO_PRESET_ID]).toEqual({ visible: true, enabled: false });
+  });
 });

@@ -30,6 +30,12 @@ function createState(
       showVideoEditor: true,
     },
     contextMenuOptions: buildAppearanceContextMenuOptions('ru'),
+    contextMenuCatalogStatus: 'ready',
+    contextMenuSettingsStatus: 'ready',
+    contextMenuQuickActions: [],
+    contextMenuViewportPresets: [],
+    retryContextMenuCatalog: vi.fn(),
+    retryContextMenuSettings: vi.fn(),
     languagePreference: 'ru',
     locale: 'ru',
     localeOptions: [{ label: 'Русский', value: 'ru' }],
@@ -117,18 +123,15 @@ async function verifyContextMenuControls(): Promise<void> {
   expect(container?.querySelector('section:not([hidden])')?.textContent).toContain(
     'Контекстное меню браузера'
   );
-  expect(container?.textContent).toContain('Копировать название и ссылку');
+  expect(container?.textContent).toContain('Каталог команд');
   expect(container?.textContent).toContain('Настройки');
   expectContextMenuButtons();
 }
 
 function expectContextMenuButtons(): void {
   expect(container?.querySelector('button[aria-label="Показывать меню Sniptale"]')).toBeTruthy();
-  expect(container?.querySelector('button[aria-label="Снимки"]')).toBeTruthy();
-  expect(
-    container?.querySelector('button[aria-label="Копировать название и ссылку"]')
-  ).toBeTruthy();
-  expect(container?.querySelector('button[aria-label="Настройки"]')).toBeTruthy();
+  expect(container?.querySelector('[role="tree"]')).toBeTruthy();
+  expect(container?.textContent).toContain('Предпросмотр меню');
 }
 
 async function verifyContextMenuToggle(): Promise<void> {
@@ -136,16 +139,22 @@ async function verifyContextMenuToggle(): Promise<void> {
 
   await renderWithState(state, 'context-menu');
 
-  const pageLinkToggle = container?.querySelector(
-    'button[aria-label="Копировать название и ссылку"]'
-  ) as HTMLButtonElement;
-  expect(pageLinkToggle).toBeTruthy();
+  const commandToggle = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label^="Показывать меню Sniptale: Подготовка страницы"]'
+  );
+  expect(commandToggle).toBeTruthy();
 
   await act(async () => {
-    pageLinkToggle.click();
+    commandToggle?.click();
   });
-
-  expect(state.updateContextMenu).toHaveBeenCalledWith({ showPageLinkCopy: false });
+  expect(state.updateContextMenu).not.toHaveBeenCalled();
+  const save = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) => button.textContent === translate('settings.appearance.contextMenuSave', 'ru')
+  );
+  await act(async () => save?.click());
+  expect(state.updateContextMenu).toHaveBeenCalledWith({
+    layout: expect.objectContaining({ version: 2 }),
+  });
 }
 
 async function verifyRawDiagnosticsHidden(): Promise<void> {
@@ -159,14 +168,11 @@ async function verifyRawDiagnosticsHidden(): Promise<void> {
 async function verifyEditorViewSwitch(): Promise<void> {
   const state = createState();
   await renderWithState(state, 'context-menu');
-  const customize = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
-    (button) => button.textContent === translate('settings.appearance.contextMenuCustomize', 'ru')
-  );
-  await act(async () => customize?.click());
   const addSection = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
   ).find(
-    (button) => button.textContent === translate('settings.appearance.contextMenuAddSection', 'ru')
+    (button) =>
+      button.textContent === translate('settings.appearance.contextMenuCreateSection', 'ru')
   );
   await act(async () => addSection?.click());
   const name = container?.querySelector<HTMLInputElement>(
@@ -192,11 +198,7 @@ async function verifyEditorViewSwitch(): Promise<void> {
   expect(state.updateContextMenu).not.toHaveBeenCalled();
 
   await renderWithState(state, 'context-menu');
-  expect(
-    container?.querySelector<HTMLInputElement>(
-      `[aria-label="${translate('settings.appearance.contextMenuSectionName', 'ru')}"]`
-    )?.value
-  ).toBe('My menu');
+  expect(container?.textContent).toContain('My menu');
 }
 
 async function verifyHiddenSave(): Promise<void> {
@@ -216,9 +218,11 @@ async function verifyHiddenSave(): Promise<void> {
     const button = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
       (entry) => entry.textContent === label
     );
-    await act(async () => button?.click());
+    await act(async () => {
+      button?.focus();
+      button?.click();
+    });
   };
-  await clickText(translate('settings.appearance.contextMenuCustomize', 'ru'));
   await clickText(translate('settings.appearance.contextMenuRestore', 'ru'));
   await clickText(translate('settings.appearance.contextMenuSave', 'ru'));
   expect(updateContextMenu).toHaveBeenCalledTimes(1);
@@ -231,5 +235,7 @@ async function verifyHiddenSave(): Promise<void> {
   );
   await clickText(translate('settings.appearance.contextMenuSave', 'ru'));
   expect(updateContextMenu).toHaveBeenCalledTimes(2);
-  expect(updateContextMenu).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true }));
+  expect(updateContextMenu).toHaveBeenLastCalledWith({
+    layout: expect.objectContaining({ version: 2 }),
+  });
 }

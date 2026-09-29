@@ -57,7 +57,7 @@ it('serializes independent page instances and preserves disjoint settings patche
   await vi.waitFor(() => expect(storage.set).toHaveBeenCalledTimes(1));
   const qualityPatch = secondPage.patchSettings({ imageQuality: 85 });
   await Promise.resolve();
-  expect(storage.get).toHaveBeenCalledTimes(1);
+  expect(storage.get).toHaveBeenCalledTimes(2);
   releaseFirstWrite?.();
   await Promise.all([imagePatch, qualityPatch]);
   expect(persisted).toMatchObject({ imageFormat: 'webp', imageQuality: 85 });

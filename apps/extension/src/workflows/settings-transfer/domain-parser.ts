@@ -92,6 +92,24 @@ function parseCoreDomain(
         result['popupStartup'] = parsedPopup;
       }
       if (parsed.data.contextMenu !== undefined) {
+        if (
+          !isPlainRecord(parsed.data.contextMenu) ||
+          Object.keys(parsed.data.contextMenu).some(
+            (key) =>
+              key !== 'layout' &&
+              key !== 'enabled' &&
+              key !== 'showScreenshots' &&
+              key !== 'showVideo' &&
+              key !== 'showExport' &&
+              key !== 'showImageEditor' &&
+              key !== 'showVideoEditor' &&
+              key !== 'showGallery' &&
+              key !== 'showPageLinkCopy' &&
+              key !== 'showWindowResize' &&
+              key !== 'showSettings'
+          )
+        )
+          failSettingsTransferDomain(domainId);
         const settings = parseStoredSettings({ contextMenu: parsed.data.contextMenu });
         if (settings.invalidFieldCount > 0 || settings.hasInvalidRoot)
           failSettingsTransferDomain(domainId);

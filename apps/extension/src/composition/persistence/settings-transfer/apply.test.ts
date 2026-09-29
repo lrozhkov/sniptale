@@ -600,3 +600,125 @@ it('applies the validated menu layout through the existing settings transfer tra
     undefined
   );
 });
+
+it('imports a 100-command layout without exceeding sync item quota', async () => {
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  const contextMenu = { ...settingsFixture().contextMenu, layout };
+  const domains = parseSettingsTransferDomains({
+    'interface.preferences': { schemaVersion: 1, data: { contextMenu } },
+  });
+  mocks.syncSet.mockImplementation(async (values: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(values)) {
+      if (new TextEncoder().encode(key + JSON.stringify(value)).length > 8192)
+        throw new Error('QUOTA_BYTES_PER_ITEM exceeded');
+    }
+  });
+  await applySettingsTransferDomains({ domains, summary: emptySummary() });
+  const saved = mocks.syncSet.mock.calls[0]?.[0] as Record<string, unknown>;
+  expect(saved['sniptale_settings']).toMatchObject({
+    contextMenuLayoutChunks: { version: 1, encoding: 'gzip' },
+  });
+  expect(Object.keys(saved).some((key) => key.startsWith('sniptale_context_menu_layout_'))).toBe(
+    true
+  );
+});
+
+it('reuses a saved large menu while importing an unrelated settings domain', async () => {
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  const manifest = { version: 1, encoding: 'gzip', id: crypto.randomUUID(), count: 1 };
+  mocks.loadSettings.mockResolvedValue({
+    ...settingsFixture(),
+    contextMenu: { ...settingsFixture().contextMenu, layout },
+  });
+  mocks.syncGet.mockResolvedValue({
+    sniptale_settings: {
+      contextMenu: settingsFixture().contextMenu,
+      contextMenuLayoutChunks: manifest,
+    },
+  });
+  await applySettingsTransferDomains({
+    domains: {
+      'capture.image': { schemaVersion: 1, data: { format: 'webp' } },
+    },
+    summary: emptySummary(),
+  });
+  const saved = mocks.syncSet.mock.calls[0]?.[0] as Record<string, unknown>;
+  expect(saved['sniptale_settings']).toMatchObject({ contextMenuLayoutChunks: manifest });
+  expect(Object.keys(saved)).toEqual(['sniptale_settings']);
+});
+
+it('removes new menu chunks when a later import write fails', async () => {
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  const contextMenu = { ...settingsFixture().contextMenu, layout };
+  mocks.localSet.mockRejectedValueOnce(new Error('local write failed'));
+  await expect(
+    applySettingsTransferDomains({
+      domains: parseSettingsTransferDomains({
+        'interface.preferences': {
+          schemaVersion: 1,
+          data: { contextMenu, locale: 'en' },
+        },
+      }),
+      summary: emptySummary(),
+    })
+  ).rejects.toThrow('local write failed');
+  const written = mocks.syncSet.mock.calls[0]?.[0] as Record<string, unknown>;
+  const newKeys = Object.keys(written).filter((key) =>
+    key.startsWith('sniptale_context_menu_layout_')
+  );
+  expect(newKeys.length).toBeGreaterThan(0);
+  expect(mocks.syncRemove).toHaveBeenCalledWith(expect.arrayContaining(newKeys), undefined);
+});
+
+it('restores settings and removes new chunks after a partially applied sync write rejects', async () => {
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  mocks.syncSet.mockRejectedValueOnce(new Error('partial sync write'));
+  await expect(
+    applySettingsTransferDomains({
+      domains: parseSettingsTransferDomains({
+        'interface.preferences': {
+          schemaVersion: 1,
+          data: { contextMenu: { ...settingsFixture().contextMenu, layout } },
+        },
+      }),
+      summary: emptySummary(),
+    })
+  ).rejects.toThrow('partial sync write');
+  const attempted = mocks.syncSet.mock.calls[0]?.[0] as Record<string, unknown>;
+  const newKeys = Object.keys(attempted).filter((key) =>
+    key.startsWith('sniptale_context_menu_layout_')
+  );
+  expect(mocks.syncSet).toHaveBeenCalledWith(
+    { sniptale_settings: { imageFormat: 'png' } },
+    undefined
+  );
+  expect(mocks.syncRemove).toHaveBeenCalledWith(expect.arrayContaining(newKeys), undefined);
+});

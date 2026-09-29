@@ -47,7 +47,9 @@ vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
 
 import {
   clearSettings,
+  createDefaultSettings,
   loadSettings,
+  patchSettings,
   removeRetiredSynchronizedSettings,
   saveSettings,
 } from './index';
@@ -124,6 +126,162 @@ it('does not rewrite synchronized settings when the retired field is absent', as
 
   await removeRetiredSynchronizedSettings();
 
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+});
+
+it('saves and reloads a 100-action tree within the real sync per-item quota', async () => {
+  resetSettingsStorageMocks();
+  const stored: Record<string, unknown> = {};
+  browserStorageSyncGetMock.mockImplementation(async (keys: string[]) =>
+    Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]]))
+  );
+  browserStorageSyncSetMock.mockImplementation(async (values: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(values)) {
+      if (new TextEncoder().encode(key + JSON.stringify(value)).length > 8192)
+        throw new Error('QUOTA_BYTES_PER_ITEM exceeded');
+    }
+    const candidate = { ...stored, ...values };
+    const total = Object.entries(candidate).reduce(
+      (sum, [key, value]) => sum + new TextEncoder().encode(key + JSON.stringify(value)).length,
+      0
+    );
+    if (total > 102400) throw new Error('QUOTA_BYTES exceeded');
+    Object.assign(stored, values);
+  });
+  browserStorageSyncRemoveMock.mockImplementation(async (keys: string[]) => {
+    for (const key of keys) delete stored[key];
+  });
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.${index === 0 ? 'a'.repeat(513) : `action-${index}`}`,
+      enabled: true,
+    })),
+  };
+  await saveSettings({
+    ...createDefaultSettings(),
+    contextMenu: { ...DEFAULT_CONTEXT_MENU, layout },
+  });
+  expect(stored['sniptale_settings']).toHaveProperty('contextMenuLayoutChunks');
+  expect((await loadSettings()).contextMenu.layout).toEqual(layout);
+  const originalChunkKeys = Object.keys(stored).filter((key) =>
+    key.startsWith('sniptale_context_menu_layout_')
+  );
+  await patchSettings({ imageQuality: 73 });
+  expect((await loadSettings()).contextMenu.layout).toEqual(layout);
+  expect(
+    Object.keys(stored).filter((key) => key.startsWith('sniptale_context_menu_layout_'))
+  ).toEqual(originalChunkKeys);
+  await clearSettings();
+  expect(stored).toEqual({});
+});
+
+it('keeps the previous settings readable when publishing chunked layout fails', async () => {
+  resetSettingsStorageMocks();
+  const previous = createDefaultSettings();
+  const stored: Record<string, unknown> = { sniptale_settings: previous };
+  browserStorageSyncGetMock.mockImplementation(async (keys: string[]) =>
+    Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]]))
+  );
+  browserStorageSyncSetMock.mockImplementation(async (values: Record<string, unknown>) => {
+    if ('sniptale_settings' in values) throw new Error('sync write failed');
+    Object.assign(stored, values);
+  });
+  browserStorageSyncRemoveMock.mockImplementation(async (keys: string[]) => {
+    for (const key of keys) delete stored[key];
+  });
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  await expect(
+    saveSettings({ ...previous, contextMenu: { ...previous.contextMenu, layout } })
+  ).rejects.toThrow('sync write failed');
+  expect(stored).toEqual({ sniptale_settings: previous });
+  expect((await loadSettings()).contextMenu.layout).toEqual(previous.contextMenu.layout);
+});
+
+it('restores the previous manifest before deleting new chunks after a partially committed write', async () => {
+  resetSettingsStorageMocks();
+  const previous = createDefaultSettings();
+  const stored: Record<string, unknown> = { sniptale_settings: previous };
+  browserStorageSyncGetMock.mockImplementation(async (keys: string[]) =>
+    Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]]))
+  );
+  let failed = false;
+  browserStorageSyncSetMock.mockImplementation(async (values: Record<string, unknown>) => {
+    Object.assign(stored, values);
+    if ('sniptale_settings' in values && !failed) {
+      failed = true;
+      throw new Error('partially committed sync write');
+    }
+  });
+  browserStorageSyncRemoveMock.mockImplementation(async (keys: string[]) => {
+    for (const key of keys) delete stored[key];
+  });
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  await expect(
+    saveSettings({ ...previous, contextMenu: { ...previous.contextMenu, layout } })
+  ).rejects.toThrow('partially committed sync write');
+  expect(stored).toEqual({ sniptale_settings: previous });
+  expect((await loadSettings()).contextMenu.layout).toEqual(previous.contextMenu.layout);
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith(
+    { sniptale_settings: previous },
+    expect.anything()
+  );
+});
+
+it('preserves newly published chunks when the failed settings write cannot be rolled back', async () => {
+  resetSettingsStorageMocks();
+  const previous = createDefaultSettings();
+  const stored: Record<string, unknown> = { sniptale_settings: previous };
+  browserStorageSyncGetMock.mockImplementation(async (keys: string[]) =>
+    Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]]))
+  );
+  browserStorageSyncSetMock.mockImplementation(async (values: Record<string, unknown>) => {
+    if ('sniptale_settings' in values) {
+      if (values['sniptale_settings'] === previous) throw new Error('restore failed');
+      Object.assign(stored, values);
+      throw new Error('partially committed sync write');
+    }
+    Object.assign(stored, values);
+  });
+  const layout = {
+    version: 2 as const,
+    nodes: Array.from({ length: 100 }, (_, index) => ({
+      type: 'command' as const,
+      command: `sniptale.screenshots.quick-action.action-${index}`,
+      enabled: true,
+    })),
+  };
+  await expect(
+    saveSettings({ ...previous, contextMenu: { ...previous.contextMenu, layout } })
+  ).rejects.toThrow('Settings rollback could not be verified');
+  expect(browserStorageSyncRemoveMock).not.toHaveBeenCalled();
+  expect((await loadSettings()).contextMenu.layout).toEqual(layout);
+});
+
+it('reports an incomplete published layout instead of silently dropping commands', async () => {
+  resetSettingsStorageMocks();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: {
+      contextMenu: DEFAULT_CONTEXT_MENU,
+      contextMenuLayoutChunks: { version: 1, encoding: 'gzip', id: crypto.randomUUID(), count: 2 },
+    },
+  });
+  await expect(loadSettings()).rejects.toThrow('incomplete or invalid');
   expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
 });
 
@@ -542,8 +700,27 @@ it('reads a custom layout without writes and preserves explicit legacy visibilit
   expect(loaded.contextMenu.layout).toEqual(layout);
   expect(loaded.contextMenu.showWindowResize).toBe(true);
   expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
-  loaded.contextMenu.layout!.sections[0]!.items.length = 0;
+  if (loaded.contextMenu.layout?.version !== 1) throw new Error('Expected legacy layout');
+  loaded.contextMenu.layout.sections[0]!.items.length = 0;
   expect((await loadSettings()).contextMenu.layout).toEqual(layout);
+});
+
+it('reads a v2 layout as the saved authority without writing on load', async () => {
+  const layout = {
+    version: 2,
+    nodes: [
+      { type: 'command', command: 'sniptale.video.tab', enabled: true },
+      { type: 'command', command: 'sniptale.screenshots.quick-action.unavailable', enabled: false },
+    ],
+  };
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: { contextMenu: { layout, showVideo: false } },
+  });
+  browserStorageSyncSetMock.mockClear();
+  const loaded = await loadSettings();
+  expect(loaded.contextMenu.layout).toEqual(layout);
+  expect(loaded.contextMenu.showVideo).toBe(false);
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
 });
 
 it('drops a malformed stored layout without changing valid booleans or repairing storage', async () => {
@@ -554,5 +731,33 @@ it('drops a malformed stored layout without changing valid booleans or repairing
   const loaded = await loadSettings();
   expect(loaded.contextMenu.enabled).toBe(false);
   expect(loaded.contextMenu.layout).toBeUndefined();
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+});
+
+it('salvages valid nodes from a partially damaged stored v2 layout without writing on read', async () => {
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: {
+      contextMenu: {
+        enabled: true,
+        layout: {
+          version: 2,
+          nodes: [
+            { type: 'command', command: 'sniptale.video.tab', enabled: false },
+            { type: 'command', command: 'unknown.command', enabled: true },
+            { type: 'command', command: 'sniptale.gallery', enabled: true },
+          ],
+        },
+      },
+    },
+  });
+  browserStorageSyncSetMock.mockClear();
+  const loaded = await loadSettings();
+  expect(loaded.contextMenu.layout).toEqual({
+    version: 2,
+    nodes: [
+      { type: 'command', command: 'sniptale.video.tab', enabled: false },
+      { type: 'command', command: 'sniptale.gallery', enabled: true },
+    ],
+  });
   expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
 });

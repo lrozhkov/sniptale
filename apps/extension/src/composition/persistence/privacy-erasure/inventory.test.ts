@@ -70,6 +70,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.sessionPrefixes).toContain('sniptale.content.pin-to-tab:tab:');
   expect(plan.sessionPrefixes).toContain('sniptale.annotation-fork-drafts:tab:');
   expect(plan.sync).toEqual([]);
+  expect(plan.syncPrefixes).toEqual([]);
 });
 
 it('removes preferences and AI provider secrets for factory reset mode', () => {
@@ -105,6 +106,7 @@ it('removes preferences and AI provider secrets for factory reset mode', () => {
   expect(plan.sync).toContain('sniptale_auto_blur_settings');
   expect(plan.sync).toContain('sniptale_callout_presets');
   expect(plan.sync).toContain('sniptale_gradient_presets');
+  expect(plan.syncPrefixes).toContain('sniptale_context_menu_layout_');
 });
 
 it('includes extension-page trace localStorage in the page-local erasure inventory', () => {

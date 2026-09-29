@@ -173,6 +173,6 @@ export function buildBrowserStorageErasurePlan(
     session: [...sessionSensitiveKeys],
     sessionPrefixes: [...sessionSensitiveKeyPrefixes],
     sync: options.preservePreferences ? [] : [...syncPreferenceKeys],
-    syncPrefixes: [],
+    syncPrefixes: options.preservePreferences ? [] : ['sniptale_context_menu_layout_'],
   };
 }

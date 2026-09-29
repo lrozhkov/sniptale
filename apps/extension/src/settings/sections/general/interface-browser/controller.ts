@@ -23,6 +23,9 @@ import {
 } from './copy';
 import { useSettingsStore } from '../../../runtime/store/useSettingsStore';
 import { usePopupStartupPreference } from './popup-startup-preference';
+import { browserStorage } from '../../../../composition/persistence/infrastructure/browser-storage';
+import { getQuickActions } from '../../../../composition/persistence/quick-actions';
+import type { QuickAction } from '../../../../contracts/settings';
 
 const logger = createLogger({ namespace: 'settings:appearance' });
 
@@ -65,17 +68,63 @@ function persistThemePreference(value: AppThemePreference): void {
 
 export function useAppearanceSection() {
   const locale = useAppLocale();
-  const { settings, updateSettings } = useSettingsStore();
+  const { settings, updateSettings, hasLoaded, error, loadSettings } = useSettingsStore();
   const { languagePreference, preference } = useStoredAppearancePreferences();
   const popupStartup = usePopupStartupPreference();
+  const [contextMenuQuickActions, setContextMenuQuickActions] = useState<QuickAction[]>([]);
+  const [contextMenuCatalogStatus, setContextMenuCatalogStatus] = useState<
+    'loading' | 'ready' | 'failed'
+  >('loading');
+  const [catalogReload, setCatalogReload] = useState(0);
+  useEffect(() => {
+    let active = true;
+    let generation = 0;
+    const load = async () => {
+      const current = ++generation;
+      setContextMenuCatalogStatus('loading');
+      try {
+        const actions = await getQuickActions();
+        if (!active || current !== generation) return;
+        setContextMenuQuickActions(actions);
+        setContextMenuCatalogStatus('ready');
+      } catch (error) {
+        if (!active || current !== generation) return;
+        logger.warn('Failed to load context menu command catalog', error);
+        setContextMenuCatalogStatus('failed');
+      }
+    };
+    const unsubscribe =
+      typeof chrome === 'undefined'
+        ? () => undefined
+        : browserStorage.subscribeToChanges((changes, area) => {
+            if (area === 'local' && changes['sniptale_quick_actions']) void load();
+          });
+    void load();
+    return () => {
+      active = false;
+      generation += 1;
+      unsubscribe();
+    };
+  }, [catalogReload]);
   const contextMenuOptions = useMemo(() => buildAppearanceContextMenuOptions(locale), [locale]);
   const localeOptions = useMemo(() => buildAppearanceLocaleOptions(locale), [locale]);
   const resolvedTheme = useMemo(() => resolveAppTheme(preference), [preference]);
   const themeOptions = useMemo(() => buildAppearanceThemeOptions(locale), [locale]);
   const popupStartupOptions = useMemo(() => buildPopupStartupOptions(locale), [locale]);
+  const contextMenuSettingsStatus: 'ready' | 'loading' | 'failed' = hasLoaded
+    ? 'ready'
+    : error
+      ? 'failed'
+      : 'loading';
 
   return {
     contextMenu: settings.contextMenu,
+    contextMenuCatalogStatus,
+    contextMenuSettingsStatus,
+    contextMenuQuickActions,
+    contextMenuViewportPresets: settings.viewportPresets,
+    retryContextMenuCatalog: () => setCatalogReload((value) => value + 1),
+    retryContextMenuSettings: () => void loadSettings(),
     contextMenuOptions,
     languagePreference,
     locale,

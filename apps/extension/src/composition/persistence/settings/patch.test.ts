@@ -72,6 +72,7 @@ describe('settings patch persistence', () => {
 
     browserStorageSyncGetMock
       .mockResolvedValueOnce({ sniptale_settings: initialSettings })
+      .mockResolvedValueOnce({ sniptale_settings: initialSettings })
       .mockResolvedValueOnce({ sniptale_settings: firstCommittedSettings });
     browserStorageSyncSetMock
       .mockImplementationOnce(() => deferredSet.promise)
@@ -82,7 +83,7 @@ describe('settings patch persistence', () => {
 
     await flushMicrotasks();
 
-    expect(browserStorageSyncGetMock).toHaveBeenCalledTimes(1);
+    expect(browserStorageSyncGetMock).toHaveBeenCalledTimes(2);
 
     deferredSet.resolve();
 

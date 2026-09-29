@@ -1,27 +1,26 @@
 import type { BrowserContextMenuUpdateProperties } from '@sniptale/platform/browser/context-menus';
-import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
-import {
-  type ContextMenuSettings,
-  type QuickAction,
-  type ViewportPreset,
-} from '../../../contracts/settings';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { getTabCapabilities } from '../../../features/tab-capabilities/capabilities';
+import type { ContextMenuSettings, QuickAction, ViewportPreset } from '../../../contracts/settings';
+import { buildContextMenuDescriptors as buildContextMenuDescriptorsImpl } from './descriptors';
 import {
-  CONTEXT_MENU_EXPORT_ID,
-  CONTEXT_MENU_SCREENSHOTS_ID,
+  CONTEXT_MENU_EXPORT_COPY_JSON_ID,
+  CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
+  CONTEXT_MENU_EXPORT_START_ID,
+  CONTEXT_MENU_ROOT_ID,
+  CONTEXT_MENU_SCREENSHOTS_PREPARE_ID,
   CONTEXT_MENU_VIDEO_AREA_ID,
-  CONTEXT_MENU_VIDEO_ID,
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_TAB_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
+  parseContextMenuQuickActionId,
 } from './constants';
 import {
-  CONTEXT_MENU_PAGE_LINK_ID,
   CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID,
   CONTEXT_MENU_PAGE_LINK_PLAIN_ID,
   CONTEXT_MENU_PAGE_LINK_RICH_ID,
 } from './page-link/constants';
-import { buildContextMenuDescriptors as buildContextMenuDescriptorsImpl } from './descriptors';
+import type { ContextMenuDescriptor } from './types';
 
 export { buildContextMenuDescriptorsImpl as buildContextMenuDescriptors };
 
@@ -33,10 +32,6 @@ export function getContextMenuContexts(): chrome.contextMenus.CreateProperties['
   return CONTEXT_MENU_CONTEXTS;
 }
 
-export function getEnabledContextMenuQuickActions(actions: QuickAction[]): QuickAction[] {
-  return actions.filter((action) => action.status);
-}
-
 export function hasVisibleContextMenuItems(args: {
   quickActions: QuickAction[];
   settings: ContextMenuSettings;
@@ -45,125 +40,56 @@ export function hasVisibleContextMenuItems(args: {
   return buildContextMenuDescriptorsImpl(args).length > 1;
 }
 
-function resolveVideoDynamicState(args: {
-  capabilities: ReturnType<typeof getTabCapabilities>;
-  hasVideoPreset: boolean;
-  settings: ContextMenuSettings;
-}): Record<string, BrowserContextMenuUpdateProperties> {
-  const videoTabEnabled = args.capabilities.videoByMode[CaptureMode.TAB].supported;
-  const videoAreaEnabled = args.capabilities.videoByMode[CaptureMode.TAB_CROP].supported;
-  const videoPresetEnabled =
-    args.hasVideoPreset && args.capabilities.videoByMode[CaptureMode.TAB].supported;
-  const videoWindowEnabled = args.capabilities.videoByMode[CaptureMode.SCREEN].supported;
-  const videoVisible =
-    args.settings.showVideo &&
-    (videoTabEnabled || videoAreaEnabled || videoPresetEnabled || videoWindowEnabled);
-
-  return {
-    [CONTEXT_MENU_VIDEO_ID]: {
-      enabled: videoVisible,
-      visible: videoVisible,
-    },
-    [CONTEXT_MENU_VIDEO_TAB_ID]: {
-      enabled: videoTabEnabled,
-      visible: args.settings.showVideo,
-    },
-    [CONTEXT_MENU_VIDEO_AREA_ID]: {
-      enabled: videoAreaEnabled,
-      visible: args.settings.showVideo,
-    },
-    [CONTEXT_MENU_VIDEO_PRESET_ID]: {
-      enabled: videoPresetEnabled,
-      visible: args.settings.showVideo,
-    },
-    [CONTEXT_MENU_VIDEO_WINDOW_ID]: {
-      enabled: videoWindowEnabled,
-      visible: args.settings.showVideo,
-    },
-  };
+function isCommandVisible(
+  id: string,
+  capabilities: ReturnType<typeof getTabCapabilities>
+): boolean {
+  if (id === CONTEXT_MENU_SCREENSHOTS_PREPARE_ID) return capabilities.screenshotMode.supported;
+  if (parseContextMenuQuickActionId(id)) return capabilities.quickActions.supported;
+  if (
+    id === CONTEXT_MENU_EXPORT_START_ID ||
+    id === CONTEXT_MENU_EXPORT_COPY_JSON_ID ||
+    id === CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID
+  )
+    return capabilities.export.supported;
+  if (
+    id === CONTEXT_MENU_PAGE_LINK_RICH_ID ||
+    id === CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID ||
+    id === CONTEXT_MENU_PAGE_LINK_PLAIN_ID
+  )
+    return !capabilities.isRestrictedPage && Boolean(capabilities.url);
+  if (id === CONTEXT_MENU_VIDEO_TAB_ID) return capabilities.videoByMode[CaptureMode.TAB].supported;
+  if (id === CONTEXT_MENU_VIDEO_AREA_ID)
+    return capabilities.videoByMode[CaptureMode.TAB_CROP].supported;
+  if (id === CONTEXT_MENU_VIDEO_PRESET_ID)
+    return capabilities.videoByMode[CaptureMode.TAB].supported;
+  if (id === CONTEXT_MENU_VIDEO_WINDOW_ID)
+    return capabilities.videoByMode[CaptureMode.SCREEN].supported;
+  return true;
 }
 
-function resolvePageLinkDynamicState(args: {
-  capabilities: ReturnType<typeof getTabCapabilities>;
-  settings: ContextMenuSettings;
-}): Record<string, BrowserContextMenuUpdateProperties> {
-  const pageLinkVisible =
-    args.settings.showPageLinkCopy &&
-    !args.capabilities.isRestrictedPage &&
-    Boolean(args.capabilities.url);
-
-  return {
-    [CONTEXT_MENU_PAGE_LINK_ID]: {
-      enabled: pageLinkVisible,
-      visible: pageLinkVisible,
-    },
-    [CONTEXT_MENU_PAGE_LINK_RICH_ID]: {
-      enabled: pageLinkVisible,
-      visible: pageLinkVisible,
-    },
-    [CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID]: {
-      enabled: pageLinkVisible,
-      visible: pageLinkVisible,
-    },
-    [CONTEXT_MENU_PAGE_LINK_PLAIN_ID]: {
-      enabled: pageLinkVisible,
-      visible: pageLinkVisible,
-    },
-  };
-}
-
+/** Visibility is computed only for actual menu IDs; section state follows its emitted children. */
 export function resolveContextMenuDynamicState(args: {
+  descriptors: readonly ContextMenuDescriptor[];
   hasVideoPreset: boolean;
-  settings: ContextMenuSettings;
-  viewportPresets?: readonly ViewportPreset[];
   tab?: chrome.tabs.Tab;
 }): Record<string, BrowserContextMenuUpdateProperties> {
   const capabilities = getTabCapabilities(args.tab);
-
-  const updates: Record<string, BrowserContextMenuUpdateProperties> = {
-    [CONTEXT_MENU_SCREENSHOTS_ID]: {
-      visible: args.settings.showScreenshots && capabilities.screenshotMode.supported,
-    },
-    ...resolveVideoDynamicState({
-      capabilities,
-      hasVideoPreset: args.hasVideoPreset,
-      settings: args.settings,
-    }),
-    [CONTEXT_MENU_EXPORT_ID]: {
-      visible: args.settings.showExport && capabilities.export.supported,
-    },
-    ...resolvePageLinkDynamicState({ capabilities, settings: args.settings }),
-  };
-
-  for (const section of args.settings.layout?.sections ?? []) {
-    if (section.id === 'root') continue;
-    const presentItems = section.items.filter(
-      (key) =>
-        args.settings[key] &&
-        (key !== 'showWindowResize' ||
-          args.viewportPresets?.some((preset) => preset.enabled && preset.target === 'window'))
-    );
-    if (presentItems.length === 0) continue;
-    const visible = presentItems.some((key) => {
-      if (!args.settings[key]) return false;
-      switch (key) {
-        case 'showScreenshots':
-          return updates[CONTEXT_MENU_SCREENSHOTS_ID]?.visible !== false;
-        case 'showVideo':
-          return updates[CONTEXT_MENU_VIDEO_ID]?.visible !== false;
-        case 'showExport':
-          return updates[CONTEXT_MENU_EXPORT_ID]?.visible !== false;
-        case 'showPageLinkCopy':
-          return updates[CONTEXT_MENU_PAGE_LINK_ID]?.visible !== false;
-        case 'showGallery':
-        case 'showImageEditor':
-        case 'showSettings':
-        case 'showVideoEditor':
-        case 'showWindowResize':
-          return true;
-      }
-    });
-    updates[`sniptale.section.${section.id}`] = { visible };
+  const updates: Record<string, BrowserContextMenuUpdateProperties> = {};
+  const visibleById = new Map<string, boolean>();
+  for (const descriptor of [...args.descriptors].reverse()) {
+    if (descriptor.id === CONTEXT_MENU_ROOT_ID) continue;
+    const children = args.descriptors.filter((child) => child.parentId === descriptor.id);
+    const visible =
+      children.length > 0
+        ? children.some((child) => visibleById.get(child.id) === true)
+        : isCommandVisible(descriptor.id, capabilities);
+    visibleById.set(descriptor.id, visible);
+    updates[descriptor.id] = {
+      visible,
+      enabled:
+        descriptor.id === CONTEXT_MENU_VIDEO_PRESET_ID ? visible && args.hasVideoPreset : visible,
+    };
   }
   return updates;
 }

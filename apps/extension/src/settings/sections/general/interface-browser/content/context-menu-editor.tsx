@@ -1,345 +1,289 @@
-import { useEffect, useRef, useState } from 'react';
-import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  createContextMenuLayout,
-  createRecommendedContextMenuSettings,
-  parseContextMenuLayout,
-  type ContextMenuItemKey,
-  type ContextMenuLayout,
+  createRecommendedContextMenuTree,
+  parseContextMenuTree,
+  resolveContextMenuTree,
+  type ContextMenuTree,
 } from '../../../../../contracts/settings/context-menu-layout';
 import { translate } from '../../../../../platform/i18n';
 import type { AppearanceSectionState } from './types';
+import { buildContextMenuCatalog } from './context-menu-catalog';
+import { ContextMenuCatalogPanel } from './context-menu-catalog-panel';
+import { ContextMenuPreview } from './context-menu-preview';
+import { ContextMenuTreeView } from './context-menu-tree';
+import { findContextMenuNode } from './context-menu-tree-model';
 
 const buttonClass = [
-  'rounded-lg px-3 py-2 text-sm hover:bg-[var(--sniptale-color-surface-hover)]',
-  'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)] disabled:opacity-45',
+  'inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg',
+  'border border-[var(--sniptale-color-border-soft)] px-3 py-1.5 text-sm',
+  'hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none',
+  'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+  'disabled:cursor-not-allowed disabled:opacity-45',
 ].join(' ');
 
-type Section = ContextMenuLayout['sections'][number];
+/** Disposable tree draft. Legacy projection is delayed until its dynamic inventories have loaded. */
+type ContextMenuEditorState = Pick<
+  AppearanceSectionState,
+  | 'contextMenu'
+  | 'contextMenuCatalogStatus'
+  | 'contextMenuSettingsStatus'
+  | 'contextMenuQuickActions'
+  | 'contextMenuViewportPresets'
+  | 'retryContextMenuCatalog'
+  | 'retryContextMenuSettings'
+  | 'locale'
+  | 'updateContextMenu'
+>;
 
-function reorder<T>(items: T[], index: number, offset: number): T[] {
-  const next = [...items];
-  const item = next[index];
-  if (item === undefined || index + offset < 0 || index + offset >= next.length) return next;
-  next.splice(index, 1);
-  next.splice(index + offset, 0, item);
-  return next;
-}
-
-/** Disposable menu draft; only explicit Save writes through the settings controller. */
-export function ContextMenuEditor({
-  state,
-  onClose,
-  visible = true,
-}: {
-  state: Pick<
-    AppearanceSectionState,
-    'contextMenu' | 'contextMenuOptions' | 'locale' | 'updateContextMenu'
-  >;
-  onClose(): void;
-  visible?: boolean;
-}) {
-  const [draft, setDraft] = useState(() => ({
-    ...state.contextMenu,
-    layout: structuredClone(state.contextMenu.layout ?? createContextMenuLayout()),
-  }));
-  const [status, setStatus] = useState<'editing' | 'saving' | 'failed'>('editing');
+function useContextMenuDraft(state: ContextMenuEditorState) {
+  const [tree, setTree] = useState<ContextMenuTree | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [status, setStatus] = useState<'ready' | 'editing' | 'saving' | 'failed' | 'saved'>(
+    'ready'
+  );
+  const [announcement, setAnnouncement] = useState('');
   const saving = useRef(false);
-  const surface = useRef<HTMLDivElement>(null);
-  const focusAfterChange = useRef<ContextMenuItemKey | 'heading' | null>(null);
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => {
-    heading.current?.focus();
-  }, []);
-  useEffect(() => {
-    const target = focusAfterChange.current;
-    focusAfterChange.current = null;
-    if (target === 'heading') heading.current?.focus();
-    else if (target)
-      surface.current
-        ?.querySelector<HTMLButtonElement>(`[data-menu-item="${target}"] button`)
-        ?.focus();
-  }, [draft]);
-  const changeDraft = (next: MenuDraft, focus?: ContextMenuItemKey | 'heading') => {
-    focusAfterChange.current = focus ?? null;
-    setDraft(next);
-  };
+  const draftRevision = useRef(0);
+  const projectedSource = useRef<{
+    settings: ContextMenuEditorState['contextMenu'];
+    actions: ContextMenuEditorState['contextMenuQuickActions'];
+    presets: ContextMenuEditorState['contextMenuViewportPresets'];
+  } | null>(null);
   const t = (key: Parameters<typeof translate>[0]) => translate(key, state.locale);
-  const sections = draft.layout.sections;
-  const changeSections = (next: Section[]) =>
-    setDraft((current) => ({ ...current, layout: { version: 1, sections: next } }));
+  const actions = state.contextMenuQuickActions;
+  const presets = state.contextMenuViewportPresets;
+  const catalog = useMemo(
+    () => buildContextMenuCatalog(actions, presets, state.locale),
+    [actions, presets, state.locale]
+  );
+  useEffect(() => {
+    if (
+      state.contextMenuCatalogStatus !== 'ready' ||
+      state.contextMenuSettingsStatus !== 'ready' ||
+      (status !== 'ready' && status !== 'saved')
+    )
+      return;
+    const source = projectedSource.current;
+    if (
+      !tree ||
+      source?.settings !== state.contextMenu ||
+      source.actions !== actions ||
+      source.presets !== presets
+    ) {
+      const next = resolveContextMenuTree(state.contextMenu, actions, presets);
+      setTree(next);
+      setSelectedKey((current) => (current && findContextMenuNode(next, current) ? current : null));
+      projectedSource.current = { settings: state.contextMenu, actions, presets };
+    }
+  }, [
+    state.contextMenuCatalogStatus,
+    state.contextMenuSettingsStatus,
+    state.contextMenu,
+    actions,
+    presets,
+    status,
+    tree,
+  ]);
+  const reset = () => {
+    if (state.contextMenuCatalogStatus !== 'ready' || state.contextMenuSettingsStatus !== 'ready')
+      return;
+    setTree(resolveContextMenuTree(state.contextMenu, actions, presets));
+    projectedSource.current = { settings: state.contextMenu, actions, presets };
+    setSelectedKey(null);
+    setExpanded(new Set());
+    setStatus('ready');
+  };
+  const restore = () => {
+    setTree(createRecommendedContextMenuTree(actions, presets));
+    setSelectedKey(null);
+    setExpanded(new Set());
+    setStatus('editing');
+  };
+  const changeTree = (next: ContextMenuTree) => {
+    draftRevision.current += 1;
+    setTree(next);
+    if (!saving.current) setStatus('editing');
+  };
   const save = async () => {
-    if (saving.current || !parseContextMenuLayout(draft.layout)) return;
+    if (saving.current || !tree || !parseContextMenuTree(tree)) return;
     saving.current = true;
+    const submittedRevision = draftRevision.current;
     setStatus('saving');
     try {
-      await state.updateContextMenu(draft);
-      onClose();
+      await state.updateContextMenu({ layout: tree });
+      const stillCurrent = draftRevision.current === submittedRevision;
+      setStatus(stillCurrent ? 'saved' : 'editing');
+      setAnnouncement(
+        t(
+          stillCurrent
+            ? 'settings.appearance.contextMenuSaved'
+            : 'settings.appearance.contextMenuUnsaved'
+        )
+      );
     } catch {
       setStatus('failed');
     } finally {
       saving.current = false;
     }
   };
+  return {
+    tree,
+    setTree: changeTree,
+    selectedKey,
+    setSelectedKey,
+    expanded,
+    setExpanded,
+    status,
+    announcement,
+    setAnnouncement,
+    catalog,
+    reset,
+    restore,
+    save,
+  };
+}
+
+export function ContextMenuEditor({
+  state,
+  visible = true,
+}: {
+  state: ContextMenuEditorState;
+  visible?: boolean;
+}) {
+  const {
+    tree,
+    setTree,
+    selectedKey,
+    setSelectedKey,
+    expanded,
+    setExpanded,
+    status,
+    announcement,
+    setAnnouncement,
+    catalog,
+    reset,
+    restore,
+    save,
+  } = useContextMenuDraft(state);
+  const [focusRequest, setFocusRequest] = useState<{ key: string } | null>(null);
+  const t = (key: Parameters<typeof translate>[0]) => translate(key, state.locale);
+  if (
+    state.contextMenuCatalogStatus !== 'ready' ||
+    state.contextMenuSettingsStatus !== 'ready' ||
+    !tree
+  ) {
+    const catalogFailed = state.contextMenuCatalogStatus === 'failed';
+    const settingsFailed = state.contextMenuSettingsStatus === 'failed';
+    const failed = catalogFailed || settingsFailed;
+    return (
+      <div className="py-4 text-sm" role={failed ? 'alert' : 'status'}>
+        {t(
+          catalogFailed
+            ? 'settings.appearance.contextMenuCatalogFailed'
+            : settingsFailed
+              ? 'settings.appearance.contextMenuSettingsFailed'
+              : 'settings.appearance.contextMenuCatalogLoading'
+        )}
+        {failed ? (
+          <button
+            type="button"
+            className={`${buttonClass} ml-3`}
+            onClick={catalogFailed ? state.retryContextMenuCatalog : state.retryContextMenuSettings}
+          >
+            {t('settings.appearance.contextMenuCatalogRetry')}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
   return (
-    <div
-      ref={surface}
-      className="max-w-[40rem] space-y-3 text-[var(--sniptale-color-text-primary)]"
-    >
-      <h2 ref={heading} tabIndex={-1} className="text-sm font-semibold">
-        {t('settings.appearance.contextMenuTitle')}
-      </h2>
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+    <div className="min-w-0 space-y-4 pb-2 text-[var(--sniptale-color-text-primary)]">
+      <p className="max-w-[65rem] text-sm leading-6 text-[var(--sniptale-color-text-muted)]">
         {t('settings.appearance.contextMenuEditorHelp')}
       </p>
-      <fieldset disabled={status === 'saving'} className="min-w-0 space-y-3">
-        {sections.map((section, sectionIndex) => (
-          <ContextMenuSection
-            key={section.id}
-            section={section}
-            sectionIndex={sectionIndex}
-            draft={draft}
-            onChange={changeDraft}
-            locale={state.locale}
-            options={state.contextMenuOptions}
-            visible={visible}
-          />
-        ))}
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={buttonClass}
-            disabled={sections.length >= 10}
-            onClick={() => {
-              let id = 1;
-              while (sections.some((section) => section.id === `section-${id}`)) id += 1;
-              changeSections([
-                ...sections,
-                {
-                  id: `section-${id}`,
-                  title: t('settings.appearance.contextMenuNewSection'),
-                  items: [],
-                },
-              ]);
-            }}
-          >
-            {t('settings.appearance.contextMenuAddSection')}
-          </button>
-          <button
-            type="button"
-            className={buttonClass}
-            onClick={() =>
-              setDraft({
-                ...createRecommendedContextMenuSettings(),
-                enabled: draft.enabled,
-                layout: createContextMenuLayout(),
-              })
-            }
-          >
-            {t('settings.appearance.contextMenuRestore')}
-          </button>
-        </div>
-        {!parseContextMenuLayout(draft.layout) && (
-          <p role="alert" className="text-sm">
-            {t('settings.appearance.contextMenuInvalidName')}
-          </p>
-        )}
-        <p role={status === 'failed' ? 'alert' : 'status'} className="text-sm">
-          {t(
-            status === 'failed'
-              ? 'settings.appearance.contextMenuSaveFailed'
-              : status === 'saving'
-                ? 'settings.appearance.contextMenuSaving'
-                : 'settings.appearance.contextMenuUnsaved'
-          )}
-        </p>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            className={buttonClass}
-            disabled={!parseContextMenuLayout(draft.layout)}
-            onClick={() => {
-              void save();
-            }}
-          >
-            {t('settings.appearance.contextMenuSave')}
-          </button>
-          <button type="button" className={buttonClass} onClick={onClose}>
-            {t('settings.appearance.contextMenuCancel')}
-          </button>
-        </div>
-      </fieldset>
-    </div>
-  );
-}
-
-type MenuDraft = AppearanceSectionState['contextMenu'] & { layout: ContextMenuLayout };
-
-function ContextMenuSection({
-  section,
-  sectionIndex,
-  draft,
-  onChange,
-  locale,
-  options,
-  visible,
-}: {
-  section: Section;
-  sectionIndex: number;
-  draft: MenuDraft;
-  onChange(next: MenuDraft, focus?: ContextMenuItemKey | 'heading'): void;
-  locale: AppearanceSectionState['locale'];
-  options: AppearanceSectionState['contextMenuOptions'];
-  visible: boolean;
-}) {
-  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
-  const sections = draft.layout.sections;
-  const rootLabel = t('settings.appearance.contextMenuRoot');
-  const sectionLabel = (section: Section) => (section.id === 'root' ? rootLabel : section.title);
-  const changeSections = (next: Section[], focus?: ContextMenuItemKey | 'heading') =>
-    onChange({ ...draft, layout: { version: 1, sections: next } }, focus);
-  const moveItem = (key: ContextMenuItemKey, destination: string) =>
-    changeSections(
-      sections.map((section) => ({
-        ...section,
-        items:
-          section.id === destination
-            ? [...section.items, key]
-            : section.items.filter((item) => item !== key),
-      })),
-      key
-    );
-  return (
-    <section
-      key={section.id}
-      className="rounded-lg border border-[var(--sniptale-color-border-soft)] p-3"
-      aria-label={sectionLabel(section)}
-    >
-      <div className="flex flex-wrap items-center gap-2">
-        {section.id === 'root' ? (
-          <h3 className="text-sm font-semibold">{rootLabel}</h3>
-        ) : (
-          <ProductInput
-            aria-label={t('settings.appearance.contextMenuSectionName')}
-            value={section.title}
-            maxLength={40}
-            onChange={(event) =>
-              changeSections(
-                sections.map((entry) =>
-                  entry.id === section.id ? { ...entry, title: event.target.value } : entry
-                )
-              )
-            }
-          />
-        )}
-        <MoveButtons
-          locale={locale}
-          label={sectionLabel(section)}
-          index={sectionIndex}
-          count={sections.length}
-          onMove={(offset) => changeSections(reorder(sections, sectionIndex, offset))}
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,1fr)]">
+        <ContextMenuTreeView
+          tree={tree}
+          catalog={catalog}
+          locale={state.locale}
+          selectedKey={selectedKey}
+          focusRequest={focusRequest}
+          onSelect={setSelectedKey}
+          onChange={setTree}
+          expanded={expanded}
+          onExpanded={setExpanded}
+          onAnnounce={setAnnouncement}
         />
-        {section.id !== 'root' && (
-          <button
-            type="button"
-            className={buttonClass}
-            onClick={() =>
-              changeSections(
-                sections
-                  .filter((entry) => entry.id !== section.id)
-                  .map((entry) =>
-                    entry.id === 'root'
-                      ? { ...entry, items: [...entry.items, ...section.items] }
-                      : entry
-                  )
-              )
-            }
-          >
-            {t('settings.appearance.contextMenuRemoveSection')}
-          </button>
-        )}
+        <div className="min-w-0 space-y-4">
+          <ContextMenuCatalogPanel
+            tree={tree}
+            catalog={catalog}
+            locale={state.locale}
+            selectedKey={selectedKey}
+            visible={visible}
+            onChange={setTree}
+            onSelect={(key) => {
+              setSelectedKey(key);
+              setFocusRequest({ key });
+            }}
+            onAnnounce={setAnnouncement}
+            expanded={expanded}
+            onExpanded={setExpanded}
+          />
+          <ContextMenuPreview tree={tree} catalog={catalog} locale={state.locale} />
+        </div>
       </div>
-      {section.items.map((key, itemIndex) => {
-        const label = options.find((option) => option.key === key)?.label ?? key;
-        return (
-          <div key={key} data-menu-item={key} className="mt-2 flex flex-wrap items-center gap-2">
-            <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={draft[key]}
-                onChange={() => onChange({ ...draft, [key]: !draft[key] })}
-              />
-              {label}
-            </label>
-            <div className="w-40">
-              <ProductSelect
-                key={visible ? 'visible' : 'hidden'}
-                aria-label={`${t('settings.appearance.contextMenuSection')}: ${label}`}
-                value={section.id}
-                options={sections.map((entry) => ({
-                  value: entry.id,
-                  label: sectionLabel(entry),
-                }))}
-                onChange={(destination) => {
-                  if (destination !== section.id) moveItem(key, destination);
-                }}
-              />
-            </div>
-            <MoveButtons
-              locale={locale}
-              label={label}
-              index={itemIndex}
-              count={section.items.length}
-              onMove={(offset) =>
-                changeSections(
-                  sections.map((entry) =>
-                    entry.id === section.id
-                      ? { ...entry, items: reorder(entry.items, itemIndex, offset) }
-                      : entry
-                  )
-                )
-              }
-            />
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-function MoveButtons({
-  locale,
-  label,
-  index,
-  count,
-  onMove,
-}: {
-  locale: AppearanceSectionState['locale'];
-  label: string;
-  index: number;
-  count: number;
-  onMove(offset: number): void;
-}) {
-  return (
-    <>
-      <button
-        type="button"
-        className={buttonClass}
-        disabled={index === 0}
-        aria-label={`${translate('settings.appearance.contextMenuUp', locale)}: ${label}`}
-        onClick={() => onMove(-1)}
+      <div aria-live="polite" className="sr-only">
+        {announcement}
+      </div>
+      {!parseContextMenuTree(tree) ? (
+        <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
+          {t('settings.appearance.contextMenuInvalidName')}
+        </p>
+      ) : null}
+      <p
+        role={status === 'failed' ? 'alert' : 'status'}
+        className="text-sm text-[var(--sniptale-color-text-muted)]"
       >
-        ↑
-      </button>
-      <button
-        type="button"
-        className={buttonClass}
-        disabled={index === count - 1}
-        aria-label={`${translate('settings.appearance.contextMenuDown', locale)}: ${label}`}
-        onClick={() => onMove(1)}
-      >
-        ↓
-      </button>
-    </>
+        {t(
+          status === 'failed'
+            ? 'settings.appearance.contextMenuSaveFailed'
+            : status === 'saving'
+              ? 'settings.appearance.contextMenuSaving'
+              : status === 'saved'
+                ? 'settings.appearance.contextMenuSaved'
+                : status === 'ready'
+                  ? 'settings.appearance.contextMenuReady'
+                  : 'settings.appearance.contextMenuUnsaved'
+        )}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={status === 'saving' || status === 'saved' || !parseContextMenuTree(tree)}
+          onClick={() => void save()}
+        >
+          {t('settings.appearance.contextMenuSave')}
+        </button>
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={status === 'saving'}
+          onClick={reset}
+        >
+          {t('settings.appearance.contextMenuResetDraft')}
+        </button>
+        <button
+          type="button"
+          className={buttonClass}
+          disabled={status === 'saving'}
+          onClick={restore}
+        >
+          {t('settings.appearance.contextMenuRestore')}
+        </button>
+      </div>
+    </div>
   );
 }

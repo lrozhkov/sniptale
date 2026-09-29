@@ -20,6 +20,11 @@ import type { SurfaceStylePresetCatalog } from '../surface-style-presets/contrac
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { loadSettings } from '../settings';
+import { parseContextMenuTree } from '../../../contracts/settings/context-menu-layout';
+import {
+  parseContextMenuLayoutChunkManifest,
+  prepareContextMenuSettingsSyncWrite,
+} from '../settings/context-menu-layout-chunks';
 import { parsePagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
 import { parseExportResourceLimits } from '@sniptale/runtime-contracts/export';
 
@@ -68,6 +73,27 @@ export async function applySettingsTransferDomains(args: {
     currentVideo,
     domains: args.domains,
   });
+  const previousStoredSettings = beforeSync['sniptale_settings'];
+  const previousManifest =
+    previousStoredSettings &&
+    typeof previousStoredSettings === 'object' &&
+    !Array.isArray(previousStoredSettings)
+      ? parseContextMenuLayoutChunkManifest(
+          (previousStoredSettings as Record<string, unknown>)['contextMenuLayoutChunks']
+        )
+      : null;
+  const settingsWrite =
+    syncWrites['sniptale_settings'] === undefined
+      ? null
+      : await prepareContextMenuSettingsSyncWrite(
+          syncWrites['sniptale_settings'] as NormalizedSettings,
+          previousManifest,
+          previousManifest ? parseContextMenuTree(currentSettings.contextMenu.layout) : null
+        );
+  if (settingsWrite) {
+    syncWrites['sniptale_settings'] = settingsWrite.settingsValue;
+    Object.assign(syncWrites, settingsWrite.chunkValues);
+  }
   const importedProviders = readImportedProviders(args.domains);
   const providerPlan = importedProviders
     ? await prepareAIProviderTransferMutation({
@@ -82,13 +108,13 @@ export async function applySettingsTransferDomains(args: {
     : null;
   let effectsCommitted = false;
 
-  let syncCommitted = false;
+  let syncAttempted = false;
   let providerCommitted = false;
   let localCommitted = false;
   try {
     if (Object.keys(syncWrites).length > 0) {
+      syncAttempted = true;
       await browserStorage.sync.set(syncWrites, args.permit);
-      syncCommitted = true;
     }
     if (providerPlan) {
       await providerPlan.commit();
@@ -117,11 +143,22 @@ export async function applySettingsTransferDomains(args: {
     if (localCommitted)
       await compensate(() => restoreArea('local', beforeLocal, LOCAL_KEYS, args.permit));
     if (providerCommitted && providerPlan) await compensate(() => providerPlan.rollback());
-    if (syncCommitted)
-      await compensate(() => restoreArea('sync', beforeSync, SYNC_KEYS, args.permit));
+    if (syncAttempted)
+      await compensate(() =>
+        restoreArea(
+          'sync',
+          beforeSync,
+          [...SYNC_KEYS, ...(settingsWrite?.newChunkKeys ?? [])],
+          args.permit
+        )
+      );
     if (rollbackFailed) throw new SettingsTransferRollbackError('Settings import rollback failed');
     throw error;
   }
+  if (settingsWrite?.retiredChunkKeys.length)
+    await browserStorage.sync
+      .remove(settingsWrite.retiredChunkKeys, args.permit)
+      .catch(() => undefined);
 }
 
 function buildWrites(args: {

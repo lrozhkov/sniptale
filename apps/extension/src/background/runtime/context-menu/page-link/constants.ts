@@ -1,4 +1,3 @@
-export const CONTEXT_MENU_PAGE_LINK_ID = 'sniptale.page-link';
 export const CONTEXT_MENU_PAGE_LINK_RICH_ID = 'sniptale.page-link.rich';
 export const CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID = 'sniptale.page-link.markdown';
 export const CONTEXT_MENU_PAGE_LINK_PLAIN_ID = 'sniptale.page-link.plain';

@@ -58,7 +58,7 @@ The scenario-page `view=guide|tour` route loads a committed project through the 
 
 ## Browser context menu
 
-The background context-menu owner projects preferences into Chrome menu descriptors and routes existing action IDs. Settings owns the editor; the composition settings owner persists the preferences under `sniptale_settings` in sync storage. The editor holds a disposable draft and commits only on Save. Cancel discards the draft; a failed write leaves it available for retry. Other settings are unaffected.
+The background context-menu owner projects preferences into Chrome menu descriptors and routes existing action IDs. Settings owns the editor; the composition settings owner persists preferences in sync storage under `sniptale_settings`. A large v2 layout is compressed and split into quota-safe sync items referenced by a manifest in that settings item; load reconstructs and validates all parts before exposing the layout. The editor holds a disposable draft and commits only on Save. Cancel discards the draft; a failed write leaves it available for retry. Other settings are unaffected.
 
 ### Audit and recommended configuration
 

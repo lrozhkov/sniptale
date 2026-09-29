@@ -41,8 +41,8 @@ it('reorders and reparents blocks while retaining stable action IDs and omitting
   expect(descriptors.slice(0, 4)).toMatchObject([
     { id: 'sniptale.root' },
     { id: 'sniptale.section.links', parentId: 'sniptale.root', title: 'My links' },
-    { id: 'sniptale.page-link', parentId: 'sniptale.section.links' },
-    { id: 'sniptale.page-link.rich', parentId: 'sniptale.page-link' },
+    { id: 'sniptale.page-link.rich', parentId: 'sniptale.section.links' },
+    { id: 'sniptale.page-link.markdown', parentId: 'sniptale.section.links' },
   ]);
   expect(descriptors.some((item) => item.id === 'sniptale.section.sizes')).toBe(false);
   expect(descriptors.some((item) => item.id === 'sniptale.settings.separator')).toBe(false);
@@ -60,13 +60,17 @@ it('hides custom sections with no available blocks and restores them on ordinary
     ['chrome://settings', false],
     ['https://example.com', true],
   ] as const) {
-    const updates = resolveContextMenuDynamicState({
+    const descriptors = buildContextMenuDescriptors({
       settings: menu,
-      hasVideoPreset: false,
+      quickActions: [],
       viewportPresets: [],
+    });
+    const updates = resolveContextMenuDynamicState({
+      descriptors,
+      hasVideoPreset: false,
       tab: { id: 7, url } as chrome.tabs.Tab,
     });
-    expect(updates['sniptale.section.links']).toEqual({ visible });
+    expect(updates['sniptale.section.links']).toEqual({ visible, enabled: visible });
     expect(updates['sniptale.section.sizes']).toBeUndefined();
   }
 });

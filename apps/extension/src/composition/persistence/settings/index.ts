@@ -42,8 +42,15 @@ import {
 } from '@sniptale/runtime-contracts/page-package';
 
 import { parseFilenameRules } from '../../../features/file-naming/rules';
+import {
+  contextMenuLayoutChunkKeys,
+  decodeContextMenuLayoutChunks,
+  parseContextMenuLayoutChunkManifest,
+  prepareContextMenuSettingsSyncWrite,
+} from './context-menu-layout-chunks';
 
 const STORAGE_KEY = 'sniptale_settings';
+const LAYOUT_CHUNKS_FIELD = 'contextMenuLayoutChunks';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
 let settingsMutationQueue = Promise.resolve<NormalizedSettings | null>(null);
 const SETTINGS_LOCK = 'sniptale:settings';
@@ -194,7 +201,49 @@ async function writeSettings(settings: Settings, permit: PersistenceMutationPerm
   ) {
     throw new Error('Page capture timing settings are invalid');
   }
-  await browserStorage.sync.set({ [STORAGE_KEY]: settings }, permit);
+  const stored = await browserStorage.sync.get([STORAGE_KEY]);
+  const previous = stored[STORAGE_KEY];
+  const oldManifest =
+    previous && typeof previous === 'object' && !Array.isArray(previous)
+      ? parseContextMenuLayoutChunkManifest(
+          (previous as Record<string, unknown>)[LAYOUT_CHUNKS_FIELD]
+        )
+      : null;
+  const previousLayout = oldManifest
+    ? await decodeContextMenuLayoutChunks(
+        oldManifest,
+        await browserStorage.sync.get(contextMenuLayoutChunkKeys(oldManifest))
+      )
+    : null;
+  const prepared = await prepareContextMenuSettingsSyncWrite(settings, oldManifest, previousLayout);
+  let manifestWriteAttempted = false;
+  try {
+    if (prepared.newChunkKeys.length) await browserStorage.sync.set(prepared.chunkValues, permit);
+    manifestWriteAttempted = true;
+    await browserStorage.sync.set({ [STORAGE_KEY]: prepared.settingsValue }, permit);
+  } catch (error) {
+    if (manifestWriteAttempted) {
+      try {
+        if (Object.hasOwn(stored, STORAGE_KEY))
+          await browserStorage.sync.set({ [STORAGE_KEY]: previous }, permit);
+        else await browserStorage.sync.remove([STORAGE_KEY], permit);
+      } catch {
+        // A rejected restore may still have committed; verify the actual stored value below.
+      }
+      const restored = await browserStorage.sync.get([STORAGE_KEY]).catch(() => null);
+      if (restored === null || JSON.stringify(restored[STORAGE_KEY]) !== JSON.stringify(previous)) {
+        throw new Error('Settings rollback could not be verified', { cause: error });
+      }
+    }
+    if (prepared.newChunkKeys.length)
+      await browserStorage.sync.remove(prepared.newChunkKeys, permit).catch(() => undefined);
+    throw error;
+  }
+  if (prepared.retiredChunkKeys.length) {
+    await browserStorage.sync
+      .remove(prepared.retiredChunkKeys, permit)
+      .catch(() => logger.warn('Could not remove retired context menu layout chunks'));
+  }
 
   logger.debug('Saved settings payload');
 }
@@ -287,6 +336,22 @@ export async function loadSettings(): Promise<NormalizedSettings> {
   const getSyncStorageValue = browserStorage.sync.get.bind(browserStorage.sync);
   const result = await getSyncStorageValue([STORAGE_KEY]);
   const parsedSettings = parseStoredSettings(result[STORAGE_KEY]);
+  const stored = result[STORAGE_KEY];
+  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    const rawManifest = (stored as Record<string, unknown>)[LAYOUT_CHUNKS_FIELD];
+    if (rawManifest !== undefined) {
+      const manifest = parseContextMenuLayoutChunkManifest(rawManifest);
+      if (!manifest) throw new Error('Stored context menu layout manifest is invalid');
+      const chunks = await browserStorage.sync.get(contextMenuLayoutChunkKeys(manifest));
+      const layout = await decodeContextMenuLayoutChunks(manifest, chunks);
+      if (!layout) throw new Error('Stored context menu layout chunks are incomplete or invalid');
+      parsedSettings.value.contextMenu = {
+        ...DEFAULT_CONTEXT_MENU_SETTINGS,
+        ...parsedSettings.value.contextMenu,
+        layout,
+      };
+    }
+  }
 
   if (parsedSettings.hasInvalidRoot) {
     logger.warn('Ignoring invalid settings payload root from storage');
@@ -324,7 +389,20 @@ export function subscribeToSettingsChanges(
 }
 
 export async function clearSettings(): Promise<void> {
-  await withSettingsMutation((permit) => browserStorage.sync.remove([STORAGE_KEY], permit));
+  await withSettingsMutation(async (permit) => {
+    const stored = await browserStorage.sync.get([STORAGE_KEY]);
+    const value = stored[STORAGE_KEY];
+    const manifest =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? parseContextMenuLayoutChunkManifest(
+            (value as Record<string, unknown>)[LAYOUT_CHUNKS_FIELD]
+          )
+        : null;
+    await browserStorage.sync.remove(
+      [STORAGE_KEY, ...(manifest ? contextMenuLayoutChunkKeys(manifest) : [])],
+      permit
+    );
+  });
   logger.debug('Cleared settings payload');
 }
 
