@@ -5,6 +5,8 @@ export const videoEditorAppMessages = defineMessageSource({
   recordAudioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
   recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
   recordAudioRemaining: { ru: 'Осталось', en: 'Remaining' },
+  recordAudioPause: { ru: 'Пауза', en: 'Pause' },
+  recordAudioResume: { ru: 'Продолжить', en: 'Resume' },
   recordAudioInsert: { ru: 'Вставить в промежуток', en: 'Insert into gap' },
   recordAudioSaveMaterial: { ru: 'Сохранить в материалы', en: 'Save to materials' },
   recordAudioStartFailed: {

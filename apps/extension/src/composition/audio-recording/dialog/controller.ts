@@ -15,15 +15,18 @@ export function useAudioRecordingController(
 ) {
   const captureTimeline = useMemo(
     () =>
-      timeline ??
-      (captureLimitSeconds
-        ? {
-            startTime: 0,
-            duration: captureLimitSeconds,
-            beforeStart: async () => {},
-            onStop: () => {},
-          }
-        : undefined),
+      timeline
+        ? captureLimitSeconds !== undefined && captureLimitSeconds > 0
+          ? { ...timeline, duration: Math.min(timeline.duration, captureLimitSeconds) }
+          : timeline
+        : captureLimitSeconds
+          ? {
+              startTime: 0,
+              duration: captureLimitSeconds,
+              beforeStart: async () => {},
+              onStop: () => {},
+            }
+          : undefined,
     [timeline, captureLimitSeconds]
   );
   const controller = useAudioRecordingSession(

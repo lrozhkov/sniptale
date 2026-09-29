@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ProductModalHeader } from '@sniptale/ui/product-modal';
-import { Mic, Save, Square } from 'lucide-react';
+import { Mic, Pause, Play, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
@@ -80,6 +80,8 @@ export function AudioRecordingTransport(props: {
   error: string | null;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  onPauseRecording?: () => void;
+  onResumeRecording?: () => Promise<void>;
   status: AudioRecordingStatus;
 }) {
   if (props.status === 'recorded') return <RecordedAudioSummary {...props} />;
@@ -103,12 +105,27 @@ export function AudioRecordingTransport(props: {
               {props.durationLabel}
             </p>
           </div>
-          {props.status === 'recording' ? (
-            <RecordingActionButton
-              icon={<Square size={16} strokeWidth={2.1} />}
-              label={translate('videoEditor.app.recordAudioStop')}
-              onClick={props.onStopRecording}
-            />
+          {props.status === 'recording' || props.status === 'paused' ? (
+            <div className="flex flex-wrap gap-2">
+              {props.status === 'recording' ? (
+                <RecordingActionButton
+                  icon={<Pause size={16} strokeWidth={2.1} />}
+                  label={translate('videoEditor.app.recordAudioPause')}
+                  onClick={props.onPauseRecording ?? (() => undefined)}
+                />
+              ) : (
+                <RecordingActionButton
+                  icon={<Play size={16} strokeWidth={2.1} />}
+                  label={translate('videoEditor.app.recordAudioResume')}
+                  onClick={() => void props.onResumeRecording?.()}
+                />
+              )}
+              <RecordingActionButton
+                icon={<Square size={16} strokeWidth={2.1} />}
+                label={translate('videoEditor.app.recordAudioStop')}
+                onClick={props.onStopRecording}
+              />
+            </div>
           ) : (
             <RecordingActionButton
               icon={<Mic size={16} strokeWidth={2.1} />}

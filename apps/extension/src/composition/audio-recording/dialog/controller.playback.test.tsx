@@ -32,6 +32,8 @@ it('pauses native playback before playing state is published, blocks busy playba
       error: null,
       startRecording: vi.fn(),
       stopRecording: vi.fn(),
+      pauseRecording: vi.fn(),
+      resumeRecording: vi.fn(),
       status: 'recorded',
     },
     trim: {

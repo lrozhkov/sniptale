@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useAudioRecordingSession } from './session';
-import type { AudioRecordingControllerState } from './session-types';
+import type { AudioRecordingControllerState, AudioRecordingTimeline } from './session-types';
 
 const errors = {
   noSupport: 'unsupported',
@@ -24,6 +24,12 @@ class Recorder extends EventTarget {
   start() {
     this.state = 'recording';
   }
+  pause() {
+    this.state = 'paused';
+  }
+  resume() {
+    this.state = 'recording';
+  }
   stop() {
     this.state = 'inactive';
     const event = new Event('dataavailable');
@@ -32,8 +38,8 @@ class Recorder extends EventTarget {
     this.dispatchEvent(new Event('stop'));
   }
 }
-function Subject({ open = true }: { open?: boolean }) {
-  latest = useAudioRecordingSession(open, errors);
+function Subject({ open = true, timeline }: { open?: boolean; timeline?: AudioRecordingTimeline }) {
+  latest = useAudioRecordingSession(open, errors, '', timeline);
   return latest.trim ? <audio ref={latest.trim.audioRef} src={latest.trim.audioUrl} /> : null;
 }
 beforeEach(async () => {
@@ -115,4 +121,94 @@ it('retains captured audio for trim and retry then releases its URL on unmount',
   await act(async () => root.unmount());
   root = createRoot(host);
   expect(revoke).toHaveBeenCalledWith('blob:voice');
+});
+
+it('excludes paused wall time and can stop a paused recording', async () => {
+  vi.useFakeTimers();
+  try {
+    await act(async () => latest.transport.startRecording());
+    await act(async () => vi.advanceTimersByTime(1200));
+    await act(async () => latest.transport.pauseRecording());
+    expect(latest.transport.status).toBe('paused');
+    const pausedAt = latest.transport.elapsedSeconds;
+    await act(async () => vi.advanceTimersByTime(3000));
+    expect(latest.transport.elapsedSeconds).toBe(pausedAt);
+    await act(async () => latest.transport.resumeRecording());
+    expect(latest.transport.status).toBe('recording');
+    await act(async () => vi.advanceTimersByTime(800));
+    expect(latest.transport.elapsedSeconds).toBeGreaterThan(pausedAt);
+    expect(latest.transport.elapsedSeconds).toBeLessThan(2.2);
+    await act(async () => latest.transport.pauseRecording());
+    await act(async () => latest.transport.stopRecording());
+    expect(latest.transport.status).toBe('recorded');
+    expect(latest.save.trimEnd).toBeLessThan(2.2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('does not restart playback after a paused take closes during asynchronous resume', async () => {
+  let finishResume!: () => void;
+  const onPause = vi.fn();
+  const timeline: AudioRecordingTimeline = {
+    startTime: 0,
+    duration: 10,
+    beforeStart: async () => undefined,
+    onStop: vi.fn(),
+    onPause,
+    onResume: () =>
+      new Promise<void>((resolve) => {
+        finishResume = resolve;
+      }),
+  };
+  await act(async () => root.render(<Subject timeline={timeline} />));
+  await act(async () => latest.transport.startRecording());
+  await act(async () => latest.transport.pauseRecording());
+  let pending!: Promise<void>;
+  await act(async () => {
+    pending = latest.transport.resumeRecording();
+  });
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await act(async () => {
+    finishResume();
+    await pending;
+  });
+  expect(onPause).toHaveBeenCalledTimes(2);
+  expect(stopped).toHaveBeenCalledOnce();
+});
+
+it('allows only one resume attempt while playback is still starting', async () => {
+  let finishResume!: () => void;
+  const onResume = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finishResume = resolve;
+      })
+  );
+  const onPause = vi.fn();
+  const timeline: AudioRecordingTimeline = {
+    startTime: 0,
+    duration: 10,
+    beforeStart: async () => undefined,
+    onStop: vi.fn(),
+    onPause,
+    onResume,
+  };
+  await act(async () => root.render(<Subject timeline={timeline} />));
+  await act(async () => latest.transport.startRecording());
+  await act(async () => latest.transport.pauseRecording());
+  let first!: Promise<void>;
+  let second!: Promise<void>;
+  await act(async () => {
+    first = latest.transport.resumeRecording();
+    second = latest.transport.resumeRecording();
+  });
+  expect(onResume).toHaveBeenCalledOnce();
+  await act(async () => {
+    finishResume();
+    await Promise.all([first, second]);
+  });
+  expect(latest.transport.status).toBe('recording');
+  expect(onPause).toHaveBeenCalledOnce();
 });

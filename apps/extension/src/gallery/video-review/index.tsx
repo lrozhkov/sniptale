@@ -28,7 +28,8 @@ import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import { useReviewSelection } from './use-review-selection';
 import type { useReviewAudio } from './use-review-audio';
-import { ReviewVoiceoverRecording, useReviewEditorAudio } from './voiceover-recording';
+import { useReviewEditorAudio } from './voiceover-recording';
+import { ReviewVoiceoverLayer } from './voiceover-panel';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
 
@@ -572,117 +573,117 @@ function ReviewEditor({
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
   return (
-    <div
-      className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)_auto]
+    <>
+      <div
+        inert={voiceover.recording}
+        className={`grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)_auto]
           max-[799px]:grid-cols-1
           max-[799px]:grid-rows-[minmax(280px,45dvh)_minmax(360px,1fr)_auto]
-          max-[799px]:overflow-y-auto"
-    >
-      <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
-        <ReviewStageBinding
-          backgroundPending={state.backgroundImport.pending}
-          url={resource.url}
-          source={state.source}
-          canvas={features.canvas}
-          video={state.video}
-          drawing={!!composer.annotation && !state.playing && !busy}
-          region={state.displayRegion}
-          zoomRegions={features.zoomRegions}
-          background={features.background}
-          outputTime={state.timeline.sceneOutputTime}
-          zoomOverlay={reviewFocusOverlay(state)}
-          comments={snapshot.document.canvasComments}
-          annotations={snapshot.document.annotations}
-          canvasComments={canvasComments}
-          overlaysVisible={features.overlaysVisible}
-          time={state.time}
-          busy={busy}
-          onRegion={(region) => {
-            if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
-          }}
-          onReady={() => {
-            const anchor = composer.annotation?.anchor;
-            if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
-          }}
-          onTime={(value) => {
-            const next = state.onTime(value);
-            state.setSelection((current) =>
-              current.kind === 'point' ? { kind: 'point', time: next } : current
-            );
-          }}
-          onPlaying={state.setPlaying}
-          onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
-        />
-      </main>
-      <ReviewInspectorBinding
-        fullHeight={fullHeight}
-        onToggleHeight={() => setFullHeight((value) => !value)}
-        resource={resource}
-        state={state}
-        canvasComments={canvasComments}
-        audio={audio}
-        onBack={onBack}
-        onClose={onClose}
-      />
-      <div
-        className={
-          fullHeight
-            ? 'col-start-1 row-start-2 min-h-0 min-w-0 max-[799px]:row-start-3'
-            : 'col-span-full min-h-0 min-w-0'
-        }
+          max-[799px]:overflow-y-auto ${voiceover.recording ? 'pb-40' : ''}`}
       >
-        <ReviewTimelineBinding
-          historyControls={<ReviewHistoryControlBinding state={state} />}
-          editing={editing}
-          edits={snapshot.document.edits}
-          annotations={snapshot.document.annotations}
-          source={state.source}
-          busy={busy}
-          composerBusy={!!composer.annotation}
-          selection={state.selection}
-          setSelection={state.setSelection}
-          advanced={advanced}
-          resultDuration={state.timeline.resultDuration}
-          outputTime={state.timeline.outputTime}
-          toOutputTime={state.timeline.toOutputTime}
-          onCutPlacement={() => state.setMessage(translate('gallery.videoReview.placementOnCut'))}
-          setTrackVisibility={state.setTrackVisibility}
-          setMode={state.setMode}
-          telemetryAvailable={state.projected.markers.length > 0}
-          time={state.time}
-          playing={state.playing}
-          markers={state.telemetry ? state.projected.markers : []}
-          selectedTelemetryRef={
-            state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
-          }
-          zoom={zoom}
+        <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
+          <ReviewStageBinding
+            backgroundPending={state.backgroundImport.pending}
+            url={resource.url}
+            source={state.source}
+            canvas={features.canvas}
+            video={state.video}
+            drawing={!!composer.annotation && !state.playing && !busy}
+            region={state.displayRegion}
+            zoomRegions={features.zoomRegions}
+            background={features.background}
+            outputTime={state.timeline.sceneOutputTime}
+            zoomOverlay={reviewFocusOverlay(state)}
+            comments={snapshot.document.canvasComments}
+            annotations={snapshot.document.annotations}
+            canvasComments={canvasComments}
+            overlaysVisible={features.overlaysVisible}
+            time={state.time}
+            busy={busy}
+            onRegion={(region) => {
+              if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
+            }}
+            onReady={() => {
+              const anchor = composer.annotation?.anchor;
+              if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
+            }}
+            onTime={(value) => {
+              const next = state.onTime(value);
+              state.setSelection((current) =>
+                current.kind === 'point' ? { kind: 'point', time: next } : current
+              );
+            }}
+            onPlaying={state.setPlaying}
+            onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
+          />
+        </main>
+        <ReviewInspectorBinding
+          fullHeight={fullHeight}
+          onToggleHeight={() => setFullHeight((value) => !value)}
+          resource={resource}
+          state={state}
+          canvasComments={canvasComments}
           audio={audio}
-          audioState={advanced.audio}
-          waveforms={waveforms}
-          onImportAudioFile={onImportAudioFile}
-          onRecordVoiceover={voiceover.open}
-          onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
-          selectedObject={state.activeSelection.kind !== 'none'}
-          onMarker={(marker) => {
-            if (!state.canStart()) return;
-            state.seek(marker.start, false);
-            state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
-          }}
-          onComment={state.selectComment}
-          onSeek={state.seek}
-          onPlay={state.play}
+          onBack={onBack}
+          onClose={onClose}
         />
+        <div
+          className={
+            `${voiceover.recording ? 'opacity-50' : ''} ` +
+            (fullHeight
+              ? 'col-start-1 row-start-2 min-h-0 min-w-0 max-[799px]:row-start-3'
+              : 'col-span-full min-h-0 min-w-0')
+          }
+        >
+          <ReviewTimelineBinding
+            historyControls={<ReviewHistoryControlBinding state={state} />}
+            editing={editing}
+            edits={snapshot.document.edits}
+            annotations={snapshot.document.annotations}
+            source={state.source}
+            busy={busy}
+            composerBusy={!!composer.annotation}
+            selection={state.selection}
+            setSelection={state.setSelection}
+            advanced={advanced}
+            resultDuration={state.timeline.resultDuration}
+            outputTime={state.timeline.outputTime}
+            toOutputTime={state.timeline.toOutputTime}
+            onCutPlacement={() => state.setMessage(translate('gallery.videoReview.placementOnCut'))}
+            setTrackVisibility={state.setTrackVisibility}
+            setMode={state.setMode}
+            telemetryAvailable={state.projected.markers.length > 0}
+            time={state.time}
+            playing={state.playing}
+            markers={state.telemetry ? state.projected.markers : []}
+            selectedTelemetryRef={
+              state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
+            }
+            zoom={zoom}
+            audio={audio}
+            audioState={advanced.audio}
+            waveforms={waveforms}
+            onImportAudioFile={onImportAudioFile}
+            onRecordVoiceover={voiceover.open}
+            onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
+            selectedObject={state.activeSelection.kind !== 'none'}
+            onMarker={(marker) => {
+              if (!state.canStart()) return;
+              state.seek(marker.start, false);
+              state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
+            }}
+            onComment={state.selectComment}
+            onSeek={state.seek}
+            onPlay={state.play}
+          />
+        </div>
       </div>
-      <ReviewVoiceoverRecording
-        isOpen={voiceover.recording}
-        playhead={voiceover.takeStart ?? state.time}
-        timelineDuration={state.source.duration}
-        onClose={voiceover.close}
-        onSyncStart={voiceover.syncStart}
-        onSyncStop={voiceover.syncStop}
-        onSave={voiceover.save}
+      <ReviewVoiceoverLayer
+        voiceover={voiceover}
+        outputTime={state.timeline.outputTime}
+        resultDuration={state.timeline.resultDuration}
       />
-    </div>
+    </>
   );
 }
 

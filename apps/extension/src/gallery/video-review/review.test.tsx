@@ -660,7 +660,7 @@ it('imports a file dropped on the music lane at the drop point', async () => {
   }
 });
 
-it('opens the shared voiceover recorder from the audio lane', async () => {
+it('isolates quick-review controls while the lower voiceover strip is open and restores them on close', async () => {
   const fixture = createEditorFixture(integration);
   const { host, root, click, back } = fixture;
   try {
@@ -670,12 +670,13 @@ it('opens the shared voiceover recorder from the audio lane', async () => {
     const modal = host.querySelector('[role="dialog"]');
     expect(modal).not.toBeNull();
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
+    expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
+    expect(host.querySelector('[inert]')).not.toBeNull();
     await act(async () =>
-      modal!
-        .querySelector<HTMLButtonElement>('sniptale-modal-close, [title="common.actions.close"]')!
-        .click()
+      modal!.querySelector<HTMLButtonElement>('[aria-label="common.actions.close"]')!.click()
     );
     expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(host.querySelector('[inert]')).toBeNull();
   } finally {
     await fixture.cleanup();
   }

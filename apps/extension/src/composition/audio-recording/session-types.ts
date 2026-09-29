@@ -1,5 +1,5 @@
 import type React from 'react';
-export type AudioRecordingStatus = 'idle' | 'recording' | 'recorded';
+export type AudioRecordingStatus = 'idle' | 'recording' | 'paused' | 'recorded';
 export interface AudioTrimRange {
   trimStart: number;
   trimEnd: number;
@@ -9,6 +9,8 @@ export interface AudioRecordingTimeline {
   duration: number;
   beforeStart: () => Promise<void>;
   onStop: () => void;
+  onPause?: (() => void) | undefined;
+  onResume?: (() => Promise<void>) | undefined;
 }
 export interface AudioRecordingErrors {
   noSupport: string;
@@ -45,6 +47,12 @@ export interface AudioRecordingRefs {
   sessionRef: React.MutableRefObject<number>;
   streamRef: React.MutableRefObject<MediaStream | null>;
   timerRef: React.MutableRefObject<number | null>;
+  clockRef: React.MutableRefObject<{
+    startedAt: number;
+    pausedAt: number | null;
+    pausedTotal: number;
+    limit: number | undefined;
+  } | null>;
 }
 
 interface AudioRecordingSaveController {
@@ -59,6 +67,8 @@ interface AudioRecordingTransportController {
   durationLabel: string;
   error: string | null;
   startRecording: () => Promise<void>;
+  pauseRecording: () => void;
+  resumeRecording: () => Promise<void>;
   status: AudioRecordingStatus;
   stopRecording: () => void;
 }

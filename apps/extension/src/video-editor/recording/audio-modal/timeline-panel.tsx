@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type ReactNode } from 'react';
-import { Mic, RotateCcw, Save, Square, X } from 'lucide-react';
+import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
@@ -23,6 +23,7 @@ export function TimelineRecordingPanel(props: {
 }) {
   const { transport, trim } = props.controller;
   const recording = transport.status === 'recording';
+  const paused = transport.status === 'paused';
   const busy = props.starting || props.saving;
   const recordButton = (
     <ProductActionButton tone="secondary" disabled={busy} onClick={props.onStart}>
@@ -62,23 +63,36 @@ export function TimelineRecordingPanel(props: {
             data-ui="video-editor.audio-recording.limit"
           >
             {translate(
-              recording
+              recording || paused
                 ? 'videoEditor.app.recordAudioRemaining'
                 : 'videoEditor.app.recordAudioLimit'
             )}{' '}
             <strong>
               {formatDurationLabel(
-                recording
+                recording || paused
                   ? Math.ceil(Math.max(0, props.duration - transport.elapsedSeconds))
                   : props.duration
               )}
             </strong>
           </span>
-          {recording ? (
-            <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
-              <Square size={16} />
-              {translate('videoEditor.app.recordAudioStop')}
-            </ProductActionButton>
+          {recording || paused ? (
+            <div className="flex items-center gap-2">
+              <ProductActionButton
+                tone="secondary"
+                onClick={() =>
+                  paused ? void transport.resumeRecording() : transport.pauseRecording()
+                }
+              >
+                {paused ? <Play size={16} /> : <Pause size={16} />}
+                {translate(
+                  paused ? 'videoEditor.app.recordAudioResume' : 'videoEditor.app.recordAudioPause'
+                )}
+              </ProductActionButton>
+              <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
+                <Square size={16} />
+                {translate('videoEditor.app.recordAudioStop')}
+              </ProductActionButton>
+            </div>
           ) : (
             recordButton
           )}

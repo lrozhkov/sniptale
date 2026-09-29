@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
 import type { VideoEditorLibraryPanelProps } from '../../library/contracts/panel';
 import { createHeaderController, createPreviewController } from './main.test-support';
+import { RuntimePlaybackContext } from '../../runtime/controller/composition/contexts';
 
 const audioRecordingModalSpy = vi.fn();
 const libraryPanelSpy = vi.fn<(props: VideoEditorLibraryPanelProps) => void>();
@@ -450,4 +451,33 @@ it('binds the recording modal save to the captured track destination', async () 
       }
     ).projectActions.onImportRecordedAudio
   ).toHaveBeenCalledWith(file, trim, target);
+});
+
+it('pauses and resumes full-editor preview with the voiceover microphone', async () => {
+  const controller = createWorkspaceController();
+  controller.layout.audioRecordingDialogOpen = true;
+  controller.layout.audioRecordingTarget = {
+    projectId: 'project-1',
+    trackId: 'voice',
+    startTime: 2,
+    endTime: 8,
+  } as never;
+  hookMocks.controller = controller;
+  const pausePlayback = vi.fn();
+  const setPlaybackPlaying = vi.fn(async () => true);
+  renderToStaticMarkup(
+    <RuntimePlaybackContext.Provider
+      value={{ pausePlayback, setPlaybackPlaying, seekTo: vi.fn() } as never}
+    >
+      <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+    </RuntimePlaybackContext.Provider>
+  );
+  const timeline = audioRecordingModalSpy.mock.lastCall![0].timeline;
+  timeline.onPause();
+  expect(pausePlayback).toHaveBeenCalledOnce();
+  await timeline.onResume();
+  expect(setPlaybackPlaying).toHaveBeenCalledWith(true);
+  setPlaybackPlaying.mockResolvedValueOnce(false);
+  await expect(timeline.onResume()).rejects.toThrow('Playback unavailable');
+  expect(pausePlayback).toHaveBeenCalledTimes(2);
 });

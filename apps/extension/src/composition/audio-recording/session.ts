@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { beginRecordingSession } from './capture';
+import { beginRecordingSession, recordingElapsed } from './capture';
 import { formatDurationLabel, resolveRecordingMimeType } from './format';
 import type {
   AudioRecordingControllerState,
@@ -52,6 +52,7 @@ function useAudioRecordingRefs(): AudioRecordingRefs {
     sessionRef: useRef(0),
     streamRef: useRef<MediaStream | null>(null),
     timerRef: useRef<number | null>(null),
+    clockRef: useRef<AudioRecordingRefs['clockRef']['current']>(null),
   };
 }
 
@@ -90,6 +91,7 @@ function useRecordingReset(state: AudioRecordingState, refs: AudioRecordingRefs)
     clearRecordingTimer(refs.timerRef);
     stopRecordingStream(refs.streamRef);
     refs.mediaRecorderRef.current = null;
+    refs.clockRef.current = null;
     refs.chunksRef.current = [];
     state.setError(null);
     state.setStatus('idle');
@@ -201,6 +203,7 @@ function useRecordingCaptureControls(
   errors: AudioRecordingErrors,
   timeline?: AudioRecordingTimeline
 ) {
+  const resumingSessionRef = useRef<number | null>(null);
   const clearTimer = useCallback(() => clearRecordingTimer(refs.timerRef), [refs.timerRef]);
   const stopStream = useCallback(() => stopRecordingStream(refs.streamRef), [refs.streamRef]);
 
@@ -234,7 +237,48 @@ function useRecordingCaptureControls(
     recorder.stop();
   }, [refs.mediaRecorderRef]);
 
-  return { startRecording, stopRecording };
+  const pauseRecording = useCallback(() => {
+    const recorder = refs.mediaRecorderRef.current;
+    const clock = refs.clockRef.current;
+    if (!recorder || recorder.state !== 'recording' || !clock) return;
+    recorder.pause();
+    clock.pausedAt = performance.now();
+    state.setDurationSeconds(recordingElapsed(refs));
+    state.setStatus('paused');
+    timeline?.onPause?.();
+  }, [refs, state, timeline]);
+
+  const resumeRecording = useCallback(async () => {
+    const recorder = refs.mediaRecorderRef.current;
+    const clock = refs.clockRef.current;
+    const sessionId = refs.sessionRef.current;
+    if (
+      !recorder ||
+      recorder.state !== 'paused' ||
+      !clock ||
+      resumingSessionRef.current === sessionId
+    )
+      return;
+    resumingSessionRef.current = sessionId;
+    try {
+      await timeline?.onResume?.();
+      if (sessionId !== refs.sessionRef.current || recorder.state !== 'paused') {
+        timeline?.onPause?.();
+        return;
+      }
+      clock.pausedTotal += performance.now() - (clock.pausedAt ?? performance.now());
+      clock.pausedAt = null;
+      recorder.resume();
+      state.setStatus('recording');
+      state.setError(null);
+    } catch {
+      if (sessionId === refs.sessionRef.current) state.setError(errors.playFailed);
+    } finally {
+      if (resumingSessionRef.current === sessionId) resumingSessionRef.current = null;
+    }
+  }, [refs, state, timeline, errors.playFailed]);
+
+  return { startRecording, stopRecording, pauseRecording, resumeRecording };
 }
 
 export function useAudioRecordingSession(
@@ -271,6 +315,8 @@ export function useAudioRecordingSession(
       durationLabel: formatDurationLabel(state.durationSeconds),
       error: state.error,
       startRecording: captureControls.startRecording,
+      pauseRecording: captureControls.pauseRecording,
+      resumeRecording: captureControls.resumeRecording,
       status: state.status,
       stopRecording: captureControls.stopRecording,
     },

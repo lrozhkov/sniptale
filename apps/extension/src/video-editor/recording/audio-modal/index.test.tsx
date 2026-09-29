@@ -20,6 +20,8 @@ vi.mock('../../../composition/audio-recording/session', () => ({
         error: null,
         startRecording: vi.fn(),
         stopRecording: vi.fn(),
+        pauseRecording: vi.fn(),
+        resumeRecording: vi.fn(),
         status: 'recorded',
       },
       trim: { pauseSelection: vi.fn() },
@@ -121,6 +123,8 @@ it('shows remaining interval time and stops recording from the compact timeline 
             error: null,
             startRecording: vi.fn(),
             stopRecording: stop,
+            pauseRecording: vi.fn(),
+            resumeRecording: vi.fn(),
             status: 'recording',
           },
         }}

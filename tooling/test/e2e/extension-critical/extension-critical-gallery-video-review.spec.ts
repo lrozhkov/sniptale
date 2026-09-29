@@ -3341,3 +3341,105 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`quick editor voiceover strip supports pause and optional cap at HD in ${variant.locale}/${variant.theme}`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.recordVoiceover').click();
+      const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
+      await expect(strip).toBeVisible();
+      await expect(
+        strip.getByRole('checkbox', {
+          name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
+        })
+      ).toBeChecked();
+      await expect(dialog.locator('[inert]')).toHaveCount(1);
+      await page.screenshot({
+        path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
+      });
+      await strip.getByRole('checkbox').uncheck();
+      await expect(strip.getByRole('checkbox')).not.toBeChecked();
+      await page.evaluate(() => {
+        const audio = new AudioContext();
+        const oscillator = audio.createOscillator();
+        const destination = audio.createMediaStreamDestination();
+        oscillator.connect(destination);
+        oscillator.start();
+        Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+          configurable: true,
+          value: async () => destination.stream,
+        });
+      });
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioStart', variant.locale),
+        })
+        .click();
+      await expect(
+        strip.getByRole('button', {
+          name: translate('videoEditor.app.recordAudioPause', variant.locale),
+        })
+      ).toBeVisible();
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioPause', variant.locale),
+        })
+        .click();
+      await expect(
+        strip.getByRole('button', {
+          name: translate('videoEditor.app.recordAudioResume', variant.locale),
+        })
+      ).toBeVisible();
+      await page.screenshot({
+        path: testInfo.outputPath(`voiceover-paused-${variant.locale}-${variant.theme}.png`),
+      });
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioResume', variant.locale),
+        })
+        .click();
+      await strip
+        .getByRole('button', { name: translate('videoEditor.app.recordAudioStop', variant.locale) })
+        .click();
+      await expect(
+        strip.getByRole('button', {
+          name: translate('videoEditor.app.recordAudioSave', variant.locale),
+        })
+      ).toBeVisible();
+      await page.screenshot({
+        path: testInfo.outputPath(`voiceover-take-${variant.locale}-${variant.theme}.png`),
+      });
+      await strip
+        .getByRole('button', { name: translate('common.actions.close', variant.locale) })
+        .click();
+      await expect(strip).toHaveCount(0);
+      await expect(dialog.locator('[inert]')).toHaveCount(0);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

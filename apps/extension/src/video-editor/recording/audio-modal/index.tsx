@@ -38,7 +38,9 @@ function TimelineAudioRecordingModal({
     <AudioRecordingDeviceSelect
       value={deviceId}
       onChange={setDeviceId}
-      disabled={starting || isSaving || controller.transport.status === 'recording'}
+      disabled={
+        starting || isSaving || ['recording', 'paused'].includes(controller.transport.status)
+      }
     />
   );
   if (!isOpen) return null;

@@ -49,7 +49,7 @@ export function MaterialAudioRecordingModal(props: AudioRecordingModalProps) {
           disabled={
             session.starting ||
             session.isSaving ||
-            session.controller.transport.status === 'recording'
+            ['recording', 'paused'].includes(session.controller.transport.status)
           }
         />
       }
@@ -98,6 +98,8 @@ function MaterialRecordingDialog({
             error={controller.transport.error}
             onStartRecording={startRecording}
             onStopRecording={controller.transport.stopRecording}
+            onPauseRecording={controller.transport.pauseRecording}
+            onResumeRecording={controller.transport.resumeRecording}
             status={controller.transport.status}
           />
         </fieldset>

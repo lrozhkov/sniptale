@@ -42,6 +42,7 @@ function fixture() {
       sessionRef: { current: 1 },
       streamRef: { current: null },
       timerRef: { current: null },
+      clockRef: { current: null },
     },
     state: {
       audioBlob: null,

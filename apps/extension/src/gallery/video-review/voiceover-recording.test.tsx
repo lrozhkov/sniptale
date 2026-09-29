@@ -3,7 +3,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RefObject } from 'react';
-import { ReviewVoiceoverRecording, useReviewVoiceoverRecording } from './voiceover-recording';
+import { useReviewVoiceoverRecording } from './voiceover-recording';
+import { ReviewVoiceoverRecording } from './voiceover-panel';
 import { importReviewAudio } from '../../workflows/video-review/audio-import';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 
@@ -73,12 +74,19 @@ const renderRecording = (isOpen: boolean) => {
   return { onClose, onSave };
 };
 
-it('mounts the shared recorder with the remaining timeline as the capture limit', () => {
+it('shows a bottom strip with an optional visible duration cap', () => {
   renderRecording(true);
   const modal = host.querySelector('[role="dialog"]');
   expect(modal).not.toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
   expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
   expect(modal!.textContent).toContain('videoEditor.app.recordAudioStart');
+  expect(modal!.textContent).toContain('gallery.videoReview.voiceoverDurationLimit');
+  const limit = modal!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+  expect(limit.checked).toBe(true);
+  act(() => limit.click());
+  expect(limit.checked).toBe(false);
+  expect(modal!.textContent).toContain('00:07');
 });
 
 it('stays closed when isOpen is false', () => {
@@ -86,11 +94,66 @@ it('stays closed when isOpen is false', () => {
   expect(host.querySelector('[role="dialog"]')).toBeNull();
 });
 
+it('shows recording, pause, resume and take review with the same lower panel', async () => {
+  class Recorder extends EventTarget {
+    static isTypeSupported = () => true;
+    state = 'inactive';
+    mimeType = 'audio/webm';
+    start() {
+      this.state = 'recording';
+    }
+    pause() {
+      this.state = 'paused';
+    }
+    resume() {
+      this.state = 'recording';
+    }
+    stop() {
+      this.state = 'inactive';
+      const data = new Event('dataavailable');
+      Object.defineProperty(data, 'data', { value: new Blob(['voice']) });
+      this.dispatchEvent(data);
+      this.dispatchEvent(new Event('stop'));
+    }
+  }
+  vi.stubGlobal('MediaRecorder', Recorder);
+  vi.stubGlobal('navigator', {
+    mediaDevices: {
+      getUserMedia: async () => ({ getTracks: () => [{ stop: vi.fn() }] }),
+      enumerateDevices: async () => [],
+    },
+  });
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:voice', revokeObjectURL: vi.fn() });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  renderRecording(true);
+  const click = async (label: string) => {
+    const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find((item) =>
+      item.textContent?.includes(label)
+    )!;
+    await act(async () => button.click());
+  };
+  await click('videoEditor.app.recordAudioStart');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioPause');
+  await click('videoEditor.app.recordAudioPause');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioResume');
+  await click('videoEditor.app.recordAudioResume');
+  await click('videoEditor.app.recordAudioStop');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioSave');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioAgain');
+});
+
 type RecordingApi = ReturnType<typeof useReviewVoiceoverRecording>;
 
 function renderHookHarness(props: {
   guard: () => boolean;
   time?: { current: number };
+  resultDuration?: number;
   flushAdvanced?: () => Promise<void>;
   toOutputTime?: (source: number) => number | null;
 }) {
@@ -108,7 +171,7 @@ function renderHookHarness(props: {
     latest = useReviewVoiceoverRecording({
       video,
       time: props.time?.current ?? 3,
-      resultDuration: 10,
+      resultDuration: props.resultDuration ?? 10,
       toOutputTime: props.toOutputTime ?? ((source: number) => source),
       audio,
       guard: props.guard,
@@ -235,6 +298,34 @@ it('places the take through the output-time map (R03)', async () => {
   );
   expect(harness.audio.addImported).toHaveBeenCalledWith(
     expect.objectContaining({ atTime: 2, timelineDuration: 10 }),
+    'voiceover',
+    2,
+    'a.webm'
+  );
+});
+
+it('keeps the entry anchor for retry and places trimmed audio in output time across speed edits', async () => {
+  const time = { current: 3 };
+  const harness = renderHookHarness({
+    guard: () => true,
+    time,
+    resultDuration: 6,
+    toOutputTime: (source) => (source - 1) / 2,
+  });
+  act(() => harness.latest.open());
+  time.current = 5;
+  act(() => root.render(<harness.Harness />));
+  await act(async () => harness.latest.syncStart());
+  expect(harness.node.currentTime).toBe(3);
+  await act(async () =>
+    harness.latest.save(
+      new File(['a'], 'a.webm'),
+      { trimStart: 1, trimEnd: 3 },
+      new AbortController().signal
+    )
+  );
+  expect(harness.audio.addImported).toHaveBeenCalledWith(
+    expect.objectContaining({ atTime: 2, timelineDuration: 6 }),
     'voiceover',
     2,
     'a.webm'

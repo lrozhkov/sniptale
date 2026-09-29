@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { RefObject } from 'react';
-import { MaterialAudioRecordingModal } from '../../composition/audio-recording/dialog';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 import { translate } from '../../platform/i18n';
 import type { useReviewAudio, ReviewAudioLane } from './use-review-audio';
@@ -13,44 +12,57 @@ export function useReviewVoiceoverRecording(args: {
   resultDuration: number;
   toOutputTime(source: number): number | null;
   audio: ReturnType<typeof useReviewAudio>;
+  onCutPlacement?: () => void;
   guard(): boolean;
   flushAdvanced(): Promise<void>;
 }) {
   const [recording, setRecording] = useState(false);
   const [takeStart, setTakeStart] = useState<number | null>(null);
+  const [takeOutputStart, setTakeOutputStart] = useState<number | null>(null);
   return {
     recording,
     takeStart,
+    takeOutputStart,
     open: () => {
       if (!args.guard()) return;
+      const outputStart = args.toOutputTime(args.time);
+      if (outputStart === null || args.resultDuration - outputStart <= 0) {
+        args.onCutPlacement?.();
+        return;
+      }
       args.video.current?.pause();
       setTakeStart(args.time);
+      setTakeOutputStart(outputStart);
       setRecording(true);
     },
     close: () => setRecording(false),
     syncStart: async () => {
       const node = args.video.current;
       if (!node) return;
-      node.currentTime = args.time;
+      node.currentTime = takeStart ?? args.time;
       await node.play();
     },
     syncStop: () => args.video.current?.pause(),
+    syncPause: () => args.video.current?.pause(),
+    syncResume: async () => {
+      await args.video.current?.play();
+    },
     /** The shared recorder already trims the file, so placement is take start + trim offset. */
     save: async (file: File, trim: AudioTrimRange, signal: AbortSignal) => {
       if (signal.aborted) return;
-      const sourceAt = (takeStart ?? args.time) + trim.trimStart;
+      const outputAt = takeOutputStart ?? args.toOutputTime(takeStart ?? args.time);
+      if (outputAt === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
+      const placement = outputAt + trim.trimStart;
       await importReviewAudio({
         file,
         signal,
         assertCurrentTarget: () => {
-          if (args.toOutputTime(sourceAt) === null)
+          if (placement >= args.resultDuration)
             throw new Error(translate('gallery.videoReview.placementOnCut'));
         },
         attach: (assetId, duration) => {
-          const at = args.toOutputTime(sourceAt);
-          if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
           args.audio.addImported(
-            importedAudioClip(assetId, duration, at, args.resultDuration),
+            importedAudioClip(assetId, duration, placement, args.resultDuration),
             'voiceover',
             duration,
             file.name
@@ -60,37 +72,6 @@ export function useReviewVoiceoverRecording(args: {
       });
     },
   };
-}
-
-/**
- * One voiceover take through the shared material recorder; the caller owns clip
- * placement and playback sync. The capture limit is the remaining timeline.
- */
-export function ReviewVoiceoverRecording(props: {
-  isOpen: boolean;
-  playhead: number;
-  timelineDuration: number;
-  onClose(): void;
-  onSyncStart(): Promise<void>;
-  onSyncStop(): void;
-  onSave(file: File, trim: AudioTrimRange, signal: AbortSignal): Promise<void>;
-}) {
-  const remaining = Math.max(0, props.timelineDuration - props.playhead);
-  return (
-    <MaterialAudioRecordingModal
-      isOpen={props.isOpen}
-      title={translate('gallery.videoReview.recordVoiceover')}
-      captureLimitSeconds={remaining}
-      timeline={{
-        startTime: props.playhead,
-        duration: remaining,
-        beforeStart: props.onSyncStart,
-        onStop: props.onSyncStop,
-      }}
-      onClose={props.onClose}
-      onSave={props.onSave}
-    />
-  );
 }
 
 /** Wires music import and voiceover recording to the review audio model. */
@@ -145,6 +126,7 @@ export function useReviewEditorAudio(args: {
     resultDuration: args.resultDuration,
     toOutputTime: args.toOutputTime,
     audio: args.audio,
+    onCutPlacement: args.onCutPlacement,
     guard,
     flushAdvanced: args.flushAdvanced,
   });

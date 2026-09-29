@@ -253,6 +253,17 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
             onStop: () => {
               runtime.pausePlayback();
             },
+            onPause: () => {
+              runtime.pausePlayback();
+            },
+            onResume: async () => {
+              if (!current.current.open) throw new Error('Recording cancelled');
+              const started = await runtime.setPlaybackPlaying(true);
+              if (started === false || !current.current.open) {
+                runtime.pausePlayback();
+                throw new Error('Playback unavailable');
+              }
+            },
           }
         : undefined,
     [target, runtime, setCurrentTime]
