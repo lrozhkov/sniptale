@@ -65,9 +65,19 @@ export function PreviewSourceField({
             </>
           ) : null}
           {isGalleryScenarioExportItem(item) ? (
-            <SourceRow label={translate('gallery.preview.type')} value={item.format} />
+            <>
+              <SourceRow label={translate('gallery.preview.type')} value={item.format} />
+              <SourceRow
+                label={translate('gallery.preview.exportSourceProject')}
+                value={item.project.name}
+              />
+            </>
           ) : null}
         </dl>
+        {isGalleryScenarioExportItem(item) &&
+        (item.project.availability !== 'available' || item.lifecycle?.trashedAt !== undefined) ? (
+          <p role="status">{translate('gallery.preview.exportSourceUnavailable')}</p>
+        ) : null}
         {title ? <p className="break-words">{title}</p> : null}
         {href && !trashMode ? (
           <a

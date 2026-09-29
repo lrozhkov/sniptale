@@ -637,11 +637,21 @@ it('renders scenario rows as shared selectable items', () => {
   });
   const onPreviewOpen = vi.fn();
   const onToggleSelection = vi.fn();
+  const otherScenario = createScenarioItem({
+    id: 'scenario:project-2',
+    project: {
+      availability: 'available',
+      createdAt: 2,
+      id: 'project-2',
+      name: 'Other scenario',
+      updatedAt: 2,
+    },
+  });
 
   act(() => {
     root?.render(
       <GalleryMediaList
-        filteredItems={[scenarioItem]}
+        filteredItems={[scenarioItem, otherScenario]}
         onPreviewOpen={onPreviewOpen}
         onToggleSelection={onToggleSelection}
         selectedIds={new Set(['scenario:project-1'])}
@@ -651,7 +661,7 @@ it('renders scenario rows as shared selectable items', () => {
 
   const buttons = Array.from(container?.querySelectorAll('button') ?? []);
   const selectionButton = buttons.find((button) => button.className.includes('h-8 w-8'));
-  const detailButton = buttons.find((button) => button.textContent?.includes('Scenario'));
+  const detailButton = buttons.find((button) => button.textContent?.includes('Other scenario'));
 
   if (
     !(selectionButton instanceof HTMLButtonElement) ||
@@ -666,7 +676,7 @@ it('renders scenario rows as shared selectable items', () => {
   });
 
   expect(onToggleSelection).toHaveBeenCalledWith('scenario:project-1', { shiftKey: false });
-  expect(onPreviewOpen).toHaveBeenCalledWith(scenarioItem);
+  expect(onPreviewOpen).toHaveBeenCalledWith(otherScenario);
   expect(container?.textContent).toContain('alpha');
 });
 

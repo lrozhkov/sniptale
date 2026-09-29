@@ -47,6 +47,48 @@ it('keeps stored scenario images on the media thumbnail path without an aggregat
   expect(item?.presentationRevision).toBeUndefined();
 });
 
+it('reconstructs each saved export under its own source project after a library reload', () => {
+  const projects = ['first', 'second'].map((id, index) => ({
+    availability: 'available' as const,
+    id,
+    name: `Project ${index + 1}`,
+    createdAt: index + 1,
+    updatedAt: index + 1,
+  }));
+  const entries = new Map(
+    projects.map((project) => [
+      project.id,
+      [
+        {
+          id: `export-${project.id}`,
+          projectId: project.id,
+          format: 'html' as const,
+          filename: `${project.id}.html`,
+          createdAt: 10,
+          size: 100,
+        },
+      ],
+    ])
+  );
+  const items = createGalleryItems({
+    mediaItems: [],
+    scenarioExportsByProjectId: entries,
+    scenarioProjects: projects,
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  const exports = items.filter((item) => item.type === 'scenario-export');
+  expect(exports).toHaveLength(2);
+  expect(
+    exports.map((item) => [item.exportEntry.id, item.exportEntry.projectId, item.project.id])
+  ).toEqual(
+    expect.arrayContaining([
+      ['export-first', 'first', 'first'],
+      ['export-second', 'second', 'second'],
+    ])
+  );
+});
+
 it('creates a mixed gallery list with scenario and export items sorted by freshness', () => {
   const scenarioProject = {
     availability: 'available' as const,

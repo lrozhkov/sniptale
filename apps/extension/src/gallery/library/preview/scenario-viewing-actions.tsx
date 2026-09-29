@@ -3,48 +3,92 @@ import { readScenarioViewingSnapshot } from '../../../composition/persistence/sc
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
 import { createTranslator, useAppLocale } from '../../../platform/i18n';
 
+const inspectorLinkClassName = [
+  'flex min-h-9 items-center rounded-[8px] px-3 text-sm',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
+  'focus-visible:outline-none focus-visible:ring-2',
+  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+].join(' ');
+
+const inlineLinkClassName = [
+  'rounded-md border border-[var(--sniptale-color-border-soft)]',
+  'px-3 py-2 text-sm underline focus-visible:outline',
+].join(' ');
+
 /** Library links open committed representations; export rows never imply historic bytes. */
 export function ScenarioViewingActions({
   projectId,
   exportMode = false,
+  revision,
+  availability = 'available',
+  layout = 'inline',
 }: {
   projectId: string;
   exportMode?: boolean;
+  revision?: number;
+  availability?: 'available' | 'unsupported' | 'invalid' | 'unavailable';
+  layout?: 'inline' | 'inspector';
 }) {
   const t = createTranslator(useAppLocale());
-  const [available, setAvailable] = useState<{ tour: boolean } | null>(null);
+  const [result, setResult] = useState<{
+    key: string;
+    status: 'ready' | 'unavailable';
+    tour: boolean;
+  } | null>(null);
+  const key = `${projectId}:${revision ?? 0}`;
   useEffect(() => {
+    if (availability !== 'available') return;
     let active = true;
-    setAvailable(null);
+    setResult(null);
     void readScenarioViewingSnapshot(projectId)
       .then((snapshot) => {
-        if (active) setAvailable(snapshot ? { tour: Boolean(snapshot.project.tour) } : null);
+        if (active)
+          setResult({
+            key,
+            status: snapshot ? 'ready' : 'unavailable',
+            tour: Boolean(snapshot?.project.tour),
+          });
       })
       .catch(() => {
-        if (active) setAvailable(null);
+        if (active) setResult({ key, status: 'unavailable', tour: false });
       });
     return () => {
       active = false;
     };
-  }, [projectId]);
-  if (!available) return null;
+  }, [availability, key, projectId]);
+  if (availability !== 'available') return null;
+  if (!result || result.key !== key) return null;
+  if (result.status === 'unavailable')
+    return <p role="status">{t('gallery.preview.unavailableGuide')}</p>;
   return (
-    <nav className="flex flex-wrap gap-3" aria-label={t('scenario.editor.previewTitle')}>
-      {exportMode && <p className="w-full text-sm">{t('scenario.editor.viewCurrentExportHint')}</p>}
-      {(['guide', 'tour'] as const)
-        .filter((mode) => mode === 'guide' || available.tour)
-        .map((mode) => (
-          <a
-            key={mode}
-            className="rounded-md border border-[var(--sniptale-color-border-soft)]
-            px-3 py-2 text-sm underline focus-visible:outline"
-            href={buildScenarioEditorUrl({ projectId, view: mode })}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t(mode === 'guide' ? 'scenario.editor.viewGuide' : 'scenario.editor.viewTour')}
-          </a>
-        ))}
+    <nav
+      className={layout === 'inspector' ? 'flex flex-col gap-1' : 'flex flex-wrap gap-3'}
+      aria-label={t('scenario.editor.previewTitle')}
+    >
+      {exportMode ? (
+        <a
+          className={layout === 'inspector' ? inspectorLinkClassName : inlineLinkClassName}
+          href={buildScenarioEditorUrl({ projectId })}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t('gallery.preview.openCurrentProject')}
+        </a>
+      ) : null}
+      {!exportMode &&
+        (['guide', 'tour'] as const)
+          .filter((mode) => mode === 'guide' || result.tour)
+          .map((mode) => (
+            <a
+              key={mode}
+              className={layout === 'inspector' ? inspectorLinkClassName : inlineLinkClassName}
+              href={buildScenarioEditorUrl({ projectId, view: mode })}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t(mode === 'guide' ? 'scenario.editor.viewGuide' : 'scenario.editor.viewTour')}
+            </a>
+          ))}
     </nav>
   );
 }

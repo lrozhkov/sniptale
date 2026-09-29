@@ -32,6 +32,7 @@ import {
 } from '../ui';
 import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
+import { ScenarioViewingActions } from './scenario-viewing-actions';
 import {
   listPreviewMediaAssetProjectUsage,
   subscribeToPreviewProjectUsageInvalidation,
@@ -501,15 +502,9 @@ function PreviewRestoreAction(
   );
 }
 
-export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
-  if (props.trashMode) return <PreviewRestoreAction {...props} />;
-  const { item, onCopy, onDelete, onDownload, onEdit, onResetChanges } = props;
-  const canEditMetadata = isMetadataEditable(item);
-  const canDelete = !isGalleryScenarioExportItem(item);
-  const canDownload = isGalleryMediaItem(item);
+function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => void }) {
+  const { item, onEdit, onReview } = props;
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
-  const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
-  const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
   const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
   const canOpenRecordingGroup =
     isGalleryMediaItem(item) &&
@@ -522,6 +517,65 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     canOpenWebSnapshot ||
     canOpenRecordingGroup ||
     canOpenVideo;
+  return (
+    <>
+      {onReview || canOpenPrimaryAction ? (
+        <div className="space-y-1">
+          {onReview ? (
+            <button
+              type="button"
+              data-ui="gallery.videoReview.enter"
+              onClick={onReview}
+              className={previewActionButtonClassName}
+            >
+              <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {translate('gallery.videoReview.enter')}
+            </button>
+          ) : null}
+          {canOpenPrimaryAction ? (
+            <button type="button" onClick={onEdit} className={previewActionButtonClassName}>
+              {canOpenVideo ? (
+                <Film className="h-4 w-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              {translate(
+                canOpenVideo
+                  ? 'gallery.videoReview.openVideoEditor'
+                  : canOpenWebSnapshot
+                    ? 'gallery.preview.openSnapshot'
+                    : canOpenRecordingGroup
+                      ? 'gallery.preview.openRecordingGroup'
+                      : 'gallery.preview.openInEditor'
+              )}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {(isGalleryScenarioItem(item) || isGalleryScenarioExportItem(item)) &&
+      item.project.availability === 'available' ? (
+        <ScenarioViewingActions
+          projectId={item.project.id}
+          revision={item.workspaceRevision ?? item.project.updatedAt}
+          availability={item.project.availability}
+          exportMode={isGalleryScenarioExportItem(item)}
+          layout="inspector"
+        />
+      ) : null}
+    </>
+  );
+}
+
+export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
+  if (props.trashMode) return <PreviewRestoreAction {...props} />;
+  const { item, onCopy, onDelete, onDownload, onResetChanges } = props;
+  const canEditMetadata = isMetadataEditable(item);
+  const canDelete = !isGalleryScenarioExportItem(item);
+  const canDownload = isGalleryMediaItem(item);
+  const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
+  const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
+  const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
+  const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
   const hasFileActions =
     canDownload ||
     canCopy ||
@@ -538,39 +592,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
         {translate('gallery.preview.actions')}
       </div>
       <div className="space-y-3">
-        {props.onReview || canOpenPrimaryAction ? (
-          <div className="space-y-1">
-            {props.onReview ? (
-              <button
-                type="button"
-                data-ui="gallery.videoReview.enter"
-                onClick={props.onReview}
-                className={previewActionButtonClassName}
-              >
-                <Clapperboard className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {translate('gallery.videoReview.enter')}
-              </button>
-            ) : null}
-            {canOpenPrimaryAction ? (
-              <button type="button" onClick={onEdit} className={previewActionButtonClassName}>
-                {canOpenVideo ? (
-                  <Film className="h-4 w-4 shrink-0" aria-hidden="true" />
-                ) : (
-                  <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                )}
-                {translate(
-                  canOpenVideo
-                    ? 'gallery.videoReview.openVideoEditor'
-                    : canOpenWebSnapshot
-                      ? 'gallery.preview.openSnapshot'
-                      : canOpenRecordingGroup
-                        ? 'gallery.preview.openRecordingGroup'
-                        : 'gallery.preview.openInEditor'
-                )}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+        <PreviewPrimaryActions {...props} />
         {hasFileActions ? (
           <PreviewActionGroup label={translate('gallery.preview.fileActions')}>
             {canOpenWebSnapshot && props.onOpenSnapshotScreenshot ? (

@@ -94,8 +94,14 @@ import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
 describe('loadGalleryLibrarySnapshot', () => {
   it('loads mixed gallery items and storage estimates without legacy read-path repair', async () => {
     const mediaItems = [{ id: 'asset-1' }];
-    const scenarioProjects = [{ id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2 }];
-    const scenarioExports = [{ id: 'export-1', projectId: 'project-1' }];
+    const scenarioProjects = [
+      { id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2 },
+      { id: 'project-2', name: 'Other', createdAt: 3, updatedAt: 4 },
+    ];
+    const scenarioExports = [
+      { id: 'export-1', projectId: 'project-1' },
+      { id: 'export-2', projectId: 'project-2' },
+    ];
     const videoProjects = [{ id: 'video-project-1', name: 'Video', createdAt: 3, updatedAt: 4 }];
     const thumbnailIds = ['asset-1', 'scenario:project-1'];
     const nextItems = [{ id: 'asset-1' }, { id: 'scenario:project-1' }];
@@ -104,7 +110,9 @@ describe('loadGalleryLibrarySnapshot', () => {
     listMediaLibraryMock.mockResolvedValue(mediaItems);
     listVideoProjectsMock.mockResolvedValue(videoProjects);
     listScenarioProjectSummariesMock.mockResolvedValue(scenarioProjects);
-    listScenarioExportRecordsMock.mockResolvedValue(scenarioExports);
+    listScenarioExportRecordsMock.mockImplementation(async (projectId: string) =>
+      scenarioExports.filter((entry) => entry.projectId === projectId)
+    );
     listMediaThumbnailIdsMock.mockResolvedValue(thumbnailIds);
     getStorageEstimateInfoMock.mockResolvedValue(estimate);
     createGalleryItemsMock.mockReturnValue(nextItems);
@@ -132,12 +140,16 @@ describe('loadGalleryLibrarySnapshot', () => {
     expect(listVideoProjectsMock).toHaveBeenCalledTimes(1);
     expect(listScenarioProjectSummariesMock).toHaveBeenCalledTimes(1);
     expect(listScenarioExportRecordsMock).toHaveBeenCalledWith('project-1');
+    expect(listScenarioExportRecordsMock).toHaveBeenCalledWith('project-2');
     expect(listMediaThumbnailIdsMock).toHaveBeenCalledTimes(1);
     expect(getStorageEstimateInfoMock).toHaveBeenCalledTimes(1);
     expect(createGalleryItemsMock).toHaveBeenCalledWith({
       mediaItems,
       presentations: [],
-      scenarioExportsByProjectId: new Map([['project-1', scenarioExports]]),
+      scenarioExportsByProjectId: new Map([
+        ['project-1', [scenarioExports[0]]],
+        ['project-2', [scenarioExports[1]]],
+      ]),
       scenarioProjects,
       thumbnailIds: new Set(thumbnailIds),
       videoProjects,

@@ -33,6 +33,16 @@ export const galleryPreviewMessages = defineMessageSource({
   projectMedia: { ru: 'Материал проекта', en: 'Project media' },
   savedMedia: { ru: 'Сохранённый материал', en: 'Saved media' },
   exportedMedia: { ru: 'Экспорт проекта', en: 'Project export' },
+  exportCurrentProjectSteps: {
+    ru: 'Ниже показаны шаги текущего проекта. Содержимое прежнего экспортированного файла не сохранено.',
+    en: 'These are steps from the current project. The previously exported file is not stored here.',
+  },
+  exportSourceProject: { ru: 'Исходный проект', en: 'Source project' },
+  exportSourceUnavailable: {
+    ru: 'Исходный проект недоступен. Сохранённые сведения об экспорте остаются прежними.',
+    en: 'The source project is unavailable. The saved export details remain unchanged.',
+  },
+  openCurrentProject: { ru: 'Открыть текущий проект', en: 'Open current project' },
   captureMethod: { ru: 'Способ записи', en: 'Capture method' },
   captureTab: { ru: 'Вкладка', en: 'Tab' },
   captureTabCrop: { ru: 'Область вкладки', en: 'Tab area' },
