@@ -253,7 +253,7 @@ function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>)
     'gap-2'
   );
   expect(container?.querySelector('[data-ui="test.sidebar"]')?.parentElement?.className).toContain(
-    'gap-3'
+    'gap-2'
   );
   expect(sidebarPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({

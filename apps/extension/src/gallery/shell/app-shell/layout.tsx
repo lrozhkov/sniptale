@@ -186,7 +186,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           storageInfo={props.state.storage.storageInfo}
           viewMode={props.viewMode}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 gap-2 overflow-hidden">
           <GallerySidebarSection {...props} />
           <GalleryMainSection {...props} />
         </div>
