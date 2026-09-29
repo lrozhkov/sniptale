@@ -13,6 +13,17 @@ const sectionMocks = vi.hoisted(() => ({
   folderList: vi.fn(),
 }));
 
+vi.mock('../../state/useTrashRetentionPolicy', () => ({
+  useTrashRetentionPolicy: () => ({
+    status: 'ready',
+    policy: { trashCleanupEnabled: false, trashRetentionDays: 30 },
+    saving: false,
+    feedback: null,
+    onChange: vi.fn(),
+    onRetry: vi.fn(),
+  }),
+}));
+
 vi.mock('./sections', () => ({
   GalleryFolderList: (props: unknown) => {
     sectionMocks.folderList(props);
@@ -142,6 +153,16 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(
     formatBytes(1536)
   );
+  const scrollContent = container!.querySelector('[data-ui="gallery.sidebar.scroll"]')!;
+  const summary = scrollContent.querySelector('[data-ui="gallery.trash.summary"]')!;
+  const retention = scrollContent.querySelector('[data-ui="gallery.trash.retention"]')!;
+  expect(
+    summary.compareDocumentPosition(retention) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(
+    retention.compareDocumentPosition(button('gallery.app.permanentDelete')) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
   act(() => button('gallery.app.restoreTrash').click());
   act(() => button('gallery.app.permanentDelete').click());
   act(() => button('gallery.app.emptyTrash').click());
@@ -154,9 +175,15 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(button('gallery.app.emptyTrash').disabled).toBe(false);
   expect(button('gallery.app.trashSelectAll').disabled).toBe(true);
   act(() => root?.render(<GallerySidebar {...props} trashMode busy />));
-  expect(
-    Array.from(container!.querySelectorAll('button')).every((element) => element.disabled)
-  ).toBe(true);
+  for (const key of [
+    'gallery.app.trashSelectAll',
+    'gallery.app.restoreTrash',
+    'gallery.app.permanentDelete',
+    'gallery.app.emptyTrash',
+    'gallery.app.returnToLibrary',
+  ] as const) {
+    expect(button(key).disabled).toBe(true);
+  }
 });
 
 it('shows zero, loading and unavailable Trash totals without a misleading size', () => {

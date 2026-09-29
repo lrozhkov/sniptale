@@ -19,6 +19,10 @@ import {
   parseFullPageQualityPolicy,
 } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
+import {
+  runWithPersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredSettings } from './guards';
@@ -42,6 +46,27 @@ import { parseFilenameRules } from '../../../features/file-naming/rules';
 const STORAGE_KEY = 'sniptale_settings';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
 let settingsMutationQueue = Promise.resolve<NormalizedSettings | null>(null);
+const SETTINGS_LOCK = 'sniptale:settings';
+let testSettingsQueue: Promise<unknown> = Promise.resolve();
+
+function withSettingsLock<T>(operation: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request(SETTINGS_LOCK, { mode: 'exclusive' }, operation);
+  }
+  if (typeof chrome !== 'undefined') {
+    return Promise.reject(new Error('Settings mutation coordination is unavailable.'));
+  }
+  const execution = testSettingsQueue.then(operation);
+  testSettingsQueue = execution.catch(() => undefined);
+  return execution;
+}
+
+function withSettingsMutation<T>(
+  operation: (permit: PersistenceMutationPermit) => Promise<T>
+): Promise<T> {
+  // The global shared permit orders settings writes against exclusive transfer and privacy erasure.
+  return runWithPersistenceMutationPermit((permit) => withSettingsLock(() => operation(permit)));
+}
 
 const DEFAULT_VIEWPORT_PRESETS: ViewportPreset[] = createSystemViewportPresetCatalog();
 
@@ -141,7 +166,7 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
  * Callers that change one field should use patchSettings so queued read-modify-write merges
  * against the latest persisted payload.
  */
-export async function saveSettings(settings: Settings): Promise<void> {
+async function writeSettings(settings: Settings, permit: PersistenceMutationPermit): Promise<void> {
   if (
     settings.contextMenu.layout !== undefined &&
     !parseContextMenuLayout(settings.contextMenu.layout)
@@ -169,9 +194,13 @@ export async function saveSettings(settings: Settings): Promise<void> {
   ) {
     throw new Error('Page capture timing settings are invalid');
   }
-  await browserStorage.sync.set({ [STORAGE_KEY]: settings });
+  await browserStorage.sync.set({ [STORAGE_KEY]: settings }, permit);
 
   logger.debug('Saved settings payload');
+}
+
+export function saveSettings(settings: Settings): Promise<void> {
+  return withSettingsMutation((permit) => writeSettings(settings, permit));
 }
 
 function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSettings {
@@ -272,8 +301,30 @@ export async function loadSettings(): Promise<NormalizedSettings> {
   return normalizeLoadedSettings(parsedSettings.value);
 }
 
+/** Observe the normalized settings authority, including key removal, across extension pages. */
+export function subscribeToSettingsChanges(
+  listener: (settings: NormalizedSettings) => void
+): () => void {
+  if (typeof chrome === 'undefined') return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+    const change = changes[STORAGE_KEY];
+    const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
+    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+    if (
+      Object.keys(next.localStoragePolicy).every(
+        (key) =>
+          next.localStoragePolicy[key as keyof LocalStoragePolicy] ===
+          previous.localStoragePolicy[key as keyof LocalStoragePolicy]
+      )
+    )
+      return;
+    listener(next);
+  });
+}
+
 export async function clearSettings(): Promise<void> {
-  await browserStorage.sync.remove([STORAGE_KEY]);
+  await withSettingsMutation((permit) => browserStorage.sync.remove([STORAGE_KEY], permit));
   logger.debug('Cleared settings payload');
 }
 
@@ -331,41 +382,73 @@ function applySettingsPatch(
  * Failed writes reject to the caller and the queue remains usable for later mutations.
  */
 export async function patchSettings(settingsPatch: SettingsPatch): Promise<NormalizedSettings> {
-  return queueSettingsMutation(async () => {
-    const currentSettings = await loadSettings();
-    const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const currentSettings = await loadSettings();
+      const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
 
-    await saveSettings(nextSettings);
-    return nextSettings;
-  });
+      await writeSettings(nextSettings, permit);
+      return nextSettings;
+    })
+  );
+}
+
+export class StaleLocalStoragePolicyError extends Error {
+  constructor() {
+    super('Local storage policy changed before the update was committed.');
+    this.name = 'StaleLocalStoragePolicyError';
+  }
+}
+
+/** Reject a policy edit based on an obsolete cross-page value inside the settings lock. */
+export function patchLocalStoragePolicy(
+  patch: Partial<LocalStoragePolicy>,
+  expected: LocalStoragePolicy
+): Promise<NormalizedSettings> {
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const current = await loadSettings();
+      const currentPolicy = current.localStoragePolicy;
+      for (const key of Object.keys(currentPolicy) as (keyof LocalStoragePolicy)[]) {
+        if (currentPolicy[key] !== expected[key]) throw new StaleLocalStoragePolicyError();
+      }
+      const next = applySettingsPatch(current, { localStoragePolicy: patch });
+      await writeSettings(next, permit);
+      return next;
+    })
+  );
 }
 
 export async function resetSettingsToDefaults(): Promise<NormalizedSettings> {
-  return queueSettingsMutation(async () => {
-    const nextSettings = createDefaultSettings();
-    await saveSettings(nextSettings);
-    return nextSettings;
-  });
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const nextSettings = createDefaultSettings();
+      await writeSettings(nextSettings, permit);
+      return nextSettings;
+    })
+  );
 }
 
 /** Removes retired synchronized fields while preserving every current stored property. */
 export async function removeRetiredSynchronizedSettings(): Promise<void> {
-  await queueSettingsMutation(async () => {
-    const stored = await browserStorage.sync.get([STORAGE_KEY]);
-    const raw = stored[STORAGE_KEY];
-    const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return loadSettings();
-    }
+  await queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const stored = await browserStorage.sync.get([STORAGE_KEY]);
+      const raw = stored[STORAGE_KEY];
+      const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return loadSettings();
+      }
 
-    const nextRaw = { ...(raw as Record<string, unknown>) };
-    const removedDiagnostics = retiredField in nextRaw;
-    if (!removedDiagnostics) {
-      return loadSettings();
-    }
+      const nextRaw = { ...(raw as Record<string, unknown>) };
+      const removedDiagnostics = retiredField in nextRaw;
+      if (!removedDiagnostics) {
+        return loadSettings();
+      }
 
-    delete nextRaw[retiredField];
-    await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw });
-    return loadSettings();
-  });
+      delete nextRaw[retiredField];
+      await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw }, permit);
+      return loadSettings();
+    })
+  );
 }

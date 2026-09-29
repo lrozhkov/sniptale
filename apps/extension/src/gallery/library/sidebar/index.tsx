@@ -10,6 +10,8 @@ import {
   INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS,
 } from '@sniptale/ui/inspector-shell';
 import { GalleryFacetFilters, GalleryFolderList } from './sections';
+import { TrashRetentionControls } from './trash-retention-controls';
+import { useTrashRetentionPolicy } from '../../state/useTrashRetentionPolicy';
 
 const gallerySidebarPanelClassName = [
   [
@@ -111,11 +113,9 @@ export function GallerySidebar(props: GallerySidebarProps) {
 }
 
 function GalleryTrashControls(props: GallerySidebarProps) {
+  const trashRetention = useTrashRetentionPolicy();
   return (
     <section className="flex flex-col gap-3 pb-6" aria-label={translate('gallery.app.trashTitle')}>
-      <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
-        {translate('gallery.app.trashDescription')}
-      </p>
       <p className="text-sm" role="status">
         {translate('gallery.app.selectedPrefix')} {props.selectedCount ?? 0}
       </p>
@@ -143,6 +143,7 @@ function GalleryTrashControls(props: GallerySidebarProps) {
       >
         <GalleryTrashSummaryText summary={props.trashSummary} />
       </p>
+      <TrashRetentionControls {...trashRetention} />
       <div className="mt-3 flex flex-col gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <button
           type="button"

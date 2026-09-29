@@ -12,6 +12,7 @@ import {
   settingsMetaLabelClassName,
 } from '../../../section-surface';
 import type { StorageUsageState } from './use-storage-drafts-state';
+import type { TrashPolicyFeedback } from './use-storage-policy-state';
 
 const destinationOptions = [
   {
@@ -32,7 +33,10 @@ type StorageDraftsContentProps = {
   busy: boolean;
   onDeleteAllRequest(): void;
   policy: LocalStoragePolicy;
+  policyLoaded: boolean;
+  retryTrashPolicy(): void;
   runCleanup(includeUnexpired: boolean): Promise<void>;
+  trashPolicyFeedback: TrashPolicyFeedback;
   updatePolicy(patch: Partial<LocalStoragePolicy>): Promise<void>;
   usage: StorageUsageState | null;
   view: 'settings' | 'storage';
@@ -127,7 +131,10 @@ function RetentionSection(
 }
 
 function TrashRetentionSection(
-  props: Pick<StorageDraftsContentProps, 'busy' | 'policy' | 'updatePolicy'>
+  props: Pick<
+    StorageDraftsContentProps,
+    'busy' | 'policy' | 'retryTrashPolicy' | 'trashPolicyFeedback' | 'updatePolicy'
+  >
 ) {
   const enabled = props.policy.trashCleanupEnabled ?? false;
   return (
@@ -156,6 +163,29 @@ function TrashRetentionSection(
         value={props.policy.trashRetentionDays ?? 30}
         onChange={(value) => props.updatePolicy({ trashRetentionDays: value })}
       />
+      {props.trashPolicyFeedback ? (
+        <div className="flex flex-wrap items-center gap-2 pb-2 text-xs" role="status">
+          <span>
+            {translate(
+              props.trashPolicyFeedback === 'saving'
+                ? 'settings.storageDrafts.trashSaving'
+                : props.trashPolicyFeedback === 'saved'
+                  ? 'settings.storageDrafts.trashSaved'
+                  : 'settings.storageDrafts.trashSaveFailed'
+            )}
+          </span>
+          {props.trashPolicyFeedback === 'error' ? (
+            <button
+              type="button"
+              className={getControlSecondaryButtonClassName({ density: 'compact' })}
+              disabled={props.busy}
+              onClick={props.retryTrashPolicy}
+            >
+              {translate('settings.storageDrafts.retry')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -180,7 +210,10 @@ function RetentionRow(props: {
 }
 
 function StorageUsageSection(
-  props: Pick<StorageDraftsContentProps, 'busy' | 'onDeleteAllRequest' | 'runCleanup' | 'usage'>
+  props: Pick<
+    StorageDraftsContentProps,
+    'busy' | 'onDeleteAllRequest' | 'policyLoaded' | 'runCleanup' | 'usage'
+  >
 ) {
   return (
     <section className={sectionClassName}>
@@ -205,7 +238,7 @@ function StorageUsageSection(
         <button
           type="button"
           className={getControlSecondaryButtonClassName({ density: 'compact' })}
-          disabled={props.busy}
+          disabled={props.busy || !props.policyLoaded}
           onClick={() => void props.runCleanup(false)}
         >
           {translate('settings.storageDrafts.deleteExpired')}

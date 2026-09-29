@@ -39,14 +39,20 @@ export const settingsStorageDraftsMessages = defineMessageSource({
     en: 'Automatically clean up trash',
   },
   trashCleanupDescription: {
-    ru: 'Материалы удаляются безвозвратно по истечении выбранного срока с момента перемещения в корзину при следующем открытии или обновлении библиотеки. Медиа, используемые в проектах, сохраняются.',
-    en: 'Items are permanently deleted after the selected time since moving to trash, when you next open or refresh the Library. Media used by projects is retained.',
+    ru: 'Уже просроченные материалы могут удалиться безвозвратно при следующем открытии или автоматическом обновлении библиотеки, в том числе после возврата на вкладку. Медиа, используемые в проектах, сохраняются.',
+    en: 'Already expired items may be permanently deleted on the next Library opening or automatic refresh, including when you return to the tab. Media used by projects is retained.',
   },
   trashCleanupDisabled: {
     ru: 'Автоочистка выключена: материалы хранятся в корзине бессрочно, пока вы не удалите их вручную.',
     en: 'Automatic cleanup is off: trash is kept indefinitely until you permanently delete it manually.',
   },
   trashRetention: { ru: 'Срок хранения в корзине', en: 'Trash retention period' },
+  trashSaving: { ru: 'Сохраняем настройку корзины…', en: 'Saving Trash setting…' },
+  trashSaved: { ru: 'Настройка корзины сохранена', en: 'Trash setting saved' },
+  trashSaveFailed: {
+    ru: 'Не удалось сохранить настройку корзины. Прежнее значение сохранено.',
+    en: 'Could not save the Trash setting. The previous value is retained.',
+  },
   daySuffix: { ru: 'дн.', en: 'days' },
   usageTitle: { ru: 'Использование хранилища', en: 'Storage usage' },
   totalUsage: { ru: 'Всего занято', en: 'Total used' },
@@ -68,5 +74,10 @@ export const settingsStorageDraftsMessages = defineMessageSource({
   },
   cleanupDone: { ru: 'Удалено черновиков: {count}', en: 'Drafts deleted: {count}' },
   error: { ru: 'Не удалось выполнить операцию', en: 'The operation could not be completed' },
+  policyUnavailable: {
+    ru: 'Не удалось загрузить настройки хранения.',
+    en: 'Could not load storage settings.',
+  },
+  retry: { ru: 'Повторить', en: 'Retry' },
   loading: { ru: 'Загрузка данных хранилища…', en: 'Loading storage data…' },
 });

@@ -88,12 +88,20 @@ describe('settings patch persistence', () => {
 
     await expect(firstPatch).resolves.toEqual(firstCommittedSettings);
     await expect(secondPatch).resolves.toEqual(secondCommittedSettings);
-    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(1, {
-      sniptale_settings: firstCommittedSettings,
-    });
-    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(2, {
-      sniptale_settings: secondCommittedSettings,
-    });
+    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(
+      1,
+      {
+        sniptale_settings: firstCommittedSettings,
+      },
+      expect.anything()
+    );
+    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(
+      2,
+      {
+        sniptale_settings: secondCommittedSettings,
+      },
+      expect.anything()
+    );
   });
 });
 
@@ -113,9 +121,12 @@ describe('settings reset persistence', () => {
     await expect(patchSettings({ imageQuality: 55 })).rejects.toThrow('persist failed');
     await expect(resetSettingsToDefaults()).resolves.toEqual(createDefaultSettings());
 
-    expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith({
-      sniptale_settings: createDefaultSettings(),
-    });
+    expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith(
+      {
+        sniptale_settings: createDefaultSettings(),
+      },
+      expect.anything()
+    );
   });
 });
 

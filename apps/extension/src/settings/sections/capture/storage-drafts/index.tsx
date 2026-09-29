@@ -41,13 +41,43 @@ function StorageDraftsResetAction(props: { busy: boolean; onRequest(): void }) {
   );
 }
 
-export function StorageDraftsSection(props: { view?: 'settings' | 'storage' }) {
-  const view = props.view === 'storage' ? 'storage' : 'settings';
-  const state = useStorageDraftsState();
-  const confirmation = useStorageDraftsConfirmation(state);
-
+function StoragePolicyLoadState(
+  props: Pick<StorageDraftsState, 'policyLoaded' | 'policyLoadFailed' | 'retryLoad'>
+) {
+  if (props.policyLoaded) return null;
   return (
-    <section className={settingsSectionClassName}>
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-3 text-sm text-[var(--sniptale-color-text-secondary)]"
+    >
+      <span>
+        {translate(
+          props.policyLoadFailed
+            ? 'settings.storageDrafts.policyUnavailable'
+            : 'settings.storageDrafts.loading'
+        )}
+      </span>
+      {props.policyLoadFailed ? (
+        <button
+          type="button"
+          className={getControlSecondaryButtonClassName({ density: 'compact' })}
+          onClick={() => void props.retryLoad()}
+        >
+          {translate('settings.storageDrafts.retry')}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function StorageDraftsBody(props: {
+  confirmation: ReturnType<typeof useStorageDraftsConfirmation>;
+  state: StorageDraftsState;
+  view: 'settings' | 'storage';
+}) {
+  const { confirmation, state, view } = props;
+  return (
+    <>
       {view === 'settings' ? (
         <StorageDraftsResetAction
           busy={state.busy}
@@ -66,6 +96,21 @@ export function StorageDraftsSection(props: { view?: 'settings' | 'storage' }) {
         onDeleteAll={confirmation.deleteAll}
         onReset={confirmation.reset}
       />
+    </>
+  );
+}
+
+export function StorageDraftsSection(props: { view?: 'settings' | 'storage' }) {
+  const view = props.view === 'storage' ? 'storage' : 'settings';
+  const state = useStorageDraftsState();
+  const confirmation = useStorageDraftsConfirmation(state);
+
+  return (
+    <section className={settingsSectionClassName}>
+      <StoragePolicyLoadState {...state} />
+      {view === 'storage' || state.policyLoaded ? (
+        <StorageDraftsBody confirmation={confirmation} state={state} view={view} />
+      ) : null}
     </section>
   );
 }

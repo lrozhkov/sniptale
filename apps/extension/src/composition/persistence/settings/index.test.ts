@@ -135,9 +135,12 @@ it('removes only the retired synchronized diagnostics field', async () => {
 
   await removeRetiredSynchronizedSettings();
 
-  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-    sniptale_settings: { imageFormat: 'webp' },
-  });
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith(
+    {
+      sniptale_settings: { imageFormat: 'webp' },
+    },
+    expect.anything()
+  );
 });
 
 function resetSettingsStorageMocks() {
@@ -185,8 +188,14 @@ async function verifySaveAndClearContracts() {
   await saveSettings(settings);
   await clearSettings();
 
-  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({ sniptale_settings: settings });
-  expect(browserStorageSyncRemoveMock).toHaveBeenCalledWith(['sniptale_settings']);
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith(
+    { sniptale_settings: settings },
+    expect.anything()
+  );
+  expect(browserStorageSyncRemoveMock).toHaveBeenCalledWith(
+    ['sniptale_settings'],
+    expect.anything()
+  );
   expect(loggerDebugMock).toHaveBeenCalledWith('Saved settings payload');
   expect(loggerDebugMock).toHaveBeenCalledWith('Cleared settings payload');
 }

@@ -15,9 +15,12 @@ it('reads old preferences without writing and uses an absent standard rule', asy
 it('persists valid rules and retains the authoritative previous value after write failure', async () => {
   const filenameRules = { template: 'Project_{type}', images: 'Shot_{index}' };
   await patchSettings({ filenameRules });
-  expect(storage.set).toHaveBeenCalledWith({
-    sniptale_settings: expect.objectContaining({ filenameRules }),
-  });
+  expect(storage.set).toHaveBeenCalledWith(
+    {
+      sniptale_settings: expect.objectContaining({ filenameRules }),
+    },
+    expect.anything()
+  );
   storage.get.mockResolvedValue({ sniptale_settings: { filenameRules } });
   storage.set.mockRejectedValueOnce(new Error('storage full'));
   await expect(patchSettings({ filenameRules: { template: 'new' } })).rejects.toThrow(
@@ -25,9 +28,12 @@ it('persists valid rules and retains the authoritative previous value after writ
   );
   expect((await loadSettings()).filenameRules).toEqual(filenameRules);
   await resetSettingsToDefaults();
-  expect(storage.set).toHaveBeenLastCalledWith({
-    sniptale_settings: expect.not.objectContaining({ filenameRules }),
-  });
+  expect(storage.set).toHaveBeenLastCalledWith(
+    {
+      sniptale_settings: expect.not.objectContaining({ filenameRules }),
+    },
+    expect.anything()
+  );
 });
 it('rejects invalid mutations and records hostile stored rules without repair', async () => {
   await expect(patchSettings({ filenameRules: { template: '{execute}' } })).rejects.toThrow(
@@ -53,7 +59,10 @@ it('carries corrupted stored rules through loading to deterministic fallback wit
   expect(await createOutputFilename(request, session)).toBe(filename);
   expect(storage.set).not.toHaveBeenCalled();
   await patchSettings({ imageQuality: 85 });
-  expect(storage.set).toHaveBeenCalledWith({
-    sniptale_settings: expect.objectContaining({ imageQuality: 85, filenameRules: null }),
-  });
+  expect(storage.set).toHaveBeenCalledWith(
+    {
+      sniptale_settings: expect.objectContaining({ imageQuality: 85, filenameRules: null }),
+    },
+    expect.anything()
+  );
 });

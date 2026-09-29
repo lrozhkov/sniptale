@@ -9,6 +9,16 @@ import type {
   GalleryTrashSummary,
 } from '../types';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
+import type { LocalStoragePolicy } from '../../../contracts/settings';
+
+export interface GalleryTrashRetentionProps {
+  status: 'loading' | 'ready' | 'unavailable';
+  policy: Pick<LocalStoragePolicy, 'trashCleanupEnabled' | 'trashRetentionDays'> | null;
+  saving: boolean;
+  feedback: 'saved' | 'error' | null;
+  onChange(patch: { trashCleanupEnabled?: boolean; trashRetentionDays?: number }): void;
+  onRetry(): void;
+}
 
 export interface GallerySidebarProps {
   trashSummary?: GalleryTrashSummary;
