@@ -5,7 +5,16 @@ import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dial
 import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
-import { Play, Pause, BetweenHorizontalStart, Undo2, Redo2, StickyNote } from 'lucide-react';
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  BetweenHorizontalStart,
+  Undo2,
+  Redo2,
+  StickyNote,
+} from 'lucide-react';
 import { useState, type ReactNode, type CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
@@ -66,6 +75,8 @@ export function ReviewToolbar(props: {
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
+  navigation: { start: number; end: number };
+  onNavigate(time: number): void;
   zoom: number;
   onZoom(value: number): void;
 }) {
@@ -76,6 +87,14 @@ export function ReviewToolbar(props: {
         {props.tools}
       </div>
       <div data-toolbar-transport className="flex shrink-0 items-center justify-center gap-2">
+        <ReviewButton
+          label={translate('gallery.videoReview.timelineStart')}
+          className={plain}
+          disabled={Math.abs(props.time - props.navigation.start) < 0.0001}
+          onClick={() => props.onNavigate(props.navigation.start)}
+        >
+          <SkipBack size={16} strokeWidth={2.2} aria-hidden="true" />
+        </ReviewButton>
         <ReviewButton
           label={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
@@ -89,6 +108,14 @@ export function ReviewToolbar(props: {
           ) : (
             <Play size={16} strokeWidth={2.2} aria-hidden="true" />
           )}
+        </ReviewButton>
+        <ReviewButton
+          label={translate('gallery.videoReview.timelineEnd')}
+          className={plain}
+          disabled={Math.abs(props.time - props.navigation.end) < 0.0001}
+          onClick={() => props.onNavigate(props.navigation.end)}
+        >
+          <SkipForward size={16} strokeWidth={2.2} aria-hidden="true" />
         </ReviewButton>
         <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
           {playbackTime(props.time)} / {playbackTime(props.duration)}

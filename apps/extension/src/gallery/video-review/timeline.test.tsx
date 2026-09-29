@@ -21,6 +21,7 @@ beforeEach(() => {
     'ResizeObserver',
     class {
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );
@@ -77,6 +78,42 @@ it('keeps the transport icon-only and stable while its accessible Play/Pause act
   expect(pause.textContent).toBe('');
   expect(pause.querySelector('svg.lucide-pause')).not.toBeNull();
   expect(pause.className).toBe(play.className);
+});
+
+it('navigates to kept source endpoints without changing selection or playback and reveals them when zoomed', () => {
+  const selection: ReviewAnchor = { kind: 'range', start: 3, end: 5 };
+  const edits = [
+    { id: 'head', kind: 'cut' as const, start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
+    { id: 'tail', kind: 'cut' as const, start: 8, end: 10, requestedStart: 8, requestedEnd: 10 },
+  ];
+  const { host, props } = renderTimeline({
+    duration: 10,
+    time: 2,
+    edits,
+    selection,
+  });
+  const start = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.timelineStart"]'
+  )!;
+  const end = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.timelineEnd"]'
+  )!;
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  expect(start.disabled).toBe(true);
+  expect(end.disabled).toBe(false);
+  expect(end.title).toBe('gallery.videoReview.timelineEnd');
+  changeZoom(host, '50');
+  act(() => end.click());
+  expect(props.onSeek).toHaveBeenCalledExactlyOnceWith(8, false);
+  expect(viewport.scrollLeft).toBeGreaterThan(0);
+  expect(props.onSelect).not.toHaveBeenCalled();
+  expect(props.onPlay).not.toHaveBeenCalled();
+  renderTimeline({ duration: 10, time: 8, edits, selection });
+  expect(end.disabled).toBe(true);
+  act(() => start.click());
+  expect(viewport.scrollLeft).toBe(0);
 });
 
 function planeWithMetrics(host: HTMLDivElement) {
@@ -166,6 +203,7 @@ it('keeps a usable ruler width while track labels and viewport are temporarily u
         measure = () => callback([], this as ResizeObserver);
       }
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );

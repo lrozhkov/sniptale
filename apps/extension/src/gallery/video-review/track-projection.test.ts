@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { createTrackProjection } from './track-projection';
+import { createTrackProjection, reviewTimelineNavigationBounds } from './track-projection';
 
 it('aligns advanced clips and drag deltas with source footage across a cut and speed change', () => {
   const projection = createTrackProjection(10, [
@@ -35,4 +35,11 @@ it('handles leading/trailing cuts and clamps a drag outside the lane', () => {
   expect(projection.source(6, 'end')).toBe(8);
   expect(projection.output(-10)).toBe(0);
   expect(projection.output(20)).toBe(6);
+  expect(
+    reviewTimelineNavigationBounds(10, [
+      { id: 'first', kind: 'cut', start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
+      { id: 'last', kind: 'cut', start: 8, end: 10, requestedStart: 8, requestedEnd: 10 },
+    ])
+  ).toEqual({ start: 2, end: 8 });
+  expect(reviewTimelineNavigationBounds(10, [])).toEqual({ start: 0, end: 10 });
 });

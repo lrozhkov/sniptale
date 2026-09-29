@@ -1,12 +1,34 @@
 import { useEffect } from 'react';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 
+const localNavigation = [
+  '[role="slider"]:not([data-ui="gallery.videoReview.timePlane"])',
+  '[role="listbox"],[role="option"],[role="tab"],[role="menuitem"]',
+  '[data-ui="gallery.videoReview.inspector"] :is(button,summary)',
+].join(',');
+
+function handleBoundaryShortcut(
+  event: KeyboardEvent,
+  navigation: { start: number; end: number },
+  seek: (value: number, snap?: boolean) => void
+): boolean {
+  const home = event.code === 'Home' || event.key === 'Home';
+  const end = event.code === 'End' || event.key === 'End';
+  if (!home && !end) return false;
+  if (event.shiftKey || (event.target instanceof Element && event.target.closest(localNavigation)))
+    return false;
+  event.preventDefault();
+  seek(home ? navigation.start : navigation.end, false);
+  return true;
+}
+
 function useReviewKeys({
   time,
   seek,
   play,
   cancelDrawing,
   boundaries,
+  navigation,
   undo,
   redo,
   remove,
@@ -15,7 +37,8 @@ function useReviewKeys({
 }: {
   time: number;
   boundaries?: readonly number[];
-  seek(value: number): void;
+  navigation: { start: number; end: number };
+  seek(value: number, snap?: boolean): void;
   play(): void;
   cancelDrawing(): void;
   undo(): void;
@@ -48,6 +71,7 @@ function useReviewKeys({
         return;
       }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (handleBoundaryShortcut(event, navigation, seek)) return;
       if (event.key === ' ') {
         if (
           target instanceof HTMLElement &&
@@ -93,6 +117,7 @@ function useReviewKeys({
 /** Gates every shortcut behind comment editing and exporter phases. */
 export function useReviewEditorShortcuts(args: {
   time: number;
+  navigation: { start: number; end: number };
   seek(value: number, snap?: boolean): void;
   play(): void;
   composerAnnotation: ReviewAnnotation | null;
@@ -113,6 +138,7 @@ export function useReviewEditorShortcuts(args: {
   const exportBlocked = args.exporterPhase !== 'idle';
   useReviewKeys({
     time: args.time,
+    navigation: args.navigation,
     seek: args.seek,
     play: args.play,
     cancelDrawing: args.cancelDrawing,

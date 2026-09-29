@@ -17,6 +17,7 @@ import type { useReviewExport } from './use-export';
 import { useReviewAudio } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
 import { useReviewEditorShortcuts } from './use-review-shortcuts';
+import { reviewTimelineNavigationBounds } from './track-projection';
 import { useReviewSelectionLifecycle } from './use-review-selection';
 import type { useReviewZoomEditor } from './zoom-editor';
 
@@ -126,6 +127,7 @@ export function useReviewEditorWiring(args: {
   };
   useReviewEditorShortcuts({
     time: args.time,
+    navigation: reviewTimelineNavigationBounds(args.sourceDuration, args.document.edits),
     seek: args.seek,
     play: args.play,
     composerAnnotation: args.composer.annotation,

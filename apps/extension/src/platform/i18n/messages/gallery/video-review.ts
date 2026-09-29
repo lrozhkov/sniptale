@@ -46,6 +46,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   toolbarUndo: { ru: 'Отменить', en: 'Undo' },
   toolbarRedo: { ru: 'Повторить', en: 'Redo' },
   toolbarNote: { ru: 'Заметка', en: 'Note' },
+  timelineStart: { ru: 'В начало (Home)', en: 'Go to start (Home)' },
+  timelineEnd: { ru: 'В конец (End)', en: 'Go to end (End)' },
   toolbarFragment: { ru: 'Фрагмент', en: 'Fragment' },
   precisePosition: { ru: 'Точное положение', en: 'Precise position' },
   preciseArea: { ru: 'Положение и размер', en: 'Position and size' },

@@ -1,6 +1,12 @@
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
 
+/** Navigation stays on the source axis while skipping removed head and tail spans. */
+export function reviewTimelineNavigationBounds(duration: number, edits: readonly ReviewEdit[]) {
+  const kept = buildReviewTimeMap(duration, edits).filter((segment) => segment.kind !== 'cut');
+  return { start: kept[0]?.sourceStart ?? 0, end: kept.at(-1)?.sourceEnd ?? duration };
+}
+
 /** Advanced clips retain result times while every lane displays the original source axis. */
 export function createTrackProjection(duration: number, edits: readonly ReviewEdit[]) {
   const segments = buildReviewTimeMap(duration, edits);

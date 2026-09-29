@@ -3520,3 +3520,69 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`quick editor jumps to timeline endpoints at HD (${variant.locale}/${variant.theme})`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+      const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+      const start = dialog.getByRole('button', {
+        name: label('gallery.videoReview.timelineStart'),
+      });
+      const end = dialog.getByRole('button', { name: label('gallery.videoReview.timelineEnd') });
+      await expect(start).toBeDisabled();
+      await expect(end).toBeEnabled();
+      await timelineGesture(page, 2, 4);
+      const range = dialog.locator('[data-ui="gallery.videoReview.sourceRange"]');
+      await expect(range).toBeVisible();
+      const rangeBox = (await range.boundingBox())!;
+      await dialog.getByRole('slider', { name: label('videoEditor.timeline.zoom') }).press('End');
+      await end.click();
+      await expect(end).toBeDisabled();
+      await expect
+        .poll(async () => Number(await plane.getAttribute('aria-valuenow')))
+        .toBeGreaterThan(11.9);
+      await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+      await expect(range).toBeVisible();
+      expect((await range.boundingBox())!.width).toBeCloseTo(rangeBox.width * 16, -1);
+      expect(
+        await dialog.locator('video').evaluate((video: HTMLVideoElement) => video.paused)
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath(`timeline-end-${variant.locale}-${variant.theme}.png`),
+      });
+      await start.click();
+      await expect(start).toBeDisabled();
+      await expect.poll(async () => Number(await plane.getAttribute('aria-valuenow'))).toBe(0);
+      await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBe(0);
+      await plane.focus();
+      await page.keyboard.press('End');
+      await expect(end).toBeDisabled();
+      await expect(range).toBeVisible();
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
