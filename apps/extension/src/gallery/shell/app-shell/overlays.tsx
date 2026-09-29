@@ -206,6 +206,7 @@ function renderPreviewOverlayPanel(
       {...buildPreviewNavigationProps(props, previewItem)}
       item={previewItem}
       previewUrl={props.state.preview.session.url}
+      previewLoadStatus={props.state.preview.session.loadStatus}
       inspectorCollapsed={props.state.preview.session.inspectorCollapsed}
       filenameDraft={props.state.preview.draft.filename}
       tagDraft={props.state.preview.draft.tagInput}

@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createController, createMediaItem, runBusyAction } from './test-support/index';
 import { useGalleryAppActions } from './useGalleryAppActions';
 
@@ -60,7 +63,8 @@ vi.mock('./preview', () => ({
   resetPreviewChanges: actionMocks.resetPreviewChangesMock,
 }));
 
-vi.mock('./preview-navigation', () => ({
+vi.mock('./preview-navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./preview-navigation')>()),
   createNavigatePreviewAction: actionMocks.createNavigatePreviewActionMock,
 }));
 
@@ -110,6 +114,25 @@ function prepareActionFactoryMocks() {
   actionMocks.createSaveImageCopyActionMock.mockReturnValue(vi.fn(async () => undefined));
 }
 
+const mountedRoots: Root[] = [];
+
+function renderActions(controller: Parameters<typeof useGalleryAppActions>[0]) {
+  const root = createRoot(document.createElement('div'));
+  mountedRoots.push(root);
+  const result: { current?: ReturnType<typeof useGalleryAppActions> } = {};
+  function Harness() {
+    result.current = useGalleryAppActions(controller);
+    return null;
+  }
+  act(() => root.render(createElement(Harness)));
+  if (!result.current) throw new Error('Gallery actions did not render');
+  return result.current;
+}
+
+afterEach(() => {
+  for (const root of mountedRoots.splice(0)) act(() => root.unmount());
+});
+
 describe('useGalleryAppActions', () => {
   it('wires gallery action factories through the shared busy runner and preview helpers', async () => {
     vi.clearAllMocks();
@@ -117,7 +140,7 @@ describe('useGalleryAppActions', () => {
     const { controller, getState } = createController({
       previewItem: createMediaItem({ id: 'asset-1' }),
     });
-    const actions = useGalleryAppActions(controller);
+    const actions = renderActions(controller);
     const backupOptions = {
       includeDrafts: false,
       scope: 'all' as const,
@@ -155,7 +178,11 @@ describe('useGalleryAppActions', () => {
     expect(actions.importing.importDroppedFiles).toEqual(expect.any(Function));
     expect(getState().storage.pendingMediaImport).toBeNull();
     expect(actionMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
-    expect(actionMocks.createNavigatePreviewActionMock).toHaveBeenCalledWith(controller);
+    expect(actionMocks.createNavigatePreviewActionMock).toHaveBeenCalledWith(
+      controller,
+      expect.objectContaining({ revision: 0 }),
+      expect.any(Function)
+    );
     expect(actionMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
     expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
     expect(actionMocks.downloadOriginalPreviewItemMock).toHaveBeenCalledWith(
@@ -189,7 +216,7 @@ describe('useGalleryAppActions', () => {
     const importMediaFiles = vi.fn(async () => undefined);
     actionMocks.createImportMediaFilesActionMock.mockReturnValue(importMediaFiles);
 
-    const actions = useGalleryAppActions(controller);
+    const actions = renderActions(controller);
     await actions.importing.confirmMediaFileImport('duplicate');
 
     expect(importMediaFiles).toHaveBeenCalledWith(pendingFiles, 'duplicate');

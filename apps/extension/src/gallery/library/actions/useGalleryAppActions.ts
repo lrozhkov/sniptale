@@ -10,6 +10,7 @@ import type {
   GallerySurfaceController,
 } from './controller-types';
 import type { GalleryItem } from '../items';
+import { useRef } from 'react';
 import {
   createClosePendingImportAction,
   createCancelActiveImportAction,
@@ -32,7 +33,13 @@ import {
   openInEditor,
   resetPreviewChanges,
 } from './preview';
-import { createNavigatePreviewAction } from './preview-navigation';
+import {
+  createNavigatePreviewAction,
+  createPreviewNavigationCoordinator,
+  previewDraftKey,
+  savePreviewDraftAfterPending,
+  type PreviewNavigationCoordinator,
+} from './preview-navigation';
 import {
   createApplySelectionTagAction,
   createDeleteManyAction,
@@ -82,6 +89,8 @@ function buildGalleryAppActionsResult(args: {
   handleSaveMetadata: () => Promise<void>;
   handleSelectionBackup: () => Promise<void>;
   handleSelectionZip: () => Promise<void>;
+  navigationCoordinator: PreviewNavigationCoordinator;
+  readPreviewState: () => GalleryPreviewController['state'];
   withBusy: ReturnType<typeof createBusyActionRunner>;
 }): UseGalleryAppActionsResult {
   const { controller, withBusy } = args;
@@ -113,7 +122,12 @@ function buildGalleryAppActionsResult(args: {
       copy: () => copyPreviewItem(controller, withBusy),
       download: () => downloadPreviewItem(controller, withBusy),
       downloadOriginal: () => downloadOriginalPreviewItem(controller, withBusy),
-      navigate: (target: GalleryItem) => createNavigatePreviewAction(controller)(target, withBusy),
+      navigate: (target: GalleryItem) =>
+        createNavigatePreviewAction(
+          controller,
+          args.navigationCoordinator,
+          args.readPreviewState
+        )(target, withBusy),
       openInEditor,
       openSnapshotScreenshotInEditor: () =>
         void openSnapshotScreenshotInEditor(controller, withBusy),
@@ -132,7 +146,11 @@ function buildGalleryAppActionsResult(args: {
   };
 }
 
-export function useGalleryAppActions({ ...controller }: GalleryAppActionsController) {
+export function useGalleryAppActions(controller: GalleryAppActionsController) {
+  const controllerRef = useRef(controller);
+  controllerRef.current = controller;
+  const navigationCoordinatorRef = useRef(createPreviewNavigationCoordinator());
+  const readPreviewState = () => controllerRef.current.state;
   const withBusy = createBusyActionRunner(controller);
   const deleteMany = (targets: GalleryItem[]) =>
     createDeleteManyAction(controller)(targets, withBusy);
@@ -151,7 +169,49 @@ export function useGalleryAppActions({ ...controller }: GalleryAppActionsControl
   const handleSaveMetadata = () => createSaveMetadataAction(controller)(withBusy);
   const handleApplySelectionTag = (tag?: string) =>
     createApplySelectionTagAction(controller)(withBusy, tag);
-  const handlePreviewClose = () => createClosePreviewAction(controller)(withBusy);
+  const handlePreviewClose = async () => {
+    const coordinator = navigationCoordinatorRef.current;
+    const requestRevision = ++coordinator.revision;
+    const sourceId = readPreviewState().preview.session.item?.id;
+    const pending = coordinator.pendingSave;
+    if (pending && pending.sourceId === sourceId) {
+      try {
+        await pending.promise;
+      } catch {
+        // The close action retries the current draft and keeps it open if that retry fails.
+      }
+    }
+    if (coordinator.revision !== requestRevision) return;
+    const latestController = controllerRef.current;
+    const source = latestController.state.preview.session.item;
+    if (!source) return;
+    const draft = latestController.state.preview.draft;
+    const draftKey = previewDraftKey(draft);
+    await createClosePreviewAction(
+      latestController,
+      () =>
+        coordinator.revision === requestRevision &&
+        readPreviewState().preview.session.item?.id === sourceId &&
+        previewDraftKey(readPreviewState().preview.draft) === draftKey,
+      async () => {
+        const changed = await savePreviewDraftAfterPending(
+          latestController,
+          coordinator,
+          source,
+          draft,
+          () =>
+            coordinator.revision === requestRevision &&
+            readPreviewState().preview.session.item?.id === sourceId &&
+            previewDraftKey(readPreviewState().preview.draft) === draftKey
+        );
+        if (changed === null) return false;
+        return changed || coordinator.refreshDue;
+      }
+    )(withBusy);
+    if (readPreviewState().preview.session.item?.id !== sourceId) {
+      coordinator.refreshDue = false;
+    }
+  };
 
   return buildGalleryAppActionsResult({
     backupActions,
@@ -166,6 +226,8 @@ export function useGalleryAppActions({ ...controller }: GalleryAppActionsControl
     handleSaveMetadata,
     handleSelectionBackup,
     handleSelectionZip,
+    navigationCoordinator: navigationCoordinatorRef.current,
+    readPreviewState,
     withBusy,
   });
 }

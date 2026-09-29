@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   initDB: vi.fn(),
   videos: vi.fn(),
   scenarios: vi.fn(),
+  events: vi.fn(),
+}));
+vi.mock('../../../features/media-hub/events', () => ({
+  subscribeToMediaHubEvents: mocks.events,
 }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
@@ -24,15 +28,19 @@ vi.mock('../scenario/projects', async (original) => ({
   listScenarioProjectEntries: mocks.scenarios,
 }));
 
-import { listMediaAssetProjectUsage } from './usage';
+import { listMediaAssetProjectUsage, listPreviewMediaAssetProjectUsage } from './usage';
 
 let media: MediaLibraryEntry;
 let childRows: unknown[];
 let reviewRows: unknown[];
 let video = createVideoProjectEntryWithMediaClip();
+let extraMedia: MediaLibraryEntry | null;
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  mocks.initDB.mockClear();
+  mocks.videos.mockClear();
+  mocks.scenarios.mockClear();
+  extraMedia = null;
   media = {
     id: 'project-asset:original',
     kind: 'image',
@@ -69,7 +77,7 @@ beforeEach(() => {
   mocks.initDB.mockResolvedValue({
     get: async (_store: string, id: string) => (id === media.id ? media : undefined),
     getAll: async (store: string) => {
-      if (store === 'media_library') return [media];
+      if (store === 'media_library') return extraMedia ? [media, extraMedia] : [media];
       if (store === 'scenario_assets') return childRows;
       if (store === 'video_workspaces') return reviewRows;
       return [];
@@ -183,4 +191,68 @@ it('reports video and borrowed scenario consumers of one library source', async 
     ])
   );
   expect(usage).toHaveLength(2);
+});
+
+it('reuses one advisory project snapshot across media switches and invalidates on project change', async () => {
+  extraMedia = { ...media, id: 'second', filename: 'second.png' };
+  const first = await listPreviewMediaAssetProjectUsage(media.id);
+  expect(first).toHaveLength(2);
+  expect(await listPreviewMediaAssetProjectUsage('second')).toEqual([]);
+  expect(mocks.videos).toHaveBeenCalledTimes(1);
+  expect(mocks.scenarios).toHaveBeenCalledTimes(1);
+
+  video.project.assets[0]!.source = { kind: 'library-asset', mediaId: 'second' };
+  const onEvent = mocks.events.mock.calls[0]?.[0];
+  expect(onEvent).toBeTypeOf('function');
+  onEvent({ type: 'library-changed', reason: 'update', assetIds: ['video:one'], timestamp: 1 });
+  expect(await listPreviewMediaAssetProjectUsage('second')).toEqual([
+    { id: video.id, kind: 'video', name: video.project.name, primary: false },
+  ]);
+  expect(mocks.videos).toHaveBeenCalledTimes(2);
+});
+
+it('retries a failed advisory snapshot and keeps the direct read authoritative', async () => {
+  const onEvent = mocks.events.mock.calls[0]?.[0];
+  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 2 });
+  mocks.videos.mockRejectedValueOnce(new Error('unavailable'));
+  await expect(listPreviewMediaAssetProjectUsage(media.id)).rejects.toThrow('unavailable');
+  expect(await listPreviewMediaAssetProjectUsage(media.id)).toHaveLength(2);
+  expect(await listMediaAssetProjectUsage(media.id)).toHaveLength(2);
+  expect(mocks.videos).toHaveBeenCalledTimes(3);
+});
+
+it('releases the advisory snapshot after its bounded lifetime', async () => {
+  const onEvent = mocks.events.mock.calls[0]?.[0];
+  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 3 });
+  vi.useFakeTimers();
+  try {
+    await listPreviewMediaAssetProjectUsage(media.id);
+    expect(mocks.videos).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(5_001);
+    await listPreviewMediaAssetProjectUsage(media.id);
+    expect(mocks.videos).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('does not return an in-flight snapshot invalidated by a project write', async () => {
+  const onEvent = mocks.events.mock.calls[0]?.[0];
+  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 4 });
+  let resolveOld!: (entries: (typeof video)[]) => void;
+  mocks.videos
+    .mockReturnValueOnce(
+      new Promise<(typeof video)[]>((resolve) => {
+        resolveOld = resolve;
+      })
+    )
+    .mockResolvedValueOnce([video]);
+  childRows = [];
+  const usage = listPreviewMediaAssetProjectUsage(media.id);
+  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 5 });
+  resolveOld([]);
+  expect(await usage).toEqual([
+    { id: video.id, kind: 'video', name: video.project.name, primary: false },
+  ]);
+  expect(mocks.videos).toHaveBeenCalledTimes(2);
 });

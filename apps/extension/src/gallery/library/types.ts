@@ -66,4 +66,5 @@ export interface GalleryPreviewSessionState {
   inspectorCollapsed: boolean;
   item: GalleryItem | null;
   url: string | null;
+  loadStatus?: 'loading' | 'ready' | 'missing' | 'error' | undefined;
 }

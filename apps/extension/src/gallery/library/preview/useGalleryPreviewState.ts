@@ -2,8 +2,10 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type Dispatch,
+  type MutableRefObject,
   type SetStateAction,
 } from 'react';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
@@ -60,9 +62,21 @@ function normalizePreviewSelectionChange(
     !nextWithRememberedInspector.item ||
     !isGalleryMediaItem(nextWithRememberedInspector.item)
   ) {
-    return nextWithRememberedInspector.url === null
-      ? nextWithRememberedInspector
-      : { ...nextWithRememberedInspector, url: null };
+    return {
+      ...nextWithRememberedInspector,
+      url: null,
+      loadStatus:
+        nextWithRememberedInspector.item && isGalleryMediaItem(nextWithRememberedInspector.item)
+          ? 'loading'
+          : undefined,
+    };
+  }
+
+  if (
+    current.item !== nextWithRememberedInspector.item &&
+    nextWithRememberedInspector.url === null
+  ) {
+    return { ...nextWithRememberedInspector, loadStatus: 'loading' };
   }
 
   return nextWithRememberedInspector;
@@ -111,22 +125,43 @@ function syncPreviewUrl(
   let objectUrl: string | null = null;
 
   if (!previewItem || !isGalleryMediaItem(previewItem)) {
-    setPreview((current) => (current.url === null ? current : { ...current, url: null }));
+    setPreview((current) =>
+      current.url === null && current.loadStatus === undefined
+        ? current
+        : { ...current, url: null, loadStatus: undefined }
+    );
     return () => undefined;
   }
 
   void loadPreviewBlob(previewItem)
     .then((blob) => {
-      if (!blob || !active) {
+      if (!active) {
+        return;
+      }
+
+      if (!blob) {
+        setPreview((current) =>
+          current.item?.id === previewItem.id
+            ? { ...current, url: null, loadStatus: 'missing' }
+            : current
+        );
         return;
       }
 
       objectUrl = URL.createObjectURL(blob);
-      setPreview((current) => ({ ...current, url: objectUrl }));
+      setPreview((current) =>
+        current.item?.id === previewItem.id
+          ? { ...current, url: objectUrl, loadStatus: 'ready' }
+          : current
+      );
     })
     .catch(() => {
       if (active) {
-        setPreview((current) => ({ ...current, url: null }));
+        setPreview((current) =>
+          current.item?.id === previewItem.id
+            ? { ...current, url: null, loadStatus: 'error' }
+            : current
+        );
       }
     });
 
@@ -148,18 +183,54 @@ function haveTagDraftsChanged(initialTagDrafts: string[], tagDrafts: string[]) {
 function usePreviewItemSync(
   previewItem: GalleryPreviewSessionState['item'],
   setPreview: Dispatch<SetStateAction<GalleryPreviewSessionState>>,
-  draftSetters: GalleryPreviewDraftStateSetters
+  draftSetters: GalleryPreviewDraftStateSetters,
+  touched: MutableRefObject<{ filename: boolean; tags: boolean }>,
+  draft: {
+    filename: string;
+    initialFilename: string;
+    initialTags: string[];
+    tags: string[];
+  }
 ) {
+  const previousItemId = useRef<string | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
   useEffect(() => {
     if (!previewItem) {
+      previousItemId.current = null;
+      touched.current = { filename: false, tags: false };
       resetDraftState(draftSetters);
-      setPreview((current) => (current.url === null ? current : { ...current, url: null }));
+      setPreview((current) =>
+        current.url === null && current.loadStatus === undefined
+          ? current
+          : { ...current, url: null, loadStatus: undefined }
+      );
       return undefined;
     }
 
-    applyPreviewItemDraftState(previewItem, draftSetters);
+    if (previousItemId.current === previewItem.id) {
+      const currentDraft = draftRef.current;
+      draftSetters.setFilenameDraft(
+        !touched.current.filename && currentDraft.filename.trim() === currentDraft.initialFilename
+          ? previewItem.filename
+          : currentDraft.filename
+      );
+      draftSetters.setTagDrafts(
+        touched.current.tags || haveTagDraftsChanged(currentDraft.initialTags, currentDraft.tags)
+          ? currentDraft.tags
+          : previewItem.tags
+      );
+      draftSetters.setInitialFilename(previewItem.filename);
+      draftSetters.setInitialTagDrafts(previewItem.tags);
+      if (currentDraft.filename.trim() === previewItem.filename) touched.current.filename = false;
+      if (!haveTagDraftsChanged(previewItem.tags, currentDraft.tags)) touched.current.tags = false;
+    } else {
+      touched.current = { filename: false, tags: false };
+      applyPreviewItemDraftState(previewItem, draftSetters);
+    }
+    previousItemId.current = previewItem.id;
     return syncPreviewUrl(previewItem, setPreview);
-  }, [draftSetters, previewItem, setPreview]);
+  }, [draftSetters, previewItem, setPreview, touched]);
 }
 
 function buildPreviewStateResult(args: {
@@ -191,6 +262,7 @@ export function useGalleryPreviewState() {
   const [tagDraft, setTagDraft] = useState('');
   const [tagDrafts, setTagDrafts] = useState<string[]>([]);
   const [initialTagDrafts, setInitialTagDrafts] = useState<string[]>([]);
+  const touched = useRef({ filename: false, tags: false });
   const previewItem = preview.item;
   const draftSetters = useMemo<GalleryPreviewDraftStateSetters>(
     () => ({
@@ -210,7 +282,12 @@ export function useGalleryPreviewState() {
     });
   }, []);
 
-  usePreviewItemSync(previewItem, setPreview, draftSetters);
+  usePreviewItemSync(previewItem, setPreview, draftSetters, touched, {
+    filename: filenameDraft,
+    initialFilename,
+    initialTags: initialTagDrafts,
+    tags: tagDrafts,
+  });
 
   const hasChanges =
     previewItem !== null &&
@@ -218,10 +295,16 @@ export function useGalleryPreviewState() {
 
   return {
     actions: {
-      setFilenameDraft,
+      setFilenameDraft: (value: SetStateAction<string>) => {
+        touched.current.filename = true;
+        setFilenameDraft(value);
+      },
       setPreview,
       setTagDraft,
-      setTagDrafts,
+      setTagDrafts: (value: SetStateAction<string[]>) => {
+        touched.current.tags = true;
+        setTagDrafts(value);
+      },
     },
     state: buildPreviewStateResult({
       filenameDraft,

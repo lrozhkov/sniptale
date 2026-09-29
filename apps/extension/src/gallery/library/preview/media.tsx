@@ -257,6 +257,7 @@ function PreviewMediaContent(
     imageReady: ReturnType<typeof usePreviewImageZoom>['image']['ready'];
     isImagePreview: boolean;
     onImageLoad: ReturnType<typeof usePreviewImageZoom>['image']['handleImageLoad'];
+    onMediaError: () => void;
   }
 ) {
   if (props.isImagePreview) {
@@ -265,6 +266,7 @@ function PreviewMediaContent(
         src={props.previewUrl ?? undefined}
         alt={props.item.filename}
         onLoad={props.onImageLoad}
+        onError={props.onMediaError}
         style={{ ...props.imageStyle, visibility: props.imageReady ? 'visible' : 'hidden' }}
         draggable={false}
         className="block max-h-none max-w-none shrink-0 select-none"
@@ -274,11 +276,13 @@ function PreviewMediaContent(
 
   if (isGalleryMediaItem(props.item) && props.previewUrl && isVideoKind(props.item.kind)) {
     return (
-      <PreviewVideo
-        key={props.previewUrl}
-        src={props.previewUrl}
-        trashMode={Boolean(props.trashMode)}
-      />
+      <div onErrorCapture={props.onMediaError}>
+        <PreviewVideo
+          key={props.previewUrl}
+          src={props.previewUrl}
+          trashMode={Boolean(props.trashMode)}
+        />
+      </div>
     );
   }
 
@@ -286,6 +290,7 @@ function PreviewMediaContent(
     return (
       <audio
         src={props.previewUrl}
+        onError={props.onMediaError}
         controls
         controlsList={props.trashMode ? 'nodownload' : undefined}
         onContextMenu={props.trashMode ? (event) => event.preventDefault() : undefined}
@@ -303,6 +308,27 @@ function PreviewMediaContent(
   }
 
   return null;
+}
+
+function PreviewMediaLoadFeedback(props: { status: 'loading' | 'missing' | 'error' | 'invalid' }) {
+  const messageKey = {
+    loading: 'gallery.preview.mediaLoading',
+    missing: 'gallery.preview.mediaMissing',
+    error: 'gallery.preview.mediaUnavailable',
+    invalid: 'gallery.preview.mediaInvalid',
+  } as const;
+  return (
+    <p
+      data-ui="gallery.preview.mediaStatus"
+      role={props.status === 'loading' ? 'status' : 'alert'}
+      aria-live={props.status === 'loading' ? 'polite' : 'assertive'}
+      className="max-w-md rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+        bg-[var(--sniptale-color-surface-panel)] px-4 py-3 text-center text-sm
+        text-[var(--sniptale-color-text-primary)]"
+    >
+      {translate(messageKey[props.status])}
+    </p>
+  );
 }
 
 function PreviewRestoreAction(props: Pick<PreviewPanelProps, 'onRestoreTrash' | 'restoreBusy'>) {
@@ -364,28 +390,57 @@ export function PreviewMedia(
     | 'onClose'
     | 'onInspectorToggle'
     | 'previewUrl'
+    | 'previewLoadStatus'
     | 'onEdit'
     | 'onRestoreTrash'
     | 'restoreBusy'
     | 'trashMode'
   >
 ) {
+  const [decodeFailure, setDecodeFailure] = useState<{ id: string; url: string } | null>(null);
+  const isMediaItem = isGalleryMediaItem(props.item);
+  const status = isMediaItem
+    ? (props.previewLoadStatus ?? (props.previewUrl ? 'ready' : 'loading'))
+    : null;
   const transitionFrame = usePreviewMediaTransition({
     item: props.item,
     navigationPosition: props.navigation?.current,
     previewUrl: props.previewUrl,
   });
   const transitionRef = useRef<HTMLDivElement>(null);
+  const frameIsCurrent =
+    transitionFrame.item.id === props.item.id && transitionFrame.previewUrl === props.previewUrl;
   const isImagePreview =
     transitionFrame.previewUrl !== null &&
     isGalleryMediaItem(transitionFrame.item) &&
-    (isImageKind(transitionFrame.item.kind) || transitionFrame.item.kind === 'web-archive');
+    (isImageKind(transitionFrame.item.kind) || transitionFrame.item.kind === 'web-archive') &&
+    (props.previewLoadStatus === undefined || (status === 'ready' && frameIsCurrent));
   const imageZoom = usePreviewImageZoom(
     isImagePreview,
     transitionFrame.previewUrl,
     transitionFrame.naturalSize
   );
   usePreviewMediaTransitionAnimation(transitionRef, transitionFrame);
+  const currentDecodeFailed =
+    decodeFailure?.id === props.item.id && decodeFailure.url === props.previewUrl;
+  let feedbackStatus: 'loading' | 'missing' | 'error' | 'invalid' | null = null;
+  if (isMediaItem) {
+    if (currentDecodeFailed) {
+      feedbackStatus = 'invalid';
+    } else if (status === 'missing' || status === 'error') {
+      feedbackStatus = status;
+    } else if (
+      status === 'loading' ||
+      (props.previewLoadStatus !== undefined && !frameIsCurrent) ||
+      (isImagePreview && !imageZoom.image.ready)
+    ) {
+      feedbackStatus = 'loading';
+    }
+  }
+  const showFrame =
+    !isMediaItem || props.previewLoadStatus === undefined
+      ? !currentDecodeFailed
+      : status === 'ready' && frameIsCurrent && !currentDecodeFailed;
 
   return (
     <div
@@ -422,15 +477,23 @@ export function PreviewMedia(
         isImagePreview={isImagePreview}
         transitionRef={transitionRef}
       >
-        <PreviewMediaContent
-          item={transitionFrame.item}
-          trashMode={Boolean(props.trashMode)}
-          previewUrl={transitionFrame.previewUrl}
-          imageStyle={imageZoom.image.style}
-          imageReady={imageZoom.image.ready}
-          isImagePreview={isImagePreview}
-          onImageLoad={imageZoom.image.handleImageLoad}
-        />
+        {showFrame ? (
+          <PreviewMediaContent
+            item={transitionFrame.item}
+            trashMode={Boolean(props.trashMode)}
+            previewUrl={transitionFrame.previewUrl}
+            imageStyle={imageZoom.image.style}
+            imageReady={imageZoom.image.ready}
+            isImagePreview={isImagePreview}
+            onImageLoad={imageZoom.image.handleImageLoad}
+            onMediaError={() => {
+              if (frameIsCurrent && props.previewUrl) {
+                setDecodeFailure({ id: props.item.id, url: props.previewUrl });
+              }
+            }}
+          />
+        ) : null}
+        {feedbackStatus ? <PreviewMediaLoadFeedback status={feedbackStatus} /> : null}
       </PreviewMediaSurface>
     </div>
   );

@@ -320,6 +320,23 @@ it('wires preview overlay callbacks to the parent app-shell actions', async () =
   expect(props.onPreviewDelete).toHaveBeenCalledWith(props.state.preview.session.item);
 });
 
+it('passes the selected media load outcome to the keyed preview panel', () => {
+  const props = createOpenOverlayProps();
+  props.state.preview.session.loadStatus = 'missing';
+  props.state.preview.session.url = null;
+
+  act(() => root?.render(<GalleryOverlays {...props} />));
+
+  const previewProps = previewPanelPropsMock.mock.lastCall?.[0] as {
+    item: { id: string };
+    previewLoadStatus?: string;
+    previewUrl: string | null;
+  };
+  expect(previewProps.item.id).toBe(props.state.preview.session.item?.id);
+  expect(previewProps.previewLoadStatus).toBe('missing');
+  expect(previewProps.previewUrl).toBeNull();
+});
+
 it('omits optional preview props when the preview draft has no reset state or tag catalog', () => {
   const { onPreviewResetChanges: _onPreviewResetChanges, ...props } = createOpenOverlayProps();
   props.state = createGalleryState({

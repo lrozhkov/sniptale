@@ -287,6 +287,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
             item={item}
             previewUrl={previewUrl}
+            previewLoadStatus={props.previewLoadStatus}
             inspectorCollapsed={props.inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
             onInspectorToggle={props.onInspectorToggle}

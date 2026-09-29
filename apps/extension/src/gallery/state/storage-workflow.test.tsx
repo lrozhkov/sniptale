@@ -5,9 +5,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createItem } from './index.test-support';
 import type { GalleryPreviewSessionState } from './types';
 
-const { useGalleryLibraryStateMock, useGallerySurfaceStateMock } = vi.hoisted(() => ({
-  useGalleryLibraryStateMock: vi.fn(),
-  useGallerySurfaceStateMock: vi.fn(),
+const { getAggregatePreviewBlobMock, useGalleryLibraryStateMock, useGallerySurfaceStateMock } =
+  vi.hoisted(() => ({
+    getAggregatePreviewBlobMock: vi.fn(),
+    useGalleryLibraryStateMock: vi.fn(),
+    useGallerySurfaceStateMock: vi.fn(),
+  }));
+
+vi.mock('../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/aggregate-presentations')
+  >()),
+  getAggregatePreviewBlob: getAggregatePreviewBlobMock,
 }));
 
 vi.mock('./useGalleryLibraryState', () => ({
@@ -19,6 +28,7 @@ vi.mock('./useGallerySurfaceState', () => ({
 }));
 
 import { useGalleryStorageWorkflow } from './storage-workflow';
+import { useGalleryPreviewState } from '../library/preview/useGalleryPreviewState';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -47,6 +57,18 @@ function HookProbe() {
     setSelectedIds: (next: Set<string> | ((previous: Set<string>) => Set<string>)) => {
       currentSelectedIds = typeof next === 'function' ? next(currentSelectedIds) : next;
     },
+  });
+  return null;
+}
+
+let latestIntegratedPreview: ReturnType<typeof useGalleryPreviewState> | null = null;
+
+function IntegratedHookProbe() {
+  const preview = useGalleryPreviewState();
+  latestIntegratedPreview = preview;
+  useGalleryStorageWorkflow({
+    setPreview: preview.actions.setPreview,
+    setSelectedIds: () => undefined,
   });
   return null;
 }
@@ -122,6 +144,11 @@ beforeEach(() => {
   currentSelectedIds = new Set(['asset-1', 'asset-2']);
   configureSurfaceStateMock();
   configureLibraryStateMock();
+  getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
+  vi.stubGlobal('URL', {
+    createObjectURL: vi.fn(() => 'blob:preview'),
+    revokeObjectURL: vi.fn(),
+  });
 });
 
 afterEach(() => {
@@ -184,4 +211,35 @@ it('retains a Trash preview only while its item remains trashed and never revive
     createItem({ id: 'asset-1', lifecycle: { trashedAt: 42 } }),
   ]);
   expect(currentPreview.item).toBeNull();
+});
+
+it('keeps edits made during save when a library refresh reconciles the selected item', async () => {
+  await act(async () => {
+    root?.render(<IntegratedHookProbe />);
+  });
+  act(() =>
+    latestIntegratedPreview?.actions.setPreview({
+      inspectorCollapsed: false,
+      item: createItem(),
+      url: null,
+    })
+  );
+  await act(async () => Promise.resolve());
+
+  act(() => {
+    latestIntegratedPreview?.actions.setFilenameDraft('newer local edit.png');
+    latestIntegratedPreview?.actions.setTagDrafts(['newer']);
+  });
+  act(() =>
+    libraryCallbacks?.onPreviewItemRefresh([createItem({ filename: 'saved.png', tags: ['saved'] })])
+  );
+  await act(async () => Promise.resolve());
+
+  expect(latestIntegratedPreview?.state.draft).toMatchObject({
+    filename: 'newer local edit.png',
+    initialFilename: 'saved.png',
+    tags: ['newer'],
+    initialTagDrafts: ['saved'],
+    hasChanges: true,
+  });
 });

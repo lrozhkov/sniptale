@@ -215,6 +215,22 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Подготовка видео…',
     en: 'Preparing video…',
   },
+  mediaLoading: {
+    ru: 'Загрузка материала…',
+    en: 'Loading media…',
+  },
+  mediaMissing: {
+    ru: 'Файл материала не найден. Выберите другой материал или откройте этот снова.',
+    en: 'The media file is missing. Choose another item or reopen this one.',
+  },
+  mediaUnavailable: {
+    ru: 'Не удалось загрузить материал. Выберите другой материал или откройте этот снова.',
+    en: 'Could not load the media. Choose another item or reopen this one.',
+  },
+  mediaInvalid: {
+    ru: 'Не удалось показать материал. Возможно, файл повреждён. Выберите другой материал или откройте этот снова.',
+    en: 'Could not display the media. The file may be damaged. Choose another item or reopen this one.',
+  },
   recordingRoleDisplay: {
     ru: 'Экран или окно',
     en: 'Screen or window',

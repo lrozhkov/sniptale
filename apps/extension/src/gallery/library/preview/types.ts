@@ -18,6 +18,7 @@ export interface PreviewPanelProps {
   hasChanges?: boolean;
   item: GalleryItem;
   previewUrl: string | null;
+  previewLoadStatus?: 'loading' | 'ready' | 'missing' | 'error' | undefined;
   inspectorCollapsed: boolean;
   filenameDraft: string;
   tagDraft: string;

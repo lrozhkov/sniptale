@@ -36,6 +36,12 @@ import { openGalleryConfirmDialog } from './shared';
 
 type PreviewMediaMetadataPatch = Partial<Pick<MediaLibraryEntry, 'filename' | 'tags'>>;
 
+export interface PreviewMetadataSnapshot {
+  item: GalleryItem;
+  draft: GalleryPreviewController['state']['preview']['draft'];
+  baseline: { filename: string; tags: string[] };
+}
+
 export function openInEditor(item: GalleryItem) {
   if (isGalleryScenarioItem(item)) {
     if (!canOpenGalleryProject(item)) return;
@@ -211,7 +217,7 @@ function areTagsEqual(left: string[], right: string[]): boolean {
 }
 
 function buildPreviewMediaMetadataPatch(
-  previewItem: GalleryItem,
+  previewItem: Pick<GalleryItem, 'filename' | 'tags'>,
   filename: string,
   tags: string[]
 ): PreviewMediaMetadataPatch {
@@ -225,29 +231,38 @@ function buildPreviewMediaMetadataPatch(
   return patch;
 }
 
-async function persistPreviewMetadata(controller: GalleryPreviewController): Promise<void> {
-  const previewItem = controller.state.preview.session.item;
-  if (!previewItem || !controller.state.preview.draft.hasChanges) {
-    return;
+export async function persistPreviewMetadata(
+  controller: GalleryPreviewController,
+  snapshot?: PreviewMetadataSnapshot
+): Promise<boolean> {
+  const previewItem = snapshot?.item ?? controller.state.preview.session.item;
+  const draft = snapshot?.draft ?? controller.state.preview.draft;
+  if (!previewItem || (!snapshot && !draft.hasChanges)) {
+    return false;
   }
 
-  const nextFilename = controller.state.preview.draft.filename.trim() || previewItem.filename;
-  const nextTags = controller.state.preview.draft.tags;
+  const nextFilename = draft.filename.trim() || previewItem.filename;
+  const nextTags = draft.tags;
+  const baseline = snapshot?.baseline ?? previewItem;
 
   if (isGalleryMediaItem(previewItem)) {
-    const patch = buildPreviewMediaMetadataPatch(previewItem, nextFilename, nextTags);
+    const patch = buildPreviewMediaMetadataPatch(baseline, nextFilename, nextTags);
     if (Object.keys(patch).length > 0) {
       await updateMediaLibraryEntrySafely(previewItem.entityId ?? previewItem.id, patch);
+      return true;
     }
-    return;
+    return false;
   }
 
   if (isGalleryScenarioItem(previewItem)) {
+    if (nextFilename === baseline.filename && areTagsEqual(nextTags, baseline.tags)) return false;
     await updateScenarioProjectRecordMetadata(previewItem.entityId, {
       name: nextFilename,
       tags: nextTags,
     });
+    return true;
   }
+  return false;
 }
 
 export function createSaveMetadataAction(controller: GalleryPreviewController) {
@@ -258,13 +273,18 @@ export function createSaveMetadataAction(controller: GalleryPreviewController) {
     }
 
     await withBusy(async () => {
-      await persistPreviewMetadata(controller);
-      await controller.actions.storage.refresh();
+      if (await persistPreviewMetadata(controller)) {
+        await controller.actions.storage.refresh();
+      }
     });
   };
 }
 
-export function createClosePreviewAction(controller: GalleryPreviewController) {
+export function createClosePreviewAction(
+  controller: GalleryPreviewController,
+  canClose: () => boolean = () => true,
+  persistMetadata: () => Promise<boolean> = () => persistPreviewMetadata(controller)
+) {
   return async (withBusy: GalleryBusyAction) => {
     const previewItem = controller.state.preview.session.item;
     if (!previewItem) {
@@ -273,9 +293,14 @@ export function createClosePreviewAction(controller: GalleryPreviewController) {
     }
 
     await withBusy(async () => {
-      await persistPreviewMetadata(controller);
-      resetPreview(controller);
-      await controller.actions.storage.refresh();
+      const changed = await persistMetadata();
+      if (!canClose()) return;
+      controller.actions.preview.setPreview((current) =>
+        current.item?.id === previewItem.id
+          ? { inspectorCollapsed: false, item: null, url: null }
+          : current
+      );
+      if (changed) await controller.actions.storage.refresh();
     });
   };
 }

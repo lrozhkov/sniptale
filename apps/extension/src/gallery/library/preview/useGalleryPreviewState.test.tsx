@@ -128,6 +128,7 @@ it('uses the durable screenshot object for web snapshot previews', async () => {
   expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
   expect(URL.createObjectURL).toHaveBeenCalledWith(thumbnail);
   expect(latest()?.state.session.url).toBe('blob:preview');
+  expect(latest()?.state.session.loadStatus).toBe('ready');
 });
 
 it.each([
@@ -199,6 +200,105 @@ it('loads preview blobs and seeds filename and tag drafts from the selected item
   expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
 });
 
+it('preserves newer filename and tag edits when the selected item refreshes', async () => {
+  getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+  const latest = () => values.at(-1);
+
+  act(() =>
+    latest()?.actions.setPreview({ inspectorCollapsed: false, item: createItem(), url: null })
+  );
+  await flushEffects();
+  act(() => {
+    latest()?.actions.setFilenameDraft('my edit.png');
+    latest()?.actions.setTagDrafts(['alpha', 'mine']);
+    latest()?.actions.setTagDraft('unfinished');
+  });
+  act(() =>
+    latest()?.actions.setPreview((current) => ({
+      ...current,
+      item: { ...createItem(), filename: 'saved.png', tags: ['server'], updatedAt: 3 },
+      url: null,
+    }))
+  );
+  await flushEffects();
+
+  expect(latest()?.state.draft).toMatchObject({
+    filename: 'my edit.png',
+    initialFilename: 'saved.png',
+    tags: ['alpha', 'mine'],
+    initialTagDrafts: ['server'],
+    tagInput: 'unfinished',
+    hasChanges: true,
+  });
+
+  act(() =>
+    latest()?.actions.setPreview((current) => ({
+      ...current,
+      item: { ...createItem(), filename: 'next.png', tags: ['new'], updatedAt: 4 },
+      url: null,
+    }))
+  );
+  await flushEffects();
+  expect(latest()?.state.draft.filename).toBe('my edit.png');
+  expect(latest()?.state.draft.initialFilename).toBe('next.png');
+});
+
+it('adopts refreshed fields that have no local edits', async () => {
+  getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+  const latest = () => values.at(-1);
+  act(() =>
+    latest()?.actions.setPreview({ inspectorCollapsed: false, item: createItem(), url: null })
+  );
+  await flushEffects();
+  act(() =>
+    latest()?.actions.setPreview((current) => ({
+      ...current,
+      item: { ...createItem(), filename: 'saved.png', tags: ['server'], updatedAt: 3 },
+      url: null,
+    }))
+  );
+  await flushEffects();
+  expect(latest()?.state.draft).toMatchObject({
+    filename: 'saved.png',
+    initialFilename: 'saved.png',
+    tags: ['server'],
+    initialTagDrafts: ['server'],
+    hasChanges: false,
+  });
+});
+
+it('keeps a deliberate baseline restore when an in-flight write refreshes the same item', async () => {
+  getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['preview'], { type: 'image/png' }));
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+  const latest = () => values.at(-1);
+  act(() =>
+    latest()?.actions.setPreview({ inspectorCollapsed: false, item: createItem(), url: null })
+  );
+  await flushEffects();
+
+  act(() => latest()?.actions.setFilenameDraft('temporary.png'));
+  act(() => latest()?.actions.setFilenameDraft('preview.png'));
+  act(() =>
+    latest()?.actions.setPreview((current) => ({
+      ...current,
+      item: { ...createItem(), filename: 'temporary.png', updatedAt: 3 },
+      url: null,
+    }))
+  );
+  await flushEffects();
+
+  expect(latest()?.state.draft).toMatchObject({
+    filename: 'preview.png',
+    initialFilename: 'temporary.png',
+    hasChanges: true,
+  });
+});
+
 it('loads a scenario image preview from its stored asset', async () => {
   const blob = new Blob(['image'], { type: 'image/png' });
   const values: ReturnType<typeof useGalleryPreviewState>[] = [];
@@ -243,18 +343,55 @@ it('clears preview url when no item is selected and tolerates null or failed blo
   });
   await flushEffects();
   expect(latest()?.state.session.url).toBeNull();
+  expect(latest()?.state.session.loadStatus).toBe('missing');
 
   act(() => {
     latest()?.actions.setPreview({ inspectorCollapsed: false, item: createItem(), url: null });
   });
   await flushEffects();
   expect(latest()?.state.session.url).toBeNull();
+  expect(latest()?.state.session.loadStatus).toBe('error');
 
   act(() => {
     latest()?.actions.setPreview({ inspectorCollapsed: false, item: null, url: null });
   });
   await flushEffects();
   expect(latest()?.state.session.url).toBeNull();
+  expect(latest()?.state.session.loadStatus).toBeUndefined();
+});
+
+it('keeps loading tied to the selected item through A to B to C and discards late results', async () => {
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  const resolvers: Array<(blob: Blob | null) => void> = [];
+  getAggregatePreviewBlobMock.mockImplementation(
+    () => new Promise<Blob | null>((resolve) => resolvers.push(resolve))
+  );
+  vi.mocked(URL.createObjectURL).mockReturnValue('blob:third');
+
+  act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+  const latest = () => values.at(-1);
+  for (const id of ['asset-a', 'asset-b', 'asset-c']) {
+    act(() => {
+      latest()?.actions.setPreview({
+        inspectorCollapsed: false,
+        item: { ...createItem(), id, filename: `${id}.png` },
+        url: 'blob:stale',
+      });
+    });
+    expect(latest()?.state.session.item?.id).toBe(id);
+    expect(latest()?.state.session.url).toBeNull();
+    expect(latest()?.state.session.loadStatus).toBe('loading');
+  }
+
+  await act(async () => resolvers[1]?.(null));
+  await act(async () => resolvers[0]?.(new Blob(['old'])));
+  expect(latest()?.state.session.item?.id).toBe('asset-c');
+  expect(latest()?.state.session.loadStatus).toBe('loading');
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+
+  await act(async () => resolvers[2]?.(new Blob(['current'])));
+  expect(latest()?.state.session.url).toBe('blob:third');
+  expect(latest()?.state.session.loadStatus).toBe('ready');
 });
 
 it('remembers the last inspector position after the preview item closes', async () => {
@@ -313,6 +450,35 @@ it('revokes the previous object url when the selected item changes or the hook u
 
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:second');
   root = null;
+});
+
+it('shows loading when the current media revision requests a new blob', async () => {
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  let resolveReload!: (blob: Blob | null) => void;
+  getAggregatePreviewBlobMock
+    .mockResolvedValueOnce(new Blob(['first'], { type: 'image/png' }))
+    .mockImplementationOnce(() => new Promise<Blob | null>((resolve) => (resolveReload = resolve)));
+  act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+  const latest = () => values.at(-1);
+
+  act(() => {
+    latest()?.actions.setPreview({ inspectorCollapsed: false, item: createItem(), url: null });
+  });
+  await flushEffects();
+  expect(latest()?.state.session.loadStatus).toBe('ready');
+
+  act(() => {
+    latest()?.actions.setPreview((current) => ({
+      ...current,
+      item: current.item ? { ...current.item, updatedAt: current.item.updatedAt + 1 } : null,
+      url: null,
+    }));
+  });
+  expect(latest()?.state.session.loadStatus).toBe('loading');
+  expect(latest()?.state.session.url).toBeNull();
+
+  await act(async () => resolveReload(new Blob(['reloaded'], { type: 'image/png' })));
+  expect(latest()?.state.session.loadStatus).toBe('ready');
 });
 
 it('clears carried preview urls synchronously when the selected item changes', async () => {

@@ -33,7 +33,8 @@ import {
 import { PromotionAction } from './promotion-action';
 import type { PreviewPanelProps } from './types';
 import {
-  listMediaAssetProjectUsage,
+  listPreviewMediaAssetProjectUsage,
+  subscribeToPreviewProjectUsageInvalidation,
   type MediaAssetProjectUsage,
 } from '../../../composition/persistence/media-library/usage';
 import {
@@ -265,25 +266,36 @@ export function PreviewProjectUsage({
   const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [usageRevision, setUsageRevision] = useState(0);
+  const invalidationRevision = useRef(0);
+
+  useEffect(() => {
+    if (!mediaId) return;
+    return subscribeToPreviewProjectUsageInvalidation(() => {
+      invalidationRevision.current += 1;
+      setUsageRevision((value) => value + 1);
+    });
+  }, [mediaId]);
 
   useEffect(() => {
     if (!mediaId) return;
     let active = true;
+    const requestRevision = invalidationRevision.current;
     setStatus('loading');
-    void listMediaAssetProjectUsage(mediaId).then(
+    void listPreviewMediaAssetProjectUsage(mediaId).then(
       (result) => {
-        if (!active) return;
+        if (!active || requestRevision !== invalidationRevision.current) return;
         setUsage(result);
         setStatus('ready');
       },
       () => {
-        if (active) setStatus('error');
+        if (active && requestRevision === invalidationRevision.current) setStatus('error');
       }
     );
     return () => {
       active = false;
     };
-  }, [mediaId]);
+  }, [mediaId, usageRevision]);
 
   if (!mediaId) return null;
   return (

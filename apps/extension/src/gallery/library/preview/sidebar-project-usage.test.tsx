@@ -13,12 +13,14 @@ import { PreviewProjectUsage } from './sidebar-sections';
 
 const mocks = vi.hoisted(() => ({
   usage: vi.fn(),
+  subscribe: vi.fn(),
   video: vi.fn(),
   scenario: vi.fn(),
   gallery: vi.fn(),
 }));
 vi.mock('../../../composition/persistence/media-library/usage', () => ({
-  listMediaAssetProjectUsage: mocks.usage,
+  listPreviewMediaAssetProjectUsage: mocks.usage,
+  subscribeToPreviewProjectUsageInvalidation: mocks.subscribe,
 }));
 vi.mock('../../../platform/navigation/extension-pages', () => ({
   openVideoEditorPage: mocks.video,
@@ -35,6 +37,7 @@ let root: Root;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.subscribe.mockReturnValue(() => undefined);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.append(container);
@@ -149,3 +152,30 @@ it.each(['resolve', 'reject'] as const)(
     expect(container.textContent).not.toContain('gallery.preview.projectsUnavailable');
   }
 );
+
+it('reloads on project invalidation and ignores the old result', async () => {
+  const pending = pendingUsage();
+  mocks.usage.mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
+  await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  const invalidate = mocks.subscribe.mock.calls[0]?.[0];
+  expect(invalidate).toBeTypeOf('function');
+  await act(async () => invalidate());
+  await act(async () =>
+    pending.resolve([{ id: 'stale', name: 'Stale project', kind: 'video', primary: false }])
+  );
+  expect(mocks.usage).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain('gallery.preview.projectsEmpty');
+  expect(container.textContent).not.toContain('Stale project');
+});
+
+it('retries an unavailable usage lookup after a library change', async () => {
+  mocks.usage
+    .mockRejectedValueOnce(new Error('unavailable'))
+    .mockResolvedValueOnce([{ id: 'video', name: 'Video', kind: 'video', primary: false }]);
+  await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  expect(container.textContent).toContain('gallery.preview.projectsUnavailable');
+  const invalidate = mocks.subscribe.mock.calls[0]?.[0];
+  await act(async () => invalidate());
+  expect(container.textContent).toContain('Video');
+  expect(container.textContent).not.toContain('gallery.preview.projectsUnavailable');
+});
