@@ -12,6 +12,7 @@ type PlaneDragProps = {
   onSelect(value: ReviewAnchor): void;
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
+  originalRangeTool?: boolean;
 };
 
 interface PlaneDragState {
@@ -50,7 +51,11 @@ export function useReviewDragEscape<T extends CapturedPointerDrag>(
   });
 }
 
-const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number, gutter: number) => {
+export const planeTime = (
+  event: React.PointerEvent<HTMLDivElement>,
+  duration: number,
+  gutter: number
+) => {
   const bounds = event.currentTarget.getBoundingClientRect();
   return Math.max(
     0,
@@ -60,6 +65,25 @@ const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number, 
     )
   );
 };
+
+/** The same hit zones drive both the gesture and its cursor/hover preview. */
+export function reviewPlaneLane(
+  target: EventTarget | null,
+  focusEnabled: boolean,
+  originalEnabled: boolean
+): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' {
+  if (!(target instanceof Element)) return 'source';
+  if (target.closest('button,[data-ui="gallery.videoReview.trackHeader"]')) return 'control';
+  if (target.closest('[data-ui="gallery.videoReview.editBlock"],[data-audio-id],[role="button"]'))
+    return 'item';
+  if (target.closest('[data-dragging="true"]')) return 'item';
+  const audio = target.closest('[data-ui="gallery.videoReview.audioLane"]');
+  if (audio)
+    return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
+    return focusEnabled ? 'focus' : 'seek';
+  return 'source';
+}
 
 /** Plane interaction state: seek, range dragging, and Escape restore; render stays separate. */
 export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
@@ -82,30 +106,23 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   });
   return {
     plane,
+    activeLane: () => drag.current?.lane,
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
-      if (
-        event.button !== 0 ||
-        (event.target instanceof Element &&
-          event.target.closest('button,[data-ui="gallery.videoReview.trackHeader"]'))
-      )
-        return;
+      if (event.button !== 0) return;
       const gutter = props.gutter ?? 0;
       if (event.clientX < event.currentTarget.getBoundingClientRect().left + gutter) return;
+      const hit = reviewPlaneLane(
+        event.target,
+        !!props.onFocusRangeCommit,
+        !!props.originalRangeTool
+      );
+      if (hit === 'control' || hit === 'item' || hit === 'original') return;
       const time = planeTime(event, props.duration, gutter);
       if (props.busy) {
         props.onSeek(time, false);
         return;
       }
-      const target = event.target instanceof Element ? event.target : null;
-      const focusLane = !!target?.closest('[data-ui="gallery.videoReview.zoomLane"]');
-      const audioLane = !!target?.closest('[data-ui="gallery.videoReview.audioLane"]');
-      const lane = focusLane
-        ? props.onFocusRangeCommit
-          ? 'focus'
-          : 'seek'
-        : audioLane
-          ? 'seek'
-          : 'source';
+      const lane = hit;
       props.onClearSelection?.();
       drag.current = {
         lane,

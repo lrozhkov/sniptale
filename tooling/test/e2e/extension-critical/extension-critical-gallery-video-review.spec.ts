@@ -3458,3 +3458,65 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const, dpr: 1 },
+  { locale: 'en' as const, theme: 'dark' as const, dpr: 2 },
+]) {
+  test(`quick editor timeline cursor and hover guide at HD DPR ${variant.dpr} (${variant.locale}/${variant.theme})`, async ({
+    browser,
+  }, testInfo) => {
+    const host = await startHostServer();
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 720 },
+      deviceScaleFactor: variant.dpr,
+    });
+    const page = await context.newPage();
+    const button = (key: Parameters<typeof translate>[0]) =>
+      page
+        .locator('dialog')
+        .getByRole('button', { name: translate(key, variant.locale), exact: true });
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');
+      const source = page.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      const box = (await source.boundingBox())!;
+      await page.mouse.move(box.x + box.width * 0.25, box.y + box.height / 2);
+      await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
+      const guide = page.locator('[data-ui="gallery.videoReview.hoverTime"]');
+      await expect(guide).toBeVisible();
+      expect(Math.abs((await guide.boundingBox())!.x - (box.x + box.width * 0.25))).toBeLessThan(2);
+      await page.screenshot({
+        path: testInfo.outputPath(`timeline-cursor-${variant.locale}-dpr${variant.dpr}.png`),
+      });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.focusRangeTool').click();
+      const focus = page.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const focusBox = (await focus.boundingBox())!;
+      await page.mouse.move(focusBox.x + focusBox.width * 0.25, focusBox.y + focusBox.height / 2);
+      await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
+      await button('gallery.videoReview.originalAudioRange').click();
+      const original = page.locator('[data-original-audio-lane]');
+      const audioBox = (await original.boundingBox())!;
+      await page.mouse.move(audioBox.x + audioBox.width * 0.25, audioBox.y + audioBox.height / 2);
+      await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
+      await page.mouse.move(focusBox.x + focusBox.width * 0.25, focusBox.y + focusBox.height / 2);
+      await expect(plane).toHaveCSS('cursor', 'default');
+    } finally {
+      await context.close();
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

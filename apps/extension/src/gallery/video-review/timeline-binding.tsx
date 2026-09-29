@@ -227,6 +227,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         />
       }
       onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
+      originalRangeTool={features.mode === 'advanced' && props.audio.originalTool}
+      snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
       trackControls={
         <ReviewTrackControls
           advanced={props.advanced}

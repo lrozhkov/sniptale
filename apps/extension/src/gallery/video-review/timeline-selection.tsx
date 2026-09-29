@@ -75,6 +75,7 @@ function ReviewEditBlock(
 ) {
   const { edit, duration, onSnap } = props;
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
+  const [dragEdge, setDragEdge] = useState<'start' | 'end' | 'move' | null>(null);
   const drag = useRef<{
     x: number;
     width: number;
@@ -86,6 +87,7 @@ function ReviewEditBlock(
   } | null>(null);
   useReviewDragEscape(drag, () => {
     setPreview(null);
+    setDragEdge(null);
     onSnap(null);
   });
   const committing = useRef(false);
@@ -98,9 +100,11 @@ function ReviewEditBlock(
       data-cut-suppressed={covered.length ? 'true' : 'false'}
       title={caption}
       className={`absolute rounded border text-xs ${position} ${reviewTimelineItemTone(selected, edit.kind)}`}
+      data-drag-edge={dragEdge ?? undefined}
       style={{
         left: percent(range.start, duration),
         width: percent(range.end - range.start, duration),
+        cursor: dragEdge === 'move' ? 'grabbing' : dragEdge ? 'ew-resize' : undefined,
       }}
       onPointerDown={(event) => {
         if (event.button !== 0 || committing.current) return;
@@ -110,6 +114,7 @@ function ReviewEditBlock(
           target instanceof Element
             ? target.closest('[data-edge]')?.getAttribute('data-edge')
             : null;
+        setDragEdge(edge === 'start' || edge === 'end' ? edge : 'move');
         drag.current = {
           x: event.clientX,
           width: event.currentTarget.parentElement!.getBoundingClientRect().width,
@@ -161,6 +166,7 @@ function ReviewEditBlock(
       onPointerUp={async (event) => {
         const current = drag.current;
         drag.current = null;
+        setDragEdge(null);
         onSnap(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
@@ -174,6 +180,7 @@ function ReviewEditBlock(
       }}
       onPointerCancel={() => {
         drag.current = null;
+        setDragEdge(null);
         setPreview(null);
         onSnap(null);
       }}

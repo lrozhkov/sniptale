@@ -76,6 +76,12 @@ export function ReviewOriginalAudioTrack(props: {
           data-ui="gallery.videoReview.audioLane"
           data-original-audio-lane
           className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] touch-none"
+          style={
+            gesture.preview?.id
+              ? { cursor: gesture.preview.edge === 'move' ? 'grabbing' : 'ew-resize' }
+              : undefined
+          }
+          data-dragging={gesture.preview?.id ? 'true' : undefined}
           {...gesture.handlers}
         >
           <ReviewAudioWaveform
@@ -177,7 +183,7 @@ function ReviewOriginalGainBlock(props: {
       title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
       data-ui="gallery.videoReview.originalAudioRange"
       data-audio-id={range.id}
-      className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
+      className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center disabled:cursor-not-allowed
         rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
       style={{
         left: `${(start / props.duration) * 100}%`,
