@@ -15,7 +15,6 @@ export function ModeSelectorButton(props: {
     <ContentToolbarButton
       ref={props.triggerRef}
       type="button"
-      active
       className="sniptale-mode-selector-btn"
       dataUi="content.toolbar.mode-selector-button"
       disabled={props.disabled ?? false}

@@ -113,6 +113,18 @@ it('activates Drawing through its distinct Working Mode option', () => {
   expect(onToggleDrawing).toHaveBeenCalledTimes(1);
 });
 
+it('shows the selected mode without a persistent focus-like active frame', () => {
+  renderModeButtons({ drawingMode: true });
+  const trigger = queryModeSelectorButton();
+  expect(trigger?.getAttribute('aria-label')).toBe('content.toolbar.drawingLabel');
+  expect(trigger?.querySelector('.sniptale-toolbar-mode-icon')).not.toBeNull();
+  expect(trigger?.classList.contains('sniptale-glass-toolbar-button--active')).toBe(false);
+  expect(trigger?.getAttribute('data-active')).toBeNull();
+  act(() => trigger?.click());
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(trigger?.classList.contains('sniptale-glass-toolbar-button--active')).toBe(false);
+});
+
 it('activates Video Recording from the real mode-menu mousedown event', () => {
   const onToggleVideoRecording = vi.fn();
   renderModeButtons({ onToggleVideoRecording });
