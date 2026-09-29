@@ -1,7 +1,7 @@
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useRef, useState } from 'react';
-import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
+import { Film, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../../features/video/review/snap';
 import { reviewTimeLabel } from './controls';
 import { ReviewTrackRow } from './track-row';
+import { ReviewCommentMarkers } from './timeline-comment-markers';
 import { useReviewDragEscape } from './timeline-drag';
 
 type SelectionProps = {
@@ -89,13 +90,14 @@ function ReviewEditBlock(
   });
   const committing = useRef(false);
   const range = preview ?? edit;
-  const { name, value, label } = reviewEditCaption(edit);
+  const { name, value, caption, covered, position } = reviewEditPresentation(edit, props.edits);
   const selected = props.selectedEditId === edit.id;
   return (
     <div
       data-ui="gallery.videoReview.editBlock"
-      title={`${label} · ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`}
-      className={`absolute inset-y-1 z-[5] rounded border text-xs ${reviewTimelineItemTone(selected, edit.kind)}`}
+      data-cut-suppressed={covered.length ? 'true' : 'false'}
+      title={caption}
+      className={`absolute rounded border text-xs ${position} ${reviewTimelineItemTone(selected, edit.kind)}`}
       style={{
         left: percent(range.start, duration),
         width: percent(range.end - range.start, duration),
@@ -178,7 +180,7 @@ function ReviewEditBlock(
     >
       <button
         type="button"
-        aria-label={`${label} ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`}
+        aria-label={caption}
         aria-pressed={selected}
         className="absolute inset-0 flex cursor-grab items-center justify-center gap-1
             overflow-hidden px-3 active:cursor-grabbing"
@@ -192,6 +194,7 @@ function ReviewEditBlock(
           value={value}
         />
       </button>
+      <ReviewSpeedCutMasks edit={edit} cuts={covered} />
       {(['start', 'end'] as const).map((edge) => (
         <ReviewEditEdge
           key={edge}
@@ -204,6 +207,54 @@ function ReviewEditBlock(
       ))}
     </div>
   );
+}
+
+/** Source-lane cut/speed geometry keeps both edit kinds selectable during an overlap. */
+function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
+  const { name, value, label } = reviewEditCaption(edit);
+  const overlap =
+    edits?.some(
+      (item) => item.kind !== edit.kind && item.start < edit.end && item.end > edit.start
+    ) ?? false;
+  const covered =
+    edit.kind === 'speed'
+      ? (edits?.filter(
+          (item) => item.kind === 'cut' && item.start < edit.end && item.end > edit.start
+        ) ?? [])
+      : [];
+  const hint = covered.length ? ` · ${translate('gallery.videoReview.cutOverlapHint')}` : '';
+  const position = overlap
+    ? edit.kind === 'cut'
+      ? 'top-1 bottom-[52%] z-[6]'
+      : 'top-[52%] bottom-1 z-[5]'
+    : 'inset-y-1 z-[5]';
+  return {
+    name,
+    value,
+    covered,
+    position,
+    caption: `${label} · ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}${hint}`,
+  };
+}
+
+/** Only the source span hidden by a cut receives the disabled treatment. */
+function ReviewSpeedCutMasks(props: { edit: ReviewEdit; cuts: readonly ReviewEdit[] }) {
+  const edit = props.edit;
+  return props.cuts.map((cut) => (
+    <span
+      key={cut.id}
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-y-0 border-x border-dashed
+        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]/65"
+      style={{
+        left: percent(Math.max(cut.start, edit.start) - edit.start, edit.end - edit.start),
+        width: percent(
+          Math.min(cut.end, edit.end) - Math.max(cut.start, edit.start),
+          edit.end - edit.start
+        ),
+      }}
+    />
+  ));
 }
 
 /** One complete caption feeds the tooltip, accessible label and responsive visible parts. */
@@ -300,70 +351,4 @@ function snapReviewEditDrag(args: {
     guide = snap.candidate ?? guide;
   }
   return { start, end, guide };
-}
-
-/** Co-located point comments share one marker; the full set remains in the inspector feed. */
-function ReviewCommentMarkers(
-  props: Pick<SelectionProps, 'annotations' | 'duration' | 'onComment'>
-) {
-  const groups = new Map<string, ReviewAnnotation[]>();
-  for (const annotation of props.annotations) {
-    const anchor = annotation.anchor;
-    const key =
-      anchor.kind === 'point' ? `point:${anchor.time}` : `range:${anchor.start}:${anchor.end}`;
-    const group = groups.get(key) ?? [];
-    group.push(annotation);
-    groups.set(key, group);
-  }
-  return [...groups.values()].map((group) => {
-    const annotation = group[0]!;
-    const anchor = annotation.anchor;
-    const time = anchor.kind === 'point' ? anchor.time : anchor.start;
-    const range = anchor.kind === 'range';
-    const caption = group.map((item) => item.text).join(' · ');
-    return (
-      <button
-        key={annotation.id}
-        type="button"
-        title={caption}
-        aria-label={[
-          translate('gallery.videoReview.commentText'),
-          reviewTimeLabel(time),
-          caption,
-        ].join(' · ')}
-        onClick={() => props.onComment(annotation)}
-        style={{
-          left: range
-            ? percent(time, props.duration)
-            : `clamp(8px, ${percent(time, props.duration)}, calc(100% - 8px))`,
-          ...(range
-            ? {
-                width: percent(anchor.end - anchor.start, props.duration),
-                top: 6,
-                height: 30,
-                backgroundColor:
-                  'color-mix(in srgb, var(--sniptale-color-accent) 14%, var(--sniptale-color-surface-canvas))',
-              }
-            : { top: -8 }),
-        }}
-        className={`absolute z-10 flex h-4 min-w-4 items-center justify-center gap-1
-        overflow-hidden rounded border border-[var(--sniptale-color-border-accent-strong)]
-        bg-[var(--sniptale-color-surface-canvas)] px-1 text-[10px] font-medium
-        text-[var(--sniptale-color-accent-emphasis)] ${range ? '' : '-translate-x-1/2'}`}
-      >
-        {range ? (
-          <ReviewTimelineLabel
-            icon={<MessageSquare size={11} />}
-            name={translate('gallery.videoReview.commentText')}
-            value={group.length > 1 ? String(group.length) : undefined}
-          />
-        ) : (
-          <>
-            <MessageSquare size={11} className="shrink-0" />
-            {group.length > 1 ? <span>{group.length}</span> : null}
-          </>
-        )}
-      </button>
-    );
-  });
 }

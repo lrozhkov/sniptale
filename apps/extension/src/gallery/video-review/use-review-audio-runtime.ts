@@ -46,6 +46,7 @@ function connectClipSource(
   const source = context.createBufferSource();
   source.buffer = buffer as AudioBuffer;
   const gain = context.createGain();
+  source.playbackRate.value = schedule.playbackRate ?? 1;
   source.connect(gain);
   gain.connect(context.destination);
   schedule.envelope.forEach(([at, value], index) => {

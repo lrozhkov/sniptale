@@ -278,6 +278,7 @@ function ReviewZoomGapLink(props: {
 }) {
   const { next, region } = props;
   if (!next || next.start <= region.end || !!next.spotlight !== !!region.spotlight) return null;
+  if (cutCrossesFocusLink(region, next, props.projection)) return null;
   if (props.enabled === false || (!props.onLink && !props.onSelectLink)) return null;
   const left = props.projection?.position(region.end, 'end') ?? region.end / props.duration;
   const right = props.projection?.position(next.start) ?? next.start / props.duration;
@@ -326,6 +327,53 @@ function ReviewZoomGapLink(props: {
   );
 }
 
+function cutCrossesFocusLink(
+  region: QuickEditZoomRegion,
+  next: QuickEditZoomRegion,
+  projection: ReviewTrackProjection | undefined
+): boolean {
+  const from = region.sourceAnchor;
+  const to = next.sourceAnchor;
+  return (
+    !!from &&
+    !!to &&
+    !!projection?.cuts.some((cut) => cut.sourceStart < to.start && cut.sourceEnd > from.end)
+  );
+}
+
+/** Source width stays visible under cuts; preview drags use the result-time projection. */
+function reviewZoomBlockPresentation(
+  props: ZoomTrackProps & {
+    region: QuickEditZoomRegion;
+    range: { start: number; end: number };
+  }
+) {
+  const { region, range, projection, duration } = props;
+  const anchor = region.sourceAnchor;
+  const cutOverlap =
+    !!anchor &&
+    props.edits.some(
+      (edit) => edit.kind === 'cut' && edit.start < anchor.end && edit.end > anchor.start
+    );
+  const authored = !!anchor && range.start === region.start && range.end === region.end;
+  const sourceDuration = projection?.duration ?? duration;
+  const left = authored
+    ? anchor.start / sourceDuration
+    : (projection?.position(range.start) ?? range.start / duration);
+  const right = authored
+    ? anchor.end / sourceDuration
+    : (projection?.position(range.end, 'end') ?? range.end / duration);
+  const label =
+    `${translate(region.spotlight ? 'gallery.videoReview.focusSpotlight' : 'gallery.videoReview.zoomRegionLabel')} ` +
+    `${reviewTimeLabel(anchor?.start ?? region.start)} – ${reviewTimeLabel(anchor?.end ?? region.end)}` +
+    (cutOverlap ? ` · ${translate('gallery.videoReview.cutOverlapHint')}` : '');
+  return {
+    cutOverlap,
+    label,
+    style: { left: `${left * 100}%`, width: `${(right - left) * 100}%` },
+  };
+}
+
 function ReviewZoomRegionBlock(
   props: ZoomTrackProps & {
     region: QuickEditZoomRegion;
@@ -338,9 +386,7 @@ function ReviewZoomRegionBlock(
   }
 ) {
   const { region, duration, snapEdges, onPreview, onGuide } = props;
-  const label =
-    `${translate(region.spotlight ? 'gallery.videoReview.focusSpotlight' : 'gallery.videoReview.zoomRegionLabel')} ` +
-    `${reviewTimeLabel(region.start)} – ${reviewTimeLabel(region.end)}`;
+  const { cutOverlap, label, style } = reviewZoomBlockPresentation(props);
   const tone = reviewTimelineItemTone(props.selected, 'focus');
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -371,16 +417,14 @@ function ReviewZoomRegionBlock(
   return (
     <div
       role="button"
+      data-cut-suppressed={cutOverlap ? 'true' : 'false'}
       tabIndex={0}
       aria-label={label}
       title={`${label}${region.spotlight ? '' : ` · ${region.transform.scale}×`}`}
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
-      style={{
-        left: `${(props.projection?.position(props.range.start) ?? props.range.start / duration) * 100}%`,
-        width: `${((props.projection?.position(props.range.end, 'end') ?? props.range.end / duration) - (props.projection?.position(props.range.start) ?? props.range.start / duration)) * 100}%`,
-      }}
+      style={style}
       onPointerDown={begin}
       onPointerMove={(event) => {
         const current = props.drag.current;

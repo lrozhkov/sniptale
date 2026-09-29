@@ -53,6 +53,41 @@ it('rejects overlapping/outside intervals instead of manufacturing a result map'
   expect(() => buildReviewTimeMap(10, [cut, { ...cut, id: 'd', start: 3 }])).toThrow();
 });
 
+it('lets a cut temporarily suppress the intersected span of a speed edit', () => {
+  const speed = {
+    id: 'speed',
+    kind: 'speed' as const,
+    start: 1,
+    end: 7,
+    requestedStart: 1,
+    requestedEnd: 7,
+    rate: 2 as const,
+    audio: 'mute' as const,
+  };
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 3,
+    end: 5,
+    requestedStart: 3,
+    requestedEnd: 5,
+  };
+  expect(
+    buildReviewTimeMap(10, [speed, cut]).map(({ sourceStart, sourceEnd, kind }) => [
+      sourceStart,
+      sourceEnd,
+      kind,
+    ])
+  ).toEqual([
+    [0, 1, 'keep'],
+    [1, 3, 'speed'],
+    [3, 5, 'cut'],
+    [5, 7, 'speed'],
+    [7, 10, 'keep'],
+  ]);
+  expect(buildReviewTimeMap(10, [speed]).at(-1)?.resultEnd).toBe(7);
+});
+
 it('exposes one conversion authority for timeline consumers', () => {
   const timeMap = createReviewTimeMap(12, [
     { id: 'c', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },

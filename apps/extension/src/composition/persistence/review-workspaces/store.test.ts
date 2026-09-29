@@ -567,7 +567,7 @@ it('keeps schema version constant in stored advanced state', async () => {
   expect(saved.workspace.advanced.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
 });
 
-it('commits cut focus cleanup atomically and restores source anchors through undo and reload', async () => {
+it('commits cut focus preservation atomically and restores source geometry through undo and reload', async () => {
   const opened = await openVideoWorkspace(id, source);
   const advanced = createQuickEditAdvancedState();
   const first = {
@@ -609,9 +609,10 @@ it('commits cut focus cleanup atomically and restores source anchors through und
       workspace.source,
       reviewAdvancedContentBaseline(workspace.advanced)
     ).advancedContent.zoom.regions;
-  expect(derive(committed.workspace)).toEqual([
-    createQuickEditZoomRegion({ id: 'first', at: 0, duration: 1 }),
-    { ...last, start: 7, end: 9 },
+  expect(derive(committed.workspace)).toMatchObject([
+    { ...first, sourceAnchor: { start: 0, end: 1 } },
+    { ...removed, start: 2, end: 3, sourceAnchor: { start: 3, end: 5 } },
+    { ...last, start: 7, end: 9, sourceAnchor: { start: 9, end: 11 } },
   ]);
   expect((await openVideoWorkspace(id, source)).workspace).toEqual(committed.workspace);
   const undone = await moveVideoWorkspaceHistory({
@@ -619,7 +620,7 @@ it('commits cut focus cleanup atomically and restores source anchors through und
     expectedRevision: committed.workspace.revision,
     direction: 'undo',
   });
-  expect(derive(undone.workspace)).toEqual([first, removed, last]);
+  expect(derive(undone.workspace)).toMatchObject([first, removed, last]);
   const redone = await moveVideoWorkspaceHistory({
     ...args,
     expectedRevision: undone.workspace.revision,
@@ -691,7 +692,11 @@ it('preserves voiceover records and temporarily suppresses recordings intersecte
       sourceOffset,
       duration,
     }))
-  ).toEqual([{ timelineStart: 8, sourceOffset: 2, duration: 1 }]);
+  ).toEqual([
+    { timelineStart: 1, sourceOffset: 2, duration: 1 },
+    { timelineStart: 2, sourceOffset: 5, duration: 5 },
+    { timelineStart: 8, sourceOffset: 2, duration: 1 },
+  ]);
   expect((await openVideoWorkspace(id, source)).workspace).toEqual(committed.workspace);
   const undone = await moveVideoWorkspaceHistory({
     ...args,

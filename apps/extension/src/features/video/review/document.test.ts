@@ -115,7 +115,7 @@ describe('video review history', () => {
         audio: 'mute',
       },
     };
-    expect(() => applyReviewOperation(document, speed, source)).toThrow('overlap');
+    expect(() => applyReviewOperation(document, speed, source)).not.toThrow();
     expect(() =>
       applyReviewOperation(document, { ...speed, after: { ...speed.after!, start: 4 } }, source)
     ).not.toThrow();

@@ -384,7 +384,7 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     await click('undo');
     await click('redo');
     const cut = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.cutLabel 0.0 – 1.0"]'
+      '[aria-label^="gallery.videoReview.cutLabel · 0.0 – 1.0"]'
     )!;
     await act(async () => cut.click());
     expect(video.currentTime).toBe(0);

@@ -249,6 +249,23 @@ describe('reviewRenderFrameSchedule', () => {
     expect(windows[2]!.sourceTimes[2]).toBeCloseTo(5.5, 9);
   });
 
+  it('renders both visible speed fragments around a cut with a continuous output clock', () => {
+    const windows = reviewRenderFrameSchedule(10, [speedEdit(1, 7), cutEdit(3, 5)], 2);
+    expect(
+      windows.map((window) => ({
+        start: window.segment.sourceStart,
+        end: window.segment.sourceEnd,
+        kind: window.segment.kind,
+        resultStart: window.segment.resultStart,
+      }))
+    ).toEqual([
+      { start: 0, end: 1, kind: 'keep', resultStart: 0 },
+      { start: 1, end: 3, kind: 'speed', resultStart: 1 },
+      { start: 5, end: 7, kind: 'speed', resultStart: 5 },
+      { start: 7, end: 10, kind: 'keep', resultStart: 9 },
+    ]);
+  });
+
   it('keeps frames over a sub-frame tail and rejects invalid frame rates', () => {
     const windows = reviewRenderFrameSchedule(0.1, [], 30);
     expect(windows[0]!.timestamps).toHaveLength(3);

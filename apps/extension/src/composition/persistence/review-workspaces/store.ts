@@ -215,6 +215,7 @@ export async function commitVideoWorkspace(args: {
         ? {
             ...parsed,
             preserveFocusAnchors: true as const,
+            preserveUnderCuts: true as const,
             preserveVoiceoverAnchors: true as const,
           }
         : parsed;

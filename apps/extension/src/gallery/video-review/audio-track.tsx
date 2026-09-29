@@ -247,6 +247,9 @@ function ReviewAudioClipBlock(props: {
   const asset = props.assets?.get(clip.assetId);
   const assetDuration = asset?.duration ?? props.waveforms?.get(clip.assetId)?.duration;
   const filename = asset?.filename || props.label;
+  const accessibleLabel = `${props.label} · ${filename}${
+    props.cutSuppressed ? ` · ${translate('gallery.videoReview.voiceoverCut')}` : ''
+  }`;
   const shownRange = reviewVoiceoverRange(props.shown);
   const start = props.projection?.position(shownRange.start) ?? shownRange.start / props.duration;
   const endTime = shownRange.end;
@@ -255,7 +258,8 @@ function ReviewAudioClipBlock(props: {
     <div
       role="button"
       tabIndex={0}
-      aria-label={`${props.label} · ${filename}`}
+      aria-label={accessibleLabel}
+      data-cut-suppressed={props.cutSuppressed ? 'true' : 'false'}
       title={
         props.cutSuppressed
           ? `${filename} · ${translate('gallery.videoReview.voiceoverCut')}`
@@ -263,9 +267,7 @@ function ReviewAudioClipBlock(props: {
       }
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab overflow-hidden rounded border
-          text-xs active:cursor-grabbing ${props.cutSuppressed ? 'opacity-45' : ''} ${reviewTimelineItemTone(
-            props.selected
-          )}`}
+          text-xs active:cursor-grabbing ${reviewTimelineItemTone(props.selected)}`}
       style={{ left: `${start * 100}%`, width: `${(end - start) * 100}%` }}
       onPointerDown={(event) => {
         if (event.button !== 0 || props.busy) return;

@@ -69,6 +69,7 @@ function ZoomTransitionSection(props: {
 /** Inspector form for the selected zoom region; edits clamp into the persisted contract. */
 export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
+  cutSuppressed?: boolean;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onReset(): void;
   onDelete(): void;
@@ -78,6 +79,14 @@ export function ReviewZoomInspector(props: {
   return (
     <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
       <ReviewInterval start={region.start} end={region.end} />
+      {props.cutSuppressed ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.cutOverlapHint')}{' '}
+          {region.sourceAnchor
+            ? `${reviewTimeLabel(region.sourceAnchor.start)} – ${reviewTimeLabel(region.sourceAnchor.end)}`
+            : ''}
+        </p>
+      ) : null}
       <ReviewInspectorSections
         sections={[
           {

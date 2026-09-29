@@ -203,6 +203,17 @@ it('round-trips the focus anchor policy and rejects malformed policy values', ()
     preserveFocusAnchors: true,
   };
   expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  expect(parseReviewOperation({ ...operation, preserveUnderCuts: true }, 12)).toEqual({
+    ...operation,
+    preserveUnderCuts: true,
+  });
+  expect(parseReviewOperation({ ...operation, preserveUnderCuts: false }, 12)).toBeNull();
+  expect(
+    parseReviewOperation(
+      { ...operation, preserveFocusAnchors: undefined, preserveUnderCuts: true },
+      12
+    )
+  ).toBeNull();
   for (const invalid of [false, 'true', 1, null])
     expect(parseReviewOperation({ ...operation, preserveFocusAnchors: invalid }, 12)).toBeNull();
 });

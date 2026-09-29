@@ -89,7 +89,7 @@ function installAudioContext() {
   const windows: {
     input?: TestAudioBuffer;
     frames: number;
-    sources?: { buffer: AudioBuffer | null }[];
+    sources?: { buffer: AudioBuffer | null; rate: number; started?: number[] }[];
     rate?: number;
     gains?: Array<{
       gain: { value: number; readonlyPoints: Array<[string, number, number]> };
@@ -119,13 +119,18 @@ function installAudioContext() {
         const window = this.window;
         const source = {
           buffer: null as AudioBuffer | null,
+          rate: 1,
+          started: [] as number[],
           playbackRate: {
             set value(rate: number) {
               window.rate = rate;
+              source.rate = rate;
             },
           },
           connect() {},
-          start() {},
+          start(...args: number[]) {
+            source.started = args;
+          },
         };
         window.sources ??= [];
         window.sources.push(source);
@@ -319,6 +324,51 @@ it('mixes applied external clips and original gain into each window', async () =
     const clipGain = window.gains![1]!.gain;
     expect(clipGain.readonlyPoints[0]).toEqual(['set', 1, 0.02 + 0.5]);
     expect(clipGain.readonlyPoints.at(-1)).toEqual(['ramp', 1, 0.02 + 1]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+it('exports a voiceover slice with the same asset rate and fade phase as preview', async () => {
+  const fixture = await audioFixture();
+  try {
+    const buffer = new TestAudioBuffer({
+      numberOfChannels: 1,
+      length: 192_000,
+      sampleRate: 48_000,
+    });
+    for await (const _sample of renderReviewAudio(
+      fixture.track,
+      { sourceStart: 0, sourceEnd: 1, resultStart: 0, resultEnd: 1, rate: 1, kind: 'keep' },
+      false,
+      new AbortController().signal,
+      {
+        entries: [
+          {
+            lane: 'voiceover',
+            clipId: 'v:slice',
+            assetId: 'voice',
+            timelineStart: 0,
+            duration: 1,
+            sourceOffset: 1,
+            volume: 1,
+            fadeIn: 1,
+            fadeOut: 1,
+            playbackRate: 2,
+            fadePhase: { offset: 1, duration: 4 },
+          },
+        ],
+        buffers: new Map([['voice', buffer as unknown as AudioBuffer]]),
+        originalVolume: 1,
+        originalMuted: false,
+      }
+    )) {
+      /* consume the generated output window */
+    }
+    const window = fixture.windows[0]!;
+    expect(window.sources?.[1]).toMatchObject({ rate: 2, started: [0.02, 1, 2] });
+    expect(window.gains?.[0]?.gain.readonlyPoints[0]).toEqual(['set', 1, 0.02]);
+    expect(window.gains?.[0]?.gain.readonlyPoints.every((point) => point[1] === 1)).toBe(true);
   } finally {
     fixture.cleanup();
   }

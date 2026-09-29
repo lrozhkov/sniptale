@@ -4,6 +4,7 @@ import type { useReviewAdvanced } from './use-advanced';
 import { commitReviewEdit, useReviewEdits } from './use-edits';
 import type { useReviewExport } from './use-export';
 import { useReviewZoomEditor } from './zoom-editor';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
@@ -33,6 +34,7 @@ export function useReviewEditingTools(args: {
     setZoom: args.advancedState.setZoom,
     zoom: args.zoom,
     timelineDuration: args.timelineDuration,
+    timeMap: buildReviewTimeMap(args.sourceDuration, args.edits),
     selection: args.activeSelection.kind === 'zoom' ? args.activeSelection.id : null,
     onSelectionChange: (id) =>
       args.setActiveSelection(id ? { kind: 'zoom', id } : { kind: 'none' }),

@@ -87,11 +87,11 @@ export function applyReviewOperation(
   }
   const edits = replaceItem(document.edits, operation.before, operation.after);
   const ordered = [...edits].sort((a, b) => a.start - b.start);
-  let previousEnd = 0;
+  const previousEnd: Record<'cut' | 'speed', number> = { cut: 0, speed: 0 };
   let removed = 0;
   for (const edit of ordered) {
-    if (edit.start < previousEnd) throw new Error('Review edit ranges overlap.');
-    previousEnd = edit.end;
+    if (edit.start < previousEnd[edit.kind]) throw new Error('Review edit ranges overlap.');
+    previousEnd[edit.kind] = edit.end;
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
   if (removed >= source.duration) throw new Error('Review cuts remove the entire video.');
@@ -106,6 +106,7 @@ export function applyReviewOperation(
             before: document.edits,
             after: edits,
             edit: operation.after,
+            ...(operation.preserveUnderCuts ? { preserveUnderCuts: true as const } : {}),
           }),
         },
       }

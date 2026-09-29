@@ -418,8 +418,12 @@ export const galleryVideoReviewMessages = defineMessageSource({
   audioOriginal: { ru: 'Исходное аудио', en: 'Source audio' },
   audioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
   voiceoverCut: {
-    ru: 'Запись временно выключена: она пересекает вырезанный участок.',
-    en: 'Recording temporarily silenced because it overlaps a cut.',
+    ru: 'Перекрытая вырезанием часть записи временно не звучит. Остальное сохраняется.',
+    en: 'The portion covered by a cut is temporarily silent. The rest remains available.',
+  },
+  cutOverlapHint: {
+    ru: 'Часть под вырезанием временно не применяется. Правка сохранена.',
+    en: 'The portion under a cut is temporarily inactive. The edit is saved.',
   },
   audioMusic: { ru: 'Музыка', en: 'Music' },
   audioImport: { ru: 'Добавить аудиофайл', en: 'Add audio file' },

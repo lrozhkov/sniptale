@@ -96,7 +96,9 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await dragTimePlane(fixture.host, 0, 100);
     await act(async () =>
       fixture.host
-        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.cutLabel 0.0 – 1.0"]')!
+        .querySelector<HTMLButtonElement>(
+          '[aria-label^="gallery.videoReview.cutLabel · 0.0 – 1.0"]'
+        )!
         .click()
     );
     await fixture.click('pointerTool');

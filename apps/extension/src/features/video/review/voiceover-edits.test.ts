@@ -42,16 +42,29 @@ it('keeps a completely cut recording intact and automatically restores its full 
   expect(clip).not.toHaveProperty('sourceAnchor');
 });
 
-it('suppresses intersected recordings but preserves later speech and touching boundaries', () => {
+it('suppresses only the cut portion of a recording and preserves later speech', () => {
   const clips = [clip, { ...clip, id: 'later', timelineStart: 10, duration: 2 }].map((value) =>
     anchorReviewVoiceover(value, original)
   );
   const output = projectReviewVoiceover(clips, buildReviewTimeMap(12, [cut(3, 5)]));
-  expect(output).toMatchObject([{ timelineStart: 8, duration: 2 }]);
+  expect(output).toMatchObject([
+    { timelineStart: 3, sourceOffset: 4, duration: 2 },
+    { timelineStart: 8, duration: 2 },
+  ]);
   expect(projectReviewVoiceover([clips[0]!], buildReviewTimeMap(12, [cut(7, 8)]))).toMatchObject([
     clip,
   ]);
   expect(clips[0]).toMatchObject({ sourceOffset: 2, duration: 4 });
+});
+
+it('keeps both audible sides of an interior cut at their original sample and fade phases', () => {
+  const recording = anchorReviewVoiceover({ ...clip, fadeIn: 1, fadeOut: 1 }, original);
+  const slices = projectReviewVoiceover([recording], buildReviewTimeMap(12, [cut(4, 5)]));
+  expect(slices).toMatchObject([
+    { timelineStart: 3, sourceOffset: 2, duration: 1, fadePhase: { offset: 0, duration: 4 } },
+    { timelineStart: 4, sourceOffset: 4, duration: 2, fadePhase: { offset: 2, duration: 4 } },
+  ]);
+  expect(recording).toMatchObject({ sourceOffset: 2, duration: 4, fadeIn: 1, fadeOut: 1 });
 });
 
 it('preserves whole recordings authored over existing cuts and speeds', () => {
@@ -64,7 +77,10 @@ it('preserves whole recordings authored over existing cuts and speeds', () => {
   ]);
   expect(reviewVoiceoverRange(anchored)).toEqual({ start: 2, end: 9 });
   const audible = projectReviewVoiceover([anchored], original);
-  expect(audible).toMatchObject([{ timelineStart: 2, sourceOffset: 2, duration: 4 }]);
+  expect(audible).toMatchObject([
+    { timelineStart: 2, sourceOffset: 2, duration: 2 },
+    { timelineStart: 6, sourceOffset: 3, duration: 3 },
+  ]);
 });
 
 it('moves and explicitly trims retained recordings without cut-dependent clamping', () => {
@@ -123,7 +139,10 @@ it.each([2, 0.5] as const)(
     const map = buildReviewTimeMap(12, [{ ...cut(2, 8), kind: 'speed', rate, audio: 'speed' }]);
     const shown = reanchorReviewVoiceover(recording, map);
     expect(reviewVoiceoverRange(shown)).toEqual({ start: 2, end: 2 + 2 * rate });
-    expect(projectReviewVoiceover([shown], map)).toEqual(projectReviewVoiceover([recording], map));
+    expect(projectReviewVoiceover([recording], map)[0]).toMatchObject({
+      sourceOffset: clip.sourceOffset,
+      playbackRate: rate,
+    });
     expect(shown).toMatchObject({ duration: 2, sourceOffset: clip.sourceOffset });
     expect(reviewVoiceoverRange(recording)).toEqual({ start: 2, end: 4 });
     expect(reviewVoiceoverRange(reanchorReviewVoiceover(recording, original))).toEqual({

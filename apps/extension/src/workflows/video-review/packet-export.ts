@@ -11,7 +11,10 @@ import {
 } from 'mediabunny';
 import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import type { ReviewEdit } from '../../features/video/review/types';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import {
+  buildReviewTimeMap,
+  reviewVisibleEditBoundaries,
+} from '../../features/video/review/timeline';
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
@@ -43,17 +46,13 @@ export async function writeReviewPackets(args: {
 }): Promise<ReviewPacketReceipt> {
   const { index, signal } = args;
   signal.throwIfAborted();
-  if (
-    args.edits.some(
-      (edit) => !index.boundaries.includes(edit.start) || !index.boundaries.includes(edit.end)
-    )
-  )
+  if (reviewVisibleEditBoundaries(args.edits).some((time) => !index.boundaries.includes(time)))
     throw new Error('Export requires verified cut boundaries.');
   const segments = buildReviewTimeMap(index.duration, args.edits).filter(
     (part) => part.kind !== 'cut'
   );
   if (!segments.length) throw new Error('The edited video is empty.');
-  const speedExists = args.edits.some((edit) => edit.kind === 'speed');
+  const speedExists = segments.some((part) => part.kind === 'speed');
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
   signal.addEventListener('abort', dispose, { once: true });
@@ -113,7 +112,10 @@ export async function writeReviewPackets(args: {
         !!args.exportAudio?.originalMuted ||
         args.edits.some(
           (edit) =>
-            edit.kind === 'speed' && edit.start === segment.sourceStart && edit.audio === 'mute'
+            edit.kind === 'speed' &&
+            edit.start <= segment.sourceStart &&
+            edit.end >= segment.sourceEnd &&
+            edit.audio === 'mute'
         );
       const audioPackets = processedAudio
         ? renderReviewAudio(audio, segment, muted, signal, args.exportAudio)

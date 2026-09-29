@@ -3209,3 +3209,80 @@ for (const locale of ['ru', 'en'] as const) {
     });
   }
 }
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`quick editor retains focus and speed beneath a cut at HD in ${variant.locale}/${variant.theme}`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.focusRangeTool').click();
+      const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const lane = (await focusLane.boundingBox())!;
+      await page.mouse.move(lane.x + lane.width / 12, lane.y + lane.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(lane.x + (lane.width * 5) / 12, lane.y + lane.height / 2, {
+        steps: 10,
+      });
+      await page.mouse.up();
+      const focus = focusLane.locator('[role="button"][data-cut-suppressed]');
+      await expect(focus).toHaveCount(1);
+      await button('gallery.videoReview.pointerTool').click();
+      await timelineGesture(page, 9);
+      await button('gallery.videoReview.speedMode').click();
+      await timelineGesture(page, 1, 5);
+      await button('gallery.videoReview.pointerTool').click();
+      await timelineGesture(page, 9);
+      await button('gallery.videoReview.cutMode').click();
+      await timelineGesture(page, 2, 4);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      const sourceLane = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      await expect(sourceLane.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(2);
+      await expect(
+        sourceLane.locator('[data-ui="gallery.videoReview.editBlock"][data-cut-suppressed="true"]')
+      ).toHaveCount(1);
+      await focus.click();
+      const inspector = dialog.locator('aside');
+      await expect(
+        inspector.getByText(translate('gallery.videoReview.cutOverlapHint', variant.locale), {
+          exact: false,
+        })
+      ).toBeVisible();
+      await page.screenshot({
+        path: testInfo.outputPath(`cut-retained-${variant.locale}-${variant.theme}.png`),
+      });
+      await button('gallery.videoReview.undo').click();
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
+      await button('gallery.videoReview.redo').click();
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-cut-suppressed="true"]')
+      ).toHaveCount(1);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

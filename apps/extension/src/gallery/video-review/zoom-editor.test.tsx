@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewZoomEditor } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type {
   QuickEditZoomRegion,
   QuickEditZoomState,
@@ -314,4 +315,36 @@ it('selects a contextual focus with its supplied geometry and refuses occupied i
   expect(created).toMatchObject({ start: 1, end: 3, transform: target.transform });
   expect(created.id).not.toBe(target.id);
   expect(onSelectionChange).toHaveBeenCalledWith(created.id);
+});
+
+it('stores source geometry when creating and editing focus around an existing cut', () => {
+  const timeMap = buildReviewTimeMap(8, [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 2,
+      end: 4,
+      requestedStart: 2,
+      requestedEnd: 4,
+    },
+  ]);
+  let zoom = createQuickEditAdvancedState().zoom;
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom,
+      timelineDuration: 6,
+      timeMap,
+      setZoom(update) {
+        zoom = update(zoom);
+      },
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.add(1, 6));
+  expect(zoom.regions[0]).toMatchObject({ start: 1, end: 3, sourceAnchor: { start: 1, end: 5 } });
+  act(() => root.render(<Harness />));
+  act(() => editor.change(zoom.regions[0]!.id, { end: 4 }));
+  expect(zoom.regions[0]).toMatchObject({ start: 1, end: 4, sourceAnchor: { start: 1, end: 6 } });
 });

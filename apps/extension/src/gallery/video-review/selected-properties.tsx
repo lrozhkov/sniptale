@@ -22,8 +22,7 @@ import { useZoomPreviewSource } from './use-zoom-preview-source';
 import { ReviewCanvasCommentsSection } from './comment-editor';
 import type { useCanvasComments } from './use-canvas-comments';
 
-/** Selected-object properties share the selection owner, separately from session actions. */
-export function ReviewSelectedProperties(props: {
+type SelectedPropertiesProps = {
   selection: ReviewSelection;
   advanced: QuickEditAdvancedState;
   editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
@@ -36,7 +35,10 @@ export function ReviewSelectedProperties(props: {
   resource: LoadedReview;
   audio: ReturnType<typeof useReviewAudio>;
   canvasComments: ReturnType<typeof useCanvasComments>;
-}) {
+};
+
+/** Selected-object properties share the selection owner, separately from session actions. */
+export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   const { advanced, zoom, busy, editing, resource, audio, selection } = props;
   const marker =
     selection.kind === 'telemetry'
@@ -80,60 +82,11 @@ export function ReviewSelectedProperties(props: {
             }}
           />
         ) : selection.kind === 'original-audio' && advanced.ui.mode === 'advanced' ? (
-          <ReviewOriginalAudioInspector
-            audio={audio}
-            duration={resource.source.duration}
-            speedMuted={
-              !!audio.selectedOriginal &&
-              resource.session
-                .getSnapshot()
-                .document.edits.some(
-                  (edit) =>
-                    edit.kind === 'speed' &&
-                    edit.audio === 'mute' &&
-                    edit.start < audio.selectedOriginal!.end &&
-                    edit.end > audio.selectedOriginal!.start
-                )
-            }
-          />
+          <SelectedOriginalAudio audio={audio} resource={resource} />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
           <ReviewAudioInspectorSection audio={audio} busy={busy} />
         ) : selection.kind === 'edit' && editing.selected ? (
-          <div className="space-y-3">
-            <ReviewInterval start={editing.selected.start} end={editing.selected.end} />
-            {editing.selected.kind === 'speed' ? (
-              <div className="space-y-3">
-                <ReviewSpeedOptions
-                  layout="inspector"
-                  rate={editing.selected.rate}
-                  audio={editing.selected.audio}
-                  busy={busy}
-                  onRate={editing.changeSelectedRate}
-                  onAudio={editing.changeSelectedAudio}
-                />
-              </div>
-            ) : null}
-            <ReviewEditRangeFields
-              key={`${editing.selected.id}:${advanced.ui.mode}`}
-              edit={editing.selected}
-              edits={resource.session.getSnapshot().document.edits}
-              duration={resource.source.duration}
-              boundaries={
-                advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
-              }
-              onApply={(range) => editing.commitRange(range, editing.selected)}
-            />
-            <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
-              <ReviewButton
-                label={translate('gallery.videoReview.deleteSelected')}
-                className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-                onClick={() => void editing.remove()}
-              >
-                <Trash2 size={15} aria-hidden="true" />
-                <span>{translate('gallery.videoReview.deleteSelected')}</span>
-              </ReviewButton>
-            </div>
-          </div>
+          <SelectedEdit editing={editing} advanced={advanced} resource={resource} busy={busy} />
         ) : selection.kind === 'zoom' || selection.kind === 'zoom-link' ? (
           <ReviewAdvancedPanels
             advanced={advanced}
@@ -157,5 +110,88 @@ export function ReviewSelectedProperties(props: {
         ) : null}
       </fieldset>
     </>
+  );
+}
+
+function overlapsSelected(
+  resource: LoadedReview,
+  interval: { start: number; end: number },
+  kind: 'cut' | 'speed',
+  mutedOnly = false
+) {
+  return resource.session
+    .getSnapshot()
+    .document.edits.some(
+      (edit) =>
+        edit.kind === kind &&
+        (!mutedOnly || (edit.kind === 'speed' && edit.audio === 'mute')) &&
+        edit.start < interval.end &&
+        edit.end > interval.start
+    );
+}
+
+function SelectedOriginalAudio(props: Pick<SelectedPropertiesProps, 'audio' | 'resource'>) {
+  const { audio, resource } = props;
+  const selected = audio.selectedOriginal;
+  return (
+    <>
+      <ReviewOriginalAudioInspector
+        audio={audio}
+        duration={resource.source.duration}
+        speedMuted={!!selected && overlapsSelected(resource, selected, 'speed', true)}
+      />
+      {selected && overlapsSelected(resource, selected, 'cut') ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.cutOverlapHint')}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function SelectedEdit(
+  props: Pick<SelectedPropertiesProps, 'editing' | 'advanced' | 'resource' | 'busy'>
+) {
+  const { editing, advanced, resource, busy } = props;
+  const selected = editing.selected!;
+  return (
+    <div className="space-y-3">
+      <ReviewInterval start={selected.start} end={selected.end} />
+      {selected.kind === 'speed' && overlapsSelected(resource, selected, 'cut') ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.cutOverlapHint')}
+        </p>
+      ) : null}
+      {selected.kind === 'speed' ? (
+        <ReviewSpeedOptions
+          layout="inspector"
+          rate={selected.rate}
+          audio={selected.audio}
+          busy={busy}
+          onRate={editing.changeSelectedRate}
+          onAudio={editing.changeSelectedAudio}
+        />
+      ) : null}
+      <ReviewEditRangeFields
+        key={`${selected.id}:${advanced.ui.mode}`}
+        edit={selected}
+        edits={resource.session.getSnapshot().document.edits}
+        duration={resource.source.duration}
+        boundaries={
+          advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
+        }
+        onApply={(range) => editing.commitRange(range, selected)}
+      />
+      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <ReviewButton
+          label={translate('gallery.videoReview.deleteSelected')}
+          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+          onClick={() => void editing.remove()}
+        >
+          <Trash2 size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.deleteSelected')}</span>
+        </ReviewButton>
+      </div>
+    </div>
   );
 }

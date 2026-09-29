@@ -227,19 +227,13 @@ function prepareReviewRender(args: {
   edits: readonly ReviewEdit[];
   advanced: QuickEditAdvancedState;
 }): ReviewRenderPreparation {
-  const ordered = [...args.edits].sort((left, right) => left.start - right.start);
-  if (
-    ordered.some(
-      (edit, index) =>
-        !Number.isFinite(edit.start) ||
-        !Number.isFinite(edit.end) ||
-        edit.start < 0 ||
-        edit.end > args.index.duration ||
-        edit.start >= edit.end ||
-        (index > 0 && edit.start < ordered[index - 1]!.end)
-    )
-  )
-    throw new Error('Export requires valid non-overlapping edit ranges.');
+  let validRanges = true;
+  try {
+    buildReviewTimeMap(args.index.duration, args.edits);
+  } catch {
+    validRanges = false;
+  }
+  if (!validRanges) throw new Error('Export requires valid non-overlapping edit ranges.');
   const container = args.renderSettings?.format ?? args.index.container;
   const supported = reviewOutputCodecs(args.index, container);
   const codec = args.renderSettings?.codec ?? supported[0];
@@ -274,7 +268,11 @@ function segmentAudioMuted(
   return (
     !!exportAudio?.originalMuted ||
     edits.some(
-      (edit) => edit.kind === 'speed' && edit.start === segment.sourceStart && edit.audio === 'mute'
+      (edit) =>
+        edit.kind === 'speed' &&
+        edit.start <= segment.sourceStart &&
+        edit.end >= segment.sourceEnd &&
+        edit.audio === 'mute'
     )
   );
 }

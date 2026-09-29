@@ -101,6 +101,42 @@ describe('buildQuickEditClipEnvelope', () => {
       [6, 0],
     ]);
   });
+
+  it('keeps the authored fade phase across cut slices and speed changes', () => {
+    expect(
+      buildQuickEditClipEnvelope({
+        entry: entry({ fadeIn: 1, fadeOut: 1, fadePhase: { offset: 0, duration: 4 } }),
+        duration: 1,
+        elapsed: 0,
+      })
+    ).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
+    expect(
+      buildQuickEditClipEnvelope({
+        entry: entry({ fadeIn: 1, fadeOut: 1, fadePhase: { offset: 2, duration: 4 } }),
+        duration: 2,
+        elapsed: 0,
+      })
+    ).toEqual([
+      [0, 1],
+      [1, 1],
+      [2, 0],
+    ]);
+    expect(
+      planQuickEditClipPlayback({
+        entry: entry({
+          duration: 1,
+          sourceOffset: 4,
+          playbackRate: 2,
+          fadePhase: { offset: 1, duration: 4 },
+        }),
+        outputTime: 2.25,
+        audioNow: 10,
+      })
+    ).toMatchObject({ offset: 4.5, duration: 1.5, playbackRate: 2 });
+  });
 });
 
 describe('planQuickEditClipPlayback', () => {

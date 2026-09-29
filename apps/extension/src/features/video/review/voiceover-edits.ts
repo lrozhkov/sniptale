@@ -59,26 +59,37 @@ export function isReviewVoiceoverCut(
   );
 }
 
-/** Intersected recordings are temporarily silent; the stored recording always remains whole. */
+/** Visible recording slices retain sample offsets and fade phase; stored recordings remain whole. */
 export function projectReviewVoiceover(
   clips: readonly QuickEditAudioClip[],
   map?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip[] {
   return clips.flatMap((clip) => {
     if (!clip.sourceAnchor || !map) return [clip];
-    if (isReviewVoiceoverCut(clip, map)) return [];
-    const start = clip.sourceAnchor[0]!.start;
-    const segment = map.find(
-      (part) => part.kind !== 'cut' && start >= part.sourceStart && start < part.sourceEnd
-    );
-    if (!segment) return [];
     const { sourceAnchor: _anchor, ...recording } = clip;
-    return [
-      {
-        ...recording,
-        timelineStart: segment.resultStart + (start - segment.sourceStart) / segment.rate,
-      },
-    ];
+    const slices = clip.sourceAnchor.flatMap((anchor, anchorIndex) =>
+      map.flatMap((part) => {
+        if (part.kind === 'cut') return [];
+        const start = Math.max(anchor.start, part.sourceStart);
+        const end = Math.min(anchor.end, part.sourceEnd);
+        if (end <= start) return [];
+        const assetPerSource = anchor.duration / (anchor.end - anchor.start);
+        const assetOffset = anchor.offset + (start - anchor.start) * assetPerSource;
+        const duration = (end - start) / part.rate;
+        return [
+          {
+            ...recording,
+            id: `${clip.id}:slice:${anchorIndex}:${part.sourceStart}`,
+            timelineStart: part.resultStart + (start - part.sourceStart) / part.rate,
+            sourceOffset: clip.sourceOffset + assetOffset,
+            duration,
+            playbackRate: assetPerSource * part.rate,
+            fadePhase: { offset: assetOffset, duration: clip.duration },
+          },
+        ];
+      })
+    );
+    return slices.length === 1 ? [{ ...slices[0]!, id: clip.id }] : slices;
   });
 }
 
@@ -88,8 +99,19 @@ export function reanchorReviewVoiceover(
   map?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
   if (!clip.sourceAnchor || !map || clip.dormant || isReviewVoiceoverCut(clip, map)) return clip;
-  const projected = projectReviewVoiceover([clip], map)[0];
-  return projected ? anchorReviewVoiceover(projected, map) : clip;
+  const start = clip.sourceAnchor[0]!.start;
+  const segment = map.find(
+    (part) => part.kind !== 'cut' && start >= part.sourceStart && start < part.sourceEnd
+  );
+  if (!segment) return clip;
+  const { sourceAnchor: _anchor, ...recording } = clip;
+  return anchorReviewVoiceover(
+    {
+      ...recording,
+      timelineStart: segment.resultStart + (start - segment.sourceStart) / segment.rate,
+    },
+    map
+  );
 }
 
 /** Moving a retained recording shifts its complete placement, including currently cut portions. */

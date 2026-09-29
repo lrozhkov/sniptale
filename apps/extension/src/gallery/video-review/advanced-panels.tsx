@@ -59,6 +59,15 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
       ) : zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
+          cutSuppressed={
+            !!zoomRegion.sourceAnchor &&
+            !!args.advanced.audio.voiceoverSegments?.some(
+              (part) =>
+                part.kind === 'cut' &&
+                part.sourceStart < zoomRegion.sourceAnchor!.end &&
+                part.sourceEnd > zoomRegion.sourceAnchor!.start
+            )
+          }
           preview={args.zoomPreview?.(zoomRegion)}
           onChange={applyZoomRegionPatch.bind(null, args, zoomRegion.id)}
           onReset={resetZoomRegion.bind(null, args, zoomRegion.id)}

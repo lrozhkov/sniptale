@@ -455,7 +455,7 @@ it('creates edits from recorded actions, selects their properties and recalculat
     ).not.toBeNull();
     await selectAction();
     expect(fixture.button('actionSpeed').disabled).toBe(true);
-    expect(fixture.button('actionCut').disabled).toBe(true);
+    expect(fixture.button('actionCut').disabled).toBe(false);
     await fixture.click('undo');
     await selectAction();
     await fixture.click('actionCut');

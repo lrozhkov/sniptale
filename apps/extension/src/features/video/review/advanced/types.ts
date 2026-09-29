@@ -54,6 +54,8 @@ export interface QuickEditZoomRegion {
   id: string;
   start: number;
   end: number;
+  /** Authored source-frame footprint retained when result-time cuts hide all or part of the region. */
+  sourceAnchor?: { start: number; end: number };
   transform: QuickEditCameraTransform;
   enter: QuickEditZoomTransition;
   exit: QuickEditZoomTransition;
@@ -112,6 +114,9 @@ export interface QuickEditVoiceoverAnchor {
 export interface QuickEditAudioClip {
   /** Lossless source-video placement; audio offsets remain relative to the intact recording. */
   sourceAnchor?: QuickEditVoiceoverAnchor[];
+  /** Derived playback projection only; storage parsing intentionally drops these fields. */
+  playbackRate?: number;
+  fadePhase?: { offset: number; duration: number };
   id: string;
   assetId: string;
   /** Kept but not applied: its start could not be proven in result time. */

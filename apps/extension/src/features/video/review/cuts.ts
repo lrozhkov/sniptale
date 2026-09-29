@@ -21,7 +21,7 @@ export function createReviewCut(args: {
   duration: number;
   edits: readonly ReviewEdit[];
 }): ReviewEdit | null {
-  const range = reviewRange(args);
+  const range = reviewRange(args, 'cut');
   if (!range) return null;
   const removed = args.edits.reduce(
     (sum, edit) => sum + (edit.kind === 'cut' ? edit.end - edit.start : 0),
@@ -37,11 +37,11 @@ export function createReviewSpeed(
 ): ReviewEdit | null {
   if (!isReviewSpeedRate(args.rate) || (args.audio !== 'speed' && args.audio !== 'mute'))
     return null;
-  const range = reviewRange(args);
+  const range = reviewRange(args, 'speed');
   return range ? { ...range, kind: 'speed', rate: args.rate, audio: args.audio } : null;
 }
 
-function reviewRange(args: Parameters<typeof createReviewCut>[0]) {
+function reviewRange(args: Parameters<typeof createReviewCut>[0], kind: ReviewEdit['kind']) {
   const { selection, boundaries, duration, edits } = args;
   if (selection.kind !== 'range' || !boundaries.length) return null;
   if (
@@ -59,7 +59,7 @@ function reviewRange(args: Parameters<typeof createReviewCut>[0]) {
       ? selection.end
       : nearestReviewBoundary(selection.end, boundaries);
   if (start < 0 || end > duration || start >= end) return null;
-  if (edits.some((edit) => edit.start < end && edit.end > start)) return null;
+  if (edits.some((edit) => edit.kind === kind && edit.start < end && edit.end > start)) return null;
   return {
     id: args.id,
     start,

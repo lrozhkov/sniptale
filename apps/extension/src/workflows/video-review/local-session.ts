@@ -73,6 +73,7 @@ export function applyLocalReviewChange(
         ? {
             ...change.operation,
             preserveFocusAnchors: true as const,
+            preserveUnderCuts: true as const,
             preserveVoiceoverAnchors: true as const,
           }
         : change.operation;

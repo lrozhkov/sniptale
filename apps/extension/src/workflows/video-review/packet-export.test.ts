@@ -289,6 +289,37 @@ it('rejects forged non-key cuts and propagates streamed quota failure', async ()
   ).rejects.toThrow('verified');
   await expect(writeReviewPackets({ file, index, signal, writer, edits })).rejects.toThrow('Quota');
 });
+it('copies packets when an off-keyframe speed edit is entirely inside a cut', async () => {
+  const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-vp8-opus.webm')]);
+  const signal = new AbortController().signal;
+  const index = await inspectReviewMedia(file, signal);
+  const cut: ReviewEdit = {
+    id: 'cut',
+    kind: 'cut',
+    start: 2,
+    end: 4,
+    requestedStart: 2,
+    requestedEnd: 4,
+  };
+  const speed: ReviewEdit = {
+    id: 'speed',
+    kind: 'speed',
+    start: 2.25,
+    end: 3.75,
+    requestedStart: 2.25,
+    requestedEnd: 3.75,
+    rate: 2,
+    audio: 'mute',
+  };
+  const receipt = await writeReviewPackets({
+    file,
+    index,
+    signal,
+    edits: [cut, speed],
+    writer: { async writeAt() {} },
+  });
+  expect(receipt.videoPackets).toBeGreaterThan(0);
+});
 it('stops a real packet stream on cancellation', async () => {
   const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-avc-aac.mp4')]);
   const controller = new AbortController();

@@ -41,7 +41,7 @@ it('keeps long action intervals exact and applies a restrained focus at verified
   });
   expect(result.contextual).toBe(false);
 });
-it('maps focus through cuts and speed, while refusing an overlapping source edit', () => {
+it('maps focus through cuts and speed, allowing a cut over a saved speed edit', () => {
   const speed: ReviewEdit = {
     id: 's',
     kind: 'speed',
@@ -54,7 +54,7 @@ it('maps focus through cuts and speed, while refusing an overlapping source edit
   };
   const result = plan({ edits: [cut, speed] });
   expect(result.focus).toMatchObject({ start: 0, end: 2 });
-  expect(result.cut).toBeNull();
+  expect(result.cut).toMatchObject({ start: 2, end: 6 });
   expect(result.speed).toBeNull();
   expect(result.editReason).toBe('overlap');
 });

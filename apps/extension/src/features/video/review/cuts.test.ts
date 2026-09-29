@@ -16,7 +16,11 @@ const input = {
 it('supports full-video speed and source-aligned sound policy without allowing overlapping cuts', () => {
   const speed = createReviewSpeed({ ...input, rate: 2, audio: 'mute' })!;
   expect(speed).toMatchObject({ kind: 'speed', start: 2, end: 4, rate: 2, audio: 'mute' });
-  expect(createReviewCut({ ...input, edits: [speed] })).toBeNull();
+  expect(createReviewCut({ ...input, edits: [speed] })).toMatchObject({
+    kind: 'cut',
+    start: 2,
+    end: 4,
+  });
   expect(
     createReviewSpeed({
       ...input,

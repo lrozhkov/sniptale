@@ -253,6 +253,9 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       return null;
     if (value['preserveFocusAnchors'] !== undefined && value['preserveFocusAnchors'] !== true)
       return null;
+    if (value['preserveUnderCuts'] !== undefined && value['preserveUnderCuts'] !== true)
+      return null;
+    if (value['preserveUnderCuts'] === true && value['preserveFocusAnchors'] !== true) return null;
     if (
       value['preserveVoiceoverAnchors'] !== undefined &&
       value['preserveVoiceoverAnchors'] !== true
@@ -264,6 +267,7 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       before,
       after,
       ...(value['preserveFocusAnchors'] === true ? { preserveFocusAnchors: true as const } : {}),
+      ...(value['preserveUnderCuts'] === true ? { preserveUnderCuts: true as const } : {}),
       ...(value['preserveVoiceoverAnchors'] === true
         ? { preserveVoiceoverAnchors: true as const }
         : {}),

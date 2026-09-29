@@ -203,6 +203,7 @@ function scheduleClipWindows(
     if (!buffer) continue;
     const source = offline.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = entry.playbackRate ?? 1;
     const gain = offline.createGain();
     source.connect(gain);
     gain.connect(offline.destination);
@@ -235,8 +236,8 @@ function scheduleClipWindows(
     else gain.gain.linearRampToValueAtTime(tailGain, windowEndAt);
     source.start(
       leadSeconds + (audibleFrom - outStart),
-      entry.sourceOffset + Math.max(0, localAt(audibleFrom)),
-      audibleTo - audibleFrom
+      entry.sourceOffset + Math.max(0, localAt(audibleFrom)) * (entry.playbackRate ?? 1),
+      (audibleTo - audibleFrom) * (entry.playbackRate ?? 1)
     );
   }
 }

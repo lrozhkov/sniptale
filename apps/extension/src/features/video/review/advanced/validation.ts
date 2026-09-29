@@ -116,6 +116,15 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const exit = parseZoomTransition(value['exit']);
   if (!transform || !enter || !exit) return null;
   if (value['linkTo'] !== undefined && !identity(value['linkTo'])) return null;
+  const sourceAnchor = value['sourceAnchor'];
+  if (
+    sourceAnchor !== undefined &&
+    (!isRecord(sourceAnchor) ||
+      !isBoundedNumber(sourceAnchor['start'], 0, MAX_QUICK_EDIT_TIME) ||
+      !isBoundedNumber(sourceAnchor['end'], 0, MAX_QUICK_EDIT_TIME) ||
+      sourceAnchor['start'] >= sourceAnchor['end'])
+  )
+    return null;
   if (
     value['linkEasing'] !== undefined &&
     value['linkEasing'] !== 'linear' &&
@@ -127,6 +136,11 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     id: value['id'],
     start: value['start'],
     end: value['end'],
+    ...(isRecord(sourceAnchor) &&
+    typeof sourceAnchor['start'] === 'number' &&
+    typeof sourceAnchor['end'] === 'number'
+      ? { sourceAnchor: { start: sourceAnchor['start'], end: sourceAnchor['end'] } }
+      : {}),
     transform,
     enter,
     exit,
@@ -151,7 +165,11 @@ function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
     if (ids.has(region.id)) return null;
     ids.add(region.id);
     if (region.dormant) continue;
-    if (previous && region.start < previous.end) return null;
+    if (
+      previous &&
+      (region.sourceAnchor?.start ?? region.start) < (previous.sourceAnchor?.end ?? previous.end)
+    )
+      return null;
     previous = region;
   }
   return regions;

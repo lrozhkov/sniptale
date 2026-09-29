@@ -189,7 +189,9 @@ export async function exportReviewedVideo(
       readProjectAsset: deps.readProjectAsset,
     });
   }
-  const speedAudio = !!index.audioCodec && edits.some((edit) => edit.kind === 'speed');
+  const speedAudio =
+    !!index.audioCodec &&
+    buildReviewTimeMap(index.duration, edits).some((part) => part.kind === 'speed');
   if (speedAudio && !(index.outputAudioCodecs?.[outputProfile.format] ?? index.processedAudioCodec))
     throw new QuickEditExportUnavailable(['audio-encoder']);
   const audioReencoded = speedAudio || !!exportAudio;
