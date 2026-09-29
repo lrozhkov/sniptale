@@ -229,12 +229,17 @@
     outline-offset: -2px;
   }
   [data-ui='gallery.videoReview.inspector'] .review-inspector-danger {
-    color: var(--sniptale-color-text-secondary) !important;
+    min-height: 36px !important;
+    padding-inline: 10px !important;
+    color: var(--sniptale-color-danger) !important;
+    border-color: color-mix(in srgb, var(--sniptale-color-danger) 24%, transparent) !important;
+    background: color-mix(in srgb, var(--sniptale-color-danger) 6%, transparent) !important;
   }
   [data-ui='gallery.videoReview.inspector']
     .review-inspector-danger:is(:hover, :focus-visible):not(:disabled) {
     color: var(--sniptale-color-danger) !important;
-    border-color: color-mix(in srgb, var(--sniptale-color-danger) 28%, transparent) !important;
+    border-color: color-mix(in srgb, var(--sniptale-color-danger) 45%, transparent) !important;
+    background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent) !important;
   }
 }
 @media (prefers-reduced-motion: reduce) {

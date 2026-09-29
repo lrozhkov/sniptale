@@ -94,7 +94,7 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
   }
 });
 
-it('edits selected speed properties and blocks unavailable editing tools', () => {
+it('sets speed creation defaults without a toolbar delete action', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -104,10 +104,8 @@ it('edits selected speed properties and blocks unavailable editing tools', () =>
     busy: false,
     rate: 2,
     audio: 'speed' as const,
-    selected: true,
     onPointer: vi.fn(),
     onToggle: vi.fn(),
-    onRemove: vi.fn(),
     onRate: vi.fn(),
     onAudio: vi.fn(),
   };
@@ -132,16 +130,13 @@ it('edits selected speed properties and blocks unavailable editing tools', () =>
     act(() => audio!.click());
     act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click());
     expect(props.onAudio).toHaveBeenCalledWith('mute');
-    act(() => button('gallery.videoReview.removeEdit').click());
-    expect(props.onRemove).toHaveBeenCalledOnce();
+    expect(button('gallery.videoReview.removeEdit')).toBeNull();
     act(() => root.render(<ReviewTimelineTools {...props} busy />));
     expect(rate!.disabled).toBe(true);
     expect(audio!.disabled).toBe(true);
     act(() => button('gallery.videoReview.cutMode').click());
     expect(props.onToggle).toHaveBeenCalledTimes(2);
-    act(() =>
-      root.render(<ReviewTimelineTools {...props} mode={null} available={false} selected={false} />)
-    );
+    act(() => root.render(<ReviewTimelineTools {...props} mode={null} available={false} />));
     expect(host.querySelector('select')).toBeNull();
     expect(button('gallery.videoReview.speedMode').disabled).toBe(true);
   } finally {

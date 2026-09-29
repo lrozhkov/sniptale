@@ -223,6 +223,33 @@ it('edits a selected speed range from its inspector through the same reversible 
     )!;
     expect(input).not.toBeNull();
     const historyLength = fixture.snapshot.workspace.history.length;
+    expect(
+      fixture.host.querySelector(
+        '[data-ui="gallery.videoReview.editingTools"] [aria-label="gallery.videoReview.removeEdit"]'
+      )
+    ).toBeNull();
+    const toolbarRate = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.editingTools"] [aria-label="gallery.videoReview.speedRate"]'
+    )!;
+    await act(async () => toolbarRate.click());
+    const four = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+      (option) => option.textContent === '4×'
+    )!;
+    await act(async () => four.click());
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'edit',
+      after: { kind: 'speed', rate: 2 },
+    });
+    await fixture.click('cutMode');
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
+    expect(input.isConnected).toBe(true);
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
+    await fixture.click('focusRangeTool');
+    expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
+    expect(input.isConnected).toBe(true);
+    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    await fixture.click('cutMode');
     await act(async () => input.dispatchEvent(new FocusEvent('focusin', { bubbles: true })));
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '2.5');
@@ -235,14 +262,79 @@ it('edits a selected speed range from its inspector through the same reversible 
       target: 'edit',
       after: { kind: 'speed', start: 1, end: 2.5 },
     });
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
     const remove = fixture.host.querySelector<HTMLButtonElement>(
-      'aside button[aria-label="gallery.videoReview.removeEdit"]'
+      'aside button[aria-label="gallery.videoReview.deleteSelected"]'
     )!;
+    expect(remove.className).toContain('!w-full');
+    expect(remove.parentElement?.className).toContain('border-t');
     await act(async () => remove.click());
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'edit',
       after: null,
     });
+    expect(
+      fixture.host.querySelector('aside input[aria-label="gallery.videoReview.rangeEnd"]')
+    ).toBeNull();
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      0
+    );
+    await fixture.click('undo');
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      1
+    );
+    await fixture.click('redo');
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      0
+    );
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('deletes a selected cut from the inspector and restores it through history', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('cutMode');
+    await dragRange(fixture.host);
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      1
+    );
+    const remove = fixture.host.querySelector<HTMLButtonElement>(
+      'aside button[aria-label="gallery.videoReview.deleteSelected"]'
+    )!;
+    expect(remove.textContent).toContain('gallery.videoReview.deleteSelected');
+    await act(async () => remove.click());
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'edit',
+      before: { kind: 'cut' },
+      after: null,
+    });
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      0
+    );
+    expect(
+      fixture.host.querySelector('aside [aria-label="gallery.videoReview.deleteSelected"]')
+    ).toBeNull();
+    await fixture.click('undo');
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      1
+    );
+    await fixture.click('redo');
+    expect(fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]')).toHaveLength(
+      0
+    );
   } finally {
     await fixture.cleanup();
   }
@@ -415,7 +507,10 @@ it('creates a source-audio mute from a range, opens properties and restores it t
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC' }))
     );
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.cutRegion"]')).toBeNull();
-    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
+    expect(
+      fixture.host.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toHaveLength(1);
     await fixture.click('undo');
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
@@ -525,7 +620,7 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
       target: 'advancedContent',
       after: { zoom: { regions: [expect.objectContaining({ start: 0.5, end: 1.5 })] } },
     });
-    expect(fixture.button('focusRangeTool').disabled).toBe(true);
+    expect(fixture.button('focusRangeTool').disabled).toBe(false);
   } finally {
     await fixture.cleanup();
   }

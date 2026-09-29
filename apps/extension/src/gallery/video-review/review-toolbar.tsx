@@ -23,15 +23,14 @@ type ToolbarProps = {
     mode: 'cut' | 'speed' | null;
     rate: Editing['rate'];
     audio: Editing['audio'];
-    selected: boolean;
     exporter: { index: ReviewMediaIndex | null; phase: 'idle' | 'exporting' | 'publishing' };
     setCutting(cutting: false): void;
     canApply: Editing['canApply'];
     toggle(kind: 'cut' | 'speed'): void;
     changeRate(rate: Editing['rate']): void;
     changeAudio(audio: Editing['audio']): void;
-    remove(): void;
   };
+  selectedObject?: boolean;
   busy: boolean;
   composerBusy: boolean;
   selection: ReviewAnchor;
@@ -72,22 +71,24 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           }
           available={!!props.editing.exporter.index}
           cutAvailable={
-            !props.originalAudioEditor?.originalRangeSelected &&
-            (props.selection.kind !== 'range' || props.editing.canApply('cut', props.selection))
+            (props.selectedObject || !props.originalAudioEditor?.originalRangeSelected) &&
+            (props.selectedObject ||
+              props.selection.kind !== 'range' ||
+              props.editing.canApply('cut', props.selection))
           }
           speedAvailable={
-            !props.originalAudioEditor?.originalRangeSelected &&
-            (props.selection.kind !== 'range' || props.editing.canApply('speed', props.selection))
+            (props.selectedObject || !props.originalAudioEditor?.originalRangeSelected) &&
+            (props.selectedObject ||
+              props.selection.kind !== 'range' ||
+              props.editing.canApply('speed', props.selection))
           }
           busy={busy}
           rate={props.editing.rate}
           audio={props.editing.audio}
-          selected={!!props.editing.selected}
           onPointer={() => props.editing.setCutting(false)}
           onToggle={props.editing.toggle}
           onRate={props.editing.changeRate}
           onAudio={props.editing.changeAudio}
-          onRemove={props.editing.remove}
         />
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewButton
@@ -114,6 +115,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             disabled={
               busy ||
               (!props.originalAudioEditor.originalTool &&
+                !props.selectedObject &&
                 props.selection.kind === 'range' &&
                 !props.originalAudioEditor.canAddOriginal(props.selection))
             }
@@ -121,7 +123,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
               props.editing.setCutting(false);
               if (props.originalAudioEditor?.originalTool)
                 props.originalAudioEditor.setOriginalTool(false);
-              else if (props.selection.kind === 'range')
+              else if (!props.selectedObject && props.selection.kind === 'range')
                 props.originalAudioEditor?.addOriginal(props.selection);
               else
                 props.originalAudioEditor?.setOriginalTool(!props.originalAudioEditor.originalTool);

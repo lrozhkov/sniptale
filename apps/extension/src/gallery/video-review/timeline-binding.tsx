@@ -137,6 +137,7 @@ type TimelineBindingProps = {
   onRecordVoiceover(): void;
   onMarker(marker: ReviewTelemetryMarker): void;
   onClearSelection(): void;
+  selectedObject: boolean;
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
   onPlay(): void;
@@ -161,7 +162,6 @@ function ReviewTimelineToolsBinding(
           mode: props.editing.mode,
           rate: props.editing.rate,
           audio: props.editing.audio,
-          selected: !!props.editing.selected,
           exporter: props.editing.exporter,
           setCutting: (value) => {
             props.clearFocusTool();
@@ -171,13 +171,14 @@ function ReviewTimelineToolsBinding(
           toggle: (kind) => {
             props.clearFocusTool();
             props.audio.setOriginalTool(false);
+            props.audio.setOriginalRangeSelected(false);
             void props.editing.toggle(kind);
           },
           canApply: props.editing.canApply,
           changeRate: props.editing.changeRate,
           changeAudio: props.editing.changeAudio,
-          remove: props.editing.remove,
         }}
+        selectedObject={props.selectedObject}
         busy={props.busy}
         composerBusy={props.composerBusy}
         selection={props.selection}
@@ -390,12 +391,16 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
     commit,
     tool: {
       active,
-      available: active || props.selection.kind !== 'range' || !!candidate(props.selection),
+      available:
+        active ||
+        props.selectedObject ||
+        props.selection.kind !== 'range' ||
+        !!candidate(props.selection),
       onToggle: () => {
         props.audio.setOriginalTool(false);
         props.editing.setCutting(false);
         if (active) setEnabled(false);
-        else if (props.selection.kind === 'range') {
+        else if (!props.selectedObject && props.selection.kind === 'range') {
           props.setTrackVisibility('zoom', true);
           commit(props.selection);
         } else {

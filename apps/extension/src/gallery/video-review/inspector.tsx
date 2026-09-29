@@ -221,15 +221,20 @@ function ReviewAnnotationList(props: {
                 >
                   <Pencil size={16} />
                 </ReviewButton>
-                <ReviewButton
-                  label={translate('gallery.videoReview.deleteComment')}
-                  disabled={props.busy}
-                  className={`${reviewDeleteButtonClassName} !w-8`}
-                  onClick={() => props.onDelete(annotation)}
-                >
-                  <Trash2 size={16} />
-                </ReviewButton>
               </div>
+              {props.selectedId === annotation.id ? (
+                <div className="col-span-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+                  <ReviewButton
+                    label={translate('gallery.videoReview.deleteSelected')}
+                    disabled={props.busy}
+                    className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                    onClick={() => props.onDelete(annotation)}
+                  >
+                    <Trash2 size={15} aria-hidden="true" />
+                    <span>{translate('gallery.videoReview.deleteSelected')}</span>
+                  </ReviewButton>
+                </div>
+              ) : null}
             </>
           )}
         </li>

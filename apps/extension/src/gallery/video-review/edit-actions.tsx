@@ -15,15 +15,7 @@ import {
   isReviewSpeedRate,
   type ReviewSpeedRate,
 } from '../../features/video/review/speed';
-import {
-  Scissors,
-  Download,
-  FileVideo,
-  Gauge,
-  MousePointer2,
-  Trash2,
-  Settings2,
-} from 'lucide-react';
+import { Scissors, Download, FileVideo, Gauge, MousePointer2, Settings2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
 import {
@@ -58,10 +50,8 @@ export function ReviewTimelineTools(props: {
   busy: boolean;
   rate: number;
   audio: 'speed' | 'mute';
-  selected: boolean;
   onPointer(): void;
   onToggle(kind: 'cut' | 'speed'): void;
-  onRemove(): void;
   onRate(value: ReviewSpeedRate): void;
   onAudio(value: 'speed' | 'mute'): void;
 }) {
@@ -98,17 +88,6 @@ export function ReviewTimelineTools(props: {
         <Gauge size={16} />
       </ReviewButton>
       {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
-      {props.selected ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.removeEdit')}
-          toolbarLabel={translate('gallery.videoReview.removeEdit')}
-          className={plain}
-          disabled={props.busy}
-          onClick={props.onRemove}
-        >
-          <Trash2 size={15} />
-        </ReviewButton>
-      ) : null}
     </>
   );
 }

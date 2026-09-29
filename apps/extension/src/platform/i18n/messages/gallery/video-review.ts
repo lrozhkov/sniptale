@@ -61,6 +61,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   applyCut: { ru: 'Вырезать диапазон', en: 'Cut range' },
   applyRange: { ru: 'Применить интервал', en: 'Apply range' },
   removeEdit: { ru: 'Удалить правку', en: 'Remove edit' },
+  deleteSelected: { ru: 'Удалить', en: 'Delete' },
   speedMode: { ru: 'Скорость', en: 'Speed' },
   applySpeed: { ru: 'Применить скорость', en: 'Apply speed' },
   speedRate: { ru: 'Скорость участка', en: 'Interval speed' },

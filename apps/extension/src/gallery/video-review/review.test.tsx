@@ -162,7 +162,12 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     clipboard.mockRejectedValueOnce(new Error('denied'));
     await click('copyReport');
     expect(host.textContent).toContain('gallery.videoReview.reportFailed');
-    await click('deleteComment');
+    await act(async () =>
+      Array.from(host.querySelectorAll<HTMLButtonElement>('ol li button'))
+        .find((button) => button.textContent?.includes('Edited note'))!
+        .click()
+    );
+    await click('deleteSelected');
     expect(host.textContent).not.toContain('Edited note');
     await click('undo');
     expect(host.textContent).toContain('Edited note');
@@ -383,7 +388,7 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     )!;
     await act(async () => cut.click());
     expect(video.currentTime).toBe(0);
-    await click('removeEdit');
+    await click('deleteSelected');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
     await click('undo');
     await click('cutMode');

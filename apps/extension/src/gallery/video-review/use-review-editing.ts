@@ -51,6 +51,7 @@ export function useReviewEditingTools(args: {
     seek: args.seek,
     setSelection: args.setTimelineSelection,
     selectedEditId: args.activeSelection.kind === 'edit' ? args.activeSelection.id : null,
+    selectedObject: args.activeSelection.kind !== 'none',
     onSelectedEditIdChange: (id) =>
       args.setActiveSelection(id ? { kind: 'edit', id } : { kind: 'none' }),
     commit: (before, after) =>

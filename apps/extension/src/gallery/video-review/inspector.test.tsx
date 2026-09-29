@@ -22,6 +22,7 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
   const onSelect = vi.fn();
   const onEdit = vi.fn();
   const onHover = vi.fn();
+  const onDelete = vi.fn();
   const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 2 } };
   try {
     act(() =>
@@ -39,7 +40,7 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
           onSelect={onSelect}
           onEdit={onEdit}
           onHover={onHover}
-          onDelete={vi.fn()}
+          onDelete={onDelete}
           onReport={vi.fn()}
         >
           {null}
@@ -61,6 +62,35 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
         .click()
     );
     expect(onEdit).toHaveBeenCalledWith(annotation);
+    expect(host.querySelector('[aria-label="gallery.videoReview.deleteSelected"]')).toBeNull();
+    act(() =>
+      root.render(
+        <ReviewInspector
+          filename="clip.webm"
+          annotations={[annotation]}
+          selectedId={annotation.id}
+          busy={false}
+          message={null}
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={onSelect}
+          onEdit={onEdit}
+          onHover={onHover}
+          onDelete={onDelete}
+          onReport={vi.fn()}
+        >
+          {null}
+        </ReviewInspector>
+      )
+    );
+    const remove = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.deleteSelected"]'
+    )!;
+    expect(remove.textContent).toContain('gallery.videoReview.deleteSelected');
+    expect(remove.className).toContain('!w-full');
+    expect(remove.parentElement?.className).toContain('border-t');
+    act(() => remove.click());
+    expect(onDelete).toHaveBeenCalledWith(annotation);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

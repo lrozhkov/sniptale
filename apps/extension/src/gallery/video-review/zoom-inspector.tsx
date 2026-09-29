@@ -243,14 +243,16 @@ export function ReviewZoomLinkInspector(props: {
           {reviewTimeLabel(gap)}
         </span>
       </div>
-      <ReviewButton
-        label={translate('gallery.videoReview.zoomLinkRemove')}
-        className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-        onClick={props.onRemove}
-      >
-        <Unlink size={15} aria-hidden="true" />
-        <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
-      </ReviewButton>
+      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <ReviewButton
+          label={translate('gallery.videoReview.zoomLinkRemove')}
+          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+          onClick={props.onRemove}
+        >
+          <Unlink size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
+        </ReviewButton>
+      </div>
     </div>
   );
 }

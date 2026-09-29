@@ -29,14 +29,12 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
               mode: null,
               rate: 2,
               audio: 'speed',
-              selected: false,
               exporter: { index: null, phase: 'idle' },
               setCutting: vi.fn(),
               toggle: vi.fn(),
               canApply: vi.fn(() => true),
               changeRate: vi.fn(),
               changeAudio: vi.fn(),
-              remove: vi.fn(),
             }}
           />
           <ReviewTrackControls {...controls} />

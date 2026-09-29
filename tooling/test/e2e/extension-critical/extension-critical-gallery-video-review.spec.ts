@@ -1974,7 +1974,7 @@ for (const variant of [
         inspector.getByText(label('gallery.videoReview.speedRate'), { exact: true })
       ).toBeVisible();
       await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
-      await page.setViewportSize({ width: 800, height: 600 });
+      await page.setViewportSize({ width: 1280, height: 720 });
       await button('gallery.videoReview.exportSettings').click();
       const quality = button('gallery.videoReview.exportQuality');
       await quality.scrollIntoViewIfNeeded();
@@ -1996,7 +1996,7 @@ for (const variant of [
       await expect(exporting).toBeInViewport({ ratio: 1 });
       await expect(button('gallery.videoReview.downloadVideo')).toBeInViewport({ ratio: 1 });
       await expect(inspector.locator('header h2')).toBeInViewport();
-      await page.screenshot({ path: testInfo.outputPath('polish-minimum-export.png') });
+      await page.screenshot({ path: testInfo.outputPath('polish-hd-export.png') });
       await button('gallery.videoReview.exportSettings').click();
       const speedValue = inspector.getByRole('button', {
         name: label('gallery.videoReview.speedRate'),
@@ -2006,7 +2006,20 @@ for (const variant of [
       await speedValue.click();
       await expect(page.getByRole('option', { name: '2×', exact: true })).toBeInViewport();
       await page.keyboard.press('Escape');
-      await page.screenshot({ path: testInfo.outputPath('polish-minimum-inspector.png') });
+      await page.screenshot({ path: testInfo.outputPath('polish-hd-inspector.png') });
+      const remove = inspector.getByRole('button', {
+        name: label('gallery.videoReview.deleteSelected'),
+        exact: true,
+      });
+      await remove.scrollIntoViewIfNeeded();
+      await expect(remove).toBeInViewport();
+      await expect(remove).toHaveCSS('min-height', '36px');
+      const baseBorder = await remove.evaluate((node) => getComputedStyle(node).borderColor);
+      await remove.hover();
+      expect(await remove.evaluate((node) => getComputedStyle(node).borderColor)).not.toBe(
+        baseBorder
+      );
+      await page.screenshot({ path: testInfo.outputPath('polish-hd-delete.png') });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -2044,7 +2057,7 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     const range = dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
     await expect(range).toHaveCount(1);
     await expect(range).toHaveAttribute('aria-pressed', 'true');
-    await expect(button('gallery.videoReview.cutMode')).toBeDisabled();
+    await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
     await expect(button('gallery.videoReview.muteAudioRange')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('source-audio-range-ru.png') });
     await button('gallery.videoReview.undo').click();
@@ -2798,7 +2811,7 @@ for (const advanced of [false, true]) {
           });
           await dialog
             .locator('aside')
-            .getByRole('button', { name: label('gallery.videoReview.removeEdit'), exact: true })
+            .getByRole('button', { name: label('gallery.videoReview.deleteSelected'), exact: true })
             .click();
         }
         if (!advanced) await button('gallery.videoReview.advancedEditing').click();

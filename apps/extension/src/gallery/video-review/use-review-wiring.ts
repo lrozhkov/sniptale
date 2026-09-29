@@ -145,9 +145,10 @@ export function useReviewEditorWiring(args: {
     remove: removeSelection,
     addComment: () => comments.add(args.timelineSelection),
     toggleCut: () => {
-      if (audio.originalRangeSelected) return;
+      if (audio.originalRangeSelected && args.activeSelection.kind === 'none') return;
       args.zoom.setDrawing(false);
       audio.setOriginalTool(false);
+      audio.setOriginalRangeSelected(false);
       void args.cuts.toggle('cut');
     },
   });

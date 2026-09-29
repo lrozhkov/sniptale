@@ -662,6 +662,7 @@ function ReviewEditor({
           onImportAudioFile={onImportAudioFile}
           onRecordVoiceover={voiceover.open}
           onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
+          selectedObject={state.activeSelection.kind !== 'none'}
           onMarker={(marker) => {
             if (!state.canStart()) return;
             state.seek(marker.start, false);
