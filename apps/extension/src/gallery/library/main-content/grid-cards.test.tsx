@@ -421,7 +421,9 @@ it.each(['compact-grid', 'large-grid'] as const)(
     expect(metadata?.querySelector('[title]')?.getAttribute('title')).toBe(
       `${translate('gallery.app.draftExpires')} date:99`
     );
-    expect(metadata?.querySelector('svg')?.classList.toString()).toContain('lucide-clock');
+    expect(metadata?.querySelector('svg')?.classList.toString()).toContain(
+      viewMode === 'compact-grid' ? 'lucide-trash' : 'lucide-clock'
+    );
   }
 );
 
@@ -619,7 +621,7 @@ it('shows only the deletion date for drafts in grid cards', () => {
   expect(compactMetadata?.querySelector('[title]')?.getAttribute('title')).toBe(
     `${translate('gallery.app.draftExpires')} date:99`
   );
-  expect(compactMetadata?.querySelector('svg')?.classList.toString()).toContain('lucide-clock');
+  expect(compactMetadata?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
 });
 
 it('renders scenario rows as shared selectable items', () => {

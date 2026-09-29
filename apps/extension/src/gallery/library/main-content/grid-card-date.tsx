@@ -11,16 +11,27 @@ function getDraftDatePresentation(items: GalleryItem[]) {
     .map((item) => item.expiresAt)
     .filter((expiresAt): expiresAt is number => expiresAt !== undefined);
   const expiresAt = expirationDates.length > 0 ? Math.min(...expirationDates) : undefined;
+  const createdAt = formatDate(drafts[0]!.createdAt);
 
   return {
-    dateLabel: formatDate(expiresAt ?? drafts[0]!.createdAt),
-    hint: expiresAt
-      ? `${translate('gallery.app.draftExpires')} ${formatDate(expiresAt)}`
-      : translate('gallery.app.draftNoExpiration'),
+    dateLabel: expiresAt === undefined ? createdAt : formatDate(expiresAt),
+    hint:
+      expiresAt !== undefined
+        ? `${translate('gallery.app.draftExpires')} ${formatDate(expiresAt)}`
+        : [
+            `${translate('gallery.app.createdLabel')} ${createdAt}`,
+            translate('gallery.app.draftNoExpiration'),
+          ].join(' · '),
   };
 }
 
-export function GalleryGridCardDate({ items }: { items: GalleryItem[] }) {
+export function GalleryGridCardDate({
+  items,
+  compact,
+}: {
+  items: GalleryItem[];
+  compact: boolean;
+}) {
   const firstItem = items[0];
   if (!firstItem) return null;
 
@@ -36,7 +47,7 @@ export function GalleryGridCardDate({ items }: { items: GalleryItem[] }) {
       className={`flex min-w-0 items-center gap-1 ${draft ? 'font-medium text-[var(--sniptale-color-warning)]' : ''}`}
       title={draft?.hint}
     >
-      {trashedAt !== undefined ? (
+      {trashedAt !== undefined || (draft && compact) ? (
         <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
       ) : draft ? (
         <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

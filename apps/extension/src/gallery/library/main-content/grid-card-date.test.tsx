@@ -4,6 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createMediaItem } from '../actions/test-support';
+import { translate } from '../../../platform/i18n';
+import { GalleryGridCardDate } from './grid-card-date';
 
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
@@ -30,6 +32,27 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+});
+
+it('labels a non-expiring draft creation date and leaves a saved card without a Trash icon', () => {
+  const draft = createMediaItem({
+    createdAt: 12,
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 12 },
+  });
+  act(() => root?.render(<GalleryGridCardDate items={[draft]} compact />));
+  const date = container?.querySelector('span[title]');
+  expect(date?.textContent).toBe('date:12');
+  expect(date?.getAttribute('title')).toContain('date:12');
+  expect(date?.getAttribute('title')).toContain(translate('gallery.app.draftNoExpiration'));
+  expect(date?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
+
+  const saved = createMediaItem({
+    createdAt: 13,
+    lifecycle: { savedAt: 13, storageClass: 'library', updatedAt: 13 },
+  });
+  act(() => root?.render(<GalleryGridCardDate items={[saved]} compact />));
+  expect(container?.textContent).toContain('date:13');
+  expect(container?.querySelector('svg')).toBeNull();
 });
 
 it.each(['compact-grid', 'large-grid'] as const)(

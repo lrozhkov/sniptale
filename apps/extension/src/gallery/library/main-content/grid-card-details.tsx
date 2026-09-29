@@ -266,7 +266,7 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
         className={`flex items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]`}
       >
-        <GalleryGridCardDate items={[props.item]} />
+        <GalleryGridCardDate items={[props.item]} compact={Boolean(props.compact)} />
         <span className="shrink-0">
           {props.item.size > 0
             ? props.compact

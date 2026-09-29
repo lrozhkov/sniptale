@@ -401,7 +401,7 @@ function GalleryRecordingGroupDetails(props: {
         className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]"
       >
-        <GalleryGridCardDate items={props.items} />
+        <GalleryGridCardDate items={props.items} compact={isCompact} />
         <span className="shrink-0">
           {totalSize > 0
             ? isCompact
