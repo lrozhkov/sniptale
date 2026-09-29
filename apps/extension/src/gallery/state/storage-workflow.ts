@@ -92,7 +92,10 @@ export function useGalleryStorageWorkflow({
           ...previous,
           item: previewItem
             ? (items.find(
-                (item) => item.id === previewItem.id && item.lifecycle?.trashedAt === undefined
+                (item) =>
+                  item.id === previewItem.id &&
+                  (item.lifecycle?.trashedAt !== undefined) ===
+                    (previewItem.lifecycle?.trashedAt !== undefined)
               ) ?? null)
             : null,
           url: null,

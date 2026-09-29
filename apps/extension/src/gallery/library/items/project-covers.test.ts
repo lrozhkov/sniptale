@@ -105,6 +105,36 @@ it('returns fallback for stale, unavailable, and empty projects without reading 
   expect(io.getMediaAssetBlob).not.toHaveBeenCalled();
 });
 
+it('reads a retained trashed project only while its lifecycle and revision still match', async () => {
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 5 };
+  const item = {
+    ...createVideoProjectItem({ id: 'video-project:deleted', entityId: 'deleted' }),
+    lifecycle,
+    workspaceRevision: 8,
+  };
+  io.getVideoProject.mockResolvedValueOnce({
+    status: 'ready',
+    project: projectWithClips(),
+    lifecycle,
+    workspaceRevision: 8,
+  });
+  await expect(getGalleryProjectCover(item)).resolves.toBeUndefined();
+  expect(io.getVideoProject).toHaveBeenCalledWith('deleted');
+  expect(io.getMediaAssetBlob.mock.calls.map(([id]) => id)).toEqual(['used', 'later']);
+  io.getMediaAssetBlob.mockClear();
+
+  io.getVideoProject.mockResolvedValueOnce({
+    status: 'ready',
+    project: projectWithClips(),
+    lifecycle: { ...lifecycle, trashedAt: 6 },
+    workspaceRevision: 8,
+  });
+  await expect(
+    getGalleryProjectCover({ ...item, id: 'video-project:stale', entityId: 'stale' })
+  ).resolves.toBeUndefined();
+  expect(io.getMediaAssetBlob).not.toHaveBeenCalled();
+});
+
 it('coalesces concurrent reads and tries the next source when the first is missing', async () => {
   const item = { ...createVideoProjectItem(), workspaceRevision: 2 };
   const project = projectWithClips();

@@ -225,7 +225,7 @@ it('partitions trash before normal facets, counts, selection and search; trash i
   expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
     expect.objectContaining({
       items: [trashed],
-      search: '',
+      search: 'capture',
       scope: 'all',
       folderFilter: 'all',
       activeTags: [],

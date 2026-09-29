@@ -209,8 +209,7 @@ it('shows read-only tags without an input for non-editable exports', async () =>
     )
   );
 
-  const tagButton = container.querySelector('button');
-  expect(tagButton?.hasAttribute('disabled')).toBe(true);
+  expect(container.querySelector('button')).toBeNull();
   expect(container.querySelector('input')).toBeNull();
   expect(container.textContent).toContain('published');
   await act(async () => root.unmount());

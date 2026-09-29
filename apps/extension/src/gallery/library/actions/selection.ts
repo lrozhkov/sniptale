@@ -4,6 +4,7 @@ import { updateScenarioProjectRecordMetadata } from '../../../composition/persis
 import type { GallerySelectionController } from './controller-types';
 import {
   isGalleryMediaItem,
+  isGalleryScenarioExportItem,
   isGalleryScenarioItem,
   isGallerySelectableItem,
   isGalleryVideoProjectItem,
@@ -30,6 +31,7 @@ function splitSelectableTargets(targets: GalleryItem[]) {
 }
 
 function trashTarget(item: GalleryItem): LibraryLifecycleTarget {
+  if (isGalleryScenarioExportItem(item)) return { kind: 'scenario-project', id: item.project.id };
   if (isGalleryScenarioItem(item)) return { kind: 'scenario-project', id: item.entityId };
   if (isGalleryVideoProjectItem(item)) return { kind: 'video-project', id: item.entityId };
   return { kind: 'media', id: item.entityId ?? item.id };
@@ -42,11 +44,26 @@ async function finishTrashAction(controller: GallerySelectionController) {
 }
 
 export function createRestoreTrashAction(controller: GallerySelectionController) {
-  return (targets: GalleryItem[], withBusy: GalleryBusyAction) =>
-    withBusy(async () => {
-      await restoreLibraryTrashItems(targets.filter(isGallerySelectableItem).map(trashTarget));
+  return async (targets: GalleryItem[], withBusy: GalleryBusyAction): Promise<boolean> => {
+    const restoreTargets = [
+      ...new Map(
+        targets
+          .filter((item) => isGallerySelectableItem(item) || isGalleryScenarioExportItem(item))
+          .map((item) => {
+            const target = trashTarget(item);
+            return [`${target.kind}:${target.id}`, target] as const;
+          })
+      ).values(),
+    ];
+    if (restoreTargets.length === 0) return false;
+    let restored = false;
+    await withBusy(async () => {
+      await restoreLibraryTrashItems(restoreTargets);
+      restored = true;
       await finishTrashAction(controller);
     });
+    return restored;
+  };
 }
 
 export function createDeleteManyAction(controller: GallerySelectionController) {

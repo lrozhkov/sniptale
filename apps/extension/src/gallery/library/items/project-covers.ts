@@ -112,14 +112,14 @@ async function buildProjectCover(
   item: GalleryItem,
   signal: AbortSignal
 ): Promise<Blob | undefined> {
-  if (signal.aborted || item.lifecycle?.trashedAt !== undefined) return undefined;
+  if (signal.aborted) return undefined;
   if (item.type === 'video-project') {
     if (item.unavailableReason !== null) return undefined;
     const result = await getVideoProject(item.entityId);
     if (
       signal.aborted ||
       result.status !== 'ready' ||
-      result.lifecycle?.trashedAt !== undefined ||
+      result.lifecycle?.trashedAt !== item.lifecycle?.trashedAt ||
       result.workspaceRevision !== item.workspaceRevision
     )
       return undefined;
@@ -144,7 +144,7 @@ async function buildProjectCover(
     if (
       signal.aborted ||
       !entry ||
-      entry.lifecycle?.trashedAt !== undefined ||
+      entry.lifecycle?.trashedAt !== item.lifecycle?.trashedAt ||
       entry.workspaceRevision !== item.workspaceRevision
     )
       return undefined;
@@ -198,13 +198,17 @@ export function getGalleryProjectCover(
 ): Promise<Blob | undefined> {
   if (signal?.aborted) return Promise.resolve(undefined);
   if (
-    item.lifecycle?.trashedAt !== undefined ||
     (item.type === 'scenario' && item.project.availability !== 'available') ||
     (item.type === 'video-project' && item.unavailableReason !== null)
   ) {
     return Promise.resolve(undefined);
   }
-  const key = `${item.type}:${item.entityId ?? item.id}:${item.workspaceRevision ?? item.updatedAt}`;
+  const key = [
+    item.type,
+    item.entityId ?? item.id,
+    item.workspaceRevision ?? item.updatedAt,
+    item.lifecycle?.trashedAt ?? 'active',
+  ].join(':');
   const cached = retained.get(key);
   if (cached) {
     retained.delete(key);

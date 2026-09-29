@@ -14,7 +14,13 @@ function SourceRow({ label, value }: { label: string; value: string }) {
 }
 
 /** Read-only provenance and recording summary for the selected library item. */
-export function PreviewSourceField({ item }: { item: GalleryItem }) {
+export function PreviewSourceField({
+  item,
+  trashMode,
+}: {
+  item: GalleryItem;
+  trashMode?: boolean;
+}) {
   const metadata = usePreviewSourceMetadata(item);
   const href = createSafeExternalHref(item.sourceUrl);
   const title =
@@ -63,7 +69,7 @@ export function PreviewSourceField({ item }: { item: GalleryItem }) {
           ) : null}
         </dl>
         {title ? <p className="break-words">{title}</p> : null}
-        {href ? (
+        {href && !trashMode ? (
           <a
             href={href}
             target="_blank"

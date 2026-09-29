@@ -12,6 +12,12 @@ export const galleryAppMessages = defineMessageSource({
   },
   trashSelectAll: { ru: 'Выбрать всё', en: 'Select all' },
   restoreTrash: { ru: 'Восстановить выбранное', en: 'Restore selected' },
+  restoreItem: { ru: 'Восстановить', en: 'Restore' },
+  restoringItem: { ru: 'Восстанавливаем…', en: 'Restoring…' },
+  restoreItemFailed: {
+    ru: 'Не удалось восстановить материал. Повторите попытку.',
+    en: 'Could not restore this item. Try again.',
+  },
   permanentDelete: { ru: 'Удалить навсегда', en: 'Delete permanently' },
   emptyTrash: { ru: 'Очистить корзину', en: 'Empty trash' },
   moveToTrash: { ru: 'Переместить в корзину', en: 'Move to trash' },
@@ -24,6 +30,9 @@ export const galleryAppMessages = defineMessageSource({
     en: 'Permanently delete the selected items from trash? This cannot be undone.',
   },
   trashEmpty: { ru: 'Корзина пуста', en: 'Trash is empty' },
+  trashNoResults: { ru: 'В корзине ничего не найдено', en: 'No matching items in Trash' },
+  trashSearchPlaceholder: { ru: 'Поиск в корзине', en: 'Search Trash' },
+  trashSearchLabel: { ru: 'Поиск в корзине', en: 'Search Trash' },
   trashCleanupFailed: {
     ru: 'Не удалось завершить автоочистку корзины. Оставшиеся материалы сохранены; повторите обновление.',
     en: 'Automatic trash cleanup could not finish. Remaining items are retained; refresh to retry.',

@@ -90,6 +90,16 @@ it('shows loading until resolved and exposes all linked project navigation route
   expect(mocks.gallery).toHaveBeenCalledExactlyOnceWith({ mediaId: 'review-1', quickEdit: true });
 });
 
+it('shows linked project names without navigation in Trash', async () => {
+  mocks.usage.mockResolvedValue([
+    { id: 'video-1', name: 'Video project', kind: 'video', primary: true },
+  ]);
+  await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} trashMode />));
+  expect(container.textContent).toContain('Video project');
+  expect(container.querySelector('button')).toBeNull();
+  expect(mocks.video).not.toHaveBeenCalled();
+});
+
 it('shows empty usage and uses the item id when entity identity is absent', async () => {
   mocks.usage.mockResolvedValue([]);
   const item = createMediaItem({ id: 'media-fallback' });

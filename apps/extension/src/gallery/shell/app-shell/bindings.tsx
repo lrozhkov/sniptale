@@ -68,38 +68,76 @@ function openPreview(
   });
 }
 
+function isReadOnlyTrashPreview(controller: GalleryAppStateController): boolean {
+  return Boolean(
+    controller.state.filters.trashMode ||
+    controller.state.preview.session.item?.lifecycle?.trashedAt !== undefined
+  );
+}
+
 function buildGalleryPreviewHandlers(
   actions: UseGalleryAppActionsResult,
   controller: GalleryAppStateController,
   messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
 ) {
   return {
-    onPreviewClose: () => void actions.preview.close(),
+    onPreviewClose: () => {
+      if (isReadOnlyTrashPreview(controller)) {
+        openPreview(controller, null, { inspectorCollapsed: false });
+        return;
+      }
+      void actions.preview.close();
+    },
     onPreviewInspectorToggle: () =>
       controller.actions.preview.setPreview((previous) => ({
         ...previous,
         inspectorCollapsed: !previous.inspectorCollapsed,
       })),
-    onPreviewResetChanges: () => actions.preview.resetChanges(),
-    onPreviewDownload: actions.preview.download,
-    onPreviewDownloadOriginal: actions.preview.downloadOriginal,
-    onPreviewCopy: actions.preview.copy,
-    onPreviewEdit: actions.preview.openInEditor,
+    onPreviewResetChanges: () => {
+      if (!isReadOnlyTrashPreview(controller)) actions.preview.resetChanges();
+    },
+    onPreviewDownload: () =>
+      isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.download(),
+    onPreviewDownloadOriginal: () =>
+      isReadOnlyTrashPreview(controller)
+        ? Promise.resolve(false)
+        : actions.preview.downloadOriginal(),
+    onPreviewCopy: () =>
+      isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.copy(),
+    onPreviewEdit: (item: GalleryItem) => {
+      if (!isReadOnlyTrashPreview(controller) && item.lifecycle?.trashedAt === undefined) {
+        actions.preview.openInEditor(item);
+      }
+    },
     onProjectOpen: (item: GalleryItem) => {
-      if (controller.state.filters.trashMode) return;
+      if (controller.state.filters.trashMode || item.lifecycle?.trashedAt !== undefined) return;
       actions.preview.openInEditor(item);
     },
     onRecordingGroupOpen: (item: GalleryItem) => {
-      if (controller.state.filters.trashMode) controller.actions.selection.toggleSelection(item.id);
-      else void actions.preview.openInEditor(item);
+      if (controller.state.filters.trashMode) {
+        if (item.lifecycle?.trashedAt !== undefined)
+          openPreview(controller, item, { inspectorCollapsed: false });
+      } else if (item.lifecycle?.trashedAt === undefined) {
+        void actions.preview.openInEditor(item);
+      }
     },
-    onPreviewOpenSnapshotScreenshot: actions.preview.openSnapshotScreenshotInEditor,
-    onPreviewRestoreOriginal: actions.preview.restoreOriginal,
-    onPreviewSaveCopy: actions.preview.saveCopy,
+    onPreviewOpenSnapshotScreenshot: () => {
+      if (!isReadOnlyTrashPreview(controller)) actions.preview.openSnapshotScreenshotInEditor();
+    },
+    onPreviewRestoreOriginal: () => {
+      if (!isReadOnlyTrashPreview(controller)) actions.preview.restoreOriginal();
+    },
+    onPreviewSaveCopy: () =>
+      isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.saveCopy(),
     onPreviewDelete: (
       item: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0][number]
-    ) => void actions.selection.deleteMany([item]),
+    ) => {
+      if (!isReadOnlyTrashPreview(controller) && item.lifecycle?.trashedAt === undefined) {
+        void actions.selection.deleteMany([item]);
+      }
+    },
     onPreviewPromote: async (item: GalleryItem) => {
+      if (isReadOnlyTrashPreview(controller) || item.lifecycle?.trashedAt !== undefined) return;
       const target = resolvePromotionTarget(item);
       if (!target) return;
       const response = await messaging.sendRuntimeMessage({
@@ -112,10 +150,30 @@ function buildGalleryPreviewHandlers(
     },
     onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) =>
       controller.state.filters.trashMode
-        ? controller.actions.selection.toggleSelection(item.id)
-        : openPreview(controller, item, options),
+        ? item.lifecycle?.trashedAt !== undefined
+          ? openPreview(controller, item, { inspectorCollapsed: false })
+          : undefined
+        : item.lifecycle?.trashedAt === undefined
+          ? openPreview(controller, item, options)
+          : undefined,
     onPreviewNavigate: (item: GalleryItem) => {
-      void actions.preview.navigate(item);
+      if (isReadOnlyTrashPreview(controller)) {
+        if (item.lifecycle?.trashedAt !== undefined && controller.state.filters.trashMode) {
+          openPreview(controller, item);
+        }
+        return;
+      }
+      if (item.lifecycle?.trashedAt === undefined) void actions.preview.navigate(item);
+    },
+    onPreviewRestoreTrash: async (item: GalleryItem) => {
+      if (
+        !controller.state.filters.trashMode ||
+        item.lifecycle?.trashedAt === undefined ||
+        controller.state.preview.session.item?.id !== item.id ||
+        controller.state.storage.isBusy
+      )
+        return false;
+      return (await actions.selection.restoreTrash?.([item])) ?? false;
     },
   };
 }
@@ -126,9 +184,15 @@ function buildGallerySelectionHandlers(
 ) {
   return {
     onSelectionTagDraftChange: controller.actions.selection.setSelectionTagDraft,
-    onApplySelectionTag: (tag?: string) => void actions.selection.applyTag(tag),
-    onSelectionBackup: () => void actions.selection.downloadBackup(),
-    onSelectionZip: () => void actions.selection.downloadZip(),
+    onApplySelectionTag: (tag?: string) => {
+      if (!controller.state.filters.trashMode) void actions.selection.applyTag(tag);
+    },
+    onSelectionBackup: () => {
+      if (!controller.state.filters.trashMode) void actions.selection.downloadBackup();
+    },
+    onSelectionZip: () => {
+      if (!controller.state.filters.trashMode) void actions.selection.downloadZip();
+    },
     onDeleteMany: (items: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0]) =>
       void actions.selection.deleteMany(items),
     onClearSelection: () => controller.actions.selection.setSelectedIds(new Set()),
@@ -192,10 +256,20 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onImportMediaClick: () => controller.refs.mediaImportInputRef.current?.click(),
     onImportWebSnapshotClick: () => controller.refs.webSnapshotImportInputRef.current?.click(),
     onBannerDismiss: () => controller.actions.surface.setBanner(null),
-    onFilenameChange: controller.actions.preview.setFilenameDraft,
-    onTagDraftChange: controller.actions.preview.setTagDraft,
-    onRemoveTag: (tag: string) => removeTag(controller, tag),
-    onAddTag: (tag?: string) => addTag(controller, tag ?? null),
+    onFilenameChange: (
+      value: Parameters<typeof controller.actions.preview.setFilenameDraft>[0]
+    ) => {
+      if (!isReadOnlyTrashPreview(controller)) controller.actions.preview.setFilenameDraft(value);
+    },
+    onTagDraftChange: (value: Parameters<typeof controller.actions.preview.setTagDraft>[0]) => {
+      if (!isReadOnlyTrashPreview(controller)) controller.actions.preview.setTagDraft(value);
+    },
+    onRemoveTag: (tag: string) => {
+      if (!isReadOnlyTrashPreview(controller)) removeTag(controller, tag);
+    },
+    onAddTag: (tag?: string) => {
+      if (!isReadOnlyTrashPreview(controller)) addTag(controller, tag ?? null);
+    },
     onFolderFilterChange: controller.actions.filters.setFolderFilter,
     onScopeChange: controller.actions.filters.setScope,
     onActiveTagsChange: controller.actions.filters.setActiveTags,

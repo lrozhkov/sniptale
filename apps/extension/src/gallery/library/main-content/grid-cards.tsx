@@ -649,7 +649,7 @@ export function GalleryMediaList(
                     {translate('gallery.preview.recordingGroup')} {unit.memberCount}
                   </span>
                 </div>
-                {props.onRecordingGroupOpen && editorItem ? (
+                {!props.trashMode && props.onRecordingGroupOpen && editorItem ? (
                   <button
                     type="button"
                     className="shrink-0 font-semibold text-[var(--sniptale-color-accent-emphasis)]
@@ -758,7 +758,7 @@ export function GalleryGridCanvas(
               key={`recording-group:${isGalleryMediaItem(item) ? item.recordingGroupView?.groupId : item.id}`}
               items={groupItems}
               onPreviewOpen={onPreviewOpen}
-              {...(props.onRecordingGroupOpen
+              {...(!props.trashMode && props.onRecordingGroupOpen
                 ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
                 : {})}
               onToggleSelection={onToggleSelection}

@@ -162,3 +162,26 @@ it('wires storage callbacks for preview refresh and selection pruning', () => {
   libraryCallbacks?.onSelectionRefresh([createItem({ id: 'asset-2' })]);
   expect(Array.from(currentSelectedIds)).toEqual(['asset-2']);
 });
+
+it('retains a Trash preview only while its item remains trashed and never revives a closed preview', () => {
+  renderHook();
+  currentPreview = {
+    inspectorCollapsed: true,
+    item: createItem({ id: 'asset-1', lifecycle: { trashedAt: 42 } }),
+    url: 'blob:old-preview',
+  };
+
+  libraryCallbacks?.onPreviewItemRefresh([
+    createItem({ id: 'asset-1', filename: 'refreshed.png', lifecycle: { trashedAt: 42 } }),
+  ]);
+  expect(currentPreview.item?.filename).toBe('refreshed.png');
+  expect(currentPreview.url).toBeNull();
+
+  libraryCallbacks?.onPreviewItemRefresh([createItem({ id: 'asset-1' })]);
+  expect(currentPreview.item).toBeNull();
+
+  libraryCallbacks?.onPreviewItemRefresh([
+    createItem({ id: 'asset-1', lifecycle: { trashedAt: 42 } }),
+  ]);
+  expect(currentPreview.item).toBeNull();
+});

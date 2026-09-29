@@ -78,7 +78,8 @@ export function useGalleryFilterState() {
   const [filterPreferences, setFilterPreferences] = useState(getInitialFilterPreferences);
   const filterPreferencesRef = useRef(filterPreferences);
   const [sortMode, setSortMode] = useState<SortMode>('newest');
-  const [search, setSearch] = useState('');
+  const [librarySearch, setLibrarySearch] = useState('');
+  const [trashSearch, setTrashSearch] = useState('');
   const [trashMode, setTrashMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionTagDraft, setSelectionTagDraft] = useState('');
@@ -139,9 +140,8 @@ export function useGalleryFilterState() {
       setTrashMode: (value: boolean) => {
         setTrashMode(value);
         setSelectedIds(new Set());
-        setSearch('');
       },
-      setSearch,
+      setSearch: trashMode ? setTrashSearch : setLibrarySearch,
       setScope,
       setSelectedIds,
       setSelectionTagDraft,
@@ -152,7 +152,7 @@ export function useGalleryFilterState() {
       activeTags: filterPreferences.activeTags,
       facetFilters: filterPreferences.facetFilters,
       folderFilter: filterPreferences.folderFilter,
-      search,
+      search: trashMode ? trashSearch : librarySearch,
       trashMode,
       scope: filterPreferences.scope,
       selectedIds,

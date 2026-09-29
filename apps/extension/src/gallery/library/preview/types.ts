@@ -11,6 +11,9 @@ interface PreviewNavigationProps {
 
 export interface PreviewPanelProps {
   initialMode?: 'edit';
+  trashMode?: boolean;
+  onRestoreTrash?: () => Promise<boolean>;
+  restoreBusy?: boolean;
   allTags?: string[];
   hasChanges?: boolean;
   item: GalleryItem;

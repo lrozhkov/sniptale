@@ -41,7 +41,7 @@ export interface UseGalleryAppActionsResult {
     saveMetadata: () => Promise<void>;
   };
   selection: {
-    restoreTrash?: (targets: GalleryItem[]) => Promise<void>;
+    restoreTrash?: (targets: GalleryItem[]) => Promise<boolean>;
     applyTag: (tag?: string) => Promise<void>;
     deleteMany: (targets: GalleryItem[]) => Promise<void>;
     downloadBackup: () => Promise<void>;

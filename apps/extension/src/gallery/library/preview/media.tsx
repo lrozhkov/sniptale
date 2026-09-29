@@ -7,9 +7,10 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Plus,
+  RotateCcw,
   X,
 } from 'lucide-react';
-import { useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { GalleryProjectOpenAction } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import {
@@ -251,7 +252,7 @@ function PreviewMediaSurface(props: {
 }
 
 function PreviewMediaContent(
-  props: Pick<PreviewPanelProps, 'item' | 'previewUrl'> & {
+  props: Pick<PreviewPanelProps, 'item' | 'previewUrl' | 'trashMode'> & {
     imageStyle: ReturnType<typeof usePreviewImageZoom>['image']['style'];
     imageReady: ReturnType<typeof usePreviewImageZoom>['image']['ready'];
     isImagePreview: boolean;
@@ -272,15 +273,29 @@ function PreviewMediaContent(
   }
 
   if (isGalleryMediaItem(props.item) && props.previewUrl && isVideoKind(props.item.kind)) {
-    return <PreviewVideo key={props.previewUrl} src={props.previewUrl} />;
+    return (
+      <PreviewVideo
+        key={props.previewUrl}
+        src={props.previewUrl}
+        trashMode={Boolean(props.trashMode)}
+      />
+    );
   }
 
   if (isGalleryMediaItem(props.item) && props.previewUrl && props.item.kind === 'audio') {
-    return <audio src={props.previewUrl} controls className="w-full max-w-xl" />;
+    return (
+      <audio
+        src={props.previewUrl}
+        controls
+        controlsList={props.trashMode ? 'nodownload' : undefined}
+        onContextMenu={props.trashMode ? (event) => event.preventDefault() : undefined}
+        className="w-full max-w-xl"
+      />
+    );
   }
 
   if (isGalleryScenarioItem(props.item) || isGalleryScenarioExportItem(props.item)) {
-    return <PreviewScenarioStage item={props.item} />;
+    return <PreviewScenarioStage item={props.item} trashMode={Boolean(props.trashMode)} />;
   }
 
   if (isGalleryVideoProjectItem(props.item)) {
@@ -288,6 +303,56 @@ function PreviewMediaContent(
   }
 
   return null;
+}
+
+function PreviewRestoreAction(props: Pick<PreviewPanelProps, 'onRestoreTrash' | 'restoreBusy'>) {
+  const [status, setStatus] = useState<'idle' | 'pending' | 'failed'>('idle');
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  return (
+    <div className="space-y-2 rounded-[8px] bg-[var(--sniptale-color-surface-panel)] p-2 shadow-sm">
+      <button
+        type="button"
+        data-ui="gallery.preview.restore"
+        disabled={pending.current || props.restoreBusy || !props.onRestoreTrash}
+        aria-busy={status === 'pending'}
+        onClick={async () => {
+          if (pending.current || props.restoreBusy || !props.onRestoreTrash) return;
+          pending.current = true;
+          setStatus('pending');
+          try {
+            const restored = await props.onRestoreTrash();
+            if (mounted.current) setStatus(restored ? 'idle' : 'failed');
+          } catch {
+            if (mounted.current) setStatus('failed');
+          } finally {
+            pending.current = false;
+          }
+        }}
+        className="inline-flex min-h-9 items-center gap-2 rounded-[8px] border
+          border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)]
+          px-3 text-sm font-semibold text-[var(--sniptale-color-accent-emphasis)]
+          transition-colors hover:bg-[var(--sniptale-color-surface-hover)]
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]
+          disabled:cursor-not-allowed disabled:opacity-55"
+      >
+        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+        {translate(status === 'pending' ? 'gallery.app.restoringItem' : 'gallery.app.restoreItem')}
+      </button>
+      {status === 'failed' ? (
+        <p role="alert" className="max-w-64 text-xs text-[var(--sniptale-color-danger)]">
+          {translate('gallery.app.restoreItemFailed')}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function PreviewMedia(
@@ -300,6 +365,9 @@ export function PreviewMedia(
     | 'onInspectorToggle'
     | 'previewUrl'
     | 'onEdit'
+    | 'onRestoreTrash'
+    | 'restoreBusy'
+    | 'trashMode'
   >
 ) {
   const transitionFrame = usePreviewMediaTransition({
@@ -330,7 +398,15 @@ export function PreviewMedia(
         )]"
     >
       <div className="absolute bottom-4 left-4 z-20">
-        <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
+        {props.trashMode ? (
+          <PreviewRestoreAction
+            key={props.item.id}
+            restoreBusy={Boolean(props.restoreBusy)}
+            {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
+          />
+        ) : (
+          <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
+        )}
       </div>
       <PreviewMediaControls
         inspectorCollapsed={props.inspectorCollapsed}
@@ -348,6 +424,7 @@ export function PreviewMedia(
       >
         <PreviewMediaContent
           item={transitionFrame.item}
+          trashMode={Boolean(props.trashMode)}
           previewUrl={transitionFrame.previewUrl}
           imageStyle={imageZoom.image.style}
           imageReady={imageZoom.image.ready}

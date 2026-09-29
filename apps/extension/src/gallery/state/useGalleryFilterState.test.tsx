@@ -169,6 +169,18 @@ it('updates filter state through each owner-local setter', () => {
   expect(next?.state.selectionTagDraft).toBe('draft-tag');
 });
 
+it('keeps Library and Trash search drafts separate while switching modes', () => {
+  renderHook();
+  act(() => latestValue?.actions.setSearch('library query'));
+  act(() => latestValue?.actions.setTrashMode(true));
+  expect(latestValue?.state.search).toBe('');
+  act(() => latestValue?.actions.setSearch('deleted query'));
+  act(() => latestValue?.actions.setTrashMode(false));
+  expect(latestValue?.state.search).toBe('library query');
+  act(() => latestValue?.actions.setTrashMode(true));
+  expect(latestValue?.state.search).toBe('deleted query');
+});
+
 it('persists user filter changes for the next Gallery visit', async () => {
   const value = renderHook();
 

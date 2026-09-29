@@ -97,6 +97,7 @@ function createLayoutProps() {
     onPreviewNavigate: vi.fn(),
     onPreviewOpenSnapshotScreenshot: vi.fn(),
     onPreviewResetChanges: vi.fn(),
+    onPreviewRestoreTrash: vi.fn(async () => true),
     onPreviewRestoreOriginal: vi.fn(),
     onPreviewSaveCopy: vi.fn(),
     onRemoveTag: vi.fn(),
@@ -174,6 +175,8 @@ type PreviewOverlayProps = {
   onDelete: () => Promise<void>;
   onDownload: () => Promise<void>;
   onEdit: () => void;
+  onRestoreTrash?: () => Promise<boolean>;
+  trashMode?: boolean;
   onFilenameChange: (value: string) => void;
   onInspectorToggle: () => void;
   onRemoveTag: (tag: string) => void;
@@ -385,4 +388,19 @@ it('preserves confirmed async results through preview callbacks', async () => {
   const preview = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
   await expect(preview.onCopy()).resolves.toBe(true);
   await expect(preview.onDownload()).resolves.toBe(false);
+});
+
+it('marks a trashed preview read-only and wires its single restore action', async () => {
+  const props = createLayoutProps();
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 3 };
+  const item = createMediaItem({ id: 'deleted', lifecycle });
+  props.state = createGalleryState({
+    filters: { ...props.state.filters, trashMode: true },
+    previewItem: item,
+  });
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  const preview = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
+  expect(preview.trashMode).toBe(true);
+  expect(await preview.onRestoreTrash?.()).toBe(true);
+  expect(props.onPreviewRestoreTrash).toHaveBeenCalledWith(item);
 });

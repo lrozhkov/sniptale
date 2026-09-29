@@ -20,6 +20,7 @@ import type { GallerySavedView } from '../../../composition/persistence/gallery-
 export interface GalleryAppLayoutProps {
   onTrashModeChange?: (value: boolean) => void;
   onRestoreTrash?: () => void;
+  onPreviewRestoreTrash?: (item: GalleryItem) => Promise<boolean>;
   gridViewportRef: RefObject<HTMLDivElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
   importTriggerRef: RefObject<HTMLButtonElement | null>;

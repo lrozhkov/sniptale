@@ -11,6 +11,7 @@ import type { GalleryItem } from '../items';
 
 export interface GalleryMainContentProps {
   trashMode?: boolean;
+  trashItemCount?: number;
   allTags?: string[];
   banner: string | null;
   children?: ReactNode;

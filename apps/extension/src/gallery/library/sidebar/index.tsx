@@ -85,11 +85,7 @@ export function GallerySidebar(props: GallerySidebarProps) {
           <button
             type="button"
             disabled={props.busy}
-            className={
-              props.trashMode
-                ? `${getControlSecondaryButtonClassName({ density: 'compact' })} max-w-full`
-                : trashButtonClassName
-            }
+            className={trashButtonClassName}
             onClick={() => props.onTrashModeChange?.(!props.trashMode)}
           >
             <span className="flex min-w-0 items-center justify-center gap-2 text-xs font-semibold">
@@ -159,7 +155,7 @@ function GalleryTrashControls(props: GallerySidebarProps) {
         </button>
         <button
           type="button"
-          disabled={props.busy || !props.filteredItemCount}
+          disabled={props.busy || !props.trashSummary?.count}
           className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
           onClick={props.onEmptyTrash}
         >

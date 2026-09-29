@@ -8,6 +8,7 @@ function renderGalleryGridContent(
   props: Pick<
     GalleryMainContentProps,
     | 'trashMode'
+    | 'trashItemCount'
     | 'filteredItems'
     | 'filteredScenarioProjects'
     | 'folderFilter'
@@ -19,6 +20,7 @@ function renderGalleryGridContent(
     | 'onProjectOpen'
     | 'onScenarioPreviewOpen'
     | 'onToggleSelection'
+    | 'search'
     | 'selectedIds'
     | 'viewMode'
     | 'visibleItems'
@@ -40,7 +42,11 @@ function renderGalleryGridContent(
   if (props.filteredItems.length === 0) {
     return props.trashMode ? (
       <p role="status" className="p-4 text-sm">
-        {translate('gallery.app.trashEmpty')}
+        {translate(
+          props.trashItemCount === 0 || !props.search.trim()
+            ? 'gallery.app.trashEmpty'
+            : 'gallery.app.trashNoResults'
+        )}
       </p>
     ) : (
       <GalleryEmptyState folderFilter={props.folderFilter} />
@@ -58,6 +64,7 @@ export function GalleryGrid(
   props: Pick<
     GalleryMainContentProps,
     | 'trashMode'
+    | 'trashItemCount'
     | 'filteredItems'
     | 'filteredScenarioProjects'
     | 'folderFilter'
@@ -70,6 +77,7 @@ export function GalleryGrid(
     | 'onProjectOpen'
     | 'onScenarioPreviewOpen'
     | 'onToggleSelection'
+    | 'search'
     | 'selectedIds'
     | 'viewMode'
     | 'visibleItems'

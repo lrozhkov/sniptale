@@ -190,6 +190,25 @@ it('wires compact search, sort, and centered view-mode controls without manual r
   expect(container?.textContent).not.toContain('gallery.app.description');
 });
 
+it('keeps Trash search, sort and all view controls without Library actions', () => {
+  const props = renderHeader({
+    trashMode: true,
+    search: 'deleted',
+    selectedItems: [createMediaItem({ id: 'selected' })],
+  });
+  const input = container?.querySelector<HTMLInputElement>('input');
+  expect(container?.textContent).toContain('gallery.app.trashTitle');
+  expect(input?.value).toBe('deleted');
+  expect(input?.getAttribute('aria-label')).toBe('gallery.app.trashSearchLabel');
+  expect(input?.placeholder).toBe('gallery.app.trashSearchPlaceholder');
+  expect(container?.querySelector('[data-ui="test.sort"]')).not.toBeNull();
+  expect(container?.querySelectorAll('[data-ui^="gallery.header.view-mode."]')).toHaveLength(3);
+  expect(container?.querySelector('[data-ui="gallery.header.storage"]')).toBeNull();
+  expect(container?.textContent).not.toContain('gallery.app.selectedPrefix');
+  act(() => updateInputValue(input!, 'another'));
+  expect(props.onSearchChange).toHaveBeenCalled();
+});
+
 it('keeps canonical name sorts and removes size sorting for scenarios', () => {
   renderHeader({ folderFilter: 'scenario' });
 

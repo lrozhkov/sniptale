@@ -35,6 +35,7 @@ function ScenarioPreviewStepsGrid(props: {
   recentSteps: ScenarioPreviewStep[];
   title: string;
   projectId: string;
+  trashMode?: boolean;
 }) {
   return (
     <ScenarioPreviewSurface>
@@ -48,7 +49,9 @@ function ScenarioPreviewStepsGrid(props: {
           {props.title}
         </div>
       </div>
-      <ScenarioViewingActions projectId={props.projectId} exportMode={props.exportMode} />
+      {!props.trashMode ? (
+        <ScenarioViewingActions projectId={props.projectId} exportMode={props.exportMode} />
+      ) : null}
       {props.recentSteps.length === 0 ? (
         <ScenarioPreviewEmptyState exportMode={props.exportMode} />
       ) : (
@@ -62,7 +65,7 @@ function ScenarioPreviewStepsGrid(props: {
   );
 }
 
-export function PreviewScenarioStage(props: { item: GalleryItem }) {
+export function PreviewScenarioStage(props: { item: GalleryItem; trashMode?: boolean }) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [recentSteps, setRecentSteps] = useState<ScenarioPreviewStep[]>([]);
 
@@ -109,6 +112,7 @@ export function PreviewScenarioStage(props: { item: GalleryItem }) {
     <ScenarioPreviewStepsGrid
       exportMode={isGalleryScenarioExportItem(props.item)}
       recentSteps={recentSteps}
+      trashMode={Boolean(props.trashMode)}
       title={props.item.filename}
       projectId={
         isGalleryScenarioItem(props.item) || isGalleryScenarioExportItem(props.item)

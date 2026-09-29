@@ -152,7 +152,7 @@ function useVideoPlayer() {
 }
 
 /** Gallery controls remain inside their fullscreen and locale owner. */
-export function PreviewVideo({ src }: { src: string }) {
+export function PreviewVideo({ src, trashMode = false }: { src: string; trashMode?: boolean }) {
   useAppLocale();
   const {
     video,
@@ -206,6 +206,8 @@ export function PreviewVideo({ src }: { src: string }) {
             src={src}
             preload="metadata"
             playsInline
+            controlsList={trashMode ? 'nodownload' : undefined}
+            onContextMenu={trashMode ? (event) => event.preventDefault() : undefined}
             className={
               fit
                 ? 'block h-full w-full bg-black object-contain'

@@ -34,6 +34,16 @@ function button(name: string) {
   return host.querySelector<HTMLButtonElement>(`[aria-label="gallery.preview.player.${name}"]`)!;
 }
 
+it('suppresses browser video download affordances in Trash while keeping playback controls', () => {
+  act(() => root.render(<PreviewVideo src="blob:clip" trashMode />));
+  const video = host.querySelector('video')!;
+  expect(video.getAttribute('controlslist')).toBe('nodownload');
+  const contextMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  act(() => video.dispatchEvent(contextMenu));
+  expect(contextMenu.defaultPrevented).toBe(true);
+  expect(button('play')).not.toBeNull();
+});
+
 it('plays, reports rejection and retains usable controls for retry', async () => {
   mount();
   const play = vi

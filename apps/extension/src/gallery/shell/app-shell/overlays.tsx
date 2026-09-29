@@ -131,6 +131,7 @@ type GalleryPreviewOverlayProps = Pick<
   | 'onPreviewOpenSnapshotScreenshot'
   | 'onPreviewPromote'
   | 'onPreviewResetChanges'
+  | 'onPreviewRestoreTrash'
   | 'onPreviewRestoreOriginal'
   | 'onPreviewSaveCopy'
   | 'onRemoveTag'
@@ -187,8 +188,18 @@ function renderPreviewOverlayPanel(
   return (
     <PreviewPanel
       key={previewItem.id}
-      {...(props.state.preview.session.initialMode
+      trashMode={Boolean(
+        props.state.filters.trashMode || previewItem.lifecycle?.trashedAt !== undefined
+      )}
+      restoreBusy={props.state.storage.isBusy}
+      {...(props.state.preview.session.initialMode && previewItem.lifecycle?.trashedAt === undefined
         ? { initialMode: props.state.preview.session.initialMode }
+        : {})}
+      {...(props.onPreviewRestoreTrash && previewItem.lifecycle?.trashedAt !== undefined
+        ? {
+            onRestoreTrash: () =>
+              props.onPreviewRestoreTrash?.(previewItem) ?? Promise.resolve(false),
+          }
         : {})}
       {...buildPreviewTagProps(props)}
       {...(props.state.preview.draft.hasChanges ? { hasChanges: true } : {})}

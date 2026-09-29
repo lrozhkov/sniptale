@@ -96,7 +96,7 @@ it('builds scenario-aware sort labels and folder toggles', () => {
     buildGalleryCommandPaletteActions(scenarioController, createActions()).some(
       ({ id }) => id === 'gallery-filter-folder-export'
     )
-  ).toBe(false);
+  ).toBe(true);
   expect(webSnapshotFolderAction.icon).toBeTruthy();
 
   scenarioFolderAction.onSelect?.();

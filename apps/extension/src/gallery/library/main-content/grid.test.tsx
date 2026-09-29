@@ -37,6 +37,7 @@ function createProps(overrides: Partial<Parameters<typeof GalleryGrid>[0]> = {})
     gridWidth: 900,
     gridViewportRef: { current: null },
     isLoading: false,
+    search: '',
     onPreviewOpen: vi.fn(),
     onToggleSelection: vi.fn(),
     selectedIds: new Set<string>(),
@@ -58,6 +59,16 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('distinguishes a Trash search miss from an empty Trash', () => {
+  renderGrid(createProps({ trashMode: true }));
+  expect(container?.textContent).toContain('gallery.app.trashEmpty');
+  renderGrid(createProps({ trashMode: true, search: 'missing' }));
+  expect(container?.textContent).toContain('gallery.app.trashNoResults');
+  expect(container?.textContent).not.toContain('gallery.app.trashEmpty');
+  renderGrid(createProps({ trashMode: true, search: 'missing', trashItemCount: 0 }));
+  expect(container?.textContent).toContain('gallery.app.trashEmpty');
 });
 
 afterEach(() => {

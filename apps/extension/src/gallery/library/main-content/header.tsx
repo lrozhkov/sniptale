@@ -310,6 +310,7 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
 
 function GalleryHeaderSearchField(props: {
   folderFilter: GalleryMainContentProps['folderFilter'];
+  trashMode?: boolean;
   search: string;
   onSearchChange: GalleryMainContentProps['onSearchChange'];
 }) {
@@ -326,13 +327,17 @@ function GalleryHeaderSearchField(props: {
     >
       <Search className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]" />
       <input
-        aria-label={translate('gallery.app.searchLabel')}
+        aria-label={translate(
+          props.trashMode ? 'gallery.app.trashSearchLabel' : 'gallery.app.searchLabel'
+        )}
         value={props.search}
         onChange={(event) => props.onSearchChange(event.target.value)}
         placeholder={
-          props.folderFilter === 'scenario'
-            ? translate('gallery.app.scenarioSearchPlaceholder')
-            : translate('gallery.app.searchPlaceholder')
+          props.trashMode
+            ? translate('gallery.app.trashSearchPlaceholder')
+            : props.folderFilter === 'scenario'
+              ? translate('gallery.app.scenarioSearchPlaceholder')
+              : translate('gallery.app.searchPlaceholder')
         }
         className="w-full bg-transparent text-sm text-[var(--sniptale-color-text-primary)]
           outline-none placeholder:text-[var(--sniptale-color-text-muted)]
@@ -458,6 +463,7 @@ function GalleryHeaderControls(
     | 'onViewModeChange'
     | 'search'
     | 'sortMode'
+    | 'trashMode'
     | 'viewMode'
   > &
     GalleryHeaderStorageProps & { stackWhenNarrow: boolean }
@@ -473,16 +479,17 @@ function GalleryHeaderControls(
     >
       <GalleryHeaderSearchField
         folderFilter={props.folderFilter}
+        trashMode={Boolean(props.trashMode)}
         search={props.search}
         onSearchChange={props.onSearchChange}
       />
       <GalleryHeaderSortControl
-        folderFilter={props.folderFilter}
+        folderFilter={props.trashMode ? 'all' : props.folderFilter}
         sortMode={props.sortMode}
         onSortModeChange={props.onSortModeChange}
       />
       <GalleryViewModeToggle viewMode={props.viewMode} onViewModeChange={props.onViewModeChange} />
-      <GalleryHeaderStorage {...props} />
+      {!props.trashMode ? <GalleryHeaderStorage {...props} /> : null}
     </div>
   );
 }
@@ -535,11 +542,12 @@ export function GalleryHeader(
     | 'selectedSize'
     | 'selectionTagDraft'
     | 'sortMode'
+    | 'trashMode'
     | 'viewMode'
   > &
     GalleryHeaderStorageProps
 ) {
-  const hasSelection = props.selectedItems.length > 0;
+  const hasSelection = !props.trashMode && props.selectedItems.length > 0;
 
   return (
     <header
@@ -559,10 +567,14 @@ export function GalleryHeader(
       >
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="text-[var(--sniptale-color-accent-emphasis)]">
-            <Images className="h-[22px] w-[22px]" aria-hidden="true" />
+            {props.trashMode ? (
+              <Trash2 className="h-[22px] w-[22px]" aria-hidden="true" />
+            ) : (
+              <Images className="h-[22px] w-[22px]" aria-hidden="true" />
+            )}
           </span>
           <h1 className="truncate text-base font-semibold text-[var(--sniptale-color-text-primary)]">
-            {translate('gallery.app.title')}
+            {translate(props.trashMode ? 'gallery.app.trashTitle' : 'gallery.app.title')}
           </h1>
         </div>
       </div>
@@ -574,14 +586,16 @@ export function GalleryHeader(
         )}
         data-ui="gallery.header.workspace"
       >
-        <div
-          className={cx(
-            'min-w-0 flex-1',
-            hasSelection && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
-          )}
-        >
-          <GallerySelectionBar {...props} />
-        </div>
+        {!props.trashMode ? (
+          <div
+            className={cx(
+              'min-w-0 flex-1',
+              hasSelection && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
+            )}
+          >
+            <GallerySelectionBar {...props} />
+          </div>
+        ) : null}
         <GalleryHeaderControls {...props} stackWhenNarrow={hasSelection} />
       </div>
     </header>

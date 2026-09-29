@@ -239,6 +239,126 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(emptyMarkup).not.toContain('<audio');
 });
 
+it('keeps Restore as the only Trash item operation across media and project previews', () => {
+  for (const item of [
+    createItem(),
+    createItem({ kind: 'recording', mimeType: 'video/webm' }),
+    createItem({ kind: 'audio', mimeType: 'audio/mpeg' }),
+    createVideoProjectItem({ id: 'video-project:deleted' }),
+    createScenarioExportItem({ id: 'scenario-export:deleted' }),
+  ]) {
+    renderNode(
+      <PreviewPanel
+        {...createProps({ item, trashMode: true, onRestoreTrash: vi.fn(async () => true) })}
+      />
+    );
+    const restore = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.preview.restore"]'
+    );
+    expect(restore).not.toBeNull();
+    expect(container?.querySelector('[data-ui="gallery.videoReview.enter"]')).toBeNull();
+    expect(container?.querySelector('[data-ui="gallery.preview.actions"]')).toBeNull();
+    expect(container?.querySelector('a[href]')).toBeNull();
+    expect(container?.querySelector('input:not([type="range"])')).toBeNull();
+  }
+});
+
+it('keeps Trash Restore visible with unavailable content and permits retry', async () => {
+  let resolveFirst!: (value: boolean) => void;
+  const onRestoreTrash = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveFirst = resolve;
+        })
+    )
+    .mockResolvedValueOnce(true);
+  renderNode(
+    <PreviewMedia
+      {...createProps({
+        previewUrl: null,
+        inspectorCollapsed: true,
+        trashMode: true,
+        onRestoreTrash,
+      })}
+    />
+  );
+  const restore = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.restore"]'
+  );
+  expect(restore).not.toBeNull();
+  await act(async () => {
+    restore?.click();
+    restore?.click();
+  });
+  expect(onRestoreTrash).toHaveBeenCalledTimes(1);
+  expect(restore?.disabled).toBe(true);
+  expect(restore?.getAttribute('aria-busy')).toBe('true');
+  await act(async () => resolveFirst(false));
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    'gallery.app.restoreItemFailed'
+  );
+  expect(restore?.disabled).toBe(false);
+  await act(async () => restore?.click());
+  expect(onRestoreTrash).toHaveBeenCalledTimes(2);
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('rejects an initial video edit intent in Trash while retaining video playback', () => {
+  renderNode(
+    <PreviewPanel
+      {...createProps({
+        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
+        initialMode: 'edit',
+        trashMode: true,
+        onRestoreTrash: vi.fn(async () => true),
+      })}
+    />
+  );
+  expect(container?.querySelector('video')).not.toBeNull();
+  expect(container?.querySelector('[data-test-review]')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.preview.restore"]')).not.toBeNull();
+});
+
+it('suppresses native audio download affordances in Trash', () => {
+  renderNode(
+    <PreviewMedia
+      {...createProps({
+        item: createItem({ kind: 'audio', mimeType: 'audio/mpeg' }),
+        previewUrl: 'blob:audio',
+        trashMode: true,
+        onRestoreTrash: vi.fn(async () => true),
+      })}
+    />
+  );
+  const audio = container?.querySelector('audio');
+  expect(audio?.controls).toBe(true);
+  expect(audio?.getAttribute('controlslist')).toBe('nodownload');
+  const contextMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  act(() => audio?.dispatchEvent(contextMenu));
+  expect(contextMenu.defaultPrevented).toBe(true);
+});
+
+it('disables Restore while another Trash storage operation is busy', () => {
+  const onRestoreTrash = vi.fn(async () => true);
+  renderNode(
+    <PreviewMedia
+      {...createProps({
+        trashMode: true,
+        restoreBusy: true,
+        onRestoreTrash,
+      })}
+    />
+  );
+  const restore = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.restore"]'
+  );
+  expect(restore?.disabled).toBe(true);
+  act(() => restore?.click());
+  expect(onRestoreTrash).not.toHaveBeenCalled();
+});
+
 it('changes image zoom through the slider and preserves it when the lock is enabled', () => {
   const firstItem = createItem({ id: 'first' });
   renderNode(<PreviewMedia {...createProps({ item: firstItem, previewUrl: 'blob:first' })} />);

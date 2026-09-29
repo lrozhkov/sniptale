@@ -155,19 +155,24 @@ function PreviewTagList(props: { onRemoveTag?: (tag: string) => void; tagDrafts:
 
   return (
     <div className="flex flex-wrap gap-1.5" data-ui="gallery.preview.tags-list">
-      {props.tagDrafts.map((tag) => (
-        <button
-          key={tag}
-          type="button"
-          disabled={!props.onRemoveTag}
-          onClick={() => props.onRemoveTag?.(tag)}
-          className={PREVIEW_TAG_CLASS_NAME}
-          title={tag}
-        >
-          <span className="max-w-40 truncate">{tag}</span>
-          {props.onRemoveTag ? <X className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
-        </button>
-      ))}
+      {props.tagDrafts.map((tag) =>
+        props.onRemoveTag ? (
+          <button
+            key={tag}
+            type="button"
+            onClick={() => props.onRemoveTag?.(tag)}
+            className={PREVIEW_TAG_CLASS_NAME}
+            title={tag}
+          >
+            <span className="max-w-40 truncate">{tag}</span>
+            <X className="h-3 w-3 shrink-0" aria-hidden="true" />
+          </button>
+        ) : (
+          <span key={tag} className={PREVIEW_TAG_CLASS_NAME} title={tag}>
+            <span className="max-w-40 truncate">{tag}</span>
+          </span>
+        )
+      )}
     </div>
   );
 }
@@ -253,7 +258,10 @@ export function PreviewMetadataCards({ item }: Pick<PreviewPanelProps, 'item'>) 
   );
 }
 
-export function PreviewProjectUsage({ item }: Pick<PreviewPanelProps, 'item'>) {
+export function PreviewProjectUsage({
+  item,
+  trashMode,
+}: Pick<PreviewPanelProps, 'item' | 'trashMode'>) {
   const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -292,22 +300,28 @@ export function PreviewProjectUsage({ item }: Pick<PreviewPanelProps, 'item'>) {
       ) : null}
       {status === 'ready' ? (
         <div className="space-y-1">
-          {usage.map((project) => (
-            <button
-              key={`${project.kind}:${project.id}`}
-              type="button"
-              className={previewActionButtonClassName}
-              onClick={() => {
-                if (project.kind === 'video') void openVideoEditorPage(project.id, null);
-                if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
-                if (project.kind === 'review')
-                  void openGalleryPage({ mediaId: project.id, quickEdit: true });
-              }}
-            >
-              <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{project.name}</span>
-            </button>
-          ))}
+          {usage.map((project) =>
+            trashMode ? (
+              <p key={`${project.kind}:${project.id}`} className="break-words px-3 py-2 text-sm">
+                {project.name}
+              </p>
+            ) : (
+              <button
+                key={`${project.kind}:${project.id}`}
+                type="button"
+                className={previewActionButtonClassName}
+                onClick={() => {
+                  if (project.kind === 'video') void openVideoEditorPage(project.id, null);
+                  if (project.kind === 'scenario') void openScenarioEditorPage(project.id);
+                  if (project.kind === 'review')
+                    void openGalleryPage({ mediaId: project.id, quickEdit: true });
+                }}
+              >
+                <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span className="truncate">{project.name}</span>
+              </button>
+            )
+          )}
         </div>
       ) : null}
     </section>
@@ -322,8 +336,9 @@ export function PreviewTagEditor(props: {
   onTagDraftChange: (value: string) => void;
   tagDraft: string;
   tagDrafts: string[];
+  trashMode?: boolean;
 }) {
-  const editable = isMetadataEditable(props.item);
+  const editable = !props.trashMode && isMetadataEditable(props.item);
   const [expanded, setExpanded] = useState(false);
   const hasTags = props.tagDrafts.length > 0;
 
@@ -417,6 +432,7 @@ export function PreviewTagEditor(props: {
 }
 
 export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
+  if (props.trashMode) return null;
   const { item, onCopy, onDelete, onDownload, onEdit, onResetChanges } = props;
   const canEditMetadata = isMetadataEditable(item);
   const canDelete = !isGalleryScenarioExportItem(item);
@@ -564,8 +580,10 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
   );
 }
 
-export function PreviewPromotionAction(props: Pick<PreviewPanelProps, 'item' | 'onPromote'>) {
-  if (props.item.lifecycle?.storageClass !== 'temporary' || !props.onPromote) {
+export function PreviewPromotionAction(
+  props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>
+) {
+  if (props.trashMode || props.item.lifecycle?.storageClass !== 'temporary' || !props.onPromote) {
     return null;
   }
 

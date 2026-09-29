@@ -57,6 +57,7 @@ type TestLayoutProps = {
   onProjectOpen: (item: unknown) => void;
   onPreviewNavigate: (item: unknown) => void;
   onPreviewPromote: (item: unknown) => Promise<void>;
+  onPreviewRestoreTrash: (item: unknown) => Promise<boolean>;
   onPreviewResetChanges: () => void;
   onRemoveTag: (tag: string) => void;
   onResetFilters: () => void;
@@ -125,6 +126,7 @@ function createActions(): UseGalleryAppActionsResult {
       deleteMany: vi.fn(),
       downloadBackup: vi.fn(async () => undefined),
       downloadZip: vi.fn(async () => undefined),
+      restoreTrash: vi.fn(async () => true),
     },
   };
 }
@@ -341,4 +343,47 @@ it('opens active projects but preserves the Trash navigation restriction', () =>
   controller.state.filters.trashMode = true;
   layoutProps.onProjectOpen(item);
   expect(actions.preview.openInEditor).not.toHaveBeenCalled();
+});
+
+it('opens trashed material read-only, navigates without saving, and restores only the current item', async () => {
+  const { actions, controller, getState, layoutProps } = renderBindings();
+  const trashedAt = 42;
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt };
+  const first = createMediaItem({ id: 'deleted-1', lifecycle });
+  const next = createMediaItem({ id: 'deleted-2', lifecycle });
+  controller.state.filters.trashMode = true;
+
+  act(() => {
+    layoutProps.onPreviewOpen(first, { inspectorCollapsed: true });
+  });
+  expect(getState().preview.session.item?.id).toBe('deleted-1');
+  expect(getState().preview.session.inspectorCollapsed).toBe(false);
+
+  act(() => {
+    layoutProps.onPreviewNavigate(next);
+    layoutProps.onPreviewDelete(next);
+    layoutProps.onPreviewOpenSnapshotScreenshot();
+    layoutProps.onPreviewResetChanges();
+    layoutProps.onSelectionBackup();
+    layoutProps.onApplySelectionTag('blocked');
+  });
+  await act(async () => {
+    await layoutProps.onPreviewPromote(next);
+  });
+  expect(getState().preview.session.item?.id).toBe('deleted-2');
+  expect(actions.preview.navigate).not.toHaveBeenCalled();
+  expect(actions.selection.deleteMany).not.toHaveBeenCalled();
+  expect(actions.preview.openSnapshotScreenshotInEditor).not.toHaveBeenCalled();
+  expect(actions.preview.resetChanges).not.toHaveBeenCalled();
+  expect(actions.selection.downloadBackup).not.toHaveBeenCalled();
+  expect(actions.selection.applyTag).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+
+  expect(await layoutProps.onPreviewRestoreTrash(first)).toBe(false);
+  expect(await layoutProps.onPreviewRestoreTrash(next)).toBe(true);
+  expect(actions.selection.restoreTrash).toHaveBeenCalledWith([next]);
+
+  act(() => layoutProps.onPreviewClose());
+  expect(getState().preview.session.item).toBeNull();
+  expect(actions.preview.close).not.toHaveBeenCalled();
 });

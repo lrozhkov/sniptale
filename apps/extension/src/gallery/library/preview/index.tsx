@@ -66,9 +66,9 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
 }
 
 function PreviewFilenameField(
-  props: Pick<PreviewPanelProps, 'filenameDraft' | 'item' | 'onFilenameChange'>
+  props: Pick<PreviewPanelProps, 'filenameDraft' | 'item' | 'onFilenameChange' | 'trashMode'>
 ) {
-  const editable = isMetadataEditable(props.item);
+  const editable = !props.trashMode && isMetadataEditable(props.item);
 
   return (
     <div>
@@ -80,15 +80,21 @@ function PreviewFilenameField(
           ? translate('gallery.preview.scenarioName')
           : translate('gallery.preview.filename')}
       </label>
-      <input
-        value={props.filenameDraft}
-        onChange={(event) => props.onFilenameChange(event.target.value)}
-        readOnly={!editable}
-        className="w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+      {props.trashMode ? (
+        <p className="break-words text-sm text-[var(--sniptale-color-text-primary)]">
+          {props.filenameDraft}
+        </p>
+      ) : (
+        <input
+          value={props.filenameDraft}
+          onChange={(event) => props.onFilenameChange(event.target.value)}
+          readOnly={!editable}
+          className="w-full rounded-[8px] border border-[var(--sniptale-color-border-soft)]
           bg-[var(--sniptale-color-surface-panel)] px-3 py-2.5 text-sm
           text-[var(--sniptale-color-text-primary)] outline-none transition
           focus:border-[var(--sniptale-color-border-accent-strong)] read-only:cursor-default"
-      />
+        />
+      )}
     </div>
   );
 }
@@ -100,30 +106,34 @@ function PreviewPanelSidebar(props: PreviewPanelProps & { onReview?: () => void 
         bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
     >
       <PreviewPanelHeader item={props.item} />
-      <PreviewPromotionAction
-        item={props.item}
-        {...(props.onPromote ? { onPromote: props.onPromote } : {})}
-      />
+      {!props.trashMode ? (
+        <PreviewPromotionAction
+          item={props.item}
+          {...(props.onPromote ? { onPromote: props.onPromote } : {})}
+        />
+      ) : null}
       <div className="mt-4 space-y-4">
         <PreviewFilenameField
           filenameDraft={props.filenameDraft}
           item={props.item}
           onFilenameChange={props.onFilenameChange}
+          trashMode={Boolean(props.trashMode)}
         />
         <UnavailableProjectNotice item={props.item} />
         <PreviewMetadataCards item={props.item} />
-        <PreviewProjectUsage item={props.item} />
-        <PreviewSourceField item={props.item} />
+        <PreviewProjectUsage item={props.item} trashMode={Boolean(props.trashMode)} />
+        <PreviewSourceField item={props.item} trashMode={Boolean(props.trashMode)} />
         <PreviewTagEditor
           {...(props.allTags === undefined ? {} : { allTags: props.allTags })}
           item={props.item}
+          trashMode={Boolean(props.trashMode)}
           tagDraft={props.tagDraft}
           tagDrafts={props.tagDrafts}
           onTagDraftChange={props.onTagDraftChange}
           onRemoveTag={props.onRemoveTag}
           onAddTag={props.onAddTag}
         />
-        <PreviewActions {...props} />
+        {!props.trashMode ? <PreviewActions {...props} /> : null}
       </div>
     </aside>
   );
@@ -164,7 +174,10 @@ export function PreviewPanel(props: PreviewPanelProps) {
   const { item, navigation, onClose } = props;
   const [review, setReview] = useState(
     () =>
-      props.initialMode === 'edit' && isGalleryMediaItem(item) && item.mimeType.startsWith('video/')
+      !props.trashMode &&
+      props.initialMode === 'edit' &&
+      isGalleryMediaItem(item) &&
+      item.mimeType.startsWith('video/')
   );
   const opener = useRef<HTMLElement | null>(null);
 
@@ -177,7 +190,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigation, onClose, review]);
 
-  if (review)
+  if (review && !props.trashMode)
     return (
       <VideoReview
         aggregateId={item.id}
@@ -198,6 +211,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
     <PreviewPanelSurface
       {...props}
       onReview={() => {
+        if (props.trashMode) return;
         opener.current =
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
         setReview(true);
@@ -210,11 +224,48 @@ export function PreviewPanel(props: PreviewPanelProps) {
 function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
   const { onReview, ...panel } = props;
   const { item, previewUrl, onClose } = panel;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!props.trashMode) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialogRef.current
+      ?.querySelector<HTMLButtonElement>('[data-ui="gallery.preview.restore"]')
+      ?.focus();
+    return () => {
+      queueMicrotask(() => {
+        if (document.querySelector('[data-ui="gallery.preview.surface"]')) return;
+        const fallback = document.querySelector<HTMLElement>(
+          '[data-ui="gallery.header.search"] input, [data-ui="gallery.sidebar.footer"] button'
+        );
+        (opener?.isConnected ? opener : fallback)?.focus();
+      });
+    };
+  }, [props.trashMode]);
+
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={item.filename}
+      onKeyDown={(event) => {
+        if (!props.trashMode || event.key !== 'Tab') return;
+        const controls = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'
+          )
+        );
+        const first = controls[0];
+        const last = controls.at(-1);
+        if (!first || !last) return;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
       className="fixed inset-0 z-40 flex
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_72%,black_20%)]
       "
@@ -231,6 +282,9 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
         >
           <PreviewMedia
             onEdit={props.onEdit}
+            trashMode={Boolean(props.trashMode)}
+            restoreBusy={Boolean(props.restoreBusy)}
+            {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
             item={item}
             previewUrl={previewUrl}
             inspectorCollapsed={props.inspectorCollapsed}
@@ -241,7 +295,10 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
           {props.inspectorCollapsed ? null : (
             <PreviewPanelSidebar
               {...panel}
-              {...(isGalleryMediaItem(item) && item.mimeType.startsWith('video/') && previewUrl
+              {...(!props.trashMode &&
+              isGalleryMediaItem(item) &&
+              item.mimeType.startsWith('video/') &&
+              previewUrl
                 ? {
                     onReview,
                   }

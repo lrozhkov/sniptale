@@ -199,7 +199,6 @@ export function useGalleryDerivedState(props: {
           },
           folderFilter: 'all' as const,
           scope: 'all' as const,
-          search: '',
         },
       }
     : filters;

@@ -133,6 +133,10 @@ it('offers trash navigation and replaces library filters with recoverable action
   act(() => button('gallery.app.trashTitle').click());
   expect(props.onTrashModeChange).toHaveBeenCalledWith(true);
   act(() => root?.render(<GallerySidebar {...props} trashMode />));
+  const returnButton = button('gallery.app.returnToLibrary');
+  expect(returnButton.className).toContain('rounded-[var(--sniptale-radius-sm)]');
+  expect(returnButton.className).toContain('hover:border-');
+  expect(returnButton.className).toContain('focus-visible:ring-2');
   expect(container?.querySelector('[data-ui="test.folder-list"]')).toBeNull();
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
   expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(
@@ -146,6 +150,9 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(props.onDeleteTrash).toHaveBeenCalledOnce();
   expect(props.onEmptyTrash).toHaveBeenCalledOnce();
   expect(props.onTrashModeChange).toHaveBeenLastCalledWith(false);
+  act(() => root?.render(<GallerySidebar {...props} trashMode filteredItemCount={0} />));
+  expect(button('gallery.app.emptyTrash').disabled).toBe(false);
+  expect(button('gallery.app.trashSelectAll').disabled).toBe(true);
   act(() => root?.render(<GallerySidebar {...props} trashMode busy />));
   expect(
     Array.from(container!.querySelectorAll('button')).every((element) => element.disabled)

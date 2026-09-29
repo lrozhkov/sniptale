@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createController,
   createMediaItem,
+  createScenarioExportItem,
   createScenarioItem,
   createVideoProjectItem,
   runBusyAction,
@@ -315,14 +316,37 @@ it('failed move preserves selection and preview for retry', async () => {
 
 it('restores selected aggregate targets and refreshes the current view', async () => {
   const { controller } = createController();
-  await createRestoreTrashAction(controller)(
+  const restored = await createRestoreTrashAction(controller)(
     [createScenarioItem({ entityId: 'guide' })],
     runBusyAction
   );
+  expect(restored).toBe(true);
   expect(restoreLibraryTrashItemsMock).toHaveBeenCalledWith([
     { kind: 'scenario-project', id: 'guide' },
   ]);
   expect(controller.actions.storage.refresh).toHaveBeenCalled();
+});
+
+it('restores a deleted scenario export through its owning project', async () => {
+  const { controller } = createController();
+  const exportItem = createScenarioExportItem();
+  const restored = await createRestoreTrashAction(controller)([exportItem], runBusyAction);
+  expect(restored).toBe(true);
+  expect(restoreLibraryTrashItemsMock).toHaveBeenCalledWith([
+    { kind: 'scenario-project', id: exportItem.project.id },
+  ]);
+});
+
+it('reports a swallowed restore failure so the preview can show retry feedback', async () => {
+  const item = createMediaItem({ entityId: 'deleted' });
+  const { controller, getState } = createController({ previewItem: item });
+  restoreLibraryTrashItemsMock.mockRejectedValueOnce(new Error('storage failure'));
+  const restored = await createRestoreTrashAction(controller)([item], async (action) => {
+    await action().catch(() => undefined);
+  });
+  expect(restored).toBe(false);
+  expect(getState().preview.session.item).toEqual(item);
+  expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
 });
 
 it('empties primary media and its confirmed project in project-first order', async () => {

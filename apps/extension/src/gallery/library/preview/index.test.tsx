@@ -25,9 +25,23 @@ vi.mock('../ui', async (importOriginal) => ({
 }));
 
 vi.mock('./media', () => ({
-  PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'onClose' | 'previewUrl'>) => (
+  PreviewMedia: (
+    props: Pick<
+      PreviewPanelProps,
+      'item' | 'onClose' | 'previewUrl' | 'trashMode' | 'onRestoreTrash'
+    >
+  ) => (
     <div data-ui="preview.media">
       {props.item.filename}:{props.previewUrl ?? 'no-preview'}
+      {props.trashMode ? (
+        <button
+          type="button"
+          data-ui="gallery.preview.restore"
+          onClick={() => void props.onRestoreTrash?.()}
+        >
+          Restore
+        </button>
+      ) : null}
       <button type="button" data-ui="preview.close" onClick={props.onClose}>
         close
       </button>
@@ -181,6 +195,20 @@ it('renders source link when available and fallback copy when missing', () => {
   expect(container?.textContent).toContain('gallery.preview.sourceMissing');
 });
 
+it('shows Trash source and filename as inert metadata', () => {
+  const props = createProps({
+    trashMode: true,
+    onRestoreTrash: vi.fn(async () => true),
+    item: { ...createProps().item, sourceUrl: 'https://example.test/source' },
+  });
+  render(props);
+  expect(container?.textContent).toContain('https://example.test/source');
+  expect(container?.querySelector('a[href]')).toBeNull();
+  expect(container?.querySelector('input:not([type="range"])')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.actions"]')).toBeNull();
+});
+
 it('renders unsafe source urls as inert text instead of links', () => {
   render(
     createProps({
@@ -270,6 +298,84 @@ it('hides the inspector sidebar when collapsed and closes on Escape', () => {
   });
 
   expect(props.onClose).toHaveBeenCalledTimes(1);
+});
+
+it('focuses Trash Restore and returns focus to opener or surviving search on close', async () => {
+  const opener = document.createElement('button');
+  document.body.append(opener);
+  opener.focus();
+  const props = createProps({
+    trashMode: true,
+    inspectorCollapsed: true,
+    onRestoreTrash: vi.fn(async () => true),
+  });
+  render(props);
+  expect(document.activeElement?.getAttribute('data-ui')).toBe('gallery.preview.restore');
+  expect(container?.querySelector('aside')).toBeNull();
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+  expect(props.onClose).toHaveBeenCalledOnce();
+  await act(async () => root?.render(null));
+  await Promise.resolve();
+  expect(document.activeElement).toBe(opener);
+
+  const search = document.createElement('input');
+  search.setAttribute('data-ui', 'test.search');
+  const searchLabel = document.createElement('label');
+  searchLabel.setAttribute('data-ui', 'gallery.header.search');
+  searchLabel.append(search);
+  document.body.append(searchLabel);
+  opener.focus();
+  render(props);
+  opener.remove();
+  await act(async () =>
+    container?.querySelector<HTMLButtonElement>('[data-ui="gallery.preview.restore"]')?.click()
+  );
+  expect(props.onRestoreTrash).toHaveBeenCalledOnce();
+  await act(async () => root?.render(null));
+  await Promise.resolve();
+  expect(document.activeElement).toBe(search);
+  searchLabel.remove();
+});
+
+it('keeps keyboard focus within a collapsed Trash preview', () => {
+  render(
+    createProps({
+      trashMode: true,
+      inspectorCollapsed: true,
+      onRestoreTrash: vi.fn(async () => true),
+    })
+  );
+  const restore = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.restore"]'
+  );
+  const close = container?.querySelector<HTMLButtonElement>('[data-ui="preview.close"]');
+  close?.focus();
+  act(() =>
+    close?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).toBe(restore);
+  act(() =>
+    restore?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).toBe(close);
+});
+
+it('keeps focus on Restore when navigating between keyed Trash previews', async () => {
+  const first = createProps({ trashMode: true, onRestoreTrash: vi.fn(async () => true) });
+  act(() => root?.render(<PreviewPanel key="first" {...first} />));
+  const second = createProps({
+    ...first,
+    item: { ...first.item, id: 'asset-2', filename: 'next.png' },
+  });
+  await act(async () => root?.render(<PreviewPanel key="second" {...second} />));
+  await Promise.resolve();
+  expect(document.activeElement).toBe(
+    container?.querySelector('[data-ui="gallery.preview.restore"]')
+  );
 });
 
 it('navigates adjacent media with arrow keys but preserves arrow editing inside fields', () => {
