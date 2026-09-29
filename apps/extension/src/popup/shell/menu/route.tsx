@@ -6,7 +6,7 @@ import {
   ClipboardCopy,
   Crop,
   Film,
-  Images,
+  Library,
   MessageSquarePlus,
   MonitorPlay,
   MonitorUp,
@@ -62,7 +62,7 @@ function buildCaptureConfig(
 }
 
 const workspaceActions = [
-  { icon: Images, labelKey: 'popup.home.libraryLabel', onClick: () => openLibrary() },
+  { icon: Library, labelKey: 'popup.home.libraryLabel', onClick: () => openLibrary() },
   { icon: ImageEditorIcon, labelKey: 'popup.home.imageEditorLabel', onClick: openImageEditor },
   { icon: Film, labelKey: 'popup.home.videoEditorLabel', onClick: openVideoEditor },
   {

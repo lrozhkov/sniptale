@@ -4,7 +4,7 @@ import {
   FileStack,
   FileText,
   Image as ImageIcon,
-  Images,
+  Library,
   Video,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -37,7 +37,7 @@ export const FOLDER_LABELS: Record<FolderFilter, string> = {
 
 export function getGalleryFolderIcon(folder: FolderFilter) {
   if (folder === 'all') {
-    return Images;
+    return Library;
   }
 
   if (folder === 'scenario') {

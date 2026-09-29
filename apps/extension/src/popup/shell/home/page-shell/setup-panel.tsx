@@ -1,4 +1,4 @@
-import { Camera, Images } from 'lucide-react';
+import { Camera, Library } from 'lucide-react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n/popup';
@@ -73,7 +73,7 @@ export function ScreenshotSetupPanel(props: {
             onClick={openImageEditor}
           />
           <PopupActionButton
-            icon={Images}
+            icon={Library}
             label={translate('popup.home.libraryLabel')}
             iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
             compact

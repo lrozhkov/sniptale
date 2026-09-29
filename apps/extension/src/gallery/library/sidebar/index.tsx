@@ -1,4 +1,4 @@
-import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react';
+import { Library, RotateCcw, Trash2 } from 'lucide-react';
 import { formatNumber, getCurrentLocale, translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -92,7 +92,7 @@ export function GallerySidebar(props: GallerySidebarProps) {
           >
             <span className="flex min-w-0 items-center justify-center gap-2 text-xs font-semibold">
               {props.trashMode ? (
-                <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
               ) : (
                 <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
               )}

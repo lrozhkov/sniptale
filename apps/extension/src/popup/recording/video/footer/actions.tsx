@@ -1,4 +1,4 @@
-import { Circle, Film, Images } from 'lucide-react';
+import { Circle, Film, Library } from 'lucide-react';
 import { translate } from '../../../../platform/i18n/popup';
 import {
   openGalleryPage,
@@ -134,7 +134,7 @@ function IdleVideoSetupFooter({
           onClick={openVideoEditor}
         />
         <PopupActionButton
-          icon={Images}
+          icon={Library}
           label={translate('popup.video.galleryLabel')}
           iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
           tone="gallery"

@@ -6,6 +6,7 @@ import {
   Globe2,
   HardDrive,
   Images,
+  Library,
   LayoutGrid,
   Settings2,
   ShieldAlert,
@@ -535,7 +536,7 @@ export function GalleryHeader(
             {props.trashMode ? (
               <Trash2 className="h-[22px] w-[22px]" aria-hidden="true" />
             ) : (
-              <Images className="h-[22px] w-[22px]" aria-hidden="true" />
+              <Library className="h-[22px] w-[22px]" aria-hidden="true" />
             )}
           </span>
           <h1 className="truncate text-base font-semibold text-[var(--sniptale-color-text-primary)]">

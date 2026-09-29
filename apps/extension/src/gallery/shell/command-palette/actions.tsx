@@ -6,7 +6,7 @@ import {
   FileStack,
   FolderArchive,
   Image,
-  Images,
+  Library,
   RefreshCw,
   Search,
   Trash2,
@@ -45,7 +45,7 @@ function buildGalleryFolderFilterActions(
   return SIDEBAR_FOLDERS.filter(
     (folder) => !countsKnown || isGalleryFolderAvailable(counts, folder)
   ).map((folder) => {
-    const icon = folder === 'all' ? commandPaletteIcon(Images) : buildGalleryFolderIcon(folder);
+    const icon = folder === 'all' ? commandPaletteIcon(Library) : buildGalleryFolderIcon(folder);
 
     return createCommandPaletteToggleAction({
       id: `gallery-filter-folder-${folder}`,

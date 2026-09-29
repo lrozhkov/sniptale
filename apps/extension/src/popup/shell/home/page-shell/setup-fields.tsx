@@ -10,7 +10,7 @@ import { formatViewportPresetDimensions } from '../../../../features/viewport-pr
 import { orderViewportPresetsForSelector } from '../../../../features/viewport-presets/operations';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
-import { Copy, Download, FolderOpen, Images, Save } from 'lucide-react';
+import { Copy, Download, FolderOpen, Library, Save } from 'lucide-react';
 
 const captureActions: CaptureActionType[] = [
   'download_default',
@@ -29,7 +29,7 @@ const actionIcons: Record<CaptureActionType, NonNullable<InlineCurtainOption['ic
   edit: ImageEditorIcon,
   copy: Copy,
   scenario: ScenarioEditorIcon,
-  save_to_library: Images,
+  save_to_library: Library,
 };
 
 const actionKeys: Record<CaptureActionType, Parameters<typeof translate>[0]> = {

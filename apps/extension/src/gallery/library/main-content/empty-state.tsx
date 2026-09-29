@@ -1,4 +1,4 @@
-import { Images, SearchX } from 'lucide-react';
+import { Library, SearchX } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import type { GalleryMainContentProps } from './types';
 
@@ -26,7 +26,7 @@ export function GalleryEmptyState(props: {
         bg-[var(--sniptale-color-surface-panel)] text-center text-[var(--sniptale-color-text-muted)]"
     >
       {isStartState ? (
-        <Images
+        <Library
           className="mb-3 h-8 w-8 text-[var(--sniptale-color-text-muted)]"
           aria-hidden="true"
         />

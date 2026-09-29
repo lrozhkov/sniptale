@@ -1,4 +1,4 @@
-import { Images, LoaderCircle } from 'lucide-react';
+import { Library, LoaderCircle } from 'lucide-react';
 import {
   createContext,
   useCallback,
@@ -415,7 +415,7 @@ function EditorFloatingDocumentSummary(props: {
               aria-hidden="true"
             />
           ) : (
-            <Images size={16} strokeWidth={2} aria-hidden="true" />
+            <Library size={16} strokeWidth={2} aria-hidden="true" />
           )}
         </ContentToolbarButton>
       ) : null}

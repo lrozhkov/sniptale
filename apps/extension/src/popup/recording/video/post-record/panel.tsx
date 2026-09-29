@@ -1,4 +1,4 @@
-import { Download, Film, Clapperboard, Images, Trash2, X } from 'lucide-react';
+import { Download, Film, Clapperboard, Library, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n/popup';
@@ -16,7 +16,7 @@ function PostRecordActionButton({
   onClick,
   tone = 'default',
 }: {
-  icon: typeof Images;
+  icon: typeof Library;
   disabled: boolean;
   label: string;
   onClick: () => void;
@@ -167,7 +167,7 @@ function PostRecordActionGrid({
       />
       <PostRecordActionButton
         disabled={isBusy}
-        icon={Images}
+        icon={Library}
         label={translate('popup.video.postRecordOpenGallery')}
         onClick={() => runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId))}
       />
