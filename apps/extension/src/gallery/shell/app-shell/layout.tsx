@@ -62,6 +62,8 @@ function GallerySidebarSection(props: GalleryAppLayoutProps) {
       activeTags={state.filters.activeTags}
       allTags={state.derived.allTags}
       counts={state.derived.counts}
+      countsKnown={state.storage.hasLoadedLibrarySnapshot}
+      countsLoading={state.storage.isLoading}
       facetFilters={state.filters.facetFilters}
       facets={state.derived.facets}
       filteredItemCount={state.derived.filteredItems.length}
@@ -101,6 +103,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       gridWidth={state.derived.gridWidth}
       gridViewportRef={gridViewportRef}
       isLoading={state.storage.isLoading}
+      libraryEmpty={state.storage.hasLoadedLibrarySnapshot && state.derived.counts.all === 0}
       search={state.filters.appliedSearch}
       scope={state.filters.scope}
       selectedIds={state.selection.selectedIds}

@@ -123,6 +123,7 @@ it('loads library state and reacts to media-hub events', async () => {
   await flushLibraryState();
 
   expect(values.at(-1)?.items).toEqual([expect.objectContaining({ id: 'asset-1' })]);
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(true);
   expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 0 });
   expect(loadGalleryLibrarySnapshotMock).toHaveBeenCalled();
   expect(onPreviewItemRefresh).toHaveBeenCalledWith([expect.objectContaining({ id: 'asset-1' })]);
@@ -177,8 +178,49 @@ it('reports library refresh failures through the gallery banner without throwing
   await flushLibraryState();
 
   expect(values.at(-1)?.isLoading).toBe(false);
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(false);
   expect(values.at(-1)?.items).toEqual([]);
   expect(onBanner).toHaveBeenCalledWith(expect.any(String));
+
+  loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
+    estimate: { usage: 0, quota: 20 },
+    nextItems: [],
+  });
+  await act(async () => values.at(-1)?.refresh());
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(true);
+  expect(values.at(-1)?.items).toEqual([]);
+
+  loadGalleryLibrarySnapshotMock.mockRejectedValueOnce(new Error('later snapshot failed'));
+  await act(async () => values.at(-1)?.refresh());
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(true);
+  expect(values.at(-1)?.items).toEqual([]);
+});
+
+it('accepts readiness only from the winning successful refresh epoch', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  const initialRefresh = createSnapshotDeferred([createMediaItem({ id: 'stale-asset' })]);
+  loadGalleryLibrarySnapshotMock.mockReturnValueOnce(initialRefresh.promise);
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(false);
+
+  loadGalleryLibrarySnapshotMock.mockRejectedValueOnce(new Error('winning refresh failed'));
+  await act(async () => values.at(-1)?.refresh());
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(false);
+  await act(async () => initialRefresh.resolve());
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(false);
+  expect(values.at(-1)?.items).toEqual([]);
+
+  loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
+    estimate: { usage: 0, quota: 20 },
+    nextItems: [],
+  });
+  await act(async () => values.at(-1)?.refresh());
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(true);
 });
 
 it('ignores stale refresh results that complete after a newer library snapshot', async () => {
@@ -192,6 +234,7 @@ it('ignores stale refresh results that complete after a newer library snapshot',
     onSelectionRefresh: vi.fn(),
   });
   await flushLibraryState();
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(true);
 
   loadGalleryLibrarySnapshotMock
     .mockReturnValueOnce(firstRefresh.promise)
@@ -207,6 +250,7 @@ it('ignores stale refresh results that complete after a newer library snapshot',
 
   await act(async () => firstRefresh.resolve());
   expect(values.at(-1)?.items).toEqual([expect.objectContaining({ id: 'fresh-asset' })]);
+  expect(values.at(-1)?.hasLoadedLibrarySnapshot).toBe(true);
 });
 
 it('updates advisory Trash size after the item snapshot and ignores stale byte reads', async () => {

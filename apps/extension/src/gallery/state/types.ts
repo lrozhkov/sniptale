@@ -105,6 +105,7 @@ interface GalleryAppStorageState {
   pendingExport: PendingExportState | null;
   confirmDialog: GalleryConfirmDialogState | null;
   banner: string | null;
+  hasLoadedLibrarySnapshot: boolean;
   isLoading: boolean;
   isBusy: boolean;
 }

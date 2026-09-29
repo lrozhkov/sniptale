@@ -170,7 +170,7 @@ function configureGalleryOwnerMocks(
   useGalleryStorageWorkflowMock.mockReturnValue({
     actions: {},
     library: { items, refresh: vi.fn() },
-    state: { isBusy: false, isLoading: false },
+    state: { hasLoadedLibrarySnapshot: true, isBusy: false, isLoading: false },
   });
   useGalleryViewportStateMock.mockReturnValue({
     gridViewportRef: { current: null },

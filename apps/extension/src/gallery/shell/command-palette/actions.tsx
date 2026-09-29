@@ -21,6 +21,7 @@ import {
 } from '../../../ui/command-palette/action-builders';
 import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import { SIDEBAR_FOLDERS } from '../../library/constants';
+import { isGalleryFolderAvailable } from '../../library/sidebar/folder-visibility';
 import type { GalleryCommandPaletteController, SortMode } from '../../state/types';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import { FOLDER_LABELS, getKindIcon, isImageKind } from '../../library/ui';
@@ -37,7 +38,13 @@ const sortModeIcons: Record<SortMode, typeof Search> = {
 function buildGalleryFolderFilterActions(
   controller: GalleryCommandPaletteController
 ): CommandPaletteAction[] {
-  return SIDEBAR_FOLDERS.map((folder) => {
+  if (controller.state.filters.trashMode) return [];
+
+  const { counts } = controller.state.derived;
+  const countsKnown = controller.state.storage.hasLoadedLibrarySnapshot;
+  return SIDEBAR_FOLDERS.filter(
+    (folder) => !countsKnown || isGalleryFolderAvailable(counts, folder)
+  ).map((folder) => {
     const icon = folder === 'all' ? commandPaletteIcon(Images) : buildGalleryFolderIcon(folder);
 
     return createCommandPaletteToggleAction({

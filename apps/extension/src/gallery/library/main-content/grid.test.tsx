@@ -37,6 +37,7 @@ function createProps(overrides: Partial<Parameters<typeof GalleryGrid>[0]> = {})
     gridWidth: 900,
     gridViewportRef: { current: null },
     isLoading: false,
+    libraryEmpty: false,
     search: '',
     onPreviewOpen: vi.fn(),
     onToggleSelection: vi.fn(),

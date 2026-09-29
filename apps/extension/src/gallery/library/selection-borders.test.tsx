@@ -171,8 +171,9 @@ it('borders active folder and saved-view rows while hover and focus remain disti
   };
   render(
     <GalleryFolderList
+      countsKnown
       activeSavedView={view}
-      counts={{ all: 7, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
+      counts={{ all: 7, audio: 0, export: 1, recording: 0, scenario: 0, screenshot: 4 }}
       folderFilter="screenshot"
       savedViews={[view]}
       savedViewsLoaded
@@ -193,6 +194,7 @@ it('borders active folder and saved-view rows while hover and focus remain disti
 
   render(
     <GalleryFolderList
+      countsKnown
       counts={{ all: 7, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
       folderFilter="screenshot"
       onFolderFilterChange={vi.fn()}
@@ -208,6 +210,7 @@ it('borders active folder and saved-view rows while hover and focus remain disti
 it('borders checked facet rows and keeps their keyboard ring distinct', () => {
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={['beta']}
       allTags={['alpha', 'beta']}
       counts={{ all: 2, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 2 }}

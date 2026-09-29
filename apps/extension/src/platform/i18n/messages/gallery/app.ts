@@ -184,6 +184,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Сбросить',
     en: 'Reset',
   },
+  savedViewsHeading: {
+    ru: 'Сохранённые виды',
+    en: 'Saved views',
+  },
   savedViewSave: {
     ru: 'Сохранить вид',
     en: 'Save view',
@@ -478,6 +482,14 @@ export const galleryAppMessages = defineMessageSource({
   emptyTitle: {
     ru: 'Ничего не найдено',
     en: 'Nothing found',
+  },
+  emptyLibraryTitle: {
+    ru: 'Библиотека пока пуста',
+    en: 'Your Library is empty',
+  },
+  emptyLibraryDescription: {
+    ru: 'Сделайте снимок, запишите видео или импортируйте файл — материалы появятся здесь.',
+    en: 'Capture a screenshot, record a video, or import a file to see your materials here.',
   },
   emptyDescription: {
     ru: 'Измените фильтры, поисковую строку или настройки сохранения в Библиотеку.',

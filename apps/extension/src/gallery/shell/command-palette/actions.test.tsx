@@ -77,13 +77,27 @@ function findAction(actionId: string, overrides: Parameters<typeof createControl
 }
 
 it('builds scenario-aware sort labels and folder toggles', () => {
+  const counts = {
+    all: 3,
+    audio: 0,
+    screenshot: 0,
+    recording: 0,
+    export: 1,
+    scenario: 1,
+    'web-snapshot': 1,
+  };
   const { action: scenarioSortAction } = findAction('gallery-filter-sort-name-asc', {
     folderFilter: 'scenario',
   });
   const { action: mediaSortAction } = findAction('gallery-filter-sort-size-desc');
-  const { controller: scenarioController } = createController({ folderFilter: 'scenario' });
-  const { action: scenarioFolderAction, controller } = findAction('gallery-filter-folder-scenario');
-  const { action: webSnapshotFolderAction } = findAction('gallery-filter-folder-web-snapshot');
+  const { controller: scenarioController } = createController({ folderFilter: 'scenario', counts });
+  const { action: scenarioFolderAction, controller } = findAction(
+    'gallery-filter-folder-scenario',
+    { counts }
+  );
+  const { action: webSnapshotFolderAction } = findAction('gallery-filter-folder-web-snapshot', {
+    counts,
+  });
 
   expect(scenarioSortAction.title).toBe('gallery.app.sortNameAsc');
   expect(mediaSortAction.title).toBe('gallery.app.sortSizeDesc');
@@ -187,10 +201,41 @@ it('keeps selected backup and original-only ZIP as separate commands', () => {
 it('marks active filters as current context and keeps disabled reasons on guarded actions', () => {
   const { action: activeFolderAction } = findAction('gallery-filter-folder-scenario', {
     folderFilter: 'scenario',
+    counts: { all: 1, audio: 0, screenshot: 0, recording: 0, export: 0, scenario: 1 },
   });
   const { action: emptyPreviewAction } = findAction('gallery-preview-download');
 
   expect(activeFolderAction.subtitle).toBe('shared.ui.commandPaletteCurrentContextHint');
   expect(emptyPreviewAction.disabled).toBe(true);
   expect(emptyPreviewAction.disabledReason).toBe('shared.ui.commandPaletteDisabledContextHint');
+});
+
+it('only offers folders with items after the library snapshot loads', () => {
+  const counts = { all: 2, audio: 0, screenshot: 2, recording: 0, export: 0, scenario: 0 };
+  const { controller } = createController({ counts });
+  controller.actions.filters.setFolderFilter = vi.fn();
+  const actions = buildGalleryCommandPaletteActions(controller, createActions());
+  const folderIds = actions
+    .filter(({ id }) => id.startsWith('gallery-filter-folder-'))
+    .map(({ id }) => id);
+
+  expect(folderIds).toEqual(['gallery-filter-folder-all', 'gallery-filter-folder-screenshot']);
+  expect(controller.actions.filters.setFolderFilter).not.toHaveBeenCalled();
+
+  const { controller: unknownController } = createController({
+    counts,
+    storage: { ...controller.state.storage, hasLoadedLibrarySnapshot: false },
+  });
+  const unknownActions = buildGalleryCommandPaletteActions(unknownController, createActions());
+  expect(unknownActions.some(({ id }) => id === 'gallery-filter-folder-audio')).toBe(true);
+});
+
+it('does not offer Library folder actions while viewing Trash counts', () => {
+  const { controller } = createController({
+    counts: { all: 1, audio: 0, screenshot: 1, recording: 0, export: 0, scenario: 0 },
+    filters: { ...createController().controller.state.filters, trashMode: true },
+  });
+  const actions = buildGalleryCommandPaletteActions(controller, createActions());
+
+  expect(actions.filter(({ id }) => id.startsWith('gallery-filter-folder-'))).toEqual([]);
 });

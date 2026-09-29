@@ -32,6 +32,7 @@ type GalleryRefreshActionArgs = {
   onRefresh?: (() => void) | undefined;
   onSelectionRefresh: (items: GalleryItem[]) => void;
   refreshEpochRef: React.MutableRefObject<number>;
+  setHasLoadedLibrarySnapshot: (hasLoaded: boolean) => void;
   setIsLoading: (isLoading: boolean) => void;
   setItems: (items: GalleryItem[]) => void;
   setTrashUsage: (value: GalleryTrashSize) => void;
@@ -66,6 +67,7 @@ function applyGalleryRefreshResult(props: {
   nextItems: GalleryItem[];
   onPreviewItemRefresh: (items: GalleryItem[]) => void;
   onSelectionRefresh: (items: GalleryItem[]) => void;
+  setHasLoadedLibrarySnapshot: (hasLoaded: boolean) => void;
   setItems: (items: GalleryItem[]) => void;
   setStorageInfo: (value: StorageEstimateInfo | null) => void;
   storageInfoRef: React.MutableRefObject<StorageEstimateInfo | null>;
@@ -84,6 +86,7 @@ function applyGalleryRefreshResult(props: {
     props.storageInfoRef.current = props.estimate;
     props.setStorageInfo(props.estimate);
   }
+  props.setHasLoadedLibrarySnapshot(true);
 }
 
 function isStorageEstimateEqual(
@@ -332,6 +335,7 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
       nextItems,
       onPreviewItemRefresh: args.onPreviewItemRefresh,
       onSelectionRefresh: args.onSelectionRefresh,
+      setHasLoadedLibrarySnapshot: args.setHasLoadedLibrarySnapshot,
       setItems: args.setItems,
       setStorageInfo: args.setStorageInfo,
       storageInfoRef: args.storageInfoRef,
@@ -383,6 +387,7 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
     onRefresh,
     onSelectionRefresh,
     refreshEpochRef,
+    setHasLoadedLibrarySnapshot,
     setIsLoading,
     setItems,
     setTrashUsage,
@@ -399,6 +404,7 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
         onRefresh,
         onSelectionRefresh,
         refreshEpochRef,
+        setHasLoadedLibrarySnapshot,
         setIsLoading,
         setItems,
         setTrashUsage,
@@ -412,6 +418,7 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
       onRefresh,
       onSelectionRefresh,
       refreshEpochRef,
+      setHasLoadedLibrarySnapshot,
       setIsLoading,
       setItems,
       setTrashUsage,
@@ -431,6 +438,7 @@ export function useGalleryLibraryState({
   const [trashUsage, setTrashUsage] = useState<GalleryTrashSize>({ status: 'loading' });
   const [storageInfo, setStorageInfo] = useState<StorageEstimateInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasLoadedLibrarySnapshot, setHasLoadedLibrarySnapshot] = useState(false);
   const itemsRef = useRef<GalleryItem[]>([]);
   const refreshEpochRef = useRef(0);
   const storageInfoRef = useRef<StorageEstimateInfo | null>(null);
@@ -441,6 +449,7 @@ export function useGalleryLibraryState({
     onRefresh,
     onSelectionRefresh,
     refreshEpochRef,
+    setHasLoadedLibrarySnapshot,
     setIsLoading,
     setItems,
     setTrashUsage,
@@ -451,6 +460,7 @@ export function useGalleryLibraryState({
   useGalleryLibrarySubscriptions({ onBanner, refresh });
 
   return {
+    hasLoadedLibrarySnapshot,
     isLoading,
     items,
     refresh,

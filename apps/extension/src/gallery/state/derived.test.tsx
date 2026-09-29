@@ -106,6 +106,7 @@ function createProbeProps(
       },
     },
     library: {
+      hasLoadedLibrarySnapshot: true,
       isLoading: false,
       items: [item],
       refresh: vi.fn(),
@@ -233,6 +234,37 @@ it('partitions trash before normal facets, counts, selection and search; trash i
       activeTags: [],
     })
   );
+});
+
+it('counts every item in the current mode independently of storage scope', () => {
+  const props = createProbeProps('healthy');
+  const temporary = {
+    ...item,
+    id: 'temporary-asset',
+    lifecycle: { storageClass: 'temporary' as const, savedAt: 1, updatedAt: 1 },
+  };
+  const trashed = {
+    ...item,
+    id: 'trashed-asset',
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1, trashedAt: 2 },
+  };
+  props.library.items = [item, temporary, trashed];
+
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getGalleryCounts).toHaveBeenLastCalledWith([item, temporary]);
+  expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([item]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ scope: 'library' })
+  );
+
+  props.filters.state.scope = 'temporary';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getGalleryCounts).toHaveBeenLastCalledWith([item, temporary]);
+  expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([temporary]);
+
+  props.filters.state.trashMode = true;
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getGalleryCounts).toHaveBeenLastCalledWith([trashed]);
 });
 
 it.each([false, true])('keeps the %s mode selector idle for raw search edits', (trashMode) => {

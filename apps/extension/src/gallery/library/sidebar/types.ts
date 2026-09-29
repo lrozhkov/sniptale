@@ -33,6 +33,8 @@ export interface GallerySidebarProps {
   activeTags: string[];
   allTags: string[];
   counts: GalleryFolderCounts;
+  countsKnown: boolean;
+  countsLoading?: boolean;
   facetFilters: GalleryFacetFilters;
   facets: GalleryFacetDefinition[];
   filteredItemCount: number;

@@ -217,6 +217,15 @@ it('keeps the raw query in the header while the main content uses the applied qu
   );
 });
 
+it('marks a confirmed empty Library for its first-run empty state', () => {
+  const props = createLayoutProps();
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(mainContentPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ libraryEmpty: true })
+  );
+  expect(sidebarPropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ countsKnown: true }));
+});
+
 it('passes all selected local media files to the dedicated import action', () => {
   const props = createLayoutProps();
   act(() => root?.render(<GalleryAppLayout {...props} />));

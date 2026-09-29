@@ -15,6 +15,7 @@ function renderGalleryGridContent(
     | 'gridMetrics'
     | 'gridWidth'
     | 'isLoading'
+    | 'libraryEmpty'
     | 'onPreviewOpen'
     | 'onRecordingGroupOpen'
     | 'onProjectOpen'
@@ -49,7 +50,7 @@ function renderGalleryGridContent(
         )}
       </p>
     ) : (
-      <GalleryEmptyState folderFilter={props.folderFilter} />
+      <GalleryEmptyState folderFilter={props.folderFilter} libraryEmpty={props.libraryEmpty} />
     );
   }
 
@@ -72,6 +73,7 @@ export function GalleryGrid(
     | 'gridWidth'
     | 'gridViewportRef'
     | 'isLoading'
+    | 'libraryEmpty'
     | 'onPreviewOpen'
     | 'onRecordingGroupOpen'
     | 'onProjectOpen'

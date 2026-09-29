@@ -113,6 +113,7 @@ function configureLibraryStateMock() {
   useGalleryLibraryStateMock.mockImplementation((callbacks) => {
     libraryCallbacks = callbacks;
     return {
+      hasLoadedLibrarySnapshot: true,
       isLoading: false,
       items: [createItem(), createItem({ id: 'asset-2', size: 50, tags: [] })],
       refresh: vi.fn(),
@@ -165,6 +166,7 @@ it('exposes storage workflow state and actions from the owner seam', () => {
   const workflow = renderHook();
 
   expect(workflow.state.storageInfo?.usage).toBe(150);
+  expect(workflow.state.hasLoadedLibrarySnapshot).toBe(true);
   expect(workflow.state.banner).toEqual({ kind: 'info' });
   expect(workflow.actions.refresh).toBeTypeOf('function');
   expect(workflow.actions.setBanner).toBe(

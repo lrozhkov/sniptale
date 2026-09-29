@@ -161,6 +161,7 @@ function configureStorageWorkflowMock(
       setPendingMediaImport: vi.fn(),
     },
     library: {
+      hasLoadedLibrarySnapshot: true,
       isLoading: false,
       items,
       refresh: vi.fn(),
@@ -176,6 +177,7 @@ function configureStorageWorkflowMock(
     state: {
       banner: { kind: 'info' },
       confirmDialog: null,
+      hasLoadedLibrarySnapshot: true,
       isBusy: false,
       isLoading: false,
       pendingExport: null,

@@ -41,6 +41,7 @@ function createProps(overrides: Partial<Parameters<typeof GalleryMainContent>[0]
     gridWidth: 960,
     gridViewportRef: { current: null },
     isLoading: false,
+    libraryEmpty: false,
     search: '',
     scope: 'all' as const,
     selectedIds: new Set<string>(),

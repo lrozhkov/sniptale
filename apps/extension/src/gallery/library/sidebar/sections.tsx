@@ -1,14 +1,13 @@
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { SIDEBAR_FOLDERS } from '../constants';
-import { FOLDER_LABELS, getGalleryFolderIcon } from '../ui';
 import type { GallerySidebarProps } from './types';
 import {
   readGalleryFacetDisclosurePreferences,
   writeGalleryFacetDisclosurePreferences,
 } from './disclosure-preferences';
-import { GallerySavedViewActions, GallerySavedViewRows } from './saved-views';
+import { GallerySavedViewActions } from './saved-views';
+export { GalleryFolderList } from './folder-list';
 
 function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
@@ -38,99 +37,6 @@ const facetSearchInputClassName = [
   'min-w-0 flex-1 bg-transparent text-xs outline-none',
   'placeholder:text-[var(--sniptale-color-text-muted)]',
 ].join(' ');
-
-export function GalleryFolderList({
-  activeSavedView = null,
-  counts,
-  folderFilter,
-  savedViews = [],
-  savedViewsLoadFailed = false,
-  savedViewsLoaded = false,
-  onDeleteSavedView,
-  onFolderFilterChange,
-  onMoveSavedView,
-  onSavedViewSelect,
-}: Pick<
-  GallerySidebarProps,
-  | 'activeSavedView'
-  | 'counts'
-  | 'folderFilter'
-  | 'onDeleteSavedView'
-  | 'onFolderFilterChange'
-  | 'onMoveSavedView'
-  | 'onSavedViewSelect'
-  | 'savedViews'
-  | 'savedViewsLoadFailed'
-  | 'savedViewsLoaded'
->) {
-  return (
-    <div className="shrink-0 space-y-2">
-      {SIDEBAR_FOLDERS.map((folder) => {
-        const Icon = getGalleryFolderIcon(folder);
-        const active = folderFilter === folder && activeSavedView === null;
-
-        return (
-          <Fragment key={folder}>
-            {folder === 'video-project' || folder === 'screenshot' ? (
-              <div className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
-                {translate(
-                  folder === 'video-project'
-                    ? 'gallery.preview.projectsHeading'
-                    : 'gallery.preview.materialsHeading'
-                )}
-              </div>
-            ) : null}
-            <button
-              type="button"
-              aria-pressed={active}
-              onClick={() => onFolderFilterChange(folder)}
-              className={cx(
-                'flex h-9 w-full items-center justify-between rounded-[8px] border px-2.5 text-left transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
-                'focus-visible:ring-[var(--sniptale-color-text-primary)]',
-                active
-                  ? 'border-[var(--sniptale-color-border-accent-strong)]' +
-                      ' bg-[var(--sniptale-color-surface-hover)]' +
-                      ' text-[var(--sniptale-color-text-primary-strong)]'
-                  : 'border-transparent text-[var(--sniptale-color-text-secondary)]' +
-                      ' hover:border-[var(--sniptale-color-border-soft)]' +
-                      ' hover:bg-[var(--sniptale-color-surface-hover)]' +
-                      ' hover:text-[var(--sniptale-color-text-primary)]'
-              )}
-            >
-              <span className="inline-flex min-w-0 items-center gap-2 text-sm font-medium">
-                <Icon className="h-4 w-4" />
-                <span className="truncate">{FOLDER_LABELS[folder]}</span>
-              </span>
-              <span
-                className="rounded-full border border-[var(--sniptale-color-border-soft)]
-                  bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]
-                  px-2 py-0.5 text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]"
-              >
-                {counts[folder] ?? 0}
-              </span>
-            </button>
-            {savedViewsLoaded ? (
-              <GallerySavedViewRows
-                activeSavedView={activeSavedView}
-                folder={folder}
-                savedViews={savedViews}
-                {...(onDeleteSavedView ? { onDeleteSavedView } : {})}
-                {...(onMoveSavedView ? { onMoveSavedView } : {})}
-                {...(onSavedViewSelect ? { onSavedViewSelect } : {})}
-              />
-            ) : null}
-          </Fragment>
-        );
-      })}
-      {savedViewsLoadFailed ? (
-        <p className="px-2 py-1 text-xs text-[var(--sniptale-color-danger)]">
-          {translate('gallery.app.savedViewLoadFailed')}
-        </p>
-      ) : null}
-    </div>
-  );
-}
 
 function getFacetTitle(id: GallerySidebarProps['facets'][number]['id']): string {
   const titles = {

@@ -21,6 +21,7 @@ vi.mock('../../composition/persistence/gallery-saved-views', async (importOrigin
   updateGallerySavedView: savedViewMocks.update,
 }));
 import { useGalleryFilterState } from './useGalleryFilterState';
+import { GalleryFolderList } from '../library/sidebar/folder-list';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -341,6 +342,60 @@ it('loads a saved view, keeps unavailable values selected, and resets changes to
   act(() => latestValue?.actions.resetFilters());
   expect(latestValue?.state.facetFilters.source).toEqual(['missing.example']);
   expect(latestValue?.state.isSavedViewDirty).toBe(false);
+});
+
+it('keeps an empty-category saved view active when selected from the hidden-view list', async () => {
+  const view = {
+    createdAt: 1,
+    filters: {
+      activeTags: ['review'],
+      facetFilters: {
+        created: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+        updated: [],
+      },
+      scope: 'library' as const,
+    },
+    folderFilter: 'screenshot' as const,
+    id: 'empty-view',
+    name: 'Empty screenshots',
+    updatedAt: 1,
+  };
+  savedViewMocks.list.mockResolvedValue([view]);
+  function GalleryProbe() {
+    const value = useGalleryFilterState();
+    latestValue = value;
+    return (
+      <GalleryFolderList
+        activeSavedView={value.state.activeSavedView}
+        counts={{ all: 0, audio: 0, screenshot: 0, recording: 0, export: 0, scenario: 0 }}
+        countsKnown
+        folderFilter={value.state.folderFilter}
+        savedViews={value.state.savedViews}
+        savedViewsLoaded={value.state.savedViewsLoaded}
+        onFolderFilterChange={value.actions.setFolderFilter}
+        onSavedViewSelect={value.actions.selectSavedView}
+      />
+    );
+  }
+  act(() => root?.render(<GalleryProbe />));
+  await vi.waitFor(() => expect(container?.textContent).toContain('Empty screenshots'));
+
+  act(() => {
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
+      .find((button) => button.textContent === 'Empty screenshots')
+      ?.click();
+  });
+
+  expect(latestValue?.state.activeSavedView?.id).toBe(view.id);
+  expect(latestValue?.state.folderFilter).toBe('screenshot');
+  expect(latestValue?.state.activeTags).toEqual(['review']);
+  expect(container?.querySelectorAll('[data-gallery-folder]')).toHaveLength(1);
+  expect(container?.textContent).toContain('Empty screenshots');
 });
 
 it('resets saved-view filters when a plain category is selected', async () => {

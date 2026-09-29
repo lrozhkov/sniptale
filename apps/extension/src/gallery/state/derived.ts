@@ -98,6 +98,7 @@ function useGalleryFilterDerivedState(props: {
 }) {
   const { filters, library } = props;
 
+  const counts = useMemo(() => getGalleryCounts(library.items), [library.items]);
   const scopedItems = useMemo(
     () =>
       library.items.filter(
@@ -107,7 +108,6 @@ function useGalleryFilterDerivedState(props: {
       ),
     [filters.state.scope, library.items]
   );
-  const counts = useMemo(() => getGalleryCounts(scopedItems), [scopedItems]);
   const allTags = useMemo(() => getAllGalleryTags(scopedItems), [scopedItems]);
   const facets = useMemo(
     () =>

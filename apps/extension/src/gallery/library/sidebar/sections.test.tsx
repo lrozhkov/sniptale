@@ -61,6 +61,7 @@ it('renders folder actions, highlights the active folder, and forwards selection
 
   render(
     <GalleryFolderList
+      countsKnown
       counts={{ all: 7, audio: 0, export: 1, recording: 2, scenario: 3, screenshot: 4 }}
       folderFilter="recording"
       onFolderFilterChange={onFolderFilterChange}
@@ -75,15 +76,16 @@ it('renders folder actions, highlights the active folder, and forwards selection
   );
   expect(container?.textContent).toContain('7');
   expect(findButton(translate('gallery.preview.folderExport'))).toBeDefined();
-  expect(findButton(translate('gallery.preview.folderVideoProject'))).toBeDefined();
+  expect(findButton(translate('gallery.preview.folderVideoProject'))).toBeUndefined();
   expect(translate('gallery.preview.folderWebSnapshot')).toBe('Веб-снимки');
-  expect(container?.textContent).toContain('Веб-снимки');
+  expect(container?.textContent).not.toContain('Веб-снимки');
 
   click(findButton(translate('gallery.preview.folderScenario')));
   expect(onFolderFilterChange).toHaveBeenCalledWith('scenario');
 
   render(
     <GalleryFolderList
+      countsKnown
       counts={{
         all: 8,
         audio: 0,
@@ -129,6 +131,7 @@ it('renders saved views under their category without icons or counters and reque
 
   render(
     <GalleryFolderList
+      countsKnown
       activeSavedView={view}
       counts={{ all: 7, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
       folderFilter="screenshot"
@@ -186,6 +189,7 @@ it('reveals saved views in batches and requests sibling reordering', () => {
 
   render(
     <GalleryFolderList
+      countsKnown
       counts={{ all: 6, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 6 }}
       folderFilter="screenshot"
       savedViews={views}
@@ -219,6 +223,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
 
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={['beta']}
       allTags={['alpha', 'beta']}
       counts={{ all: 2, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 2 }}
@@ -351,6 +356,7 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
     .mockImplementation(async (name: string) => createdView(name));
   render(
     <GalleryFacetFilters
+      countsKnown
       activeSavedView={null}
       activeTags={[]}
       allTags={[]}
@@ -418,6 +424,7 @@ it('updates a changed active saved view instead of opening the name field', asyn
   };
   render(
     <GalleryFacetFilters
+      countsKnown
       activeSavedView={view}
       activeTags={[]}
       allTags={[]}
@@ -477,6 +484,7 @@ it('hides reset and update actions while the active saved view matches its basel
 
   render(
     <GalleryFacetFilters
+      countsKnown
       activeSavedView={view}
       activeTags={view.filters.activeTags}
       allTags={['review']}
@@ -511,6 +519,7 @@ it('shows search and scrolling only for facet lists with more than ten values', 
 
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={[]}
       allTags={options.map((option) => option.value)}
       counts={{ all: 11, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 11 }}
@@ -566,6 +575,7 @@ it('shows result selection for a non-default section without a redundant filter 
   const onSelectAll = vi.fn();
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={[]}
       allTags={[]}
       counts={{ all: 3, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 3 }}
@@ -602,6 +612,7 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
   const onFacetFilterChange = vi.fn();
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={[]}
       allTags={[]}
       counts={{ all: 1, audio: 0, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
@@ -655,6 +666,7 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
   const facetProps = {
     activeTags: [],
     allTags: [],
+    countsKnown: true,
     counts: { all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 },
     facetFilters: {
       created: [],
@@ -699,6 +711,7 @@ it('shows the Audio count and selects its section', () => {
   const onFolderFilterChange = vi.fn();
   render(
     <GalleryFolderList
+      countsKnown
       counts={{ all: 3, audio: 2, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
       folderFilter="audio"
       onFolderFilterChange={onFolderFilterChange}

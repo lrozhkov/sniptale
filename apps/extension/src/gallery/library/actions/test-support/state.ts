@@ -135,6 +135,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
       ...overrides.selection,
     },
     storage: {
+      hasLoadedLibrarySnapshot: true,
       activeImport: overrides.activeImport ?? null,
       banner: null,
       confirmDialog: overrides.confirmDialog ?? null,

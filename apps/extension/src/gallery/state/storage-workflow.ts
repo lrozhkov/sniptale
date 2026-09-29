@@ -9,6 +9,7 @@ type GalleryStorageWorkflowState = Pick<
   | 'activeImport'
   | 'banner'
   | 'confirmDialog'
+  | 'hasLoadedLibrarySnapshot'
   | 'isBusy'
   | 'isLoading'
   | 'pendingExport'
@@ -47,6 +48,7 @@ function buildGalleryStorageWorkflowState(
     activeImport: surface.state.activeImport,
     banner: surface.state.banner,
     confirmDialog: surface.state.confirmDialog,
+    hasLoadedLibrarySnapshot: library.hasLoadedLibrarySnapshot,
     isBusy: surface.state.isBusy,
     isLoading: library.isLoading,
     pendingExport: surface.state.pendingExport,

@@ -22,6 +22,7 @@ export interface GalleryMainContentProps {
   gridWidth: number;
   gridViewportRef: RefObject<HTMLDivElement | null>;
   isLoading: boolean;
+  libraryEmpty: boolean;
   search: string;
   scope: GalleryScope;
   selectedIds: Set<string>;
