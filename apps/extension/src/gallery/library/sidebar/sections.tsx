@@ -22,9 +22,11 @@ const facetOptionRowClassName = [
 ].join(' ');
 
 const facetSummaryClassName = [
-  'flex h-10 cursor-pointer list-none items-center gap-2 rounded-[8px] px-1.5 outline-none',
+  'mx-1.5 flex h-8 cursor-pointer list-none items-center gap-2 rounded-[var(--sniptale-radius-sm)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
-  'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-text-primary)]',
+  'hover:shadow-[6px_0_0_var(--sniptale-color-surface-hover),-6px_0_0_var(--sniptale-color-surface-hover)]',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+  'focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 
 const facetSearchClassName = [
@@ -282,7 +284,9 @@ function GalleryFacetSection(props: {
         ) : null}
         <ChevronDown
           className="h-3.5 w-3.5 text-[var(--sniptale-color-text-muted)]
-            transition-transform group-open:rotate-180"
+            -rotate-90 transition-transform duration-[120ms] group-open:rotate-0
+            motion-reduce:transition-none"
+          aria-hidden="true"
         />
       </summary>
       <div className="pb-2">

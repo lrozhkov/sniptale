@@ -268,9 +268,17 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
 
   const initialSummaries = Array.from(container?.querySelectorAll('summary') ?? []);
   expect(container?.firstElementChild?.className).toContain('shrink-0');
-  expect(initialSummaries[0]?.className).toContain(
-    'focus-visible:ring-[var(--sniptale-color-text-primary)]'
-  );
+  for (const summary of initialSummaries) {
+    expect(summary.className).toContain('h-8');
+    expect(summary.className).toContain('mx-1.5');
+    expect(summary.className).toContain('rounded-[var(--sniptale-radius-sm)]');
+    expect(summary.className).toContain('hover:shadow-[6px_0_0_var(');
+    expect(summary.className).toContain('focus-visible:outline-[var(--sniptale-color-accent)]');
+    const chevron = summary.querySelector(':scope > svg:last-child');
+    expect(chevron?.getAttribute('class')).toContain('-rotate-90');
+    expect(chevron?.getAttribute('class')).toContain('group-open:rotate-0');
+    expect(chevron?.getAttribute('class')).toContain('motion-reduce:transition-none');
+  }
   expect(initialSummaries[0]?.textContent).toContain(`${translate('gallery.app.facetSelected')} 2`);
   expect(initialSummaries[1]?.textContent).toContain('beta');
   expect(initialSummaries[1]?.textContent).not.toContain(
@@ -304,6 +312,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
       `[aria-label="${translate('gallery.app.facetClear')} ${translate('gallery.app.facetTitle.tags')}"]`
     )
   );
+  expect(container?.querySelectorAll('details')[1]?.open).toBe(true);
   click(findButton(translate('gallery.app.facetResetAll')));
 
   expect(onActiveTagsChange).toHaveBeenLastCalledWith([]);
