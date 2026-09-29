@@ -57,17 +57,59 @@ it('plays, reports rejection and retains usable controls for retry', async () =>
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 
+it('keeps transport feedback and audio settings in sync with media events', () => {
+  const video = mount();
+  act(() => video.dispatchEvent(new Event('play')));
+  expect(button('pause')).not.toBeNull();
+  act(() => video.dispatchEvent(new Event('waiting')));
+  expect(host.querySelector('[data-ui="gallery.preview.player"]')?.getAttribute('aria-busy')).toBe(
+    'true'
+  );
+  act(() => video.dispatchEvent(new Event('playing')));
+  expect(host.querySelector('[data-ui="gallery.preview.player"]')?.getAttribute('aria-busy')).toBe(
+    'false'
+  );
+  act(() => video.dispatchEvent(new Event('ended')));
+  expect(button('play')).not.toBeNull();
+
+  act(() => button('mute').click());
+  act(() => video.dispatchEvent(new Event('volumechange')));
+  expect(video.muted).toBe(true);
+  expect(button('unmute')).not.toBeNull();
+  const volume = host.querySelector<HTMLInputElement>(
+    '[aria-label="gallery.preview.player.volume"]'
+  )!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(volume, '0.5');
+    volume.dispatchEvent(new Event('input', { bubbles: true }));
+    volume.dispatchEvent(new Event('change', { bubbles: true }));
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  expect(video.volume).toBe(0.5);
+  expect(video.muted).toBe(false);
+  const speed = host.querySelector<HTMLSelectElement>(
+    '[aria-label="gallery.preview.player.speed"]'
+  )!;
+  act(() => {
+    speed.value = '1.5';
+    speed.dispatchEvent(new Event('change', { bubbles: true }));
+    video.dispatchEvent(new Event('ratechange'));
+  });
+  expect(video.playbackRate).toBe(1.5);
+  expect(speed.value).toBe('1.5');
+});
+
 it('keeps hover decoding separate from playback and disables seeking after media errors', () => {
   const video = mount();
   video.currentTime = 7;
   const seek = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
   vi.spyOn(seek, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 10));
   act(() => seek.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 50 })));
-  expect(host.querySelector('canvas')).not.toBeNull();
+  expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).not.toBeNull();
   expect(video.currentTime).toBe(7);
   act(() => video.dispatchEvent(new Event('error')));
   expect(seek.disabled).toBe(true);
-  expect(host.querySelector('canvas')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).toBeNull();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('player.failed');
 });
 
@@ -83,11 +125,15 @@ it('switches fit to intrinsic size and seeks through the native range', () => {
   expect(video.className).toContain('max-w-none');
   const seek = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
   act(() => {
+    seek.focus();
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(seek, '12');
     seek.dispatchEvent(new Event('input', { bubbles: true }));
     seek.dispatchEvent(new Event('change', { bubbles: true }));
   });
   expect(video.currentTime).toBe(12);
+  expect(host.querySelector('[data-sample-time="12"]')).not.toBeNull();
+  act(() => seek.blur());
+  expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).toBeNull();
 });
 
 it('requests fullscreen on the controls container and handles failure', async () => {
@@ -116,40 +162,59 @@ it('owns fullscreen Escape and restores focus after fullscreenchange', async () 
   expect(document.activeElement).toBe(button('fullscreen'));
 });
 
-it('disposes obsolete frame decoding and hides stale frames while the next request loads', () => {
-  vi.useFakeTimers();
-  const create = document.createElement.bind(document);
-  const decoders: HTMLVideoElement[] = [];
-  vi.spyOn(document, 'createElement').mockImplementation((tag, options) => {
-    const node = create(tag, options);
-    if (node instanceof HTMLVideoElement) decoders.push(node);
-    return node;
+it('labels the displayed frame with its own sampled time and keeps feedback dimensions stable', () => {
+  act(() => root.render(<VideoThumbnail snapshot={{ sampleTime: 4, status: 'loading' }} />));
+  expect(host.querySelector('[data-sample-time="4"]')?.textContent).toContain('0:04');
+  const frameBox = host.querySelector('[data-ui="gallery.preview.player.frame"] > div');
+  expect(frameBox?.className).toContain('aspect-video');
+  act(() =>
+    root.render(
+      <VideoThumbnail
+        snapshot={{
+          sampleTime: 9,
+          status: 'ready',
+          dataUrl: 'data:image/jpeg;base64,YQ==',
+        }}
+      />
+    )
+  );
+  expect(host.querySelector('[data-sample-time="9"] img')?.getAttribute('src')).toContain(
+    'data:image/jpeg'
+  );
+  expect(host.querySelector('[data-sample-time="9"]')?.textContent).toContain('0:09');
+  act(() => root.render(<VideoThumbnail snapshot={{ sampleTime: 9, status: 'error' }} />));
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('frameFailed');
+  expect(host.querySelector('[data-sample-time="9"] img')).toBeNull();
+});
+
+it('clamps the hover frame to the player at both timeline edges', () => {
+  mount();
+  const player = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player"]')!;
+  const timeline = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player.timeline"]')!;
+  const seek = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
+  vi.spyOn(player, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 100, 300, 250));
+  vi.spyOn(timeline, 'getBoundingClientRect').mockReturnValue(new DOMRect(110, 300, 280, 24));
+  vi.spyOn(seek, 'getBoundingClientRect').mockReturnValue(new DOMRect(110, 300, 280, 24));
+  const popupRect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+  popupRect.mockImplementation(function (this: HTMLElement) {
+    return this.dataset['ui'] === 'gallery.preview.player.framePopover'
+      ? new DOMRect(0, 0, 192, 130)
+      : new DOMRect();
   });
-  const draw = vi.fn();
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: draw,
-    clearRect: vi.fn(),
-  } as unknown as CanvasRenderingContext2D);
-  act(() => root.render(<VideoThumbnail src="blob:clip" time={4} />));
-  act(() => vi.advanceTimersByTime(120));
-  const first = decoders[0]!;
-  for (const [key, value] of Object.entries({
-    readyState: 2,
-    videoWidth: 1280,
-    videoHeight: 720,
-    duration: 30,
-  }))
-    Object.defineProperty(first, key, { value });
-  act(() => first.dispatchEvent(new Event('loadeddata')));
-  expect(first.currentTime).toBe(4);
-  act(() => first.dispatchEvent(new Event('seeked')));
-  expect(draw).toHaveBeenCalledOnce();
-  expect(host.querySelector('canvas')?.hidden).toBe(false);
-  act(() => root.render(<VideoThumbnail src="blob:clip" time={9} />));
-  expect(first.hasAttribute('src')).toBe(false);
-  expect(host.querySelector('canvas')?.hidden).toBe(true);
-  act(() => first.dispatchEvent(new Event('seeked')));
-  expect(draw).toHaveBeenCalledOnce();
-  act(() => vi.advanceTimersByTime(8000));
-  expect(host.textContent).toContain('frameFailed');
+
+  act(() => seek.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 112 })));
+  const popup = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player.framePopover"]')!;
+  expect(popup.style.left).toBe('-10px');
+  expect(popup.style.top).toBe('-138px');
+
+  act(() => seek.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 388 })));
+  expect(popup.style.left).toBe('98px');
+  expect(popup.querySelector('[data-sample-time]')).not.toBeNull();
+
+  act(() => timeline.dispatchEvent(new MouseEvent('pointerout', { bubbles: true })));
+  expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).toBeNull();
+  act(() => seek.focus());
+  expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).not.toBeNull();
+  act(() => timeline.dispatchEvent(new MouseEvent('pointerout', { bubbles: true })));
+  expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).not.toBeNull();
 });

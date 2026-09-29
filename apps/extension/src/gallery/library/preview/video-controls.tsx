@@ -1,0 +1,187 @@
+import { LoaderCircle, Maximize, Minimize, Pause, Play, Volume2, VolumeX } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductRange } from '@sniptale/ui/product-form-controls';
+import type { ReactNode, RefObject } from 'react';
+import { translate } from '../../../platform/i18n';
+import { videoTime } from './video-thumbnail';
+import { VideoTimeline } from './video-timeline';
+import type { useVideoPlayer } from './video-playback';
+
+function PlayerButton(props: {
+  label: string;
+  onClick(): void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <ContentToolbarButton
+      type="button"
+      aria-label={props.label}
+      title={props.label}
+      onClick={props.onClick}
+      disabled={props.disabled}
+      tone="utility"
+      size="compact"
+      className="!h-9 !w-9 shrink-0 !p-0"
+    >
+      {props.children}
+    </ContentToolbarButton>
+  );
+}
+
+/** Groups media transport controls while playback state stays in the player hook. */
+export function VideoControls({
+  src,
+  player,
+}: {
+  src: string;
+  player: ReturnType<typeof useVideoPlayer>;
+}) {
+  const {
+    video,
+    container,
+    fullscreenButton,
+    duration,
+    time,
+    playing,
+    volume,
+    muted,
+    speed,
+    fit,
+    fullscreen,
+    pending,
+    buffering,
+    ready,
+    setFit,
+    togglePlayback,
+    toggleFullscreen,
+    seek,
+  } = player;
+  return (
+    <div
+      className="shrink-0 border-t border-[var(--sniptale-color-border-soft)]
+        bg-[var(--sniptale-color-surface-panel)] px-3 py-2"
+    >
+      <VideoTimeline
+        src={src}
+        duration={duration}
+        time={time}
+        ready={ready}
+        seek={seek}
+        playerRef={container}
+      />
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <div className="flex shrink-0 items-center gap-2">
+          <PlayerButton
+            label={translate(
+              playing ? 'gallery.preview.player.pause' : 'gallery.preview.player.play'
+            )}
+            disabled={!ready || pending}
+            onClick={() => void togglePlayback()}
+          >
+            {pending || buffering ? (
+              <LoaderCircle
+                size={16}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : playing ? (
+              <Pause size={16} aria-hidden />
+            ) : (
+              <Play size={16} aria-hidden />
+            )}
+          </PlayerButton>
+          <span className="whitespace-nowrap tabular-nums text-[var(--sniptale-color-text-secondary)]">
+            {videoTime(time)} / {videoTime(duration)}
+          </span>
+        </div>
+        <PlaybackSettings video={video} muted={muted} volume={volume} speed={speed} />
+        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
+          <select
+            aria-label={translate('gallery.preview.player.scale')}
+            value={fit ? 'fit' : 'original'}
+            className="h-9 max-w-48 rounded-[var(--sniptale-radius-md)] border
+              border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
+              px-2 text-[var(--sniptale-color-text-primary)] focus-visible:outline
+              focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
+            onChange={(event) => setFit(event.currentTarget.value === 'fit')}
+          >
+            <option value="fit">{translate('gallery.preview.player.fit')}</option>
+            <option value="original">{translate('gallery.preview.player.original')}</option>
+          </select>
+          <div ref={fullscreenButton}>
+            <PlayerButton
+              label={translate(
+                fullscreen
+                  ? 'gallery.preview.player.exitFullscreen'
+                  : 'gallery.preview.player.fullscreen'
+              )}
+              disabled={pending}
+              onClick={() => void toggleFullscreen()}
+            >
+              {fullscreen ? <Minimize size={16} aria-hidden /> : <Maximize size={16} aria-hidden />}
+            </PlayerButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Audio and playback-rate settings use the media element as their authority. */
+function PlaybackSettings({
+  video,
+  muted,
+  volume,
+  speed,
+}: {
+  video: RefObject<HTMLVideoElement | null>;
+  muted: boolean;
+  volume: number;
+  speed: number;
+}) {
+  return (
+    <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+      <PlayerButton
+        label={translate(muted ? 'gallery.preview.player.unmute' : 'gallery.preview.player.mute')}
+        onClick={() => {
+          if (video.current) video.current.muted = !video.current.muted;
+        }}
+      >
+        {muted ? <VolumeX size={16} aria-hidden /> : <Volume2 size={16} aria-hidden />}
+      </PlayerButton>
+      <ProductRange
+        aria-label={translate('gallery.preview.player.volume')}
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={muted ? 0 : volume}
+        className="w-20 min-w-12"
+        onChange={(event) => {
+          if (video.current) {
+            video.current.volume = event.currentTarget.valueAsNumber;
+            video.current.muted = false;
+          }
+        }}
+      />
+      <select
+        aria-label={translate('gallery.preview.player.speed')}
+        value={speed}
+        className="h-9 rounded-[var(--sniptale-radius-md)] border
+          border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
+          px-2 text-[var(--sniptale-color-text-primary)] focus-visible:outline
+          focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
+        onChange={(event) => {
+          if (video.current) video.current.playbackRate = Number(event.currentTarget.value);
+        }}
+      >
+        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
+          <option key={rate} value={rate}>
+            {rate}×
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
