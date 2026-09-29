@@ -8,7 +8,10 @@ import {
   createVideoProjectAsset,
   createVideoProjectTrack,
 } from '../../../../apps/extension/src/features/video/project/factories/creation';
-import { createAudioClipFromAsset } from '../../../../apps/extension/src/features/video/project/factories/clip';
+import {
+  createAudioClipFromAsset,
+  createVideoClipFromAsset,
+} from '../../../../apps/extension/src/features/video/project/factories/clip';
 import {
   VideoProjectAssetType,
   VideoTrackKind,
@@ -61,6 +64,105 @@ async function openVideoEditorHarness(page: Page, hostOrigin: string) {
     waitUntil: 'domcontentloaded',
   });
 }
+
+test('timeline clip hover remains attached while crossing artwork and trim handles at HD', async ({
+  page,
+  hostOrigin,
+}) => {
+  const project = createEmptyVideoProject('Hover');
+  project.duration = 10;
+  const audioTrack = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
+  project.tracks.push(audioTrack);
+  const videoAsset = createVideoProjectAsset(
+    'Video',
+    VideoProjectAssetType.VIDEO,
+    { kind: 'project-asset', projectAssetId: 'hover-video' },
+    {
+      width: 1280,
+      height: 720,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const audioAsset = createVideoProjectAsset(
+    'Audio',
+    VideoProjectAssetType.AUDIO,
+    { kind: 'project-asset', projectAssetId: 'hover-audio' },
+    {
+      width: 0,
+      height: 0,
+      duration: 4,
+      mimeType: 'audio/webm',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  project.assets.push(videoAsset, audioAsset);
+  const videoClip = createVideoClipFromAsset(
+    project.tracks[0]!.id,
+    videoAsset,
+    project.width,
+    project.height
+  );
+  const audioClip = createAudioClipFromAsset(audioTrack.id, audioAsset);
+  project.clips.push(videoClip, audioClip);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: { runtimeFallback: 'typed-success' },
+    videoProjects: [project],
+  });
+  await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`);
+  for (const clip of [videoClip, audioClip]) {
+    const locator = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
+    await expect(locator).toBeVisible();
+    const bounds = await locator.boundingBox();
+    if (!bounds) throw new Error('Missing clip geometry');
+    await page.mouse.move(bounds.x - 12, bounds.y + bounds.height / 2);
+    await page.evaluate((clipId) => {
+      const element = document.querySelector(`[data-project-timeline-clip="${clipId}"]`);
+      if (!element) throw new Error('Missing clip');
+      const trace: string[] = [];
+      element.addEventListener('pointerenter', () => trace.push('enter'));
+      element.addEventListener('pointerleave', () => trace.push('leave'));
+      new MutationObserver(() => {
+        trace.push(
+          element.classList.contains('video-editor-timeline-item-hovered') ? 'highlight' : 'clear'
+        );
+      }).observe(element, { attributes: true, attributeFilter: ['class'] });
+      (window as Window & { __clipHoverTrace?: string[] }).__clipHoverTrace = trace;
+    }, clip.id);
+    for (const fraction of [0.02, 0.25, 0.5, 0.75, 0.98]) {
+      await page.mouse.move(bounds.x + bounds.width * fraction, bounds.y + bounds.height / 2, {
+        steps: 5,
+      });
+      await expect(locator).toHaveClass(/video-editor-timeline-item-hovered/);
+    }
+    const trace = await page.evaluate(
+      () => (window as Window & { __clipHoverTrace?: string[] }).__clipHoverTrace
+    );
+    expect(trace).toEqual(['enter', 'highlight']);
+    expect(
+      await locator.evaluate((element) => getComputedStyle(element, '::after').transitionDuration)
+    ).toBe('0s');
+  }
+  const zoom = page.locator('[data-ui="video-editor.timeline.toolbar"] input[type="range"]');
+  await zoom.focus();
+  await zoom.press('Home');
+  for (const clip of [videoClip, audioClip]) {
+    const locator = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
+    const bounds = await locator.boundingBox();
+    if (!bounds) throw new Error('Missing compact clip geometry');
+    await page.mouse.move(bounds.x - 8, bounds.y + bounds.height / 2);
+    for (const fraction of [0.1, 0.5, 0.9]) {
+      await page.mouse.move(bounds.x + bounds.width * fraction, bounds.y + bounds.height / 2);
+      await expect(locator).toHaveClass(/video-editor-timeline-item-hovered/);
+    }
+  }
+});
 
 async function expectVideoEditorStackSpacingCompatibility(page: Page): Promise<void> {
   await expect

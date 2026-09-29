@@ -20,6 +20,11 @@
   transition: box-shadow 120ms ease;
 }
 
+/* Clip hover is already owned by its pointer state; an animated contour replays on redraw. */
+.video-editor-timeline-item[data-project-timeline-clip]::after {
+  transition: none;
+}
+
 .video-editor-timeline-item:where(:hover, .video-editor-timeline-item-hovered):not(:disabled),
 .video-editor-timeline-item.video-editor-timeline-item-selected {
   --timeline-item-contour: var(--sniptale-color-border-accent-strong);
