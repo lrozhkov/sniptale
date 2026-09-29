@@ -148,6 +148,7 @@ it('renders saved views under their category without icons or counters and reque
   expect(viewButton?.parentElement?.className).toContain(
     'bg-[var(--sniptale-color-surface-hover)]'
   );
+  expect(viewButton?.parentElement?.className).toContain('border-transparent');
   expect(viewButton?.className).toContain(
     'focus-visible:ring-[var(--sniptale-color-text-primary)]'
   );
@@ -294,8 +295,11 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   const selectedLabel = labels.find((label) => label.textContent?.includes('beta'));
   expect(selectedLabel?.className).toContain('relative');
   expect(selectedLabel?.className).not.toContain('focus-within:ring-2');
-  expect(selectedLabel?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
-  expect(selectedLabel?.className).toContain('hover:bg-[var(--sniptale-color-surface-hover)]');
+  expect(selectedLabel?.className).toContain('border-transparent');
+  expect(selectedLabel?.className).not.toContain('bg-[var(--sniptale-color-surface-hover)]');
+  const hoverSurface = selectedLabel?.querySelector(':scope > span[aria-hidden="true"]');
+  expect(hoverSurface?.className).toContain('inset-x-1.5 inset-y-1');
+  expect(hoverSurface?.className).toContain('group-hover:bg-[var(--sniptale-color-surface-hover)]');
   expect(selectedLabel?.querySelector('[aria-hidden="true"]')?.className).not.toContain('accent');
   click(labels.find((label) => label.textContent?.includes('alpha')));
   click(labels.find((label) => label.textContent?.includes('Сохранённые')));

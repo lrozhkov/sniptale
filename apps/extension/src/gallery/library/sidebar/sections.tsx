@@ -14,8 +14,7 @@ function cx(...values: Array<string | false | null | undefined>): string {
 }
 
 const facetOptionRowClassName = [
-  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border px-1.5',
-  'transition-colors hover:bg-[var(--sniptale-color-surface-hover)]',
+  'group relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border border-transparent px-1.5',
   'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset',
   'has-[:focus-visible]:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
@@ -78,15 +77,15 @@ function GalleryFacetOptionRow(props: {
   return (
     <label
       aria-disabled={props.disabled || undefined}
-      className={cx(
-        facetOptionRowClassName,
-        props.checked
-          ? 'border-[var(--sniptale-color-border-accent-strong)]'
-          : 'border-transparent hover:border-[var(--sniptale-color-border-soft)]',
-        props.checked && 'bg-[var(--sniptale-color-surface-hover)]',
-        props.disabled && 'cursor-default opacity-55 hover:bg-transparent'
-      )}
+      className={cx(facetOptionRowClassName, props.disabled && 'cursor-default opacity-55')}
     >
+      <span
+        aria-hidden="true"
+        className={cx(
+          'pointer-events-none absolute inset-x-1.5 inset-y-1 rounded-[5px] transition-colors',
+          !props.disabled && 'group-hover:bg-[var(--sniptale-color-surface-hover)]'
+        )}
+      />
       <input
         type="checkbox"
         checked={props.checked}
@@ -97,7 +96,7 @@ function GalleryFacetOptionRow(props: {
       <span
         aria-hidden="true"
         className={cx(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors',
+          'relative flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors',
           props.checked
             ? [
                 'border-[var(--sniptale-color-text-primary)]',
@@ -111,7 +110,7 @@ function GalleryFacetOptionRow(props: {
       </span>
       <span
         className={cx(
-          'min-w-0 flex-1 truncate text-xs',
+          'relative min-w-0 flex-1 truncate text-xs',
           props.checked
             ? 'font-semibold text-[var(--sniptale-color-text-primary-strong)]'
             : 'text-[var(--sniptale-color-text-secondary)]'
@@ -119,7 +118,7 @@ function GalleryFacetOptionRow(props: {
       >
         {props.label}
       </span>
-      <span className="text-[11px] tabular-nums text-[var(--sniptale-color-text-muted)]">
+      <span className="relative text-[11px] tabular-nums text-[var(--sniptale-color-text-muted)]">
         {props.count}
       </span>
     </label>

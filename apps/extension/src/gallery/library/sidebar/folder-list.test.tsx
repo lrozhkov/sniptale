@@ -71,6 +71,9 @@ afterEach(() => {
 it('shows only All for a confirmed empty library and places headings before later visible siblings', () => {
   renderList({});
   expect(folderButton(translate('gallery.preview.folderAll'))).toBeDefined();
+  expect(folderButton(translate('gallery.preview.folderAll'))?.className).toContain(
+    'border-transparent'
+  );
   expect(container?.querySelectorAll('[data-gallery-folder]')).toHaveLength(1);
   expect(container?.textContent).not.toContain(translate('gallery.preview.projectsHeading'));
   expect(container?.textContent).not.toContain(translate('gallery.preview.materialsHeading'));

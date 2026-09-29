@@ -24,7 +24,7 @@ type FolderListProps = Pick<
 >;
 
 const activeFolderClassName = [
-  'border-[var(--sniptale-color-border-accent-strong)]',
+  'border-transparent',
   'bg-[var(--sniptale-color-surface-hover)]',
   'text-[var(--sniptale-color-text-primary-strong)]',
 ].join(' ');

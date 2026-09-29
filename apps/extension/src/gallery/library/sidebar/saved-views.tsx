@@ -32,7 +32,7 @@ export function GallerySavedViewRows(
               'group relative h-8 rounded-[7px] border text-xs transition-colors',
               active
                 ? [
-                    'border-[var(--sniptale-color-border-accent-strong)]',
+                    'border-transparent',
                     'bg-[var(--sniptale-color-surface-hover)]',
                     'text-[var(--sniptale-color-text-primary-strong)]',
                   ].join(' ')
