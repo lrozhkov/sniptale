@@ -11,6 +11,7 @@ import { VideoEditorCompositionProvider } from '../../runtime/controller/composi
 import { VideoEditorWorkspace } from '../../workspace/surface';
 import { VideoEditorCommandPalette } from '../command-palette';
 import { VideoEditorStatusScreen } from '../status-screen';
+import { VideoEditorStart } from './start';
 import { useVideoEditorWheelZoomGuard } from './wheel-zoom';
 
 /** Boots the single editor composition owner around a stable shell-gate child. */
@@ -41,9 +42,10 @@ export function VideoEditorShellGate(props: {
   if (!shell.isReady) {
     return <VideoEditorStatusScreen mode="loading" />;
   }
-  if (shell.error || !shell.project) {
+  if (shell.error) {
     return <VideoEditorStatusScreen mode="error" error={shell.error ?? ''} />;
   }
+  if (!shell.project) return <VideoEditorStart />;
   return <VideoEditorReadySurface {...props} />;
 }
 

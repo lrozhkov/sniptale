@@ -20,6 +20,7 @@ import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driv
 import { useGuideHistory } from './history';
 import { useGuideAutosave } from './autosave';
 import { useGuideResourceSession } from './resource-session';
+import { openExistingScenarioProject } from './open-existing';
 
 import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
 import { applyTourImageEdit } from '../../../workflows/scenario-capture-edit/tour-edits';
@@ -114,11 +115,11 @@ export function useGuidePageState() {
     commit(committed, reversible);
     setStatus('saved');
   };
-  const openProject = async (committed: GuideProject | null) => {
+  const openProject = async (committed: GuideProject | null, previous: GuideProject[] = []) => {
     if (!(await enterResourceSession(committed?.id ?? null))) return;
     requestedId.current = committed?.id ?? null;
     saved.current = committed;
-    reset(committed);
+    reset(committed, previous);
     setStatus(committed ? 'saved' : 'empty');
     clearSelection();
     replaceScenarioEditorSelectionInUrl({ projectId: committed?.id ?? null });
@@ -193,6 +194,8 @@ export function useGuidePageState() {
     images: useGuideImages(project),
     ...selection,
     create,
+    openExisting: (id: string) =>
+      openExistingScenarioProject(id, enterResourceSession, openProject),
     ...editing,
     save,
     duplicate,

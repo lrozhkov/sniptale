@@ -1,6 +1,8 @@
 import { defineMessageSource } from '../source';
 
 export const editorPageMessages = defineMessageSource({
+  startCreate: { ru: 'Создать изображение 1280 × 720', en: 'Create image 1280 × 720' },
+  startRecent: { ru: 'Недавние изображения', en: 'Recent images' },
   renameImage: { ru: 'Имя файла', en: 'File name' },
   documentTitle: {
     ru: 'Редактор изображений',

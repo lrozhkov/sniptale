@@ -57,6 +57,7 @@ export function EditorPageLayout(props: {
   onCloseCommandPalette: () => void;
   onRecoverOriginal: () => Promise<void>;
   afterLayout?: React.ReactNode;
+  startPage?: React.ReactNode;
 }) {
   const [confirmRecovery, setConfirmRecovery] = useState(false);
   const [recoveryFailed, setRecoveryFailed] = useState(false);
@@ -81,12 +82,24 @@ export function EditorPageLayout(props: {
       <div className="absolute inset-0 min-h-0 min-w-0" data-ui="editor.canvas.layer">
         <CanvasWrapper hasImage={props.hasImage} />
       </div>
-      <EditorFloatingWorkspace hasImage={props.hasImage} />
+      <div
+        className={
+          props.hasImage || !props.startPage ? 'contents' : 'invisible pointer-events-none'
+        }
+        aria-hidden={!props.hasImage && Boolean(props.startPage)}
+      >
+        <EditorFloatingWorkspace hasImage={props.hasImage} />
+      </div>
       <EditorCommandPalette
         hasImage={props.hasImage}
         isOpen={props.commandPaletteOpen}
         onClose={props.onCloseCommandPalette}
       />
+      {!props.hasImage && props.startPage && props.openStatus !== 'loading' ? (
+        <div className="absolute inset-0 z-40" data-ui="editor.page.start">
+          {props.startPage}
+        </div>
+      ) : null}
       {props.openStatus === 'loading' ? (
         <div
           className="absolute inset-0 z-50 grid place-items-center bg-[var(--sniptale-color-surface-canvas)]/80"

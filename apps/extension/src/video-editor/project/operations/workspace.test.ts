@@ -144,7 +144,7 @@ describe('loadInitialProjectFromLocation', () => {
   });
 
   it('fails for a missing explicit project', verifyMissingProject);
-  it('creates a blank project without an explicit target', verifyBlankProjectCreation);
+  it('stays idle without an explicit target', verifyBlankProjectCreation);
   it('hydrates cursor telemetry from a recording', verifyRecordingHydration);
   it(
     'preserves the shared recording when project persistence fails',
@@ -159,6 +159,7 @@ describe('loadInitialProjectFromLocation', () => {
     'opens persisted recording references even when their source is unavailable',
     verifyUnavailablePersistedRecording
   );
+  it('rejects a project moved to trash after the start list was read', verifyTrashedProject);
   it(
     'preserves recording references on explicit project query loads',
     verifyProjectQueryReferencePath
@@ -178,15 +179,10 @@ async function verifyMissingProject() {
 }
 
 async function verifyBlankProjectCreation() {
-  const blankProject = createEmptyVideoProject('Blank');
-
-  vi.spyOn(Date, 'now').mockReturnValue(blankProject.createdAt);
-  getVideoProject.mockResolvedValue({ status: 'notFound' });
-
   const result = await loadInitialProjectFromLocation();
 
-  expect(result.project.id).toBeTruthy();
-  expect(saveVideoProject).toHaveBeenCalledTimes(1);
+  expect(result).toEqual({ project: null, recordingId: null });
+  expect(saveVideoProject).not.toHaveBeenCalled();
 }
 
 async function verifyRecordingHydration() {
@@ -195,9 +191,9 @@ async function verifyRecordingHydration() {
 
   const result = await loadInitialProjectFromLocation();
 
-  expect(result.project.cursorTrack?.captureMode).toBe('separate');
-  expect(result.project.cursorTrack?.samples[0]?.id).toBe('sample-1');
-  expect(result.project.assets[0]?.source).toEqual({
+  expect(result.project!.cursorTrack?.captureMode).toBe('separate');
+  expect(result.project!.cursorTrack?.samples[0]?.id).toBe('sample-1');
+  expect(result.project!.assets[0]?.source).toEqual({
     kind: 'recording',
     recordingId: 'recording-1',
   });
@@ -219,12 +215,12 @@ async function verifyPlainRecordingHydration() {
 
   const result = await loadInitialProjectFromLocation();
 
-  expect(result.project.source).toEqual({
+  expect(result.project!.source).toEqual({
     kind: 'recording',
     recordingId: 'recording-1',
   });
-  expect(result.project.cursorTrack).toBeNull();
-  expect(result.project.actionEvents).toEqual([]);
+  expect(result.project!.cursorTrack).toBeNull();
+  expect(result.project!.actionEvents).toEqual([]);
 }
 
 async function verifyPersistedRecordingReferences() {
@@ -253,6 +249,16 @@ async function verifyUnavailablePersistedRecording() {
   expect(deleteProjectAsset).not.toHaveBeenCalled();
 }
 
+async function verifyTrashedProject() {
+  getVideoProject.mockResolvedValue({
+    project: createPersistedLegacyRecordingProject(),
+    status: 'ready',
+    lifecycle: { trashedAt: 500 },
+  });
+  await expect(openPersistedProject('project-1')).rejects.toThrow('unavailable');
+  expect(saveVideoProject).not.toHaveBeenCalled();
+}
+
 async function verifyMalformedPersistedProject() {
   getVideoProject.mockResolvedValue({
     diagnostics: ['invalid-video-project-entry'],
@@ -278,7 +284,7 @@ async function verifyProjectQueryReferencePath() {
   const result = await loadInitialProjectFromLocation();
 
   expect(importRecordingProjectAssetMock).not.toHaveBeenCalled();
-  expect(result.project.assets[0]?.source).toEqual({
+  expect(result.project!.assets[0]?.source).toEqual({
     kind: 'recording',
     recordingId: 'recording-1',
   });

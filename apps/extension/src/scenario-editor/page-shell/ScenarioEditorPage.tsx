@@ -27,6 +27,7 @@ import { GuideDocument, type GuideFocusRequest } from './guide-document';
 import { GuideWorkspace, GuidePanelControls } from './workspace';
 import { useGuidePanels } from './panel-layout';
 import { useGuidePageState } from './runtime/use-state';
+import { ScenarioEditorStart } from './start';
 
 /** Composes the local guide workspace around its single edit/save state owner. */
 export function ScenarioEditorPage() {
@@ -107,14 +108,13 @@ export function ScenarioEditorPage() {
       t={t}
     />
   );
+  if (!project) return <ScenarioEditorStart state={state} t={t} />;
   return (
     <main
       className="guide-page"
       onBlurCapture={state.sealEdit}
       onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
     >
-      {!project && renderHeader()}
-      <GuideProjectRecovery state={state} t={t} />
       {project && tourMode && (
         <TourWorkspace
           key={project.id}
@@ -682,46 +682,6 @@ function GuidePageFeedback({
 }
 
 /** Empty and unavailable project recovery actions share the page state owner. */
-function GuideProjectRecovery({
-  state,
-  t,
-}: {
-  state: ReturnType<typeof useGuidePageState>;
-  t: Translate;
-}) {
-  const { project, status } = state;
-  const disabled = status === 'loading' || status === 'saving';
-  return (
-    <>
-      {' '}
-      {(status === 'missing' || status === 'unavailable') && (
-        <ProductActionButton
-          tone="secondary"
-          compact
-          type="button"
-          onClick={() => void state.reload()}
-        >
-          {t('scenario.editor.guideRetry')}
-        </ProductActionButton>
-      )}
-      {!project && (status === 'empty' || status === 'failed') && (
-        <section className="guide-empty">
-          <p>{t('scenario.editor.guideEmpty')}</p>
-          <ProductActionButton
-            tone="secondary"
-            compact
-            type="button"
-            disabled={disabled}
-            onClick={() => void state.create(t('scenario.common.defaultProjectName'))}
-          >
-            {t('scenario.editor.createProject')}
-          </ProductActionButton>
-        </section>
-      )}
-    </>
-  );
-}
-
 /** Adapts library, drop and upload gestures to the existing single import transaction. */
 function guideImageImportCommands(commit: ReturnType<typeof useGuidePageState>['commitChange']) {
   const resources = (input: Extract<Parameters<typeof commit>[0], { kind: 'import' }>['input']) =>

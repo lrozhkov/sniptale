@@ -20,6 +20,7 @@ const io = vi.hoisted(() => ({
   importImages: vi.fn(),
   select: vi.fn(),
   mount: vi.fn(),
+  list: vi.fn(),
 }));
 vi.mock('./library-browser', () => ({
   GuideLibraryBrowser: ({
@@ -53,6 +54,8 @@ vi.mock('../../composition/persistence/scenario/store/public', () => ({
   deleteScenarioProjectRecord: io.remove,
   saveScenarioProjectRecord: io.save,
   importScenarioImages: io.importImages,
+  listScenarioProjectSummaries: io.list,
+  getScenarioProjectRecord: io.load,
 }));
 vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: io.select }));
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -69,6 +72,7 @@ let container: HTMLDivElement;
 beforeEach(() => {
   vi.clearAllMocks();
   io.previous.mockReturnValue([]);
+  io.list.mockResolvedValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   container = document.createElement('div');
@@ -151,6 +155,18 @@ it('requires explicit creation for an empty editor route', async () => {
   await click('New scenario');
   expect(io.select).toHaveBeenCalledWith({ projectId: 'new-guide' });
   expect(container.querySelector('input')?.value).toBe('New guide');
+});
+
+it('opens recent scenarios with their saved revisions available to Undo', async () => {
+  window.history.replaceState({}, '', '/');
+  io.list.mockResolvedValue([
+    { id: 'guide', name: 'Local guide', updatedAt: 100, availability: 'available' },
+  ]);
+  io.previous.mockReturnValue([{ project: createGuideProject('Older', 'guide', 90) }]);
+  await render();
+  await act(async () => container.querySelector<HTMLButtonElement>('section button')?.click());
+  await click('Undo');
+  expect(container.querySelector('input[aria-label="Scenario"]')).toHaveProperty('value', 'Older');
 });
 
 it('opens a linked step and keeps outline navigation tied to stable item IDs', async () => {
@@ -457,6 +473,9 @@ it('navigates from current resources and collapses panels without changing the d
   await click('Inspector');
   expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(false);
   expect(actions.querySelector('[aria-controls="guide-inspector-panel"]')).toBeNull();
+  await click('Appearance');
+  await click('Interactive tour');
+  await click('Guide');
   expect(container.querySelectorAll('article')).toHaveLength(1);
   expect(io.save).not.toHaveBeenCalled();
 });

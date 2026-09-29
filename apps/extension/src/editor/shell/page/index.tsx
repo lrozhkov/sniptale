@@ -19,6 +19,7 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import { createEditorPageEmbedProviderValue, startScenarioEditorEmbed } from './embed';
 import { EditorPageLayout } from './layout';
+import { ImageEditorStart } from './start';
 import { useEditorDrawingPreferencesSynchronization } from '../../drawing/preferences';
 import { EditorOpenStatusContext, useEditorOpenStatusOwner } from '../../runtime/open-status';
 
@@ -166,6 +167,11 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
       <EditorOpenStatusContext.Provider value={openStatus}>
         <EditorEmbedProvider {...embedProps}>
           <EditorPageLayout
+            startPage={
+              embedMode === 'scenario' ? null : (
+                <ImageEditorStart services={services} runOpen={openStatus.runOpen} />
+              )
+            }
             afterLayout={afterLayout}
             commandPaletteOpen={commandPaletteOpen}
             hasImage={hasImage}

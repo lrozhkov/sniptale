@@ -125,7 +125,7 @@ export async function createBlankProject(name?: string): Promise<VideoProject> {
  * Resolves the initial project workspace from the current location params.
  */
 export async function loadInitialProjectFromLocation(): Promise<{
-  project: VideoProject;
+  project: VideoProject | null;
   recordingId: string | null;
 }> {
   const params = new URLSearchParams(window.location.search);
@@ -142,19 +142,16 @@ export async function loadInitialProjectFromLocation(): Promise<{
     project = await createProjectFromRecordingId(rootRecordingId);
   }
 
-  if (!project) {
-    project = await createBlankProject();
-    recordingId = project.baseRecordingId;
-  }
-
   return {
-    project,
-    recordingId: recordingId ?? project.baseRecordingId,
+    project: project ?? null,
+    recordingId: recordingId ?? project?.baseRecordingId ?? null,
   };
 }
 
 export async function openPersistedProject(projectId: string): Promise<VideoProject> {
   const result = await getVideoProject(projectId);
+  if (result.status === 'ready' && result.lifecycle?.trashedAt !== undefined)
+    throw new Error('Video project is unavailable.');
   const storedProject = resolveVideoProjectReadResult(result);
   const persistedProject = storedProject ? parseHydratableVideoProject(storedProject) : null;
 

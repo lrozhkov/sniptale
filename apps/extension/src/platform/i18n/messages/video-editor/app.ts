@@ -1,6 +1,11 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  startDescription: {
+    ru: 'Создайте проект или продолжите работу с сохранённым видео.',
+    en: 'Create a project or continue working on a saved video.',
+  },
+  startRecent: { ru: 'Недавние видеопроекты', en: 'Recent video projects' },
   recordAudioMicrophone: { ru: 'Запись с микрофона', en: 'Record microphone' },
   recordAudioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
   recordAudioPlayVideo: {

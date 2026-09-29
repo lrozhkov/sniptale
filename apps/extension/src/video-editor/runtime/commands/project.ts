@@ -131,7 +131,8 @@ export function useProjectHandlers(
         await loadProjectWorkspace(projectId, port);
       } catch (projectError) {
         logger.error('Failed to open project', projectError);
-        port.setError(toErrorMessage(projectError, 'videoEditor.app.openFailed'));
+        if (port.getCurrentProject())
+          port.setError(toErrorMessage(projectError, 'videoEditor.app.openFailed'));
         throw projectError;
       }
     },
@@ -144,8 +145,9 @@ export function useProjectHandlers(
         await createProjectWorkspace(port, name, copyCurrent);
       } catch (projectError) {
         logger.error('Failed to create project', projectError);
-        port.setError(toErrorMessage(projectError, 'common.errors.actionFailed'));
-        if (name !== undefined) throw projectError;
+        if (port.getCurrentProject())
+          port.setError(toErrorMessage(projectError, 'common.errors.actionFailed'));
+        if (name !== undefined || !port.getCurrentProject()) throw projectError;
       }
     },
     [port]

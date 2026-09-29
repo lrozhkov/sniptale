@@ -127,6 +127,11 @@ export function useVideoEditorShellController() {
   return createVideoEditorShellController(store);
 }
 
+export function useVideoEditorStartActions() {
+  const commands = useProjectCommandContext();
+  return { onCreate: commands.handleCreateProject, onOpen: commands.handleOpenProject };
+}
+
 export function useVideoEditorOverlaysController() {
   const exportPort = useVideoEditorExportPort((port) => port);
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);

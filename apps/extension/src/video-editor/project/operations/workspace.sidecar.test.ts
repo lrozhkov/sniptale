@@ -133,12 +133,12 @@ it('adds a saved webcam sidecar as a separate muted recording track', async () =
   window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
 
   const result = await loadInitialProjectFromLocation();
-  const videoClips = result.project.clips.filter(
+  const videoClips = result.project!.clips.filter(
     (clip) => clip.type === VideoProjectClipType.VIDEO
   );
 
   expect(importRecordingProjectAssetMock).toHaveBeenCalledWith('recording-1-webcam');
-  expect(result.project.assets.map((asset) => asset.source)).toEqual([
+  expect(result.project!.assets.map((asset) => asset.source)).toEqual([
     expect.objectContaining({ originRecordingId: 'recording-1' }),
     expect.objectContaining({ originRecordingId: 'recording-1-webcam' }),
   ]);
@@ -146,7 +146,7 @@ it('adds a saved webcam sidecar as a separate muted recording track', async () =
     expect.objectContaining({
       muted: true,
       startTime: 0,
-      trackId: result.project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA)
+      trackId: result.project!.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA)
         ?.id,
       transform: expect.objectContaining({
         height: expect.any(Number),
@@ -156,15 +156,15 @@ it('adds a saved webcam sidecar as a separate muted recording track', async () =
       }),
     })
   );
-  expect(videoClips[1]?.transform.width).toBeLessThan(result.project.width / 2);
-  expect(result.project.duration).toBe(5);
+  expect(videoClips[1]?.transform.width).toBeLessThan(result.project!.width / 2);
+  expect(result.project!.duration).toBe(5);
   expect(videoClips[1]?.duration).toBe(5);
   expect(videoClips[1]?.groupId).toBe(videoClips[0]?.groupId);
   expect(videoClips[0]?.groupId).not.toBeNull();
-  expect(result.project.assets.map((asset) => asset.recordingPart)).toEqual([
+  expect(result.project!.assets.map((asset) => asset.recordingPart)).toEqual([
     { recordingId: 'recording-1', role: 'primary' },
     { recordingId: 'recording-1', role: 'camera' },
   ]);
-  expect(result.project.assets[1]?.metadata.duration).toBe(7);
+  expect(result.project!.assets[1]?.metadata.duration).toBe(7);
   expect(saveVideoProject).toHaveBeenCalledOnce();
 });

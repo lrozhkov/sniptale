@@ -99,6 +99,28 @@ it('shows a blocking loading status and a recoverable error without raw exceptio
   expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
 });
 
+it('keeps the canvas mounted behind the start surface while hiding working chrome', async () => {
+  await act(async () => {
+    root?.render(
+      <EditorPageLayout
+        commandPaletteOpen={false}
+        hasImage={false}
+        openStatus="idle"
+        onCloseCommandPalette={vi.fn()}
+        onRecoverOriginal={vi.fn(async () => undefined)}
+        startPage={<div data-ui="start-content">Start</div>}
+      />
+    );
+  });
+  expect(container?.querySelector('[data-ui="editor.canvas-wrapper"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="start-content"]')).not.toBeNull();
+  expect(
+    container
+      ?.querySelector('[data-ui="editor.floating-workspace"]')
+      ?.parentElement?.getAttribute('aria-hidden')
+  ).toBe('true');
+});
+
 it('requires confirmation before replacing a missing document with its original', async () => {
   const recover = vi.fn(async () => undefined);
   await renderLayout(false, 'missing', recover);

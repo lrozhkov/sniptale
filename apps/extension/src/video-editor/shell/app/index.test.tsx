@@ -11,6 +11,7 @@ const historyControllerMock = vi.fn();
 const workspaceSpy = vi.fn();
 const paletteSpy = vi.fn();
 const statusSpy = vi.fn();
+const startSpy = vi.fn();
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -46,6 +47,12 @@ vi.mock('../status-screen', () => ({
   VideoEditorStatusScreen: (props: unknown) => {
     statusSpy(props);
     return <div data-testid="status" />;
+  },
+}));
+vi.mock('./start', () => ({
+  VideoEditorStart: () => {
+    startSpy();
+    return <div data-testid="start" />;
   },
 }));
 
@@ -136,4 +143,10 @@ describe('video editor app', () => {
   );
 
   it('renders loading and error branches from shell state', verifyStatusBranches);
+  it('renders the start surface without working chrome when ready and projectless', () => {
+    renderAppWithController({ palette: {}, shell: { error: null, isReady: true, project: null } });
+    expect(startSpy).toHaveBeenCalledOnce();
+    expect(workspaceSpy).not.toHaveBeenCalled();
+    expect(paletteSpy).not.toHaveBeenCalled();
+  });
 });
