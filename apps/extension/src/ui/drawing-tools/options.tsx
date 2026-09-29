@@ -309,7 +309,7 @@ export function DrawingColorOptions(props: {
     <div
       role="group"
       data-ui={props.dataUi}
-      className="flex flex-row items-center gap-1.5"
+      className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
       aria-label={props.label}
       title={props.label}
     >
@@ -337,7 +337,7 @@ export function DrawingColorOptions(props: {
         {...(previewReset ? { onPreviewReset: previewReset } : {})}
       />
       <div
-        className="grid w-[104px] grid-cols-5 gap-1.5"
+        className={`grid gap-1.5 ${props.vertical ? 'grid-cols-1' : 'w-[104px] grid-cols-5'}`}
         data-ui="content.toolbar.drawing-options.quick-colors"
       >
         {quickColors.map((color) => {

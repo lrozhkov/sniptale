@@ -350,6 +350,13 @@ it('shows compact two-row text and background palettes with text-size controls',
   ).toBeNull();
   act(() => backgroundToggle?.click());
   expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#60a5fa');
+  act(() => root.render(<ToolbarDrawingControls controller={controller} displayMode="vertical" />));
+  const verticalPalette = host.querySelector<HTMLElement>(
+    '[aria-label="content.toolbar.drawingTextColor"]'
+  );
+  expect(verticalPalette?.classList.contains('flex-col')).toBe(true);
+  expect(verticalPalette?.querySelector('.grid.grid-cols-1')).not.toBeNull();
+  expect(verticalPalette?.querySelectorAll('.grid.grid-cols-1 button[title^="#"]')).toHaveLength(5);
   act(() => root.unmount());
 });
 
@@ -619,8 +626,8 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   expect(surface?.style.zIndex).toBe('2147483646');
   expect(panel?.classList).toContain('flex-col');
   const markerColorGroup = panel?.querySelector('[aria-label="content.toolbar.drawingColor"]');
-  expect(markerColorGroup?.classList).toContain('flex-row');
-  expect(markerColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
+  expect(markerColorGroup?.classList).toContain('flex-col');
+  expect(markerColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-1');
   const verticalDivider = panel?.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.divider"]'
   );
@@ -660,8 +667,8 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   const textColorGroup = textPanel?.querySelector(
     '[aria-label="content.toolbar.drawingTextColor"]'
   );
-  expect(textColorGroup?.classList).toContain('flex-row');
-  expect(textColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
+  expect(textColorGroup?.classList).toContain('flex-col');
+  expect(textColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-1');
   const textBackgroundGroup = textPanel?.querySelector(
     '[data-ui="content.toolbar.drawing-options.text.background-group"]'
   );
@@ -674,7 +681,7 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
       )
       ?.click()
   );
-  expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-5');
+  expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-1');
   act(() => root.unmount());
 });
 
