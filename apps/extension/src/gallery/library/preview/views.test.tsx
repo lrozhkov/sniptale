@@ -223,7 +223,8 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(imageMarkup).toContain('<img');
   expect(imageMarkup).toContain('data-ui="preview.media.scrollable"');
   expect(imageMarkup).toContain('data-ui="gallery.preview.zoomSlider"');
-  expect(imageMarkup).toContain('gallery.preview.lockZoom');
+  expect(imageMarkup).toContain('data-ui="gallery.preview.zoomSliderGroup"');
+  expect(imageMarkup).toContain('aria-hidden="true"');
   expect(imageMarkup).not.toContain('rounded-[16px]');
   expect(imageMarkup).toContain('max-h-none max-w-none');
   expect(imageMarkup).not.toContain('max-h-full max-w-full shrink-0 select-none object-contain');

@@ -147,6 +147,40 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it.each(['image', 'video'] as const)(
+  'keeps %s side navigation below the top controls with either inspector state',
+  (kind) => {
+    for (const inspectorCollapsed of [false, true]) {
+      const item =
+        kind === 'video' ? createItem({ kind: 'recording', mimeType: 'video/webm' }) : createItem();
+      renderNode(
+        <PreviewMedia
+          {...createProps({
+            item,
+            inspectorCollapsed,
+            navigation: {
+              current: 1,
+              total: 2,
+              hasPrevious: false,
+              hasNext: true,
+              onPrevious: vi.fn(),
+              onNext: vi.fn(),
+            },
+          })}
+        />
+      );
+      const toolbar = container?.querySelector('[data-ui="gallery.preview.toolbar"]');
+      const content = container?.querySelector('[data-ui="gallery.preview.content-row"]');
+      const previous = container?.querySelector(
+        '[data-ui="gallery.preview.navigationZone.previous"]'
+      );
+      expect(toolbar?.nextElementSibling).toBe(content);
+      expect(content?.contains(previous ?? null)).toBe(true);
+      expect(toolbar?.className).not.toContain('absolute');
+    }
+  }
+);
+
 it('changes image zoom through the slider and preserves it when the lock is enabled', () => {
   const firstItem = createItem({ id: 'first' });
   renderNode(<PreviewMedia {...createProps({ item: firstItem, previewUrl: 'blob:first' })} />);
@@ -164,13 +198,25 @@ it('changes image zoom through the slider and preserves it when the lock is enab
   );
   expect(slider?.type).toBe('range');
   expect(slider?.getAttribute('aria-label')).toBe('gallery.preview.zoomSlider');
-  expect(slider?.className).toContain('accent-[var(--sniptale-color-accent)]');
-  expect(
-    container?.querySelector('button[aria-label="gallery.preview.zoomLockToggle"]')
-  ).not.toBeNull();
+  expect(slider?.className).toContain('sniptale-range');
+  const lock = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.zoomLockToggle"]'
+  );
+  expect(lock?.closest('[data-ui="gallery.preview.zoomSliderGroup"]')).toBe(
+    slider?.closest('[data-ui="gallery.preview.zoomSliderGroup"]')
+  );
+  expect(lock?.tabIndex).toBe(-1);
+  expect(lock?.parentElement?.className).toContain('invisible');
+
+  const sliderGroup = slider?.closest<HTMLElement>('[data-ui="gallery.preview.zoomSliderGroup"]');
+  act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })));
+  expect(lock?.tabIndex).toBe(0);
+  act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerout', { bubbles: true })));
+  expect(lock?.tabIndex).toBe(-1);
 
   if (!slider) throw new Error('Expected zoom slider');
   setInputValue(slider, '1.5');
+  expect(lock?.tabIndex).toBe(0);
   expect(slider.valueAsNumber).toBe(1.5);
   expect(slider.getAttribute('aria-valuetext')).toBe('150%');
   expect(container?.textContent).toContain('150%');

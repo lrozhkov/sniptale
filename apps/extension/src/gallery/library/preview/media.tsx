@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { ProductRange } from '@sniptale/ui/product-form-controls';
 import { GalleryProjectOpenAction } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import {
@@ -35,6 +36,7 @@ function PreviewFloatingControl(props: {
   disabled?: boolean;
   onClick: () => void;
   pressed?: boolean;
+  tabIndex?: number;
   title?: string;
 }) {
   return (
@@ -43,6 +45,7 @@ function PreviewFloatingControl(props: {
       aria-label={props.ariaLabel}
       aria-pressed={props.pressed}
       title={props.title ?? props.ariaLabel}
+      tabIndex={props.tabIndex}
       disabled={props.disabled}
       onClick={props.onClick}
       className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border
@@ -94,79 +97,81 @@ function PreviewZoomControls(props: {
   controls: ReturnType<typeof usePreviewImageZoom>['controls'];
   disabled: boolean;
 }) {
+  const [interacting, setInteracting] = useState(false);
+  const showLock = interacting || props.controls.isZoomedFromFit || props.controls.zoomLocked;
+
   return (
-    <div className="group relative">
-      <div className="flex items-center gap-1.5">
-        <PreviewFloatingControl
-          ariaLabel={translate('gallery.preview.zoomOut')}
-          disabled={props.disabled || !props.controls.canZoomOut}
-          onClick={props.controls.zoomOut}
-        >
-          <Minus className="h-4 w-4" />
-        </PreviewFloatingControl>
-        <button
-          type="button"
-          onClick={props.controls.resetZoom}
-          disabled={props.disabled}
-          title={translate('gallery.preview.resetZoom')}
-          className="h-9 min-w-14 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
+    <div className="flex max-w-full items-center gap-1.5">
+      <PreviewFloatingControl
+        ariaLabel={translate('gallery.preview.zoomOut')}
+        disabled={props.disabled || !props.controls.canZoomOut}
+        onClick={props.controls.zoomOut}
+      >
+        <Minus className="h-4 w-4" />
+      </PreviewFloatingControl>
+      <button
+        type="button"
+        onClick={props.controls.resetZoom}
+        disabled={props.disabled}
+        title={translate('gallery.preview.resetZoom')}
+        className="h-9 min-w-14 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
           bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]
           px-3 py-2 text-xs font-semibold text-[var(--sniptale-color-text-primary)] shadow-sm
           transition hover:border-[var(--sniptale-color-border-strong)]
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]
           disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {Math.round(props.controls.zoom * 100)}%
-        </button>
-        <PreviewFloatingControl
-          ariaLabel={translate('gallery.preview.zoomIn')}
-          disabled={props.disabled || !props.controls.canZoomIn}
-          onClick={props.controls.zoomIn}
-        >
-          <Plus className="h-4 w-4" />
-        </PreviewFloatingControl>
-        <PreviewFloatingControl
-          ariaLabel={translate('gallery.preview.zoomLockToggle')}
-          title={translate(
-            props.controls.zoomLocked ? 'gallery.preview.unlockZoom' : 'gallery.preview.lockZoom'
-          )}
-          onClick={props.controls.toggleZoomLock}
-          pressed={props.controls.zoomLocked}
-          disabled={props.disabled}
-        >
-          {props.controls.zoomLocked ? (
-            <LockKeyhole className="h-4 w-4" />
-          ) : (
-            <LockKeyholeOpen className="h-4 w-4" />
-          )}
-        </PreviewFloatingControl>
-      </div>
-      <div
-        className="pointer-events-none absolute inset-x-0 top-full pt-1 opacity-0 transition-opacity
-        group-hover:pointer-events-auto group-hover:opacity-100
-        group-focus-within:pointer-events-auto group-focus-within:opacity-100
-        [@media(hover:none)]:pointer-events-auto [@media(hover:none)]:opacity-100"
       >
-        <div
-          className="rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-          bg-[var(--sniptale-color-surface-panel)] px-2 py-1 shadow-sm"
-        >
-          <input
-            data-ui="gallery.preview.zoomSlider"
-            type="range"
-            aria-label={translate('gallery.preview.zoomSlider')}
-            aria-valuetext={`${Math.round(props.controls.zoom * 100)}%`}
-            min={props.controls.minimumZoom}
-            max={props.controls.maximumZoom}
-            step="any"
-            value={props.controls.zoom}
+        {Math.round(props.controls.zoom * 100)}%
+      </button>
+      <PreviewFloatingControl
+        ariaLabel={translate('gallery.preview.zoomIn')}
+        disabled={props.disabled || !props.controls.canZoomIn}
+        onClick={props.controls.zoomIn}
+      >
+        <Plus className="h-4 w-4" />
+      </PreviewFloatingControl>
+      <div
+        data-ui="gallery.preview.zoomSliderGroup"
+        className="flex items-center gap-1"
+        onPointerEnter={() => setInteracting(true)}
+        onPointerLeave={() => setInteracting(false)}
+        onFocusCapture={() => setInteracting(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setInteracting(false);
+          }
+        }}
+      >
+        <ProductRange
+          data-ui="gallery.preview.zoomSlider"
+          aria-label={translate('gallery.preview.zoomSlider')}
+          aria-valuetext={`${Math.round(props.controls.zoom * 100)}%`}
+          min={props.controls.minimumZoom}
+          max={props.controls.maximumZoom}
+          step="any"
+          value={props.controls.zoom}
+          disabled={props.disabled}
+          onChange={(event) => props.controls.setZoom(event.currentTarget.valueAsNumber)}
+          className="w-28 disabled:cursor-not-allowed disabled:opacity-40"
+        />
+        <span aria-hidden={!showLock} className={showLock ? '' : 'invisible pointer-events-none'}>
+          <PreviewFloatingControl
+            ariaLabel={translate('gallery.preview.zoomLockToggle')}
+            title={translate(
+              props.controls.zoomLocked ? 'gallery.preview.unlockZoom' : 'gallery.preview.lockZoom'
+            )}
+            onClick={props.controls.toggleZoomLock}
+            pressed={props.controls.zoomLocked}
             disabled={props.disabled}
-            onChange={(event) => props.controls.setZoom(event.currentTarget.valueAsNumber)}
-            className="block h-5 w-full cursor-pointer accent-[var(--sniptale-color-accent)]
-              focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]
-              disabled:cursor-not-allowed disabled:opacity-40"
-          />
-        </div>
+            tabIndex={showLock ? 0 : -1}
+          >
+            {props.controls.zoomLocked ? (
+              <LockKeyhole className="h-4 w-4" />
+            ) : (
+              <LockKeyholeOpen className="h-4 w-4" />
+            )}
+          </PreviewFloatingControl>
+        </span>
       </div>
     </div>
   );
@@ -220,11 +225,14 @@ function PreviewMediaControls(
   }
 ) {
   return (
-    <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-wrap items-start justify-between gap-2">
-      <div className="pointer-events-auto shrink-0">
+    <div
+      data-ui="gallery.preview.toolbar"
+      className="relative z-10 flex shrink-0 flex-wrap items-start justify-between gap-2 px-3 pb-2 pt-3"
+    >
+      <div className="shrink-0">
         <PreviewNavigationControls navigation={props.navigation} />
       </div>
-      <div className="pointer-events-auto ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5">
+      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1.5">
         {props.isImagePreview ? (
           <PreviewZoomControls
             controls={props.imageZoom.controls}
@@ -254,8 +262,7 @@ function PreviewMediaSurface(props: {
       onPointerMove={props.imageZoom.viewport.handlePointerMove}
       onPointerUp={props.imageZoom.viewport.handlePointerEnd}
       onPointerCancel={props.imageZoom.viewport.handlePointerEnd}
-      className={`h-full min-w-0 flex-1 overscroll-contain px-4 pb-4 pt-16
-        @max-[500px]/preview-media:pt-28 @max-[330px]/preview-media:pt-40
+      className={`min-h-0 min-w-0 flex-1 overscroll-contain p-4
         ${props.isImagePreview ? 'touch-none overflow-auto' : 'overflow-hidden'}
         ${
           props.imageZoom.controls.isZoomedFromFit
@@ -424,7 +431,7 @@ export function PreviewMedia(
 
   return (
     <div
-      className="@container/preview-media relative flex min-w-0 flex-1 overflow-hidden
+      className="@container/preview-media relative flex min-w-0 flex-1 flex-col overflow-hidden
         bg-[radial-gradient(
           circle_at_top,
           color-mix(in_srgb,var(--sniptale-color-accent-soft)_80%,transparent),
@@ -432,11 +439,6 @@ export function PreviewMedia(
           var(--sniptale-color-surface-canvas)_100%
         )]"
     >
-      {!props.trashMode ? (
-        <div className="absolute bottom-4 left-4 z-20">
-          <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
-        </div>
-      ) : null}
       <PreviewMediaControls
         trashMode={Boolean(props.trashMode)}
         inspectorCollapsed={props.inspectorCollapsed}
@@ -447,36 +449,43 @@ export function PreviewMedia(
         onInspectorToggle={props.onInspectorToggle}
         imageZoom={imageZoom}
       />
-      {props.navigation ? (
-        <PreviewNavigationZone direction="previous" navigation={props.navigation} />
-      ) : null}
-      <PreviewMediaSurface
-        containerRef={imageZoom.viewport.containerRef}
-        imageZoom={imageZoom}
-        isImagePreview={isImagePreview}
-        transitionRef={transitionRef}
-      >
-        {showFrame ? (
-          <PreviewMediaContent
-            item={transitionFrame.item}
-            trashMode={Boolean(props.trashMode)}
-            previewUrl={transitionFrame.previewUrl}
-            imageStyle={imageZoom.image.style}
-            imageReady={imageZoom.image.ready}
-            isImagePreview={isImagePreview}
-            onImageLoad={imageZoom.image.handleImageLoad}
-            onMediaError={() => {
-              if (frameIsCurrent && props.previewUrl) {
-                setDecodeFailure({ id: props.item.id, url: props.previewUrl });
-              }
-            }}
-          />
+      <div data-ui="gallery.preview.content-row" className="relative flex min-h-0 flex-1">
+        {!props.trashMode ? (
+          <div className="absolute bottom-4 left-4 z-20">
+            <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
+          </div>
         ) : null}
-        {feedbackStatus ? <PreviewMediaLoadFeedback status={feedbackStatus} /> : null}
-      </PreviewMediaSurface>
-      {props.navigation ? (
-        <PreviewNavigationZone direction="next" navigation={props.navigation} />
-      ) : null}
+        {props.navigation ? (
+          <PreviewNavigationZone direction="previous" navigation={props.navigation} />
+        ) : null}
+        <PreviewMediaSurface
+          containerRef={imageZoom.viewport.containerRef}
+          imageZoom={imageZoom}
+          isImagePreview={isImagePreview}
+          transitionRef={transitionRef}
+        >
+          {showFrame ? (
+            <PreviewMediaContent
+              item={transitionFrame.item}
+              trashMode={Boolean(props.trashMode)}
+              previewUrl={transitionFrame.previewUrl}
+              imageStyle={imageZoom.image.style}
+              imageReady={imageZoom.image.ready}
+              isImagePreview={isImagePreview}
+              onImageLoad={imageZoom.image.handleImageLoad}
+              onMediaError={() => {
+                if (frameIsCurrent && props.previewUrl) {
+                  setDecodeFailure({ id: props.item.id, url: props.previewUrl });
+                }
+              }}
+            />
+          ) : null}
+          {feedbackStatus ? <PreviewMediaLoadFeedback status={feedbackStatus} /> : null}
+        </PreviewMediaSurface>
+        {props.navigation ? (
+          <PreviewNavigationZone direction="next" navigation={props.navigation} />
+        ) : null}
+      </div>
     </div>
   );
 }
