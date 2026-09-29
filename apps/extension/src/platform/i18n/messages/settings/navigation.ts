@@ -49,6 +49,7 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Хранилище и черновики',
     en: 'Storage and drafts',
   },
+  drafts: { ru: 'Черновики', en: 'Drafts' },
   annotations: {
     ru: 'Рамки и аннотации',
     en: 'Frames and annotations',
@@ -105,6 +106,10 @@ export const settingsNavigationMessages = defineMessageSource({
     storageDrafts: {
       ru: 'Управляйте локальным хранилищем, сроками хранения и черновиками.',
       en: 'Manage local storage, retention periods, and drafts.',
+    },
+    drafts: {
+      ru: 'Управляйте рабочими копиями, корзиной и сроками хранения.',
+      en: 'Manage working copies, Trash, and retention periods.',
     },
     annotations: {
       ru: 'Настройте рамки, выноски, нумерацию и теги для аннотаций.',

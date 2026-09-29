@@ -72,7 +72,7 @@ import {
   SettingsSectionHeaderActionsProvider,
 } from '../../../section-surface';
 
-function SectionHarness(props: { view?: 'settings' | 'storage' }) {
+function SectionHarness(props: { view?: 'drafts' | 'storage' }) {
   return (
     <SettingsSectionHeaderActionsProvider>
       <SettingsSectionHeader kicker="Хранилище" description="Описание" />
@@ -162,16 +162,26 @@ it('renders usage, policy warnings, confirmation, and editable policy fields', a
   act(() => root.render(<SectionHarness view="storage" />));
   expect(container.textContent).not.toContain(translate('settings.storageDrafts.newItemsTitle'));
   expect(container.textContent).toContain(translate('settings.storageDrafts.usageTitle'));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.deleteExpired'));
 
-  const storageButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
-  const clickStorageAction = (label: string) => {
-    const button = storageButtons.find((candidate) => candidate.textContent?.includes(label));
+  const clickAction = (label: string) => {
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.includes(label)
+    );
     expect(button).toBeDefined();
     act(() => button?.click());
   };
-  clickStorageAction(translate('settings.storageDrafts.openDrafts'));
-  clickStorageAction(translate('settings.storageDrafts.deleteExpired'));
-  clickStorageAction(translate('settings.storageDrafts.privacyLink'));
+  clickAction(translate('settings.storageDrafts.privacyLink'));
+  act(() => root.render(<SectionHarness view="drafts" />));
+  clickAction(translate('settings.storageDrafts.openDrafts'));
+  clickAction(translate('settings.storageDrafts.deleteExpired'));
+  expect(state.runCleanup).not.toHaveBeenCalled();
+  act(() => container.querySelector<HTMLButtonElement>('[data-testid="cancel"]')?.click());
+  expect(state.runCleanup).not.toHaveBeenCalled();
+  clickAction(translate('settings.storageDrafts.deleteExpired'));
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-testid="confirm"]')?.click();
+  });
 
   expect(mocks.openGalleryPage).toHaveBeenCalledWith({ scope: 'temporary' });
   expect(state.runCleanup).toHaveBeenCalledWith(false);
@@ -341,10 +351,10 @@ it('hides policy controls until loaded and offers retry after a load failure', (
     Array.from(container.querySelectorAll('button')).find((button) =>
       button.textContent?.includes(label)
     );
-  expect(action(translate('settings.storageDrafts.openDrafts'))?.disabled).toBe(false);
   expect(action(translate('settings.storageDrafts.privacyLink'))?.disabled).toBe(false);
-  expect(action(translate('settings.storageDrafts.deleteAll'))?.disabled).toBe(false);
-  expect(action(translate('settings.storageDrafts.deleteExpired'))?.disabled).toBe(true);
+  expect(action(translate('settings.storageDrafts.openDrafts'))).toBeUndefined();
+  act(() => root.render(<SectionHarness view="drafts" />));
+  expect(action(translate('settings.storageDrafts.deleteAll'))).toBeUndefined();
   act(() => root.unmount());
   container.remove();
 });

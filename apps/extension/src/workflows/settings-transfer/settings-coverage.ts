@@ -9,7 +9,8 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'quick-actions': ['capture.quick-actions'],
   'screen-sizes': ['capture.viewport-presets'],
   'media-quality': ['capture.image', 'capture.video', 'capture.pages'],
-  saving: ['capture.after-capture', 'capture.saving', 'capture.retention'],
+  saving: ['capture.after-capture', 'capture.saving'],
+  drafts: ['capture.retention'],
   annotations: ['styles.borders', 'styles.callouts', 'styles.numbering', 'styles.tags'],
   'editor-resources': [
     'styles.tool-presets',
@@ -126,8 +127,8 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   ),
   transferable('capture/screen-sizes/sync.ts', ['updateSettings'], ['capture.viewport-presets']),
   transferable(
-    'capture/storage-drafts/use-storage-drafts-state.ts',
-    ['patchSettings'],
+    'capture/storage-drafts/use-storage-policy-state.ts',
+    ['patchLocalStoragePolicy'],
     ['capture.retention']
   ),
   excluded(

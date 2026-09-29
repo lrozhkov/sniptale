@@ -41,7 +41,7 @@ export function SavePresetsSection(props: {
         />
       ) : null}
       {view === 'files' ? <FilenameRulesSettings /> : null}
-      {view === 'settings' || view === 'storage' ? <StorageDraftsSection view={view} /> : null}
+      {view === 'storage' ? <StorageDraftsSection view="storage" /> : null}
     </div>
   );
 }

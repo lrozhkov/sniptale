@@ -32,14 +32,14 @@ const sectionClassName = 'space-y-1';
 type StorageDraftsContentProps = {
   busy: boolean;
   onDeleteAllRequest(): void;
+  onDeleteExpiredRequest(): void;
   policy: LocalStoragePolicy;
   policyLoaded: boolean;
   retryTrashPolicy(): void;
-  runCleanup(includeUnexpired: boolean): Promise<void>;
   trashPolicyFeedback: TrashPolicyFeedback;
   updatePolicy(patch: Partial<LocalStoragePolicy>): Promise<void>;
   usage: StorageUsageState | null;
-  view: 'settings' | 'storage';
+  view: 'drafts' | 'storage';
 };
 
 export function StorageDraftsContent(props: StorageDraftsContentProps) {
@@ -55,6 +55,7 @@ export function StorageDraftsContent(props: StorageDraftsContentProps) {
       <NewItemsSection {...props} />
       <RetentionSection {...props} />
       <TrashRetentionSection {...props} />
+      <DraftActionsSection {...props} />
     </div>
   );
 }
@@ -126,6 +127,9 @@ function RetentionSection(
           onChange={(value) => props.updatePolicy({ videoDraftRetentionDays: value })}
         />
       </div>
+      <p className="pb-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        {translate('settings.storageDrafts.retentionConsequence')}
+      </p>
     </section>
   );
 }
@@ -163,6 +167,9 @@ function TrashRetentionSection(
         value={props.policy.trashRetentionDays ?? 30}
         onChange={(value) => props.updatePolicy({ trashRetentionDays: value })}
       />
+      <p className="pb-2 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        {translate('settings.storageDrafts.trashRetentionConsequence')}
+      </p>
       {props.trashPolicyFeedback ? (
         <div className="flex flex-wrap items-center gap-2 pb-2 text-xs" role="status">
           <span>
@@ -209,12 +216,7 @@ function RetentionRow(props: {
   );
 }
 
-function StorageUsageSection(
-  props: Pick<
-    StorageDraftsContentProps,
-    'busy' | 'onDeleteAllRequest' | 'policyLoaded' | 'runCleanup' | 'usage'
-  >
-) {
+function StorageUsageSection(props: Pick<StorageDraftsContentProps, 'usage'>) {
   return (
     <section className={sectionClassName}>
       <SectionLabel>{translate('settings.storageDrafts.usageTitle')}</SectionLabel>
@@ -231,37 +233,49 @@ function StorageUsageSection(
         <button
           type="button"
           className={getControlSecondaryButtonClassName({ density: 'compact' })}
-          onClick={() => void openGalleryPage({ scope: 'temporary' })}
-        >
-          {translate('settings.storageDrafts.openDrafts')}
-        </button>
-        <button
-          type="button"
-          className={getControlSecondaryButtonClassName({ density: 'compact' })}
-          disabled={props.busy || !props.policyLoaded}
-          onClick={() => void props.runCleanup(false)}
-        >
-          {translate('settings.storageDrafts.deleteExpired')}
-        </button>
-        <button
-          type="button"
-          className={getControlSecondaryButtonClassName({
-            density: 'compact',
-            tone: 'danger',
-          })}
-          disabled={props.busy}
-          onClick={props.onDeleteAllRequest}
-        >
-          {translate('settings.storageDrafts.deleteAll')}
-        </button>
-        <button
-          type="button"
-          className={getControlSecondaryButtonClassName({ density: 'compact' })}
           onClick={() =>
             void openSettingsPage({ route: { section: 'access-data', view: 'privacy' } })
           }
         >
           {translate('settings.storageDrafts.privacyLink')}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function DraftActionsSection(
+  props: Pick<
+    StorageDraftsContentProps,
+    'busy' | 'onDeleteAllRequest' | 'onDeleteExpiredRequest' | 'policy' | 'policyLoaded'
+  >
+) {
+  return (
+    <section className="space-y-3 border-t border-[var(--sniptale-color-border-subtle)] pt-5">
+      <SectionLabel>{translate('settings.storageDrafts.draftActionsTitle')}</SectionLabel>
+      <button
+        type="button"
+        className={getControlSecondaryButtonClassName({ density: 'compact' })}
+        onClick={() => void openGalleryPage({ scope: 'temporary' })}
+      >
+        {translate('settings.storageDrafts.openDrafts')}
+      </button>
+      <div className="flex flex-wrap gap-2 pt-2">
+        <button
+          type="button"
+          className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
+          disabled={props.busy || !props.policyLoaded || !props.policy.cleanupEnabled}
+          onClick={props.onDeleteExpiredRequest}
+        >
+          {translate('settings.storageDrafts.deleteExpired')}
+        </button>
+        <button
+          type="button"
+          className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
+          disabled={props.busy || !props.policyLoaded}
+          onClick={props.onDeleteAllRequest}
+        >
+          {translate('settings.storageDrafts.deleteAll')}
         </button>
       </div>
     </section>

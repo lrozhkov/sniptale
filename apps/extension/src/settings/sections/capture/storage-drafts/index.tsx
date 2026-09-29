@@ -17,11 +17,15 @@ function useStorageDraftsConfirmation(state: StorageDraftsState) {
     await state.runCleanup(true);
     close();
   };
+  const deleteExpired = async () => {
+    await state.runCleanup(false);
+    close();
+  };
   const reset = async () => {
     await state.updatePolicy(DEFAULT_LOCAL_STORAGE_POLICY);
     close();
   };
-  return { close, confirmation, deleteAll, reset, request: setConfirmation };
+  return { close, confirmation, deleteAll, deleteExpired, reset, request: setConfirmation };
 }
 
 function StorageDraftsResetAction(props: { busy: boolean; onRequest(): void }) {
@@ -73,12 +77,12 @@ function StoragePolicyLoadState(
 function StorageDraftsBody(props: {
   confirmation: ReturnType<typeof useStorageDraftsConfirmation>;
   state: StorageDraftsState;
-  view: 'settings' | 'storage';
+  view: 'drafts' | 'storage';
 }) {
   const { confirmation, state, view } = props;
   return (
     <>
-      {view === 'settings' ? (
+      {view === 'drafts' ? (
         <StorageDraftsResetAction
           busy={state.busy}
           onRequest={() => confirmation.request('reset')}
@@ -88,20 +92,22 @@ function StorageDraftsBody(props: {
         {...state}
         view={view}
         onDeleteAllRequest={() => confirmation.request('delete-all')}
+        onDeleteExpiredRequest={() => confirmation.request('delete-expired')}
       />
       <StorageDraftsDialogs
         busy={state.busy}
         confirmation={confirmation.confirmation}
         onCancel={confirmation.close}
         onDeleteAll={confirmation.deleteAll}
+        onDeleteExpired={confirmation.deleteExpired}
         onReset={confirmation.reset}
       />
     </>
   );
 }
 
-export function StorageDraftsSection(props: { view?: 'settings' | 'storage' }) {
-  const view = props.view === 'storage' ? 'storage' : 'settings';
+export function StorageDraftsSection(props: { view?: string }) {
+  const view = props.view === 'storage' ? 'storage' : 'drafts';
   const state = useStorageDraftsState();
   const confirmation = useStorageDraftsConfirmation(state);
 

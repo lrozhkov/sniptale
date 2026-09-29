@@ -98,7 +98,7 @@ it('places Files after Folder templates and isolates its controls', async () => 
   expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeNull();
   await renderSection('settings');
   expect(container?.querySelector('[data-testid="filename-rules"]')).toBeNull();
-  expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeTruthy();
+  expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeNull();
 });
 
 afterEach(() => {

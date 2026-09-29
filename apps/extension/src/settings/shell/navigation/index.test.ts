@@ -28,7 +28,8 @@ describe('settings navigation items', () => {
     ).toBe(true);
   });
 
-  it('composes storage and drafts inside saving instead of registering a second page', () => {
+  it('registers Drafts as its own page while Saving keeps the storage view', () => {
+    expect(DEFERRED_SETTINGS_SECTION_LOADERS).toHaveProperty('drafts');
     expect(DEFERRED_SETTINGS_SECTION_LOADERS).not.toHaveProperty('storage-drafts');
   });
 
