@@ -406,8 +406,32 @@ export const galleryVideoReviewMessages = defineMessageSource({
   addOverlayComment: { ru: 'Комментарий на кадре', en: 'Frame comment' },
   originalAudioRange: { ru: 'Громкость участка', en: 'Range volume' },
   originalAudioRangeHint: {
-    ru: 'Изменить громкость выбранного интервала или выделить участок на дорожке исходного аудио',
-    en: 'Adjust the selected range or draw a range on the source audio track',
+    ru: 'Выделите участок исходного видео, чтобы создать изменение громкости',
+    en: 'Drag a range on the source video to add a volume change',
+  },
+  originalAudioUnavailable: {
+    ru: 'В этом видео нет исходного звука',
+    en: 'This video has no source audio',
+  },
+  originalAudioTooShort: {
+    ru: 'Выделите участок длительностью не менее 0,01 с',
+    en: 'Select at least 0.01 seconds',
+  },
+  originalAudioOverlap: {
+    ru: 'На этом участке уже есть изменение громкости',
+    en: 'This range already has a volume change',
+  },
+  originalAudioCut: {
+    ru: 'Участок полностью вырезан из видео',
+    en: 'This range is completely cut from the video',
+  },
+  originalAudioLimit: {
+    ru: 'Достигнут предел изменений громкости',
+    en: 'Volume change limit reached',
+  },
+  originalAudioMutedHint: {
+    ru: 'Исходное аудио отключено. Настройка сохранится и начнёт действовать после включения звука.',
+    en: 'Source audio is muted. This setting is saved and will apply when audio is enabled.',
   },
   muteAudioRange: { ru: 'Выключить звук на участке', en: 'Mute this range' },
   audioMutedBySpeed: { ru: 'Без звука: настройка ускорения', en: 'Muted by speed change' },

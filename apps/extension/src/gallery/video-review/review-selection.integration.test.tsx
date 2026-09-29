@@ -532,6 +532,104 @@ it('creates a source-audio mute from a range, opens properties and restores it t
   }
 });
 
+it('draws a source-video volume edit with an independent toolbar default', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: 'opus',
+    processedAudioCodec: 'opus',
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('originalAudioRange');
+    await dragRange(fixture.host);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    const item = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.originalAudioRange"]'
+    );
+    expect(item).not.toBeNull();
+    expect(item?.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.host.textContent).toContain('gallery.videoReview.volume');
+    expect(item?.title).toContain('50%');
+    await fixture.click('undo');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toBeNull();
+    await fixture.click('redo');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).not.toBeNull();
+    await fixture.click('originalAudioRange');
+    await dragRange(fixture.host, { start: 400, end: 300 });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(
+      fixture.host.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toHaveLength(2);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('keeps Volume unavailable without source audio and drops the tool on leaving advanced mode', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    expect(fixture.button('originalAudioRange').disabled).toBe(true);
+    expect(fixture.button('originalAudioRange').title).toContain(
+      'gallery.videoReview.originalAudioUnavailable'
+    );
+  } finally {
+    await fixture.cleanup();
+  }
+
+  const audible = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: 'opus',
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      audible.root.render(<VideoReview aggregateId="recording:r" onBack={audible.back} />)
+    );
+    await audible.click('advancedEditing');
+    const marker = audible.host.querySelector<HTMLButtonElement>(
+      '[aria-label^="gallery.videoReview.telemetry ·"]'
+    )!;
+    await act(async () => marker.click());
+    await audible.click('originalAudioRange');
+    expect(audible.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
+    await audible.click('advancedEditing');
+    await dragRange(audible.host);
+    expect(
+      audible.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
+    ).toBeNull();
+  } finally {
+    await audible.cleanup();
+  }
+});
+
 it('draws focus in source coordinates, selects it and keeps drawing tools mutually exclusive', async () => {
   const fixture = createEditorFixture(integration, {
     history: [

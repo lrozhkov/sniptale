@@ -204,6 +204,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     [props.source.duration, props.edits]
   );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
+  const originalSource = useOriginalAudioSourcePlacement(props);
   const focus = useFocusPlacement(props, projection);
   const onZoomAdd = () => {
     focus.clear();
@@ -301,7 +302,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           }
         : {})}
       onRangeCommit={(range) => {
-        if (props.editing.mode) void props.editing.commitRange(range);
+        if (!originalSource.commit(range) && props.editing.mode)
+          void props.editing.commitRange(range);
       }}
       onChangeEdit={async (edit, range) => {
         await props.editing.commitRange(range, edit);
@@ -343,6 +345,26 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onComment={props.onComment}
     />
   );
+}
+
+/** Source-video drawing routes to gain only while its advanced audio capability is available. */
+function useOriginalAudioSourcePlacement(props: TimelineBindingProps) {
+  const mode = props.advanced.ui.mode;
+  const audioCodec = props.editing.exporter.index?.audioCodec;
+  const { originalTool, setOriginalTool, addOriginal } = props.audio;
+  useEffect(() => {
+    if (mode !== 'advanced' || audioCodec === null) setOriginalTool(false);
+  }, [mode, audioCodec, setOriginalTool]);
+  return {
+    commit(range: ReviewAnchor): boolean {
+      if (mode !== 'advanced' || !audioCodec || !originalTool) return false;
+      if (addOriginal(range) && range.kind === 'range') {
+        props.setSelection({ kind: 'point', time: range.start });
+        props.onSeek(range.start);
+      }
+      return true;
+    },
+  };
 }
 
 /** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */

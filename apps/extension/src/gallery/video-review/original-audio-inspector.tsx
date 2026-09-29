@@ -15,6 +15,7 @@ export function ReviewOriginalAudioInspector(props: {
   audio: ReturnType<typeof useReviewAudio>;
   duration: number;
   speedMuted: boolean;
+  originalMuted?: boolean;
 }) {
   const range = props.audio.selectedOriginal;
   if (!range) return null;
@@ -50,6 +51,11 @@ export function ReviewOriginalAudioInspector(props: {
                 {props.speedMuted ? (
                   <p className="text-xs text-[var(--sniptale-color-text-muted)]">
                     {translate('gallery.videoReview.audioRangeSpeedHint')}
+                  </p>
+                ) : null}
+                {props.originalMuted ? (
+                  <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+                    {translate('gallery.videoReview.originalAudioMutedHint')}
                   </p>
                 ) : null}
               </>

@@ -195,6 +195,10 @@ function useReviewAudioAssets() {
 function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
   const [originalTool, setOriginalTool] = useState(false);
   const [originalRangeSelected, setOriginalRangeSelected] = useState(false);
+  const [defaultOriginalVolume, setDefaultOriginalVolume] = useState(0.5);
+  const [originalFeedback, setOriginalFeedback] = useState<
+    'too-short' | 'overlap' | 'cut' | 'limit' | null
+  >(null);
   const originalRanges = args.audio.original.ranges ?? [];
   const canAddOriginal = (range: ReviewAnchor, exceptId?: string) =>
     range.kind === 'range' &&
@@ -209,6 +213,11 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
   const updateOriginalRanges = (ranges: typeof originalRanges) =>
     args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ranges } }));
   return {
+    defaultOriginalVolume,
+    setDefaultOriginalVolume: (volume: number) => {
+      if (Number.isFinite(volume) && volume >= 0 && volume <= 2) setDefaultOriginalVolume(volume);
+    },
+    originalFeedback,
     originalRangeSelected,
     setOriginalRangeSelected,
     originalTool,
@@ -220,17 +229,33 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
       setOriginalTool(false);
       args.onOriginalSelection?.(id);
     },
-    addOriginal: (range: ReviewAnchor) => {
-      if (range.kind !== 'range' || !canAddOriginal(range) || originalRanges.length >= 512) return;
+    addOriginal: (range: ReviewAnchor): boolean => {
+      if (range.kind !== 'range' || range.end - range.start < 0.01) {
+        setOriginalFeedback('too-short');
+        return false;
+      }
+      if (!canAddOriginal(range)) {
+        setOriginalFeedback(
+          originalRanges.length >= 512
+            ? 'limit'
+            : originalRanges.some((item) => item.start < range.end && item.end > range.start)
+              ? 'overlap'
+              : 'cut'
+        );
+        return false;
+      }
       const id = crypto.randomUUID();
       setOriginalRangeSelected(true);
       updateOriginalRanges(
-        [...originalRanges, { id, start: range.start, end: range.end, volume: 0 }].sort(
-          (a, b) => a.start - b.start
-        )
+        [
+          ...originalRanges,
+          { id, start: range.start, end: range.end, volume: defaultOriginalVolume },
+        ].sort((a, b) => a.start - b.start)
       );
       setOriginalTool(false);
+      setOriginalFeedback(null);
       args.onOriginalSelection?.(id);
+      return true;
     },
     patchOriginal: (id: string, patch: Partial<{ start: number; end: number; volume: number }>) => {
       const old = originalRanges.find((range) => range.id === id);
@@ -240,7 +265,13 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
         !Number.isFinite(next.volume) ||
         next.volume < 0 ||
         next.volume > 2 ||
-        !canAddOriginal({ kind: 'range', ...next }, id)
+        !canPlaceOriginalAudioRange(
+          next,
+          originalRanges,
+          args.edits ?? [],
+          args.sourceDuration ?? args.timelineDuration,
+          id
+        )
       )
         return;
       updateOriginalRanges(

@@ -3286,3 +3286,58 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`quick editor draws source volume at HD in ${variant.locale}/${variant.theme}`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.originalAudioRange').click();
+      await expect(button('gallery.videoReview.volume')).toContainText('50%');
+      await page.screenshot({
+        path: testInfo.outputPath(`source-volume-tool-${variant.locale}-${variant.theme}.png`),
+      });
+      const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      const box = (await source.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 6, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2, { steps: 8 });
+      await page.mouse.up();
+      const range = dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]');
+      await expect(range).toHaveCount(1);
+      await expect(range).toHaveAttribute('title', /50%/);
+      await expect(range).toHaveAttribute('aria-pressed', 'true');
+      await page.screenshot({
+        path: testInfo.outputPath(`source-volume-${variant.locale}-${variant.theme}.png`),
+      });
+      await button('gallery.videoReview.undo').click();
+      await expect(range).toHaveCount(0);
+      await button('gallery.videoReview.redo').click();
+      await expect(range).toHaveCount(1);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

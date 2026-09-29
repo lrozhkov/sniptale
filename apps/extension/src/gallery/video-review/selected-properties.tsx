@@ -82,7 +82,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
             }}
           />
         ) : selection.kind === 'original-audio' && advanced.ui.mode === 'advanced' ? (
-          <SelectedOriginalAudio audio={audio} resource={resource} />
+          <SelectedOriginalAudio audio={audio} resource={resource} advanced={advanced} />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
           <ReviewAudioInspectorSection audio={audio} busy={busy} />
         ) : selection.kind === 'edit' && editing.selected ? (
@@ -130,14 +130,17 @@ function overlapsSelected(
     );
 }
 
-function SelectedOriginalAudio(props: Pick<SelectedPropertiesProps, 'audio' | 'resource'>) {
-  const { audio, resource } = props;
+function SelectedOriginalAudio(
+  props: Pick<SelectedPropertiesProps, 'audio' | 'resource' | 'advanced'>
+) {
+  const { audio, resource, advanced } = props;
   const selected = audio.selectedOriginal;
   return (
     <>
       <ReviewOriginalAudioInspector
         audio={audio}
         duration={resource.source.duration}
+        originalMuted={advanced.audio.original.muted}
         speedMuted={!!selected && overlapsSelected(resource, selected, 'speed', true)}
       />
       {selected && overlapsSelected(resource, selected, 'cut') ? (

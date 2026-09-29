@@ -6,7 +6,8 @@ import {
 } from '../../features/video/review/advanced/effective';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { reviewIconButtonClassName, ReviewButton } from './controls';
+import { reviewIconButtonClassName, reviewTextButtonClassName, ReviewButton } from './controls';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import { Activity, AudioLines, Focus, PanelsTopLeft, Volume2 } from 'lucide-react';
@@ -46,6 +47,7 @@ type ToolbarProps = {
 export function ReviewTimelineToolbar(props: ToolbarProps) {
   const busy = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
   const advanced = props.advanced;
+  const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
   return (
     <>
       {advanced.ui.mode === 'basic' ? (
@@ -103,34 +105,49 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             <Focus size={16} aria-hidden="true" />
           </ReviewButton>
         ) : null}
-        {advanced.ui.mode === 'advanced' &&
-        props.editing.exporter.index?.audioCodec &&
-        props.originalAudioEditor ? (
+        {advanced.ui.mode === 'advanced' && props.originalAudioEditor ? (
           <ReviewButton
             label={translate('gallery.videoReview.originalAudioRange')}
             toolbarLabel={translate('gallery.videoReview.volume')}
-            title={translate('gallery.videoReview.originalAudioRangeHint')}
+            title={translate(
+              sourceAudioReady
+                ? 'gallery.videoReview.originalAudioRangeHint'
+                : 'gallery.videoReview.originalAudioUnavailable'
+            )}
             aria-pressed={props.originalAudioEditor.originalTool}
             className={plain}
-            disabled={
-              busy ||
-              (!props.originalAudioEditor.originalTool &&
-                !props.selectedObject &&
-                props.selection.kind === 'range' &&
-                !props.originalAudioEditor.canAddOriginal(props.selection))
-            }
+            disabled={busy || !sourceAudioReady}
             onClick={() => {
               props.editing.setCutting(false);
               if (props.originalAudioEditor?.originalTool)
                 props.originalAudioEditor.setOriginalTool(false);
-              else if (!props.selectedObject && props.selection.kind === 'range')
-                props.originalAudioEditor?.addOriginal(props.selection);
-              else
+              else if (!props.selectedObject && props.selection.kind === 'range') {
+                if (!props.originalAudioEditor?.addOriginal(props.selection))
+                  props.originalAudioEditor?.setOriginalTool(true);
+              } else
                 props.originalAudioEditor?.setOriginalTool(!props.originalAudioEditor.originalTool);
             }}
           >
             <Volume2 size={16} aria-hidden="true" />
           </ReviewButton>
+        ) : null}
+        {advanced.ui.mode === 'advanced' &&
+        props.originalAudioEditor?.originalTool &&
+        sourceAudioReady ? (
+          <ProductSelect
+            aria-label={translate('gallery.videoReview.volume')}
+            controlSize="sm"
+            className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+            containerClassName="!w-auto !min-w-0 shrink-0"
+            menuWidth={112}
+            value={String(props.originalAudioEditor.defaultOriginalVolume)}
+            disabled={busy}
+            options={[0, 0.25, 0.5, 0.75, 1, 1.5, 2].map((volume) => ({
+              value: String(volume),
+              label: `${Math.round(volume * 100)}%`,
+            }))}
+            onChange={(value) => props.originalAudioEditor?.setDefaultOriginalVolume(Number(value))}
+          />
         ) : null}
         <ReviewFragmentAction
           selection={props.selection}

@@ -99,18 +99,12 @@ const renderTrack = (
 it('shows the three semantic lanes and toggles the original mute', async () => {
   const lanes = renderTrack();
   expect(lanes).toHaveLength(3);
-  expect(lanes[0]!.parentElement!.parentElement!.textContent).toContain(
-    'gallery.videoReview.audioOriginal'
-  );
-  expect(lanes[1]!.parentElement!.parentElement!.textContent).toContain(
-    'gallery.videoReview.audioVoiceover'
-  );
-  expect(lanes[2]!.parentElement!.parentElement!.textContent).toContain(
-    'gallery.videoReview.audioMusic'
-  );
-  const mute = lanes[0]!.parentElement!.parentElement!.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.audioEnabled"]'
-  )!;
+  expect(lanes[0]!.closest('.grid')?.textContent).toContain('gallery.videoReview.audioOriginal');
+  expect(lanes[1]!.closest('.grid')?.textContent).toContain('gallery.videoReview.audioVoiceover');
+  expect(lanes[2]!.closest('.grid')?.textContent).toContain('gallery.videoReview.audioMusic');
+  const mute = lanes[0]!
+    .closest('.grid')!
+    .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.audioEnabled"]')!;
   expect(mute.getAttribute('aria-pressed')).toBe('true');
   await act(async () => mute.click());
   expect(onOriginal).toHaveBeenCalledWith({ muted: true });

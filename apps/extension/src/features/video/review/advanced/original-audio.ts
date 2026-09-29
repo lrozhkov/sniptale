@@ -78,5 +78,9 @@ export function canPlaceOriginalAudioRange(
         sum + Math.max(0, Math.min(range.end, edit.end) - Math.max(range.start, edit.start)),
       0
     );
-  return range.end - range.start - removed >= 0.001;
+  // Existing authored ranges remain editable when a later cut hides them completely.
+  return (
+    (exceptId !== undefined && ranges.some((item) => item.id === exceptId)) ||
+    range.end - range.start - removed >= 0.001
+  );
 }

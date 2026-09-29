@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'rea
 import { Volume2, VolumeX, Link2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
+import type {
+  QuickEditOriginalAudio,
+  QuickEditOriginalAudioRange,
+} from '../../features/video/review/advanced/types';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import type { ReviewTrackProjection } from './track-projection';
@@ -68,104 +71,140 @@ export function ReviewOriginalAudioTrack(props: {
         </ReviewButton>
       }
     >
-      <div
-        data-ui="gallery.videoReview.audioLane"
-        data-original-audio-lane
-        className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] touch-none"
-        {...gesture.handlers}
-      >
-        <ReviewAudioWaveform
-          waveform={props.waveform}
-          duration={duration}
-          volume={1}
-          muted={props.original.muted}
-          gainAt={gainAt}
-        />
-        {props.original.ranges?.map((range) => {
-          const selected = props.editor?.selectedOriginal?.id === range.id;
-          return (
-            <button
-              key={range.id}
-              type="button"
-              disabled={props.busy}
-              aria-pressed={selected}
-              aria-label={translate('gallery.videoReview.originalAudioRange')}
-              title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
-              data-ui="gallery.videoReview.originalAudioRange"
-              data-audio-id={range.id}
-              className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
-                rounded border ${reviewTimelineItemTone(selected, range.volume === 0 ? 'cut' : 'neutral')}`}
-              style={rectStyle(
-                preview?.id === range.id ? preview.from : range.start,
-                preview?.id === range.id ? preview.to : range.end
-              )}
-              onClick={(event) => {
-                event.stopPropagation();
-                props.editor?.selectOriginal(range.id);
-              }}
-            >
-              <span className="pointer-events-none mx-3 min-w-0 flex-1 text-[10px]">
-                <ReviewTimelineLabel
-                  icon={range.volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
-                  value={range.volume > 0 ? `${Math.round(range.volume * 100)}%` : undefined}
-                />
-              </span>
-              {(['start', 'end'] as const).map((edge) => (
-                <span
-                  key={edge}
-                  data-audio-edge={edge}
-                  data-audio-id={range.id}
-                  className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-                >
-                  <span className="h-4 w-px bg-current opacity-60" />
-                </span>
-              ))}
-            </button>
-          );
-        })}
-        {props.edits
-          ?.filter((edit) => edit.kind === 'speed' && edit.audio === 'mute')
-          .map((edit) => (
-            <button
-              key={edit.id}
-              type="button"
-              disabled={props.busy}
-              title={translate('gallery.videoReview.audioMutedBySpeed')}
-              aria-label={translate('gallery.videoReview.audioMutedBySpeed')}
-              data-ui="gallery.videoReview.speedAudioMute"
-              aria-pressed={props.selectedEditId === edit.id}
-              className={`absolute inset-y-0 z-20 flex items-center justify-center gap-1 rounded border text-[10px]
-                ${reviewTimelineItemTone(props.selectedEditId === edit.id)}`}
-              style={rectStyle(edit.start, edit.end)}
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                props.onSelectSpeed?.(edit);
-              }}
-            >
-              <ReviewTimelineLabel
-                icon={
-                  <>
-                    <VolumeX size={14} />
-                    <Link2 size={12} />
-                  </>
-                }
-                name={translate('gallery.videoReview.audioMutedBySpeed')}
-              />
-            </button>
-          ))}
-        {preview && !preview.id ? (
-          <div
-            className="pointer-events-none absolute inset-y-0 z-30 border border-[var(--sniptale-color-accent)]"
-            style={rectStyle(
-              Math.min(preview.from, preview.to),
-              Math.max(preview.from, preview.to)
-            )}
+      <div className="min-w-0">
+        <div
+          data-ui="gallery.videoReview.audioLane"
+          data-original-audio-lane
+          className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] touch-none"
+          {...gesture.handlers}
+        >
+          <ReviewAudioWaveform
+            waveform={props.waveform}
+            duration={duration}
+            volume={1}
+            muted={props.original.muted}
+            gainAt={gainAt}
           />
+          {props.original.ranges?.map((range) => (
+            <ReviewOriginalGainBlock
+              key={range.id}
+              range={range}
+              duration={duration}
+              preview={preview}
+              selected={props.editor?.selectedOriginal?.id === range.id}
+              busy={props.busy}
+              onSelect={() => props.editor?.selectOriginal(range.id)}
+            />
+          ))}
+          {props.edits
+            ?.filter((edit) => edit.kind === 'speed' && edit.audio === 'mute')
+            .map((edit) => (
+              <button
+                key={edit.id}
+                type="button"
+                disabled={props.busy}
+                title={translate('gallery.videoReview.audioMutedBySpeed')}
+                aria-label={translate('gallery.videoReview.audioMutedBySpeed')}
+                data-ui="gallery.videoReview.speedAudioMute"
+                aria-pressed={props.selectedEditId === edit.id}
+                className={`absolute inset-y-0 z-20 flex items-center justify-center gap-1 rounded border text-[10px]
+                ${reviewTimelineItemTone(props.selectedEditId === edit.id)}`}
+                style={rectStyle(edit.start, edit.end)}
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onSelectSpeed?.(edit);
+                }}
+              >
+                <ReviewTimelineLabel
+                  icon={
+                    <>
+                      <VolumeX size={14} />
+                      <Link2 size={12} />
+                    </>
+                  }
+                  name={translate('gallery.videoReview.audioMutedBySpeed')}
+                />
+              </button>
+            ))}
+          {preview && !preview.id ? (
+            <div
+              className="pointer-events-none absolute inset-y-0 z-30 border border-[var(--sniptale-color-accent)]"
+              style={rectStyle(
+                Math.min(preview.from, preview.to),
+                Math.max(preview.from, preview.to)
+              )}
+            />
+          ) : null}
+          <ReviewTrackCuts projection={props.projection} />
+        </div>
+        {props.editor?.originalFeedback ? (
+          <p role="status" className="px-1 py-1 text-xs text-[var(--sniptale-color-danger)]">
+            {translate(
+              props.editor.originalFeedback === 'too-short'
+                ? 'gallery.videoReview.originalAudioTooShort'
+                : props.editor.originalFeedback === 'overlap'
+                  ? 'gallery.videoReview.originalAudioOverlap'
+                  : props.editor.originalFeedback === 'cut'
+                    ? 'gallery.videoReview.originalAudioCut'
+                    : 'gallery.videoReview.originalAudioLimit'
+            )}
+          </p>
         ) : null}
-        <ReviewTrackCuts projection={props.projection} />
       </div>
     </ReviewTrackRow>
+  );
+}
+
+/** One authored source-gain item keeps its selection and resize handles together. */
+function ReviewOriginalGainBlock(props: {
+  range: QuickEditOriginalAudioRange;
+  duration: number;
+  preview: Drag | null;
+  selected: boolean;
+  busy: boolean;
+  onSelect(): void;
+}) {
+  const { range, preview } = props;
+  const start = preview?.id === range.id ? preview.from : range.start;
+  const end = preview?.id === range.id ? preview.to : range.end;
+  return (
+    <button
+      type="button"
+      disabled={props.busy}
+      aria-pressed={props.selected}
+      aria-label={translate('gallery.videoReview.originalAudioRange')}
+      title={`${translate('gallery.videoReview.originalAudioRange')}: ${Math.round(range.volume * 100)}%`}
+      data-ui="gallery.videoReview.originalAudioRange"
+      data-audio-id={range.id}
+      className={`absolute inset-y-0 z-10 flex cursor-grab items-center justify-center
+        rounded border ${reviewTimelineItemTone(props.selected, range.volume === 0 ? 'cut' : 'neutral')}`}
+      style={{
+        left: `${(start / props.duration) * 100}%`,
+        width: `${((end - start) / props.duration) * 100}%`,
+      }}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onSelect();
+      }}
+    >
+      <span className="pointer-events-none mx-3 min-w-0 flex-1 text-[10px]">
+        <ReviewTimelineLabel
+          icon={range.volume === 0 ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          value={range.volume > 0 ? `${Math.round(range.volume * 100)}%` : undefined}
+        />
+      </span>
+      {(['start', 'end'] as const).map((edge) => (
+        <span
+          key={edge}
+          data-audio-edge={edge}
+          data-audio-id={range.id}
+          className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
+        >
+          <span className="h-4 w-px bg-current opacity-60" />
+        </span>
+      ))}
+    </button>
   );
 }
 
@@ -282,7 +321,10 @@ function useOriginalAudioGesture(
             start: Math.min(current.from, current.to),
             end: Math.max(current.from, current.to),
           };
-          if (range.end - range.start < 0.01) return;
+          if (range.end - range.start < 0.01) {
+            props.editor?.addOriginal(range);
+            return;
+          }
           props.onRange?.(range);
           if (props.editor?.originalTool) props.editor.addOriginal(range);
         }

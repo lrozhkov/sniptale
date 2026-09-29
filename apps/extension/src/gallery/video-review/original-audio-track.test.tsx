@@ -30,6 +30,7 @@ function setup() {
     rate: 2,
     audio: 'mute',
   };
+  let currentEdits: ReviewEdit[] = [speed];
   let editor!: ReturnType<typeof useReviewAudio>;
   let busy = false;
   function Harness() {
@@ -40,7 +41,7 @@ function setup() {
       setAudio,
       timelineDuration: 10,
       sourceDuration: 10,
-      edits: [speed],
+      edits: currentEdits,
       selectedOriginalId,
       onOriginalSelection,
     });
@@ -51,7 +52,7 @@ function setup() {
           duration={10}
           editor={editor}
           busy={busy}
-          edits={[speed]}
+          edits={currentEdits}
           onOriginal={editor.setOriginal}
           onRange={onRange}
           onSelectSpeed={onSelectSpeed}
@@ -84,6 +85,10 @@ function setup() {
       busy = value;
       act(() => root.render(<Harness />));
     },
+    setEdits(edits: ReviewEdit[]) {
+      currentEdits = edits;
+      act(() => root.render(<Harness />));
+    },
     close() {
       act(() => root.unmount());
       host.remove();
@@ -105,7 +110,7 @@ it('draws in source time, trims both edges, cancels gestures and follows a linke
     f.send('pointerdown', 200);
     f.send('pointermove', 500);
     f.send('pointerup', 500);
-    expect(f.editor.selectedOriginal).toMatchObject({ start: 2, end: 5, volume: 0 });
+    expect(f.editor.selectedOriginal).toMatchObject({ start: 2, end: 5, volume: 0.5 });
     const range = () =>
       f.host.querySelector<HTMLButtonElement>(
         '[data-ui="gallery.videoReview.originalAudioRange"]'
@@ -164,6 +169,7 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
       f.editor.patchOriginal(id, { end: 1 });
     });
     expect(f.editor.selectedOriginal).toMatchObject({ start: 2, end: 5 });
+    expect(f.host.textContent).toContain(translate('gallery.videoReview.originalAudioOverlap'));
     const change = (label: string, value: string) => {
       const input = f.host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
       expect(input).not.toBeNull();
@@ -220,6 +226,49 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
         .click()
     );
     expect(f.editor.selectedOriginal).toBeNull();
+  } finally {
+    f.close();
+  }
+});
+
+it('keeps toolbar gain independent and edits an authored range after a cut hides it', () => {
+  const f = setup();
+  try {
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 4 }));
+    const first = f.editor.selectedOriginal!;
+    act(() => f.editor.setDefaultOriginalVolume(1.5));
+    expect(f.editor.selectedOriginal?.volume).toBe(0.5);
+    act(() => f.editor.addOriginal({ kind: 'range', start: 4, end: 6 }));
+    expect(f.editor.selectedOriginal?.volume).toBe(1.5);
+    act(() => f.editor.selectOriginal(first.id));
+    f.setEdits([{ id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 }]);
+    act(() => f.editor.patchOriginal(first.id, { volume: 0.75 }));
+    expect(f.editor.selectedOriginal).toMatchObject({ id: first.id, volume: 0.75 });
+    f.setEdits([]);
+    expect(f.editor.selectedOriginal).toMatchObject({
+      id: first.id,
+      start: 2,
+      end: 4,
+      volume: 0.75,
+    });
+  } finally {
+    f.close();
+  }
+});
+
+it('explains rejected short and fully cut ranges without leaving the drawing tool', () => {
+  const f = setup();
+  try {
+    act(() => f.editor.setOriginalTool(true));
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 2.005 }));
+    expect(f.editor.selectedOriginal).toBeNull();
+    expect(f.editor.originalTool).toBe(true);
+    expect(f.host.textContent).toContain(translate('gallery.videoReview.originalAudioTooShort'));
+    f.setEdits([{ id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 }]);
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 4 }));
+    expect(f.editor.selectedOriginal).toBeNull();
+    expect(f.editor.originalTool).toBe(true);
+    expect(f.host.textContent).toContain(translate('gallery.videoReview.originalAudioCut'));
   } finally {
     f.close();
   }
