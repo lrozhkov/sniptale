@@ -24,6 +24,7 @@ import { PreviewVideo } from './video-player';
 import { PreviewScenarioStage } from './scenario-stage';
 import type { PreviewPanelProps } from './types';
 import { usePreviewImageZoom } from './usePreviewImageZoom';
+import { PreviewNavigationZone } from './navigation-zones';
 import {
   usePreviewMediaTransition,
   usePreviewMediaTransitionAnimation,
@@ -246,7 +247,7 @@ function PreviewMediaSurface(props: {
       onPointerMove={props.imageZoom.viewport.handlePointerMove}
       onPointerUp={props.imageZoom.viewport.handlePointerEnd}
       onPointerCancel={props.imageZoom.viewport.handlePointerEnd}
-      className={`h-full w-full overscroll-contain px-4 pb-4 pt-16
+      className={`h-full min-w-0 flex-1 overscroll-contain px-4 pb-4 pt-16
         @max-[500px]/preview-media:pt-28 @max-[330px]/preview-media:pt-40
         ${props.isImagePreview ? 'touch-none overflow-auto' : 'overflow-hidden'}
         ${
@@ -496,6 +497,9 @@ export function PreviewMedia(
         onInspectorToggle={props.onInspectorToggle}
         imageZoom={imageZoom}
       />
+      {props.navigation ? (
+        <PreviewNavigationZone direction="previous" navigation={props.navigation} />
+      ) : null}
       <PreviewMediaSurface
         containerRef={imageZoom.viewport.containerRef}
         imageZoom={imageZoom}
@@ -520,6 +524,9 @@ export function PreviewMedia(
         ) : null}
         {feedbackStatus ? <PreviewMediaLoadFeedback status={feedbackStatus} /> : null}
       </PreviewMediaSurface>
+      {props.navigation ? (
+        <PreviewNavigationZone direction="next" navigation={props.navigation} />
+      ) : null}
     </div>
   );
 }

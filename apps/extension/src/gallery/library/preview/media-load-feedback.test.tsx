@@ -164,22 +164,39 @@ it('keeps zoom controls in place through delayed loading and unavailable image f
   vi.useFakeTimers();
   const first = createItem({ id: 'first' });
   const next = createItem({ id: 'next' });
+  const navigation = {
+    current: 1,
+    total: 2,
+    hasPrevious: false,
+    hasNext: true,
+    onPrevious: vi.fn(),
+    onNext: vi.fn(),
+  };
   renderNode(
     <PreviewMedia
-      {...createProps({ item: first, previewUrl: 'blob:first', previewLoadStatus: 'ready' })}
+      {...createProps({
+        item: first,
+        navigation,
+        previewUrl: 'blob:first',
+        previewLoadStatus: 'ready',
+      })}
     />
   );
   const slider = container?.querySelector<HTMLInputElement>(
     '[data-ui="gallery.preview.zoomSlider"]'
   );
+  const nextZone = container?.querySelector('[data-ui="gallery.preview.navigationZone.next"]');
   expect(slider).not.toBeNull();
 
   renderNode(
     <PreviewMedia
-      {...createProps({ item: next, previewUrl: null, previewLoadStatus: 'loading' })}
+      {...createProps({ item: next, navigation, previewUrl: null, previewLoadStatus: 'loading' })}
     />
   );
   expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
+  expect(container?.querySelector('[data-ui="gallery.preview.navigationZone.next"]')).toBe(
+    nextZone
+  );
   expect(slider?.disabled).toBe(true);
   expect(container?.querySelector('img')).toBeNull();
   act(() => vi.advanceTimersByTime(320));
@@ -188,10 +205,13 @@ it('keeps zoom controls in place through delayed loading and unavailable image f
 
   renderNode(
     <PreviewMedia
-      {...createProps({ item: next, previewUrl: null, previewLoadStatus: 'missing' })}
+      {...createProps({ item: next, navigation, previewUrl: null, previewLoadStatus: 'missing' })}
     />
   );
   expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
+  expect(container?.querySelector('[data-ui="gallery.preview.navigationZone.next"]')).toBe(
+    nextZone
+  );
   expect(slider?.disabled).toBe(true);
   expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
     'gallery.preview.mediaMissing'

@@ -220,6 +220,17 @@ it('keeps adjacent navigation in the fixed toolbar and exposes video readiness',
 
   const previousButton = container?.querySelector('button[aria-label="gallery.preview.previous"]');
   const nextButton = container?.querySelector('button[aria-label="gallery.preview.next"]');
+  const previousZone = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.navigationZone.previous"]'
+  );
+  const nextZone = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.navigationZone.next"]'
+  );
+  const viewport = container?.querySelector('[data-ui="preview.media.contained"]')?.parentElement;
+  expect(previousZone?.nextElementSibling).toBe(viewport);
+  expect(viewport?.nextElementSibling).toBe(nextZone);
+  expect(previousZone?.disabled).toBe(false);
+  expect(nextZone?.disabled).toBe(false);
   const video = container?.querySelector('video');
   if (video) {
     Object.defineProperty(video, 'duration', { configurable: true, value: 12 });
