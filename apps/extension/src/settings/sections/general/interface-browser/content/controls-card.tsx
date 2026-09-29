@@ -6,7 +6,6 @@ import { SettingsControlRow } from '../../../../section-surface';
 import { openExtensionShortcutsPage } from '../../../../../platform/navigation/extension-pages';
 
 import type { AppearanceSectionState } from './types';
-import { ContextMenuControls } from './context-menu-controls';
 import { ThemeChips } from './theme-chips';
 
 export function AppearanceControlsCard({ state }: { state: AppearanceSectionState }) {
@@ -53,10 +52,6 @@ export function AppearanceControlsCard({ state }: { state: AppearanceSectionStat
           <ExternalLink aria-hidden="true" className="h-4 w-4" />
         </ProductActionButton>
       </SettingsControlRow>
-
-      <div className="pt-1">
-        <ContextMenuControls state={state} />
-      </div>
     </div>
   );
 }

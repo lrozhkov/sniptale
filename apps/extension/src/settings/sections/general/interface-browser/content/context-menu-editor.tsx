@@ -30,12 +30,14 @@ function reorder<T>(items: T[], index: number, offset: number): T[] {
 export function ContextMenuEditor({
   state,
   onClose,
+  visible = true,
 }: {
   state: Pick<
     AppearanceSectionState,
     'contextMenu' | 'contextMenuOptions' | 'locale' | 'updateContextMenu'
   >;
   onClose(): void;
+  visible?: boolean;
 }) {
   const [draft, setDraft] = useState(() => ({
     ...state.contextMenu,
@@ -100,6 +102,7 @@ export function ContextMenuEditor({
             onChange={changeDraft}
             locale={state.locale}
             options={state.contextMenuOptions}
+            visible={visible}
           />
         ))}
         <div className="flex flex-wrap gap-2">
@@ -179,6 +182,7 @@ function ContextMenuSection({
   onChange,
   locale,
   options,
+  visible,
 }: {
   section: Section;
   sectionIndex: number;
@@ -186,6 +190,7 @@ function ContextMenuSection({
   onChange(next: MenuDraft, focus?: ContextMenuItemKey | 'heading'): void;
   locale: AppearanceSectionState['locale'];
   options: AppearanceSectionState['contextMenuOptions'];
+  visible: boolean;
 }) {
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   const sections = draft.layout.sections;
@@ -268,6 +273,7 @@ function ContextMenuSection({
             </label>
             <div className="w-40">
               <ProductSelect
+                key={visible ? 'visible' : 'hidden'}
                 aria-label={`${t('settings.appearance.contextMenuSection')}: ${label}`}
                 value={section.id}
                 options={sections.map((entry) => ({

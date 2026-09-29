@@ -4,6 +4,7 @@ import {
   resolveSettingsRoute,
   SETTINGS_SECTION_IDS,
   SETTINGS_SECTION_VIEWS,
+  updateSettingsRouteView,
 } from './codec';
 
 const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
@@ -12,6 +13,7 @@ describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
     expect(SETTINGS_SECTION_IDS).toHaveLength(15);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
+      'interface-browser': ['interface', 'context-menu'],
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
       saving: ['settings', 'storage', 'templates'],
@@ -25,7 +27,7 @@ describe('settings route codec', () => {
   });
 
   it.each([
-    ['appearance', 'interface-browser', undefined],
+    ['appearance', 'interface-browser', 'interface'],
     ['ai', 'ai-connections', 'integrations'],
     ['presets', 'screen-sizes', undefined],
     ['saves', 'saving', 'settings'],
@@ -58,6 +60,7 @@ describe('settings route codec', () => {
       `${BASE}?section=media-quality&view=video&keep=1#anchor`
     );
     expect(implicit.shouldReplace).toBe(false);
+    expect(implicit.route).toEqual({ section: 'interface-browser', view: 'interface' });
     expect(implicit.normalizedUrl.toString()).toBe(`${BASE}?keep=1#anchor`);
     expect(canonical.shouldReplace).toBe(false);
     expect(canonical.route).toEqual({ section: 'media-quality', view: 'video' });
@@ -66,10 +69,44 @@ describe('settings route codec', () => {
   it('replaces invalid sections and views with route defaults', () => {
     const unknownSection = resolveSettingsRoute(`${BASE}?section=missing&keep=1`);
     const unknownView = resolveSettingsRoute(`${BASE}?section=annotations&view=missing`);
-    expect(unknownSection.route).toEqual({ section: 'interface-browser' });
+    expect(unknownSection.route).toEqual({ section: 'interface-browser', view: 'interface' });
     expect(unknownSection.normalizedUrl.searchParams.get('keep')).toBe('1');
     expect(unknownView.route).toEqual({ section: 'annotations', view: 'borders' });
     expect(unknownView.normalizedUrl.searchParams.get('view')).toBe('borders');
+  });
+
+  it('resolves Interface views and preserves unrelated URL state', () => {
+    const implicitInterface = resolveSettingsRoute(
+      `${BASE}?section=interface-browser&keep=1#anchor`
+    );
+    expect(implicitInterface.route).toEqual({ section: 'interface-browser', view: 'interface' });
+    expect(implicitInterface.shouldReplace).toBe(false);
+    expect(implicitInterface.normalizedUrl.toString()).toBe(
+      `${BASE}?section=interface-browser&keep=1#anchor`
+    );
+
+    const contextMenu = resolveSettingsRoute(
+      `${BASE}?keep=1&section=interface-browser&view=context-menu#anchor`
+    );
+    expect(contextMenu.route).toEqual({ section: 'interface-browser', view: 'context-menu' });
+    expect(contextMenu.shouldReplace).toBe(false);
+    expect(
+      buildSettingsRouteUrl(contextMenu.normalizedUrl, { section: 'interface-browser' }).toString()
+    ).toBe(`${BASE}?keep=1&section=interface-browser&view=interface#anchor`);
+    expect(updateSettingsRouteView(contextMenu.route, 'interface')).toEqual({
+      section: 'interface-browser',
+      view: 'interface',
+    });
+    expect(() => updateSettingsRouteView(contextMenu.route, 'missing')).toThrow();
+
+    const invalid = resolveSettingsRoute(
+      `${BASE}?keep=1&section=interface-browser&view=missing#anchor`
+    );
+    expect(invalid.route).toEqual({ section: 'interface-browser', view: 'interface' });
+    expect(invalid.shouldReplace).toBe(true);
+    expect(invalid.normalizedUrl.toString()).toBe(
+      `${BASE}?keep=1&section=interface-browser&view=interface#anchor`
+    );
   });
 
   it('builds canonical URLs while preserving unrelated query and hash values', () => {

@@ -140,6 +140,8 @@ export const settingsNavigationMessages = defineMessageSource({
     },
   },
   views: {
+    interface: { ru: 'Интерфейс', en: 'Interface' },
+    contextMenu: { ru: 'Контекстное меню', en: 'Context menu' },
     settings: { ru: 'Настройки', en: 'Settings' },
     storage: { ru: 'Хранилище', en: 'Storage' },
     folderTemplates: { ru: 'Шаблоны папок', en: 'Folder templates' },

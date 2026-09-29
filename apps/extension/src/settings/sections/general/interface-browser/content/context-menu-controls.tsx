@@ -49,11 +49,19 @@ function ContextMenuItem(props: {
   );
 }
 
-export function ContextMenuControls({ state }: { state: AppearanceSectionState }) {
+export function ContextMenuControls({
+  state,
+  visible = true,
+}: {
+  state: AppearanceSectionState;
+  visible?: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saving' | 'failed'>('idle');
   const busy = useRef(false);
   const editButton = useRef<HTMLButtonElement>(null);
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const update = async (patch: Parameters<typeof state.updateContextMenu>[0]) => {
     if (busy.current) return;
     busy.current = true;
@@ -71,9 +79,12 @@ export function ContextMenuControls({ state }: { state: AppearanceSectionState }
     return (
       <ContextMenuEditor
         state={state}
+        visible={visible}
         onClose={() => {
           setEditing(false);
-          requestAnimationFrame(() => editButton.current?.focus());
+          requestAnimationFrame(() => {
+            if (visibleRef.current) editButton.current?.focus();
+          });
         }}
       />
     );

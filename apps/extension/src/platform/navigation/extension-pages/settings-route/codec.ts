@@ -21,7 +21,7 @@ export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
 export const SETTINGS_SECTION_VIEWS = {
   'video-effects': [],
   'scenario-layouts': [],
-  'interface-browser': [],
+  'interface-browser': ['interface', 'context-menu'],
   'quick-actions': [],
   'screen-sizes': [],
   'media-quality': ['image', 'video'],
@@ -40,7 +40,6 @@ type SettingsRouteWithoutView = {
   section:
     | 'video-effects'
     | 'scenario-layouts'
-    | 'interface-browser'
     | 'quick-actions'
     | 'screen-sizes'
     | 'voice-input'
@@ -50,6 +49,7 @@ type SettingsRouteWithoutView = {
 
 export type SettingsRoute =
   | SettingsRouteWithoutView
+  | { section: 'interface-browser'; view?: 'interface' | 'context-menu' }
   | { section: 'media-quality'; view?: 'image' | 'video' }
   | { section: 'saving'; view?: 'settings' | 'storage' | 'templates' }
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
@@ -66,7 +66,7 @@ type SettingsRouteResolution = {
   source: 'canonical' | 'implicit-default' | 'invalid' | 'legacy';
 };
 
-const DEFAULT_SECTION: SettingsSectionId = 'interface-browser';
+const DEFAULT_SECTION = 'interface-browser' satisfies SettingsSectionId;
 export type LegacySettingsSection =
   | 'appearance'
   | 'ai'
@@ -89,7 +89,7 @@ export type LegacySettingsSection =
   | 'privacy';
 
 const LEGACY_ROUTES: Readonly<Record<LegacySettingsSection, SettingsRoute>> = {
-  appearance: { section: 'interface-browser' },
+  appearance: { section: 'interface-browser', view: 'interface' },
   ai: { section: 'ai-connections', view: 'integrations' },
   presets: { section: 'screen-sizes' },
   saves: { section: 'saving', view: 'settings' },
@@ -161,7 +161,7 @@ export function resolveSettingsRoute(input: URL | string): SettingsRouteResoluti
   if (requestedSection === null && requestedView === null) {
     return {
       normalizedUrl: url,
-      route: { section: DEFAULT_SECTION },
+      route: { section: DEFAULT_SECTION, view: 'interface' },
       shouldReplace: false,
       source: 'implicit-default',
     };
@@ -203,7 +203,7 @@ export function resolveSettingsRoute(input: URL | string): SettingsRouteResoluti
     };
   }
 
-  const fallback = { section: DEFAULT_SECTION } satisfies SettingsRoute;
+  const fallback = { section: DEFAULT_SECTION, view: 'interface' } satisfies SettingsRoute;
   const normalizedUrl = new URL(url.toString());
   normalizedUrl.searchParams.delete('section');
   normalizedUrl.searchParams.delete('view');

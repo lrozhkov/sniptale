@@ -53,7 +53,7 @@ function createState(
   };
 }
 
-async function renderWithState(state: AppearanceSectionContentState) {
+async function renderWithState(state: AppearanceSectionContentState, view = 'interface') {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -61,7 +61,7 @@ async function renderWithState(state: AppearanceSectionContentState) {
   }
 
   await act(async () => {
-    root?.render(<AppearanceSectionContent state={state} />);
+    root?.render(<AppearanceSectionContent state={state} view={view} />);
   });
 }
 
@@ -76,6 +76,11 @@ describe('AppearanceSectionContent', () => {
     verifyContextMenuToggle
   );
   it('does not expose retired raw diagnostics as a settings toggle', verifyRawDiagnosticsHidden);
+  it(
+    'preserves an editor draft and closes its portal when history switches views',
+    verifyEditorViewSwitch
+  );
+  it('keeps a failed save draft and never focuses hidden editor controls', verifyHiddenSave);
 });
 
 function setupAppearanceContentTest(): void {
@@ -97,12 +102,21 @@ async function verifyContextMenuControls(): Promise<void> {
 
   await renderWithState(state);
 
-  expect(container?.firstElementChild?.className).toContain('max-w-[720px]');
+  expect(container?.querySelector('section:not([hidden])')?.className).toContain('max-w-[720px]');
   expect(container?.textContent).toContain(translate('settings.appearance.themeModeLabel', 'ru'));
   expect(container?.textContent).toContain(
     translate('settings.appearance.languagePreferenceLabel', 'ru')
   );
-  expect(container?.textContent).toContain('Контекстное меню браузера');
+  expect(container?.querySelector('section[hidden]')?.textContent).toContain(
+    'Контекстное меню браузера'
+  );
+  expect(container?.querySelector('section:not([hidden])')?.textContent).not.toContain(
+    'Контекстное меню браузера'
+  );
+  await renderWithState(state, 'context-menu');
+  expect(container?.querySelector('section:not([hidden])')?.textContent).toContain(
+    'Контекстное меню браузера'
+  );
   expect(container?.textContent).toContain('Копировать название и ссылку');
   expect(container?.textContent).toContain('Настройки');
   expectContextMenuButtons();
@@ -120,7 +134,7 @@ function expectContextMenuButtons(): void {
 async function verifyContextMenuToggle(): Promise<void> {
   const state = createState();
 
-  await renderWithState(state);
+  await renderWithState(state, 'context-menu');
 
   const pageLinkToggle = container?.querySelector(
     'button[aria-label="Копировать название и ссылку"]'
@@ -140,4 +154,82 @@ async function verifyRawDiagnosticsHidden(): Promise<void> {
   await renderWithState(state);
 
   expect(container?.textContent).not.toContain('Сохранять расширенную диагностику');
+}
+
+async function verifyEditorViewSwitch(): Promise<void> {
+  const state = createState();
+  await renderWithState(state, 'context-menu');
+  const customize = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (button) => button.textContent === translate('settings.appearance.contextMenuCustomize', 'ru')
+  );
+  await act(async () => customize?.click());
+  const addSection = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find(
+    (button) => button.textContent === translate('settings.appearance.contextMenuAddSection', 'ru')
+  );
+  await act(async () => addSection?.click());
+  const name = container?.querySelector<HTMLInputElement>(
+    `[aria-label="${translate('settings.appearance.contextMenuSectionName', 'ru')}"]`
+  );
+  expect(name).toBeTruthy();
+  await act(async () => {
+    if (name) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        name,
+        'My menu'
+      );
+      name.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  });
+  const menuSelect = container?.querySelector<HTMLButtonElement>('[aria-controls]');
+  await act(async () => menuSelect?.click());
+  expect(document.querySelector('[role="listbox"]')).not.toBeNull();
+
+  await renderWithState(state, 'interface');
+  expect(document.querySelector('[role="listbox"]')).toBeNull();
+  expect(document.activeElement?.getAttribute('aria-current')).toBe('page');
+  expect(state.updateContextMenu).not.toHaveBeenCalled();
+
+  await renderWithState(state, 'context-menu');
+  expect(
+    container?.querySelector<HTMLInputElement>(
+      `[aria-label="${translate('settings.appearance.contextMenuSectionName', 'ru')}"]`
+    )?.value
+  ).toBe('My menu');
+}
+
+async function verifyHiddenSave(): Promise<void> {
+  let rejectWrite: ((error: Error) => void) | undefined;
+  const updateContextMenu = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectWrite = reject;
+        })
+    )
+    .mockResolvedValue(undefined);
+  const state = createState({ updateContextMenu });
+  await renderWithState(state, 'context-menu');
+  const clickText = async (label: string) => {
+    const button = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+      (entry) => entry.textContent === label
+    );
+    await act(async () => button?.click());
+  };
+  await clickText(translate('settings.appearance.contextMenuCustomize', 'ru'));
+  await clickText(translate('settings.appearance.contextMenuRestore', 'ru'));
+  await clickText(translate('settings.appearance.contextMenuSave', 'ru'));
+  expect(updateContextMenu).toHaveBeenCalledTimes(1);
+  await renderWithState(state, 'interface');
+  await act(async () => rejectWrite?.(new Error('write failed')));
+  expect(document.activeElement?.getAttribute('aria-current')).toBe('page');
+  await renderWithState(state, 'context-menu');
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    translate('settings.appearance.contextMenuSaveFailed', 'ru')
+  );
+  await clickText(translate('settings.appearance.contextMenuSave', 'ru'));
+  expect(updateContextMenu).toHaveBeenCalledTimes(2);
+  expect(updateContextMenu).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: true }));
 }

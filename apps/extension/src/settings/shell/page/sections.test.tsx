@@ -5,7 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../sections/general/interface-browser', () => ({
-  AppearanceSection: () => 'appearance',
+  AppearanceSection: ({ view }: { view?: string }) => `appearance:${view}`,
 }));
 vi.mock('../../sections/styles/editor-resources', () => ({
   EditorResourcesSection: () => 'editor',
@@ -44,6 +44,19 @@ describe('settings page section registry', () => {
     expect(
       isValidElement(renderSettingsRouteContent({ section: 'interface-browser' }, vi.fn()))
     ).toBe(true);
+  });
+  it('passes the selected Interface view and navigation callback to its owner', () => {
+    const onViewChange = vi.fn();
+    const element = renderSettingsRouteContent(
+      { section: 'interface-browser', view: 'context-menu' },
+      onViewChange
+    );
+    expect(isValidElement(element)).toBe(true);
+    if (!isValidElement(element)) return;
+    expect(element.props).toMatchObject({
+      view: 'context-menu',
+      onViewChange,
+    });
   });
   it('renders exactly one shell-owned compact header for every canonical section', async () => {
     for (const item of SETTINGS_NAV_ITEMS) {
