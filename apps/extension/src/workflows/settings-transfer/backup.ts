@@ -1,10 +1,13 @@
 import type { SettingsTransferDomainPayload } from '../../contracts/settings-transfer';
 import { SETTINGS_TRANSFER_DOMAIN_IDS } from './registry';
+import { parseViewportPresetCatalog } from '../../features/viewport-presets/parser';
 
 export function isCompleteSettingsTransferBackup(args: {
   imported: Record<string, SettingsTransferDomainPayload>;
   current: Record<string, SettingsTransferDomainPayload>;
 }): boolean {
+  const viewport = asRecord(args.imported['capture.viewport-presets']?.data);
+  if (!viewport || !parseViewportPresetCatalog(viewport['items'])) return false;
   return SETTINGS_TRANSFER_DOMAIN_IDS.every((domainId) => {
     const importedData = asRecord(args.imported[domainId]?.data);
     const currentData = asRecord(args.current[domainId]?.data);

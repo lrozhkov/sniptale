@@ -60,9 +60,9 @@ export function SettingsTransferImportFlow() {
           response.inspection.conflicts.map((conflict) => [conflict.id, conflict.defaultDecision])
         )
       );
-    } catch {
+    } catch (caught) {
       if (requestId !== inspectionRequestRef.current) return;
-      setError(translate('settings.settingsTransfer.fileError'));
+      setError(importInspectionErrorMessage(caught));
     } finally {
       if (requestId === inspectionRequestRef.current) setBusy(false);
     }
@@ -85,13 +85,7 @@ export function SettingsTransferImportFlow() {
       });
       setReport(response.report);
     } catch (caught) {
-      setError(
-        translate(
-          (caught as { code?: string }).code === 'stale-plan'
-            ? 'settings.settingsTransfer.staleError'
-            : 'settings.settingsTransfer.importError'
-        )
-      );
+      setError(importCommitErrorMessage(caught));
     } finally {
       setBusy(false);
       setCommitBusy(false);
@@ -156,6 +150,37 @@ export function SettingsTransferImportFlow() {
       ) : null}
     </section>
   );
+}
+
+function transferErrorCode(caught: unknown): string | null {
+  return caught && typeof caught === 'object' && 'code' in caught && typeof caught.code === 'string'
+    ? caught.code
+    : null;
+}
+
+function importInspectionErrorMessage(caught: unknown): string {
+  const code = transferErrorCode(caught);
+  if (code === 'future-format') return translate('settings.settingsTransfer.futureFileError');
+  if (code === 'unsupported-domain') {
+    const domain =
+      caught &&
+      typeof caught === 'object' &&
+      'message' in caught &&
+      typeof caught.message === 'string'
+        ? caught.message
+        : '?';
+    return translate('settings.settingsTransfer.domainFileError').replace('{domain}', domain);
+  }
+  if (code === 'invalid-package') return translate('settings.settingsTransfer.invalidFileError');
+  return translate('settings.settingsTransfer.fileError');
+}
+
+function importCommitErrorMessage(caught: unknown): string {
+  const code = transferErrorCode(caught);
+  if (code === 'stale-plan') return translate('settings.settingsTransfer.staleError');
+  if (code === 'rollback-failed') return translate('settings.settingsTransfer.rollbackError');
+  if (code === 'quota-exceeded') return translate('settings.settingsTransfer.quotaError');
+  return translate('settings.settingsTransfer.importError');
 }
 
 function defaultConflictDecisions(

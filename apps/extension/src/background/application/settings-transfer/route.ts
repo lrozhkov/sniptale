@@ -72,7 +72,7 @@ function toFailure(
     };
   }
   if (error instanceof SettingsTransferDomainError) {
-    return { success: false, operation, errorCode: 'unsupported-domain', error: error.message };
+    return { success: false, operation, errorCode: 'unsupported-domain', error: error.domainId };
   }
   if (error instanceof SettingsTransferPackageError) {
     return {

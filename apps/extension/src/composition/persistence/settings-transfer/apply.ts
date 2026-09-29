@@ -110,7 +110,7 @@ export async function applySettingsTransferDomains(args: {
 
   let syncAttempted = false;
   let providerCommitted = false;
-  let localCommitted = false;
+  let localAttempted = false;
   try {
     if (Object.keys(syncWrites).length > 0) {
       syncAttempted = true;
@@ -121,8 +121,8 @@ export async function applySettingsTransferDomains(args: {
       providerCommitted = true;
     }
     if (Object.keys(localWrites).length > 0) {
+      localAttempted = true;
       await browserStorage.local.set(localWrites, args.permit);
-      localCommitted = true;
     }
     if (effectPlan) {
       effectsCommitted = true;
@@ -140,7 +140,7 @@ export async function applySettingsTransferDomains(args: {
       }
     };
     if (effectsCommitted && effectPlan) await compensate(() => effectPlan.rollback());
-    if (localCommitted)
+    if (localAttempted)
       await compensate(() => restoreArea('local', beforeLocal, LOCAL_KEYS, args.permit));
     if (providerCommitted && providerPlan) await compensate(() => providerPlan.rollback());
     if (syncAttempted)
@@ -268,9 +268,13 @@ function applySettingsWrites(context: WriteBuildContext): void {
   const voice = data('system.voice');
   if (voice) {
     nextSettings.voiceInput = {
-      language: voice['language'] as NonNullable<NormalizedSettings['voiceInput']>['language'],
-      mode: voice['mode'] as NonNullable<NormalizedSettings['voiceInput']>['mode'],
-      microphoneDeviceId: null,
+      language: (voice['language'] ?? nextSettings.voiceInput?.language ?? 'ru-RU') as NonNullable<
+        NormalizedSettings['voiceInput']
+      >['language'],
+      mode: (voice['mode'] ?? nextSettings.voiceInput?.mode ?? 'local-first') as NonNullable<
+        NormalizedSettings['voiceInput']
+      >['mode'],
+      microphoneDeviceId: nextSettings.voiceInput?.microphoneDeviceId ?? null,
     };
   }
   if (preferences || viewports || image || pages || afterCapture || saving || retention || voice)

@@ -1,4 +1,5 @@
 import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
+import { parseSettingsTransferPackageText } from '../../../contracts/settings-transfer';
 vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
   listImportedEffectBundles: vi.fn(async () => []),
@@ -8,7 +9,12 @@ import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/
 import { resolveStoredCalloutPresetCatalog } from '../callout-presets/migration';
 import { resolveStoredStepBadgePresetCatalog } from '../step-badge-presets/migration';
 import { createSurfaceStylePresetCatalog } from '../surface-style-presets/catalog';
-import { parseSettingsTransferDomains } from '../../../workflows/settings-transfer';
+import {
+  buildSettingsTransferPackage,
+  buildSettingsTransferTree,
+  parseSettingsTransferDomains,
+} from '../../../workflows/settings-transfer';
+import { SETTINGS_TRANSFER_DOMAIN_IDS } from '../../../workflows/settings-transfer/registry';
 import { createSystemViewportPresetCatalog } from '../../../features/viewport-presets/catalog';
 import { createDefaultEditorPresetStorageState } from '../editor-presets/defaults';
 import { createDefaultGradientPresetCatalog } from '../gradient-presets/defaults';
@@ -220,11 +226,122 @@ it('produces a complete snapshot that remains valid during commit revalidation',
   expect(parseSettingsTransferDomains(inspected)).toEqual(inspected);
 });
 
+it('round-trips the full backup and each of the 25 selectable domain roots', async () => {
+  const snapshot = await readSettingsTransferSnapshot();
+  const tree = buildSettingsTransferTree(snapshot.dynamicItems, snapshot.dependencies);
+  const allNodeIds = tree.flatMap((root) => [
+    root.id,
+    ...root.children.flatMap((field) => [field.id, ...field.children.map((item) => item.id)]),
+  ]);
+  const complete = buildSettingsTransferPackage({
+    appVersion: '1.0.0',
+    domains: snapshot.domains,
+    exportKind: 'backup',
+    selectedNodeIds: allNodeIds,
+    tree,
+  });
+  const parsedComplete = parseSettingsTransferPackageText(complete.fileText);
+  expect(Object.keys(parseSettingsTransferDomains(parsedComplete.domains)).sort()).toEqual(
+    [...SETTINGS_TRANSFER_DOMAIN_IDS].sort()
+  );
+  expect(complete.fileText).not.toContain('canary-secret');
+  expect(complete.fileText).not.toContain('microphoneDeviceId');
+
+  for (const domainId of SETTINGS_TRANSFER_DOMAIN_IDS) {
+    const root = tree.find((node) => node.id === domainId)!;
+    const selectedNodeIds = [
+      root.id,
+      ...root.children.flatMap((field) => [field.id, ...field.children.map((item) => item.id)]),
+    ];
+    const selective = buildSettingsTransferPackage({
+      appVersion: '1.0.0',
+      domains: snapshot.domains,
+      exportKind: 'selective',
+      selectedNodeIds,
+      tree,
+    });
+    const parsed = parseSettingsTransferPackageText(selective.fileText);
+    expect(Object.keys(parsed.domains), domainId).toContain(domainId);
+    expect(parseSettingsTransferDomains(parsed.domains)[domainId], domainId).toEqual(
+      parseSettingsTransferDomains({ [domainId]: snapshot.domains[domainId]! })[domainId]
+    );
+  }
+});
+
+it('builds parseable selective packages for each available collection item', async () => {
+  const snapshot = await readSettingsTransferSnapshot();
+  const tree = buildSettingsTransferTree(snapshot.dynamicItems, snapshot.dependencies);
+  const failures: string[] = [];
+  for (const item of snapshot.dynamicItems) {
+    const id = `${item.collectionNodeId}.${item.id}`;
+    try {
+      const selected = buildSettingsTransferPackage({
+        appVersion: '1.0.0',
+        domains: snapshot.domains,
+        exportKind: 'selective',
+        selectedNodeIds: [id],
+        tree,
+      });
+      parseSettingsTransferDomains(parseSettingsTransferPackageText(selected.fileText).domains);
+    } catch {
+      failures.push(id);
+    }
+  }
+  expect(failures).toEqual([]);
+});
+
+it('builds parseable selective packages for each selectable field', async () => {
+  const snapshot = await readSettingsTransferSnapshot();
+  const tree = buildSettingsTransferTree(snapshot.dynamicItems, snapshot.dependencies);
+  const failures: string[] = [];
+  for (const root of tree) {
+    for (const field of root.children) {
+      try {
+        const selected = buildSettingsTransferPackage({
+          appVersion: '1.0.0',
+          domains: snapshot.domains,
+          exportKind: 'selective',
+          selectedNodeIds: [field.id],
+          tree,
+        });
+        parseSettingsTransferDomains(parseSettingsTransferPackageText(selected.fileText).domains);
+      } catch (error) {
+        failures.push(`${field.id}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+  expect(failures).toEqual([]);
+});
+
 it('collects dynamic annotation, editor, and default dependencies without dangling values', () => {
   const domains = {
     'capture.video': {
       schemaVersion: 1,
-      data: { profiles: [{ id: 'video-profile-a', name: 'Video profile' }] },
+      data: {
+        profiles: [{ id: 'video-profile-a', name: 'Video profile' }],
+        qualityProfileId: 'video-profile-a',
+      },
+    },
+    'interface.preferences': {
+      schemaVersion: 1,
+      data: {
+        contextMenu: {
+          layout: {
+            version: 2,
+            nodes: [
+              {
+                type: 'command',
+                command: 'sniptale.screenshots.quick-action.quick-a',
+                enabled: true,
+              },
+            ],
+          },
+        },
+      },
+    },
+    'capture.quick-actions': {
+      schemaVersion: 1,
+      data: { items: [{ id: 'quick-a', viewportPresetId: 'viewport-a' }] },
     },
     'capture.saving': {
       schemaVersion: 1,
@@ -320,6 +437,8 @@ it('collects dynamic annotation, editor, and default dependencies without dangli
     },
   };
   expect(collectSettingsTransferDependencies(domains)).toMatchObject({
+    'capture.video.selection': ['capture.video.profiles.video-profile-a'],
+    'interface.preferences.context-menu': ['capture.quick-actions.items.quick-a'],
     'capture.saving.defaults': ['capture.saving.templates.folder-a'],
     'capture.viewport-presets.default': ['capture.viewport-presets.items.viewport-a'],
   });
@@ -348,6 +467,158 @@ it('collects dynamic annotation, editor, and default dependencies without dangli
       expect.objectContaining({ id: 'system-classic', label: 'Sniptale Orange' }),
     ])
   );
+});
+
+it('includes only referenced menu actions, viewports, and the selected video profile', () => {
+  const domains = {
+    'interface.preferences': {
+      schemaVersion: 1,
+      data: {
+        contextMenu: {
+          layout: {
+            version: 2,
+            nodes: [
+              {
+                type: 'command',
+                command: 'sniptale.screenshots.quick-action.quick-a',
+                enabled: true,
+              },
+              {
+                type: 'command',
+                command: 'sniptale.window-resize.preset.viewport-a',
+                enabled: true,
+              },
+              {
+                type: 'command',
+                command: 'sniptale.screenshots.quick-action.missing',
+                enabled: false,
+              },
+            ],
+          },
+        },
+      },
+    },
+    'capture.quick-actions': {
+      schemaVersion: 1,
+      data: {
+        items: [
+          { id: 'quick-a', viewportPresetId: 'viewport-a' },
+          { id: 'quick-b', viewportPresetId: 'viewport-b' },
+        ],
+      },
+    },
+    'capture.viewport-presets': {
+      schemaVersion: 1,
+      data: {
+        items: [{ id: 'viewport-a' }, { id: 'viewport-b' }],
+      },
+    },
+    'capture.video': {
+      schemaVersion: 1,
+      data: {
+        profiles: [{ id: 'video-a' }, { id: 'video-b' }],
+        qualityProfileId: 'video-a',
+      },
+    },
+  };
+  const tree = buildSettingsTransferTree(
+    collectSettingsTransferDynamicItems(domains),
+    collectSettingsTransferDependencies(domains)
+  );
+  const menuPackage = buildSettingsTransferPackage({
+    appVersion: '1.0.0',
+    domains,
+    exportKind: 'selective',
+    selectedNodeIds: ['interface.preferences.context-menu'],
+    tree,
+  });
+  expect(menuPackage.package.domains['capture.quick-actions']?.data).toEqual({
+    items: [{ id: 'quick-a', viewportPresetId: 'viewport-a' }],
+  });
+  expect(menuPackage.package.domains['capture.viewport-presets']?.data).toEqual({
+    items: [{ id: 'viewport-a' }],
+  });
+  expect(menuPackage.package.domains['capture.video']).toBeUndefined();
+
+  const videoPackage = buildSettingsTransferPackage({
+    appVersion: '1.0.0',
+    domains,
+    exportKind: 'selective',
+    selectedNodeIds: ['capture.video.selection'],
+    tree,
+  });
+  expect(videoPackage.package.domains['capture.video']?.data).toEqual({
+    profiles: [{ id: 'video-a' }],
+    qualityProfileId: 'video-a',
+  });
+});
+
+it('includes available tag and style references without implicitly exporting effect assets', () => {
+  const domains = {
+    'styles.tags': {
+      schemaVersion: 1,
+      data: {
+        schemaVersion: 2,
+        tags: [{ id: 'tag-a', label: 'Tag A', origin: 'user' }],
+        activeFilterTagIds: ['tag-a'],
+      },
+    },
+    'styles.surfaces': {
+      schemaVersion: 1,
+      data: {
+        presets: [{ id: 'surface-a' }],
+        defaultPresetIdBySurface: { 'highlighter-callout': 'surface-a' },
+        favoriteIdsBySurface: { 'highlighter-callout': ['surface-a'] },
+      },
+    },
+    'styles.gradients': {
+      schemaVersion: 1,
+      data: {
+        presets: [{ id: 'gradient-a' }],
+        defaultPresetIdBySurface: { 'highlighter-frame-fill': 'gradient-a' },
+        favoriteIdsBySurface: { 'highlighter-frame-fill': ['gradient-a'] },
+      },
+    },
+    'styles.video-effects': {
+      schemaVersion: 1,
+      data: { items: [{ id: 'effect-a' }], preferences: [{ packId: 'effect-a' }] },
+    },
+  };
+  expect(collectSettingsTransferDependencies(domains)).toMatchObject({
+    'styles.tags.active-filter': ['styles.tags.items.tag-a'],
+    'styles.surfaces.defaults': ['styles.surfaces.items.surface-a'],
+    'styles.gradients.defaults': ['styles.gradients.items.gradient-a'],
+  });
+  expect(collectSettingsTransferDependencies(domains)).not.toHaveProperty(
+    'styles.video-effects.preferences'
+  );
+});
+
+it('does not export effect documents when only preferences are selected', () => {
+  const domains = {
+    'styles.video-effects': {
+      schemaVersion: 1,
+      data: {
+        items: [{ id: 'private-effect', documents: { secret: 'asset' } }],
+        preferences: [{ packId: 'private-effect', enabled: true }],
+      },
+    },
+  };
+  const tree = buildSettingsTransferTree(
+    [{ collectionNodeId: 'styles.video-effects.items', id: 'private-effect', label: 'Effect' }],
+    collectSettingsTransferDependencies(domains)
+  );
+  const built = buildSettingsTransferPackage({
+    appVersion: '1.0.0',
+    domains,
+    exportKind: 'selective',
+    selectedNodeIds: ['styles.video-effects.preferences'],
+    tree,
+  });
+  expect(built.package.domains['styles.video-effects']?.data).toEqual({
+    preferences: [{ packId: 'private-effect', enabled: true }],
+  });
+  expect(built.fileText).not.toContain('secret');
 });
 
 function settingsFixture() {

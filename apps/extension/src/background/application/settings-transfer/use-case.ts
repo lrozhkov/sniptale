@@ -16,6 +16,7 @@ import {
 } from '../../../composition/persistence/settings-transfer';
 import { runWithExclusivePersistenceMutationPermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import {
+  assertDurableSettingsTransferCatalogs,
   buildSettingsTransferPackage,
   buildExactRestoreDomainsBySelection,
   buildSettingsTransferTree,
@@ -76,9 +77,13 @@ async function inspectSettingsTransfer(fileText: string): Promise<SettingsTransf
     imported,
     strategy: 'safe-merge',
   });
+  assertDurableSettingsTransferCatalogs(
+    Object.fromEntries(Object.keys(imported).map((domainId) => [domainId, plan.domains[domainId]!]))
+  );
   const exactRestoreAvailable =
     transferPackage.exportKind === 'backup' &&
     isCompleteSettingsTransferBackup({ imported, current: currentDomains });
+  if (exactRestoreAvailable) assertDurableSettingsTransferCatalogs(imported);
   return {
     fingerprint: await fingerprintSettingsTransferDomains(currentDomains),
     package: { ...transferPackage, domains: imported },
@@ -141,6 +146,7 @@ async function commitSettingsTransfer(
     const affectedDomains = Object.fromEntries(
       Object.keys(selected).map((domainId) => [domainId, plan.domains[domainId]!])
     );
+    assertDurableSettingsTransferCatalogs(affectedDomains);
     const validatedDomains = parseSettingsTransferDomains(affectedDomains);
     await applySettingsTransferDomains({
       domains: validatedDomains,

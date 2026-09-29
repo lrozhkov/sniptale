@@ -32,12 +32,32 @@ export const settingsTransferMessages = defineMessageSource({
   loadError: message('Не удалось загрузить список настроек.', 'Could not load the settings list.'),
   exportError: message('Не удалось создать файл экспорта.', 'Could not create the export file.'),
   fileError: message(
-    'Файл не прошёл проверку совместимости и безопасности.',
-    'The file failed compatibility or security validation.'
+    'Не удалось проверить файл. Ничего не применено.',
+    'Could not validate the file. Nothing was applied.'
+  ),
+  invalidFileError: message(
+    'Файл повреждён или содержит недопустимые данные. Ничего не применено.',
+    'The file is damaged or contains invalid data. Nothing was applied.'
+  ),
+  futureFileError: message(
+    'Файл создан в более новой версии формата. Ничего не применено.',
+    'The file uses a newer format version. Nothing was applied.'
+  ),
+  domainFileError: message(
+    'Раздел «{domain}» не поддерживается или повреждён. Ничего не применено.',
+    'Section “{domain}” is unsupported or damaged. Nothing was applied.'
   ),
   importError: message(
-    'Импорт не выполнен. Исходные настройки восстановлены.',
-    'Import failed. Original settings were restored.'
+    'Не удалось применить импорт. Проверьте настройки перед повторной попыткой.',
+    'Import could not be applied. Check your settings before retrying.'
+  ),
+  rollbackError: message(
+    'Не удалось подтвердить восстановление исходных настроек. Проверьте настройки перед повторной попыткой.',
+    'Restoration of the original settings could not be verified. Check your settings before retrying.'
+  ),
+  quotaError: message(
+    'Для этих настроек не хватило места в хранилище. Импорт не завершён.',
+    'There was not enough storage for these settings. Import did not complete.'
   ),
   staleError: message(
     'Настройки изменились после preview. Проверьте импорт ещё раз.',
