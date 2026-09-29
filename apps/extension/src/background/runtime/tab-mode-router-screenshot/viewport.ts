@@ -85,12 +85,21 @@ async function applyRegularPreset(
     presetId,
     context: 'screenshot',
   } as const;
+  if (!current && session.generation > 0 && service.hasSessionLease(session.sessionId)) {
+    await service.releaseTabOwners(tabId, ['screenshot']);
+  }
   let applied;
   if (current?.sessionId !== session.sessionId) {
     applied = await service.apply(request);
   } else {
     await requireEnabledPreset(presetId);
-    applied = await service.replace(request);
+    try {
+      applied = await service.replace(request);
+    } catch (error) {
+      if (!(error instanceof CaptureSurfaceError) || error.code !== 'restore-conflict') throw error;
+      await service.releaseTabOwners(tabId, ['screenshot']);
+      applied = await service.apply(request);
+    }
   }
   return {
     presetId: applied.presetId,

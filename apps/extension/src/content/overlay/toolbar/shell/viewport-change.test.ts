@@ -121,7 +121,7 @@ describe('toolbar viewport change action', () => {
     expect(viewportChangeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
   });
 
-  it('does not confirm a size selection if the background status cannot verify it', async () => {
+  it('keeps a natively confirmed selection when the follow-up status read fails', async () => {
     const setCurrentViewport = vi.fn();
     viewportChangeMocks.sendRuntimeMessage
       .mockResolvedValueOnce({ success: true })
@@ -129,11 +129,12 @@ describe('toolbar viewport change action', () => {
 
     await expect(
       handleToolbarViewportChange(
-        { height: 600, presetId: 'viewport-800', target: 'window', width: 800 },
+        { height: 720, presetId: 'viewport-1280', target: 'window', width: 1280 },
         setCurrentViewport
       )
-    ).resolves.toBe(false);
-    expect(setCurrentViewport).not.toHaveBeenCalled();
+    ).resolves.toBe(true);
+    expect(setCurrentViewport).toHaveBeenCalledWith({ width: 1280, height: 720 });
+    expect(viewportChangeMocks.showToast).not.toHaveBeenCalled();
   });
 
   it('keeps the actual background size when it differs from the requested preset', async () => {

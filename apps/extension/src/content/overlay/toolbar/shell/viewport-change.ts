@@ -101,8 +101,11 @@ export async function handleToolbarViewportChange(
 
     if (response?.success) {
       const status = await refreshToolbarViewportStatus(setCurrentViewport).catch(() => null);
+      if (!status?.success) {
+        setCurrentViewport(viewport ? { width: viewport.width, height: viewport.height } : null);
+        return true;
+      }
       if (statusMatchesSelection(status, viewport)) return true;
-      showToast(translate('viewportPresets.availability.verificationFailed'), 'error');
       return false;
     }
 
