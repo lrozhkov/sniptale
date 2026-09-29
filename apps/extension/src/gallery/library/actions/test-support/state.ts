@@ -80,7 +80,7 @@ function createGalleryDerivedState(overrides: GalleryStateOverride): GalleryAppS
     facets: overrides.facets ?? [],
     filteredItems: overrides.filteredItems ?? [],
     trashSummary: { count: 0, size: { status: 'ready', bytes: 0 } },
-    gridMetrics: { columnCount: 1, startRow: 0, totalRows: 0 },
+    gridMetrics: { columnCount: 1, rowTops: [0], startRow: 0, totalRows: 0 },
     gridWidth: 1200,
     visibleItems: [],
     ...overrides.derived,

@@ -37,7 +37,7 @@ function createProps(overrides: Partial<Parameters<typeof GalleryMainContent>[0]
     filteredItems: [createMediaItem()],
     filteredScenarioProjects: [],
     folderFilter: 'all' as const,
-    gridMetrics: { columnCount: 1, startRow: 0, totalRows: 1 },
+    gridMetrics: { columnCount: 1, rowTops: [0, 598], startRow: 0, totalRows: 1 },
     gridWidth: 960,
     gridViewportRef: { current: null },
     isLoading: false,

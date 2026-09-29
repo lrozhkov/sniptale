@@ -1,5 +1,6 @@
 import { GalleryProjectDetails } from '../ui/project-presentation';
-import { getGalleryGridCardLayout, GRID_GAP } from '../constants';
+import { GRID_GAP } from '../constants';
+import { getGalleryGridCardHeight, getGalleryGridCardWidth } from '../grid-layout';
 import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../items';
 import {
   getGalleryItemKindLabel,
@@ -651,31 +652,19 @@ export function GalleryMediaList(
   );
 }
 
-function resolveGalleryGridCanvasLayout(args: {
-  gridMetrics: GalleryMainContentProps['gridMetrics'];
-  gridWidth: number;
-  viewMode: GalleryMainContentProps['viewMode'];
-}) {
-  return getGalleryGridCardLayout({
-    columnCount: args.gridMetrics.columnCount,
-    gridWidth: args.gridWidth,
-    viewMode: args.viewMode === 'large-grid' ? 'large-grid' : 'compact-grid',
-  });
-}
-
 function resolveGalleryGridCardStyle(args: {
   absoluteIndex: number;
   cardHeight: number;
   cardWidth: number;
   columnCount: number;
-  rowHeight: number;
+  rowTops: number[];
 }) {
   const row = Math.floor(args.absoluteIndex / args.columnCount);
   const column = args.absoluteIndex % args.columnCount;
 
   return {
     height: `${args.cardHeight}px`,
-    top: `${row * args.rowHeight}px`,
+    top: `${args.rowTops[row] ?? 0}px`,
     left: `${column * (args.cardWidth + GRID_GAP)}px`,
     width: `${args.cardWidth}px`,
   };
@@ -698,16 +687,13 @@ export function GalleryGridCanvas(
   >
 ) {
   const { gridMetrics, gridWidth, onPreviewOpen, onToggleSelection, selectedIds, viewMode } = props;
-  const { cardHeight, cardWidth, rowHeight } = resolveGalleryGridCanvasLayout({
-    gridMetrics,
-    gridWidth,
-    viewMode,
-  });
+  const cardWidth = getGalleryGridCardWidth(gridWidth, gridMetrics.columnCount);
+  const gridMode = viewMode === 'large-grid' ? 'large-grid' : 'compact-grid';
 
   return (
     <div
       style={{
-        height: `${Math.max(gridMetrics.totalRows * rowHeight, rowHeight)}px`,
+        height: `${gridMetrics.rowTops[gridMetrics.totalRows] ?? 0}px`,
         position: 'relative',
       }}
     >
@@ -716,10 +702,10 @@ export function GalleryGridCanvas(
         const groupItems = getRecordingGroupItems(props.filteredItems, item);
         const style = resolveGalleryGridCardStyle({
           absoluteIndex,
-          cardHeight,
+          cardHeight: getGalleryGridCardHeight(item, gridMode, cardWidth),
           cardWidth,
           columnCount: gridMetrics.columnCount,
-          rowHeight,
+          rowTops: gridMetrics.rowTops,
         });
 
         if (groupItems.length > 0) {

@@ -119,6 +119,7 @@ function buildGalleryDerivedViewState(
     filteredItems: derived.filteredItems,
     gridMetrics: {
       columnCount: derived.gridMetrics.columnCount,
+      rowTops: derived.gridMetrics.rowTops,
       startRow: derived.gridMetrics.startRow,
       totalRows: derived.gridMetrics.totalRows,
     },

@@ -12,6 +12,7 @@ vi.mock('../ui', async (importOriginal) => ({
 }));
 
 import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
+import { createGridMetricsFixture } from '../test-support/items';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -65,7 +66,12 @@ it.each(['large-grid', 'list'] as const)(
         ) : (
           <GalleryGridCanvas
             {...common}
-            gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+            gridMetrics={createGridMetricsFixture({
+              items: [item],
+              columnCount: 1,
+              gridWidth: 400,
+              viewMode,
+            })}
             gridWidth={400}
             viewMode={viewMode}
             visibleItems={[item]}

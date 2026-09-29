@@ -536,6 +536,7 @@ it('computes visible grid rows and resolves storage pressure classes', () => {
     })
   ).toEqual({
     columnCount: 3,
+    rowTops: [0, 202, 404, 606, 808],
     startRow: 0,
     totalRows: 4,
     visibleItems: filteredItems,
@@ -544,6 +545,41 @@ it('computes visible grid rows and resolves storage pressure classes', () => {
   expect(getActiveStorageBarClass('critical')).toBe('bg-rose-500');
   expect(getActiveStorageBarClass('warning')).toBe('bg-amber-400');
   expect(getActiveStorageBarClass(undefined)).toBe('bg-emerald-400');
+});
+
+it('keeps later ordinary rows visible after a taller project row and clamps stale scroll', () => {
+  const project = createVideoProjectItem();
+  const ordinary = Array.from({ length: 18 }, (_, index) => createItem({ id: `asset-${index}` }));
+  const items = [project, ...ordinary];
+  const middle = getGalleryGridMetrics({
+    filteredItems: items,
+    gridWidth: 800,
+    scrollTop: 1_050,
+    viewMode: 'compact-grid',
+    viewportHeight: 200,
+  });
+  expect(middle.rowTops[1]).toBeGreaterThan(middle.rowTops[2]! - middle.rowTops[1]!);
+  expect(middle.startRow).toBeGreaterThan(0);
+  expect(middle.visibleItems).toContain(ordinary[14]);
+
+  const end = getGalleryGridMetrics({
+    filteredItems: items,
+    gridWidth: 800,
+    scrollTop: 100_000,
+    viewMode: 'compact-grid',
+    viewportHeight: 200,
+  });
+  expect(end.visibleItems).toContain(ordinary[ordinary.length - 1]);
+  expect(end.rowTops).toHaveLength(end.totalRows + 1);
+  expect(
+    getGalleryGridMetrics({
+      filteredItems: [],
+      gridWidth: 800,
+      scrollTop: 100_000,
+      viewMode: 'compact-grid',
+      viewportHeight: 200,
+    }).visibleItems
+  ).toEqual([]);
 });
 
 it('projects one grid card per recording group without hiding list rows', () => {

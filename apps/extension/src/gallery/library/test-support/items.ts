@@ -1,11 +1,29 @@
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
+  GalleryItem,
   GalleryMediaItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
   GalleryVideoProjectItem,
 } from '../items';
+import type { GalleryViewMode } from '../types';
+import { getGalleryGridLayout } from '../grid-layout';
+
+export function createGridMetricsFixture(args: {
+  items: GalleryItem[];
+  columnCount: number;
+  gridWidth: number;
+  viewMode: Exclude<GalleryViewMode, 'list'>;
+  startRow?: number;
+}) {
+  return {
+    columnCount: args.columnCount,
+    rowTops: getGalleryGridLayout(args).rowTops,
+    startRow: args.startRow ?? 0,
+    totalRows: Math.ceil(args.items.length / args.columnCount),
+  };
+}
 
 export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): GalleryMediaItem {
   return {

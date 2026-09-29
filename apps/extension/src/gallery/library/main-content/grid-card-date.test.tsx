@@ -12,6 +12,7 @@ vi.mock('../ui', async (importOriginal) => ({
 }));
 
 import { GalleryGridCanvas } from './grid-cards';
+import { createGridMetricsFixture } from '../test-support/items';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -43,7 +44,12 @@ it.each(['compact-grid', 'large-grid'] as const)(
       root?.render(
         <GalleryGridCanvas
           filteredItems={[item]}
-          gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+          gridMetrics={createGridMetricsFixture({
+            items: [item],
+            columnCount: 1,
+            gridWidth: 400,
+            viewMode,
+          })}
           gridWidth={400}
           onPreviewOpen={vi.fn()}
           onToggleSelection={vi.fn()}
@@ -89,7 +95,12 @@ it.each(['compact-grid', 'large-grid'] as const)(
       root?.render(
         <GalleryGridCanvas
           filteredItems={[item]}
-          gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+          gridMetrics={createGridMetricsFixture({
+            items: [item],
+            columnCount: 1,
+            gridWidth: 400,
+            viewMode,
+          })}
           gridWidth={400}
           onPreviewOpen={vi.fn()}
           onToggleSelection={vi.fn()}

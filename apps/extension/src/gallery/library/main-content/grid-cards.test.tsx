@@ -9,7 +9,8 @@ import {
   createVideoProjectItem,
 } from '../actions/test-support/index';
 import { translate } from '../../../platform/i18n';
-import { getGalleryGridCardLayout, GRID_GAP } from '../constants';
+import { GRID_GAP } from '../constants';
+import { createGridMetricsFixture } from '../test-support/items';
 
 vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n/format-bytes')>()),
@@ -42,17 +43,12 @@ import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-it.each(['compact-grid', 'large-grid'] as const)(
-  'reserves a readable landscape cover beside project details in %s',
-  (viewMode) => {
-    const layout = getGalleryGridCardLayout({
-      columnCount: 1,
-      gridWidth: viewMode === 'compact-grid' ? 220 : 320,
-      viewMode,
-    });
-    expect(layout.cardHeight - 144).toBeGreaterThanOrEqual(layout.cardWidth * (9 / 16));
-  }
-);
+const metrics = (
+  items: Parameters<typeof createGridMetricsFixture>[0]['items'],
+  gridWidth: number,
+  viewMode: 'compact-grid' | 'large-grid',
+  columnCount: number
+) => createGridMetricsFixture({ items, gridWidth, viewMode, columnCount });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -92,7 +88,7 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
     root?.render(
       <GalleryGridCanvas
         filteredItems={[firstItem, secondItem]}
-        gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([firstItem, secondItem], 800, 'compact-grid', 2)}
         gridWidth={800}
         onPreviewOpen={onPreviewOpen}
         onToggleSelection={onToggleSelection}
@@ -147,7 +143,7 @@ it('keeps the vertical grid gap equal to the horizontal tile gap', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 2 }}
+        gridMetrics={metrics(items, 800, 'compact-grid', 2)}
         gridWidth={800}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -162,7 +158,7 @@ it('keeps the vertical grid gap equal to the horizontal tile gap', () => {
   const firstHeight = Number.parseFloat(cards?.[0]?.style.height ?? '');
   const secondRowTop = Number.parseFloat(cards?.[2]?.style.top ?? '');
 
-  expect(firstHeight).toBeGreaterThan(300);
+  expect(firstHeight).toBeLessThan(300);
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
 });
 
@@ -175,7 +171,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 2 }}
+        gridMetrics={metrics(items, 400, 'large-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -192,7 +188,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
   const details = cards?.[0]?.querySelector<HTMLElement>('[data-ui="gallery.large.details"]');
   const metadata = cards?.[0]?.querySelector<HTMLElement>('[data-ui="gallery.large.metadata"]');
 
-  expect(firstHeight).toBeGreaterThan(360);
+  expect(firstHeight).toBeLessThan(360);
   expect(secondRowTop - firstHeight).toBe(GRID_GAP);
   expect(cards?.[0]?.className).toContain('flex flex-col');
   expect(details?.className).toContain('h-[72px]');
@@ -216,7 +212,7 @@ it('keeps the distinguishing filename tail and extension visible in constrained 
     root?.render(
       <GalleryGridCanvas
         filteredItems={[item]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([item], 240, 'large-grid', 1)}
         gridWidth={240}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -285,7 +281,7 @@ it('renders one composite grid card for raw recording tracks without a project',
     root?.render(
       <GalleryGridCanvas
         filteredItems={[display, webcam]}
-        gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([display], 800, 'compact-grid', 2)}
         gridWidth={800}
         onPreviewOpen={onPreviewOpen}
         onRecordingGroupOpen={onRecordingGroupOpen}
@@ -356,7 +352,7 @@ it('renders one unduplicated recording-group title in large grid', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([items[0]!], 400, 'large-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -406,7 +402,7 @@ it.each(['compact-grid', 'large-grid'] as const)(
       root?.render(
         <GalleryGridCanvas
           filteredItems={items}
-          gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+          gridMetrics={metrics([items[0]!], 400, viewMode, 1)}
           gridWidth={400}
           onPreviewOpen={vi.fn()}
           onToggleSelection={vi.fn()}
@@ -440,7 +436,7 @@ it('does not present a stale video-project thumbnail as actively updating', () =
     root?.render(
       <GalleryGridCanvas
         filteredItems={[item]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([item], 400, 'large-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -602,7 +598,7 @@ it('shows only the deletion date for drafts in grid cards', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={[draft]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([draft], 400, 'compact-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -737,7 +733,7 @@ it.each(['compact-grid', 'large-grid', 'list'] as const)(
           <GalleryGridCanvas
             filteredItems={items}
             visibleItems={items}
-            gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 1 }}
+            gridMetrics={metrics(items, 800, viewMode, 2)}
             gridWidth={800}
             onPreviewOpen={vi.fn()}
             onProjectOpen={onProjectOpen}

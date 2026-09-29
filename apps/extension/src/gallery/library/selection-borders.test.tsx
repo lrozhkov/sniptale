@@ -7,6 +7,7 @@ import { createMediaItem } from './actions/test-support/index';
 import { GalleryGridCanvas, GalleryMediaList } from './main-content/grid-cards';
 import { GalleryFacetFilters, GalleryFolderList } from './sidebar/sections';
 import { translate } from '../../platform/i18n';
+import { createGridMetricsFixture } from './test-support/items';
 
 vi.mock('./ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./ui')>()),
@@ -41,7 +42,12 @@ it.each(['compact-grid', 'large-grid'] as const)(
     const unselected = createMediaItem({ id: 'unselected', filename: 'unselected.png' });
     const baseProps = {
       filteredItems: [selected, unselected],
-      gridMetrics: { columnCount: 2, startRow: 0, totalRows: 1 },
+      gridMetrics: createGridMetricsFixture({
+        items: [selected, unselected],
+        columnCount: 2,
+        gridWidth: 800,
+        viewMode,
+      }),
       gridWidth: 800,
       onPreviewOpen: vi.fn(),
       onToggleSelection: vi.fn(),
@@ -111,7 +117,12 @@ it.each([false, true])(
     render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={createGridMetricsFixture({
+          items: [items[0]!],
+          columnCount: 1,
+          gridWidth: 400,
+          viewMode: 'compact-grid',
+        })}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -183,9 +194,7 @@ it('borders active folder and saved-view rows while hover and focus remain disti
   const savedViewButton = [...container.querySelectorAll('button')].find((button) =>
     button.textContent?.includes('PNG review')
   );
-  expect(savedViewButton?.parentElement?.className).toContain(
-    'border-[var(--sniptale-color-border-accent-strong)]'
-  );
+  expect(savedViewButton?.parentElement?.className).toContain('border-transparent');
   expect(savedViewButton?.className).toContain('focus-visible:ring-2');
   const inactiveFolder = [...container.querySelectorAll('button')].find((button) =>
     button.textContent?.includes(translate('gallery.preview.folderExport'))
@@ -203,11 +212,11 @@ it('borders active folder and saved-view rows while hover and focus remain disti
   const activeFolder = [...container.querySelectorAll('button')].find((button) =>
     button.textContent?.includes(translate('gallery.preview.folderScreenshot'))
   );
-  expect(activeFolder?.className).toContain('border-[var(--sniptale-color-border-accent-strong)]');
+  expect(activeFolder?.className).toContain('border-transparent');
   expect(activeFolder?.className).toContain('focus-visible:ring-2');
 });
 
-it('borders checked facet rows and keeps their keyboard ring distinct', () => {
+it('marks checked facet rows and keeps their keyboard ring distinct', () => {
   render(
     <GalleryFacetFilters
       countsKnown
@@ -247,10 +256,12 @@ it('borders checked facet rows and keeps their keyboard ring distinct', () => {
   const labels = [...container.querySelectorAll('label')];
   const selected = labels.find((label) => label.textContent?.includes('beta'));
   const unselected = labels.find((label) => label.textContent?.includes('alpha'));
-  expect(selected?.className).toContain('border-[var(--sniptale-color-border-accent-strong)]');
+  expect(selected?.className).toContain('border-transparent');
   expect(selected?.className).toContain(
     'has-[:focus-visible]:ring-[var(--sniptale-color-focus-ring)]'
   );
-  expect(unselected?.className).toContain('hover:border-[var(--sniptale-color-border-soft)]');
+  expect(unselected?.querySelector('[aria-hidden="true"]')?.className).toContain(
+    'group-hover:bg-[var(--sniptale-color-surface-hover)]'
+  );
   expect(selected?.querySelector('input')?.checked).toBe(true);
 });

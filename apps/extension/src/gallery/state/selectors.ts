@@ -3,11 +3,11 @@ import { formatBytes } from '../../platform/i18n/format-bytes';
 import type { ScenarioProjectSummary } from '../../features/scenario/contracts/types/project';
 import {
   FOLDER_FILTER_KIND_MAP,
-  getGalleryGridCardLayout,
   GRID_CARD_MIN_WIDTH_BY_MODE,
   GRID_GAP,
   GRID_OVERSCAN_ROWS,
 } from '../library/constants';
+import { getGalleryGridLayout } from '../library/grid-layout';
 import type {
   FolderFilter,
   GalleryFolderCounts,
@@ -378,6 +378,7 @@ export function getGalleryGridMetrics(args: {
   if (args.viewMode === 'list') {
     return {
       columnCount: 1,
+      rowTops: [0],
       startRow: 0,
       totalRows: displayItems.length,
       visibleItems: displayItems,
@@ -389,24 +390,41 @@ export function getGalleryGridMetrics(args: {
     1,
     Math.floor((args.gridWidth + GRID_GAP) / (cardMinWidth + GRID_GAP))
   );
-  const { rowHeight } = getGalleryGridCardLayout({
+  const { rowTops } = getGalleryGridLayout({
     columnCount,
     gridWidth: args.gridWidth,
+    items: displayItems,
     viewMode: args.viewMode,
   });
   const totalRows = Math.ceil(displayItems.length / columnCount);
-  const startRow = Math.max(0, Math.floor(args.scrollTop / rowHeight) - GRID_OVERSCAN_ROWS);
-  const endRow = Math.min(
-    totalRows,
-    Math.ceil((args.scrollTop + args.viewportHeight) / rowHeight) + GRID_OVERSCAN_ROWS
+  const totalHeight = rowTops[totalRows] ?? 0;
+  const scrollTop = Math.min(
+    Math.max(0, args.scrollTop),
+    Math.max(0, totalHeight - args.viewportHeight)
   );
+  const firstVisibleRow = Math.max(0, findFirstRowAfter(rowTops, scrollTop) - 1);
+  const lastVisibleRow = findFirstRowAfter(rowTops, scrollTop + Math.max(1, args.viewportHeight));
+  const startRow = Math.max(0, Math.min(firstVisibleRow, totalRows - 1) - GRID_OVERSCAN_ROWS);
+  const endRow = Math.min(totalRows, lastVisibleRow + GRID_OVERSCAN_ROWS);
 
   return {
     columnCount,
+    rowTops,
     startRow,
     totalRows,
     visibleItems: displayItems.slice(startRow * columnCount, endRow * columnCount),
   };
+}
+
+function findFirstRowAfter(rowTops: number[], offset: number): number {
+  let low = 0;
+  let high = rowTops.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if ((rowTops[middle] ?? 0) <= offset) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
 
 export function collapseGalleryRecordingGroups(items: GalleryItem[]): GalleryItem[] {

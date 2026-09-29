@@ -33,7 +33,7 @@ function createProps(overrides: Partial<Parameters<typeof GalleryGrid>[0]> = {})
   return {
     filteredItems: [],
     folderFilter: 'all' as const,
-    gridMetrics: { columnCount: 2, startRow: 0, totalRows: 1 },
+    gridMetrics: { columnCount: 2, rowTops: [0], startRow: 0, totalRows: 0 },
     gridWidth: 900,
     gridViewportRef: { current: null },
     isLoading: false,

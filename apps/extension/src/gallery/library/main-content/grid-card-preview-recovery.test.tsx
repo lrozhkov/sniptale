@@ -24,6 +24,7 @@ vi.mock('../ui', async (importOriginal) => ({
 }));
 
 import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
+import { createGridMetricsFixture } from '../test-support/items';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -58,7 +59,12 @@ it('offers recovery for an interrupted image presentation in grid and list views
       root?.render(
         <GalleryGridCanvas
           filteredItems={[item]}
-          gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+          gridMetrics={createGridMetricsFixture({
+            items: [item],
+            columnCount: 1,
+            gridWidth: 400,
+            viewMode: 'large-grid',
+          })}
           gridWidth={400}
           onPreviewOpen={vi.fn()}
           onToggleSelection={vi.fn()}
@@ -101,7 +107,12 @@ it('shows an unavailable preview without an editor retry action in Trash', () =>
         ) : (
           <GalleryGridCanvas
             filteredItems={[item]}
-            gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+            gridMetrics={createGridMetricsFixture({
+              items: [item],
+              columnCount: 1,
+              gridWidth: 400,
+              viewMode: 'large-grid',
+            })}
             gridWidth={400}
             onPreviewOpen={vi.fn()}
             onProjectOpen={onProjectOpen}
