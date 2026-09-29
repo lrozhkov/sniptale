@@ -311,7 +311,11 @@ function PreviewMediaContent(
 
   if (isGalleryMediaItem(props.item) && props.previewUrl && isVideoKind(props.item.kind)) {
     return (
-      <div onErrorCapture={props.onMediaError}>
+      <div
+        data-ui="gallery.preview.video-frame"
+        className="h-full min-h-0 w-full min-w-0 overflow-hidden"
+        onErrorCapture={props.onMediaError}
+      >
         <PreviewVideo
           key={props.previewUrl}
           src={props.previewUrl}

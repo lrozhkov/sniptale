@@ -144,6 +144,8 @@ function isPreviewEditingTarget(target: EventTarget | null) {
     target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement &&
+      Boolean(target.closest('[role="listbox"], [aria-haspopup="listbox"]'))) ||
     (target instanceof HTMLElement && target.isContentEditable)
   );
 }

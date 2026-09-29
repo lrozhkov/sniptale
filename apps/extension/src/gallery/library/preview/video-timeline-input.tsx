@@ -2,6 +2,7 @@ import { ProductRange } from '@sniptale/ui/product-form-controls';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { translate } from '../../../platform/i18n';
 import { videoTime } from './video-thumbnail';
+import './video-timeline.css';
 import type { VideoFrameHover } from './video-frame-placement';
 
 /** Keeps timeline pointer and keyboard intent aligned with the seek range. */
@@ -47,7 +48,7 @@ export function VideoTimelineInput({
       }}
       onFocus={() => setHover({ time, clientX: null })}
       onBlur={() => setHover(null)}
-      className="block h-6 w-full"
+      className="sniptale-video-seek block w-full"
     />
   );
 }

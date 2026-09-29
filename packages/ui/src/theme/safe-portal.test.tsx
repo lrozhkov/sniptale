@@ -169,3 +169,17 @@ it('keeps floating controls inside the nearest open native dialog and restores t
     outer.remove();
   }
 });
+
+it('keeps floating controls inside their fullscreen element', () => {
+  const fullscreen = document.createElement('div');
+  const anchor = document.createElement('button');
+  fullscreen.append(anchor);
+  document.body.append(fullscreen);
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: fullscreen });
+  try {
+    expect(resolveThemeSafePortalTarget(anchor)).toBe(fullscreen);
+  } finally {
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+    fullscreen.remove();
+  }
+});

@@ -1,0 +1,11 @@
+.sniptale-range.sniptale-video-seek {
+  --sniptale-range-track-height: 4px;
+  --sniptale-range-thumb-size: 14px;
+}
+
+.sniptale-range.sniptale-video-seek:hover,
+.sniptale-range.sniptale-video-seek:focus-visible,
+.sniptale-range.sniptale-video-seek:active {
+  --sniptale-range-track-height: 6px;
+  --sniptale-range-thumb-size: 18px;
+}

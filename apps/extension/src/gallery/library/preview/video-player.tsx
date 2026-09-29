@@ -22,11 +22,15 @@ export function PreviewVideo({ src, trashMode = false }: { src: string; trashMod
     <div
       ref={container}
       data-ui="gallery.preview.player"
-      className="relative flex h-full w-full min-h-0 min-w-0 flex-col
+      className="@container/player relative flex h-full w-full min-h-0 min-w-0 flex-col
         bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary)]"
       aria-busy={pending || buffering}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' && document.fullscreenElement === container.current) {
+        if (
+          !event.defaultPrevented &&
+          event.key === 'Escape' &&
+          document.fullscreenElement === container.current
+        ) {
           event.preventDefault();
           event.stopPropagation();
           void toggleFullscreen();

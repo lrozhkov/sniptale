@@ -34,6 +34,42 @@ function button(name: string) {
   return host.querySelector<HTMLButtonElement>(`[aria-label="gallery.preview.player.${name}"]`)!;
 }
 
+it('uses app menus for speed and size while retaining their current values', () => {
+  mount();
+  expect(host.querySelector('select[aria-label="gallery.preview.player.speed"]')).toBeNull();
+  expect(host.querySelector('select[aria-label="gallery.preview.player.scale"]')).toBeNull();
+  expect(button('speed').textContent).toContain('1×');
+  expect(button('scale').textContent).toContain('gallery.preview.player.fit');
+});
+
+it('keeps transport, seek and settings in one responsive control row', () => {
+  mount();
+  const row = host.querySelector('[data-ui="gallery.preview.player.controls-row"]');
+  const seek = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]');
+  expect(row?.contains(button('play'))).toBe(true);
+  expect(row?.contains(seek ?? null)).toBe(true);
+  expect(row?.contains(button('speed'))).toBe(true);
+  expect(seek?.className).toContain('sniptale-video-seek');
+});
+
+it('keeps menus in fullscreen and lets menu Escape close only the menu', async () => {
+  mount();
+  const player = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player"]')!;
+  const exit = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: player });
+  Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
+  act(() => button('speed').click());
+  const menu = player.querySelector<HTMLElement>('[role="listbox"]');
+  expect(menu).not.toBeNull();
+  const option = menu?.querySelector<HTMLButtonElement>('[role="option"]');
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  act(() => option?.dispatchEvent(escape));
+  expect(escape.defaultPrevented).toBe(true);
+  expect(exit).not.toHaveBeenCalled();
+  expect(player.querySelector('[role="listbox"]')).toBeNull();
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+});
+
 it('suppresses browser video download affordances in Trash while keeping playback controls', () => {
   act(() => root.render(<PreviewVideo src="blob:clip" trashMode />));
   const video = host.querySelector('video')!;
@@ -87,16 +123,19 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   });
   expect(video.volume).toBe(0.5);
   expect(video.muted).toBe(false);
-  const speed = host.querySelector<HTMLSelectElement>(
-    '[aria-label="gallery.preview.player.speed"]'
-  )!;
+  const speed = button('speed');
   act(() => {
-    speed.value = '1.5';
-    speed.dispatchEvent(new Event('change', { bubbles: true }));
+    speed.click();
+  });
+  const faster = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="listbox"] [role="option"]'),
+  ].find((option) => option.textContent?.includes('1.5×'));
+  act(() => {
+    faster?.click();
     video.dispatchEvent(new Event('ratechange'));
   });
   expect(video.playbackRate).toBe(1.5);
-  expect(speed.value).toBe('1.5');
+  expect(speed.textContent).toContain('1.5×');
 });
 
 it('keeps hover decoding separate from playback and disables seeking after media errors', () => {
@@ -115,14 +154,23 @@ it('keeps hover decoding separate from playback and disables seeking after media
 
 it('switches fit to intrinsic size and seeks through the native range', () => {
   const video = mount();
-  const select = host.querySelector<HTMLSelectElement>(
-    '[aria-label="gallery.preview.player.scale"]'
-  )!;
+  video.currentTime = 8;
+  const select = button('scale');
   act(() => {
-    select.value = 'original';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select.click();
   });
+  const original = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="listbox"] [role="option"]'),
+  ].find((option) => option.textContent?.includes('gallery.preview.player.original'));
+  act(() => original?.click());
   expect(video.className).toContain('max-w-none');
+  expect(host.querySelector('video')).toBe(video);
+  expect(video.currentTime).toBe(8);
+  expect(
+    video.closest('[data-ui="gallery.preview.player"]')?.querySelector('[tabindex="0"]')?.className
+  ).toContain('overflow-auto');
+  expect(button('scale')).not.toBeNull();
+  expect(button('fullscreen')).not.toBeNull();
   const seek = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
   act(() => {
     seek.focus();

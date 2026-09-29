@@ -45,6 +45,8 @@ export function resolveThemeSafePortalTarget(
   // Native modal dialogs make body-level portals inert and paint above them.
   const dialog = anchorEl?.closest<HTMLDialogElement>('dialog[open]');
   if (dialog) return dialog;
+  const fullscreen = anchorEl?.ownerDocument.fullscreenElement;
+  if (fullscreen instanceof HTMLElement && fullscreen.contains(anchorEl)) return fullscreen;
   const portalTarget = anchorEl?.getRootNode();
   if (portalTarget instanceof ShadowRoot || portalTarget instanceof DocumentFragment) {
     return portalTarget;

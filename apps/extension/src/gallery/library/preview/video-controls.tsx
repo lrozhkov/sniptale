@@ -1,6 +1,6 @@
 import { LoaderCircle, Maximize, Minimize, Pause, Play, Volume2, VolumeX } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductRange } from '@sniptale/ui/product-form-controls';
+import { ProductRange, ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { ReactNode, RefObject } from 'react';
 import { translate } from '../../../platform/i18n';
 import { videoTime } from './video-thumbnail';
@@ -62,15 +62,10 @@ export function VideoControls({
       className="shrink-0 border-t border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] px-3 py-2"
     >
-      <VideoTimeline
-        src={src}
-        duration={duration}
-        time={time}
-        ready={ready}
-        seek={seek}
-        playerRef={container}
-      />
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <div
+        data-ui="gallery.preview.player.controls-row"
+        className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+      >
         <div className="flex shrink-0 items-center gap-2">
           <PlayerButton
             label={translate(
@@ -95,20 +90,33 @@ export function VideoControls({
             {videoTime(time)} / {videoTime(duration)}
           </span>
         </div>
+        <div
+          className="order-last min-w-0 w-full
+          @min-[760px]/player:order-none @min-[760px]/player:w-auto @min-[760px]/player:flex-1"
+        >
+          <VideoTimeline
+            src={src}
+            duration={duration}
+            time={time}
+            ready={ready}
+            seek={seek}
+            playerRef={container}
+          />
+        </div>
         <PlaybackSettings video={video} muted={muted} volume={volume} speed={speed} />
         <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
-          <select
+          <ProductSelect<'fit' | 'original'>
             aria-label={translate('gallery.preview.player.scale')}
             value={fit ? 'fit' : 'original'}
-            className="h-9 max-w-48 rounded-[var(--sniptale-radius-md)] border
-              border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
-              px-2 text-[var(--sniptale-color-text-primary)] focus-visible:outline
-              focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
-            onChange={(event) => setFit(event.currentTarget.value === 'fit')}
-          >
-            <option value="fit">{translate('gallery.preview.player.fit')}</option>
-            <option value="original">{translate('gallery.preview.player.original')}</option>
-          </select>
+            controlSize="sm"
+            containerClassName="w-36 shrink-0"
+            className="!h-9 !min-h-9 w-full"
+            options={[
+              { value: 'fit', label: translate('gallery.preview.player.fit') },
+              { value: 'original', label: translate('gallery.preview.player.original') },
+            ]}
+            onChange={(value) => setFit(value === 'fit')}
+          />
           <div ref={fullscreenButton}>
             <PlayerButton
               label={translate(
@@ -157,7 +165,7 @@ function PlaybackSettings({
         max={1}
         step={0.05}
         value={muted ? 0 : volume}
-        className="w-20 min-w-12"
+        className="w-14 min-w-12"
         onChange={(event) => {
           if (video.current) {
             video.current.volume = event.currentTarget.valueAsNumber;
@@ -165,23 +173,20 @@ function PlaybackSettings({
           }
         }}
       />
-      <select
+      <ProductSelect<string>
         aria-label={translate('gallery.preview.player.speed')}
-        value={speed}
-        className="h-9 rounded-[var(--sniptale-radius-md)] border
-          border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
-          px-2 text-[var(--sniptale-color-text-primary)] focus-visible:outline
-          focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
-        onChange={(event) => {
-          if (video.current) video.current.playbackRate = Number(event.currentTarget.value);
+        value={String(speed)}
+        controlSize="sm"
+        containerClassName="w-16 shrink-0"
+        className="!h-9 !min-h-9 w-full"
+        options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => ({
+          value: String(rate),
+          label: `${rate}×`,
+        }))}
+        onChange={(value) => {
+          if (video.current) video.current.playbackRate = Number(value);
         }}
-      >
-        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => (
-          <option key={rate} value={rate}>
-            {rate}×
-          </option>
-        ))}
-      </select>
+      />
     </div>
   );
 }

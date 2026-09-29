@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { EditorStartItem } from './index';
+export interface EditorStartItem {
+  id: string;
+  title: string;
+  detail: string;
+  thumbnailUrl?: string | null;
+  unavailable?: boolean;
+}
 
 export interface EditorStartSourceItem extends Omit<EditorStartItem, 'thumbnailUrl'> {
   updatedAt: number;

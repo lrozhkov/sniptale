@@ -1,15 +1,8 @@
 import { FolderOpen, Plus, Search } from 'lucide-react';
 import { useState, type DragEvent, type ReactNode } from 'react';
+import type { EditorStartItem } from './use-items';
 export { useEditorStartItems, sortEditorStartItems } from './use-items';
-export type { EditorStartSourceItem } from './use-items';
-
-export interface EditorStartItem {
-  id: string;
-  title: string;
-  detail: string;
-  thumbnailUrl?: string | null;
-  unavailable?: boolean;
-}
+export type { EditorStartItem, EditorStartSourceItem } from './use-items';
 
 export interface EditorStartProps {
   title: string;

@@ -229,6 +229,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(imageMarkup).toContain('max-h-none max-w-none');
   expect(imageMarkup).not.toContain('max-h-full max-w-full shrink-0 select-none object-contain');
   expect(videoMarkup).toContain('<video');
+  expect(videoMarkup).toContain('data-ui="gallery.preview.video-frame"');
   expect(videoMarkup).toContain('data-ui="preview.media.contained"');
   expect(videoMarkup).toContain('preload="metadata"');
   expect(videoMarkup).toContain('class="block h-full w-full bg-black object-contain"');
@@ -587,13 +588,14 @@ it('keeps native-size video scrolling keys inside the player without navigating 
       })}
     />
   );
-  const scale = container!.querySelector<HTMLSelectElement>(
+  const scale = container!.querySelector<HTMLButtonElement>(
     '[aria-label="gallery.preview.player.scale"]'
   )!;
-  act(() => {
-    scale.value = 'original';
-    scale.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  act(() => scale.click());
+  const original = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="listbox"] [role="option"]'),
+  ].find((option) => option.textContent?.includes('gallery.preview.player.original'));
+  act(() => original?.click());
   const viewport = container!.querySelector<HTMLElement>(
     '[data-ui="gallery.preview.player"] [tabindex="0"]'
   )!;
@@ -611,6 +613,35 @@ it('keeps native-size video scrolling keys inside the player without navigating 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
   );
   expect(onNext).toHaveBeenCalledOnce();
+});
+
+it('keeps video menu arrow keys from navigating adjacent Gallery items', () => {
+  const onNext = vi.fn();
+  renderNode(
+    <PreviewPanel
+      {...createProps({
+        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
+        navigation: {
+          current: 1,
+          total: 2,
+          hasPrevious: false,
+          hasNext: true,
+          onPrevious: vi.fn(),
+          onNext,
+        },
+      })}
+    />
+  );
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="gallery.preview.player.speed"]')
+      ?.click()
+  );
+  const option = document.querySelector<HTMLButtonElement>('[role="listbox"] [role="option"]');
+  act(() =>
+    option?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(onNext).not.toHaveBeenCalled();
 });
 
 it('keeps the project editor action available with the inspector collapsed', () => {
