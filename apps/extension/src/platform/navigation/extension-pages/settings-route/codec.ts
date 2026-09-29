@@ -25,7 +25,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'quick-actions': [],
   'screen-sizes': [],
   'media-quality': ['image', 'video'],
-  saving: ['settings', 'storage', 'templates'],
+  saving: ['settings', 'storage', 'templates', 'files'],
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
   'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
@@ -51,7 +51,7 @@ export type SettingsRoute =
   | SettingsRouteWithoutView
   | { section: 'interface-browser'; view?: 'interface' | 'context-menu' }
   | { section: 'media-quality'; view?: 'image' | 'video' }
-  | { section: 'saving'; view?: 'settings' | 'storage' | 'templates' }
+  | { section: 'saving'; view?: 'settings' | 'storage' | 'templates' | 'files' }
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
   | { section: 'editor-resources'; view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }

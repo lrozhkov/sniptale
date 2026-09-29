@@ -16,7 +16,7 @@ describe('settings route codec', () => {
       'interface-browser': ['interface', 'context-menu'],
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
-      saving: ['settings', 'storage', 'templates'],
+      saving: ['settings', 'storage', 'templates', 'files'],
       'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
@@ -130,6 +130,22 @@ describe('settings route codec', () => {
     expect(
       buildSettingsRouteUrl(BASE, { section: 'ai-connections' }).searchParams.get('view')
     ).toBe('integrations');
+  });
+
+  it('round-trips the Files subpage while old Saving URLs retain their default', () => {
+    const files = buildSettingsRouteUrl(`${BASE}?keep=1#anchor`, {
+      section: 'saving',
+      view: 'files',
+    });
+    expect(files.toString()).toBe(`${BASE}?keep=1&section=saving&view=files#anchor`);
+    expect(resolveSettingsRoute(files)).toMatchObject({
+      route: { section: 'saving', view: 'files' },
+      shouldReplace: false,
+    });
+    expect(resolveSettingsRoute(`${BASE}?section=saving`)).toMatchObject({
+      route: { section: 'saving', view: 'settings' },
+      shouldReplace: false,
+    });
   });
 });
 

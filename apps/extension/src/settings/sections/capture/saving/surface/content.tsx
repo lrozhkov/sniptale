@@ -4,7 +4,7 @@ import {
   settingsSectionClassName,
 } from '../../../../section-surface';
 import type { SavePresetsListProps, SavePresetsRowHandlers } from '../state/types';
-import { SaveSettingsRows } from './cards';
+import { CaptureActionRow, DownloadPresetRows } from './cards';
 import { PresetsList } from './list/root';
 
 type SavePresetsSectionContentProps = {
@@ -25,7 +25,7 @@ type SavePresetsSectionContentProps = {
   isLoading: boolean;
   openEditor: SavePresetsRowHandlers['onEdit'];
   presetOptions: { value: string; label: string }[];
-  view: 'settings' | 'templates';
+  view: 'settings' | 'templates' | 'files';
 } & Pick<
   SavePresetsListProps,
   | 'confirmDelete'
@@ -64,19 +64,25 @@ export function SavePresetsSectionContent(props: SavePresetsSectionContentProps)
 
   return (
     <div className={`${settingsSectionClassName} ${settingsCompactWorkbenchClassName} !space-y-0`}>
-      <SaveSettingsRows
-        captureAction={props.captureAction}
-        captureActionOptions={props.captureActionOptions}
-        defaultExportPresetId={props.defaultExportPresetId}
-        defaultImagePresetId={props.defaultImagePresetId}
-        defaultVideoPresetId={props.defaultVideoPresetId}
-        isLoading={props.isLoading}
-        onCaptureActionChange={props.handleCaptureActionChange}
-        onDefaultExportChange={props.handleDefaultExportChange}
-        onDefaultImageChange={props.handleDefaultImageChange}
-        onDefaultVideoChange={props.handleDefaultVideoChange}
-        presetOptions={props.presetOptions}
-      />
+      {props.view === 'settings' ? (
+        <CaptureActionRow
+          captureAction={props.captureAction}
+          captureActionOptions={props.captureActionOptions}
+          isLoading={props.isLoading}
+          onCaptureActionChange={props.handleCaptureActionChange}
+        />
+      ) : (
+        <DownloadPresetRows
+          defaultExportPresetId={props.defaultExportPresetId}
+          defaultImagePresetId={props.defaultImagePresetId}
+          defaultVideoPresetId={props.defaultVideoPresetId}
+          isLoading={props.isLoading}
+          onDefaultExportChange={props.handleDefaultExportChange}
+          onDefaultImageChange={props.handleDefaultImageChange}
+          onDefaultVideoChange={props.handleDefaultVideoChange}
+          presetOptions={props.presetOptions}
+        />
+      )}
     </div>
   );
 }

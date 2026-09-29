@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import {
+  settingsCompactWorkbenchClassName,
+  settingsMetaLabelClassName,
+} from '../../../section-surface';
 import { useSettingsStore } from '../../../runtime/store/useSettingsStore';
 import { translate, useAppLocale } from '../../../../platform/i18n';
 import {
@@ -102,9 +106,13 @@ export function FilenameRulesSettings() {
       </div>
     );
   };
+  const sectionClassName = [
+    settingsCompactWorkbenchClassName,
+    'space-y-3 border-t border-[var(--sniptale-color-border-subtle)] pt-5',
+  ].join(' ');
   return (
-    <section className="space-y-3" aria-labelledby="filename-heading">
-      <h2 id="filename-heading" className="text-base font-semibold">
+    <section className={sectionClassName} aria-labelledby="filename-heading">
+      <h2 id="filename-heading" className={settingsMetaLabelClassName}>
         {translate('settings.filenameRules.heading')}
       </h2>
       <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
@@ -141,7 +149,10 @@ export function FilenameRulesSettings() {
         </summary>
         <div className="mt-3 space-y-3">{FILENAME_CATEGORIES.map(field)}</div>
       </details>
-      <div aria-label={translate('settings.filenameRules.preview')} className="space-y-2 text-sm">
+      <div
+        aria-label={translate('settings.filenameRules.preview')}
+        className="grid gap-x-5 gap-y-1 text-xs leading-5 sm:grid-cols-2"
+      >
         {FILENAME_CATEGORIES.map((category, index) => {
           const result = resolveFilename(
             previewRules,
