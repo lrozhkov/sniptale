@@ -6,6 +6,7 @@ function createDependencies(revisions: number[]) {
   let index = 0;
   const history = {
     clear: vi.fn(),
+    hasOpenTransactions: vi.fn(() => false),
     getState: vi.fn(() => ({
       canRedo: false,
       canUndo: index < revisions.length - 1,
@@ -38,6 +39,7 @@ it('preserves recovery history and residual owners when an undo cannot make prog
     clearHighlights: vi.fn(),
     history: {
       clear: vi.fn(),
+      hasOpenTransactions: vi.fn(() => false),
       getState: vi.fn(() => ({ canRedo: false, canUndo: true, revision: 7 })),
       undo: vi.fn(),
     },
@@ -50,4 +52,14 @@ it('preserves recovery history and residual owners when an undo cannot make prog
   expect(dependencies.clearHighlights).not.toHaveBeenCalled();
   expect(dependencies.resetAnnotations).not.toHaveBeenCalled();
   expect(dependencies.history.clear).not.toHaveBeenCalled();
+});
+
+it('preserves pending edits when an owner has not finalized its transaction', () => {
+  const dependencies = createDependencies([1]);
+  dependencies.history.hasOpenTransactions.mockReturnValue(true);
+
+  expect(clearAllPagePreparationChanges(dependencies)).toBe(false);
+  expect(dependencies.history.clear).not.toHaveBeenCalled();
+  expect(dependencies.clearHighlights).not.toHaveBeenCalled();
+  expect(dependencies.resetAnnotations).not.toHaveBeenCalled();
 });

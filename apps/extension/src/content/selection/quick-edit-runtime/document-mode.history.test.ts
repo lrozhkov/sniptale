@@ -191,6 +191,20 @@ it('captures before-state before text mutation and commits the changed root', ()
   });
 });
 
+it('reports only an actual pending document-mode edit to the reset control', () => {
+  const tracker = createQuickEditDocumentModeHistoryTracker();
+  const paragraph = appendParagraph('Before');
+  tracker.begin();
+  expect(tracker.hasPendingChanges()).toBe(false);
+  dispatchInputSequence(paragraph, () => {
+    paragraph.textContent = 'After';
+  });
+  expect(tracker.hasPendingChanges()).toBe(true);
+  paragraph.textContent = 'Before';
+  expect(tracker.hasPendingChanges()).toBe(false);
+  tracker.cancel();
+});
+
 it('cancels the transaction when no input occurred', () => {
   const tracker = createQuickEditDocumentModeHistoryTracker();
 

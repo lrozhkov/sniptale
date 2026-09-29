@@ -168,6 +168,14 @@ function commitHistoryTransaction(
 
 function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
   return {
+    flushDeferredCommits(): void {
+      for (const id of [...state.deferredCommits.keys()]) {
+        const entry = finalizeDeferredEntry({ id, state });
+        if (entry) {
+          if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
+        }
+      }
+    },
     beginDeferredCommit(): number | null {
       return beginDeferredCommitBoundary(state);
     },

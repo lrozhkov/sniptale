@@ -6,6 +6,7 @@ const MAX_UNDO_STEPS = 10_000;
 type PagePreparationResetHistory = {
   clear(): void;
   getState(): { canUndo: boolean; revision: number };
+  hasOpenTransactions(): boolean;
   undo(): void;
 };
 
@@ -18,6 +19,10 @@ type PagePreparationResetDependencies = {
 export function clearAllPagePreparationChanges(
   dependencies: PagePreparationResetDependencies
 ): boolean {
+  if (dependencies.history.hasOpenTransactions()) {
+    logger.warn('Stopped page preparation reset while an editor transaction is open');
+    return false;
+  }
   let undoSteps = 0;
   let previousState = dependencies.history.getState();
 
@@ -32,7 +37,8 @@ export function clearAllPagePreparationChanges(
     previousState = nextState;
   }
 
-  const fullyReverted = !dependencies.history.getState().canUndo;
+  const fullyReverted =
+    !dependencies.history.getState().canUndo && !dependencies.history.hasOpenTransactions();
   if (!fullyReverted) {
     logger.warn('Page preparation reset could not finish undoing changes', { undoSteps });
     return false;

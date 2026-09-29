@@ -22,7 +22,17 @@ import {
 } from './document-mode.targets';
 
 const DOCUMENT_MODE_HISTORY_KEY = 'quick-edit-document-mode';
+const DOCUMENT_MODE_CHANGE_EVENT = 'sniptale-document-mode-history-changed';
 const logger = createLogger({ namespace: 'ContentQuickEditDocumentModeHistory' });
+
+export function subscribeToQuickEditDocumentModeChanges(listener: () => void): () => void {
+  window.addEventListener(DOCUMENT_MODE_CHANGE_EVENT, listener);
+  return () => window.removeEventListener(DOCUMENT_MODE_CHANGE_EVENT, listener);
+}
+
+function notifyDocumentModeChanges(): void {
+  window.dispatchEvent(new Event(DOCUMENT_MODE_CHANGE_EVENT));
+}
 
 interface DocumentModeHistoryState {
   annotationCaptures: Map<HTMLElement, QuickEditTextAnnotationCapture>;
@@ -45,6 +55,7 @@ interface QuickEditDocumentModeHistoryTracker {
   begin: () => void;
   cancel: () => void;
   commit: () => void;
+  hasPendingChanges: () => boolean;
   recordPotentialEditTarget: (target: QuickEditDocumentModeEditTarget) => void;
 }
 
@@ -108,6 +119,7 @@ function resetDocumentModeHistoryState(state: DocumentModeHistoryState): void {
   state.failure = null;
   state.isActive = false;
   state.pendingInputRecovery = null;
+  notifyDocumentModeChanges();
 }
 
 function resolveConnectedDirtyRoots(state: DocumentModeHistoryState): HTMLElement[] {
@@ -136,6 +148,13 @@ export function createQuickEditDocumentModeHistoryTracker(
     begin: () => beginDocumentModeHistory(state, options),
     cancel: () => cancelDocumentModeHistory(state),
     commit: () => commitDocumentModeHistory(state),
+    hasPendingChanges: () =>
+      state.isActive &&
+      [...state.dirtyRoots].some(
+        (root) =>
+          root.isConnected &&
+          state.beforeStatesByRoot.get(root)?.html !== captureDomElementState(root).html
+      ),
     recordPotentialEditTarget: (target) => recordPotentialEditTarget(state, target),
   };
 }
@@ -179,6 +198,7 @@ function markDirtyTarget(
 
   captureBeforeState(state, root);
   state.dirtyRoots.add(root);
+  notifyDocumentModeChanges();
 }
 
 function beginDocumentModeHistory(

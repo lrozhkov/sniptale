@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { Toolbar } from '../toolbar/view';
 import {
@@ -15,13 +15,10 @@ import type {
   ContentAppScenarioState,
 } from './types';
 import type { CaptureActionType } from '../../../contracts/settings';
-import { clearAllPagePreparationChanges } from '../../application/page-preparation-reset';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
-import { pagePreparationHistory } from '../../parser/page-preparation/history';
-import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
-import { clearAllHighlights } from '../../selection/highlighter';
+import { canResetPagePreparation, clearPagePreparation, subscribeResetAvailability } from './reset';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -148,23 +145,6 @@ function createToolbarAutoBlurProps(
   };
 }
 
-function clearPagePreparation(toolbar: ContentAppLayoutToolbarProps) {
-  toolbar.drawingController?.finalizeInteraction();
-  const fullyCleared = clearAllPagePreparationChanges({
-    clearHighlights: clearAllHighlights,
-    history: pagePreparationHistory,
-    resetAnnotations: browserAnnotationSession.resetForDocument,
-  });
-  showToast(
-    translate(
-      fullyCleared
-        ? 'content.toolbar.allChangesCleared'
-        : 'content.toolbar.someChangesCouldNotBeCleared'
-    ),
-    fullyCleared ? 'info' : 'error'
-  );
-}
-
 function createVideoRecordingModeToggleHandler(toolbar: ContentAppLayoutToolbarProps) {
   const { modeController } = toolbar;
   return async (enabled: boolean, activationEvent?: Event): Promise<boolean> => {
@@ -288,9 +268,17 @@ function renderToolbarShell(args: {
 }
 
 export function ContentToolbarShell({ designReview, scenario, toolbar }: ContentToolbarShellProps) {
+  const subscribeAvailability = useCallback(
+    (listener: () => void) => subscribeResetAvailability(listener, toolbar.drawingController),
+    [toolbar.drawingController]
+  );
+  const getResetAvailability = useCallback(
+    () => canResetPagePreparation(toolbar.drawingController),
+    [toolbar.drawingController]
+  );
   const canClearPagePreparation = useSyncExternalStore(
-    pagePreparationHistory.subscribe,
-    () => pagePreparationHistory.getState().canUndo,
+    subscribeAvailability,
+    getResetAvailability,
     () => false
   );
   const byClickBlocked = isScenarioByClickBlocked(toolbar.modes);

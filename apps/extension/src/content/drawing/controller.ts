@@ -18,6 +18,9 @@ export interface ContentDrawingController {
   prepareActivation(): boolean;
   registerInteractionFinalizer(finalizer: (() => void) | null): void;
   finalizeInteraction(): void;
+  hasPendingTextChange?(): boolean;
+  setPendingTextChange?(pending: boolean): void;
+  subscribePendingTextChange?(listener: () => void): () => void;
 }
 
 export function useDrawingSessionSnapshot(session: DrawingSession): DrawingSessionSnapshot {
@@ -46,6 +49,8 @@ export function createContentDrawingController(
   let root: PageScrollRoot = { kind: 'viewport', element: null };
   let palette: readonly string[] = [...DEFAULT_DRAWING_COLORS];
   let finalizer: (() => void) | null = null;
+  let pendingTextChange = false;
+  const pendingTextListeners = new Set<() => void>();
   return {
     session,
     getPalette: () => palette,
@@ -67,6 +72,16 @@ export function createContentDrawingController(
     finalizeInteraction() {
       finalizer?.();
       session.select(null);
+    },
+    hasPendingTextChange: () => pendingTextChange,
+    setPendingTextChange(pending) {
+      if (pendingTextChange === pending) return;
+      pendingTextChange = pending;
+      pendingTextListeners.forEach((listener) => listener());
+    },
+    subscribePendingTextChange(listener) {
+      pendingTextListeners.add(listener);
+      return () => pendingTextListeners.delete(listener);
     },
   };
 }

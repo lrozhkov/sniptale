@@ -10,6 +10,7 @@ import {
 import { useCalloutEditingHandlers } from '../../../features/highlighter/frame-annotation/callout/editing-handlers';
 import { useCalloutBlurRequestEffect } from './editing-blur-request-effect';
 import { useCalloutVoiceInput } from './voice-input';
+import { registerInteractiveFrameResetFinalizer } from '../interactive-frame/controller/reset-finalization';
 
 type UseCalloutEditingArgs = {
   frameId: string;
@@ -153,6 +154,11 @@ export function useCalloutEditing(args: UseCalloutEditingArgs) {
     onStartEditing: args.onStartEditing,
     onStopEditing: args.onStopEditing,
   });
+
+  useEffect(() => {
+    if (!args.isEditing) return;
+    return registerInteractiveFrameResetFinalizer(() => handlers.finishEditing(), 0);
+  }, [args.isEditing, handlers]);
 
   useCalloutEditingEffects({
     calloutArgs: args,

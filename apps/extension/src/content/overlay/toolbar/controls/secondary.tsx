@@ -107,6 +107,7 @@ function createCaptureActionProps(args: {
 }) {
   return {
     screenshotMode: args.viewModel.screenshotMode,
+    videoRecordingMode: args.toolbarProps.videoRecordingMode ?? false,
     isNavigationMode:
       args.interactionMode === 'cursor' &&
       !args.toolbarProps.drawingMode &&

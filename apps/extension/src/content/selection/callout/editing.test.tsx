@@ -7,6 +7,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
 import { dispatchCalloutBlurRequest } from '../../platform/page-context/frame-events';
 import { useCalloutEditing } from './editing';
+import { finalizeInteractiveFrameEditsForReset } from '../interactive-frame/controller/reset-finalization';
 
 function CalloutEditingLifecycleHarness(props: {
   htmlContent?: string;
@@ -109,6 +110,22 @@ function mockHistoryTransactions() {
 }
 
 describe('useCalloutEditing external finish lifecycle', () => {
+  it('finishes a callout edit for Reset after focus moves inside the callout', () => {
+    const history = mockHistoryTransactions();
+    const onContentChange = vi.fn();
+    const onStopEditing = vi.fn();
+    const { editable, title } = renderHarness({ onContentChange, onStopEditing });
+    act(() => {
+      editable.dispatchEvent(new FocusEvent('blur', { bubbles: true, relatedTarget: title }));
+    });
+    expect(onStopEditing).not.toHaveBeenCalled();
+
+    act(() => finalizeInteractiveFrameEditsForReset());
+    expect(onContentChange).toHaveBeenCalledWith('<p>updated</p>');
+    expect(onStopEditing).toHaveBeenCalledOnce();
+    expect(history.commitTransactionSpy).toHaveBeenCalledWith('callout-editing:frame-1');
+  });
+
   it('commits the callout editing transaction when Enter finishes input', () => {
     const history = mockHistoryTransactions();
     const onContentChange = vi.fn();

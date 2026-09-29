@@ -39,6 +39,10 @@ class PageStyleCommentDraftModel {
     return { commitFailed, draft: this.draft, marker: this.marker };
   }
 
+  hasPendingChanges(): boolean {
+    return Boolean(this.currentTarget && normalizeComment(this.draft) !== this.committedComment);
+  }
+
   updateDraft(value: string): CommentDraftView {
     this.draft = value;
     if (normalizeComment(value) !== this.lastFailedComment) {

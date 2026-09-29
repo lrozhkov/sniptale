@@ -89,12 +89,16 @@ export function ToolbarCaptureActionGroup(
           onSelectCaptureAction={onSelectCaptureAction}
         />
       </ContentToolbarGroup>
-      {captureProps.screenshotMode || captureProps.canClearPagePreparation ? (
+      {!captureProps.videoRecordingMode &&
+      (captureProps.screenshotMode ||
+        captureProps.canClearPagePreparation ||
+        captureProps.isNavigationMode) ? (
         <>
           <ContentToolbarDivider dataUi="content.toolbar.history-divider-before" />
           <ContentToolbarGroup dataUi="content.toolbar.history-group">
             <ToolbarHistoryControls
               screenshotMode={captureProps.screenshotMode}
+              isNavigationMode={captureProps.isNavigationMode ?? false}
               canClearPagePreparation={captureProps.canClearPagePreparation ?? false}
               {...(captureProps.onClearPagePreparation === undefined
                 ? {}

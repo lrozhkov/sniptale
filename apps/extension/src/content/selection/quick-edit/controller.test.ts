@@ -12,6 +12,7 @@ function createRuntimeControllerStub() {
     documentMode: {
       disable: vi.fn(),
       enable: vi.fn(),
+      hasPendingChanges: vi.fn(() => false),
       isEnabled: vi.fn(() => false),
     },
     editing: {

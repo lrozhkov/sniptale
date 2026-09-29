@@ -121,7 +121,12 @@ function useCalloutFinishEditing(args: CalloutEditingHandlersArgs) {
       }
 
       didFinishEditingRef.current = true;
-      commitCalloutContent(args, editableElement);
+      try {
+        commitCalloutContent(args, editableElement);
+      } catch (error) {
+        didFinishEditingRef.current = false;
+        throw error;
+      }
     },
     [args]
   );

@@ -7,6 +7,8 @@ import { afterEach, beforeAll, expect, it, vi } from 'vitest';
 
 import { useCalloutEditingHandlers } from './editing-handlers';
 
+let latestHandlers: ReturnType<typeof useCalloutEditingHandlers> | null = null;
+
 function EditingHandlersHarness(props: {
   isEditing?: boolean;
   onContentChange: (html: string) => void;
@@ -27,6 +29,7 @@ function EditingHandlersHarness(props: {
     onStartEditing: props.onStartEditing ?? vi.fn(),
     onStopEditing: props.onStopEditing ?? vi.fn(),
   });
+  latestHandlers = handlers;
 
   return (
     <div className="sniptale-callout" onClick={handlers.handleClick}>
@@ -80,6 +83,33 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  latestHandlers = null;
+});
+
+it('retries finishing the same callout after a failed content update', () => {
+  const onContentChange = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw new Error('history rejected');
+    })
+    .mockImplementationOnce(() => undefined);
+  const onStopEditing = vi.fn();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  act(() =>
+    root?.render(
+      <EditingHandlersHarness onContentChange={onContentChange} onStopEditing={onStopEditing} />
+    )
+  );
+  const editable = container.querySelector<HTMLDivElement>('[data-ui="callout-editable"]')!;
+  editable.innerHTML = 'Keep this text';
+
+  expect(() => act(() => latestHandlers?.finishEditing(editable))).toThrow('history rejected');
+  expect(onStopEditing).not.toHaveBeenCalled();
+  act(() => latestHandlers?.finishEditing(editable));
+  expect(onContentChange).toHaveBeenCalledTimes(2);
+  expect(onStopEditing).toHaveBeenCalledOnce();
 });
 
 it('restores title focus when title click starts callout editing', () => {

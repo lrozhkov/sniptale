@@ -110,7 +110,7 @@ function historyValueEqual(left: unknown, right: unknown): boolean {
   return false;
 }
 
-function snapshotsEqual(
+export function snapshotsEqual(
   left: PagePreparationSessionSnapshot,
   right: PagePreparationSessionSnapshot
 ): boolean {

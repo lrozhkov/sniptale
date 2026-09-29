@@ -23,7 +23,8 @@ function renderComponent(
   reset: { canClearPagePreparation: boolean; onClearPagePreparation: () => void } = {
     canClearPagePreparation: false,
     onClearPagePreparation: () => undefined,
-  }
+  },
+  isNavigationMode = false
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -32,7 +33,13 @@ function renderComponent(
   }
 
   act(() => {
-    root?.render(<ToolbarHistoryControls screenshotMode={screenshotMode} {...reset} />);
+    root?.render(
+      <ToolbarHistoryControls
+        screenshotMode={screenshotMode}
+        isNavigationMode={isNavigationMode}
+        {...reset}
+      />
+    );
   });
 }
 
@@ -264,6 +271,30 @@ describe('ToolbarHistoryControls', () => {
     expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
   });
   it('refreshes button state from the subscribed history store', verifySubscribedStateRefresh);
+  it('offers reset for committed changes while an editor keeps a transaction open', () => {
+    historyState = { canRedo: false, canUndo: true, revision: 1 };
+    openTransactions = true;
+    renderComponent(true, { canClearPagePreparation: true, onClearPagePreparation: vi.fn() });
+    expect(
+      container?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.reset-all-button"]')
+        ?.disabled
+    ).toBe(false);
+  });
+  it('shows only Reset all in ordinary navigation and keeps shared history', () => {
+    historyState = { canRedo: true, canUndo: true, revision: 2 };
+    renderComponent(
+      false,
+      { canClearPagePreparation: true, onClearPagePreparation: vi.fn() },
+      true
+    );
+    expect(
+      Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).map(
+        (button) => button.dataset['ui']
+      )
+    ).toEqual(['content.toolbar.reset-all-button']);
+    expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+    expect(pagePreparationHistory.redo).not.toHaveBeenCalled();
+  });
   it(
     'keeps undo and redo disabled until a document-mode transaction closes',
     verifyOpenTransactionBlocksHistoryControls

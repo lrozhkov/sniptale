@@ -3,6 +3,17 @@ import { queryContentUiElement } from '../../../platform/dom-host';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { clearFrameEditing, setFrameEditing } from '../../highlighter';
 import type { FrameData, FrameState } from '../../../../features/highlighter/contracts';
+import { registerInteractiveFrameResetFinalizer } from './reset-finalization';
+
+export function useInteractiveFrameResetFinalization(
+  state: FrameState,
+  handleSaveRef: React.MutableRefObject<() => void>
+): void {
+  React.useEffect(() => {
+    if (state !== 'editing') return;
+    return registerInteractiveFrameResetFinalizer(() => handleSaveRef.current());
+  }, [state, handleSaveRef]);
+}
 
 const logger = createLogger({ namespace: 'ContentInteractiveFrameEditing' });
 

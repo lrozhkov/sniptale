@@ -68,6 +68,7 @@ function createQuickEditRuntimeParts(props: {
     ...modeToggles,
     disableDocumentMode: documentMode.disable,
     enableDocumentMode: documentMode.enable,
+    hasPendingDocumentModeChanges: documentMode.hasPendingChanges,
     isDocumentModeEnabled: documentMode.isEnabled,
   };
 }
@@ -150,6 +151,7 @@ export function createQuickEditRuntimeController(
     documentMode: {
       enable: modeToggles.enableDocumentMode,
       disable: modeToggles.disableDocumentMode,
+      hasPendingChanges: modeToggles.hasPendingDocumentModeChanges,
       isEnabled: modeToggles.isDocumentModeEnabled,
     },
     editing: stateAccessors,

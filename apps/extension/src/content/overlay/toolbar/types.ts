@@ -81,6 +81,7 @@ export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
 export interface ToolbarCaptureActionsProps {
   windowSize?: ScreenshotWindowSizeControls;
   screenshotMode: boolean;
+  videoRecordingMode?: boolean;
   isNavigationMode?: boolean;
   autoBlurEnabled?: boolean;
   canClearPagePreparation?: boolean;

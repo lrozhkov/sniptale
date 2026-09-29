@@ -137,6 +137,7 @@ function HistoryButton(props: { action: 'undo' | 'redo'; canRun: boolean }) {
 
 export function ToolbarHistoryControls(props: {
   screenshotMode: boolean;
+  isNavigationMode?: boolean;
   canClearPagePreparation?: boolean;
   onClearPagePreparation?: () => void;
 }) {
@@ -153,16 +154,14 @@ export function ToolbarHistoryControls(props: {
 
   return (
     <>
-      <HistoryButton action="undo" canRun={canUndo} />
-      <HistoryButton action="redo" canRun={canRedo} />
+      {props.isNavigationMode ? null : <HistoryButton action="undo" canRun={canUndo} />}
+      {props.isNavigationMode ? null : <HistoryButton action="redo" canRun={canRedo} />}
       <ContentToolbarButton
         type="button"
         dataUi="content.toolbar.reset-all-button"
         title={translate('content.toolbar.clearPagePreparation')}
         aria-label={translate('content.toolbar.clearPagePreparation')}
-        disabled={
-          !props.canClearPagePreparation || historyState.hasOpenTransactions || frameEditing
-        }
+        disabled={!props.canClearPagePreparation}
         tone="danger"
         onClick={props.onClearPagePreparation}
       >

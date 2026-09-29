@@ -1,6 +1,7 @@
 import { createLazyContentDefaultOwner } from '../../application/default-owner';
 import { registerContentMode } from '../../application/mode-session';
 import { createQuickEditController } from './controller';
+import { subscribeToQuickEditDocumentModeChanges } from '../quick-edit-runtime/document-mode.history';
 
 const quickEditControllerOwner = createLazyContentDefaultOwner(createQuickEditController);
 
@@ -23,5 +24,11 @@ export function disableQuickEditDocumentMode(): void {
 export function isQuickEditDocumentModeEnabled(): boolean {
   return quickEditControllerOwner.getOwnerIfCreated()?.isDocumentModeEnabled() ?? false;
 }
+
+export function hasPendingQuickEditDocumentModeChanges(): boolean {
+  return quickEditControllerOwner.getOwnerIfCreated()?.hasPendingDocumentModeChanges() ?? false;
+}
+
+export { subscribeToQuickEditDocumentModeChanges };
 
 registerContentMode('quick-edit', disableQuickEditMode);

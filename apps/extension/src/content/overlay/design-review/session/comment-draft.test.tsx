@@ -33,7 +33,11 @@ vi.mock('../../../parser/page-preparation/annotations', async (importOriginal) =
 }));
 
 import { usePageStyleCommentDraft } from './comment-draft';
-import { finalizeDesignReviewCommentDraft } from './comment-draft-finalization';
+import {
+  finalizeDesignReviewCommentDraft,
+  hasPendingDesignReviewCommentDraft,
+  subscribeToDesignReviewCommentDraft,
+} from './comment-draft-finalization';
 
 let host: HTMLDivElement;
 let root: Root | null;
@@ -116,6 +120,26 @@ it('deduplicates blur, panel close, and unmount into one commit', async () => {
   expect(commentMocks.commit).toHaveBeenCalledWith(
     expect.objectContaining({ comment: 'One commit', target: selection.element })
   );
+});
+
+it('publishes only changed comment drafts before shared history commit', async () => {
+  const selection = createSelection('pending-comment');
+  const listener = vi.fn();
+  const unsubscribe = subscribeToDesignReviewCommentDraft(listener);
+  await renderHarness({ open: true, selection });
+  expect(hasPendingDesignReviewCommentDraft()).toBe(false);
+
+  act(() => latest?.updateCommentDraft('Pending comment'));
+  expect(hasPendingDesignReviewCommentDraft()).toBe(true);
+  expect(listener).toHaveBeenCalled();
+  expect(commentMocks.commit).not.toHaveBeenCalled();
+
+  act(() => finalizeDesignReviewCommentDraft());
+  expect(hasPendingDesignReviewCommentDraft()).toBe(false);
+  expect(commentMocks.commit).toHaveBeenCalledWith(
+    expect.objectContaining({ comment: 'Pending comment', target: selection.element })
+  );
+  unsubscribe();
 });
 
 it('commits the previous target once before hydrating the next target', async () => {

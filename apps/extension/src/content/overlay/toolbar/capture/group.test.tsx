@@ -53,7 +53,8 @@ function renderGroup(
   screenshotMode = true,
   canClearPagePreparation = false,
   isNavigationMode = false,
-  autoBlurEnabled = false
+  autoBlurEnabled = false,
+  videoRecordingMode = false
 ) {
   const onPinToTabChange = vi.fn();
   const onClose = vi.fn();
@@ -67,6 +68,7 @@ function renderGroup(
     root?.render(
       <ToolbarCaptureActionGroup
         screenshotMode={screenshotMode}
+        videoRecordingMode={videoRecordingMode}
         isNavigationMode={isNavigationMode}
         autoBlurEnabled={autoBlurEnabled}
         canClearPagePreparation={canClearPagePreparation}
@@ -142,6 +144,16 @@ describe('ToolbarCaptureActionGroup', () => {
   it('shows reset beside history when existing changes can be cleared outside screenshot mode', () => {
     renderGroup(false, true);
     expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).not.toBeNull();
+  });
+
+  it('keeps the disabled Reset all control visible in ordinary navigation', () => {
+    renderGroup(false, false, true);
+    expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).not.toBeNull();
+  });
+
+  it('leaves recording mode to its drawing-only broom', () => {
+    renderGroup(false, true, false, false, true);
+    expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).toBeNull();
   });
 
   it('places Navigation pin and collapse immediately before settings and blocks unpin during auto-blur', () => {

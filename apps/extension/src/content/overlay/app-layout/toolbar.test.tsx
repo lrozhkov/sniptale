@@ -14,14 +14,18 @@ import { INITIAL_VIDEO_RECORDING_TOOLBAR_STATE } from '../video-recording/sessio
 import type { ToolbarVideoRecordingProps } from '../toolbar/types';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
 import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import * as quickEdit from '../../selection/quick-edit';
+import { registerDesignReviewCommentDraftFinalizer } from '../design-review/session/comment-draft-finalization';
 
 const {
   clearAllPagePreparationChangesMock,
+  flushPendingPageStyleHistoryMock,
   preloadContentScenarioRecorderSidebarMock,
   showToastMock,
   toolbarMock,
 } = vi.hoisted(() => ({
   clearAllPagePreparationChangesMock: vi.fn(() => true),
+  flushPendingPageStyleHistoryMock: vi.fn(),
   preloadContentScenarioRecorderSidebarMock: vi.fn(async () => undefined),
   showToastMock: vi.fn(),
   toolbarMock: vi.fn((props: { scenario?: unknown }) => (
@@ -31,6 +35,10 @@ const {
 
 vi.mock('../../application/page-preparation-reset', () => ({
   clearAllPagePreparationChanges: clearAllPagePreparationChangesMock,
+}));
+
+vi.mock('../design-review/runtime/actions', () => ({
+  flushPendingPageStyleHistory: flushPendingPageStyleHistoryMock,
 }));
 
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
@@ -201,6 +209,7 @@ async function renderShell(props: ReturnType<typeof createProps>) {
 function useContentToolbarShellTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
+    flushPendingPageStyleHistoryMock.mockReset();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   });
 
@@ -353,6 +362,194 @@ async function verifiesDrawingOnlyHistoryEnablesResetInNavigation() {
   }
 }
 
+async function verifiesPendingDrawingTextEnablesReset() {
+  const props = createProps();
+  props.toolbar.frameCount = 0;
+  vi.spyOn(pagePreparationHistory, 'getState').mockReturnValue({
+    canRedo: false,
+    canUndo: false,
+    revision: 0,
+  });
+  vi.spyOn(pagePreparationHistory, 'hasPendingSnapshotChanges').mockReturnValue(false);
+  const drawingController = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => true })
+  );
+  drawingController.registerInteractionFinalizer(() =>
+    drawingController.setPendingTextChange?.(false)
+  );
+  props.toolbar.drawingController = drawingController;
+  await renderShell(props);
+  act(() => drawingController.setPendingTextChange?.(true));
+
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    canClearPagePreparation: boolean;
+    onClearPagePreparation: () => void;
+  };
+  expect(lastToolbarProps.canClearPagePreparation).toBe(true);
+  lastToolbarProps.onClearPagePreparation();
+  expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
+}
+
+async function verifiesRejectedDrawingTextPreservesResetState() {
+  const props = createProps();
+  const drawingController = createContentDrawingController(
+    createDrawingSession({ onDocumentCommit: () => false })
+  );
+  drawingController.setPendingTextChange?.(true);
+  props.toolbar.drawingController = drawingController;
+  await renderShell(props);
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onClearPagePreparation: () => void;
+  };
+  lastToolbarProps.onClearPagePreparation();
+  expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
+  expect(showToastMock).toHaveBeenCalledWith('Не удалось очистить часть изменений', 'error');
+}
+
+async function verifiesPendingDesignReviewCommentEnablesReset() {
+  const props = createProps();
+  props.toolbar.frameCount = 0;
+  vi.spyOn(pagePreparationHistory, 'getState').mockReturnValue({
+    canRedo: false,
+    canUndo: false,
+    revision: 0,
+  });
+  vi.spyOn(pagePreparationHistory, 'hasPendingSnapshotChanges').mockReturnValue(false);
+  let pending = true;
+  const finalize = vi.fn(() => {
+    pending = false;
+    return true;
+  });
+  const unregister = registerDesignReviewCommentDraftFinalizer(finalize, () => pending);
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      canClearPagePreparation: boolean;
+      onClearPagePreparation: () => void;
+    };
+    expect(lastToolbarProps.canClearPagePreparation).toBe(true);
+    lastToolbarProps.onClearPagePreparation();
+    expect(finalize).toHaveBeenCalledOnce();
+    expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
+  } finally {
+    act(() => unregister());
+  }
+}
+
+async function verifiesFailedDesignReviewCommentPreservesResetState() {
+  const props = createProps();
+  const unregister = registerDesignReviewCommentDraftFinalizer(
+    () => false,
+    () => true
+  );
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      onClearPagePreparation: () => void;
+    };
+    lastToolbarProps.onClearPagePreparation();
+    expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
+    expect(showToastMock).toHaveBeenCalledWith('Не удалось очистить часть изменений', 'error');
+  } finally {
+    act(() => unregister());
+  }
+}
+
+async function verifiesPendingFrameChangeEnablesReset() {
+  const props = createProps();
+  props.toolbar.frameCount = 0;
+  props.toolbar.modes.screenshotMode = false;
+  const pending = vi
+    .spyOn(pagePreparationHistory, 'hasPendingSnapshotChanges')
+    .mockReturnValue(true);
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      canClearPagePreparation: boolean;
+    };
+    expect(lastToolbarProps.canClearPagePreparation).toBe(true);
+  } finally {
+    pending.mockRestore();
+  }
+}
+
+async function verifiesPendingDocumentEditEnablesReset() {
+  const props = createProps();
+  props.toolbar.frameCount = 0;
+  const pending = vi
+    .spyOn(quickEdit, 'hasPendingQuickEditDocumentModeChanges')
+    .mockReturnValue(true);
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      canClearPagePreparation: boolean;
+    };
+    expect(lastToolbarProps.canClearPagePreparation).toBe(true);
+  } finally {
+    pending.mockRestore();
+  }
+}
+
+async function verifiesFailedOwnerFinalizationPreservesResetState() {
+  const props = createProps();
+  flushPendingPageStyleHistoryMock.mockImplementationOnce(() => {
+    throw new Error('pending Design Review change cannot be finalized');
+  });
+  await renderShell(props);
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onClearPagePreparation: () => void;
+  };
+  lastToolbarProps.onClearPagePreparation();
+  expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
+  expect(showToastMock).toHaveBeenCalledWith('Не удалось очистить часть изменений', 'error');
+}
+
+async function verifiesDocumentModeFinishesBeforeReset() {
+  const props = createProps();
+  const enabled = vi.spyOn(quickEdit, 'isQuickEditDocumentModeEnabled');
+  enabled.mockReturnValueOnce(true).mockReturnValueOnce(false);
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      onClearPagePreparation: () => void;
+    };
+    lastToolbarProps.onClearPagePreparation();
+    expect(props.toolbar.modeController.handleToggleQuickEditDocumentMode).toHaveBeenCalledWith(
+      false
+    );
+    expect(clearAllPagePreparationChangesMock).toHaveBeenCalledOnce();
+  } finally {
+    enabled.mockRestore();
+  }
+}
+
+async function verifiesDocumentModeFailurePreservesResetState() {
+  const props = createProps();
+  const enabled = vi.spyOn(quickEdit, 'isQuickEditDocumentModeEnabled').mockReturnValue(true);
+  try {
+    await renderShell(props);
+    const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+      onClearPagePreparation: () => void;
+    };
+    lastToolbarProps.onClearPagePreparation();
+    expect(clearAllPagePreparationChangesMock).not.toHaveBeenCalled();
+    expect(showToastMock).toHaveBeenCalledWith('Не удалось очистить часть изменений', 'error');
+  } finally {
+    enabled.mockRestore();
+  }
+}
+
+async function verifiesIncompleteResetReportsFailure() {
+  const props = createProps();
+  clearAllPagePreparationChangesMock.mockReturnValueOnce(false);
+  await renderShell(props);
+  const lastToolbarProps = toolbarMock.mock.calls.at(-1)?.[0] as {
+    onClearPagePreparation: () => void;
+  };
+  lastToolbarProps.onClearPagePreparation();
+  expect(showToastMock).toHaveBeenCalledWith('Не удалось очистить часть изменений', 'error');
+}
+
 async function verifiesScenarioSidebarPreloadOnIntent() {
   const props = createProps();
   await renderShell(props);
@@ -502,6 +699,40 @@ describe('ContentToolbarShell', () => {
     'enables reset in navigation when only shared Drawing history exists',
     verifiesDrawingOnlyHistoryEnablesResetInNavigation
   );
+  it('enables reset for an uncommitted Drawing text draft', verifiesPendingDrawingTextEnablesReset);
+  it(
+    'preserves history when a Drawing text draft cannot commit',
+    verifiesRejectedDrawingTextPreservesResetState
+  );
+  it(
+    'enables reset for an uncommitted Design Review comment',
+    verifiesPendingDesignReviewCommentEnablesReset
+  );
+  it(
+    'preserves history when a Design Review comment cannot finish',
+    verifiesFailedDesignReviewCommentPreservesResetState
+  );
+  it(
+    'offers reset for a changed frame before its deferred history commit',
+    verifiesPendingFrameChangeEnablesReset
+  );
+  it(
+    'offers reset for a changed document-mode edit before it closes',
+    verifiesPendingDocumentEditEnablesReset
+  );
+  it(
+    'keeps history when an editor cannot finalize before reset',
+    verifiesFailedOwnerFinalizationPreservesResetState
+  );
+  it(
+    'finishes document mode before clearing page preparation',
+    verifiesDocumentModeFinishesBeforeReset
+  );
+  it(
+    'preserves history when document mode cannot finish',
+    verifiesDocumentModeFailurePreservesResetState
+  );
+  it('reports an incomplete page preparation reset', verifiesIncompleteResetReportsFailure);
   it(
     'keeps the toolbar visible while switching transactionally into video recording mode',
     verifiesVideoModeActivationKeepsToolbarVisible

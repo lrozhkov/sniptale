@@ -8,7 +8,9 @@ import {
   useInteractiveFrameIdleReset,
   useInteractiveFrameEditingKeyboardEffect,
   useInteractiveFrameEditingOverlayEffect,
+  useInteractiveFrameResetFinalization,
 } from './edit-mode-effects';
+import { finalizeInteractiveFrameEditsForReset } from './reset-finalization';
 import type { FrameData } from '../../../../features/highlighter/contracts';
 
 const setFrameEditing = vi.fn();
@@ -80,6 +82,20 @@ function OverlayEffectHarness(props: {
 }
 
 const idleFrame: FrameData = { id: 'frame-1', x: 10, y: 20, width: 100, height: 80 };
+
+it('saves an active frame edit for Reset without invoking cancel', () => {
+  const onSave = vi.fn();
+  const onCancel = vi.fn();
+  function Harness() {
+    const handleSaveRef = React.useRef(onSave);
+    useInteractiveFrameResetFinalization('editing', handleSaveRef);
+    return null;
+  }
+  renderHarness(<Harness />);
+  act(() => finalizeInteractiveFrameEditsForReset());
+  expect(onSave).toHaveBeenCalledOnce();
+  expect(onCancel).not.toHaveBeenCalled();
+});
 
 function IdleResetHarness(props: {
   pendingCalloutFrame: FrameData | null;

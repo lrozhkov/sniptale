@@ -13,6 +13,7 @@ export interface QuickEditRuntimeModeSurface {
 interface QuickEditRuntimeDocumentModeSurface {
   enable: () => void;
   disable: () => void;
+  hasPendingChanges: () => boolean;
   isEnabled: () => boolean;
 }
 

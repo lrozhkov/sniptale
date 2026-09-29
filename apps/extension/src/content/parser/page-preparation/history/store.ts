@@ -5,6 +5,8 @@ import {
   notifyHistoryReachabilityChanged,
   publishHistoryState,
   readHistoryState,
+  snapshotsEqual,
+  captureHistorySnapshot,
   type HistoryClearListener,
   type HistoryListener,
   type HistoryStoreRuntimeState,
@@ -34,6 +36,13 @@ function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
     },
     hasOpenTransactions(): boolean {
       return state.transactions.size > 0;
+    },
+    hasPendingSnapshotChanges(): boolean {
+      const current = captureHistorySnapshot(state);
+      if (!current) return false;
+      return [...state.transactions.values(), ...state.deferredCommits.values()].some(
+        ({ before }) => !snapshotsEqual(before, current)
+      );
     },
     isApplying(): boolean {
       return state.isApplying;
