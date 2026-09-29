@@ -47,7 +47,7 @@ export const galleryAppMessages = defineMessageSource({
   },
   trashEmpty: { ru: 'Корзина пуста', en: 'Trash is empty' },
   trashNoResults: { ru: 'В корзине ничего не найдено', en: 'No matching items in Trash' },
-  trashSearchPlaceholder: { ru: 'Поиск в корзине', en: 'Search Trash' },
+  trashSearchPlaceholder: { ru: 'Поиск', en: 'Search' },
   trashSearchLabel: { ru: 'Поиск в корзине', en: 'Search Trash' },
   trashCleanupFailed: {
     ru: 'Не удалось завершить автоочистку корзины. Оставшиеся материалы сохранены; повторите обновление.',

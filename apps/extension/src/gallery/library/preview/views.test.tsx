@@ -256,14 +256,23 @@ it('keeps Restore as the only Trash item operation across media and project prev
       '[data-ui="gallery.preview.restore"]'
     );
     expect(restore).not.toBeNull();
+    expect(restore?.closest('aside')).not.toBeNull();
+    expect(restore?.closest('section')?.textContent).toContain('gallery.preview.actions');
+    expect(restore?.className).toContain('w-full');
+    expect(restore?.closest('aside')?.className).toContain('overflow-y-auto');
+    expect(
+      container?.querySelector(
+        '[data-ui="gallery.preview.surface"] > div [data-ui="gallery.preview.restore"]'
+      )
+    ).toBeNull();
     expect(container?.querySelector('[data-ui="gallery.videoReview.enter"]')).toBeNull();
-    expect(container?.querySelector('[data-ui="gallery.preview.actions"]')).toBeNull();
+    expect(container?.querySelector('[data-ui="gallery.preview.actions"]')).not.toBeNull();
     expect(container?.querySelector('a[href]')).toBeNull();
     expect(container?.querySelector('input:not([type="range"])')).toBeNull();
   }
 });
 
-it('keeps Trash Restore visible with unavailable content and permits retry', async () => {
+it('keeps Trash Restore in the inspector with unavailable content and permits retry', async () => {
   let resolveFirst!: (value: boolean) => void;
   const onRestoreTrash = vi
     .fn()
@@ -275,7 +284,7 @@ it('keeps Trash Restore visible with unavailable content and permits retry', asy
     )
     .mockResolvedValueOnce(true);
   renderNode(
-    <PreviewMedia
+    <PreviewPanel
       {...createProps({
         previewUrl: null,
         inspectorCollapsed: true,
@@ -288,6 +297,7 @@ it('keeps Trash Restore visible with unavailable content and permits retry', asy
     '[data-ui="gallery.preview.restore"]'
   );
   expect(restore).not.toBeNull();
+  expect(restore?.closest('aside')).not.toBeNull();
   await act(async () => {
     restore?.click();
     restore?.click();
@@ -343,7 +353,7 @@ it('suppresses native audio download affordances in Trash', () => {
 it('disables Restore while another Trash storage operation is busy', () => {
   const onRestoreTrash = vi.fn(async () => true);
   renderNode(
-    <PreviewMedia
+    <PreviewPanel
       {...createProps({
         trashMode: true,
         restoreBusy: true,

@@ -443,8 +443,66 @@ export function PreviewTagEditor(props: {
   );
 }
 
+function PreviewRestoreAction(
+  props: Pick<PreviewPanelProps, 'item' | 'onRestoreTrash' | 'restoreBusy'>
+) {
+  const [status, setStatus] = useState<'idle' | 'pending' | 'failed'>('idle');
+  const pending = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  return (
+    <section
+      key={props.item.id}
+      data-ui="gallery.preview.actions"
+      aria-labelledby="preview-actions-heading"
+    >
+      <div id="preview-actions-heading" className={previewActionGroupLabelClassName}>
+        {translate('gallery.preview.actions')}
+      </div>
+      <div className="space-y-2">
+        <button
+          type="button"
+          data-ui="gallery.preview.restore"
+          disabled={pending.current || props.restoreBusy || !props.onRestoreTrash}
+          aria-busy={status === 'pending'}
+          onClick={async () => {
+            if (pending.current || props.restoreBusy || !props.onRestoreTrash) return;
+            pending.current = true;
+            setStatus('pending');
+            try {
+              const restored = await props.onRestoreTrash();
+              if (mounted.current) setStatus(restored ? 'idle' : 'failed');
+            } catch {
+              if (mounted.current) setStatus('failed');
+            } finally {
+              pending.current = false;
+            }
+          }}
+          className={previewActionButtonClassName}
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          {translate(
+            status === 'pending' ? 'gallery.app.restoringItem' : 'gallery.app.restoreItem'
+          )}
+        </button>
+        {status === 'failed' ? (
+          <p role="alert" className="px-3 text-xs text-[var(--sniptale-color-danger)]">
+            {translate('gallery.app.restoreItemFailed')}
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
 export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
-  if (props.trashMode) return null;
+  if (props.trashMode) return <PreviewRestoreAction {...props} />;
   const { item, onCopy, onDelete, onDownload, onEdit, onResetChanges } = props;
   const canEditMetadata = isMetadataEditable(item);
   const canDelete = !isGalleryScenarioExportItem(item);

@@ -7,10 +7,9 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Plus,
-  RotateCcw,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { GalleryProjectOpenAction } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import {
@@ -64,7 +63,10 @@ function PreviewFloatingControl(props: {
 }
 
 function PreviewInspectorControls(
-  props: Pick<PreviewPanelProps, 'inspectorCollapsed' | 'onClose' | 'onInspectorToggle'>
+  props: Pick<
+    PreviewPanelProps,
+    'inspectorCollapsed' | 'onClose' | 'onInspectorToggle' | 'trashMode'
+  >
 ) {
   const inspectorLabel = props.inspectorCollapsed
     ? translate('gallery.preview.showInspector')
@@ -72,13 +74,15 @@ function PreviewInspectorControls(
 
   return (
     <>
-      <PreviewFloatingControl ariaLabel={inspectorLabel} onClick={props.onInspectorToggle}>
-        {props.inspectorCollapsed ? (
-          <PanelRightOpen className="h-4 w-4" />
-        ) : (
-          <PanelRightClose className="h-4 w-4" />
-        )}
-      </PreviewFloatingControl>
+      {!props.trashMode ? (
+        <PreviewFloatingControl ariaLabel={inspectorLabel} onClick={props.onInspectorToggle}>
+          {props.inspectorCollapsed ? (
+            <PanelRightOpen className="h-4 w-4" />
+          ) : (
+            <PanelRightClose className="h-4 w-4" />
+          )}
+        </PreviewFloatingControl>
+      ) : null}
       <PreviewFloatingControl ariaLabel={translate('common.actions.close')} onClick={props.onClose}>
         <X className="h-4 w-4" />
       </PreviewFloatingControl>
@@ -205,7 +209,10 @@ function PreviewNavigationControls({
 }
 
 function PreviewMediaControls(
-  props: Pick<PreviewPanelProps, 'inspectorCollapsed' | 'onClose' | 'onInspectorToggle'> & {
+  props: Pick<
+    PreviewPanelProps,
+    'inspectorCollapsed' | 'onClose' | 'onInspectorToggle' | 'trashMode'
+  > & {
     isImagePreview: boolean;
     zoomCommandsEnabled: boolean;
     imageZoom: ReturnType<typeof usePreviewImageZoom>;
@@ -352,56 +359,6 @@ function PreviewMediaLoadFeedback(props: { status: 'loading' | 'missing' | 'erro
   );
 }
 
-function PreviewRestoreAction(props: Pick<PreviewPanelProps, 'onRestoreTrash' | 'restoreBusy'>) {
-  const [status, setStatus] = useState<'idle' | 'pending' | 'failed'>('idle');
-  const pending = useRef(false);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  return (
-    <div className="space-y-2 rounded-[8px] bg-[var(--sniptale-color-surface-panel)] p-2 shadow-sm">
-      <button
-        type="button"
-        data-ui="gallery.preview.restore"
-        disabled={pending.current || props.restoreBusy || !props.onRestoreTrash}
-        aria-busy={status === 'pending'}
-        onClick={async () => {
-          if (pending.current || props.restoreBusy || !props.onRestoreTrash) return;
-          pending.current = true;
-          setStatus('pending');
-          try {
-            const restored = await props.onRestoreTrash();
-            if (mounted.current) setStatus(restored ? 'idle' : 'failed');
-          } catch {
-            if (mounted.current) setStatus('failed');
-          } finally {
-            pending.current = false;
-          }
-        }}
-        className="inline-flex min-h-9 items-center gap-2 rounded-[8px] border
-          border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)]
-          px-3 text-sm font-semibold text-[var(--sniptale-color-accent-emphasis)]
-          transition-colors hover:bg-[var(--sniptale-color-surface-hover)]
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]
-          disabled:cursor-not-allowed disabled:opacity-55"
-      >
-        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-        {translate(status === 'pending' ? 'gallery.app.restoringItem' : 'gallery.app.restoreItem')}
-      </button>
-      {status === 'failed' ? (
-        <p role="alert" className="max-w-64 text-xs text-[var(--sniptale-color-danger)]">
-          {translate('gallery.app.restoreItemFailed')}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
 export function PreviewMedia(
   props: Pick<
     PreviewPanelProps,
@@ -413,8 +370,6 @@ export function PreviewMedia(
     | 'previewUrl'
     | 'previewLoadStatus'
     | 'onEdit'
-    | 'onRestoreTrash'
-    | 'restoreBusy'
     | 'trashMode'
   >
 ) {
@@ -477,18 +432,13 @@ export function PreviewMedia(
           var(--sniptale-color-surface-canvas)_100%
         )]"
     >
-      <div className="absolute bottom-4 left-4 z-20">
-        {props.trashMode ? (
-          <PreviewRestoreAction
-            key={props.item.id}
-            restoreBusy={Boolean(props.restoreBusy)}
-            {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
-          />
-        ) : (
+      {!props.trashMode ? (
+        <div className="absolute bottom-4 left-4 z-20">
           <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
-        )}
-      </div>
+        </div>
+      ) : null}
       <PreviewMediaControls
+        trashMode={Boolean(props.trashMode)}
         inspectorCollapsed={props.inspectorCollapsed}
         isImagePreview={isImageTarget}
         zoomCommandsEnabled={zoomCommandsEnabled}

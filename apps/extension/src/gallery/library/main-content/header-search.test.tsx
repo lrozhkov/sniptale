@@ -4,6 +4,7 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { GalleryHeaderSearchField } from './header-search';
+import { galleryAppMessages } from '../../../platform/i18n/messages/gallery/app';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -79,6 +80,11 @@ it('commits Enter immediately while ignoring an active IME composition', () => {
   act(() => root?.render(<SearchProbe trashMode />));
   const input = container?.querySelector<HTMLInputElement>('input');
   expect(input?.getAttribute('aria-label')).toBe('gallery.app.trashSearchLabel');
+  expect(galleryAppMessages.trashSearchPlaceholder).toEqual({ ru: 'Поиск', en: 'Search' });
+  expect(galleryAppMessages.trashSearchLabel).toEqual({
+    ru: 'Поиск в корзине',
+    en: 'Search Trash',
+  });
   act(() => typeSearch(input!, 'deleted material'));
 
   act(() => {

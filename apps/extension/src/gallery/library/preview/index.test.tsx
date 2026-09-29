@@ -35,23 +35,9 @@ vi.mock('../../video-review', () => ({
 }));
 
 vi.mock('./media', () => ({
-  PreviewMedia: (
-    props: Pick<
-      PreviewPanelProps,
-      'item' | 'onClose' | 'previewUrl' | 'trashMode' | 'onRestoreTrash'
-    >
-  ) => (
+  PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'onClose' | 'previewUrl'>) => (
     <div data-ui="preview.media">
       {props.item.filename}:{props.previewUrl ?? 'no-preview'}
-      {props.trashMode ? (
-        <button
-          type="button"
-          data-ui="gallery.preview.restore"
-          onClick={() => void props.onRestoreTrash?.()}
-        >
-          Restore
-        </button>
-      ) : null}
       <button type="button" data-ui="preview.close" onClick={props.onClose}>
         close
       </button>
@@ -60,7 +46,20 @@ vi.mock('./media', () => ({
 }));
 
 vi.mock('./sidebar-sections', () => ({
-  PreviewActions: () => <div data-ui="preview.actions" />,
+  PreviewActions: (props: Pick<PreviewPanelProps, 'trashMode' | 'onRestoreTrash'>) =>
+    props.trashMode ? (
+      <section data-ui="preview.actions">
+        <button
+          type="button"
+          data-ui="gallery.preview.restore"
+          onClick={() => void props.onRestoreTrash?.()}
+        >
+          Restore
+        </button>
+      </section>
+    ) : (
+      <div data-ui="preview.actions" />
+    ),
   PreviewMetadataCards: (props: Pick<PreviewPanelProps, 'item'>) => (
     <div data-ui="preview.metadata">{props.item.mimeType}</div>
   ),
@@ -216,7 +215,7 @@ it('shows Trash source and filename as inert metadata', () => {
   expect(container?.querySelector('a[href]')).toBeNull();
   expect(container?.querySelector('input:not([type="range"])')).toBeNull();
   expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
-  expect(container?.querySelector('[data-ui="preview.actions"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.actions"]')).not.toBeNull();
 });
 
 it('renders unsafe source urls as inert text instead of links', () => {
@@ -321,7 +320,7 @@ it('focuses Trash Restore and returns focus to opener or surviving search on clo
   });
   render(props);
   expect(document.activeElement?.getAttribute('data-ui')).toBe('gallery.preview.restore');
-  expect(container?.querySelector('aside')).toBeNull();
+  expect(container?.querySelector('aside [data-ui="gallery.preview.restore"]')).not.toBeNull();
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
   expect(props.onClose).toHaveBeenCalledOnce();
   await act(async () => root?.render(null));
@@ -347,7 +346,7 @@ it('focuses Trash Restore and returns focus to opener or surviving search on clo
   searchLabel.remove();
 });
 
-it('keeps keyboard focus within a collapsed Trash preview', () => {
+it('keeps keyboard focus within a Trash preview with the inspector open', () => {
   render(
     createProps({
       trashMode: true,
@@ -359,19 +358,19 @@ it('keeps keyboard focus within a collapsed Trash preview', () => {
     '[data-ui="gallery.preview.restore"]'
   );
   const close = container?.querySelector<HTMLButtonElement>('[data-ui="preview.close"]');
-  close?.focus();
+  restore?.focus();
   act(() =>
-    close?.dispatchEvent(
+    restore?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     )
   );
-  expect(document.activeElement).toBe(restore);
+  expect(document.activeElement).toBe(close);
   act(() =>
-    restore?.dispatchEvent(
+    close?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
     )
   );
-  expect(document.activeElement).toBe(close);
+  expect(document.activeElement).toBe(restore);
 });
 
 it('keeps focus on Restore when navigating between Trash previews in one session', async () => {

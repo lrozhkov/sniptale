@@ -133,7 +133,7 @@ function PreviewPanelSidebar(props: PreviewPanelProps & { onReview?: () => void 
           onRemoveTag={props.onRemoveTag}
           onAddTag={props.onAddTag}
         />
-        {!props.trashMode ? <PreviewActions {...props} /> : null}
+        <PreviewActions key={props.item.id} {...props} />
       </div>
     </aside>
   );
@@ -233,6 +233,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
 function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
   const { onReview, ...panel } = props;
   const { item, previewUrl, onClose } = panel;
+  const inspectorCollapsed = !props.trashMode && props.inspectorCollapsed;
   const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!props.trashMode) return;
@@ -287,22 +288,20 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             border border-[var(--sniptale-color-border-soft)]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]
             text-[var(--sniptale-color-text-primary)] shadow-sm
-            ${props.inspectorCollapsed ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_360px]'}`}
+            ${inspectorCollapsed ? 'grid-cols-[minmax(0,1fr)]' : 'grid-cols-[minmax(0,1fr)_360px]'}`}
         >
           <PreviewMedia
             onEdit={props.onEdit}
             trashMode={Boolean(props.trashMode)}
-            restoreBusy={Boolean(props.restoreBusy)}
-            {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
             item={item}
             previewUrl={previewUrl}
             previewLoadStatus={props.previewLoadStatus}
-            inspectorCollapsed={props.inspectorCollapsed}
+            inspectorCollapsed={inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
             onInspectorToggle={props.onInspectorToggle}
             onClose={onClose}
           />
-          {props.inspectorCollapsed ? null : (
+          {inspectorCollapsed ? null : (
             <PreviewPanelSidebar
               {...panel}
               {...(!props.trashMode &&
