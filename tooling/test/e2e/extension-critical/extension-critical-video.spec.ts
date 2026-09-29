@@ -164,6 +164,121 @@ test('timeline clip hover remains attached while crossing artwork and trim handl
   }
 });
 
+for (const locale of ['ru', 'en'] as const) {
+  test(`left library panel controls stay separate at minimum HD width in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const project = createEmptyVideoProject('Narrow panel');
+    project.duration = 10;
+    const track = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
+    project.tracks.push(track);
+    const videoAsset = createVideoProjectAsset(
+      'Video',
+      VideoProjectAssetType.VIDEO,
+      { kind: 'project-asset', projectAssetId: 'panel-video' },
+      {
+        width: 1280,
+        height: 720,
+        duration: 4,
+        mimeType: 'video/webm',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const asset = createVideoProjectAsset(
+      'Audio',
+      VideoProjectAssetType.AUDIO,
+      { kind: 'project-asset', projectAssetId: 'panel-audio' },
+      {
+        width: 0,
+        height: 0,
+        duration: 4,
+        mimeType: 'audio/webm',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    project.assets.push(videoAsset, asset);
+    project.clips.push(
+      createVideoClipFromAsset(project.tracks[0]!.id, videoAsset, project.width, project.height)
+    );
+    project.clips.push(createAudioClipFromAsset(track.id, asset));
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [project],
+      storage: {
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': 'light',
+      },
+    });
+    await page.addInitScript((value) => {
+      localStorage.setItem('sniptale-locale-preference', value);
+    }, locale);
+    await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`);
+    await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(2);
+    const panel = page.locator('[data-ui="video-editor.library.panel"]');
+    if (!(await panel.isVisible())) {
+      await page.locator('[data-ui="video-editor.viewer.open-materials"]').click();
+    }
+    await expect(panel).toBeVisible();
+    const resize = page.locator('[data-ui="video-editor.materials.resize"]');
+    await resize.focus();
+    for (let index = 0; index < 10; index += 1) await resize.press('ArrowLeft');
+    await expect(resize).toHaveAttribute('aria-valuenow', '240');
+    const actions = ['materials', 'annotations', 'effects', 'transitions'].map(
+      (section) => `[data-ui="video-editor.library-tab.${section}"]`
+    );
+    actions.push('[data-ui="video-editor.materials.dock-toggle"]');
+    actions.push('[data-ui="video-editor.materials.close"]');
+    const bounds = await Promise.all(
+      actions.map((selector) => panel.locator(selector).boundingBox())
+    );
+    const panelBounds = await panel.boundingBox();
+    expect(panelBounds).not.toBeNull();
+    for (let index = 0; index < bounds.length; index += 1) {
+      const current = bounds[index];
+      if (!current || !panelBounds) throw new Error('Missing left panel control geometry');
+      expect(current.x).toBeGreaterThanOrEqual(panelBounds.x);
+      expect(current.x + current.width).toBeLessThanOrEqual(panelBounds.x + panelBounds.width);
+      if (index > 0) {
+        const previous = bounds[index - 1]!;
+        expect(current.x).toBeGreaterThanOrEqual(previous.x + previous.width);
+      }
+    }
+    const dock = panel.locator('[data-ui="video-editor.materials.dock-toggle"]');
+    await dock.click();
+    await expect(dock).toHaveAttribute('aria-pressed', 'true');
+    await page.reload();
+    await expect(page.locator('[data-ui="video-editor.materials.resize"]')).toHaveAttribute(
+      'aria-valuenow',
+      '240'
+    );
+    await page.evaluate(() => {
+      document.body.style.zoom = '1.25';
+    });
+    const scaledBounds = await Promise.all(
+      actions.map((selector) => panel.locator(selector).boundingBox())
+    );
+    for (let index = 1; index < scaledBounds.length; index += 1) {
+      const previous = scaledBounds[index - 1];
+      const current = scaledBounds[index];
+      if (!previous || !current) throw new Error('Missing zoomed panel control geometry');
+      expect(current.x).toBeGreaterThanOrEqual(previous.x + previous.width);
+    }
+    await panel.locator('[data-ui="video-editor.materials.close"]').click();
+    await expect(panel).toHaveCount(0);
+    await page.locator('[data-ui="video-editor.viewer.open-materials"]').click();
+    await expect(page.locator('[data-ui="video-editor.materials.resize"]')).toHaveAttribute(
+      'aria-valuenow',
+      '240'
+    );
+  });
+}
+
 async function expectVideoEditorStackSpacingCompatibility(page: Page): Promise<void> {
   await expect
     .poll(() =>

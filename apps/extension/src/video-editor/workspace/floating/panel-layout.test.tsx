@@ -71,6 +71,12 @@ it('resizes each pane independently and restores its default with double click o
   expect(width('inspector')).toBe(320);
 });
 
+it('stops the left panel at the width needed by all navigation and header actions', () => {
+  for (let index = 0; index < 10; index += 1) key('materials', 'ArrowLeft');
+  expect(width('materials')).toBe(240);
+  expect(pane('materials').getAttribute('aria-valuemin')).toBe('240');
+});
+
 it('keeps a usable HD viewer when both panes expand and the viewport narrows', () => {
   act(() => {
     frameWidth = 1920;
