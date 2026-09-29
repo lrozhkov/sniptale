@@ -1,9 +1,9 @@
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, type GalleryItem } from '../items';
 import { formatDate, getRecordingGroupRoleLabel } from '../ui';
-import { Clock3 } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { GalleryProjectOpenAction, getGalleryProjectSummary } from '../ui/project-presentation';
+import { GalleryGridCardDate } from './grid-card-date';
 
 interface GalleryCardDetailsProps {
   compact?: boolean;
@@ -236,17 +236,6 @@ export function GalleryListDetails(
 }
 
 export function GalleryGridDetails(props: GalleryCardDetailsProps) {
-  const isDraft = props.item.lifecycle?.storageClass === 'temporary';
-  const dateLabel = formatDate(
-    isDraft && props.item.expiresAt ? props.item.expiresAt : props.item.createdAt
-  );
-  const draftClassName = isDraft ? 'font-medium text-[var(--sniptale-color-warning)]' : '';
-  const draftHint = isDraft
-    ? props.item.expiresAt
-      ? `${translate('gallery.app.draftExpires')} ${formatDate(props.item.expiresAt)}`
-      : translate('gallery.app.draftNoExpiration')
-    : undefined;
-
   return (
     <button
       type="button"
@@ -277,10 +266,7 @@ export function GalleryGridDetails(props: GalleryCardDetailsProps) {
         className={`flex items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]`}
       >
-        <span className={`flex min-w-0 items-center gap-1 ${draftClassName}`} title={draftHint}>
-          {isDraft ? <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-          <span className="truncate">{dateLabel}</span>
-        </span>
+        <GalleryGridCardDate items={[props.item]} />
         <span className="shrink-0">
           {props.item.size > 0
             ? props.compact

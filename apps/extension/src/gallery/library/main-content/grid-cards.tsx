@@ -2,7 +2,6 @@ import { GalleryProjectDetails } from '../ui/project-presentation';
 import { getGalleryGridCardLayout, GRID_GAP } from '../constants';
 import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../items';
 import {
-  formatDate,
   getGalleryItemKindLabel,
   getKindIcon,
   getRecordingGroupRoleLabel,
@@ -16,10 +15,11 @@ import {
 } from './grid-card-details';
 import type { GalleryMainContentProps } from './types';
 import { translate } from '../../../platform/i18n';
-import { Clock3, Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { getGallerySelectionButtonClassName } from './selection-button-style';
+import { GalleryGridCardDate } from './grid-card-date';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -347,23 +347,6 @@ function getRecordingGroupItems(items: GalleryItem[], representative: GalleryIte
     );
 }
 
-function resolveRecordingGroupDraftPresentation(items: GalleryItem[]) {
-  const draftItems = items.filter((item) => item.lifecycle?.storageClass === 'temporary');
-  if (draftItems.length === 0) return null;
-
-  const expirationDates = draftItems
-    .map((item) => item.expiresAt)
-    .filter((expiresAt): expiresAt is number => expiresAt !== undefined);
-  const expiresAt = expirationDates.length > 0 ? Math.min(...expirationDates) : undefined;
-
-  return {
-    dateLabel: formatDate(expiresAt ?? draftItems[0]!.createdAt),
-    hint: expiresAt
-      ? `${translate('gallery.app.draftExpires')} ${formatDate(expiresAt)}`
-      : translate('gallery.app.draftNoExpiration'),
-  };
-}
-
 function GalleryRecordingGroupDetails(props: {
   items: GalleryItem[];
   onRecordingGroupOpen?: (item: GalleryItem) => void;
@@ -376,8 +359,6 @@ function GalleryRecordingGroupDetails(props: {
   const editorItem = props.items.find(
     (item) => isGalleryMediaItem(item) && Boolean(item.recordingGroupView?.projectId)
   );
-  const draftPresentation = resolveRecordingGroupDraftPresentation(props.items);
-  const dateLabel = draftPresentation?.dateLabel ?? formatDate(firstItem.createdAt);
   const projectName = props.items.find(isGalleryMediaItem)?.recordingGroupView?.projectName;
   const totalSize = props.items.reduce((total, item) => total + item.size, 0);
 
@@ -419,18 +400,7 @@ function GalleryRecordingGroupDetails(props: {
         className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
           text-[var(--sniptale-color-text-muted)]"
       >
-        <span
-          className={cx(
-            'flex min-w-0 items-center gap-1',
-            draftPresentation && 'font-medium text-[var(--sniptale-color-warning)]'
-          )}
-          title={draftPresentation?.hint}
-        >
-          {draftPresentation ? (
-            <Clock3 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          ) : null}
-          <span className="truncate">{dateLabel}</span>
-        </span>
+        <GalleryGridCardDate items={props.items} />
         <span className="shrink-0">
           {totalSize > 0
             ? isCompact
