@@ -2,6 +2,9 @@ import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
   trashTitle: { ru: 'Корзина', en: 'Trash' },
+  trashSummaryCount: { ru: 'Удалено', en: 'Deleted' },
+  trashSizeLoading: { ru: 'Подсчёт объёма…', en: 'Calculating size…' },
+  trashSizeUnavailable: { ru: 'Объём недоступен', en: 'Size unavailable' },
   returnToLibrary: { ru: 'Вернуться в библиотеку', en: 'Return to library' },
   trashDescription: {
     ru: 'Выберите материалы для восстановления или окончательного удаления. По умолчанию корзина хранится без ограничения срока. Автоочистка включается в настройках хранения.',

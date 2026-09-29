@@ -21,6 +21,7 @@ import type {
   GalleryFacetFilterId,
   GalleryFacetFilters,
   GalleryScope,
+  GalleryTrashSummary,
   GalleryPreviewSessionState,
   SortMode,
 } from '../library/types';
@@ -113,6 +114,7 @@ interface GalleryAppDerivedState {
   counts: GalleryFolderCounts;
   facets: GalleryFacetDefinition[];
   filteredItems: GalleryItem[];
+  trashSummary: GalleryTrashSummary;
   activeStorageBarClass: string;
   visibleItems: GalleryItem[];
   gridWidth: number;

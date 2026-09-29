@@ -6,10 +6,12 @@ import type {
   GalleryFacetFilters,
   GalleryFolderCounts,
   GalleryScope,
+  GalleryTrashSummary,
 } from '../types';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface GallerySidebarProps {
+  trashSummary?: GalleryTrashSummary;
   trashMode?: boolean;
   busy?: boolean;
   selectedCount?: number;

@@ -10,6 +10,7 @@ import {
 import type { GalleryAppState } from './types';
 import type { GalleryViewMode } from './types';
 import type { GalleryItem } from '../library/items';
+import { isGallerySelectableItem } from '../library/items';
 import type { useGalleryFilterState } from './useGalleryFilterState';
 import type { useGalleryLibraryState } from './useGalleryLibraryState';
 import type { useGalleryViewportState } from './useGalleryViewportState';
@@ -33,6 +34,15 @@ function getSelectedGalleryItems(
 
 function getSelectedGallerySize(items: GalleryLibraryState['items']) {
   return items.reduce((total, item) => total + item.size, 0);
+}
+
+function getGalleryTrashRootCount(items: GalleryLibraryState['items']): number {
+  const roots = new Set<string>();
+  for (const item of items) {
+    if (item.lifecycle?.trashedAt === undefined || !isGallerySelectableItem(item)) continue;
+    roots.add(`${item.kind}:${item.entityId ?? item.id}`);
+  }
+  return roots.size;
 }
 
 function getDerivedFilteredGalleryItems(args: {
@@ -165,6 +175,13 @@ export function useGalleryDerivedState(props: {
     [props.library.items, filters.state.trashMode]
   );
   const library = { ...props.library, items: modeItems };
+  const trashSummary = useMemo(
+    () => ({
+      count: getGalleryTrashRootCount(props.library.items),
+      size: props.library.trashUsage,
+    }),
+    [props.library.items, props.library.trashUsage]
+  );
   const modeFilters = filters.state.trashMode
     ? {
         ...filters,
@@ -219,6 +236,7 @@ export function useGalleryDerivedState(props: {
     gridMetrics,
     selectedItems: selectionState.selectedItems,
     selectedSize: selectionState.selectedSize,
+    trashSummary,
   } satisfies Pick<
     GalleryAppState['derived'],
     | 'activeStorageBarClass'
@@ -228,6 +246,7 @@ export function useGalleryDerivedState(props: {
     | 'facets'
     | 'filteredItems'
     | 'gridMetrics'
+    | 'trashSummary'
   > &
     Pick<GalleryAppState['selection'], 'selectedItems' | 'selectedSize'> & {
       gridMetrics: GalleryAppState['derived']['gridMetrics'] & { visibleItems: GalleryItem[] };

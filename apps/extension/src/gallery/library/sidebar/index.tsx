@@ -1,7 +1,9 @@
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react';
-import { translate } from '../../../platform/i18n';
+import { formatNumber, getCurrentLocale, translate } from '../../../platform/i18n';
+import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import type { GallerySidebarProps } from './types';
+import type { GalleryTrashSummary } from '../types';
 import {
   InspectorShellFrame,
   InspectorShellPanel,
@@ -23,6 +25,37 @@ const gallerySidebarPanelClassName = [
     ')]',
   ].join(' '),
 ].join(' ');
+
+const trashButtonClassName = [
+  'flex min-h-14 min-w-0 w-full cursor-pointer flex-col items-center justify-center gap-1',
+  'rounded-[var(--sniptale-radius-sm)] border border-[var(--sniptale-color-border-soft)]',
+  'bg-transparent px-2 py-2 text-center transition-colors',
+  'hover:border-[var(--sniptale-color-border-strong)] hover:bg-[var(--sniptale-color-surface-hover)]',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
+  'focus-visible:ring-[var(--sniptale-color-accent)]',
+  'disabled:cursor-not-allowed disabled:opacity-55',
+].join(' ');
+
+function GalleryTrashSummaryText({ summary }: { summary: GalleryTrashSummary | undefined }) {
+  const size = summary?.size;
+  const sizeText =
+    size?.status === 'ready'
+      ? formatBytes(size.bytes)
+      : translate(
+          size?.status === 'unavailable'
+            ? 'gallery.app.trashSizeUnavailable'
+            : 'gallery.app.trashSizeLoading'
+        );
+
+  return (
+    <>
+      {translate('gallery.app.trashSummaryCount')}:{' '}
+      {formatNumber(summary?.count ?? 0, undefined, getCurrentLocale())}
+      <span aria-hidden="true"> · </span>
+      {sizeText}
+    </>
+  );
+}
 
 export function GallerySidebar(props: GallerySidebarProps) {
   return (
@@ -52,15 +85,28 @@ export function GallerySidebar(props: GallerySidebarProps) {
           <button
             type="button"
             disabled={props.busy}
-            className={`${getControlSecondaryButtonClassName({ density: 'compact' })} max-w-full`}
+            className={
+              props.trashMode
+                ? `${getControlSecondaryButtonClassName({ density: 'compact' })} max-w-full`
+                : trashButtonClassName
+            }
             onClick={() => props.onTrashModeChange?.(!props.trashMode)}
           >
-            {props.trashMode ? (
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            ) : (
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            )}
-            {translate(props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle')}
+            <span className="flex min-w-0 items-center justify-center gap-2 text-xs font-semibold">
+              {props.trashMode ? (
+                <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+              )}
+              {translate(
+                props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle'
+              )}
+            </span>
+            {!props.trashMode ? (
+              <span className="max-w-full truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
+                <GalleryTrashSummaryText summary={props.trashSummary} />
+              </span>
+            ) : null}
           </button>
         </div>
       </InspectorShellPanel>
@@ -94,6 +140,13 @@ function GalleryTrashControls(props: GallerySidebarProps) {
         <RotateCcw className="h-4 w-4" aria-hidden="true" />
         {translate('gallery.app.restoreTrash')}
       </button>
+      <p
+        data-ui="gallery.trash.summary"
+        role="status"
+        className="text-xs text-[var(--sniptale-color-text-secondary)]"
+      >
+        <GalleryTrashSummaryText summary={props.trashSummary} />
+      </p>
       <div className="mt-3 flex flex-col gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <button
           type="button"

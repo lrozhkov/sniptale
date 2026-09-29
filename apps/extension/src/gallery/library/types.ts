@@ -27,6 +27,16 @@ export type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size-de
 export type GalleryScope = LibraryFilterScope;
 export type GalleryViewMode = 'list' | 'compact-grid' | 'large-grid';
 
+export type GalleryTrashSize =
+  | { status: 'loading' }
+  | { status: 'ready'; bytes: number }
+  | { status: 'unavailable' };
+
+export interface GalleryTrashSummary {
+  count: number;
+  size: GalleryTrashSize;
+}
+
 export type GalleryFacetFilterId = LibraryFacetId;
 
 export type GalleryFacetId = 'status' | 'tags' | GalleryFacetFilterId;

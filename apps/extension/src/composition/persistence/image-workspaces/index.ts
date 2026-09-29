@@ -28,6 +28,11 @@ export async function recoverAndListStoredImageWorkspaces(): Promise<StoredImage
   return readStoredImageWorkspaces();
 }
 
+/** Enumerates persisted workspaces without running publication recovery. */
+export async function listStoredImageWorkspaces(): Promise<StoredImageWorkspaceEntry[]> {
+  return readStoredImageWorkspaces();
+}
+
 export async function recoverAndListImageWorkspaces(): Promise<ImageWorkspaceEntry[]> {
   return hydrateImageWorkspaces(await recoverAndListStoredImageWorkspaces());
 }

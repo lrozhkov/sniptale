@@ -231,6 +231,7 @@ function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>)
     expect.objectContaining({
       counts: expect.objectContaining({ scenario: 1 }),
       facets: [expect.objectContaining({ id: 'format' })],
+      trashSummary: withStorage.state.derived.trashSummary,
     })
   );
   expect(headerPropsMock).toHaveBeenCalledWith(

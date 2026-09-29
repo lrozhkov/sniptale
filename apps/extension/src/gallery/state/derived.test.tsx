@@ -31,6 +31,7 @@ let latestValue: ReturnType<typeof useGalleryDerivedState> | null = null;
 
 const item = {
   id: 'asset-1',
+  type: 'media' as const,
   kind: 'screenshot' as const,
   filename: 'capture.png',
   originalFilename: 'capture.png',
@@ -106,6 +107,7 @@ function createProbeProps(
       isLoading: false,
       items: [item],
       refresh: vi.fn(),
+      trashUsage: { status: 'ready', bytes: 0 },
       storageInfo:
         storagePressure === undefined
           ? null
@@ -208,6 +210,7 @@ it('partitions trash before normal facets, counts, selection and search; trash i
   props.library.items = [item, trashed];
   props.filters.state.selectedIds = new Set(['asset-1', 'trashed']);
   act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.trashSummary.count).toBe(1);
   expect(latestValue?.allItems).toEqual([item]);
   expect(latestValue?.selectedItems).toEqual([item]);
   expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([item]);
@@ -216,6 +219,7 @@ it('partitions trash before normal facets, counts, selection and search; trash i
   );
   props.filters.state.trashMode = true;
   act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.trashSummary.count).toBe(1);
   expect(latestValue?.allItems).toEqual([trashed]);
   expect(latestValue?.selectedItems).toEqual([trashed]);
   expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(

@@ -1,5 +1,8 @@
 import { listAggregatePresentations } from '../aggregate-presentations';
-import { recoverAndListStoredImageWorkspaces } from '../image-workspaces';
+import {
+  listStoredImageWorkspaces,
+  recoverAndListStoredImageWorkspaces,
+} from '../image-workspaces';
 import { getMediaThumbnail, listMediaLibrary } from '../media-library';
 import { listVideoProjectEntries } from '../projects';
 import {
@@ -15,34 +18,53 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 export interface LibraryStorageUsage {
   draftsBytes: number;
   libraryBytes: number;
+  /** Logical bytes retained by trashed roots, including shared assets once within Trash. */
+  trashBytes: number;
   totalBytes: number;
 }
 
 type StorageClass = 'temporary' | 'library';
 
-export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
+/** Existing callers recover image publications; read-only callers can suppress recovery. */
+export async function getLibraryStorageUsage(
+  options: { recoverImageWorkspaces?: boolean } = {}
+): Promise<LibraryStorageUsage> {
   const [media, videoProjects, scenarioProjects, imageWorkspaces, presentations, assetAuthority] =
     await Promise.all([
       listMediaLibrary(),
       listVideoProjectEntries(),
       listScenarioProjectEntries(),
-      recoverAndListStoredImageWorkspaces(),
+      options.recoverImageWorkspaces === false
+        ? listStoredImageWorkspaces()
+        : recoverAndListStoredImageWorkspaces(),
       listAggregatePresentations(),
       loadAssetUsageAuthority(),
     ]);
-  const usage: LibraryStorageUsage = { draftsBytes: 0, libraryBytes: 0, totalBytes: 0 };
+  const usage: LibraryStorageUsage = {
+    draftsBytes: 0,
+    libraryBytes: 0,
+    trashBytes: 0,
+    totalBytes: 0,
+  };
   const countedPhysicalAssetIds = new Set<string>();
-  const addBytes = (size: number, storageClass: StorageClass) => {
+  const countedTrashAssetIds = new Set<string>();
+  const addBytes = (size: number, storageClass: StorageClass, trashed: boolean) => {
     const safeSize = Math.max(0, size);
     usage.totalBytes += safeSize;
     if (storageClass === 'temporary') usage.draftsBytes += safeSize;
     else usage.libraryBytes += safeSize;
+    if (trashed) usage.trashBytes += safeSize;
   };
   const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
-  const addPhysicalAsset = (assetId: string, storageClass: StorageClass) => {
+  const addPhysicalAsset = (assetId: string, storageClass: StorageClass, trashed: boolean) => {
+    const size = assetAuthority.refsById.get(assetId)?.size ?? 0;
+    if (trashed && !countedTrashAssetIds.has(assetId)) {
+      countedTrashAssetIds.add(assetId);
+      usage.trashBytes += Math.max(0, size);
+    }
     if (countedPhysicalAssetIds.has(assetId)) return;
     countedPhysicalAssetIds.add(assetId);
-    addBytes(assetAuthority.refsById.get(assetId)?.size ?? 0, storageClass);
+    addBytes(size, storageClass, false);
   };
   const mediaById = new Map(media.map((entry) => [entry.id, entry]));
   const videoById = new Map(videoProjects.map((entry) => [entry.id, entry]));
@@ -50,37 +72,43 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
 
   for (const entry of media) {
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
-    if (!entry.source) addBytes(entry.size, storageClass);
+    const trashed = entry.lifecycle?.trashedAt !== undefined;
+    if (!entry.source) addBytes(entry.size, storageClass, trashed);
     else {
       for (const assetId of resolveMediaPhysicalAssetIds(entry, assetAuthority)) {
-        addPhysicalAsset(assetId, storageClass);
+        addPhysicalAsset(assetId, storageClass, trashed);
       }
-      if (entry.source.kind === 'screenshot') addBytes(entry.size, storageClass);
+      if (entry.source.kind === 'screenshot') addBytes(entry.size, storageClass, trashed);
     }
     if (entry.hasThumbnail) {
       const thumbnail = await getMediaThumbnail(entry.id);
-      if (thumbnail) addBytes(thumbnail.blob.size, storageClass);
+      if (thumbnail) addBytes(thumbnail.blob.size, storageClass, trashed);
     }
   }
   for (const workspace of imageWorkspaces) {
     const parent = mediaById.get(workspace.aggregateId);
     if (parent) {
-      addBytes(jsonBytes(workspace), parent.lifecycle?.storageClass ?? 'library');
+      const storageClass = parent.lifecycle?.storageClass ?? 'library';
+      const trashed = parent.lifecycle?.trashedAt !== undefined;
+      addBytes(jsonBytes(workspace), storageClass, trashed);
       for (const assetId of new Set(workspace.document.assets.map((asset) => asset.assetId))) {
-        addPhysicalAsset(assetId, parent.lifecycle?.storageClass ?? 'library');
+        addPhysicalAsset(assetId, storageClass, trashed);
       }
     }
   }
   for (const entry of videoProjects) {
-    addBytes(jsonBytes(entry.project), entry.lifecycle?.storageClass ?? 'library');
+    const storageClass = entry.lifecycle?.storageClass ?? 'library';
+    const trashed = entry.lifecycle?.trashedAt !== undefined;
+    addBytes(jsonBytes(entry.project), storageClass, trashed);
     const legacyThumbnail = await getMediaThumbnail(`video-project:${entry.id}`);
     if (legacyThumbnail) {
-      addBytes(legacyThumbnail.blob.size, entry.lifecycle?.storageClass ?? 'library');
+      addBytes(legacyThumbnail.blob.size, storageClass, trashed);
     }
   }
   for (const entry of scenarioProjects) {
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
-    addBytes(jsonBytes(entry.project), storageClass);
+    const trashed = entry.lifecycle?.trashedAt !== undefined;
+    addBytes(jsonBytes(entry.project), storageClass, trashed);
     const [assets, exports, stepDocuments, legacyThumbnail] = await Promise.all([
       listScenarioAssets(entry.id),
       listScenarioExports(entry.id),
@@ -88,30 +116,32 @@ export async function getLibraryStorageUsage(): Promise<LibraryStorageUsage> {
       getMediaThumbnail(`scenario:${entry.id}`),
     ]);
     for (const asset of assets) {
-      addPhysicalAsset(asset.assetId, storageClass);
+      addPhysicalAsset(asset.assetId, storageClass, trashed);
     }
     for (const stepDocument of stepDocuments) {
-      addBytes(jsonBytes(stepDocument), storageClass);
+      addBytes(jsonBytes(stepDocument), storageClass, trashed);
       for (const assetId of new Set(stepDocument.document.assets.map((asset) => asset.assetId))) {
-        addPhysicalAsset(assetId, storageClass);
+        addPhysicalAsset(assetId, storageClass, trashed);
       }
     }
-    if (legacyThumbnail) addBytes(legacyThumbnail.blob.size, storageClass);
+    if (legacyThumbnail) addBytes(legacyThumbnail.blob.size, storageClass, trashed);
     for (const scenarioExport of exports) {
-      addBytes(scenarioExport.size, storageClass);
+      addBytes(scenarioExport.size, storageClass, trashed);
       const exportThumbnail = await getMediaThumbnail(`scenario-export:${scenarioExport.id}`);
-      if (exportThumbnail) addBytes(exportThumbnail.blob.size, storageClass);
+      if (exportThumbnail) addBytes(exportThumbnail.blob.size, storageClass, trashed);
     }
   }
   for (const presentation of presentations) {
-    const storageClass = resolvePresentationStorageClass(presentation, {
+    const root = resolvePresentationRoot(presentation, {
       mediaById,
       scenarioById,
       videoById,
     });
-    if (!storageClass) continue;
-    addBytes(presentation.thumbnailBlob.size, storageClass);
-    if (presentation.previewBlob) addBytes(presentation.previewBlob.size, storageClass);
+    if (!root) continue;
+    const storageClass = root.lifecycle?.storageClass ?? 'library';
+    const trashed = root.lifecycle?.trashedAt !== undefined;
+    addBytes(presentation.thumbnailBlob.size, storageClass, trashed);
+    if (presentation.previewBlob) addBytes(presentation.previewBlob.size, storageClass, trashed);
   }
   return usage;
 }
@@ -175,19 +205,23 @@ function isPresent<T>(value: T | null): value is T {
   return value !== null;
 }
 
-function resolvePresentationStorageClass(
+function resolvePresentationRoot(
   presentation: Awaited<ReturnType<typeof listAggregatePresentations>>[number],
   roots: {
     mediaById: Map<string, Awaited<ReturnType<typeof listMediaLibrary>>[number]>;
     scenarioById: Map<string, Awaited<ReturnType<typeof listScenarioProjectEntries>>[number]>;
     videoById: Map<string, Awaited<ReturnType<typeof listVideoProjectEntries>>[number]>;
   }
-): StorageClass | null {
+):
+  | Awaited<ReturnType<typeof listMediaLibrary>>[number]
+  | Awaited<ReturnType<typeof listScenarioProjectEntries>>[number]
+  | Awaited<ReturnType<typeof listVideoProjectEntries>>[number]
+  | undefined {
   const root =
     presentation.aggregateKind === 'image'
       ? roots.mediaById.get(presentation.aggregateId)
       : presentation.aggregateKind === 'scenario'
         ? roots.scenarioById.get(presentation.aggregateId)
         : roots.videoById.get(presentation.aggregateId);
-  return root ? (root.lifecycle?.storageClass ?? 'library') : null;
+  return root;
 }

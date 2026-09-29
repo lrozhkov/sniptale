@@ -113,6 +113,7 @@ function buildGalleryDerivedViewState(
     allItems: derived.allItems,
     allTags: derived.allTags,
     counts: derived.counts,
+    trashSummary: derived.trashSummary,
     facets: derived.facets,
     filteredItems: derived.filteredItems,
     gridMetrics: {

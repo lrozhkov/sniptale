@@ -11,9 +11,19 @@ import {
 } from '../library/test-support/items';
 import type { GalleryItem } from '../library/items';
 
-const { loadGalleryLibrarySnapshotMock, subscribeToMediaHubEventsMock } = vi.hoisted(() => ({
+const {
+  getLibraryStorageUsageMock,
+  loadGalleryLibrarySnapshotMock,
+  subscribeToMediaHubEventsMock,
+} = vi.hoisted(() => ({
+  getLibraryStorageUsageMock: vi.fn(),
   loadGalleryLibrarySnapshotMock: vi.fn(),
   subscribeToMediaHubEventsMock: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/library-lifecycle', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../composition/persistence/library-lifecycle')>()),
+  getLibraryStorageUsage: getLibraryStorageUsageMock,
 }));
 
 vi.mock('../../features/media-hub/events', async (importOriginal) => ({
@@ -36,6 +46,7 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  getLibraryStorageUsageMock.mockResolvedValue({ trashBytes: 0 });
   loadGalleryLibrarySnapshotMock.mockResolvedValue({
     estimate: { usage: 10, quota: 20 },
     nextItems: [createMediaItem({ id: 'asset-1' })],
@@ -112,6 +123,7 @@ it('loads library state and reacts to media-hub events', async () => {
   await flushLibraryState();
 
   expect(values.at(-1)?.items).toEqual([expect.objectContaining({ id: 'asset-1' })]);
+  expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 0 });
   expect(loadGalleryLibrarySnapshotMock).toHaveBeenCalled();
   expect(onPreviewItemRefresh).toHaveBeenCalledWith([expect.objectContaining({ id: 'asset-1' })]);
   expect(onSelectionRefresh).toHaveBeenCalledWith([expect.objectContaining({ id: 'asset-1' })]);
@@ -195,6 +207,56 @@ it('ignores stale refresh results that complete after a newer library snapshot',
 
   await act(async () => firstRefresh.resolve());
   expect(values.at(-1)?.items).toEqual([expect.objectContaining({ id: 'fresh-asset' })]);
+});
+
+it('updates advisory Trash size after the item snapshot and ignores stale byte reads', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  const trashed = createMediaItem({
+    id: 'trashed',
+    lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 1, trashedAt: 0 },
+  });
+  loadGalleryLibrarySnapshotMock.mockResolvedValue({
+    estimate: { usage: 10, quota: 20 },
+    nextItems: [trashed],
+  });
+  let resolveOld: (value: { trashBytes: number }) => void = () => undefined;
+  getLibraryStorageUsageMock.mockReturnValueOnce(
+    new Promise<{ trashBytes: number }>((resolve) => {
+      resolveOld = resolve;
+    })
+  );
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  expect(values.at(-1)?.items).toEqual([trashed]);
+  expect(values.at(-1)?.trashUsage).toEqual({ status: 'loading' });
+  expect(getLibraryStorageUsageMock).toHaveBeenCalledWith({ recoverImageWorkspaces: false });
+
+  getLibraryStorageUsageMock.mockResolvedValueOnce({ trashBytes: 42 });
+  await act(async () => values.at(-1)?.refresh());
+  await flushLibraryState();
+  expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 42 });
+
+  await act(async () => resolveOld({ trashBytes: 99 }));
+  expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 42 });
+
+  const usageReads = getLibraryStorageUsageMock.mock.calls.length;
+  loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
+    estimate: { usage: 0, quota: 20 },
+    nextItems: [],
+  });
+  await act(async () => values.at(-1)?.refresh());
+  expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 0 });
+  expect(getLibraryStorageUsageMock).toHaveBeenCalledTimes(usageReads);
+
+  getLibraryStorageUsageMock.mockRejectedValueOnce(new Error('usage unavailable'));
+  await act(async () => values.at(-1)?.refresh());
+  await flushLibraryState();
+  expect(values.at(-1)?.items).toEqual([trashed]);
+  expect(values.at(-1)?.trashUsage).toEqual({ status: 'unavailable' });
 });
 
 it('keeps gallery items stable when a background refresh returns an equivalent snapshot', async () => {

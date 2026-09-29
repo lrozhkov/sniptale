@@ -1,5 +1,6 @@
 import { loadSettings } from '../../composition/persistence/settings';
 import { cleanupLibraryTrash } from '../../workflows/media-hub/trash';
+import { getLibraryStorageUsage } from '../../composition/persistence/library-lifecycle';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import type { StorageEstimateInfo } from '../../features/media-hub/storage-capacity';
@@ -9,10 +10,12 @@ import {
   isGalleryMediaItem,
   isGalleryScenarioExportItem,
   isGalleryScenarioItem,
+  isGallerySelectableItem,
   isGalleryVideoProjectItem,
   type GalleryItem,
   type GalleryMediaItem,
 } from '../library/items';
+import type { GalleryTrashSize } from '../library/types';
 import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
 
 interface UseGalleryLibraryStateOptions {
@@ -31,6 +34,7 @@ type GalleryRefreshActionArgs = {
   refreshEpochRef: React.MutableRefObject<number>;
   setIsLoading: (isLoading: boolean) => void;
   setItems: (items: GalleryItem[]) => void;
+  setTrashUsage: (value: GalleryTrashSize) => void;
   setStorageInfo: (value: StorageEstimateInfo | null) => void;
   storageInfoRef: React.MutableRefObject<StorageEstimateInfo | null>;
 };
@@ -305,6 +309,7 @@ function isCurrentGalleryRefreshEpoch(args: {
 
 async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
   const refreshEpoch = beginGalleryRefreshEpoch(args);
+  args.setTrashUsage({ status: 'loading' });
   if (args.itemsRef.current.length === 0) {
     args.setIsLoading(true);
   }
@@ -331,12 +336,37 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
       setStorageInfo: args.setStorageInfo,
       storageInfoRef: args.storageInfoRef,
     });
+    if (
+      !nextItems.some(
+        (item) => item.lifecycle?.trashedAt !== undefined && isGallerySelectableItem(item)
+      )
+    ) {
+      args.setTrashUsage({ status: 'ready', bytes: 0 });
+    } else {
+      void getLibraryStorageUsage({ recoverImageWorkspaces: false })
+        .then((usage) => {
+          if (
+            isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })
+          ) {
+            args.setTrashUsage({ status: 'ready', bytes: usage.trashBytes });
+          }
+        })
+        .catch((error: unknown) => {
+          if (
+            isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })
+          ) {
+            logger.warn('Failed to load gallery trash size', error);
+            args.setTrashUsage({ status: 'unavailable' });
+          }
+        });
+    }
     args.onRefresh?.();
   } catch (error) {
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
       return;
     }
     logger.error('Failed to refresh gallery library state', error);
+    args.setTrashUsage({ status: 'unavailable' });
     args.onBanner(translate('common.states.error'));
   } finally {
     if (isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
@@ -355,6 +385,7 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
     refreshEpochRef,
     setIsLoading,
     setItems,
+    setTrashUsage,
     setStorageInfo,
     storageInfoRef,
   } = args;
@@ -370,6 +401,7 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
         refreshEpochRef,
         setIsLoading,
         setItems,
+        setTrashUsage,
         setStorageInfo,
         storageInfoRef,
       }),
@@ -382,6 +414,7 @@ function useGalleryRefreshAction(args: GalleryRefreshActionArgs) {
       refreshEpochRef,
       setIsLoading,
       setItems,
+      setTrashUsage,
       setStorageInfo,
       storageInfoRef,
     ]
@@ -395,6 +428,7 @@ export function useGalleryLibraryState({
   onSelectionRefresh,
 }: UseGalleryLibraryStateOptions) {
   const [items, setItems] = useState<GalleryItem[]>([]);
+  const [trashUsage, setTrashUsage] = useState<GalleryTrashSize>({ status: 'loading' });
   const [storageInfo, setStorageInfo] = useState<StorageEstimateInfo | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const itemsRef = useRef<GalleryItem[]>([]);
@@ -409,6 +443,7 @@ export function useGalleryLibraryState({
     refreshEpochRef,
     setIsLoading,
     setItems,
+    setTrashUsage,
     setStorageInfo,
     storageInfoRef,
   });
@@ -420,5 +455,6 @@ export function useGalleryLibraryState({
     items,
     refresh,
     storageInfo,
+    trashUsage,
   };
 }

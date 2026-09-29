@@ -1,4 +1,5 @@
 import { translate } from '../../../platform/i18n';
+import { formatBytes } from '../../../platform/i18n/format-bytes';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -44,6 +45,7 @@ function createProps(): GallerySidebarProps {
     },
     facets: [],
     filteredItemCount: 2,
+    trashSummary: { count: 3, size: { status: 'ready', bytes: 1536 } },
     folderFilter: 'all',
     scope: 'all',
     onActiveTagsChange: vi.fn(),
@@ -106,7 +108,9 @@ it('composes folder and tag sections inside the shared shell', () => {
   const trashButton = container?.querySelector<HTMLElement>(
     '[data-ui="gallery.sidebar.footer"] button'
   );
-  expect(trashButton?.classList.contains('w-full')).toBe(false);
+  expect(trashButton?.classList.contains('w-full')).toBe(true);
+  expect(trashButton?.textContent).toContain('3');
+  expect(trashButton?.textContent).toContain(formatBytes(1536));
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
 });
@@ -131,6 +135,9 @@ it('offers trash navigation and replaces library filters with recoverable action
   act(() => root?.render(<GallerySidebar {...props} trashMode />));
   expect(container?.querySelector('[data-ui="test.folder-list"]')).toBeNull();
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(
+    formatBytes(1536)
+  );
   act(() => button('gallery.app.restoreTrash').click());
   act(() => button('gallery.app.permanentDelete').click());
   act(() => button('gallery.app.emptyTrash').click());
@@ -143,4 +150,32 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(
     Array.from(container!.querySelectorAll('button')).every((element) => element.disabled)
   ).toBe(true);
+});
+
+it('shows zero, loading and unavailable Trash totals without a misleading size', () => {
+  const props = createProps();
+  const footerButton = () =>
+    container?.querySelector<HTMLButtonElement>('[data-ui="gallery.sidebar.footer"] button');
+
+  act(() =>
+    root?.render(
+      <GallerySidebar {...props} trashSummary={{ count: 0, size: { status: 'ready', bytes: 0 } }} />
+    )
+  );
+  expect(footerButton()?.textContent).toContain(formatBytes(0));
+
+  act(() =>
+    root?.render(
+      <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'loading' } }} />
+    )
+  );
+  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeLoading'));
+  expect(footerButton()?.textContent).not.toContain(formatBytes(0));
+
+  act(() =>
+    root?.render(
+      <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'unavailable' } }} />
+    )
+  );
+  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeUnavailable'));
 });
