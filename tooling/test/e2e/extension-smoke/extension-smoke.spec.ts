@@ -1196,6 +1196,78 @@ test('settings AI sections render provider, model, and prompt template surfaces'
   ).toBeVisible();
 });
 
+test('settings subpage navigation seals the header edge while content scrolls', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 650 });
+  await page.goto(`${hostOrigin}/tooling/test/harness/settings.html`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.getByRole('button', { name: 'Файлы и хранилище', exact: true }).click();
+  const nav = page.locator('[data-ui="settings.subpage-tabs"]');
+  await expect(nav).toBeVisible();
+  await page.waitForTimeout(300);
+  const geometry = () =>
+    page.evaluate(() => {
+      const header = document.querySelector('[data-ui="settings.page.header"]');
+      const scroll = document.querySelector('[data-ui="settings.page.content-scroll"]');
+      const tabs = document.querySelector('[data-ui="settings.subpage-tabs"]');
+      const firstButton = tabs?.querySelector('button');
+      if (!header || !scroll || !tabs || !firstButton) throw new Error('Settings tabs missing');
+      return {
+        backgroundColor: getComputedStyle(tabs).backgroundColor,
+        backgroundImage: getComputedStyle(tabs).backgroundImage,
+        buttonTop: firstButton.getBoundingClientRect().top,
+        headerBottom: header.getBoundingClientRect().bottom,
+        navLeft: tabs.getBoundingClientRect().left,
+        navRight: tabs.getBoundingClientRect().right,
+        navTop: tabs.getBoundingClientRect().top,
+        coversHeaderBand:
+          document.elementFromPoint(
+            tabs.getBoundingClientRect().left + 100,
+            header.getBoundingClientRect().bottom + 8
+          ) === tabs,
+        scrollLeft: scroll.getBoundingClientRect().left,
+        scrollRight: scroll.getBoundingClientRect().right,
+        scrollbarGutter: scroll.offsetWidth - scroll.clientWidth,
+      };
+    });
+  const initial = await geometry();
+  await page.locator('[data-ui="settings.page.content-scroll"]').evaluate((element) => {
+    element.scrollTop = 400;
+  });
+  const scrolled = await geometry();
+  expect(scrolled.navTop).toBeCloseTo(initial.headerBottom, 0);
+  expect(scrolled.backgroundColor).toMatch(/^rgb\(/u);
+  expect(scrolled.backgroundImage).toContain('linear-gradient');
+  expect(scrolled.coversHeaderBand).toBe(true);
+  expect(scrolled.navLeft).toBeLessThanOrEqual(scrolled.scrollLeft + 1);
+  expect(scrolled.navRight).toBeGreaterThanOrEqual(
+    scrolled.scrollRight - scrolled.scrollbarGutter - 1
+  );
+  expect(scrolled.buttonTop).toBeCloseTo(initial.buttonTop, 0);
+});
+
+test('settings wrapped subpage tabs keep keyboard focus below the sticky surface', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 420, height: 600 });
+  await page.goto(`${hostOrigin}/tooling/test/harness/settings.html?section=annotations`, {
+    waitUntil: 'domcontentloaded',
+  });
+  const nav = page.locator('[data-ui="settings.subpage-tabs"]').first();
+  await expect(nav).toBeVisible();
+  await page.waitForTimeout(300);
+  await nav.locator('button').last().focus();
+  for (let index = 0; index < 4; index += 1) await page.keyboard.press('Tab');
+  const focusTop = await page.evaluate(() => document.activeElement?.getBoundingClientRect().top);
+  const navBottom = (await nav.boundingBox())?.y ?? 0;
+  const navHeight = (await nav.boundingBox())?.height ?? 0;
+  expect(focusTop).toBeGreaterThanOrEqual(navBottom + navHeight - 1);
+});
+
 test('design-system page keeps theme ownership local and contains floating previews', async ({
   context,
   extensionId,

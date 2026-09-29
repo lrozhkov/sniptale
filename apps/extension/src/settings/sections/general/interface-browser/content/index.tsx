@@ -20,23 +20,22 @@ export function AppearanceSectionContent(props: {
   const { navigationRef, interfaceRef, contextMenuRef } = useAppearanceViewFocus(view);
   return (
     <div className="space-y-5">
-      <div ref={navigationRef}>
-        <SettingsSubpageTabs
-          activeId={view}
-          ariaLabel={translate('settings.navigation.interfaceBrowser', state.locale)}
-          items={[
-            {
-              id: 'interface',
-              label: translate('settings.navigation.views.interface', state.locale),
-            },
-            {
-              id: 'context-menu',
-              label: translate('settings.navigation.views.contextMenu', state.locale),
-            },
-          ]}
-          onChange={props.onViewChange}
-        />
-      </div>
+      <SettingsSubpageTabs
+        navRef={navigationRef}
+        activeId={view}
+        ariaLabel={translate('settings.navigation.interfaceBrowser', state.locale)}
+        items={[
+          {
+            id: 'interface',
+            label: translate('settings.navigation.views.interface', state.locale),
+          },
+          {
+            id: 'context-menu',
+            label: translate('settings.navigation.views.contextMenu', state.locale),
+          },
+        ]}
+        onChange={props.onViewChange}
+      />
       {view === 'interface' ? (
         <section
           ref={interfaceRef}

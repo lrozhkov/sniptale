@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
 import { DelayedSettingsCenteredLoadingState } from '../../section-surface/loading-state';
@@ -23,12 +23,15 @@ import {
   shouldDeferSettingsTab,
 } from './sections';
 import { useSettingsRoute } from '../route/history';
+import { useSettingsStickyNavScrollPadding } from './sticky-nav-scroll';
 
 function SettingsPageSurface(props: {
   navigationLocked: boolean;
   onRouteChange: (route: SettingsRoute) => void;
   route: SettingsRoute;
 }) {
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  useSettingsStickyNavScrollPadding(contentScrollRef);
   const content = renderSettingsRouteContent(props.route, (view) =>
     props.onRouteChange(updateSettingsRouteView(props.route, view))
   );
@@ -50,10 +53,13 @@ function SettingsPageSurface(props: {
             {header}
           </div>
           <div
+            ref={contentScrollRef}
             data-ui="settings.page.content-scroll"
             className={[
               'min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain',
               '[scrollbar-gutter:stable] px-5 pb-4 pt-4 lg:px-8 lg:pb-6 lg:pt-4',
+              '[--settings-scroll-inset-x:1.25rem] lg:[--settings-scroll-inset-x:2rem]',
+              '[--settings-scroll-inset-top:1rem]',
             ].join(' ')}
           >
             {shouldDeferSettingsTab(props.route.section) ? (

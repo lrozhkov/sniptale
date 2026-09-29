@@ -4,9 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { translate } from '../../../../platform/i18n';
-import { buildAppearanceContextMenuOptions, buildPopupStartupOptions } from './copy';
-import { AppearanceSectionContent } from './content';
+import { translate } from '../../../../../platform/i18n';
+import { buildAppearanceContextMenuOptions, buildPopupStartupOptions } from '../copy';
+import { AppearanceSectionContent } from './index';
 
 type AppearanceSectionContentState = Parameters<typeof AppearanceSectionContent>[0]['state'];
 

@@ -24,7 +24,7 @@ function focusedView(
 }
 
 export function useAppearanceViewFocus(view: AppearanceView) {
-  const navigationRef = useRef<HTMLDivElement>(null);
+  const navigationRef = useRef<HTMLElement>(null);
   const interfaceRef = useRef<HTMLElement>(null);
   const contextMenuRef = useRef<HTMLElement>(null);
   const focusedViewRef = useRef<AppearanceView | null>(null);
