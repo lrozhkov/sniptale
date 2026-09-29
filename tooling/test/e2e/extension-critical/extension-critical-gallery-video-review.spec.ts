@@ -3377,12 +3377,20 @@ for (const variant of [
           name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
         })
       ).toBeChecked();
+      const playVideo = strip.getByRole('checkbox', {
+        name: translate('videoEditor.app.recordAudioPlayVideo', variant.locale),
+      });
+      await expect(playVideo).toBeChecked();
+      if (variant.locale === 'en') await playVideo.uncheck();
       await expect(dialog.locator('[inert]')).toHaveCount(1);
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
       });
-      await strip.getByRole('checkbox').uncheck();
-      await expect(strip.getByRole('checkbox')).not.toBeChecked();
+      const durationLimit = strip.getByRole('checkbox', {
+        name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
+      });
+      await durationLimit.uncheck();
+      await expect(durationLimit).not.toBeChecked();
       await page.evaluate(() => {
         const audio = new AudioContext();
         const oscillator = audio.createOscillator();
@@ -3404,12 +3412,25 @@ for (const variant of [
           name: translate('videoEditor.app.recordAudioPause', variant.locale),
         })
       ).toBeVisible();
-      const playback = dialog.locator('[data-toolbar-transport] button').first();
+      await expect
+        .poll(() =>
+          dialog
+            .locator('video')
+            .first()
+            .evaluate((video) => video.muted)
+        )
+        .toBe(true);
+      const playback = dialog.locator('[data-toolbar-transport] button[aria-pressed]');
       await expect(playback).toHaveAttribute(
         'aria-label',
-        translate('gallery.videoReview.pause', variant.locale)
+        translate(
+          variant.locale === 'ru' ? 'gallery.videoReview.pause' : 'gallery.videoReview.play',
+          variant.locale
+        )
       );
-      await expect(playback.locator('svg.lucide-pause')).toHaveCount(1);
+      await expect(
+        playback.locator(variant.locale === 'ru' ? 'svg.lucide-pause' : 'svg.lucide-play')
+      ).toHaveCount(1);
       await expect(playback.locator('[data-review-toolbar-label]')).toHaveCount(0);
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-recording-${variant.locale}-${variant.theme}.png`),
@@ -3449,10 +3470,13 @@ for (const variant of [
         path: testInfo.outputPath(`voiceover-take-${variant.locale}-${variant.theme}.png`),
       });
       await strip
-        .getByRole('button', { name: translate('common.actions.close', variant.locale) })
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioSave', variant.locale),
+        })
         .click();
       await expect(strip).toHaveCount(0);
       await expect(dialog.locator('[inert]')).toHaveCount(0);
+      await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

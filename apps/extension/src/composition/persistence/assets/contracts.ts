@@ -95,5 +95,5 @@ export interface AssetReadyJournal<TPayload = unknown> {
 
 export interface AssetPublicationAdapter {
   domain: string;
-  publish(journal: AssetReadyJournal): Promise<void>;
+  publish(journal: AssetReadyJournal): Promise<void | 'defer'>;
 }

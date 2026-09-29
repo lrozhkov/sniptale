@@ -108,13 +108,15 @@ export function useAudioRecordingDialogSession({
       await onSave(
         file,
         { trimStart: controller.save.trimStart, trimEnd: controller.save.trimEnd },
-        active.signal
+        active.signal,
+        controller.save.audioBlob
       );
       if (active.signal.aborted) return;
       controller.save.resetSession();
       onClose();
     } catch {
-      if (!active.signal.aborted) setSaveError(translate('common.errors.actionFailed'));
+      if (!active.signal.aborted)
+        setSaveError(translate('videoEditor.app.recordAudioSaveFailedRetry'));
     } finally {
       if (lifetime.current === active && !active.signal.aborted) {
         savingRef.current = false;

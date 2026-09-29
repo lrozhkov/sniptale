@@ -104,6 +104,10 @@ export function useReviewAudio(args: {
       ]);
       setSelected(clip.id, lane);
     },
+    markImported: (clip: QuickEditAudioClip, duration: number, filename: string) => {
+      setAssets((current) => new Map(current).set(clip.assetId, { duration, filename }));
+      setSelected(clip.id, 'voiceover');
+    },
     moveClip: (lane: ReviewAudioLane, id: string, timelineStart: number) =>
       updateClip(lane, id, (clip) =>
         reanchorReviewVoiceover(

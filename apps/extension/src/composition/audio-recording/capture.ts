@@ -86,7 +86,7 @@ function beginRecordedSessionState(state: AudioRecordingState) {
 export async function beginRecordingSession(args: RecordingSessionArgs) {
   const sessionId = args.refs.sessionRef.current;
 
-  let microphoneReady = false;
+  let stage: 'permission' | 'playback' | 'recorder' = 'permission';
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: args.deviceId ? { deviceId: { exact: args.deviceId } } : true,
@@ -97,12 +97,13 @@ export async function beginRecordingSession(args: RecordingSessionArgs) {
     }
 
     args.refs.streamRef.current = stream;
-    microphoneReady = true;
+    stage = 'playback';
     await args.timeline?.beforeStart();
     if (sessionId !== args.refs.sessionRef.current) {
       stream.getTracks().forEach((track) => track.stop());
       return;
     }
+    stage = 'recorder';
     const recorder = createRecorder(stream, args.mimeType);
     const startedAt = performance.now();
     args.refs.clockRef.current = {
@@ -139,6 +140,12 @@ export async function beginRecordingSession(args: RecordingSessionArgs) {
     if (sessionId !== args.refs.sessionRef.current) return;
     args.timeline?.onStop();
     args.resetSession();
-    args.state.setError(microphoneReady ? args.errors.startFailed : args.errors.permissionDenied);
+    args.state.setError(
+      stage === 'permission'
+        ? args.errors.permissionDenied
+        : stage === 'playback'
+          ? args.errors.playFailed
+          : args.errors.startFailed
+    );
   }
 }

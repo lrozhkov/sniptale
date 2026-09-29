@@ -24,7 +24,9 @@ export interface VideoEditorActionHandlers {
   handleImportRecordedAudio: (
     file: File,
     trim: { trimEnd: number; trimStart: number },
-    target?: VideoEditorAudioRecordingTarget | null
+    target?: VideoEditorAudioRecordingTarget | null,
+    signal?: AbortSignal,
+    take?: Blob
   ) => Promise<void>;
   handleStartExport: () => Promise<void>;
   handleCancelExport: () => Promise<void>;

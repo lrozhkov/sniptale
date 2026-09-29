@@ -78,9 +78,10 @@ function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
     return;
   }
 
-  const gain = isClipActive
-    ? clampPreviewAudioVolume(getClipCompositeAudioGain(project, clip, currentTime))
-    : 0;
+  const gain =
+    !params.mutePreviewAudio && isClipActive
+      ? clampPreviewAudioVolume(getClipCompositeAudioGain(project, clip, currentTime))
+      : 0;
   setPreviewAudioNodeGain(node, gain);
 
   if (isPlaying && isClipActive && gain > 0) {

@@ -196,13 +196,18 @@ function VideoEditorWorkspaceLibraryPanel(): React.JSX.Element | null {
 }
 
 function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
+  const [playVideo, setPlayVideo] = useState(true);
   const layout = useVideoEditorLayoutController();
   const sidebar = useVideoEditorSidebarController();
   const runtime = useContext(RuntimePlaybackContext);
   const ranges = useContext(WorkspacePlaybackRangeContext);
   const setCurrentTime = useVideoEditorPlaybackPort((port) => port.setCurrentTime);
+  const playbackRunning = useVideoEditorPlaybackPort((port) => port.isPlaying);
   const current = useRef({ open: layout.audioRecordingDialogOpen });
   current.current = { open: layout.audioRecordingDialogOpen };
+  const generation = useRef(0);
+  const selectedPlayback = useRef(playVideo);
+  selectedPlayback.current = playVideo;
   const target = layout.audioRecordingTarget;
   const runtimeRef = useRef(runtime);
   runtimeRef.current = runtime;
@@ -210,6 +215,7 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
   rangesRef.current = ranges;
   useEffect(() => {
     if (!layout.audioRecordingDialogOpen || !runtimeRef.current) return;
+    generation.current += 1;
     const runtime = runtimeRef.current;
     const ranges = rangesRef.current;
     const previousRange = ranges?.playbackRange ?? null;
@@ -219,6 +225,7 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
       runtime.seekTo(target.startTime);
     }
     return () => {
+      generation.current += 1;
       runtimeRef.current?.pausePlayback();
       if (target) rangesRef.current?.setPlaybackRange(previousRange);
     };
@@ -230,6 +237,7 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
             startTime: target.startTime,
             duration: target.endTime - target.startTime,
             beforeStart: async () => {
+              const startedGeneration = generation.current;
               const project = getCurrentVideoEditorProjectSnapshot();
               if (
                 !project ||
@@ -245,10 +253,20 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
               runtime.pausePlayback();
               setCurrentTime(target.startTime);
               await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-              if (!current.current.open) throw new Error('Recording cancelled');
-              const started = await runtime.setPlaybackPlaying(true);
-              if (started === false || !current.current.open)
-                throw new Error('Playback unavailable');
+              if (!current.current.open || startedGeneration !== generation.current)
+                throw new Error('Recording cancelled');
+              if (playVideo) {
+                const started = await runtime.setPlaybackPlaying(true);
+                if (
+                  started === false ||
+                  !current.current.open ||
+                  startedGeneration !== generation.current
+                ) {
+                  if (started === false || !current.current.open || !selectedPlayback.current)
+                    runtime.pausePlayback();
+                  throw new Error('Playback unavailable');
+                }
+              }
             },
             onStop: () => {
               runtime.pausePlayback();
@@ -257,25 +275,46 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
               runtime.pausePlayback();
             },
             onResume: async () => {
+              const startedGeneration = generation.current;
               if (!current.current.open) throw new Error('Recording cancelled');
-              const started = await runtime.setPlaybackPlaying(true);
-              if (started === false || !current.current.open) {
-                runtime.pausePlayback();
-                throw new Error('Playback unavailable');
+              if (playVideo) {
+                const started = await runtime.setPlaybackPlaying(true);
+                if (
+                  started === false ||
+                  !current.current.open ||
+                  startedGeneration !== generation.current
+                ) {
+                  if (started === false || !current.current.open || !selectedPlayback.current)
+                    runtime.pausePlayback();
+                  throw new Error('Playback unavailable');
+                }
               }
             },
           }
         : undefined,
-    [target, runtime, setCurrentTime]
+    [target, runtime, setCurrentTime, playVideo]
   );
   if (!sidebar) return null;
   return (
     <AudioRecordingModal
       timeline={timeline}
+      playVideo={playVideo}
+      playbackRunning={playbackRunning}
+      onPlayVideoChange={setPlayVideo}
       isOpen={layout.audioRecordingDialogOpen}
-      onClose={layout.closeAudioRecordingDialog}
-      onSave={(file, trim) =>
-        sidebar.projectActions.onImportRecordedAudio(file, trim, layout.audioRecordingTarget)
+      onClose={() => {
+        generation.current += 1;
+        runtime?.pausePlayback();
+        layout.closeAudioRecordingDialog();
+      }}
+      onSave={(file, trim, signal, take) =>
+        sidebar.projectActions.onImportRecordedAudio(
+          file,
+          trim,
+          layout.audioRecordingTarget,
+          signal,
+          take
+        )
       }
     />
   );

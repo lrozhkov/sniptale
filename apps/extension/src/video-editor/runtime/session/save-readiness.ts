@@ -57,3 +57,45 @@ function subscribeToSaveReadiness(listener: (snapshot: SaveReadinessSnapshot) =>
     listeners = listeners.filter((candidate) => candidate !== listener);
   };
 }
+
+/** Observe the save triggered by a mutation, rather than an earlier saved state. */
+export function observeVideoEditorSave(projectId: string): {
+  promise: Promise<void>;
+  cancel(): void;
+} {
+  let cancel = () => undefined;
+  const promise = new Promise<void>((resolve, reject) => {
+    let changed = false;
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      unsubscribe();
+      if (error) reject(error);
+      else resolve();
+    };
+    const unsubscribe = subscribeToSaveReadiness((snapshot) => {
+      if (snapshot.projectId !== projectId) {
+        finish(new Error('The open video project changed.'));
+      } else if (snapshot.saveState === 'error' || snapshot.saveState === 'conflict') {
+        finish(new Error('The video project could not be saved.'));
+      } else if (snapshot.saveState === 'dirty' || snapshot.saveState === 'saving') {
+        changed = true;
+      } else if (snapshot.saveState === 'saved' && changed) {
+        finish();
+      }
+    });
+    const timeout = globalThis.setTimeout(
+      () => finish(new Error('The video project did not finish saving.')),
+      SAVE_SETTLE_TIMEOUT_MS
+    );
+    cancel = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      unsubscribe();
+    };
+  });
+  return { promise, cancel };
+}

@@ -14,6 +14,7 @@ export function TimelineRecordingPanel(props: {
   duration: number;
   controller: AudioRecordingControllerState;
   device: ReactNode;
+  playbackChoice?: ReactNode;
   starting: boolean;
   saving: boolean;
   error: string | null;
@@ -55,49 +56,58 @@ export function TimelineRecordingPanel(props: {
   return (
     <div className="grid gap-2 px-3 py-2" data-ui="video-editor.audio-recording.strip">
       {!trim && (
-        <div className="flex min-h-9 items-center gap-3">
-          {context}
-          <div className="w-40 min-w-0">{props.device}</div>
-          <span
-            className="ml-auto whitespace-nowrap text-xs tabular-nums"
-            data-ui="video-editor.audio-recording.limit"
-          >
-            {translate(
-              recording || paused
-                ? 'videoEditor.app.recordAudioRemaining'
-                : 'videoEditor.app.recordAudioLimit'
-            )}{' '}
-            <strong>
-              {formatDurationLabel(
+        <>
+          <div className="flex min-h-9 items-center gap-2">
+            {context}
+            <div className="ml-auto">{closeButton}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-40 min-w-0">{props.device}</div>
+            {props.playbackChoice}
+            <span
+              className="whitespace-nowrap text-xs tabular-nums"
+              data-ui="video-editor.audio-recording.limit"
+            >
+              {translate(
                 recording || paused
-                  ? Math.ceil(Math.max(0, props.duration - transport.elapsedSeconds))
-                  : props.duration
-              )}
-            </strong>
-          </span>
-          {recording || paused ? (
-            <div className="flex items-center gap-2">
-              <ProductActionButton
-                tone="secondary"
-                onClick={() =>
-                  paused ? void transport.resumeRecording() : transport.pauseRecording()
-                }
-              >
-                {paused ? <Play size={16} /> : <Pause size={16} />}
-                {translate(
-                  paused ? 'videoEditor.app.recordAudioResume' : 'videoEditor.app.recordAudioPause'
+                  ? 'videoEditor.app.recordAudioRemaining'
+                  : 'videoEditor.app.recordAudioLimit'
+              )}{' '}
+              <strong>
+                {formatDurationLabel(
+                  recording || paused
+                    ? Math.ceil(Math.max(0, props.duration - transport.elapsedSeconds))
+                    : props.duration
                 )}
-              </ProductActionButton>
-              <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
-                <Square size={16} />
-                {translate('videoEditor.app.recordAudioStop')}
-              </ProductActionButton>
+              </strong>
+            </span>
+            <div className="ml-auto flex items-center gap-2">
+              {recording || paused ? (
+                <>
+                  <ProductActionButton
+                    tone="secondary"
+                    onClick={() =>
+                      paused ? void transport.resumeRecording() : transport.pauseRecording()
+                    }
+                  >
+                    {paused ? <Play size={16} /> : <Pause size={16} />}
+                    {translate(
+                      paused
+                        ? 'videoEditor.app.recordAudioResume'
+                        : 'videoEditor.app.recordAudioPause'
+                    )}
+                  </ProductActionButton>
+                  <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
+                    <Square size={16} />
+                    {translate('videoEditor.app.recordAudioStop')}
+                  </ProductActionButton>
+                </>
+              ) : (
+                recordButton
+              )}
             </div>
-          ) : (
-            recordButton
-          )}
-          {closeButton}
-        </div>
+          </div>
+        </>
       )}
       {renderAudioRecordingTrimPanel(
         trim,

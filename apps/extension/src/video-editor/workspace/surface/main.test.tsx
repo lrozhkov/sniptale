@@ -443,14 +443,15 @@ it('binds the recording modal save to the captured track destination', async () 
   const props = audioRecordingModalSpy.mock.lastCall![0];
   const file = new File(['voice'], 'voice.webm');
   const trim = { trimStart: 1, trimEnd: 4 };
-  await props.onSave(file, trim);
+  const signal = new AbortController().signal;
+  await props.onSave(file, trim, signal);
   expect(
     (
       controller.sidebar as unknown as {
         projectActions: ReturnType<typeof createSidebarProjectActions>;
       }
     ).projectActions.onImportRecordedAudio
-  ).toHaveBeenCalledWith(file, trim, target);
+  ).toHaveBeenCalledWith(file, trim, target, signal, undefined);
 });
 
 it('pauses and resumes full-editor preview with the voiceover microphone', async () => {
@@ -480,4 +481,46 @@ it('pauses and resumes full-editor preview with the voiceover microphone', async
   setPlaybackPlaying.mockResolvedValueOnce(false);
   await expect(timeline.onResume()).rejects.toThrow('Playback unavailable');
   expect(pausePlayback).toHaveBeenCalledTimes(2);
+});
+
+it('keeps video stopped when the full-editor recording choice is off', async () => {
+  const controller = createWorkspaceController();
+  controller.layout.audioRecordingDialogOpen = true;
+  controller.layout.audioRecordingTarget = {
+    projectId: 'project-1',
+    trackId: 'voice',
+    startTime: 2,
+    endTime: 8,
+  } as never;
+  hookMocks.controller = controller;
+  const setPlaybackPlaying = vi.fn(async () => true);
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        <RuntimePlaybackContext.Provider
+          value={
+            {
+              pausePlayback: vi.fn(),
+              setPlaybackPlaying,
+              seekTo: vi.fn(),
+            } as never
+          }
+        >
+          <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+        </RuntimePlaybackContext.Provider>
+      )
+    );
+    const modal = audioRecordingModalSpy.mock.lastCall![0];
+    expect(modal.playVideo).toBe(true);
+    await act(async () => modal.onPlayVideoChange(false));
+    const muted = audioRecordingModalSpy.mock.lastCall![0];
+    expect(muted.playVideo).toBe(false);
+    await muted.timeline.onResume();
+    expect(setPlaybackPlaying).not.toHaveBeenCalled();
+    expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(true);
+  } finally {
+    await act(async () => root.unmount());
+  }
 });

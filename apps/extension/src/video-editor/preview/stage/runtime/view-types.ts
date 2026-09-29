@@ -41,6 +41,7 @@ export interface PreviewStageProps {
   currentTime: number;
   grid: PreviewStageGridSettings;
   isPlaying: boolean;
+  mutePreviewAudio?: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
   previewMode: VideoEditorPreviewMode;
   previewPreferencesSaveFailed: boolean;

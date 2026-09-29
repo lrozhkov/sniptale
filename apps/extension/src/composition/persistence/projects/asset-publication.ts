@@ -10,6 +10,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
+  discardPreparedAsset,
   parseAssetRef,
   recoverStandaloneAssetPublications,
   type AssetPublicationAdapter,
@@ -21,8 +22,10 @@ import {
 } from '../media-library/entry-mapping';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { readVideoWorkspace } from '../review-workspaces/store';
 import type { StoredProjectAssetEntry, StoredProjectExportEntry } from './contracts';
 import { parseProjectAssetEntry, parseProjectExportEntry } from './read-guards';
+import { tryVoiceoverAttachmentLock } from './voiceover-publication-lock';
 
 export const PROJECT_ASSET_PUBLICATION_DOMAIN = 'project-assets';
 export const PROJECT_EXPORT_PUBLICATION_DOMAIN = 'project-exports';
@@ -33,6 +36,7 @@ export const PROJECT_MEDIA_ASSET_ROLE = 'body';
 interface ProjectAssetPublicationPayload {
   entry: StoredProjectAssetEntry;
   filename: string;
+  requiredReview?: { aggregateId: string; clipId: string };
 }
 
 interface ProjectExportPublicationPayload {
@@ -46,7 +50,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function parseProjectAssetPayload(value: unknown): ProjectAssetPublicationPayload | null {
   if (!isRecord(value) || typeof value['filename'] !== 'string') return null;
   const entry = parseProjectAssetEntry(value['entry']);
-  return entry ? { entry, filename: value['filename'] } : null;
+  if (!entry) return null;
+  const required = value['requiredReview'];
+  if (
+    required !== undefined &&
+    (!isRecord(required) ||
+      typeof required['aggregateId'] !== 'string' ||
+      typeof required['clipId'] !== 'string')
+  )
+    return null;
+  return {
+    entry,
+    filename: value['filename'],
+    ...(required
+      ? {
+          requiredReview: {
+            aggregateId: required['aggregateId'] as string,
+            clipId: required['clipId'] as string,
+          },
+        }
+      : {}),
+  };
+}
+
+function hasSavedVoiceoverClip(
+  workspace: { advanced: unknown; history: readonly unknown[] },
+  clipId: string,
+  assetId: string
+): boolean {
+  const contains = (content: unknown) => {
+    if (
+      !isRecord(content) ||
+      !isRecord(content['audio']) ||
+      !Array.isArray(content['audio']['voiceover'])
+    )
+      return false;
+    return content['audio']['voiceover'].some(
+      (clip: unknown) => isRecord(clip) && clip['id'] === clipId && clip['assetId'] === assetId
+    );
+  };
+  if (contains(workspace.advanced)) return true;
+  return workspace.history.some(
+    (operation) =>
+      isRecord(operation) &&
+      operation['target'] === 'advancedContent' &&
+      (contains(operation['before']) || contains(operation['after']))
+  );
 }
 
 function parseProjectExportPayload(value: unknown): ProjectExportPublicationPayload | null {
@@ -142,6 +191,26 @@ export async function publishProjectAssetJournal(journal: AssetReadyJournal): Pr
   });
 }
 
+async function recoverProjectAssetJournal(journal: AssetReadyJournal): Promise<void | 'defer'> {
+  const payload = parseProjectAssetPayload(journal.payload);
+  if (!payload) throw new Error('Invalid project asset publication payload.');
+  if (payload.requiredReview) {
+    const assetId = `project-asset:${payload.entry.id}`;
+    return tryVoiceoverAttachmentLock(assetId, async () => {
+      const review = await readVideoWorkspace(payload.requiredReview!.aggregateId);
+      const referenced =
+        !!review &&
+        hasSavedVoiceoverClip(review.workspace, payload.requiredReview!.clipId, assetId);
+      if (!referenced) {
+        await discardPreparedAsset(payload.entry.assetId);
+        return;
+      }
+      await publishProjectAssetJournal(journal);
+    });
+  }
+  await publishProjectAssetJournal(journal);
+}
+
 export async function publishProjectExportJournal(journal: AssetReadyJournal): Promise<void> {
   if (journal.domain !== PROJECT_EXPORT_PUBLICATION_DOMAIN || journal.operationId) {
     throw new Error('Invalid standalone project export publication journal.');
@@ -158,7 +227,7 @@ export async function publishProjectExportJournal(journal: AssetReadyJournal): P
 
 export const projectAssetPublicationAdapter: AssetPublicationAdapter = {
   domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
-  publish: publishProjectAssetJournal,
+  publish: recoverProjectAssetJournal,
 };
 
 export const projectExportPublicationAdapter: AssetPublicationAdapter = {

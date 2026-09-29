@@ -174,7 +174,7 @@ it('does not restart playback after a paused take closes during asynchronous res
     finishResume();
     await pending;
   });
-  expect(onPause).toHaveBeenCalledTimes(2);
+  expect(onPause).toHaveBeenCalledOnce();
   expect(stopped).toHaveBeenCalledOnce();
 });
 

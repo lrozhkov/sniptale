@@ -65,6 +65,40 @@ it('serializes draft then Save using the committed draft revision, without an ex
   unsubscribe();
 });
 
+it('durably commits an explicit recording save while autosave stays disabled', async () => {
+  const snapshot = initial();
+  const operation = {
+    id: 'voice-1',
+    at: 2,
+    target: 'annotation' as const,
+    before: null,
+    after: annotation,
+  };
+  const buffered = { ...snapshot, workspace: { ...snapshot.workspace, revision: 2 } };
+  const committed = {
+    ...buffered,
+    workspace: { ...buffered.workspace, revision: 3, cursor: 1, history: [operation] },
+  };
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => buffered),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
+    commitVideoWorkspace: vi.fn(async () => committed),
+    readVideoWorkspace: vi.fn(async () => committed),
+    moveVideoWorkspaceHistory: vi.fn(async () => committed),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  session.setAutosaveEnabled(false);
+  await session.saveAdvanced(snapshot.workspace.advanced);
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  await session.commitDurable(operation);
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledWith(
+    expect.objectContaining({ expectedRevision: 2, operation })
+  );
+  expect(session.getSnapshot()).toMatchObject({ autosaveEnabled: false, dirty: false });
+});
+
 it('keeps recovery and committed state after failed Save and exposes reload explicitly', async () => {
   const snapshot = initial();
   snapshot.draft = {

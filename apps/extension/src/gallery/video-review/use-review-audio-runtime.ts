@@ -102,7 +102,7 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
     decode: (data) => context.decodeAudioData(data),
     scheduleClip: (schedule, buffer) => connectClipSource(context, handles, schedule, buffer),
     setOriginalGain: (volume) => {
-      if (originalGain) originalGain.gain.value = volume > 1 ? volume : 1;
+      if (originalGain) originalGain.gain.value = volume === 0 ? 0 : Math.max(1, volume);
     },
     stopAll,
     dispose: () => {
@@ -123,6 +123,7 @@ interface ReviewAudioRuntime {
 interface ReviewAudioRuntimeProps {
   video: RefObject<HTMLVideoElement | null>;
   playing: boolean;
+  silent?: boolean;
   outputTime: number;
   original: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
@@ -179,6 +180,7 @@ function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
 export function useReviewEditorAudioRuntime(args: {
   video: RefObject<HTMLVideoElement | null>;
   playing: boolean;
+  silent?: boolean;
   outputTime: number;
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
@@ -189,6 +191,7 @@ export function useReviewEditorAudioRuntime(args: {
   useReviewAudioRuntime({
     video: args.video,
     playing: args.playing,
+    silent: args.silent ?? false,
     outputTime: args.outputTime,
     original: args.originalAudio,
     voiceover: args.voiceover,
@@ -238,7 +241,12 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     scheduledAt.current = { outputTime: current.outputTime, audioNow: engine.now() };
     engine.stopAll();
     engine.setOriginalGain(
-      Math.max(1, originalAudioGainAt(current.original, current.video.current?.currentTime ?? 0))
+      current.silent
+        ? 0
+        : Math.max(
+            1,
+            originalAudioGainAt(current.original, current.video.current?.currentTime ?? 0)
+          )
     );
     void (async () => {
       try {
@@ -301,10 +309,15 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   }, [getEngine, props.outputTime, schedule]);
   useEffect(() => {
     peekEngine()?.setOriginalGain(
-      Math.max(
-        1,
-        originalAudioGainAt(latest.current.original, latest.current.video.current?.currentTime ?? 0)
-      )
+      latest.current.silent
+        ? 0
+        : Math.max(
+            1,
+            originalAudioGainAt(
+              latest.current.original,
+              latest.current.video.current?.currentTime ?? 0
+            )
+          )
     );
-  }, [peekEngine, props.original, props.outputTime]);
+  }, [peekEngine, props.original, props.outputTime, props.silent]);
 }

@@ -1,5 +1,8 @@
 import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
 import { isAudioRecordingRangeAvailable } from '../../project/operations/timeline-gaps';
+import { addAssetClipToProject } from '../../project/state/asset-actions';
+import { observeVideoEditorSave } from '../session/save-readiness';
+import { requestVideoEditorSaveRetry } from '../session/save-retry';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
@@ -117,13 +120,19 @@ async function importRecordedAudioFile(
   file: File,
   trim: { trimEnd: number; trimStart: number },
   port: AssetHandlerPort,
-  target?: VideoEditorAudioRecordingTarget | null
-): Promise<void> {
+  target?: VideoEditorAudioRecordingTarget | null,
+  signal?: AbortSignal
+): Promise<{ assetId: string; saveCycle: ReturnType<typeof observeVideoEditorSave> | null }> {
+  signal?.throwIfAborted();
   if (!isRecordingDestinationAvailable(port, target))
     throw new Error('Recording destination unavailable');
   const targetProjectId = port.getCurrentProjectId()!;
   const insertionTime = target ? target.startTime + trim.trimStart : 0;
   const asset = await importProjectAsset(file, VideoProjectAssetType.AUDIO);
+  if (signal?.aborted) {
+    await cleanupStaleImportedAsset(asset);
+    signal.throwIfAborted();
+  }
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     throw new Error('Recording project changed');
   }
@@ -131,9 +140,20 @@ async function importRecordedAudioFile(
     await cleanupStaleImportedAsset(asset);
     throw new Error('Recording destination unavailable');
   }
+  if (signal?.aborted) {
+    await cleanupStaleImportedAsset(asset);
+    signal.throwIfAborted();
+  }
   if (!target) {
-    port.upsertAsset(asset);
-    return;
+    const saveCycle = signal ? observeVideoEditorSave(targetProjectId) : null;
+    try {
+      port.upsertAsset(asset);
+      return { assetId: asset.id, saveCycle };
+    } catch (error) {
+      saveCycle?.cancel();
+      await cleanupStaleImportedAsset(asset);
+      throw error;
+    }
   }
   const duration = asset.metadata.duration;
   if (
@@ -150,13 +170,28 @@ async function importRecordedAudioFile(
     await cleanupStaleImportedAsset(asset);
     throw new Error('Recording history unavailable');
   }
+  const saveCycle = signal ? observeVideoEditorSave(targetProjectId) : null;
   try {
-    port.upsertAsset(asset);
-    const clipId = port.addAssetClip(asset, target.trackId, insertionTime);
-    if (!clipId) throw new Error('Recording insertion failed');
+    port.updateProject((current) => {
+      if (
+        signal?.aborted ||
+        current.id !== target.projectId ||
+        !isAudioRecordingRangeAvailable(current, target.trackId, target.startTime, target.endTime)
+      )
+        throw new Error('Recording destination unavailable');
+      const result = addAssetClipToProject(current, asset, target.trackId, insertionTime);
+      if (!result.selectedClipId) throw new Error('Recording insertion failed');
+      return result.project;
+    });
+  } catch (error) {
+    saveCycle?.cancel();
+    if (!port.getCurrentProject()?.assets.some((item) => item.id === asset.id))
+      await cleanupStaleImportedAsset(asset);
+    throw error;
   } finally {
     port.endProjectHistoryTransaction(lease);
   }
+  return { assetId: asset.id, saveCycle };
 }
 
 function useRecordingAssetHandler(port: AssetHandlerPort) {
@@ -247,6 +282,7 @@ export function useAssetHandlers(
   | 'handleImportRecordedAudio'
   | 'handleImportVideo'
 > {
+  const recordedTakes = useRef(new WeakMap<Blob, { projectId: string; assetId: string }>());
   const handleAddRecording = useRecordingAssetHandler(port);
   const handleAddLibraryMedia = useMaterialAssetHandler(port, 'library');
   const handleImportImage = useProjectAssetImportHandler(
@@ -268,10 +304,34 @@ export function useAssetHandlers(
     async (
       file: File,
       trim: { trimEnd: number; trimStart: number },
-      target?: VideoEditorAudioRecordingTarget | null
+      target?: VideoEditorAudioRecordingTarget | null,
+      signal?: AbortSignal,
+      take?: Blob
     ) => {
       try {
-        await importRecordedAudioFile(file, trim, port, target);
+        signal?.throwIfAborted();
+        const previous = take ? recordedTakes.current.get(take) : undefined;
+        const project = port.getCurrentProject();
+        let saveCycle: ReturnType<typeof observeVideoEditorSave> | null = null;
+        if (
+          previous &&
+          project?.id === previous.projectId &&
+          project.assets.some((asset) => asset.id === previous.assetId) &&
+          (!target ||
+            project.clips.some((clip) => 'assetId' in clip && clip.assetId === previous.assetId))
+        ) {
+          if (signal) saveCycle = observeVideoEditorSave(previous.projectId);
+          requestVideoEditorSaveRetry();
+        } else {
+          const imported = await importRecordedAudioFile(file, trim, port, target, signal);
+          saveCycle = imported.saveCycle;
+          if (take)
+            recordedTakes.current.set(take, {
+              projectId: port.getCurrentProjectId()!,
+              assetId: imported.assetId,
+            });
+        }
+        if (signal) await saveCycle?.promise;
       } catch (assetError) {
         logger.error('Failed to import recorded audio', assetError);
         throw assetError;

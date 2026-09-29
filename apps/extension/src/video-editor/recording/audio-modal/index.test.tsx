@@ -11,7 +11,7 @@ vi.mock('../../../composition/audio-recording/trim-file', () => ({
   ),
 }));
 
-const controller = vi.hoisted(() => ({ reset: vi.fn() }));
+const controller = vi.hoisted(() => ({ reset: vi.fn(), stop: vi.fn(), status: 'recorded' }));
 vi.mock('../../../composition/audio-recording/session', () => ({
   useAudioRecordingSession: () => {
     return {
@@ -19,10 +19,10 @@ vi.mock('../../../composition/audio-recording/session', () => ({
         durationLabel: '00:04',
         error: null,
         startRecording: vi.fn(),
-        stopRecording: vi.fn(),
+        stopRecording: controller.stop,
         pauseRecording: vi.fn(),
         resumeRecording: vi.fn(),
-        status: 'recorded',
+        status: controller.status,
       },
       trim: { pauseSelection: vi.fn() },
       save: {
@@ -48,6 +48,24 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  controller.status = 'recorded';
+});
+
+it('stops microphone capture when synchronized video playback ends', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  controller.status = 'recording';
+  document.body.append(host);
+  root = createRoot(host);
+  const props = {
+    isOpen: true,
+    playVideo: true,
+    onSave: vi.fn(async () => undefined),
+    onClose: vi.fn(),
+    timeline: { startTime: 2, duration: 5, beforeStart: async () => undefined, onStop: vi.fn() },
+  };
+  await act(async () => root.render(<AudioRecordingModal {...props} playbackRunning />));
+  await act(async () => root.render(<AudioRecordingModal {...props} playbackRunning={false} />));
+  expect(controller.stop).toHaveBeenCalledOnce();
 });
 it('retains failed recording for retry and blocks duplicate saves and dismissal', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

@@ -224,6 +224,16 @@ it('replays only standalone journals with a registered domain adapter', async ()
   expect(deleteReadyJournalMock).not.toHaveBeenCalledWith('workflow');
 });
 
+it('retains a deferred journal until its attachment can be decided', async () => {
+  const journal = createJournal();
+  listReadyJournalsMock.mockResolvedValue([journal]);
+  const publish = vi.fn().mockResolvedValue('defer');
+  await expect(
+    recoverStandaloneAssetPublications([{ domain: journal.domain, publish }])
+  ).resolves.toBe(0);
+  expect(deleteReadyJournalMock).not.toHaveBeenCalled();
+});
+
 it('keeps privacy erasure ordered after an admitted standalone recovery', async () => {
   const journal = createJournal();
   listReadyJournalsMock.mockResolvedValue([journal]);

@@ -145,22 +145,25 @@ it('discards a cancelled timeline start and stale recorder stop events', async (
   Recorder.latest.stop();
   expect(args.state.setAudioBlob).not.toHaveBeenCalled();
 });
-it.each(['permission', 'start'])('keeps the localized %s error after cleanup', async (failure) => {
-  const { args, acquire } = fixture();
-  if (failure === 'permission') acquire.mockRejectedValue(new Error('denied'));
-  else
-    args.timeline = {
-      startTime: 0,
-      duration: 1,
-      beforeStart: async () => {
-        throw new Error('start');
-      },
-      onStop: vi.fn(),
-    };
-  await beginRecordingSession(args);
-  expect(args.resetSession).toHaveBeenCalledOnce();
-  expect(args.state.setError).toHaveBeenLastCalledWith(
-    failure === 'permission' ? 'denied' : 'failed'
-  );
-  expect(args.state.setAudioBlob).not.toHaveBeenCalled();
-});
+it.each(['permission', 'playback'])(
+  'keeps the localized %s error after cleanup',
+  async (failure) => {
+    const { args, acquire } = fixture();
+    if (failure === 'permission') acquire.mockRejectedValue(new Error('denied'));
+    else
+      args.timeline = {
+        startTime: 0,
+        duration: 1,
+        beforeStart: async () => {
+          throw new Error('start');
+        },
+        onStop: vi.fn(),
+      };
+    await beginRecordingSession(args);
+    expect(args.resetSession).toHaveBeenCalledOnce();
+    expect(args.state.setError).toHaveBeenLastCalledWith(
+      failure === 'permission' ? 'denied' : 'play'
+    );
+    expect(args.state.setAudioBlob).not.toHaveBeenCalled();
+  }
+);

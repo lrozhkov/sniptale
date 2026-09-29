@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -6,6 +6,7 @@ import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useAudioRecordingDialogSession } from '../../composition/audio-recording/dialog/controller';
 import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog-focus';
 import { AudioRecordingDeviceSelect } from '../../composition/audio-recording/dialog/controls';
+import { RecordingPlaybackChoice } from '../../composition/audio-recording/dialog/playback-choice';
 import { renderAudioRecordingTrimPanel } from '../../composition/audio-recording/dialog/trim';
 import { formatDurationLabel } from '../../composition/audio-recording/format';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
@@ -24,6 +25,7 @@ export function ReviewVoiceoverLayer(props: {
   return (
     <ReviewVoiceoverRecording
       isOpen={voiceover.recording}
+      video={voiceover.video}
       playhead={voiceover.takeOutputStart ?? props.outputTime ?? 0}
       timelineDuration={props.resultDuration}
       onClose={voiceover.close}
@@ -41,18 +43,20 @@ export function ReviewVoiceoverLayer(props: {
  */
 export function ReviewVoiceoverRecording(props: {
   isOpen: boolean;
+  video?: RefObject<HTMLVideoElement | null>;
   playhead: number;
   timelineDuration: number;
   onClose(): void;
-  onSyncStart(): Promise<void>;
+  onSyncStart(playVideo: boolean): Promise<void>;
   onSyncStop(): void;
   onSyncPause?: () => void;
-  onSyncResume?: () => Promise<void>;
-  onSave(file: File, trim: AudioTrimRange, signal: AbortSignal): Promise<void>;
+  onSyncResume?: (playVideo: boolean) => Promise<void>;
+  onSave(file: File, trim: AudioTrimRange, signal: AbortSignal, take: Blob): Promise<void>;
 }) {
   const remaining = Math.max(0, props.timelineDuration - props.playhead);
   const [limitEnabled, setLimitEnabled] = useState(true);
   const [limitSeconds, setLimitSeconds] = useState(60);
+  const [playVideo, setPlayVideo] = useState(true);
   const { titleId, handleKeyDown } = useAudioRecordingFocus(props.isOpen);
   const session = useAudioRecordingDialogSession({
     isOpen: props.isOpen,
@@ -61,16 +65,27 @@ export function ReviewVoiceoverRecording(props: {
     timeline: {
       startTime: props.playhead,
       duration: remaining,
-      beforeStart: props.onSyncStart,
+      beforeStart: () => props.onSyncStart(playVideo),
       onStop: props.onSyncStop,
       onPause: props.onSyncPause,
-      onResume: props.onSyncResume,
+      onResume: async () => {
+        await props.onSyncResume?.(playVideo);
+      },
     },
     captureLimitSeconds: limitEnabled ? limitSeconds : undefined,
   });
   const { controller, starting, isSaving, saveError } = session;
   const { transport, trim } = controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
+  const stopRecording = transport.stopRecording;
+  useEffect(() => {
+    if (!props.isOpen || !playVideo || transport.status !== 'recording') return;
+    const video = props.video?.current;
+    if (!video) return;
+    const onEnded = () => stopRecording();
+    video.addEventListener('ended', onEnded);
+    return () => video.removeEventListener('ended', onEnded);
+  }, [playVideo, props.isOpen, props.video, transport.status, stopRecording]);
   const effectiveLimit = Math.min(remaining, limitEnabled ? limitSeconds : Infinity);
   if (!props.isOpen) return null;
   return (
@@ -116,6 +131,8 @@ export function ReviewVoiceoverRecording(props: {
             <VoiceoverCaptureOptions
               session={session}
               capturing={capturing}
+              playVideo={playVideo}
+              onPlayVideo={setPlayVideo}
               limitEnabled={limitEnabled}
               limitSeconds={limitSeconds}
               onLimitEnabled={setLimitEnabled}
@@ -138,6 +155,8 @@ export function ReviewVoiceoverRecording(props: {
 function VoiceoverCaptureOptions(props: {
   session: RecordingSession;
   capturing: boolean;
+  playVideo: boolean;
+  onPlayVideo(value: boolean): void;
   limitEnabled: boolean;
   limitSeconds: number;
   onLimitEnabled(value: boolean): void;
@@ -146,35 +165,42 @@ function VoiceoverCaptureOptions(props: {
   const disabled = props.session.starting || props.capturing;
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <div className="min-w-40 flex-1">
+      <div className="w-44 min-w-0">
         <AudioRecordingDeviceSelect
           value={props.session.deviceId}
           onChange={props.session.setDeviceId}
           disabled={disabled || props.session.isSaving}
         />
       </div>
-      <label className="flex items-center gap-2 text-xs">
-        <input
-          type="checkbox"
-          checked={props.limitEnabled}
-          disabled={disabled}
-          onChange={(event) => props.onLimitEnabled(event.target.checked)}
-        />
-        {translate('gallery.videoReview.voiceoverDurationLimit')}
-      </label>
-      {props.limitEnabled ? (
-        <ProductSelect
-          aria-label={translate('gallery.videoReview.voiceoverDurationLimit')}
-          controlSize="sm"
-          value={String(props.limitSeconds)}
-          disabled={disabled}
-          options={[30, 60, 120, 300].map((seconds) => ({
-            value: String(seconds),
-            label: formatDurationLabel(seconds),
-          }))}
-          onChange={(value) => props.onLimitSeconds(Number(value))}
-        />
-      ) : null}
+      <RecordingPlaybackChoice
+        checked={props.playVideo}
+        disabled={disabled || props.session.isSaving}
+        onChange={props.onPlayVideo}
+      />
+      <div className="ml-auto flex items-center gap-2">
+        <label className="flex items-center gap-2 whitespace-nowrap text-xs">
+          <input
+            type="checkbox"
+            checked={props.limitEnabled}
+            disabled={disabled}
+            onChange={(event) => props.onLimitEnabled(event.target.checked)}
+          />
+          {translate('gallery.videoReview.voiceoverDurationLimit')}
+        </label>
+        {props.limitEnabled ? (
+          <ProductSelect
+            aria-label={translate('gallery.videoReview.voiceoverDurationLimit')}
+            controlSize="sm"
+            value={String(props.limitSeconds)}
+            disabled={disabled}
+            options={[30, 60, 120, 300].map((seconds) => ({
+              value: String(seconds),
+              label: formatDurationLabel(seconds),
+            }))}
+            onChange={(value) => props.onLimitSeconds(Number(value))}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

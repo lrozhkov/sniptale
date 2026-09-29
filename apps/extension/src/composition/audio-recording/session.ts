@@ -263,7 +263,6 @@ function useRecordingCaptureControls(
     try {
       await timeline?.onResume?.();
       if (sessionId !== refs.sessionRef.current || recorder.state !== 'paused') {
-        timeline?.onPause?.();
         return;
       }
       clock.pausedTotal += performance.now() - (clock.pausedAt ?? performance.now());

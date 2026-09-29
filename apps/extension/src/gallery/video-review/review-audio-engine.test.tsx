@@ -92,6 +92,10 @@ it('builds the default Web Audio engine graph', async () => {
   expect(context.gains[0]!.gain.value).toBe(2);
   engine!.setOriginalGain(0.5);
   expect(context.gains[0]!.gain.value).toBe(1);
+  engine!.setOriginalGain(0);
+  expect(context.gains[0]!.gain.value).toBe(0);
+  engine!.setOriginalGain(0.5);
+  expect(context.gains[0]!.gain.value).toBe(1);
   const schedule = {
     when: 60,
     offset: 2,

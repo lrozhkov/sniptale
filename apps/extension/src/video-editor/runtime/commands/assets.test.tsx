@@ -394,6 +394,9 @@ describe('recording into an explicit audio track', () => {
     const track = createVideoProjectTrack('Voice', 1, VideoTrackKind.AUDIO);
     project.tracks.push(track);
     project.duration = 20;
+    vi.mocked(params.updateProject).mockImplementation((updater) => {
+      Object.assign(project, updater(project));
+    });
     return {
       params,
       track,
@@ -411,14 +414,50 @@ describe('recording into an explicit audio track', () => {
     );
     params.currentTime = 20;
     await act(async () => pending);
-    expect(params.addAssetClip).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'asset-1' }),
-      target.trackId,
-      8
+    expect(params.updateProject).toHaveBeenCalledOnce();
+    const committed = params.getCurrentProject()!;
+    expect(committed.assets.filter((asset) => asset.id === 'asset-1')).toHaveLength(1);
+    expect(committed.clips).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ trackId: target.trackId, startTime: 8, duration: 6 }),
+      ])
     );
+    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(params.addAssetClip).not.toHaveBeenCalled();
     expect(params.beginProjectHistoryTransaction).toHaveBeenCalledTimes(1);
     expect(params.endProjectHistoryTransaction).toHaveBeenCalledTimes(1);
     expect(params.trimClipEnd).not.toHaveBeenCalled();
+  });
+
+  it('retries saving the same recorded take without importing or inserting it twice', async () => {
+    const { params, target } = setupTarget();
+    renderHook(params);
+    const take = new Blob(['voice']);
+    const file = new File(['voice'], 'voice.webm');
+    await act(async () =>
+      latestHandlers!.handleImportRecordedAudio(
+        file,
+        { trimStart: 1, trimEnd: 4 },
+        target,
+        undefined,
+        take
+      )
+    );
+    await act(async () =>
+      latestHandlers!.handleImportRecordedAudio(
+        file,
+        { trimStart: 1, trimEnd: 4 },
+        target,
+        undefined,
+        take
+      )
+    );
+    expect(importProjectAssetMock).toHaveBeenCalledOnce();
+    expect(params.updateProject).toHaveBeenCalledOnce();
+    expect(
+      params.getCurrentProject()!.assets.filter((asset) => asset.id === 'asset-1')
+    ).toHaveLength(1);
+    expect(params.getCurrentProject()!.clips).toHaveLength(1);
   });
 
   it.each(['missing', 'locked', 'video', 'project', 'occupied'])(
@@ -458,6 +497,31 @@ describe('recording into an explicit audio track', () => {
     await expect(pending).rejects.toThrow();
     expect(deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
     expect(params.addAssetClip).not.toHaveBeenCalled();
+  });
+  it('does not insert a recording that finished importing after the editor closed', async () => {
+    const { params, target } = setupTarget();
+    let finishImport!: (asset: unknown) => void;
+    const asset = await importProjectAssetMock();
+    importProjectAssetMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishImport = resolve;
+        })
+    );
+    renderHook(params);
+    const lifetime = new AbortController();
+    const pending = latestHandlers!.handleImportRecordedAudio(
+      new File(['voice'], 'voice.webm'),
+      { trimStart: 0, trimEnd: 4 },
+      target,
+      lifetime.signal
+    );
+    const rejected = expect(pending).rejects.toThrow();
+    lifetime.abort();
+    finishImport(asset);
+    await rejected;
+    expect(params.updateProject).not.toHaveBeenCalled();
+    expect(deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
   });
   it.each(['project', 'history'])(
     'cleans the imported copy when %s admission fails',

@@ -1,5 +1,9 @@
 import { beforeEach, expect, it } from 'vitest';
-import { publishVideoEditorSaveReadiness, waitForVideoEditorSave } from './save-readiness';
+import {
+  observeVideoEditorSave,
+  publishVideoEditorSaveReadiness,
+  waitForVideoEditorSave,
+} from './save-readiness';
 
 beforeEach(() => {
   publishVideoEditorSaveReadiness({ projectId: 'project-1', saveState: 'saved' });
@@ -38,4 +42,19 @@ it('rejects when saving fails or the open project changes', async () => {
   const changed = waitForVideoEditorSave('project-1');
   publishVideoEditorSaveReadiness({ projectId: 'project-2', saveState: 'saved' });
   await expect(changed).rejects.toThrow('could not be saved');
+});
+
+it('waits for the next mutation save rather than an earlier saved state', async () => {
+  const cycle = observeVideoEditorSave('project-1');
+  let settled = false;
+  void cycle.promise.then(() => {
+    settled = true;
+  });
+  publishVideoEditorSaveReadiness({ projectId: 'project-1', saveState: 'saved' });
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  publishVideoEditorSaveReadiness({ projectId: 'project-1', saveState: 'dirty' });
+  publishVideoEditorSaveReadiness({ projectId: 'project-1', saveState: 'saving' });
+  publishVideoEditorSaveReadiness({ projectId: 'project-1', saveState: 'saved' });
+  await expect(cycle.promise).resolves.toBeUndefined();
 });

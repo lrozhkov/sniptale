@@ -34,12 +34,14 @@ import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
   createAssetPublicationJournal,
+  deleteReadyJournal,
   discardPreparedAsset,
   parseAssetRef,
   publishReadyJournalWithRetry,
   readAssetFile,
   releaseAssetReadyProtection,
   writeBlobToAsset,
+  type AssetReadyJournal,
   type AssetRef,
 } from '../assets';
 import {
@@ -279,7 +281,11 @@ export async function listVideoProjectEntries(): Promise<VideoProjectEntry[]> {
 export interface PreparedProjectAsset {
   id: string;
   ref: AssetRef;
-  /** Publishes the library entry and releases the ready protection once. */
+  /** Makes staged bytes recoverable before another owner attaches their reference. */
+  protect(): Promise<void>;
+  /** Cancels a protected import only when its caller proved no durable reference exists. */
+  cancel(): Promise<void>;
+  /** Publishes the library entry and releases ready protection; failed attempts can be retried. */
   publish(): Promise<void>;
   /** Discards the staged object unless a publication journal already owns it. */
   discard(): Promise<void>;
@@ -294,7 +300,8 @@ export async function prepareProjectAsset(
   mimeType: string,
   filename?: string,
   id?: string,
-  createdAt = Date.now()
+  createdAt = Date.now(),
+  requiredReview?: ProjectAssetPublicationPayload['requiredReview']
 ): Promise<PreparedProjectAsset> {
   const entryId = id ?? crypto.randomUUID();
   await recoverProjectMediaPublications();
@@ -307,25 +314,48 @@ export async function prepareProjectAsset(
     createdAt,
     size: prepared.ref.size,
   };
-  let owned = false;
-  const publish = async () => {
-    if (owned) throw new Error('Project asset is already published.');
-    const payload: ProjectAssetPublicationPayload = { entry, filename: filename || entryId };
-    const journal = await createAssetPublicationJournal({
+  let journal: AssetReadyJournal<ProjectAssetPublicationPayload> | null = null;
+  let complete = false;
+  let inFlight: Promise<void> | null = null;
+  const protect = async () => {
+    journal ??= await createAssetPublicationJournal({
       assetRefs: [prepared.ref],
       domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
-      payload,
+      payload: {
+        entry,
+        filename: filename || entryId,
+        ...(requiredReview ? { requiredReview } : {}),
+      },
     });
-    owned = true;
-    await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
-    await releaseAssetReadyProtection([prepared.ref.assetId]);
+  };
+  const publish = async () => {
+    if (complete) return;
+    if (inFlight) return inFlight;
+    inFlight = (async () => {
+      await protect();
+      if (!journal) throw new Error('Project asset publication journal is unavailable.');
+      await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
+      await releaseAssetReadyProtection([prepared.ref.assetId]);
+      complete = true;
+    })();
+    try {
+      await inFlight;
+    } finally {
+      inFlight = null;
+    }
   };
   return {
     id: entryId,
     ref: prepared.ref,
+    protect,
+    cancel: async () => {
+      if (complete) return;
+      if (journal) await deleteReadyJournal(journal.journalId);
+      await discardPreparedAsset(prepared.ref.assetId);
+    },
     publish,
     discard: async () => {
-      if (owned) return;
+      if (journal) return;
       await discardPreparedAsset(prepared.ref.assetId);
     },
   };

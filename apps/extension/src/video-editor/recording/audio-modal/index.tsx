@@ -5,6 +5,8 @@ import { useAudioRecordingFocus } from '../../../composition/audio-recording/dia
 import { useAudioRecordingDialogSession } from '../../../composition/audio-recording/dialog/controller';
 import { MaterialAudioRecordingModal } from '../../../composition/audio-recording/dialog';
 import { AudioRecordingDeviceSelect } from '../../../composition/audio-recording/dialog/controls';
+import { RecordingPlaybackChoice } from '../../../composition/audio-recording/dialog/playback-choice';
+import { useEffect, useRef } from 'react';
 import type { AudioRecordingModalProps } from '../../../composition/audio-recording/dialog/types';
 
 export function AudioRecordingModal(props: AudioRecordingModalProps) {
@@ -20,6 +22,9 @@ function TimelineAudioRecordingModal({
   onClose,
   onSave,
   timeline,
+  playVideo = true,
+  playbackRunning = false,
+  onPlayVideoChange,
 }: AudioRecordingModalProps): React.JSX.Element | null {
   const { titleId, handleKeyDown } = useAudioRecordingFocus(isOpen);
   const session = useAudioRecordingDialogSession({ isOpen, onClose, onSave, timeline });
@@ -34,6 +39,18 @@ function TimelineAudioRecordingModal({
     startRecording,
     saveRecording,
   } = session;
+  const sawPlayback = useRef(false);
+  useEffect(() => {
+    if (!isOpen || !playVideo) {
+      sawPlayback.current = false;
+      return;
+    }
+    if (playbackRunning) sawPlayback.current = true;
+    else if (sawPlayback.current && controller.transport.status === 'recording') {
+      sawPlayback.current = false;
+      controller.transport.stopRecording();
+    }
+  }, [controller.transport, isOpen, playVideo, playbackRunning]);
   const device = (
     <AudioRecordingDeviceSelect
       value={deviceId}
@@ -60,6 +77,7 @@ function TimelineAudioRecordingModal({
           labelledBy={titleId}
           width="min(800px, calc(100vw - 32px))"
           maxHeight="calc(100vh - 24px)"
+          scrollable
         >
           <TimelineRecordingPanel
             titleId={titleId}
@@ -67,6 +85,17 @@ function TimelineAudioRecordingModal({
             duration={timeline.duration}
             controller={controller}
             device={device}
+            playbackChoice={
+              <RecordingPlaybackChoice
+                checked={playVideo}
+                disabled={
+                  starting ||
+                  isSaving ||
+                  ['recording', 'paused'].includes(controller.transport.status)
+                }
+                onChange={(value) => onPlayVideoChange?.(value)}
+              />
+            }
             starting={starting}
             saving={isSaving}
             error={saveError}

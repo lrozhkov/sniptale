@@ -114,6 +114,15 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   }
   return {
     getSnapshot: () => state,
+    async hasDurableVoiceoverClip(clipId: string, assetId: string) {
+      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
+      return (
+        !!saved &&
+        project(saved).advancedContent.audio.voiceover.some(
+          (clip) => clip.id === clipId && clip.assetId === assetId
+        )
+      );
+    },
     setAutosaveEnabled(enabled: boolean) {
       state = { ...state, autosaveEnabled: enabled };
       emit();
@@ -166,6 +175,14 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         },
         { kind: 'commit', operation: captured, consumeDraft }
       );
+    },
+    /** Explicit Save persists buffered edits and this operation even with autosave disabled. */
+    commitDurable(operation: ReviewOperation) {
+      const captured = structuredClone(operation);
+      return enqueue(async () => {
+        await persistBuffer();
+        return deps.commitVideoWorkspace({ ...identity(), operation: captured });
+      });
     },
     /** Clears authored content atomically while preserving source identity and UI preferences. */
     reset() {

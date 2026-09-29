@@ -131,6 +131,7 @@ function AudioSyncHarness(props: {
   audioRefs: PreviewStageAudioRefs;
   currentTime: number;
   isPlaying: boolean;
+  mutePreviewAudio?: boolean;
   project: VideoProject;
   syncedClips: PreviewStageAudioBankClip[];
 }) {
@@ -142,6 +143,7 @@ async function renderHarness(props: {
   audioRefs: PreviewStageAudioRefs;
   currentTime: number;
   isPlaying: boolean;
+  mutePreviewAudio?: boolean;
   project: VideoProject;
   syncedClips: PreviewStageAudioBankClip[];
 }) {
@@ -213,6 +215,24 @@ async function verifiesActiveAudioClipPlayback() {
   expect(audio.muted).toBe(false);
   expect(audio.play).toHaveBeenCalledTimes(1);
 }
+
+it('silences clip audio during voiceover capture and restores preview after closing', async () => {
+  const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  const clip = createAudioClip(project.tracks[1]!.id);
+  const audio = createAudioElement();
+  const props = {
+    audioRefs: { current: { [clip.id]: audio } },
+    currentTime: 6,
+    isPlaying: true,
+    project: createProject([clip]),
+    syncedClips: [clip],
+  };
+  await renderHarness({ ...props, mutePreviewAudio: true });
+  expect(audio.play).not.toHaveBeenCalled();
+  await renderHarness({ ...props, mutePreviewAudio: false });
+  expect(audio.play).toHaveBeenCalledTimes(1);
+});
 
 async function verifiesPausedSeekSync() {
   const project = createEmptyVideoProject('Preview');

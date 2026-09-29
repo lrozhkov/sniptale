@@ -3,6 +3,14 @@ import { defineMessageSource } from '../source';
 export const videoEditorAppMessages = defineMessageSource({
   recordAudioMicrophone: { ru: 'Запись с микрофона', en: 'Record microphone' },
   recordAudioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
+  recordAudioPlayVideo: {
+    ru: 'Воспроизводить видео при записи (без звука)',
+    en: 'Play video while recording (sound muted)',
+  },
+  recordAudioSaveFailedRetry: {
+    ru: 'Не удалось завершить сохранение. Запись осталась здесь — повторите попытку.',
+    en: 'Could not finish saving. Your recording is still here; try again.',
+  },
   recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
   recordAudioRemaining: { ru: 'Осталось', en: 'Remaining' },
   recordAudioPause: { ru: 'Пауза', en: 'Pause' },

@@ -82,7 +82,7 @@ export function usePreviewStageAudioBankClips(
 }
 
 export function usePreviewStageAudioSync(params: PreviewStageAudioSyncParams): void {
-  const { audioRefs, currentTime, isPlaying, project, syncedClips } = params;
+  const { audioRefs, currentTime, isPlaying, mutePreviewAudio, project, syncedClips } = params;
   const audioGraphStateRef = useRef(createPreviewAudioGraphState());
   const mediaSyncStateRef = useRef(createPreviewMediaSyncState());
 
@@ -92,12 +92,13 @@ export function usePreviewStageAudioSync(params: PreviewStageAudioSyncParams): v
       audioRefs,
       currentTime,
       isPlaying,
+      mutePreviewAudio: mutePreviewAudio ?? false,
       mediaSyncState: mediaSyncStateRef.current,
       project,
       syncedClips,
     } satisfies PreviewStageAudioElementSyncParams);
     updatePreviewMediaSyncState(mediaSyncStateRef.current, currentTime, isPlaying);
-  }, [audioRefs, currentTime, isPlaying, project, syncedClips]);
+  }, [audioRefs, currentTime, isPlaying, mutePreviewAudio, project, syncedClips]);
 
   useEffect(() => {
     const audioGraphState = audioGraphStateRef.current;

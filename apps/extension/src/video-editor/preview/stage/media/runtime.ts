@@ -25,6 +25,7 @@ interface PreviewStageMediaRuntimeParams {
   currentTime: number;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;
   isPlaying: boolean;
+  mutePreviewAudio?: boolean;
   onPresentationTime: (time: number) => void;
   playbackRange: VideoEditorPlaybackRange | null;
   previewExactFrameCache: VideoPreviewExactFrameCache;
@@ -89,13 +90,14 @@ function usePreviewMediaSynchronization(
     audioRefs: media.audioRefs,
     currentTime: params.currentTime,
     isPlaying: params.isPlaying,
+    mutePreviewAudio: params.mutePreviewAudio ?? false,
     project: params.project,
     syncedClips: media.audioBankClips,
   });
   usePreviewEffectAudio({
     currentTime: params.currentTime,
     feedback: params.effectRuntimeFeedback,
-    isPlaying: params.isPlaying,
+    isPlaying: params.isPlaying && !params.mutePreviewAudio,
     project: params.project,
   });
 }

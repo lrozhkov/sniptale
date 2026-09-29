@@ -4,6 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+} from '../../../../apps/extension/src/features/video/project/factories/creation';
+import { createAudioClipFromAsset } from '../../../../apps/extension/src/features/video/project/factories/clip';
+import {
+  VideoProjectAssetType,
+  VideoTrackKind,
+} from '../../../../apps/extension/src/features/video/project/types';
+import {
   applyHarnessBootstrap,
   countRuntimeMessagesByType,
   createVideoExportStatus,
@@ -484,4 +494,65 @@ async function expectProductionProjectInLibrary(page: Page) {
       )
     )
     .toBe('library');
+}
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`full editor voiceover playback choice at HD in ${variant.locale}/${variant.theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const project = createEmptyVideoProject('Voiceover');
+    project.duration = 12;
+    const track = createVideoProjectTrack('Voice', 2, VideoTrackKind.AUDIO);
+    project.tracks.push(track);
+    const asset = createVideoProjectAsset(
+      'Guide',
+      VideoProjectAssetType.AUDIO,
+      { kind: 'project-asset', projectAssetId: 'guide-audio' },
+      {
+        width: 0,
+        height: 0,
+        duration: 2,
+        mimeType: 'audio/webm',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    project.assets.push(asset);
+    project.clips.push(createAudioClipFromAsset(track.id, asset, 0));
+    project.clips.push(createAudioClipFromAsset(track.id, asset, 6));
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [project],
+      storage: {
+        'sniptale-locale-preference': variant.locale,
+        'sniptale-theme-preference': variant.theme,
+      },
+    });
+    await page.emulateMedia({ colorScheme: variant.theme });
+    await page.addInitScript(({ locale, theme }) => {
+      localStorage.setItem('sniptale-locale-preference', locale);
+      localStorage.setItem('sniptale-theme-preference', theme);
+    }, variant);
+    await page.goto(
+      `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${variant.theme}`
+    );
+    await page.locator('[data-ui="video-editor.timeline.record-range"]').first().click();
+    const strip = page.locator('[data-ui="video-editor.audio-recording.strip"]');
+    await expect(strip).toBeVisible();
+    const playVideo = strip.getByRole('checkbox', {
+      name: translate('videoEditor.app.recordAudioPlayVideo', variant.locale),
+    });
+    await expect(playVideo).toBeChecked();
+    await playVideo.uncheck();
+    await expect(playVideo).not.toBeChecked();
+    await page.screenshot({
+      path: testInfo.outputPath(`full-voiceover-ready-${variant.locale}-${variant.theme}.png`),
+    });
+  });
 }

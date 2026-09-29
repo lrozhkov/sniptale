@@ -6,6 +6,9 @@ export interface AudioRecordingModalProps {
   saveLabel?: string | undefined;
   captureLimitSeconds?: number | undefined;
   timeline?: AudioRecordingTimeline | undefined;
+  playVideo?: boolean | undefined;
+  playbackRunning?: boolean | undefined;
+  onPlayVideoChange?: ((value: boolean) => void) | undefined;
   onClose: () => void;
-  onSave: (file: File, trim: AudioTrimRange, signal: AbortSignal) => Promise<void>;
+  onSave: (file: File, trim: AudioTrimRange, signal: AbortSignal, take: Blob) => Promise<void>;
 }

@@ -29,7 +29,8 @@ async function recoverStandaloneJournals(
     if (journal.operationId) continue;
     const adapter = byDomain.get(journal.domain);
     if (!adapter) continue;
-    await adapter.publish(journal as AssetReadyJournal);
+    const result = await adapter.publish(journal as AssetReadyJournal);
+    if (result === 'defer') continue;
     await deleteReadyJournal(journal.journalId);
     recovered += 1;
   }

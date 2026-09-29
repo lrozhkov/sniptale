@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   completeDelete: vi.fn(),
   recoverStandalone: vi.fn(),
   runMutation: vi.fn(),
+  readReview: vi.fn(),
+  discardPrepared: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
@@ -17,16 +19,24 @@ vi.mock('../assets', async (importOriginal) => ({
   buildPhysicalDeleteOperation: mocks.buildDelete,
   completePhysicalDeleteOperation: mocks.completeDelete,
   recoverStandaloneAssetPublications: mocks.recoverStandalone,
+  discardPreparedAsset: mocks.discardPrepared,
+}));
+
+vi.mock('../review-workspaces/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../review-workspaces/store')>()),
+  readVideoWorkspace: mocks.readReview,
 }));
 
 import {
   PROJECT_ASSET_PUBLICATION_DOMAIN,
   PROJECT_EXPORT_PUBLICATION_DOMAIN,
   publishProjectAssetJournal,
+  projectAssetPublicationAdapter,
   publishProjectExportJournal,
   recoverProjectMediaPublications,
 } from './asset-publication';
 import type { AssetReadyJournal } from '../assets';
+import { withVoiceoverAttachmentLock } from './voiceover-publication-lock';
 
 const ref = {
   assetId: 'asset-new',
@@ -161,6 +171,98 @@ it('registers only the two project media publication domains for standalone reco
     expect.objectContaining({ domain: PROJECT_ASSET_PUBLICATION_DOMAIN }),
     expect.objectContaining({ domain: PROJECT_EXPORT_PUBLICATION_DOMAIN }),
   ]);
+});
+
+it('discards an old staged voiceover journal without a durable review reference', async () => {
+  mocks.readReview.mockResolvedValue(null);
+  await expect(
+    projectAssetPublicationAdapter.publish(
+      createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+        entry: {
+          assetId: ref.assetId,
+          createdAt: 2,
+          id: 'voice-1',
+          mimeType: ref.mimeType,
+          size: ref.size,
+        },
+        filename: 'voice.webm',
+        requiredReview: { aggregateId: 'review-1', clipId: 'clip-1' },
+      })
+    )
+  ).resolves.toBeUndefined();
+  expect(mocks.readReview).toHaveBeenCalledWith('review-1');
+  expect(mocks.discardPrepared).toHaveBeenCalledWith(ref.assetId);
+  expect(mocks.runMutation).not.toHaveBeenCalled();
+});
+
+it('defers cleanup of an aged voiceover journal during an active attachment', async () => {
+  mocks.readReview.mockResolvedValue(null);
+  const journal = createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+    entry: {
+      assetId: ref.assetId,
+      createdAt: 2,
+      id: 'voice-1',
+      mimeType: ref.mimeType,
+      size: ref.size,
+    },
+    filename: 'voice.webm',
+    requiredReview: { aggregateId: 'review-1', clipId: 'clip-1' },
+  });
+  let finishAttachment!: () => void;
+  const attachment = withVoiceoverAttachmentLock(
+    'project-asset:voice-1',
+    () =>
+      new Promise<void>((resolve) => {
+        finishAttachment = resolve;
+      })
+  );
+  await expect(projectAssetPublicationAdapter.publish(journal)).resolves.toBe('defer');
+  expect(mocks.discardPrepared).not.toHaveBeenCalled();
+  expect(mocks.runMutation).not.toHaveBeenCalled();
+  finishAttachment();
+  await attachment;
+  await expect(projectAssetPublicationAdapter.publish(journal)).resolves.toBeUndefined();
+  expect(mocks.discardPrepared).toHaveBeenCalledWith(ref.assetId);
+});
+
+it('recovers a voiceover asset when its durable review history retains the clip', async () => {
+  const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+  mocks.readReview.mockResolvedValue({
+    workspace: {
+      advanced: { audio: { voiceover: [], music: [] } },
+      history: [
+        {
+          target: 'advancedContent',
+          before: { audio: { voiceover: [], music: [] } },
+          after: {
+            audio: { voiceover: [{ id: 'clip-1', assetId: 'project-asset:voice-1' }], music: [] },
+          },
+        },
+      ],
+    },
+  });
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => createTransaction(writes, Promise.resolve()) })
+  );
+  await projectAssetPublicationAdapter.publish(
+    createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+      entry: {
+        assetId: ref.assetId,
+        createdAt: 2,
+        id: 'voice-1',
+        mimeType: ref.mimeType,
+        size: ref.size,
+      },
+      filename: 'voice.webm',
+      requiredReview: { aggregateId: 'review-1', clipId: 'clip-1' },
+    })
+  );
+  expect(writes).toContainEqual([
+    'project_assets',
+    'put',
+    expect.objectContaining({ id: 'voice-1' }),
+  ]);
+  expect(mocks.discardPrepared).not.toHaveBeenCalled();
 });
 
 function createJournal(domain: string, payload: unknown): AssetReadyJournal {

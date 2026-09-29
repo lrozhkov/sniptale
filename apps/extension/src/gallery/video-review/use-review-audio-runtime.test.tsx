@@ -154,6 +154,27 @@ it('schedules future clips with lead-in', async () => {
   expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 103, offset: 0, duration: 4 });
 });
 
+it('silences original and external clips during capture, then restores the authored gain', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2,
+    music: [clip()],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => {
+    root.render(<Harness />);
+    await Promise.resolve();
+  });
+  const before = engine.stops;
+  await act(async () => root.render(<Harness playing={false} silent />));
+  expect(engine.stops).toBeGreaterThan(before);
+  expect(engine.gains.at(-1)).toBe(0);
+  await act(async () => root.render(<Harness playing={false} silent={false} />));
+  expect(engine.gains.at(-1)).toBe(1);
+});
+
 it('stops all nodes on pause', async () => {
   const engine = new FakeEngine();
   const { Harness } = renderRuntime({
