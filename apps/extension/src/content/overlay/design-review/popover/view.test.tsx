@@ -95,8 +95,11 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(
     root.querySelector('[data-ui="content.design-review.comment-submit-hint"]')
   ).not.toBeNull();
-  expect(root.querySelector('button[aria-label="Изменить свойства элемента"]')).toBeNull();
-  for (const label of ['Копировать данные элемента', 'Удалить замечание']) {
+  for (const label of [
+    'Копировать данные элемента',
+    'Изменить свойства элемента',
+    'Удалить замечание',
+  ]) {
     expect(root.querySelector(`button[aria-label="${label}"]`)?.className).toContain(
       'cursor-pointer'
     );
@@ -107,8 +110,8 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   const commentField = root.querySelector(
     '[data-ui="content.design-review.comment"] textarea'
   )?.parentElement;
-  expect(commentField?.className).toContain('border-[color:var(--sniptale-color-border-soft)]');
-  expect(commentField?.className).toContain('focus-within:ring-1');
+  expect(commentField?.className).toContain('border-[color:var(--sniptale-color-border-strong)]');
+  expect(commentField?.className).toContain('has-[textarea:focus]:ring-1');
   expect(commentField?.className).not.toContain('focus-within:ring-2');
   const copyButton = root.querySelector('button[aria-label="Копировать данные элемента"]');
   expect(copyButton?.className).toContain('focus-visible:ring-2');
@@ -150,16 +153,14 @@ it('does not render without an active click selection', () => {
   ).toBe('');
 });
 
-it('shows edit and delete in separate popover states', () => {
+it('shows edit and delete together for saved feedback in both panel states', () => {
   for (const settingsOpen of [false, true]) {
     const root = document.createElement('div');
     root.innerHTML = renderToStaticMarkup(
       <DesignReviewPopover actions={actions} open state={{ ...state, settingsOpen }} />
     );
-    expect(Boolean(root.querySelector('[aria-label="Изменить свойства элемента"]'))).toBe(
-      !settingsOpen
-    );
-    expect(Boolean(root.querySelector('[aria-label="Удалить замечание"]'))).toBe(settingsOpen);
+    expect(root.querySelector('[aria-label="Изменить свойства элемента"]')).not.toBeNull();
+    expect(root.querySelector('[aria-label="Удалить замечание"]')).not.toBeNull();
   }
 });
 
@@ -173,6 +174,63 @@ it('hides delete when the selected element has no saved feedback', () => {
     />
   );
   expect(root.querySelector('[aria-label="Удалить замечание"]')).toBeNull();
+});
+
+it('switches edit and delete panels without showing both or losing the actions', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const setSettingsOpen = vi.fn();
+  const scopedActions = { ...actions, setSettingsOpen };
+  const render = (settingsOpen: boolean) =>
+    act(() =>
+      root.render(
+        <DesignReviewPopover actions={scopedActions} open state={{ ...state, settingsOpen }} />
+      )
+    );
+
+  try {
+    render(true);
+    const edit = () =>
+      container.querySelector<HTMLButtonElement>('button[aria-label="Изменить свойства элемента"]');
+    const remove = () =>
+      container.querySelector<HTMLButtonElement>('button[aria-label="Удалить замечание"]');
+    expect(edit()).not.toBeNull();
+    expect(remove()).not.toBeNull();
+    act(() => remove()?.click());
+    expect(setSettingsOpen).toHaveBeenLastCalledWith(false);
+    render(false);
+    expect(
+      container.querySelector('[data-ui="content.design-review.delete-confirmation"]')
+    ).not.toBeNull();
+    expect(container.querySelector('[data-ui="compact-settings"]')).toBeNull();
+
+    act(() => edit()?.click());
+    expect(setSettingsOpen).toHaveBeenLastCalledWith(true);
+    render(true);
+    expect(
+      container.querySelector('[data-ui="content.design-review.delete-confirmation"]')
+    ).toBeNull();
+    expect(container.querySelector('[data-ui="compact-settings"]')).not.toBeNull();
+    act(() => edit()?.click());
+    expect(setSettingsOpen).toHaveBeenLastCalledWith(false);
+    render(false);
+    expect(container.querySelector('[data-ui="compact-settings"]')).toBeNull();
+
+    act(() => remove()?.click());
+    expect(
+      container.querySelector('[data-ui="content.design-review.delete-confirmation"]')
+    ).not.toBeNull();
+    act(() => remove()?.click());
+    expect(
+      container.querySelector('[data-ui="content.design-review.delete-confirmation"]')
+    ).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
 });
 
 it('shows five compact action choices with only the selected label and colored icon', () => {
@@ -334,6 +392,16 @@ it('measures and reclamps base, delete, and action-menu states inside the viewpo
     }
     popoverHeight = 320;
     act(() => deleteButton.click());
+    expect(actions.setSettingsOpen).toHaveBeenCalledWith(false);
+    act(() =>
+      root.render(
+        <DesignReviewPopover
+          actions={actions}
+          open={true}
+          state={{ ...state, settingsOpen: false, anchor: { x: 310, y: 230 } }}
+        />
+      )
+    );
     act(() => {
       (resizeCallback as ResizeObserverCallback)([], {} as ResizeObserver);
     });
@@ -587,7 +655,13 @@ it('collapses delete confirmation when the same selection is reopened', () => {
 
   try {
     act(() => {
-      root.render(<DesignReviewPopover actions={actions} open={true} state={state} />);
+      root.render(
+        <DesignReviewPopover
+          actions={actions}
+          open={true}
+          state={{ ...state, settingsOpen: false }}
+        />
+      );
     });
     const deleteButton = container.querySelector<HTMLButtonElement>(
       'button[aria-label="Удалить замечание"]'
@@ -599,10 +673,22 @@ it('collapses delete confirmation when the same selection is reopened', () => {
     ).not.toBeNull();
 
     act(() => {
-      root.render(<DesignReviewPopover actions={actions} open={false} state={state} />);
+      root.render(
+        <DesignReviewPopover
+          actions={actions}
+          open={false}
+          state={{ ...state, settingsOpen: false }}
+        />
+      );
     });
     act(() => {
-      root.render(<DesignReviewPopover actions={actions} open={true} state={state} />);
+      root.render(
+        <DesignReviewPopover
+          actions={actions}
+          open={true}
+          state={{ ...state, settingsOpen: false }}
+        />
+      );
     });
 
     expect(

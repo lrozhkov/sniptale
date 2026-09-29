@@ -6,12 +6,12 @@ import { DesignReviewCommentVoiceButton } from './comment-voice-button';
 
 const COMMENT_FOCUS_CLASS_NAMES = {
   keyboard: [
-    'focus-within:border-[var(--sniptale-color-accent)] focus-within:ring-2',
-    'focus-within:ring-[color:var(--sniptale-color-accent-soft)]',
+    'has-[textarea:focus]:ring-1',
+    'has-[textarea:focus]:ring-[color:var(--sniptale-color-border-strong)]',
   ].join(' '),
   pointer: [
-    'focus-within:border-[color:var(--sniptale-color-border-strong)] focus-within:ring-1',
-    'focus-within:ring-[color:var(--sniptale-color-border-soft)]',
+    'has-[textarea:focus]:ring-1',
+    'has-[textarea:focus]:ring-[color:var(--sniptale-color-border-soft)]',
   ].join(' '),
 } as const;
 
@@ -90,9 +90,7 @@ export function PageStyleCommentField(props: {
         data-focus-modality={focusModality}
         className={[
           'overflow-visible rounded-[9px] border bg-[var(--sniptale-color-surface-input)]',
-          'border-[color:var(--sniptale-color-border-soft)]',
-          'hover:border-[color:var(--sniptale-color-border-strong)]',
-          'active:bg-[var(--sniptale-color-surface-hover)]',
+          'border-[color:var(--sniptale-color-border-strong)]',
           COMMENT_FOCUS_CLASS_NAMES[focusModality],
         ].join(' ')}
       >

@@ -106,6 +106,10 @@ function useDesignReviewPopoverViewModel(props: { open: boolean; state: DesignRe
     }
   }, [props.open, selectionElement]);
 
+  useEffect(() => {
+    if (props.state.settingsOpen) setDeleteRequested(false);
+  }, [props.state.settingsOpen]);
+
   return {
     basePosition,
     containedPopoverRef,
@@ -197,15 +201,22 @@ export function DesignReviewPopover(props: {
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain">
           <DesignReviewElementBar
+            deleteRequested={view.deleteRequested}
             hasFeedback={props.state.comment.marker !== null}
             onCopyElement={() => void props.actions.copyElement()}
             onCopyPath={() => void props.actions.copyPath()}
-            onDeleteRequest={() => view.setDeleteRequested(true)}
-            onSettingsOpenChange={props.actions.setSettingsOpen}
+            onDeleteRequest={() => {
+              props.actions.setSettingsOpen(false);
+              view.setDeleteRequested((requested) => !requested);
+            }}
+            onSettingsOpenChange={(open) => {
+              view.setDeleteRequested(false);
+              props.actions.setSettingsOpen(open);
+            }}
             selection={props.state.selection}
             settingsOpen={props.state.settingsOpen}
           />
-          {view.deleteRequested ? (
+          {view.deleteRequested && !props.state.settingsOpen ? (
             <DeleteConfirmation
               onCancel={() => view.setDeleteRequested(false)}
               onConfirm={props.actions.delete}

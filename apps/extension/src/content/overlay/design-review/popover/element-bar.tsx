@@ -5,6 +5,7 @@ import type { PageStyleSelectionSnapshot } from '../../../selection/design-revie
 import { describeDesignReviewElement } from './element-label';
 
 export function DesignReviewElementBar(props: {
+  deleteRequested: boolean;
   hasFeedback: boolean;
   onCopyElement: () => void;
   onCopyPath: () => void;
@@ -56,24 +57,23 @@ export function DesignReviewElementBar(props: {
       >
         <ClipboardCopy size={16} />
       </ElementActionButton>
-      {props.settingsOpen ? (
-        props.hasFeedback ? (
-          <ElementActionButton
-            danger
-            label={translate('content.designReview.deleteFeedback')}
-            onClick={props.onDeleteRequest}
-          >
-            <Trash2 size={16} />
-          </ElementActionButton>
-        ) : null
-      ) : (
+      <ElementActionButton
+        expanded={props.settingsOpen}
+        label={translate('content.designReview.editProperties')}
+        onClick={() => props.onSettingsOpenChange(!props.settingsOpen)}
+      >
+        <Pencil size={16} />
+      </ElementActionButton>
+      {props.hasFeedback ? (
         <ElementActionButton
-          label={translate('content.designReview.editProperties')}
-          onClick={() => props.onSettingsOpenChange(true)}
+          danger
+          expanded={props.deleteRequested}
+          label={translate('content.designReview.deleteFeedback')}
+          onClick={props.onDeleteRequest}
         >
-          <Pencil size={16} />
+          <Trash2 size={16} />
         </ElementActionButton>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -81,6 +81,7 @@ export function DesignReviewElementBar(props: {
 function ElementActionButton(props: {
   children: ReactNode;
   danger?: boolean;
+  expanded?: boolean;
   label: string;
   onClick: () => void;
 }) {
@@ -96,6 +97,7 @@ function ElementActionButton(props: {
           : 'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-input)]',
       ].join(' ')}
       aria-label={props.label}
+      aria-expanded={props.expanded}
       title={props.label}
       onClick={props.onClick}
     >
