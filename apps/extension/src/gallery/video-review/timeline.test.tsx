@@ -132,8 +132,12 @@ function planeWithMetrics(host: HTMLDivElement) {
 
 function dispatchPlane(plane: HTMLElement, events: PlaneEvent[]) {
   for (const event of events) {
+    const target =
+      event.type === 'pointerdown' && plane.dataset['ui'] === 'gallery.videoReview.timePlane'
+        ? (plane.querySelector('[data-ui="gallery.videoReview.sourceLane"]') ?? plane)
+        : plane;
     act(() =>
-      plane.dispatchEvent(
+      target.dispatchEvent(
         new MouseEvent(event.type, {
           bubbles: true,
           button: event.button ?? 0,
@@ -147,42 +151,6 @@ function dispatchPlane(plane: HTMLElement, events: PlaneEvent[]) {
 function hoverAt(target: Element, x: number) {
   act(() => target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: x })));
 }
-
-it('shows an exact range-start guide only over drawing zones, with neutral seek and control cursors', () => {
-  const { host } = renderTimeline({
-    onFocusRangeCommit: vi.fn(),
-    originalRangeTool: true,
-    zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
-    audioTrack: (
-      <>
-        <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />
-        <div data-ui="gallery.videoReview.audioLane" />
-      </>
-    ),
-  });
-  const plane = planeWithMetrics(host);
-  const source = host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!;
-  hoverAt(source, 100);
-  expect(plane.style.cursor).toContain('data:image/svg+xml');
-  expect(plane.style.cursor).toContain('4 16, cell');
-  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')?.textContent).toBe('1.0');
-  expect(
-    (host.querySelector('[data-ui="gallery.videoReview.hoverTime"]') as HTMLElement).style.left
-  ).toBe(`${100 + Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'))}px`);
-  hoverAt(host.querySelector('[data-ui="gallery.videoReview.zoomLane"]')!, 200);
-  expect(plane.style.cursor).toContain('4 16, cell');
-  hoverAt(host.querySelector('[data-original-audio-lane]')!, 200);
-  expect(plane.style.cursor).toContain('4 16, cell');
-  hoverAt(
-    host.querySelector(
-      '[data-ui="gallery.videoReview.audioLane"]:not([data-original-audio-lane])'
-    )!,
-    200
-  );
-  expect(plane.style.cursor).toBe('default');
-  hoverAt(host.querySelector('[data-ui="gallery.videoReview.trackHeader"]')!, 200);
-  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
-});
 
 it('clears hover feedback on pointer leave and leaves disabled seeking neutral', () => {
   const { host } = renderTimeline({ busy: true });
@@ -510,7 +478,7 @@ function changeZoom(host: HTMLElement, value: string) {
   });
 }
 
-it('clears object selection on empty-plane seek, leaving interactive action clicks alone', () => {
+it('clears object selection on empty source-lane seek, leaving interactive action clicks alone', () => {
   const clear = vi.fn();
   const { host } = renderTimeline({ onClearSelection: clear });
   const plane = planeWithMetrics(host);

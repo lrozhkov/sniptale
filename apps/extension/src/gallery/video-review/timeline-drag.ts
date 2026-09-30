@@ -71,8 +71,8 @@ export function reviewPlaneLane(
   target: EventTarget | null,
   focusEnabled: boolean,
   originalEnabled: boolean
-): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' {
-  if (!(target instanceof Element)) return 'source';
+): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' {
+  if (!(target instanceof Element)) return 'gap';
   if (target.closest('button,[data-ui="gallery.videoReview.trackHeader"]')) return 'control';
   if (target.closest('[data-ui="gallery.videoReview.editBlock"],[data-audio-id],[role="button"]'))
     return 'item';
@@ -82,7 +82,13 @@ export function reviewPlaneLane(
     return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
   if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
     return focusEnabled ? 'focus' : 'seek';
-  return 'source';
+  if (
+    target.closest(
+      '[data-ui="gallery.videoReview.sourceLane"],[data-ui="gallery.videoReview.ruler"]'
+    )
+  )
+    return 'source';
+  return 'gap';
 }
 
 /** Plane interaction state: seek, range dragging, and Escape restore; render stays separate. */
@@ -116,7 +122,7 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         !!props.onFocusRangeCommit,
         !!props.originalRangeTool
       );
-      if (hit === 'control' || hit === 'item' || hit === 'original') return;
+      if (hit === 'control' || hit === 'item' || hit === 'original' || hit === 'gap') return;
       const time = planeTime(event, props.duration, gutter);
       if (props.busy) {
         props.onSeek(time, false);

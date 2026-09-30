@@ -135,6 +135,7 @@ export function ReviewTimeline(props: TimelineProps) {
               cursor: hover.cursor,
             } as CSSProperties
           }
+          onPointerDownCapture={hover.clear}
           onPointerDown={plane.onPointerDown}
           onPointerMove={(event) => {
             plane.onPointerMove(event);

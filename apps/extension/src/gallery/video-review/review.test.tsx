@@ -247,14 +247,17 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const pointer = (type: string, x: number) => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
     Object.defineProperty(event, 'pointerId', { value: 1 });
-    plane.dispatchEvent(event);
+    (type === 'pointerdown'
+      ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+      : plane
+    ).dispatchEvent(event);
   };
   await act(async () => pointer('pointerdown', start));
   if (end !== undefined) await act(async () => pointer('pointermove', end));
   await act(async () => pointer('pointerup', end ?? start));
 }
 
-it('selects a range by dragging anywhere on the time plane and clears it outside', async () => {
+it('selects a range by dragging on the source lane and clears it outside', async () => {
   const fixture = createEditorFixture(integration);
   const { root, host } = fixture;
   let selected: ReviewAnchor = { kind: 'point', time: 0 };
@@ -296,7 +299,10 @@ it('selects a range by dragging anywhere on the time plane and clears it outside
       ['pointermove', 200],
     ] as const)
       await act(async () =>
-        plane.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
+        (kind === 'pointerdown'
+          ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+          : plane
+        ).dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
       );
     expect(selected).toEqual({ kind: 'range', start: 1, end: 2 });
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
@@ -340,7 +346,10 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       ['pointermove', 300],
     ] as const)
       await act(async () =>
-        plane.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
+        (kind === 'pointerdown'
+          ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+          : plane
+        ).dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
       );
     await key('Escape');
     expect(video.currentTime).toBe(1.4);

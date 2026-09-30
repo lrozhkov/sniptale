@@ -57,7 +57,10 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const pointer = (type: string, x: number) => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
     Object.defineProperty(event, 'pointerId', { value: 1 });
-    plane.dispatchEvent(event);
+    (type === 'pointerdown'
+      ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+      : plane
+    ).dispatchEvent(event);
   };
   await act(async () => pointer('pointerdown', start));
   if (end !== undefined) await act(async () => pointer('pointermove', end));

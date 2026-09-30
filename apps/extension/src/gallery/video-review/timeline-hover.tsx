@@ -52,7 +52,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
     }
     const lane =
       activeLane ?? reviewPlaneLane(event.target, options.focusEnabled, options.originalEnabled);
-    if (lane === 'control' || lane === 'item') {
+    if (lane === 'control' || lane === 'item' || lane === 'gap') {
       setHover(null);
       return;
     }
