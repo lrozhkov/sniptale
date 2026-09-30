@@ -47,23 +47,24 @@ export function syncTimelineTrackScrollIntoView(params: {
 export function useProjectTimelineScrollSync() {
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const trackListRef = useRef<HTMLDivElement | null>(null);
-  const scrollSyncRef = useRef<'tracks' | 'timeline' | null>(null);
+  const mirroredTopRef = useRef<{ tracks: number | null; timeline: number | null }>({
+    tracks: null,
+    timeline: null,
+  });
 
   const syncTracksScroll = (source: 'tracks' | 'timeline') => {
-    if (scrollSyncRef.current && scrollSyncRef.current !== source) {
-      return;
-    }
-
-    scrollSyncRef.current = source;
-    if (source === 'tracks' && timelineRef.current && trackListRef.current) {
-      timelineRef.current.scrollTop = trackListRef.current.scrollTop;
-    }
-    if (source === 'timeline' && timelineRef.current && trackListRef.current) {
-      trackListRef.current.scrollTop = timelineRef.current.scrollTop;
-    }
-    requestAnimationFrame(() => {
-      scrollSyncRef.current = null;
-    });
+    const tracks = trackListRef.current;
+    const timeline = timelineRef.current;
+    if (!tracks || !timeline) return;
+    const origin = source === 'tracks' ? tracks : timeline;
+    const mirror = source === 'tracks' ? timeline : tracks;
+    const mirrorKey = source === 'tracks' ? 'timeline' : 'tracks';
+    const acknowledgedTop = mirroredTopRef.current[source];
+    mirroredTopRef.current[source] = null;
+    if (acknowledgedTop === origin.scrollTop) return;
+    if (mirror.scrollTop === origin.scrollTop) return;
+    mirror.scrollTop = origin.scrollTop;
+    mirroredTopRef.current[mirrorKey] = mirror.scrollTop;
   };
 
   return { timelineRef, trackListRef, syncTracksScroll };
