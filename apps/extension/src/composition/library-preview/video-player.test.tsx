@@ -27,7 +27,9 @@ function mount() {
   act(() => root.render(<PreviewVideo src="blob:clip" />));
   const video = host.querySelector('video')!;
   Object.defineProperty(video, 'duration', { configurable: true, value: 30 });
+  Object.defineProperty(video, 'volume', { configurable: true, writable: true, value: 1 });
   act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  act(() => video.dispatchEvent(new Event('volumechange')));
   return video;
 }
 function button(name: string) {
@@ -113,8 +115,13 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   expect(video.muted).toBe(true);
   expect(button('unmute')).not.toBeNull();
   const volume = host.querySelector<HTMLInputElement>(
-    '[aria-label="gallery.preview.player.volume"]'
+    'input[aria-label="gallery.preview.player.volume"]'
   )!;
+  expect(Number(volume.value)).toBe(1);
+  expect(volume.getAttribute('aria-valuetext')).toBe('100%');
+  expect(
+    host.querySelector('[data-ui="gallery.preview.player.volumeGroup"]')?.textContent
+  ).toContain('100%');
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(volume, '0.5');
     volume.dispatchEvent(new Event('input', { bubbles: true }));
@@ -123,6 +130,10 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   });
   expect(video.volume).toBe(0.5);
   expect(video.muted).toBe(false);
+  expect(volume.getAttribute('aria-valuetext')).toBe('50%');
+  expect(
+    host.querySelector('[data-ui="gallery.preview.player.volumeGroup"]')?.textContent
+  ).toContain('50%');
   const speed = button('speed');
   act(() => {
     speed.click();
@@ -136,6 +147,35 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   });
   expect(video.playbackRate).toBe(1.5);
   expect(speed.textContent).toContain('1.5×');
+});
+
+it('distinguishes zero volume from mute and mirrors external volume changes', () => {
+  const video = mount();
+  const volume = host.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.preview.player.volume"]'
+  )!;
+  act(() => {
+    video.volume = 0;
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  expect(Number(volume.value)).toBe(0);
+  expect(volume.getAttribute('aria-valuetext')).toBe('0%');
+  expect(button('mute').querySelector('.lucide-volume')).not.toBeNull();
+
+  act(() => {
+    video.muted = true;
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  expect(button('unmute').querySelector('.lucide-volume-x')).not.toBeNull();
+  expect(Number(volume.value)).toBe(0);
+
+  act(() => {
+    video.volume = 1;
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  expect(Number(volume.value)).toBe(1);
+  expect(button('unmute')).not.toBeNull();
+  expect(volume.getAttribute('aria-valuetext')).toBe('100%');
 });
 
 it('keeps hover decoding separate from playback and disables seeking after media errors', () => {

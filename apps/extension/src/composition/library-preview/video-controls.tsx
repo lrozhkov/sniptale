@@ -1,7 +1,17 @@
-import { LoaderCircle, Maximize, Minimize, Pause, Play, Volume2, VolumeX } from 'lucide-react';
+import {
+  LoaderCircle,
+  Maximize,
+  Minimize,
+  Pause,
+  Play,
+  Volume,
+  Volume1,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange, ProductSelect } from '@sniptale/ui/product-form-controls';
-import type { ReactNode, RefObject } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { translate } from '../../platform/i18n';
 import { videoTime } from './video-thumbnail';
 import { VideoTimeline } from './video-timeline';
@@ -104,13 +114,22 @@ export function VideoControls({
           />
         </div>
         <PlaybackSettings video={video} muted={muted} volume={volume} speed={speed} />
-        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <ProductSelect<'fit' | 'original'>
             aria-label={translate('gallery.preview.player.scale')}
+            title={translate(
+              fit ? 'gallery.preview.player.fit' : 'gallery.preview.player.original'
+            )}
             value={fit ? 'fit' : 'original'}
             controlSize="sm"
-            containerClassName="w-36 shrink-0"
-            className="!h-9 !min-h-9 w-full"
+            containerClassName="!w-[152px] shrink-0"
+            className="!h-9 !min-h-9 !w-full"
+            style={
+              {
+                '--sniptale-field-padding-inline-start': '8px',
+                '--sniptale-field-padding-inline-end': '28px',
+              } as CSSProperties
+            }
             options={[
               { value: 'fit', label: translate('gallery.preview.player.fit') },
               { value: 'original', label: translate('gallery.preview.player.original') },
@@ -149,36 +168,74 @@ function PlaybackSettings({
   speed: number;
 }) {
   return (
-    <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-      <PlayerButton
-        label={translate(muted ? 'gallery.preview.player.unmute' : 'gallery.preview.player.mute')}
-        onClick={() => {
-          if (video.current) video.current.muted = !video.current.muted;
-        }}
-      >
-        {muted ? <VolumeX size={16} aria-hidden /> : <Volume2 size={16} aria-hidden />}
-      </PlayerButton>
-      <ProductRange
+    <div className="flex shrink-0 items-center gap-1.5">
+      <div
+        data-ui="gallery.preview.player.volumeGroup"
+        role="group"
         aria-label={translate('gallery.preview.player.volume')}
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={muted ? 0 : volume}
-        className="w-14 min-w-12"
-        onChange={(event) => {
-          if (video.current) {
-            video.current.volume = event.currentTarget.valueAsNumber;
-            video.current.muted = false;
+        className="flex shrink-0 items-center gap-1 rounded-[8px]
+          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_45%,transparent)] pr-1"
+      >
+        <PlayerButton
+          label={translate(muted ? 'gallery.preview.player.unmute' : 'gallery.preview.player.mute')}
+          onClick={() => {
+            if (video.current) video.current.muted = !video.current.muted;
+          }}
+        >
+          {muted ? (
+            <VolumeX size={16} aria-hidden />
+          ) : volume === 0 ? (
+            <Volume size={16} aria-hidden />
+          ) : volume < 0.5 ? (
+            <Volume1 size={16} aria-hidden />
+          ) : (
+            <Volume2 size={16} aria-hidden />
+          )}
+        </PlayerButton>
+        <ProductRange
+          aria-label={translate('gallery.preview.player.volume')}
+          aria-valuetext={`${Math.round(volume * 100)}%`}
+          type="range"
+          min={0}
+          max={1}
+          step={0.01}
+          value={volume}
+          style={
+            {
+              '--sniptale-range-track-height': '4px',
+              '--sniptale-range-thumb-size': '12px',
+            } as CSSProperties
           }
-        }}
-      />
+          className="!w-16 shrink-0 focus-visible:ring-2
+            focus-visible:ring-[var(--sniptale-color-accent)]"
+          onChange={(event) => {
+            if (video.current) {
+              video.current.volume = event.currentTarget.valueAsNumber;
+              video.current.muted = false;
+            }
+          }}
+        />
+        <output
+          aria-hidden="true"
+          className="w-9 shrink-0 text-right tabular-nums
+            text-[var(--sniptale-color-text-secondary)]"
+        >
+          {Math.round(volume * 100)}%
+        </output>
+      </div>
       <ProductSelect<string>
         aria-label={translate('gallery.preview.player.speed')}
+        title={`${speed}×`}
         value={String(speed)}
         controlSize="sm"
-        containerClassName="w-16 shrink-0"
-        className="!h-9 !min-h-9 w-full"
+        containerClassName="!w-[84px] shrink-0"
+        className="!h-9 !min-h-9 !w-full"
+        style={
+          {
+            '--sniptale-field-padding-inline-start': '8px',
+            '--sniptale-field-padding-inline-end': '28px',
+          } as CSSProperties
+        }
         options={[0.5, 0.75, 1, 1.25, 1.5, 2].map((rate) => ({
           value: String(rate),
           label: `${rate}×`,

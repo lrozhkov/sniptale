@@ -1,11 +1,48 @@
 .sniptale-range.sniptale-video-seek {
-  --sniptale-range-track-height: 4px;
-  --sniptale-range-thumb-size: 14px;
+  --sniptale-range-track-height: 8px;
+  --sniptale-range-thumb-size: 1px;
 }
 
 .sniptale-range.sniptale-video-seek:hover,
 .sniptale-range.sniptale-video-seek:focus-visible,
 .sniptale-range.sniptale-video-seek:active {
-  --sniptale-range-track-height: 6px;
-  --sniptale-range-thumb-size: 18px;
+  --sniptale-range-track-height: 10px;
+}
+
+.sniptale-range.sniptale-video-seek::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--sniptale-color-accent) var(--sniptale-range-fill-ratio),
+    color-mix(in srgb, var(--sniptale-color-text-primary) 22%, transparent)
+      var(--sniptale-range-fill-ratio)
+  );
+}
+
+.sniptale-range.sniptale-video-seek::-moz-range-track {
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 22%, transparent);
+}
+
+.sniptale-range.sniptale-video-seek::-moz-range-progress {
+  background: var(--sniptale-color-accent);
+}
+
+.sniptale-range.sniptale-video-seek::-webkit-slider-thumb {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sniptale-range.sniptale-video-seek::-moz-range-thumb {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sniptale-range.sniptale-video-seek:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+
+.sniptale-range.sniptale-video-seek:disabled {
+  opacity: 0.45;
 }
