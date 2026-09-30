@@ -30,6 +30,7 @@ export function mapScenarioExportEntry(entry: DbScenarioExportEntry): ScenarioEx
     id: entry.id,
     projectId: entry.projectId,
     format: entry.format,
+    ...(entry.trashState ? { trashState: { ...entry.trashState } } : {}),
     filename: entry.filename,
     createdAt: entry.createdAt,
     size: entry.size,

@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type {
   MediaHubBackupExportOptions,
   MediaHubImportConflictStrategy,
@@ -43,7 +44,7 @@ export interface UseGalleryAppActionsResult {
   selection: {
     restoreTrash?: (targets: GalleryItem[]) => Promise<boolean>;
     applyTag: (tag?: string) => Promise<void>;
-    deleteMany: (targets: GalleryItem[]) => Promise<void>;
+    deleteMany: (targets: GalleryItem[], opening?: GalleryDeletionOpening) => Promise<void>;
     downloadBackup: () => Promise<void>;
     downloadZip: () => Promise<void>;
   };

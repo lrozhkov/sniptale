@@ -471,7 +471,7 @@ it('opens an available video project from detail actions', async () => {
   await act(async () => root.unmount());
 });
 
-it('keeps promotion available for temporary scenario exports without a Delete action', async () => {
+it('keeps promotion and independent Delete available for temporary scenario exports', async () => {
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
@@ -485,7 +485,7 @@ it('keeps promotion available for temporary scenario exports without a Delete ac
     (button) => button.textContent === 'gallery.preview.saveToLibrary'
   );
   expect(save).toBeDefined();
-  expect(container.textContent).not.toContain('common.actions.delete');
+  expect(container.textContent).toContain('common.actions.delete');
   await act(async () => save?.click());
   expect(onPromote).toHaveBeenCalledOnce();
   act(() => root.unmount());

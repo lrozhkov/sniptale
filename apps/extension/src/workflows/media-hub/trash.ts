@@ -1,14 +1,21 @@
 import type { LocalStoragePolicy } from '../../contracts/settings';
-import type { LibraryLifecycleTarget } from '../../composition/persistence/library-lifecycle';
+import type { LibraryLifecycle } from '../../composition/persistence/library-lifecycle/contracts';
+import type { LibraryTrashTarget } from '../../composition/persistence/library-lifecycle/trash';
 import {
   moveStoredItemsToTrash,
   restoreStoredItemsFromTrash,
   runWithTrashedStoredItem,
+  runWithStoredItemLifecycle,
   StaleTrashItemError,
 } from '../../composition/persistence/library-lifecycle/trash';
 import { listMediaLibrary } from '../../composition/persistence/media-library';
 import { listVideoProjectEntries } from '../../composition/persistence/projects';
-import { listScenarioProjectEntries } from '../../composition/persistence/scenario/projects';
+import {
+  listScenarioProjectEntries,
+  listScenarioExports,
+  deleteScenarioExport,
+} from '../../composition/persistence/scenario/projects';
+import { deleteMediaThumbnail } from '../../composition/persistence/media-library/index.library.ts';
 import { deleteScenarioProjectRecord } from '../../composition/persistence/scenario/store/public';
 import {
   listMediaAssetProjectUsage,
@@ -20,11 +27,11 @@ import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 
 /** A deletion preview is bound to the exact trash admission seen by the user. */
 interface TrashDeletionTarget {
-  target: LibraryLifecycleTarget;
+  target: LibraryTrashTarget;
   trashedAt: number;
 }
 
-export async function moveLibraryItemsToTrash(targets: LibraryLifecycleTarget[]): Promise<void> {
+export async function moveLibraryItemsToTrash(targets: LibraryTrashTarget[]): Promise<void> {
   await moveStoredItemsToTrash(targets);
   publishMediaHubLibraryChanged(
     'update',
@@ -32,7 +39,7 @@ export async function moveLibraryItemsToTrash(targets: LibraryLifecycleTarget[])
   );
 }
 
-export async function restoreLibraryTrashItems(targets: LibraryLifecycleTarget[]): Promise<void> {
+export async function restoreLibraryTrashItems(targets: LibraryTrashTarget[]): Promise<void> {
   await restoreStoredItemsFromTrash(targets);
   publishMediaHubLibraryChanged(
     'update',
@@ -46,17 +53,42 @@ export async function permanentlyDeleteTrashItem(
   expectedUsage?: readonly MediaAssetProjectUsage[]
 ): Promise<void> {
   await runWithTrashedStoredItem(entry.target, entry.trashedAt, async () => {
-    if (entry.target.kind === 'media') {
-      await deleteMediaLibraryAssetsBatchSafely(
-        [entry.target.id],
-        new Map([[entry.target.id, expectedUsage ?? []]])
-      );
-    } else if (entry.target.kind === 'scenario-project') {
-      await deleteScenarioProjectRecord(entry.target.id);
-    } else {
-      await deletePersistedVideoProject(entry.target.id, { preserveExports: true });
-    }
+    await deleteLibraryTarget(entry.target, expectedUsage);
   });
+  publishMediaHubLibraryChanged('delete', [entry.target.id]);
+}
+
+/** Release only the confirmed root through its existing aggregate/resource owner. */
+async function deleteLibraryTarget(
+  target: LibraryTrashTarget,
+  expectedUsage?: readonly MediaAssetProjectUsage[]
+): Promise<void> {
+  if (target.kind === 'media') {
+    await deleteMediaLibraryAssetsBatchSafely(
+      [target.id],
+      new Map([[target.id, expectedUsage ?? []]])
+    );
+  } else if (target.kind === 'scenario-project') {
+    await deleteScenarioProjectRecord(target.id);
+  } else if (target.kind === 'video-project') {
+    await deletePersistedVideoProject(target.id, { preserveExports: true });
+  } else {
+    await deleteScenarioExport(target.id);
+    await deleteMediaThumbnail(`scenario-export:${target.id}`);
+  }
+}
+
+/** Explicitly confirmed manual deletion accepts both active and retained Trash roots. */
+export async function permanentlyDeleteLibraryItem(
+  entry: {
+    target: LibraryTrashTarget;
+    lifecycle: Pick<LibraryLifecycle, 'updatedAt' | 'trashedAt'>;
+  },
+  expectedUsage?: readonly MediaAssetProjectUsage[]
+): Promise<void> {
+  await runWithStoredItemLifecycle(entry.target, entry.lifecycle, () =>
+    deleteLibraryTarget(entry.target, expectedUsage)
+  );
   publishMediaHubLibraryChanged('delete', [entry.target.id]);
 }
 
@@ -73,11 +105,15 @@ export async function cleanupLibraryTrash(
     listScenarioProjectEntries(),
   ]);
   const candidates: TrashDeletionTarget[] = [];
-  const append = (target: LibraryLifecycleTarget, trashedAt: number | undefined) => {
+  const append = (target: LibraryTrashTarget, trashedAt: number | undefined) => {
     if (trashedAt !== undefined && trashedAt <= cutoff) candidates.push({ target, trashedAt });
   };
   scenarios.forEach((item) =>
     append({ kind: 'scenario-project', id: item.id }, item.lifecycle?.trashedAt)
+  );
+  const exports = (await Promise.all(scenarios.map((item) => listScenarioExports(item.id)))).flat();
+  exports.forEach((item) =>
+    append({ kind: 'scenario-export', id: item.id }, item.trashState?.trashedAt)
   );
   videos.forEach((item) =>
     append({ kind: 'video-project', id: item.id }, item.lifecycle?.trashedAt)

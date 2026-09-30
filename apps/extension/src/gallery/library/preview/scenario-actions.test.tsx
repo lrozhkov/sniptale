@@ -123,7 +123,7 @@ it('distinguishes historical export metadata from the current project and links 
   expect(open?.href).not.toContain('view=');
   const unavailable = {
     ...item,
-    project: { ...item.project, availability: 'invalid' },
+    project: { ...item.project, availability: 'invalid' as const },
   } as const;
   await act(async () =>
     root.render(
@@ -145,7 +145,7 @@ it('removes repeated ready-to-edit copy while retaining scenario availability re
   await act(async () =>
     root.render(
       <PreviewMetadataCards
-        item={{ ...item, project: { ...item.project, availability: 'unavailable' } }}
+        item={{ ...item, project: { ...item.project, availability: 'invalid' as const } }}
       />
     )
   );

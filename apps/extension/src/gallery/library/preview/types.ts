@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type { GalleryPreviewPresentation } from '../types';
 import type { GalleryItem } from '../items';
 
@@ -40,7 +41,7 @@ export interface PreviewPanelProps {
   onCopy: () => Promise<boolean | void>;
   onEdit: () => void;
   onOpenSnapshotScreenshot?: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  onDelete: (opening?: GalleryDeletionOpening) => Promise<void>;
   onPromote?: () => Promise<void>;
   onRestoreOriginal?: () => void;
   onSaveCopy?: () => Promise<boolean | void>;

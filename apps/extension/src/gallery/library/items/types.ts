@@ -113,10 +113,13 @@ export function isGalleryVideoProjectAvailable(item: GalleryItem): boolean {
   return !isGalleryVideoProjectItem(item) || item.unavailableReason === null;
 }
 
-export function isGallerySelectableItem(
-  item: GalleryItem
-): item is GalleryMediaItem | GalleryScenarioItem | GalleryVideoProjectItem {
-  return item.type === 'media' || item.type === 'scenario' || item.type === 'video-project';
+export function isGallerySelectableItem(item: GalleryItem): boolean {
+  return (
+    item.type === 'media' ||
+    item.type === 'scenario' ||
+    item.type === 'scenario-export' ||
+    item.type === 'video-project'
+  );
 }
 
 export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem {

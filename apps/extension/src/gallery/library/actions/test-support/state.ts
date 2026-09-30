@@ -139,6 +139,7 @@ export function createGalleryState(overrides: GalleryStateOverride = {}): Galler
       activeImport: overrides.activeImport ?? null,
       banner: null,
       confirmDialog: overrides.confirmDialog ?? null,
+      deletionRequest: null,
       isBusy: false,
       isLoading: false,
       pendingExport: overrides.pendingExport ?? null,

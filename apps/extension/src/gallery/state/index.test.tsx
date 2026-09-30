@@ -156,6 +156,7 @@ function configureStorageWorkflowMock(
       replaceActiveBackupExport: vi.fn(),
       setBanner: vi.fn(),
       setConfirmDialog: vi.fn(),
+      setDeletionRequest: vi.fn(),
       setPendingExport: vi.fn(),
       setPendingImport: vi.fn(),
       setPendingMediaImport: vi.fn(),
@@ -177,6 +178,7 @@ function configureStorageWorkflowMock(
     state: {
       banner: { kind: 'info' },
       confirmDialog: null,
+      deletionRequest: null,
       hasLoadedLibrarySnapshot: true,
       isBusy: false,
       isLoading: false,
@@ -292,7 +294,7 @@ it('toggles selected ids in both directions through the controller action seam',
   expect(Array.from(currentSelectedIds)).toEqual(['asset-2', 'asset-3']);
 });
 
-it('selects the full filtered range for shift-toggle and skips non-selectable items', () => {
+it('selects the full filtered range including independently deletable exports', () => {
   currentSelectedIds = new Set();
   getFilteredGalleryItemsMock.mockReturnValue([
     createItem({ id: 'asset-1' }),
@@ -309,7 +311,12 @@ it('selects the full filtered range for shift-toggle and skips non-selectable it
     controller.actions.selection.toggleSelection('asset-1');
     controller.actions.selection.toggleSelection('asset-4', { shiftKey: true });
   });
-  expect(Array.from(currentSelectedIds)).toEqual(['asset-1', 'scenario:project-1', 'asset-4']);
+  expect(Array.from(currentSelectedIds)).toEqual([
+    'asset-1',
+    'scenario:project-1',
+    'scenario-export:export-1',
+    'asset-4',
+  ]);
 });
 
 it('opens the requested recording once when gallery is entered from a recording route', () => {

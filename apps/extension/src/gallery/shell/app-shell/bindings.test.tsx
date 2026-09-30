@@ -375,7 +375,7 @@ it('opens trashed material read-only, navigates without saving, and restores onl
   });
   expect(getState().preview.session.item?.id).toBe('deleted-2');
   expect(actions.preview.navigate).not.toHaveBeenCalled();
-  expect(actions.selection.deleteMany).not.toHaveBeenCalled();
+  expect(actions.selection.deleteMany).toHaveBeenCalledExactlyOnceWith([next], undefined);
   expect(actions.preview.openSnapshotScreenshotInEditor).not.toHaveBeenCalled();
   expect(actions.preview.resetChanges).not.toHaveBeenCalled();
   expect(actions.selection.downloadBackup).not.toHaveBeenCalled();

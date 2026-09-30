@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../../library/deletion/types';
 import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { MediaHubImportConflictStrategy } from '../../../workflows/media-hub-backup/index';
@@ -41,6 +42,7 @@ export interface GalleryAppLayoutProps {
   onActiveImportCancel: () => void;
   onActiveImportDismiss: () => void;
   onConfirmDialogClose: () => void;
+  onDeletionRequestClose: () => void;
   onPendingImportClose: () => void;
   onPendingMediaImportClose: () => void;
   onPendingWebSnapshotImportClose?: () => void;
@@ -66,7 +68,7 @@ export interface GalleryAppLayoutProps {
   onPreviewCopy: () => Promise<boolean>;
   onPreviewEdit: (item: GalleryItem) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
-  onPreviewDelete: (item: GalleryItem) => void;
+  onPreviewDelete: (item: GalleryItem, opening?: GalleryDeletionOpening) => void;
   onPreviewPromote?: (item: GalleryItem) => Promise<void>;
   onPreviewRestoreOriginal: () => void;
   onPreviewSaveCopy: () => Promise<boolean>;
@@ -95,7 +97,7 @@ export interface GalleryAppLayoutProps {
   onApplySelectionTag: (tag?: string) => void;
   onSelectionBackup: () => void;
   onSelectionZip: () => void;
-  onDeleteMany: (items: GalleryItem[]) => void;
+  onDeleteMany: (items: GalleryItem[], opening?: GalleryDeletionOpening) => void;
   onClearSelection: () => void;
   onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;

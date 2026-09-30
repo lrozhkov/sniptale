@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   FolderFilter,
@@ -27,8 +28,8 @@ export interface GallerySidebarProps {
   selectedCount?: number;
   onTrashModeChange?: (value: boolean) => void;
   onRestoreTrash?: () => void;
-  onDeleteTrash?: () => void;
-  onEmptyTrash?: () => void;
+  onDeleteTrash?: (opening: GalleryDeletionOpening) => void;
+  onEmptyTrash?: (opening: GalleryDeletionOpening) => void;
   activeSavedView?: GallerySavedView | null;
   activeTags: string[];
   allTags: string[];

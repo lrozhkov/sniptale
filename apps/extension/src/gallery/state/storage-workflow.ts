@@ -9,6 +9,7 @@ type GalleryStorageWorkflowState = Pick<
   | 'activeImport'
   | 'banner'
   | 'confirmDialog'
+  | 'deletionRequest'
   | 'hasLoadedLibrarySnapshot'
   | 'isBusy'
   | 'isLoading'
@@ -29,6 +30,7 @@ type GalleryStorageWorkflowActions = Pick<
   | 'setActiveImport'
   | 'setBanner'
   | 'setConfirmDialog'
+  | 'setDeletionRequest'
   | 'setPendingExport'
   | 'setPendingImport'
   | 'setPendingMediaImport'
@@ -48,6 +50,7 @@ function buildGalleryStorageWorkflowState(
     activeImport: surface.state.activeImport,
     banner: surface.state.banner,
     confirmDialog: surface.state.confirmDialog,
+    deletionRequest: surface.state.deletionRequest,
     hasLoadedLibrarySnapshot: library.hasLoadedLibrarySnapshot,
     isBusy: surface.state.isBusy,
     isLoading: library.isLoading,
@@ -72,6 +75,7 @@ function buildGalleryStorageWorkflowActions(
     refresh: library.refresh,
     setBanner: surface.actions.setBanner,
     setConfirmDialog: surface.actions.setConfirmDialog,
+    setDeletionRequest: surface.actions.setDeletionRequest,
     setPendingExport: surface.actions.setPendingExport,
     setPendingImport: surface.actions.setPendingImport,
     setPendingMediaImport: surface.actions.setPendingMediaImport,

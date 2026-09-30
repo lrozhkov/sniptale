@@ -183,6 +183,7 @@ function buildGalleryAppActions(args: {
       setActiveImport: args.storage.setActiveImport,
       setBanner: args.storage.setBanner,
       setConfirmDialog: args.storage.setConfirmDialog,
+      setDeletionRequest: args.storage.setDeletionRequest,
       setPendingExport: args.storage.setPendingExport,
       setPendingImport: args.storage.setPendingImport,
       setPendingMediaImport: args.storage.setPendingMediaImport,

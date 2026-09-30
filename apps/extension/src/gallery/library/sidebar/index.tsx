@@ -172,16 +172,20 @@ function GalleryTrashControls(props: GallerySidebarProps) {
           type="button"
           disabled={props.busy || !props.selectedCount}
           className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
-          onClick={props.onDeleteTrash}
+          onClick={(event) =>
+            props.onDeleteTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
+          }
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
-          {translate('gallery.app.permanentDelete')}
+          {translate('common.actions.delete')}
         </button>
         <button
           type="button"
           disabled={props.busy || !props.trashSummary?.count}
           className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
-          onClick={props.onEmptyTrash}
+          onClick={(event) =>
+            props.onEmptyTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
+          }
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           {translate('gallery.app.emptyTrash')}

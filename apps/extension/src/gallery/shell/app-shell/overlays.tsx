@@ -1,3 +1,6 @@
+import { useGalleryDeleteShortcut } from '../../library/deletion/use-gallery-delete-shortcut';
+import { GalleryDeletionMenu } from '../../library/deletion/menu';
+import { getGalleryDeletionContextKey } from '../../library/deletion/types';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { BackupExportModalContent } from '../../library/modals/backup-export-content';
 import { ImportConflictModalContent } from '../../library/modals/import-conflict-content';
@@ -225,7 +228,7 @@ function renderPreviewOverlayPanel(
       onCopy={async () => props.onPreviewCopy()}
       onEdit={() => props.onPreviewEdit(previewItem)}
       onOpenSnapshotScreenshot={async () => props.onPreviewOpenSnapshotScreenshot()}
-      onDelete={async () => props.onPreviewDelete(previewItem)}
+      onDelete={async (opening) => props.onPreviewDelete(previewItem, opening)}
       onRestoreOriginal={props.onPreviewRestoreOriginal}
       onSaveCopy={async () => props.onPreviewSaveCopy()}
       {...(props.onPreviewPromote
@@ -241,9 +244,36 @@ function GalleryPreviewOverlay(props: GalleryPreviewOverlayProps) {
 }
 
 export function GalleryOverlays(props: GalleryAppLayoutProps) {
+  const storage = props.state.storage;
+  useGalleryDeleteShortcut({
+    enabled:
+      !storage.isBusy &&
+      !storage.isLoading &&
+      !storage.confirmDialog &&
+      !storage.deletionRequest &&
+      !storage.pendingImport &&
+      !storage.pendingMediaImport &&
+      !storage.pendingWebSnapshotImport &&
+      !storage.pendingExport &&
+      !storage.activeImport &&
+      !props.state.preview.session.item,
+    selectedItems: props.state.selection.selectedItems,
+    gridRef: props.gridViewportRef,
+    onDelete: props.onDeleteMany,
+  });
   return (
     <>
       <GalleryConfirmOverlay {...props} />
+      {props.state.storage.deletionRequest ? (
+        <GalleryDeletionMenu
+          request={props.state.storage.deletionRequest}
+          contextKey={getGalleryDeletionContextKey(
+            props.state.selection.selectedItems,
+            props.state.preview.session.item
+          )}
+          onClose={props.onDeletionRequestClose}
+        />
+      ) : null}
       <GalleryBackupExportOverlay {...props} />
       <GalleryImportOverlay {...props} />
       <GalleryMediaImportOverlay {...props} />

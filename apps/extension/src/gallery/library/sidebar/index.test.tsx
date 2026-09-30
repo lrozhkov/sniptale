@@ -166,11 +166,11 @@ it('offers trash navigation and replaces library filters with recoverable action
     summary.compareDocumentPosition(retention) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   expect(
-    retention.compareDocumentPosition(button('gallery.app.permanentDelete')) &
+    retention.compareDocumentPosition(button('common.actions.delete')) &
       Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   act(() => button('gallery.app.restoreTrash').click());
-  act(() => button('gallery.app.permanentDelete').click());
+  act(() => button('common.actions.delete').click());
   act(() => button('gallery.app.emptyTrash').click());
   act(() => button('gallery.app.returnToLibrary').click());
   expect(props.onRestoreTrash).toHaveBeenCalledOnce();
@@ -184,7 +184,7 @@ it('offers trash navigation and replaces library filters with recoverable action
   for (const key of [
     'gallery.app.trashSelectAll',
     'gallery.app.restoreTrash',
-    'gallery.app.permanentDelete',
+    'common.actions.delete',
     'gallery.app.emptyTrash',
     'gallery.app.returnToLibrary',
   ] as const) {

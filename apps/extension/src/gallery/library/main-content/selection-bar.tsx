@@ -1,3 +1,4 @@
+import { isGalleryScenarioExportItem } from '../items';
 import { Archive, Download, FolderArchive, Trash2, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -64,21 +65,28 @@ function GallerySelectionActions(
 ) {
   return (
     <>
-      <button
-        type="button"
-        aria-label={translate('gallery.app.selectionBackup')}
-        title={translate('gallery.app.selectionBackup')}
-        onClick={props.onSelectionBackup}
-        className={gallerySelectionActionClassName}
-      >
-        <Archive className="h-4 w-4" aria-hidden="true" />
-        <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
-      </button>
+      {props.selectedItems.some((item) => !isGalleryScenarioExportItem(item)) ? (
+        <button
+          type="button"
+          aria-label={translate('gallery.app.selectionBackup')}
+          title={translate('gallery.app.selectionBackup')}
+          onClick={props.onSelectionBackup}
+          className={gallerySelectionActionClassName}
+        >
+          <Archive className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
+        </button>
+      ) : null}
       <button
         type="button"
         aria-label={translate('common.actions.delete')}
         title={translate('common.actions.delete')}
-        onClick={() => props.onDeleteMany(props.selectedItems)}
+        onClick={(event) =>
+          props.onDeleteMany(props.selectedItems, {
+            anchor: event.currentTarget,
+            keyboard: event.detail === 0,
+          })
+        }
         className={galleryDangerSelectionActionClassName}
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -146,26 +154,30 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
         aria-hidden="true"
         className="mx-0.5 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
       />
-      <GallerySelectionTagInput
-        {...(allTags === undefined ? {} : { allTags })}
-        onApplySelectionTag={onApplySelectionTag}
-        onSelectionTagDraftChange={onSelectionTagDraftChange}
-        selectionTagDraft={selectionTagDraft}
-      />
-      <button
-        type="button"
-        aria-label={downloadLabel}
-        title={downloadLabel}
-        onClick={onSelectionZip}
-        className={gallerySelectionActionClassName}
-      >
-        {downloadsSingleOriginal ? (
-          <Download className="h-4 w-4" aria-hidden="true" />
-        ) : (
-          <FolderArchive className="h-4 w-4" aria-hidden="true" />
-        )}
-        <span className="hidden 2xl:inline">{downloadLabel}</span>
-      </button>
+      {selectedItems.some((item) => !isGalleryScenarioExportItem(item)) ? (
+        <>
+          <GallerySelectionTagInput
+            {...(allTags === undefined ? {} : { allTags })}
+            onApplySelectionTag={onApplySelectionTag}
+            onSelectionTagDraftChange={onSelectionTagDraftChange}
+            selectionTagDraft={selectionTagDraft}
+          />
+          <button
+            type="button"
+            aria-label={downloadLabel}
+            title={downloadLabel}
+            onClick={onSelectionZip}
+            className={gallerySelectionActionClassName}
+          >
+            {downloadsSingleOriginal ? (
+              <Download className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <FolderArchive className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span className="hidden 2xl:inline">{downloadLabel}</span>
+          </button>
+        </>
+      ) : null}
       <GallerySelectionActions
         onDeleteMany={onDeleteMany}
         onSelectionBackup={onSelectionBackup}

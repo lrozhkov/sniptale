@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type {
   MediaHubBackupExportOptions,
   MediaHubImportConflictStrategy,
@@ -79,7 +80,7 @@ type GalleryAppActionsController = GallerySelectionController &
 function buildGalleryAppActionsResult(args: {
   backupActions: ReturnType<typeof createGalleryBackupActions>;
   controller: GalleryAppActionsController;
-  deleteMany: (targets: GalleryItem[]) => Promise<void>;
+  deleteMany: (targets: GalleryItem[], opening?: GalleryDeletionOpening) => Promise<void>;
   handleApplySelectionTag: (tag?: string) => Promise<void>;
   handleImport: (strategy: MediaHubImportConflictStrategy) => Promise<void>;
   handleImportSelectedFile: (file: File | null) => Promise<void>;
@@ -152,8 +153,8 @@ export function useGalleryAppActions(controller: GalleryAppActionsController) {
   const navigationCoordinatorRef = useRef(createPreviewNavigationCoordinator());
   const readPreviewState = () => controllerRef.current.state;
   const withBusy = createBusyActionRunner(controller);
-  const deleteMany = (targets: GalleryItem[]) =>
-    createDeleteManyAction(controller)(targets, withBusy);
+  const deleteMany = (targets: GalleryItem[], opening?: GalleryDeletionOpening) =>
+    createDeleteManyAction(controller, () => controllerRef.current)(targets, withBusy, opening);
   const backupActions = createGalleryBackupActions(controller, withBusy);
   const handleImportSelectedFile = (file: File | null) =>
     createImportSelectedFileAction(controller)(file, withBusy);

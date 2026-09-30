@@ -469,3 +469,29 @@ it.each([2, 3, 99])(
     expect(target.projects.put).not.toHaveBeenCalled();
   }
 );
+
+it('restores an export catalogue with its independent Trash marker intact', async () => {
+  const target = stores();
+  const entry: ScenarioExportEntry = {
+    id: 'export',
+    projectId: 'project',
+    format: 'html',
+    filename: 'guide.html',
+    createdAt: 1,
+    size: 42,
+    trashState: { updatedAt: 2, trashedAt: 3 },
+  };
+  await putScenarioProjectBackupRestore({
+    operation: operation(),
+    root: {
+      assets: [],
+      entry: projectEntry(),
+      exportThumbnails: [],
+      exports: [entry],
+      stepDocuments: [],
+    },
+    stores: target,
+    strategy: 'replace',
+  });
+  expect(target.exports.put).toHaveBeenCalledWith(entry);
+});

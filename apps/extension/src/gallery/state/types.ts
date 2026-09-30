@@ -1,3 +1,4 @@
+import type { GalleryDeletionRequest } from '../library/deletion/types';
 import type { GalleryPreviewPresentation } from '../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
@@ -105,6 +106,7 @@ interface GalleryAppStorageState {
   pendingWebSnapshotImport: PendingWebSnapshotImportState | null;
   pendingExport: PendingExportState | null;
   confirmDialog: GalleryConfirmDialogState | null;
+  deletionRequest: GalleryDeletionRequest | null;
   banner: string | null;
   hasLoadedLibrarySnapshot: boolean;
   isLoading: boolean;
@@ -189,6 +191,7 @@ interface GalleryAppSurfaceActions {
   setPendingWebSnapshotImport: Dispatch<SetStateAction<PendingWebSnapshotImportState | null>>;
   setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
+  setDeletionRequest: Dispatch<SetStateAction<GalleryDeletionRequest | null>>;
   setBanner: Dispatch<SetStateAction<string | null>>;
 }
 

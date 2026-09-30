@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createMediaItem } from '../actions/test-support/index';
+import { createMediaItem, createScenarioExportItem } from '../actions/test-support/index';
 
 const { translateMock } = vi.hoisted(() => ({
   translateMock: vi.fn((key: string) => key),
@@ -156,7 +156,7 @@ it('renders selected-state actions and forwards callbacks', () => {
     applyButton.click();
     backupButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     zipButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    deleteButton.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
     clearButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 
@@ -170,7 +170,10 @@ it('renders selected-state actions and forwards callbacks', () => {
   expect(container?.querySelector('input')).not.toBeNull();
   expect(props.onSelectionBackup).toHaveBeenCalledTimes(1);
   expect(props.onSelectionZip).toHaveBeenCalledTimes(1);
-  expect(props.onDeleteMany).toHaveBeenCalledWith(selectedItems);
+  expect(props.onDeleteMany).toHaveBeenCalledWith(selectedItems, {
+    anchor: deleteButton,
+    keyboard: false,
+  });
   expect(props.onClearSelection).toHaveBeenCalledTimes(1);
   expect(container?.textContent).toContain('gallery.app.selectedPrefix 2');
   expect(container?.textContent).not.toContain('gallery.app.sizePrefix');
@@ -204,4 +207,25 @@ it('supports missing tag catalog while keeping selection actions available', () 
   );
   act(() => addTagsButton?.click());
   expect(container?.querySelector('input')).not.toBeNull();
+});
+
+it('offers catalogue deletion without resource actions for export-only selection', () => {
+  const selectedItems = [createScenarioExportItem()];
+  const props = createProps({ selectedItems });
+  renderSelectionBar(props);
+  const deletion = container?.querySelector('button[aria-label="common.actions.delete"]');
+  expect(deletion).toBeInstanceOf(HTMLButtonElement);
+  for (const label of [
+    'gallery.app.addTags',
+    'gallery.app.selectionBackup',
+    'gallery.app.selectionZip',
+    'gallery.preview.downloadOriginal',
+  ]) {
+    expect(container?.querySelector(`button[aria-label="${label}"]`)).toBeNull();
+  }
+  act(() => deletion?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+  expect(props.onDeleteMany).toHaveBeenCalledWith(selectedItems, {
+    anchor: deletion,
+    keyboard: false,
+  });
 });

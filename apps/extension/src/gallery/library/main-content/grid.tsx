@@ -89,6 +89,7 @@ export function GalleryGrid(
     <div
       ref={props.gridViewportRef as Ref<HTMLDivElement>}
       data-ui="gallery.content.surface"
+      tabIndex={-1}
       className={[
         'min-h-0 flex-1 overflow-auto rounded-[var(--sniptale-radius-lg)]',
         'border border-[var(--sniptale-color-border-soft)]',

@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
@@ -35,7 +36,7 @@ export interface GalleryMainContentProps {
   onApplySelectionTag: (tag?: string) => void;
   onBannerDismiss: () => void;
   onClearSelection: () => void;
-  onDeleteMany: (items: GalleryItem[]) => void;
+  onDeleteMany: (items: GalleryItem[], opening?: GalleryDeletionOpening) => void;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;
   onProjectOpen?: (item: GalleryItem) => void;
   onRecordingGroupOpen?: (item: GalleryItem) => void;

@@ -45,7 +45,14 @@ export interface ScenarioAssetEntry extends ScenarioAssetMetadata {
   createdAt: number;
 }
 
+export interface ScenarioExportTrashState {
+  updatedAt: number;
+  trashedAt?: number;
+}
+
 export interface ScenarioExportEntry {
+  /** Independent catalogue retention; source project resources remain owned by the project. */
+  trashState?: ScenarioExportTrashState;
   id: string;
   projectId: string;
   format: ScenarioExportFormat;

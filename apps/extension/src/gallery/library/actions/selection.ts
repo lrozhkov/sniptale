@@ -13,25 +13,29 @@ import {
 import {
   moveLibraryItemsToTrash,
   restoreLibraryTrashItems,
-  permanentlyDeleteTrashItem,
+  permanentlyDeleteLibraryItem,
 } from '../../../workflows/media-hub/trash';
-import type { LibraryLifecycleTarget } from '../../../composition/persistence/library-lifecycle';
-import { type GalleryBusyAction, openGalleryConfirmDialog } from './shared';
+import type { LibraryTrashTarget } from '../../../composition/persistence/library-lifecycle/trash';
+import { type GalleryBusyAction, createGalleryUserFacingActionError } from './shared';
 import {
-  listMediaAssetProjectUsage,
-  type MediaAssetProjectUsage,
-} from '../../../composition/persistence/media-library/usage';
+  getGalleryDeletionContextKey,
+  type GalleryDeletionOpening,
+  type GalleryPreparedDeletion,
+  type GalleryDeletionRequest,
+} from '../deletion/types';
+import { listMediaAssetProjectUsage } from '../../../composition/persistence/media-library/usage';
 
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
     media: targets.filter(isGalleryMediaItem),
     scenarios: targets.filter(isGalleryScenarioItem),
     videoProjects: targets.filter(isGalleryVideoProjectItem),
+    exports: targets.filter(isGalleryScenarioExportItem),
   };
 }
 
-function trashTarget(item: GalleryItem): LibraryLifecycleTarget {
-  if (isGalleryScenarioExportItem(item)) return { kind: 'scenario-project', id: item.project.id };
+function trashTarget(item: GalleryItem): LibraryTrashTarget {
+  if (isGalleryScenarioExportItem(item)) return { kind: 'scenario-export', id: item.entityId };
   if (isGalleryScenarioItem(item)) return { kind: 'scenario-project', id: item.entityId };
   if (isGalleryVideoProjectItem(item)) return { kind: 'video-project', id: item.entityId };
   return { kind: 'media', id: item.entityId ?? item.id };
@@ -66,98 +70,146 @@ export function createRestoreTrashAction(controller: GallerySelectionController)
   };
 }
 
-export function createDeleteManyAction(controller: GallerySelectionController) {
-  return async (targets: GalleryItem[], withBusy: GalleryBusyAction) => {
-    const selectableTargets = targets.filter(isGallerySelectableItem);
-    if (selectableTargets.length === 0) {
-      return;
-    }
-
-    if (selectableTargets.every((item) => item.lifecycle?.trashedAt === undefined)) {
-      openGalleryConfirmDialog(controller, {
-        title: translate('gallery.app.moveToTrash'),
-        message: translate('gallery.app.moveToTrashConfirm'),
-        confirmText: translate('gallery.app.moveToTrash'),
-        onConfirm: () =>
-          withBusy(async () => {
-            await moveLibraryItemsToTrash(selectableTargets.map(trashTarget));
-            await finishTrashAction(controller);
-          }),
-      });
-      return;
-    }
-    const trashItems = selectableTargets.filter((item) => item.lifecycle?.trashedAt !== undefined);
-    const { media, scenarios, videoProjects } = splitSelectableTargets(trashItems);
-    const removedProjectKeys = new Set([
-      ...scenarios.map((item) => `scenario:${item.entityId}`),
-      ...videoProjects.map((item) => `video:${item.entityId}`),
-    ]);
-    let expectedUsageById = new Map<string, readonly MediaAssetProjectUsage[]>();
-    let usageLoaded = false;
-    await withBusy(async () => {
-      expectedUsageById = new Map(
-        await Promise.all(
-          media.map(async (item) => {
-            const id = item.entityId ?? item.id;
-            const remainingUsage = (await listMediaAssetProjectUsage(id)).filter(
-              (usage) => !removedProjectKeys.has(`${usage.kind}:${usage.id}`)
-            );
-            return [id, remainingUsage] as const;
-          })
-        )
+async function preparePermanentDeletion(
+  controller: GallerySelectionController,
+  targets: readonly GalleryItem[],
+  withBusy: GalleryBusyAction,
+  isCurrent: () => boolean
+): Promise<GalleryPreparedDeletion | null> {
+  const { media, scenarios, videoProjects, exports } = splitSelectableTargets([...targets]);
+  const scenarioIds = new Set(scenarios.map((item) => item.entityId));
+  const independentExports = exports.filter((item) => !scenarioIds.has(item.project.id));
+  const removedProjectKeys = new Set([
+    ...scenarios.map((item) => `scenario:${item.entityId}`),
+    ...videoProjects.map((item) => `video:${item.entityId}`),
+  ]);
+  let prepared: GalleryPreparedDeletion | null = null;
+  await withBusy(async () => {
+    const expectedUsageById = new Map(
+      await Promise.all(
+        media.map(async (item) => {
+          const id = item.entityId ?? item.id;
+          const usage = (await listMediaAssetProjectUsage(id)).filter(
+            (project) => !removedProjectKeys.has(`${project.kind}:${project.id}`)
+          );
+          return [id, usage] as const;
+        })
+      )
+    );
+    if (!isCurrent()) return;
+    const affectedProjects = [
+      ...new Map(
+        [...expectedUsageById.values()]
+          .flat()
+          .map((project) => [`${project.kind}:${project.id}`, project])
+      ).values(),
+    ];
+    const primaryProjects = [...expectedUsageById.values()]
+      .flat()
+      .filter((project) => project.primary);
+    if (primaryProjects.length > 0)
+      throw createGalleryUserFacingActionError(
+        `${translate('gallery.app.deleteBlockedPrimary')} ${primaryProjects.map((project) => project.name).join(', ')}`
       );
-      usageLoaded = true;
-    });
-    if (!usageLoaded) return;
-    const affectedById = new Map<string, MediaAssetProjectUsage>();
-    for (const project of [...expectedUsageById.values()].flat()) {
-      const key = `${project.kind}:${project.id}`;
-      affectedById.set(key, {
-        ...project,
-        primary: project.primary || (affectedById.get(key)?.primary ?? false),
-      });
-    }
-    const affectedProjects = [...affectedById.values()];
-    const primaryProjects = affectedProjects.filter((project) => project.primary);
-    if (primaryProjects.length > 0) {
-      const projectNames = primaryProjects.map((project) => project.name).join(', ');
-      openGalleryConfirmDialog(controller, {
-        title: translate('gallery.app.deleteBlockedTitle'),
-        message: `${translate('gallery.app.deleteBlockedPrimary')} ${projectNames}`,
-        confirmText: translate('common.actions.close'),
-        onConfirm: async () => undefined,
-      });
-      return;
-    }
-    const affectedNames = affectedProjects.map((project) => project.name).join(', ');
     const warning =
       affectedProjects.length > 0
         ? [
             translate('gallery.app.deleteAffectsProjects'),
-            `${affectedNames}.`,
+            `${affectedProjects.map((project) => project.name).join(', ')}.`,
             translate('gallery.app.deleteHistoryWarning'),
           ].join(' ')
         : '';
-    openGalleryConfirmDialog(controller, {
-      title: translate('gallery.app.permanentDelete'),
-      confirmText: translate('gallery.app.permanentDelete'),
-      message: `${translate('gallery.app.permanentDeleteConfirm')} ${warning}`.trim(),
-      onConfirm: async () => {
+    prepared = {
+      warning: `${translate('gallery.app.permanentDeleteConfirm')} ${warning}`.trim(),
+      confirm: async () => {
+        if (!isCurrent()) return false;
+        let deleted = false;
         await withBusy(async () => {
           try {
-            // Remove only confirmed project roots first, then revalidate remaining media usage.
-            for (const item of [...scenarios, ...videoProjects, ...media]) {
-              await permanentlyDeleteTrashItem(
-                { target: trashTarget(item), trashedAt: item.lifecycle!.trashedAt! },
+            for (const item of [...independentExports, ...scenarios, ...videoProjects, ...media]) {
+              await permanentlyDeleteLibraryItem(
+                {
+                  target: trashTarget(item),
+                  lifecycle: {
+                    updatedAt: item.lifecycle?.updatedAt ?? item.updatedAt,
+                    ...(item.lifecycle?.trashedAt !== undefined
+                      ? { trashedAt: item.lifecycle.trashedAt }
+                      : {}),
+                  },
+                },
                 expectedUsageById.get(item.entityId ?? item.id)
               );
             }
+            deleted = true;
           } finally {
             await finishTrashAction(controller);
           }
         });
+        return deleted;
       },
-    });
+    };
+  });
+  return prepared;
+}
+
+export function createDeleteManyAction(
+  controller: GallerySelectionController,
+  readController: () => GallerySelectionController = () => controller
+) {
+  return async (
+    targets: GalleryItem[],
+    withBusy: GalleryBusyAction,
+    opening?: GalleryDeletionOpening
+  ) => {
+    const selectable = [
+      ...new Map(
+        targets
+          .filter(isGallerySelectableItem)
+          .map((item) => [
+            item.id,
+            { ...item, ...(item.lifecycle ? { lifecycle: { ...item.lifecycle } } : {}) },
+          ])
+      ).values(),
+    ];
+    if (selectable.length === 0) return;
+    const contextKey = getGalleryDeletionContextKey(
+      controller.state.selection.selectedItems,
+      controller.state.preview.session.item
+    );
+    const isCurrent = () => {
+      const current = readController().state;
+      return (
+        current.storage.deletionRequest === request &&
+        contextKey ===
+          getGalleryDeletionContextKey(
+            current.selection.selectedItems,
+            current.preview.session.item
+          )
+      );
+    };
+    const request: GalleryDeletionRequest = {
+      anchor: opening?.anchor ?? null,
+      keyboard: opening?.keyboard ?? false,
+      contextKey,
+      targets: selectable,
+      moveToTrash: selectable.some((item) => item.lifecycle?.trashedAt === undefined)
+        ? async () => {
+            if (!isCurrent()) return false;
+            let moved = false;
+            await withBusy(async () => {
+              await moveLibraryItemsToTrash(selectable.map(trashTarget));
+              moved = true;
+              await finishTrashAction(controller);
+            });
+            return moved;
+          }
+        : null,
+      preparePermanent: () =>
+        isCurrent()
+          ? preparePermanentDeletion(controller, selectable, withBusy, isCurrent)
+          : Promise.resolve(null),
+    };
+    controller.actions.surface.setDeletionRequest(request);
   };
 }
 

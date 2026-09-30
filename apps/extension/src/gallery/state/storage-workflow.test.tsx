@@ -94,6 +94,7 @@ function configureSurfaceStateMock() {
       replaceActiveBackupExport: vi.fn(),
       setBanner: vi.fn(),
       setConfirmDialog: vi.fn(),
+      setDeletionRequest: vi.fn(),
       setPendingExport: vi.fn(),
       setPendingImport: vi.fn(),
       setPendingMediaImport: vi.fn(),
@@ -101,6 +102,7 @@ function configureSurfaceStateMock() {
     state: {
       banner: { kind: 'info' },
       confirmDialog: null,
+      deletionRequest: null,
       isBusy: false,
       pendingExport: null,
       pendingImport: null,

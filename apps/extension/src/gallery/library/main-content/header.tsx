@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import type { GalleryDeletionOpening } from '../deletion/types';
+import { useEffect, useRef, useState, type RefObject, type MouseEventHandler } from 'react';
 import {
   AlignJustify,
   Download,
@@ -42,7 +43,7 @@ interface GalleryHeaderStorageProps {
   mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
   webSnapshotImportTriggerRef?: RefObject<HTMLButtonElement | null>;
   isBusy: boolean;
-  onDeleteAll: () => void;
+  onDeleteAll: (opening?: GalleryDeletionOpening) => void;
   onExportBackup: () => void;
   onImportBackupClick: () => void;
   onImportMediaClick: () => void;
@@ -56,7 +57,7 @@ function GalleryStorageMenuAction(props: {
   disabled: boolean;
   icon: typeof Download;
   label: string;
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
 }) {
   const Icon = props.icon;
 
@@ -226,7 +227,14 @@ function GalleryStorageMenu(
           disabled={props.isBusy}
           icon={Trash2}
           label={translate('gallery.app.deleteAll')}
-          onClick={() => props.closeAndRun(props.onDeleteAll)}
+          onClick={(event) => {
+            const anchor =
+              event.currentTarget
+                .closest('[data-ui="gallery.header.storage"]')
+                ?.querySelector<HTMLButtonElement>('button') ?? null;
+            const keyboard = event.detail === 0;
+            props.closeAndRun(() => props.onDeleteAll({ anchor, keyboard }));
+          }}
         />
       </div>
       {props.isBusy ? (
@@ -338,7 +346,7 @@ function GalleryViewModeButton(props: {
   active: boolean;
   icon: typeof AlignJustify;
   label: string;
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
 }) {
   const Icon = props.icon;
 

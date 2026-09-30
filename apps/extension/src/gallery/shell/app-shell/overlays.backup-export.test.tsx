@@ -45,6 +45,7 @@ function createCallbackProps() {
     onBannerDismiss: vi.fn(),
     onClearSelection: vi.fn(),
     onConfirmDialogClose: vi.fn(),
+    onDeletionRequestClose: vi.fn(),
     onDeleteMany: vi.fn(),
     onExportBackup: vi.fn(),
     onFilenameChange: vi.fn(),

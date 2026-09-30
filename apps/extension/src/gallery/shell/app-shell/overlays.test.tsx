@@ -79,6 +79,7 @@ function createLayoutProps() {
     onBannerDismiss: vi.fn(),
     onClearSelection: vi.fn(),
     onConfirmDialogClose: vi.fn(),
+    onDeletionRequestClose: vi.fn(),
     onDeleteMany: vi.fn(),
     onExportBackup: vi.fn(),
     onFilenameChange: vi.fn(),
@@ -401,7 +402,7 @@ it('wires preview overlay callbacks to the parent app-shell actions', async () =
   expect(props.onPreviewDownload).toHaveBeenCalledTimes(1);
   expect(props.onPreviewCopy).toHaveBeenCalledTimes(1);
   expect(props.onPreviewEdit).toHaveBeenCalledWith(props.state.preview.session.item);
-  expect(props.onPreviewDelete).toHaveBeenCalledWith(props.state.preview.session.item);
+  expect(props.onPreviewDelete).toHaveBeenCalledWith(props.state.preview.session.item, undefined);
 });
 
 it('passes the selected media load outcome to the keyed preview panel', () => {

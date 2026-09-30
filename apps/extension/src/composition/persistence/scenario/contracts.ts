@@ -1,4 +1,3 @@
-import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
@@ -58,14 +57,7 @@ export interface PendingScenarioAssetEntry {
   size: number;
 }
 
-export interface ScenarioExportEntry {
-  id: string;
-  projectId: string;
-  format: ScenarioExportFormat;
-  filename: string;
-  createdAt: number;
-  size: number;
-}
+export type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 
 export interface ScenarioStepEditorDocumentEntry {
   stepId: string;

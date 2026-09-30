@@ -569,11 +569,24 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
 }
 
 export function PreviewActions(props: PreviewPanelProps & { onReview?: () => void }) {
-  if (props.trashMode) return <PreviewRestoreAction {...props} />;
+  if (props.trashMode)
+    return (
+      <>
+        <PreviewRestoreAction {...props} />
+        <button
+          type="button"
+          className={previewActionButtonClassName}
+          onClick={(event) =>
+            void props.onDelete({ anchor: event.currentTarget, keyboard: event.detail === 0 })
+          }
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          {translate('common.actions.delete')}
+        </button>
+      </>
+    );
   const { item, onCopy, onDelete, onDownload, onResetChanges } = props;
   const canEditMetadata = isMetadataEditable(item);
-  const canDelete = !isGalleryScenarioExportItem(item);
-  const canPromote = item.lifecycle?.storageClass === 'temporary' && Boolean(props.onPromote);
   const canDownload = isGalleryMediaItem(item);
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
   const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
@@ -658,24 +671,22 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
             ) : null}
           </PreviewActionGroup>
         ) : null}
-        {canDelete || canPromote ? (
-          <div
-            data-ui="gallery.preview.lifecycle-actions"
-            className="flex items-start gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2"
+        <div
+          data-ui="gallery.preview.lifecycle-actions"
+          className="flex items-start gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2"
+        >
+          <button
+            type="button"
+            onClick={(event) =>
+              void onDelete({ anchor: event.currentTarget, keyboard: event.detail === 0 })
+            }
+            className={`${previewDangerActionButtonClassName} !w-auto shrink-0`}
           >
-            {canDelete ? (
-              <button
-                type="button"
-                onClick={() => void onDelete()}
-                className={`${previewDangerActionButtonClassName} !w-auto shrink-0`}
-              >
-                <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                {translate('common.actions.delete')}
-              </button>
-            ) : null}
-            <PreviewPromotionAction {...props} />
-          </div>
-        ) : null}
+            <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {translate('common.actions.delete')}
+          </button>
+          <PreviewPromotionAction {...props} />
+        </div>
       </div>
     </section>
   );

@@ -66,6 +66,7 @@ function createLayoutProps() {
     onBannerDismiss: vi.fn(),
     onClearSelection: vi.fn(),
     onConfirmDialogClose: vi.fn(),
+    onDeletionRequestClose: vi.fn(),
     onDeleteMany: vi.fn(),
     onExportBackup: vi.fn(),
     onFacetFilterChange: vi.fn(),
@@ -377,7 +378,7 @@ it('forwards facet, scope, grouped-recording, selection, and delete callbacks', 
   expect(props.onApplySelectionTag).toHaveBeenCalledWith('alpha');
   expect(onRecordingGroupOpen).toHaveBeenCalledTimes(1);
   expect(props.onScopeChange).toHaveBeenCalledWith('temporary');
-  expect(props.onDeleteMany).toHaveBeenCalledWith(props.state.derived.allItems);
+  expect(props.onDeleteMany).toHaveBeenCalledWith(props.state.derived.allItems, undefined);
 
   const {
     onFacetFilterChange: omittedFacetFilterChange,

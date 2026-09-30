@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../../library/deletion/types';
 import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
@@ -133,11 +134,10 @@ function buildGalleryPreviewHandlers(
     onPreviewSaveCopy: () =>
       isReadOnlyTrashPreview(controller) ? Promise.resolve(false) : actions.preview.saveCopy(),
     onPreviewDelete: (
-      item: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0][number]
+      item: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0][number],
+      opening?: GalleryDeletionOpening
     ) => {
-      if (!isReadOnlyTrashPreview(controller) && item.lifecycle?.trashedAt === undefined) {
-        void actions.selection.deleteMany([item]);
-      }
+      void actions.selection.deleteMany([item], opening);
     },
     onPreviewPromote: async (item: GalleryItem) => {
       if (isReadOnlyTrashPreview(controller) || item.lifecycle?.trashedAt !== undefined) return;
@@ -196,8 +196,10 @@ function buildGallerySelectionHandlers(
     onSelectionZip: () => {
       if (!controller.state.filters.trashMode) void actions.selection.downloadZip();
     },
-    onDeleteMany: (items: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0]) =>
-      void actions.selection.deleteMany(items),
+    onDeleteMany: (
+      items: Parameters<UseGalleryAppActionsResult['selection']['deleteMany']>[0],
+      opening?: GalleryDeletionOpening
+    ) => void actions.selection.deleteMany(items, opening),
     onClearSelection: () => controller.actions.selection.setSelectedIds(new Set()),
     onSelectAllFiltered: () =>
       controller.actions.selection.setSelectedIds(
@@ -238,6 +240,7 @@ function buildGalleryLayoutProps(props: GalleryAppBindingsProps) {
     onActiveImportCancel: actions.importing.cancelActiveImport,
     onActiveImportDismiss: actions.importing.dismissActiveImport,
     onConfirmDialogClose: () => controller.actions.surface.setConfirmDialog(null),
+    onDeletionRequestClose: () => controller.actions.surface.setDeletionRequest(null),
     onPendingImportClose: actions.importing.closePendingImport,
     onPendingMediaImportClose: actions.importing.closePendingMediaImport,
     onPendingWebSnapshotImportClose: actions.importing.closePendingWebSnapshotImport,

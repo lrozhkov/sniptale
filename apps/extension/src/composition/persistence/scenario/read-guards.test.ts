@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../../features/scenario/project/public';
-import { parseScenarioProjectEntry, parseScenarioProjectSummary } from './read-guards';
+import {
+  parseScenarioProjectEntry,
+  parseScenarioProjectSummary,
+  parseScenarioExportEntry,
+} from './read-guards';
 
 it('retains template purpose for catalog routing even when content needs recovery', () => {
   const project = {
@@ -20,4 +24,31 @@ it('retains template purpose for catalog routing even when content needs recover
     purpose: 'step-template',
     availability: 'invalid',
   });
+});
+
+it('preserves independent export Trash metadata through the canonical decoder and rejects malformed states', () => {
+  const legacy = {
+    id: 'export',
+    projectId: 'project',
+    format: 'html',
+    filename: 'guide.html',
+    createdAt: 1,
+    size: 42,
+  };
+  expect(parseScenarioExportEntry(legacy)).toEqual(legacy);
+  const trashed = { ...legacy, trashState: { updatedAt: 2, trashedAt: 3 } };
+  expect(parseScenarioExportEntry(trashed)).toEqual(trashed);
+  expect(parseScenarioExportEntry({ ...legacy, trashState: { updatedAt: 4 } })).toMatchObject({
+    trashState: { updatedAt: 4 },
+  });
+  for (const trashState of [
+    null,
+    {},
+    { updatedAt: -1 },
+    { updatedAt: Number.NaN },
+    { updatedAt: 1, trashedAt: 'bad' },
+    { updatedAt: 1, trashedAt: Number.POSITIVE_INFINITY },
+  ]) {
+    expect(parseScenarioExportEntry({ ...legacy, trashState })).toBeNull();
+  }
 });

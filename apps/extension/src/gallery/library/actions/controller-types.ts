@@ -1,3 +1,4 @@
+import type { GalleryDeletionRequest } from '../deletion/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
   MediaHubBackupExportOptions,
@@ -39,6 +40,7 @@ interface GalleryActionPreviewDraftState {
 }
 
 interface GallerySelectionActionState {
+  storage: { deletionRequest: GalleryDeletionRequest | null };
   preview: {
     session: GalleryPreviewSessionState;
   };
@@ -85,6 +87,7 @@ interface GallerySelectionControllerActions {
     setPreview: Dispatch<SetStateAction<GalleryPreviewSessionState>>;
   };
   surface: {
+    setDeletionRequest: Dispatch<SetStateAction<GalleryDeletionRequest | null>>;
     setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
   };
   storage: {

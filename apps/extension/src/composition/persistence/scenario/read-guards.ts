@@ -132,6 +132,15 @@ export function parsePendingScenarioAssetEntry(value: unknown): PendingScenarioA
   };
 }
 
+function parseScenarioExportTrashState(value: unknown) {
+  if (!isRecord(value) || !isNonNegativeNumber(value['updatedAt'])) return null;
+  if (value['trashedAt'] !== undefined && !isNonNegativeNumber(value['trashedAt'])) return null;
+  return {
+    updatedAt: value['updatedAt'],
+    ...(isNonNegativeNumber(value['trashedAt']) ? { trashedAt: value['trashedAt'] } : {}),
+  };
+}
+
 export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | null {
   if (!isRecord(value)) {
     return null;
@@ -148,7 +157,11 @@ export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | 
     return null;
   }
 
+  const trashState = parseScenarioExportTrashState(value['trashState']);
+  if (value['trashState'] !== undefined && !trashState) return null;
+
   return {
+    ...(trashState ? { trashState } : {}),
     createdAt: value['createdAt'],
     filename: value['filename'],
     format: value['format'],

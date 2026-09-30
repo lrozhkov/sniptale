@@ -59,7 +59,14 @@ export function createScenarioExportGalleryItem(
     hasThumbnail: false,
     id: `scenario-export:${exportEntry.id}`,
     kind: 'scenario-export',
-    lifecycle: resolveLifecycle(project.lifecycle, project.updatedAt),
+    lifecycle: {
+      storageClass: project.lifecycle?.storageClass ?? 'library',
+      savedAt: project.lifecycle?.savedAt ?? exportEntry.createdAt,
+      updatedAt: exportEntry.trashState?.updatedAt ?? exportEntry.createdAt,
+      ...(exportEntry.trashState?.trashedAt !== undefined
+        ? { trashedAt: exportEntry.trashState.trashedAt }
+        : {}),
+    },
     size: exportEntry.size,
     sourceFavicon: null,
     sourceTitle: project.name,

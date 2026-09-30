@@ -6,6 +6,7 @@ import {
   moveStoredItemsToTrash,
   restoreStoredItemsFromTrash,
   runWithTrashedStoredItem,
+  runWithStoredItemLifecycle,
   StaleTrashItemError,
 } from './trash';
 
@@ -42,6 +43,22 @@ beforeEach(() => {
     ['media_library', new Map([[media.id, media]])],
     ['video_projects', new Map([[video.id, video]])],
     ['scenario_projects', new Map([[scenario.id, scenario]])],
+    [
+      'scenario_exports',
+      new Map([
+        [
+          'export-1',
+          {
+            id: 'export-1',
+            projectId: 'scenario-1',
+            format: 'html',
+            filename: 'guide.html',
+            createdAt: 1,
+            size: 42,
+          },
+        ],
+      ]),
+    ],
     ['asset_owners', new Map([['retained', { assetId: 'unchanged' }]])],
   ]);
   transaction = vi.fn(() => {
@@ -174,4 +191,88 @@ it('fails closed if cross-page locks are unavailable in the extension', async ()
     'coordination is unavailable'
   );
   expect(transaction).not.toHaveBeenCalled();
+});
+
+it('admits active permanent deletion without changing its lifecycle or retained graph', async () => {
+  const deletion = vi.fn(async () => 'deleted');
+  for (const target of targets) {
+    await expect(runWithStoredItemLifecycle(target, { updatedAt: 1 }, deletion)).resolves.toBe(
+      'deleted'
+    );
+  }
+  expect(deletion).toHaveBeenCalledTimes(3);
+  expect(transaction).not.toHaveBeenCalled();
+  expect(rows.get('media_library')?.get(media.id)).toEqual(media);
+});
+
+it('invalidates an active confirmation after move and restore even if active again', async () => {
+  const deletion = vi.fn();
+  await moveStoredItemsToTrash([targets[0]], 100);
+  await expect(
+    runWithStoredItemLifecycle(targets[0], { updatedAt: 1 }, deletion)
+  ).rejects.toBeInstanceOf(StaleTrashItemError);
+  await restoreStoredItemsFromTrash([targets[0]], 200);
+  await expect(
+    runWithStoredItemLifecycle(targets[0], { updatedAt: 1 }, deletion)
+  ).rejects.toBeInstanceOf(StaleTrashItemError);
+  expect(deletion).not.toHaveBeenCalled();
+});
+
+it('rejects missing roots and malformed lifecycle snapshots before permanent deletion', async () => {
+  const deletion = vi.fn();
+  await expect(
+    runWithStoredItemLifecycle({ kind: 'media', id: 'missing' }, { updatedAt: 1 }, deletion)
+  ).rejects.toBeInstanceOf(StaleTrashItemError);
+  await expect(
+    runWithStoredItemLifecycle(targets[0], { updatedAt: Number.NaN }, deletion)
+  ).rejects.toBeInstanceOf(StaleTrashItemError);
+  expect(deletion).not.toHaveBeenCalled();
+});
+
+it('admits legacy active roots with the same metadata revision fallback as Gallery', async () => {
+  const { lifecycle: _lifecycle, ...legacy } = media;
+  rows.get('media_library')?.set(media.id, legacy);
+  const deletion = vi.fn(async () => undefined);
+  await runWithStoredItemLifecycle(targets[0], { updatedAt: media.updatedAt }, deletion);
+  expect(deletion).toHaveBeenCalledOnce();
+});
+
+it('holds lifecycle mutations until active permanent deletion finishes', async () => {
+  const gate = Promise.withResolvers<void>();
+  const entered = Promise.withResolvers<void>();
+  const deletion = runWithStoredItemLifecycle(targets[0], { updatedAt: 1 }, async () => {
+    entered.resolve();
+    await gate.promise;
+    rows.get('media_library')?.delete(media.id);
+  });
+  await entered.promise;
+  const move = moveStoredItemsToTrash([targets[0]], 100);
+  const result = expect(move).rejects.toBeInstanceOf(StaleTrashItemError);
+  expect(transaction).not.toHaveBeenCalled();
+  gate.resolve();
+  await deletion;
+  await result;
+});
+
+it('moves and restores only an export catalogue marker, leaving its parent and siblings untouched', async () => {
+  const parent = rows.get('scenario_projects')?.get(scenario.id);
+  const source = rows.get('scenario_exports')?.get('export-1');
+  rows.get('scenario_exports')?.set('sibling', { ...(source as object), id: 'sibling' });
+  const sibling = rows.get('scenario_exports')?.get('sibling');
+  const target = { kind: 'scenario-export' as const, id: 'export-1' };
+  await moveStoredItemsToTrash([target], 100);
+  expect(rows.get('scenario_exports')?.get('export-1')).toEqual({
+    ...(source as object),
+    trashState: { updatedAt: 1, trashedAt: 100 },
+  });
+  await restoreStoredItemsFromTrash([target], 200);
+  await expect(
+    runWithStoredItemLifecycle(target, { updatedAt: 1, trashedAt: 100 }, vi.fn())
+  ).rejects.toBeInstanceOf(StaleTrashItemError);
+  expect(rows.get('scenario_exports')?.get('export-1')).toEqual({
+    ...(source as object),
+    trashState: { updatedAt: 200 },
+  });
+  expect(rows.get('scenario_projects')?.get(scenario.id)).toEqual(parent);
+  expect(rows.get('scenario_exports')?.get('sibling')).toEqual(sibling);
 });

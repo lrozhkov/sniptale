@@ -56,8 +56,8 @@ function GallerySidebarSection(props: GalleryAppLayoutProps) {
       trashSummary={state.derived.trashSummary}
       {...(props.onTrashModeChange ? { onTrashModeChange: props.onTrashModeChange } : {})}
       {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
-      onDeleteTrash={() => props.onDeleteMany(state.selection.selectedItems)}
-      onEmptyTrash={() => props.onDeleteMany(state.derived.allItems)}
+      onDeleteTrash={(opening) => props.onDeleteMany(state.selection.selectedItems, opening)}
+      onEmptyTrash={(opening) => props.onDeleteMany(state.derived.allItems, opening)}
       activeSavedView={state.filters.activeSavedView}
       activeTags={state.filters.activeTags}
       allTags={state.derived.allTags}
@@ -164,7 +164,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onApplySelectionTag={props.onApplySelectionTag}
           onClearSelection={props.onClearSelection}
           onDeleteMany={props.onDeleteMany}
-          onDeleteAll={() => props.onDeleteMany(props.state.derived.allItems)}
+          onDeleteAll={(opening) => props.onDeleteMany(props.state.derived.allItems, opening)}
           onExportBackup={props.onExportBackup}
           onSearchChange={props.onSearchChange}
           onSearchCommit={props.onSearchCommit}

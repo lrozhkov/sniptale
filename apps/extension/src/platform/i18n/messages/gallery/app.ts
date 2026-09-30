@@ -43,14 +43,15 @@ export const galleryAppMessages = defineMessageSource({
   },
   permanentDelete: { ru: 'Удалить навсегда', en: 'Delete permanently' },
   emptyTrash: { ru: 'Очистить корзину', en: 'Empty trash' },
+  confirmPermanentDelete: { ru: 'Нажмите ещё раз, чтобы удалить', en: 'Click again to confirm' },
   moveToTrash: { ru: 'Переместить в корзину', en: 'Move to trash' },
   moveToTrashConfirm: {
     ru: 'Переместить выбранные материалы в корзину? Их можно будет восстановить.',
     en: 'Move the selected items to trash? You can restore them later.',
   },
   permanentDeleteConfirm: {
-    ru: 'Удалить выбранные материалы из корзины навсегда? Восстановить их будет невозможно.',
-    en: 'Permanently delete the selected items from trash? This cannot be undone.',
+    ru: 'Удалить выбранные материалы навсегда? Восстановить их будет невозможно.',
+    en: 'Permanently delete the selected items? This cannot be undone.',
   },
   trashEmpty: { ru: 'Корзина пуста', en: 'Trash is empty' },
   trashNoResults: { ru: 'В корзине ничего не найдено', en: 'No matching items in Trash' },
