@@ -2,7 +2,6 @@ import {
   Bot,
   LayoutTemplate,
   FolderOpen,
-  NotebookPen,
   Image,
   MessageSquare,
   Mic,
@@ -73,12 +72,6 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         description: 'settings.navigation.descriptions.saving',
         label: 'settings.navigation.saving',
         icon: FolderOpen,
-      },
-      {
-        id: 'drafts',
-        description: 'settings.navigation.descriptions.drafts',
-        label: 'settings.navigation.drafts',
-        icon: NotebookPen,
       },
     ],
   },
@@ -199,10 +192,6 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   saving: {
     load: () => import('../../sections/capture/saving'),
     exportName: 'SavePresetsSection',
-  },
-  drafts: {
-    load: () => import('../../sections/capture/storage-drafts'),
-    exportName: 'StorageDraftsSection',
   },
   annotations: {
     load: () => import('../../sections/styles/annotations'),

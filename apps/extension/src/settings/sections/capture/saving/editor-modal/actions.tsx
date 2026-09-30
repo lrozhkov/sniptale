@@ -17,7 +17,12 @@ export function SavePresetEditorActions(props: {
 
   return (
     <ProductModalFooter compact>
-      <ProductActionButton type="button" onClick={props.onClose} tone="secondary">
+      <ProductActionButton
+        type="button"
+        onClick={props.onClose}
+        disabled={props.saving}
+        tone="secondary"
+      >
         {translate('common.actions.cancel')}
       </ProductActionButton>
       <ProductActionButton type="submit" disabled={props.disabled} tone="primary">

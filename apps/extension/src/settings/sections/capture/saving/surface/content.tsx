@@ -38,6 +38,10 @@ type SavePresetsSectionContentProps = {
 
 function buildPresetsListProps(props: SavePresetsSectionContentProps): SavePresetsListProps {
   return {
+    defaultExportPresetId: props.defaultExportPresetId,
+    defaultImagePresetId: props.defaultImagePresetId,
+    defaultVideoPresetId: props.defaultVideoPresetId,
+    isLoading: props.isLoading,
     confirmDelete: props.confirmDelete,
     confirmDeletePreset: props.confirmDeletePreset,
     isEditorOpen: props.isEditorOpen,

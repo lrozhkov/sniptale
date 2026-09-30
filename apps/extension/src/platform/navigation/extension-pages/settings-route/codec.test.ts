@@ -11,13 +11,12 @@ const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
-    expect(SETTINGS_SECTION_IDS).toHaveLength(16);
+    expect(SETTINGS_SECTION_IDS).toHaveLength(15);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
       'interface-browser': ['interface', 'context-menu'],
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
-      saving: ['settings', 'storage', 'templates', 'files'],
-      drafts: [],
+      saving: ['settings', 'files', 'drafts', 'storage', 'templates'],
       'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
@@ -32,7 +31,8 @@ describe('settings route codec', () => {
     ['ai', 'ai-connections', 'integrations'],
     ['presets', 'screen-sizes', undefined],
     ['saves', 'saving', 'settings'],
-    ['storage-drafts', 'drafts', undefined],
+    ['storage-drafts', 'saving', 'drafts'],
+    ['drafts', 'saving', 'drafts'],
     ['highlighter', 'annotations', 'borders'],
     ['editor', 'editor-resources', 'tools'],
     ['image', 'media-quality', 'image'],
@@ -149,12 +149,13 @@ describe('settings route codec', () => {
     });
   });
 
-  it('opens Drafts as a leaf without changing existing Saving subpage URLs', () => {
+  it('opens Drafts as a Saving subpage without changing existing Saving URLs', () => {
     const drafts = buildSettingsRouteUrl(`${BASE}?keep=1#anchor`, {
-      section: 'drafts',
+      section: 'saving',
+      view: 'drafts',
     });
     expect(resolveSettingsRoute(drafts)).toMatchObject({
-      route: { section: 'drafts' },
+      route: { section: 'saving', view: 'drafts' },
       shouldReplace: false,
     });
     for (const view of ['settings', 'storage', 'templates', 'files'] as const) {

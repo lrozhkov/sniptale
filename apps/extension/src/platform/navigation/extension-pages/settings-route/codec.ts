@@ -4,7 +4,6 @@ export const SETTINGS_SECTION_IDS = [
   'screen-sizes',
   'media-quality',
   'saving',
-  'drafts',
   'annotations',
   'video-effects',
   'editor-resources',
@@ -26,8 +25,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'quick-actions': [],
   'screen-sizes': [],
   'media-quality': ['image', 'video'],
-  saving: ['settings', 'storage', 'templates', 'files'],
-  drafts: [],
+  saving: ['settings', 'files', 'drafts', 'storage', 'templates'],
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
   'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
@@ -44,7 +42,6 @@ type SettingsRouteWithoutView = {
     | 'scenario-layouts'
     | 'quick-actions'
     | 'screen-sizes'
-    | 'drafts'
     | 'voice-input'
     | 'settings-transfer';
   view?: never;
@@ -54,7 +51,7 @@ export type SettingsRoute =
   | SettingsRouteWithoutView
   | { section: 'interface-browser'; view?: 'interface' | 'context-menu' }
   | { section: 'media-quality'; view?: 'image' | 'video' }
-  | { section: 'saving'; view?: 'settings' | 'storage' | 'templates' | 'files' }
+  | { section: 'saving'; view?: 'settings' | 'files' | 'drafts' | 'storage' | 'templates' }
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
   | { section: 'editor-resources'; view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
@@ -76,6 +73,7 @@ export type LegacySettingsSection =
   | 'presets'
   | 'saves'
   | 'storage-drafts'
+  | 'drafts'
   | 'highlighter'
   | 'editor'
   | 'image'
@@ -96,7 +94,8 @@ const LEGACY_ROUTES: Readonly<Record<LegacySettingsSection, SettingsRoute>> = {
   ai: { section: 'ai-connections', view: 'integrations' },
   presets: { section: 'screen-sizes' },
   saves: { section: 'saving', view: 'settings' },
-  'storage-drafts': { section: 'drafts' },
+  'storage-drafts': { section: 'saving', view: 'drafts' },
+  drafts: { section: 'saving', view: 'drafts' },
   highlighter: { section: 'annotations', view: 'borders' },
   editor: { section: 'editor-resources', view: 'tools' },
   image: { section: 'media-quality', view: 'image' },

@@ -5,15 +5,19 @@ import { SavePresetEditorFields } from './fields';
 import { useSavePresetEditorState } from './state';
 import type { SavePresetEditorModalProps } from './types';
 import { settingsModalClassName } from '../../../../section-surface';
+import { translate } from '../../../../../platform/i18n';
 
 /**
  * Modal editor for a single save preset.
  */
 export function SavePresetEditorModal(props: SavePresetEditorModalProps) {
   const state = useSavePresetEditorState(props);
+  const close = () => {
+    if (!state.saving) props.onClose();
+  };
   const actionsProps = {
     disabled: state.isSubmitDisabled,
-    onClose: props.onClose,
+    onClose: close,
     saving: state.saving,
     ...(props.preset === undefined ? {} : { preset: props.preset }),
   };
@@ -21,8 +25,8 @@ export function SavePresetEditorModal(props: SavePresetEditorModalProps) {
   return (
     <ProductModal
       isOpen
-      onClose={props.onClose}
-      width="400px"
+      onClose={close}
+      width="560px"
       maxHeight="85vh"
       scrollable
       dialogClassName={settingsModalClassName}
@@ -30,7 +34,7 @@ export function SavePresetEditorModal(props: SavePresetEditorModalProps) {
       <ProductModalHeader
         compact
         title={resolveSavePresetEditorTitle(props.preset)}
-        onClose={props.onClose}
+        onClose={close}
       />
       <form onSubmit={state.handleSubmit} className="contents">
         <ProductModalBody compact>
@@ -41,7 +45,13 @@ export function SavePresetEditorModal(props: SavePresetEditorModalProps) {
             setEnabled={state.setEnabled}
             setName={state.setName}
             setPath={state.setPath}
+            {...(props.preset ? { previousPath: props.preset.path } : {})}
           />
+          {state.saveFailed ? (
+            <p role="alert" className="mt-3 text-sm text-[var(--sniptale-color-danger)]">
+              {translate('savePresets.editor.saveFailed')}
+            </p>
+          ) : null}
         </ProductModalBody>
         <SavePresetEditorActions {...actionsProps} />
       </form>

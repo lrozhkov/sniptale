@@ -151,6 +151,7 @@ export const settingsNavigationMessages = defineMessageSource({
     storage: { ru: 'Хранилище', en: 'Storage' },
     folderTemplates: { ru: 'Шаблоны папок', en: 'Folder templates' },
     files: { ru: 'Файлы', en: 'Files' },
+    drafts: { ru: 'Черновики', en: 'Drafts' },
     templates: { ru: 'Шаблоны', en: 'Templates' },
     prompts: { ru: 'Промпты', en: 'Prompts' },
     image: { ru: 'Изображения', en: 'Images' },

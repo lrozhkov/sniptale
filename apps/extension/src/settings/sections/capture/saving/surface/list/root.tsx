@@ -10,7 +10,14 @@ import { PresetsListEmptyState } from './empty-state';
 import type { SavePresetsListProps } from '../../state/types';
 
 export function PresetsList(props: SavePresetsListProps) {
-  const items: readonly SettingsCollectionItem[] = props.presets.map((preset) => ({
+  const [query, setQuery] = useState('');
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filteredPresets = normalizedQuery
+    ? props.presets.filter((preset) =>
+        `${preset.name} ${preset.path}`.toLocaleLowerCase().includes(normalizedQuery)
+      )
+    : props.presets;
+  const items: readonly SettingsCollectionItem[] = filteredPresets.map((preset) => ({
     id: preset.id,
     title: preset.name,
     meta: [
@@ -19,7 +26,36 @@ export function PresetsList(props: SavePresetsListProps) {
       translate('savePresets.editor.downloadsSuffix'),
     ].join(''),
     enabled: preset.enabled,
-    capabilities: { edit: true, toggle: true, delete: true, reorder: true },
+    badges: [
+      ...(preset.id === props.defaultImagePresetId
+        ? [
+            {
+              id: 'image',
+              label: translate('savePresets.section.imageDefault'),
+              tone: 'neutral' as const,
+            },
+          ]
+        : []),
+      ...(preset.id === props.defaultVideoPresetId
+        ? [
+            {
+              id: 'video',
+              label: translate('savePresets.section.videoDefault'),
+              tone: 'neutral' as const,
+            },
+          ]
+        : []),
+      ...(preset.id === props.defaultExportPresetId
+        ? [
+            {
+              id: 'export',
+              label: translate('savePresets.section.exportDefault'),
+              tone: 'neutral' as const,
+            },
+          ]
+        : []),
+    ],
+    capabilities: { edit: true, toggle: true, delete: true, reorder: !normalizedQuery },
   }));
   const byId = new Map(props.presets.map((preset) => [preset.id, preset]));
   const onAction = (action: SettingsCollectionAction) => {
@@ -31,19 +67,46 @@ export function PresetsList(props: SavePresetsListProps) {
   };
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-4 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="max-w-[620px]">
+            <h2 className="text-base font-semibold text-[var(--sniptale-color-text-primary)]">
+              {translate('savePresets.section.folderPresetsLabel')}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--sniptale-color-text-secondary)]">
+              {translate('savePresets.section.listDescription')}
+            </p>
+          </div>
+          <label className="w-full max-w-[280px] text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
+            {translate('savePresets.section.searchLabel')}
+            <ProductInput
+              type="search"
+              className="mt-1 w-full"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={translate('savePresets.section.searchPlaceholder')}
+            />
+          </label>
+        </div>
         <SettingsCollection
           ariaLabel={translate('savePresets.section.folderPresetsLabel')}
+          state={props.isLoading ? 'loading' : 'ready'}
           items={items}
-          emptyState={<PresetsListEmptyState />}
+          emptyState={
+            normalizedQuery ? translate('savePresets.section.noMatches') : <PresetsListEmptyState />
+          }
           addAction={{
             label: translate('savePresets.section.addButton'),
+            disabled: props.isLoading ?? false,
             onInvoke: () => props.onEdit(),
           }}
           onAction={onAction}
-          onMove={(intent: SettingsCollectionMoveIntent) =>
-            void props.onMoveBefore(intent.itemId, intent.beforeItemId)
-          }
+          {...(normalizedQuery
+            ? {}
+            : {
+                onMove: (intent: SettingsCollectionMoveIntent) =>
+                  void props.onMoveBefore(intent.itemId, intent.beforeItemId),
+              })}
         />
       </div>
       <PresetsListOverlays
@@ -58,3 +121,5 @@ export function PresetsList(props: SavePresetsListProps) {
     </>
   );
 }
+import { useState } from 'react';
+import { ProductInput } from '@sniptale/ui/product-form-controls';

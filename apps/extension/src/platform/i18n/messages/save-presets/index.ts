@@ -58,6 +58,19 @@ export const savePresetsMessages = defineMessageSource({
       ru: 'Добавить шаблон',
       en: 'Add preset',
     },
+    searchLabel: { ru: 'Поиск шаблонов', en: 'Search presets' },
+    searchPlaceholder: { ru: 'Название или путь', en: 'Name or folder path' },
+    noMatches: {
+      ru: 'Шаблоны не найдены. Измените запрос.',
+      en: 'No matching presets. Try another search.',
+    },
+    listDescription: {
+      ru: 'Папки внутри «Загрузок». Шаблоны по умолчанию выбираются на вкладке «Файлы».',
+      en: 'Folders inside Downloads. Choose defaults on the Files tab.',
+    },
+    imageDefault: { ru: 'По умолчанию: изображения', en: 'Default: images' },
+    videoDefault: { ru: 'По умолчанию: видео', en: 'Default: video' },
+    exportDefault: { ru: 'По умолчанию: экспорт', en: 'Default: export' },
     unsetOption: {
       ru: 'Не задан',
       en: 'Not set',
@@ -145,8 +158,18 @@ export const savePresetsMessages = defineMessageSource({
       en: ']',
     },
     enabledLabel: {
-      ru: 'Включён (показывать в диалоге выбора)',
-      en: 'Enabled (show in the picker dialog)',
+      ru: 'Показывать в диалоге выбора',
+      en: 'Show in the picker dialog',
+    },
+    previewLabel: { ru: 'Папка после сохранения', en: 'Folder after saving' },
+    previewRoot: { ru: 'Загрузки', en: 'Downloads' },
+    previewHint: {
+      ru: 'Относительно папки «Загрузки». Имя файла задаётся отдельно.',
+      en: 'Relative to Downloads. The file name is set separately.',
+    },
+    saveFailed: {
+      ru: 'Не удалось сохранить шаблон. Проверьте соединение и повторите.',
+      en: 'Could not save the preset. Check the connection and try again.',
     },
   },
   messages: {

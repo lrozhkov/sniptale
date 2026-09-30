@@ -12,7 +12,10 @@ export function SavePresetsSection(props: {
   const savePresetsSection = useSavePresetsSection();
   const { editingPreset, ...contentProps } = savePresetsSection;
   const view =
-    props.view === 'templates' || props.view === 'storage' || props.view === 'files'
+    props.view === 'templates' ||
+    props.view === 'storage' ||
+    props.view === 'files' ||
+    props.view === 'drafts'
       ? props.view
       : 'settings';
 
@@ -23,16 +26,17 @@ export function SavePresetsSection(props: {
         ariaLabel={translate('settings.navigation.saving')}
         items={[
           { id: 'settings', label: translate('settings.navigation.views.settings') },
+          { id: 'files', label: translate('settings.navigation.views.files') },
+          { id: 'drafts', label: translate('settings.navigation.views.drafts') },
           { id: 'storage', label: translate('settings.navigation.views.storage') },
           {
             id: 'templates',
             label: translate('settings.navigation.views.folderTemplates'),
           },
-          { id: 'files', label: translate('settings.navigation.views.files') },
         ]}
         onChange={props.onViewChange}
       />
-      {view !== 'storage' ? (
+      {view !== 'storage' && view !== 'drafts' ? (
         <SavePresetsSectionContent
           {...contentProps}
           onMoveBefore={savePresetsSection.handleMoveBefore}
@@ -42,6 +46,7 @@ export function SavePresetsSection(props: {
       ) : null}
       {view === 'files' ? <FilenameRulesSettings /> : null}
       {view === 'storage' ? <StorageDraftsSection view="storage" /> : null}
+      {view === 'drafts' ? <StorageDraftsSection view="drafts" /> : null}
     </div>
   );
 }

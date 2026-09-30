@@ -79,7 +79,7 @@ it('keeps storage management on its own subpage', async () => {
   expect(storageDraftsSectionSpy).toHaveBeenCalledWith({ view: 'storage' });
 });
 
-it('places Files after Folder templates and isolates its controls', async () => {
+it('places Drafts immediately after Files and isolates its controls', async () => {
   useSavePresetsSectionSpy.mockReturnValue(createSectionState());
   await renderSection('files');
 
@@ -87,15 +87,20 @@ it('places Files after Folder templates and isolates its controls', async () => 
     Array.from(container?.querySelectorAll('nav button') ?? []).map((button) => button.textContent)
   ).toEqual([
     translate('settings.navigation.views.settings'),
+    translate('settings.navigation.views.files'),
+    translate('settings.navigation.views.drafts'),
     translate('settings.navigation.views.storage'),
     translate('settings.navigation.views.folderTemplates'),
-    translate('settings.navigation.views.files'),
   ]);
   expect(savePresetsSectionContentSpy).toHaveBeenCalledWith(
     expect.objectContaining({ view: 'files' })
   );
   expect(container?.querySelector('[data-testid="filename-rules"]')).toBeTruthy();
   expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeNull();
+  await renderSection('drafts');
+  expect(storageDraftsSectionSpy).toHaveBeenCalledWith({ view: 'drafts' });
+  expect(container?.querySelector('[data-testid="filename-rules"]')).toBeNull();
+  expect(savePresetsSectionContentSpy).toHaveBeenCalledTimes(1);
   await renderSection('settings');
   expect(container?.querySelector('[data-testid="filename-rules"]')).toBeNull();
   expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeNull();

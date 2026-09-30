@@ -28,9 +28,9 @@ describe('settings navigation items', () => {
     ).toBe(true);
   });
 
-  it('registers Drafts as its own page while Saving keeps the storage view', () => {
-    expect(DEFERRED_SETTINGS_SECTION_LOADERS).toHaveProperty('drafts');
-    expect(DEFERRED_SETTINGS_SECTION_LOADERS).not.toHaveProperty('storage-drafts');
+  it('loads Drafts through the Saving subpage', () => {
+    expect(DEFERRED_SETTINGS_SECTION_LOADERS).not.toHaveProperty('drafts');
+    expect(SETTINGS_NAV_ITEMS).not.toContainEqual(expect.objectContaining({ id: 'drafts' }));
   });
 
   it('keeps every deferred section loader executable and aligned with its export', async () => {
