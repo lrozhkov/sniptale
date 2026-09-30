@@ -308,6 +308,21 @@ it('rolls preview back to the committed value when the picker closes without app
   expect(document.body.textContent).not.toContain('#ABCDEF');
 });
 
+it('returns focus to the color trigger after Apply and Cancel', async () => {
+  renderSelector();
+  const trigger = getButton('shared.ui.colorSelectorChooseColor');
+  expect(trigger).toBeDefined();
+
+  for (const action of ['shared.ui.colorSelectorCancel', 'shared.ui.colorSelectorApply']) {
+    await openPicker();
+    const input = getTextInput('shared.ui.colorSelectorHex');
+    input?.focus();
+    expect(document.activeElement).toBe(input);
+    await clickButton(action);
+    expect(document.activeElement).toBe(trigger);
+  }
+});
+
 it('renders the translated transparent value in the picker trigger', () => {
   renderSelector({ value: 'transparent' });
 

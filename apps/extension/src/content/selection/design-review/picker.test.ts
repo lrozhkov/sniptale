@@ -227,7 +227,9 @@ it('keeps the inspector open when text selection starts inside and releases outs
   popover.append(textarea);
   contentRoot.append(popover);
   const selected = makeVisible(document.createElement('button'));
-  const outside = makeVisible(document.createElement('article'));
+  const outside = makeVisible(document.createElement('button'));
+  const onPageClick = vi.fn();
+  outside.addEventListener('click', onPageClick);
   document.body.append(selected, outside);
   const onInspectorDismissRequested = vi.fn(() => true);
   startPicker({ onInspectorDismissRequested });
@@ -237,9 +239,12 @@ it('keeps the inspector open when text selection starts inside and releases outs
     new MouseEvent('pointerdown', { bubbles: true, cancelable: true, composed: true })
   );
   outside.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, cancelable: true }));
-  outside.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  const gestureClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+  outside.dispatchEvent(gestureClick);
 
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(gestureClick.defaultPrevented).toBe(true);
+  expect(onPageClick).not.toHaveBeenCalled();
   expectFrameSummary('button');
 
   outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
@@ -289,6 +294,8 @@ it('keeps portaled settings controls owned by the inspector inside its dismissal
   popover.append(owner);
   const portaledControl = document.createElement('button');
   portaledControl.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'review-color');
+  const onControlClick = vi.fn();
+  portaledControl.addEventListener('click', onControlClick);
   contentRoot.append(popover, portaledControl);
   const selected = makeVisible(document.createElement('button'));
   document.body.append(selected);
@@ -301,6 +308,7 @@ it('keeps portaled settings controls owned by the inspector inside its dismissal
   );
 
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(onControlClick).toHaveBeenCalledOnce();
 });
 
 it('selects the visible label proxy for an opacity-hidden checkbox menu trigger', () => {

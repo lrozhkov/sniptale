@@ -62,9 +62,9 @@ function useEscapeDismiss(args: {
       return;
     }
 
-    const active = rootRef.current?.ownerDocument.activeElement;
-    const trigger =
-      active instanceof HTMLElement && rootRef.current?.contains(active) ? active : null;
+    const trigger = pickerOpen
+      ? rootRef.current?.querySelector<HTMLButtonElement>('button')
+      : rootRef.current?.querySelector<HTMLButtonElement>('button[aria-expanded]');
     const handleDocumentKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();

@@ -111,6 +111,23 @@ it('applies a selected background color from the picker', () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(hex, '#123456');
     hex.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  expect(onChange).not.toHaveBeenCalled();
+  const cancel = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'Отмена'
+  );
+  act(() => cancel?.click());
+  expect(onChange).not.toHaveBeenCalled();
+  act(() => trigger?.click());
+  const reopenedHex = document.querySelector<HTMLInputElement>('input[aria-label="HEX"]');
+  expect(reopenedHex?.value).toBe('#FFFFFF');
+  act(() => {
+    if (!reopenedHex) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      reopenedHex,
+      '#123456'
+    );
+    reopenedHex.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   const apply = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
     (button) => button.textContent === 'Применить'
   );

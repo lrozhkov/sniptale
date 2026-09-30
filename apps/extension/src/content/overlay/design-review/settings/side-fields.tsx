@@ -18,10 +18,7 @@ const SIDE_LABEL_KEYS = [
   'content.designReview.sideLeft',
 ] as const;
 
-const COMPACT_VALUES_CLASS_NAME = [
-  'w-[4.75rem] min-w-0 rounded-[9px]',
-  'border border-[var(--sniptale-color-border-soft)] p-0.5',
-].join(' ');
+const COMPACT_VALUES_CLASS_NAME = ['w-full min-w-0'].join(' ');
 
 const AXIS_GROUP_CLASS_NAME = [
   'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
@@ -113,10 +110,7 @@ function CompactSideValues(props: {
   state: DesignReviewViewState;
 }) {
   return (
-    <div
-      className={`${COMPACT_VALUES_CLASS_NAME} ${props.properties[0]?.endsWith('-color') ? '!w-36' : ''}`}
-      data-ui="content.design-review.side-values-compact"
-    >
+    <div className={COMPACT_VALUES_CLASS_NAME} data-ui="content.design-review.side-values-compact">
       <SideValueControl
         compact
         disabled={props.disabled}
@@ -215,30 +209,26 @@ export function LinkedSideFields(props: {
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div
-        className={`flex min-w-0 items-center gap-2 ${props.properties[0]?.endsWith('-color') ? 'flex-wrap' : ''}`}
-      >
-        <div
-          className={`min-w-0 flex-1 ${props.properties[0]?.endsWith('-color') ? 'basis-full' : ''}`}
-        >
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
+        <div className="min-w-0">
           <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {!expanded ? (
+        <LinkToggle
+          disabled={props.disabled}
+          linked={linking.model.linked}
+          name="all"
+          onClick={linking.toggleAll}
+        />
+        {!expanded ? (
+          <div className="col-span-2 min-w-0">
             <CompactSideValues
               disabled={props.disabled}
               properties={props.properties}
               state={props.state}
               onSideChange={linking.updateSide}
             />
-          ) : null}
-          <LinkToggle
-            disabled={props.disabled}
-            linked={linking.model.linked}
-            name="all"
-            onClick={linking.toggleAll}
-          />
-        </div>
+          </div>
+        ) : null}
       </div>
       {expanded ? (
         <div className="grid w-full gap-1.5" data-ui="content.design-review.side-values-expanded">

@@ -223,8 +223,14 @@ function ColorSelectorBody(props: {
         pickerOpen={props.state.pickerOpen}
         title={props.title}
         value={props.state.draftColor}
-        onApply={props.state.handlePickerApply}
-        onCancel={props.state.handlePickerCancel}
+        onApply={() => {
+          props.state.handlePickerApply();
+          props.state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
+        }}
+        onCancel={() => {
+          props.state.handlePickerCancel();
+          props.state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
+        }}
         onColorChange={props.state.handleDraftColorChange}
         onSelectTransparent={props.state.handleSelectTransparent}
         onPaletteSelect={props.state.handlePaletteSelect}

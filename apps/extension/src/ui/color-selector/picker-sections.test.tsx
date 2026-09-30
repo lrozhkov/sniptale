@@ -169,9 +169,10 @@ it('renders the footer without an opaque backing', () => {
   expect(onCancel).toHaveBeenCalledOnce();
   expect(onApply).toHaveBeenCalledOnce();
   expect(footer.props.className).not.toContain('bg-[var(--sniptale-color-surface-panel)]');
-  expect(footerButtons[0]?.props.className).toContain('text-xs font-medium');
-  expect(footerButtons[0]?.props.className).toContain('bg-transparent');
-  expect(footerButtons[1]?.props.className).toContain('text-xs font-medium');
+  expect(footerButtons[0]?.props.tone).toBe('secondary');
+  expect(footerButtons[0]?.props.compact).toBe(true);
+  expect(footerButtons[1]?.props.tone).toBe('primary');
+  expect(footerButtons[1]?.props.compact).toBe(true);
 });
 
 it('renders HSL fields with the expected labels and handlers', () => {

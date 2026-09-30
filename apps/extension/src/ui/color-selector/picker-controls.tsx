@@ -3,6 +3,7 @@ import { translate } from '../../platform/i18n';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { NumericValueField } from '../compact-inspector-controls/numeric';
 import { CompactInput } from '../compact-inspector-controls/primitives';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 const TEXT_ACTION_CLASS_NAME = [
   'inline-flex h-7 cursor-pointer items-center justify-center rounded-[var(--sniptale-radius-sm)] border-none px-3',
@@ -116,17 +117,13 @@ export function PickerManualColorField(props: {
 
 export function PickerFooter(props: { onApply: () => void; onCancel: () => void }) {
   return (
-    <div className="grid grid-cols-2 gap-2 py-1">
-      <button type="button" onClick={props.onCancel} className={TEXT_ACTION_CLASS_NAME}>
+    <div className="grid grid-cols-2 gap-2 pt-2">
+      <ProductActionButton compact tone="secondary" onClick={props.onCancel} className="w-full">
         {translate('shared.ui.colorSelectorCancel')}
-      </button>
-      <button
-        type="button"
-        onClick={props.onApply}
-        className={`${TEXT_ACTION_CLASS_NAME} text-[var(--sniptale-color-text-primary)]`}
-      >
+      </ProductActionButton>
+      <ProductActionButton compact tone="primary" onClick={props.onApply} className="w-full">
         {translate('shared.ui.colorSelectorApply')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }

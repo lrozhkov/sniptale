@@ -182,7 +182,11 @@ function handlePickerClick(
     claimPageClick(event);
     return;
   }
-  if (isInspectorInteractionEvent(event) || inspectorPointerGestureStarted) return;
+  if (isInspectorInteractionEvent(event)) return;
+  if (inspectorPointerGestureStarted) {
+    claimPageClick(event);
+    return;
+  }
 
   const contentOwned = isContentOwnedEvent(event);
   const dismissed = args.onInspectorDismissRequested();
@@ -235,7 +239,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     'mousemove',
     (event, iframe) => {
       handlePickerMouseMove(state, event, iframe);
-      if (isTrustedMouseEvent(event))
+      if (isTrustedMouseEvent(event) && !state.inspectorPointerGestureStarted)
         measurements.hover(resolveSelectablePageElement(event, iframe));
     },
     { capture: true }

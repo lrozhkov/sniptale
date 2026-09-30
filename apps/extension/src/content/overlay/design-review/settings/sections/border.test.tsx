@@ -79,9 +79,14 @@ it('owns four compact linkable border groups without nested disclosures', () => 
   const colorGroup = root.querySelector('[data-side-field-label="Цвет рамки"]');
   expect(
     colorGroup?.querySelector('[data-ui="content.design-review.side-values-compact"]')?.className
-  ).toContain('!w-36');
+  ).toContain('w-full');
   expect(colorGroup?.querySelector('[data-ui="shared.ui.color-selector.trigger"]')).not.toBeNull();
-  expect(colorGroup?.querySelector('.basis-full')).not.toBeNull();
+  expect(colorGroup?.querySelector('.basis-full')).toBeNull();
+  expect(
+    root.querySelector(
+      '[data-side-field-label="Толщина"] [data-ui="content.design-review.side-values-compact"]'
+    )?.className
+  ).toContain('w-full');
   expect(root.textContent).toContain('Скругление');
   expect(root.querySelector('details')).toBeNull();
 });

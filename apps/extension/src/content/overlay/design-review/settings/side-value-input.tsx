@@ -83,7 +83,7 @@ function SideSelectInput(props: {
   return (
     <CompactSelect
       aria-label={props.ariaLabel}
-      className={`${PAGE_STYLE_SELECT_CLASS_NAME} ${props.compact ? '!h-7 !px-1 !text-[10px]' : ''}`}
+      className={PAGE_STYLE_SELECT_CLASS_NAME}
       disabled={props.disabled}
       options={getBorderStyleOptions(props.value)}
       value={normalizeBorderStyleValue(props.value)}
@@ -102,7 +102,6 @@ function SideColorInput(props: {
 }) {
   return (
     <CompactColorSelector
-      {...(props.compact ? { className: '!h-7' } : {})}
       disabled={props.disabled}
       label={props.ariaLabel ?? ''}
       title={props.ariaLabel ?? ''}
@@ -124,7 +123,7 @@ function SideTextInput(props: {
   return (
     <CompactInput
       aria-label={props.ariaLabel}
-      className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${props.compact ? '!h-7 !px-1 !text-[11px]' : ''}`}
+      className={PAGE_STYLE_CONTROL_CLASS_NAME}
       disabled={props.disabled}
       value={props.value}
       onChange={(event) => props.onChange(event.currentTarget.value)}
@@ -151,7 +150,7 @@ function SideLengthInput(props: {
   const inputClassName = [
     PAGE_STYLE_CONTROL_CLASS_NAME,
     showUnit ? '!pr-12' : '!pr-6',
-    props.compact ? '!h-7 !px-1 !pr-5 !text-[11px]' : '',
+    props.compact ? '!pr-7' : '',
   ].join(' ');
 
   return (
