@@ -274,7 +274,9 @@ it('keeps Restore as the only Trash item operation across media and project prev
     expect(restore?.closest('aside')).not.toBeNull();
     expect(restore?.closest('section')?.textContent).toContain('gallery.preview.actions');
     expect(restore?.className).toContain('w-full');
-    expect(restore?.closest('aside')?.className).toContain('overflow-y-auto');
+    expect(restore?.closest('[data-ui="gallery.preview.inspectorContent"]')?.className).toContain(
+      'overflow-y-auto'
+    );
     expect(
       container?.querySelector(
         '[data-ui="gallery.preview.surface"] > div [data-ui="gallery.preview.restore"]'

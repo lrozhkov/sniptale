@@ -165,10 +165,10 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
 
   render(props);
 
-  expect(container?.textContent).toContain('gallery.preview.inspector');
+  expect(container?.textContent).not.toContain('gallery.preview.inspector');
   expect(container?.textContent).toContain('Screenshot');
   expect(container?.textContent).toContain('31 Mar 2026');
-  expect(container?.querySelector('[data-ui="preview.promotion"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
 
   const input = container?.querySelector('input');
   const closeButton = container?.querySelector('[data-ui="preview.close"]');
@@ -432,4 +432,27 @@ it('navigates adjacent media with arrow keys but preserves arrow editing inside 
     input?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
   });
   expect(onNext).toHaveBeenCalledOnce();
+});
+
+it('keeps close and inspector toggle outside the pending metadata boundary', () => {
+  const props = createProps({ item: createMediaItem() });
+  render(props);
+  const header = container?.querySelector('[data-ui="gallery.preview.inspectorHeader"]');
+  const close = header?.querySelector<HTMLButtonElement>(
+    'button[aria-label="common.actions.close"]'
+  );
+  const toggle = header?.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.hideInspector"]'
+  );
+  expect(close?.closest('[inert]')).toBeNull();
+  expect(toggle?.closest('[inert]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="preview.metadata"]')?.closest('[inert]')
+  ).not.toBeNull();
+  act(() => {
+    close?.click();
+    toggle?.click();
+  });
+  expect(props.onClose).toHaveBeenCalledOnce();
+  expect(props.onInspectorToggle).toHaveBeenCalledOnce();
 });

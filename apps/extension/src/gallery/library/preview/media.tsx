@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef, type ReactNode, type RefObject } from 'react';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { GalleryProjectOpenAction } from '../ui/project-presentation';
@@ -16,39 +16,13 @@ import { PreviewZoomControls } from '../../../composition/library-preview/image-
 import { PreviewScenarioStage } from './scenario-stage';
 import type { PreviewPanelProps } from './types';
 import { usePreviewImageZoom } from '../../../composition/library-preview/usePreviewImageZoom';
+import { PreviewInspectorControls } from './inspector-controls';
+import './navigation-zones.css';
 import { PreviewNavigationZone } from './navigation-zones';
 import {
   usePreviewMediaTransition,
   usePreviewMediaTransitionAnimation,
 } from './usePreviewMediaTransition';
-
-function PreviewInspectorControls(
-  props: Pick<
-    PreviewPanelProps,
-    'inspectorCollapsed' | 'onClose' | 'onInspectorToggle' | 'trashMode'
-  >
-) {
-  const inspectorLabel = props.inspectorCollapsed
-    ? translate('gallery.preview.showInspector')
-    : translate('gallery.preview.hideInspector');
-
-  return (
-    <>
-      {!props.trashMode ? (
-        <PreviewFloatingControl ariaLabel={inspectorLabel} onClick={props.onInspectorToggle}>
-          {props.inspectorCollapsed ? (
-            <PanelRightOpen className="h-4 w-4" />
-          ) : (
-            <PanelRightClose className="h-4 w-4" />
-          )}
-        </PreviewFloatingControl>
-      ) : null}
-      <PreviewFloatingControl ariaLabel={translate('common.actions.close')} onClick={props.onClose}>
-        <X className="h-4 w-4" />
-      </PreviewFloatingControl>
-    </>
-  );
-}
 
 function PreviewNavigationControls({
   navigation,
@@ -111,7 +85,7 @@ function PreviewMediaControls(
             disabled={!props.zoomCommandsEnabled}
           />
         ) : null}
-        <PreviewInspectorControls {...props} />
+        {props.inspectorCollapsed ? <PreviewInspectorControls {...props} /> : null}
       </div>
     </div>
   );
@@ -374,7 +348,7 @@ export function PreviewMedia(
 
   return (
     <div
-      className="@container/preview-media relative flex min-w-0 flex-1 flex-col overflow-hidden
+      className="gallery-preview-media @container/preview-media relative flex min-w-0 flex-1 flex-col overflow-hidden
         bg-[radial-gradient(
           circle_at_top,
           color-mix(in_srgb,var(--sniptale-color-accent-soft)_80%,transparent),

@@ -20,14 +20,14 @@ export function PreviewNavigationZone({
       title={translate(previous ? 'gallery.preview.previous' : 'gallery.preview.next')}
       disabled={disabled}
       onClick={previous ? navigation.onPrevious : navigation.onNext}
-      className="group relative flex h-full w-6 shrink-0 cursor-pointer items-center justify-center
+      className={`gallery-preview-navigation-${direction} group relative flex h-full w-6 shrink-0
+        cursor-pointer items-center justify-center
         bg-transparent text-[var(--sniptale-color-text-secondary)] transition-colors
-        hover:bg-[var(--sniptale-color-surface-hover)]
         hover:text-[var(--sniptale-color-text-primary)]
         focus-visible:z-30 focus-visible:outline-none focus-visible:ring-2
         focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)]
         disabled:cursor-default disabled:hover:bg-transparent
-        disabled:hover:text-[var(--sniptale-color-text-secondary)]"
+        disabled:hover:text-[var(--sniptale-color-text-secondary)]`}
     >
       {previous ? (
         <ChevronLeft

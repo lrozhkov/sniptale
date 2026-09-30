@@ -1,13 +1,13 @@
+import { BookOpen, Play } from 'lucide-react';
+import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { useEffect, useState } from 'react';
 import { readScenarioViewingSnapshot } from '../../../composition/persistence/scenario/projects/viewing';
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
 import { createTranslator, useAppLocale } from '../../../platform/i18n';
 
 const inspectorLinkClassName = [
-  'flex min-h-9 items-center rounded-[8px] px-3 text-sm',
-  'hover:bg-[var(--sniptale-color-surface-hover)]',
-  'focus-visible:outline-none focus-visible:ring-2',
-  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+  'w-full !justify-start !rounded-[8px] !px-3 text-left gap-2',
+  getControlSecondaryButtonClassName({ density: 'compact' }),
 ].join(' ');
 
 const inlineLinkClassName = [
@@ -86,6 +86,13 @@ export function ScenarioViewingActions({
               target="_blank"
               rel="noopener noreferrer"
             >
+              {layout === 'inspector' ? (
+                mode === 'guide' ? (
+                  <BookOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <Play className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )
+              ) : null}
               {t(mode === 'guide' ? 'scenario.editor.viewGuide' : 'scenario.editor.viewTour')}
             </a>
           ))}

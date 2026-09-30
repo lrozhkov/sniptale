@@ -470,3 +470,23 @@ it('opens an available video project from detail actions', async () => {
   expect(props.onEdit).toHaveBeenCalledOnce();
   await act(async () => root.unmount());
 });
+
+it('keeps promotion available for temporary scenario exports without a Delete action', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onPromote = vi.fn(async () => undefined);
+  const item = {
+    ...createScenarioExportItem(),
+    lifecycle: { savedAt: null, storageClass: 'temporary' as const, updatedAt: 1 },
+  };
+  await act(async () => root.render(<PreviewActions {...createProps(onPromote)} item={item} />));
+  const save = Array.from(container.querySelectorAll('button')).find(
+    (button) => button.textContent === 'gallery.preview.saveToLibrary'
+  );
+  expect(save).toBeDefined();
+  expect(container.textContent).not.toContain('common.actions.delete');
+  await act(async () => save?.click());
+  expect(onPromote).toHaveBeenCalledOnce();
+  act(() => root.unmount());
+});

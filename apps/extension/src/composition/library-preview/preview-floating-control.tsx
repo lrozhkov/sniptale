@@ -1,10 +1,10 @@
-import type { ReactNode } from 'react';
+import type { MouseEventHandler, ReactNode } from 'react';
 
 export function PreviewFloatingControl(props: {
   ariaLabel: string;
   children: ReactNode;
   disabled?: boolean;
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
   pressed?: boolean;
   tabIndex?: number;
   title?: string;

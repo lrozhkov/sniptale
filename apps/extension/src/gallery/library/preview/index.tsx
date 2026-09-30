@@ -5,12 +5,12 @@ import { PreviewSourceField } from './source-field';
 import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
 import type { GalleryPreviewPresentation } from '../types';
 import type { PreviewPanelProps } from './types';
+import { PreviewInspectorControls } from './inspector-controls';
 import { PreviewMedia } from './media';
 import {
   PreviewActions,
   PreviewMetadataCards,
   PreviewProjectUsage,
-  PreviewPromotionAction,
   PreviewTagEditor,
 } from './sidebar-sections';
 import { formatDate, getGalleryItemKindLabel } from '../ui';
@@ -38,19 +38,21 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
   );
 }
 
-function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
+function PreviewPanelHeader(
+  props: Pick<
+    PreviewPanelProps,
+    'item' | 'inspectorCollapsed' | 'onClose' | 'onInspectorToggle' | 'trashMode'
+  >
+) {
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
 
   return (
-    <div>
-      <div>
-        <div
-          className="text-xs font-semibold uppercase tracking-[0.14em]
-            text-[var(--sniptale-color-text-muted-strong)]"
-        >
-          {translate('gallery.preview.inspector')}
-        </div>
-        <h2 className="mt-1 text-base font-semibold">{getGalleryItemKindLabel(props.item.kind)}</h2>
+    <div
+      className="flex shrink-0 items-start justify-between gap-2"
+      data-ui="gallery.preview.inspectorHeader"
+    >
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold">{getGalleryItemKindLabel(props.item.kind)}</h2>
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}
         </div>
@@ -61,6 +63,9 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
               : translate('gallery.app.draftNoExpiration')}
           </div>
         ) : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <PreviewInspectorControls {...props} />
       </div>
     </div>
   );
@@ -105,20 +110,17 @@ function PreviewPanelSidebar(
 ) {
   return (
     <aside
-      inert={props.pending}
-      aria-busy={props.pending}
       data-ui="gallery.preview.inspector"
-      className="min-h-0 w-full overflow-y-auto border-l border-[var(--sniptale-color-border-soft)]
+      className="flex min-h-0 w-full flex-col overflow-hidden border-l border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
     >
-      <PreviewPanelHeader item={props.item} />
-      {!props.trashMode ? (
-        <PreviewPromotionAction
-          item={props.item}
-          {...(props.onPromote ? { onPromote: props.onPromote } : {})}
-        />
-      ) : null}
-      <div className="mt-4 space-y-4">
+      <PreviewPanelHeader {...props} />
+      <div
+        data-ui="gallery.preview.inspectorContent"
+        inert={props.pending}
+        aria-busy={props.pending}
+        className="mt-4 min-h-0 space-y-4 overflow-y-auto"
+      >
         <PreviewFilenameField
           filenameDraft={props.filenameDraft}
           item={props.item}

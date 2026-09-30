@@ -352,7 +352,7 @@ it('blocks requested-item actions and retained-frame zoom until presentation or 
     />
   );
   expect(
-    container?.querySelector('[data-ui="gallery.preview.inspector"]')?.hasAttribute('inert')
+    container?.querySelector('[data-ui="gallery.preview.inspectorContent"]')?.hasAttribute('inert')
   ).toBe(false);
   ImagePreloaderStub.deferLoad = true;
   renderNode(
@@ -360,7 +360,7 @@ it('blocks requested-item actions and retained-frame zoom until presentation or 
       {...createProps({ item: next, previewUrl: 'blob:b', previewRequestRevision: 2 })}
     />
   );
-  const inspector = container?.querySelector('[data-ui="gallery.preview.inspector"]');
+  const inspector = container?.querySelector('[data-ui="gallery.preview.inspectorContent"]');
   expect(inspector?.hasAttribute('inert')).toBe(true);
   const image = container?.querySelector('img');
   const style = image?.getAttribute('style');

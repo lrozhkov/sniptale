@@ -210,7 +210,7 @@ it('changes image zoom through the slider and preserves it when the lock is enab
     '[data-ui="gallery.preview.zoomSliderPanel"]'
   );
   expect(sliderPanel?.className).toContain('invisible');
-  expect(sliderPanel?.className).toContain('right-0 top-full');
+  expect(sliderPanel?.className).toContain('inset-x-0 top-full');
   expect(slider?.tabIndex).toBe(-1);
   expect(slider?.style.getPropertyValue('--sniptale-range-track-height')).toBe('4px');
 
@@ -267,7 +267,7 @@ it('changes image zoom through the slider and preserves it when the lock is enab
 });
 
 it('keeps the zoom slider open while keyboard focus moves from percent to slider and lock', () => {
-  renderNode(<PreviewMedia {...createProps()} />);
+  renderNode(<PreviewMedia {...createProps({ inspectorCollapsed: true })} />);
   const group = container?.querySelector<HTMLElement>(
     '[data-ui="gallery.preview.zoomSliderGroup"]'
   );

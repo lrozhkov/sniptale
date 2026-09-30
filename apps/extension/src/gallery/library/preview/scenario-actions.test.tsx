@@ -3,7 +3,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createScenarioExportItem, createScenarioItem } from '../actions/test-support';
-import { PreviewActions } from './sidebar-sections';
+import { PreviewActions, PreviewMetadataCards } from './sidebar-sections';
 import { PreviewScenarioStage } from './scenario-stage';
 import { PreviewSourceField } from './source-field';
 import type { PreviewPanelProps } from './types';
@@ -135,4 +135,19 @@ it('distinguishes historical export metadata from the current project and links 
   );
   expect(host.textContent).toContain('gallery.preview.exportSourceUnavailable');
   expect(host.querySelector('a[href*="projectId="]')).toBeNull();
+});
+
+it('removes repeated ready-to-edit copy while retaining scenario availability recovery', async () => {
+  const { host, root } = await render(<PreviewMetadataCards item={createScenarioItem()} />);
+  expect(host.textContent).not.toContain('gallery.preview.editableProject');
+  expect(host.textContent).toContain('gallery.preview.type');
+  const item = createScenarioItem();
+  await act(async () =>
+    root.render(
+      <PreviewMetadataCards
+        item={{ ...item, project: { ...item.project, availability: 'unavailable' } }}
+      />
+    )
+  );
+  expect(host.textContent).toContain('gallery.preview.projectUnavailable');
 });
