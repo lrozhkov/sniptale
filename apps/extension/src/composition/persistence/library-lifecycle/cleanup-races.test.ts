@@ -1,4 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
 import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
@@ -229,25 +233,25 @@ async function runExpiredVideoProjectCleanup(args: {
   await expect(
     cleanupDrafts({ now: args.now, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [`video-project:${project.id}`],
+    deletedCount: 0,
+    deletedIds: [],
   });
   return { deletes, media, project };
 }
 
-it('keeps a fresh temporary child when its video project has expired', async () => {
+it('keeps a fresh temporary child and its legacy project past the old expiry', async () => {
   const now = 40 * day;
   const { deletes, media, project } = await runExpiredVideoProjectCleanup({
     mediaUpdatedAt: now - day,
     now,
   });
 
-  expect(deletes).toHaveBeenCalledWith('video_projects', project.id);
+  expect(deletes).not.toHaveBeenCalledWith('video_projects', project.id);
   expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
   expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
 });
 
-it('removes recording telemetry and the project thumbnail with an expired recording graph', async () => {
+it('retains recording telemetry and project thumbnail with a legacy project graph', async () => {
   const now = 40 * day;
   const project = createVideoProjectEntry(
     {
@@ -312,22 +316,19 @@ it('removes recording telemetry and the project thumbnail with an expired record
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [`video-project:${project.id}`],
+    deletedCount: 0,
+    deletedIds: [],
   });
-  expect(deletes).toHaveBeenCalledWith('media_library', media.id);
-  expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
-  expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `video-project:${project.id}`);
+  expect(deletes).not.toHaveBeenCalled();
 });
 
-it('retains independently trashed media when its draft video project expires', async () => {
+it('retains independently trashed media and its legacy video project', async () => {
   const { deletes, media, project } = await runExpiredVideoProjectCleanup({
     mediaUpdatedAt: 1,
     now: 40 * day,
     trashedAt: 2,
   });
-  expect(deletes).toHaveBeenCalledWith('video_projects', project.id);
+  expect(deletes).not.toHaveBeenCalledWith('video_projects', project.id);
   expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
   expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
 });

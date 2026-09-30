@@ -19,7 +19,7 @@ import { createScenarioProjectEntry } from './projects/entry';
 import { parseScenarioProjectEntry } from './read-guards';
 import { parseScenarioAssetEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.guards';
-import type { LibraryStorageClass } from '../library-lifecycle/contracts';
+import { promoteLibraryLifecycle, type LibraryStorageClass } from '../library-lifecycle/contracts';
 import { areScenarioProjectsEqual } from './aggregate-comparison';
 import { isRecord } from '../infrastructure/indexed-db/read-primitives';
 import {
@@ -323,6 +323,12 @@ async function commitScenarioAggregateInTransaction(
       !hasScenarioChildMutations(options.children) &&
       areScenarioProjectsEqual(existing.project, project)
     ) {
+      if (existing.lifecycle?.storageClass === 'temporary') {
+        await projectStore.put({
+          ...existing,
+          lifecycle: promoteLibraryLifecycle(existing.lifecycle, Date.now()),
+        });
+      }
       await tx.done;
       return {
         project: existing.project,

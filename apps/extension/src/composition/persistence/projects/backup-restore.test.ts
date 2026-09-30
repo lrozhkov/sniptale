@@ -56,6 +56,22 @@ const ref = {
 };
 
 describe('video project backup restore adapter', () => {
+  it('restores an archived temporary project as permanent without changing its graph', async () => {
+    const target = stores();
+    const entry = createVideoProjectEntry({ id: 'legacy-import' }, { id: 'legacy-import' });
+    entry.lifecycle = { savedAt: null, storageClass: 'temporary', updatedAt: 10 };
+    await putVideoProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exports: [] },
+      stores: target,
+      strategy: 'replace',
+    });
+    expect(target.projects.put).toHaveBeenCalledWith({
+      ...entry,
+      lifecycle: expect.objectContaining({ savedAt: 10, storageClass: 'library' }),
+    });
+  });
+
   it('publishes a prepared project graph through caller-owned stores', async () => {
     const target = stores();
     await expect(

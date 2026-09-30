@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
 import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
@@ -172,14 +176,8 @@ describe('library lifecycle cleanup and usage', () => {
       { id: 'scenario-library', lifecycle: createLibraryLifecycle('library', now - 90 * day) },
     ]);
     await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-      deletedCount: 5,
-      deletedIds: [
-        'video-project:video-project-1',
-        'video-project:video-project-2',
-        'draft-image',
-        'draft-video',
-        'scenario:scenario-1',
-      ],
+      deletedCount: 2,
+      deletedIds: ['draft-image', 'draft-video'],
     });
   });
 
@@ -367,6 +365,7 @@ describe('library lifecycle cleanup and usage', () => {
       draftsBytes: expectedDrafts,
       libraryBytes: expectedLibrary,
       totalBytes: expectedDrafts + expectedLibrary,
+      trashBytes: 0,
     });
   });
 });

@@ -451,13 +451,13 @@ it('retains a temporary project in the library with its next revisioned workspac
 });
 
 it.each([
-  { parentSaved: false, mirrorSaved: false, sibling: 'temporary', saved: false },
-  { parentSaved: false, mirrorSaved: false, sibling: 'library', saved: true },
-  { parentSaved: true, mirrorSaved: false, sibling: 'temporary', saved: true },
-  { parentSaved: false, mirrorSaved: true, sibling: 'temporary', saved: true },
+  { parentSaved: false, mirrorSaved: false, sibling: 'temporary' },
+  { parentSaved: false, mirrorSaved: false, sibling: 'library' },
+  { parentSaved: true, mirrorSaved: false, sibling: 'temporary' },
+  { parentSaved: false, mirrorSaved: true, sibling: 'temporary' },
 ])(
-  'preserves independent Trash admission through project save and shared-media lifecycle synchronization: %j',
-  async ({ parentSaved, mirrorSaved, sibling, saved }) => {
+  'promotes project media while preserving independent Trash admission: %j',
+  async ({ parentSaved, mirrorSaved, sibling }) => {
     const { saveVideoProject } = await import('./index');
     const lifecycle = (library: boolean) => ({
       storageClass: library ? ('library' as const) : ('temporary' as const),
@@ -491,8 +491,8 @@ it.each([
         id: media.id,
         source: media.source,
         lifecycle: {
-          storageClass: saved ? 'library' : 'temporary',
-          savedAt: saved ? (mirrorSaved ? 100 : 1000) : null,
+          storageClass: 'library',
+          savedAt: mirrorSaved ? 100 : 1000,
           updatedAt: mirrorSaved ? 100 : 1000,
           trashedAt: 500,
         },

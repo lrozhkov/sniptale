@@ -12,6 +12,7 @@ const {
   listAggregatePresentationsMock,
   backfillScenarioLibraryAssetsMock,
   cleanupDraftsMock,
+  repairTemporaryProjectLifecyclesMock,
 } = vi.hoisted(() => ({
   createGalleryItemsMock: vi.fn(),
   getStorageEstimateInfoMock: vi.fn(),
@@ -24,6 +25,11 @@ const {
   listAggregatePresentationsMock: vi.fn().mockResolvedValue([]),
   backfillScenarioLibraryAssetsMock: vi.fn().mockResolvedValue(0),
   cleanupDraftsMock: vi.fn().mockResolvedValue({ deletedCount: 0, deletedIds: [] }),
+  repairTemporaryProjectLifecyclesMock: vi.fn().mockResolvedValue(0),
+}));
+
+vi.mock('../../composition/persistence/library-lifecycle/project-retention', () => ({
+  repairTemporaryProjectLifecycles: repairTemporaryProjectLifecyclesMock,
 }));
 
 vi.mock('../../composition/persistence/library-lifecycle/cleanup', () => ({
@@ -92,7 +98,7 @@ vi.mock('../library/items', async (importOriginal) => ({
 import { loadGalleryLibrarySnapshot } from './use-gallery-library-snapshot';
 
 describe('loadGalleryLibrarySnapshot', () => {
-  it('loads mixed gallery items and storage estimates without legacy read-path repair', async () => {
+  it('repairs legacy projects before loading mixed gallery items and storage estimates', async () => {
     const mediaItems = [{ id: 'asset-1' }];
     const scenarioProjects = [
       { id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2 },
@@ -126,6 +132,10 @@ describe('loadGalleryLibrarySnapshot', () => {
     });
 
     await expect(loadGalleryLibrarySnapshot()).resolves.toEqual({ estimate, nextItems });
+    expect(repairTemporaryProjectLifecyclesMock).toHaveBeenCalled();
+    expect(repairTemporaryProjectLifecyclesMock.mock.invocationCallOrder[0]).toBeLessThan(
+      listVideoProjectsMock.mock.invocationCallOrder[0]!
+    );
     expect(backfillScenarioLibraryAssetsMock).toHaveBeenCalledOnce();
     expect(backfillScenarioLibraryAssetsMock.mock.invocationCallOrder[0]).toBeLessThan(
       listMediaLibraryMock.mock.invocationCallOrder[0]!
@@ -201,6 +211,7 @@ describe('loadGalleryLibrarySnapshot', () => {
 
   it('does not delete drafts under default retention when settings cannot be read', async () => {
     cleanupDraftsMock.mockClear();
+    repairTemporaryProjectLifecyclesMock.mockClear();
     loadSettingsMock.mockRejectedValueOnce(new Error('settings unavailable'));
     listMediaLibraryMock.mockResolvedValue([]);
     listVideoProjectsMock.mockResolvedValue([]);
@@ -210,7 +221,15 @@ describe('loadGalleryLibrarySnapshot', () => {
     createGalleryItemsMock.mockReturnValue([]);
 
     await expect(loadGalleryLibrarySnapshot()).resolves.toMatchObject({ nextItems: [] });
+    expect(repairTemporaryProjectLifecyclesMock).toHaveBeenCalledOnce();
     expect(cleanupDraftsMock).not.toHaveBeenCalled();
+  });
+
+  it('does not list projects when authoritative lifecycle repair fails', async () => {
+    listVideoProjectsMock.mockClear();
+    repairTemporaryProjectLifecyclesMock.mockRejectedValueOnce(new Error('repair unavailable'));
+    await expect(loadGalleryLibrarySnapshot()).rejects.toThrow('repair unavailable');
+    expect(listVideoProjectsMock).not.toHaveBeenCalled();
   });
 
   it('still shows library items when draft maintenance is blocked by an image journal', async () => {

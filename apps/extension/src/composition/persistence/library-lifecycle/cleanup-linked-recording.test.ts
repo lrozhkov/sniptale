@@ -1,4 +1,8 @@
 import { expect, it, vi } from 'vitest';
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
 import { createMediaLibraryEntry, createVideoProjectEntry } from '../projects/index.test-support';
 import { createLibraryLifecycle } from './contracts';
 
@@ -39,7 +43,7 @@ vi.mock('../scenario/projects', async (importOriginal) => ({
 
 import { cleanupDrafts, DEFAULT_LOCAL_STORAGE_POLICY } from '.';
 
-it('expires a draft project after saving its linked recording and media', async () => {
+it('retains a legacy draft project and its linked recording and media', async () => {
   const day = 24 * 60 * 60 * 1000;
   const now = 10 * day;
   const lifecycle = createLibraryLifecycle('temporary', 1);
@@ -84,10 +88,10 @@ it('expires a draft project after saving its linked recording and media', async 
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [`video-project:${project.id}`],
+    deletedCount: 0,
+    deletedIds: [],
   });
-  expect(values.get('video_projects')?.has(project.id)).toBe(false);
+  expect(values.get('video_projects')?.has(project.id)).toBe(true);
   expect(values.get('recordings')?.get(recording.id)).toMatchObject({
     lifecycle: { storageClass: 'library', savedAt: now },
   });

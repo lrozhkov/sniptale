@@ -25,6 +25,26 @@ import {
 } from './aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
 import { backfillScenarioLibraryAssets } from './library-publication';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { parseScenarioProjectEntry } from './read-guards';
+
+it('promotes an unchanged legacy scenario without changing its document revision or trash state', async () => {
+  const project = createGuideProject('Legacy scenario');
+  await commitScenarioAggregateMutation(project);
+  const stored = parseScenarioProjectEntry(getStore('scenario_projects').get(project.id));
+  if (!stored) throw new Error('Expected saved scenario');
+  getStore('scenario_projects').set(project.id, {
+    ...stored,
+    lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 2 },
+  });
+
+  const result = await commitScenarioAggregateMutation(stored.project);
+  const promoted = parseScenarioProjectEntry(getStore('scenario_projects').get(project.id));
+  expect(result.workspaceRevision).toBe(stored.workspaceRevision);
+  expect(promoted?.project).toEqual(stored.project);
+  expect(promoted?.updatedAt).toBe(stored.updatedAt);
+  expect(promoted?.lifecycle).toMatchObject({ storageClass: 'library', trashedAt: 2 });
+});
 
 it('commits root and owned children, preserves document creation, and accepts exact replay', async () => {
   const project = createGuideProject('Aggregate');

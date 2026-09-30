@@ -120,7 +120,7 @@ export async function saveVideoProject(
       },
       createdAt: existing?.createdAt ?? candidate.createdAt,
       updatedAt: now,
-      lifecycle: buildSavedProjectLifecycle(existing, options, now),
+      lifecycle: buildSavedProjectLifecycle(existing, now),
       workspaceRevision: (existing?.workspaceRevision ?? 0) + 1,
     };
 
@@ -180,18 +180,11 @@ async function persistProjectReferences(args: {
   });
 }
 
-function buildSavedProjectLifecycle(
-  existing: VideoProjectEntry | null,
-  options: SaveVideoProjectOptions,
-  now: number
-) {
+function buildSavedProjectLifecycle(existing: VideoProjectEntry | null, now: number) {
   const lifecycle = existing
     ? (existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt))
-    : createLibraryLifecycle(options.storageClass ?? 'library', now);
-  return updateLibraryLifecycle(
-    options.storageClass === 'library' ? promoteLibraryLifecycle(lifecycle, now) : lifecycle,
-    now
-  );
+    : createLibraryLifecycle('library', now);
+  return updateLibraryLifecycle(promoteLibraryLifecycle(lifecycle, now), now);
 }
 
 async function prepareVideoProjectSave(project: VideoProject): Promise<VideoProject> {

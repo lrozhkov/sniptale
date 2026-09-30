@@ -65,6 +65,36 @@ const ref = {
 };
 
 describe('scenario project backup restore adapter', () => {
+  it('restores a legacy temporary scenario as permanent without changing its content or trash marker', async () => {
+    const target = stores();
+    const entry = {
+      ...projectEntry(),
+      lifecycle: {
+        savedAt: null,
+        storageClass: 'temporary' as const,
+        trashedAt: 50,
+        updatedAt: 1,
+      },
+    };
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+
+    await putScenarioProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exportThumbnails: [], exports: [], stepDocuments: [] },
+      stores: target,
+      strategy: 'duplicate',
+    });
+
+    expect(target.projects.put).toHaveBeenCalledWith({
+      ...entry,
+      lifecycle: {
+        savedAt: 999,
+        storageClass: 'library',
+        trashedAt: 50,
+        updatedAt: 999,
+      },
+    });
+  });
   it('publishes prepared scenario assets and metadata through caller stores', async () => {
     const target = stores();
     await expect(

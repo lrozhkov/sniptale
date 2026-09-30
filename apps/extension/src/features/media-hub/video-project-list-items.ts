@@ -134,7 +134,7 @@ export function createVideoProjectListItem(
   };
 }
 
-export function resolveVideoProjectRetentionKind(project: VideoProject): 'ordinary' | 'video' {
+function resolveVideoProjectRetentionKind(project: VideoProject): 'ordinary' | 'video' {
   if (project.baseRecordingId || project.source?.kind === 'recording') return 'video';
   return project.assets.some(
     (asset) =>

@@ -1,5 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
+
 const persistenceMocks = vi.hoisted(() => ({
   listMediaLibrary: vi.fn(),
   listScenarioProjectEntries: vi.fn(),

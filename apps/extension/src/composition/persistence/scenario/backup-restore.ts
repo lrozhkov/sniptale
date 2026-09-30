@@ -7,6 +7,7 @@ import type {
   PhysicalDeleteAssetOperation,
 } from '../assets';
 import { removeEditorDocumentOwnership } from '../document-assets';
+import { createLibraryLifecycle, promoteLibraryLifecycle } from '../library-lifecycle/contracts';
 import type { MediaThumbnailEntry } from '../media-library/contracts';
 import type {
   ScenarioAssetEntry,
@@ -208,7 +209,12 @@ export async function putScenarioProjectBackupRestore(args: {
       projectId: args.root.entry.id,
       stores: args.stores,
     });
-  await args.stores.projects.put(args.root.entry);
+  const lifecycle =
+    args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
+  await args.stores.projects.put({
+    ...args.root.entry,
+    lifecycle: promoteLibraryLifecycle(lifecycle, Date.now()),
+  });
   await publishScenarioAssets(args.root, args.stores);
   await publishScenarioDocuments(args.root, args.stores);
   await publishScenarioSidecars(args.root, args.stores);

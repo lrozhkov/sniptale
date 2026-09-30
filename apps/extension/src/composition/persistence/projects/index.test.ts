@@ -229,7 +229,7 @@ describe('projects-db video project flows', () => {
     'saves projects with preserved createdAt and refreshed updatedAt',
     verifyProjectSaveRefreshesUpdatedAt
   );
-  it('aligns project-asset mirrors with a new temporary project lifecycle', async () => {
+  it('keeps a new project and its asset mirrors permanent despite a temporary request', async () => {
     const { saveVideoProject } = await importProjectsDbModule();
     const project = createVideoProjectEntryWithMediaClip().project;
     const media = createMediaLibraryEntry({
@@ -246,7 +246,7 @@ describe('projects-db video project flows', () => {
       2,
       expect.objectContaining({
         id: media.id,
-        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 999 },
+        lifecycle: { savedAt: 999, storageClass: 'library', updatedAt: 999 },
       })
     );
   });
@@ -268,6 +268,48 @@ describe('projects-db video project flows', () => {
       expect.objectContaining({
         id: media.id,
         lifecycle: { savedAt: 800, storageClass: 'library', updatedAt: 800 },
+      })
+    );
+  });
+  it('adds permanent lifecycle metadata when resaving a legacy project without it', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const existing = createVideoProjectEntry();
+    projectsDbMocks.txGetMock.mockResolvedValueOnce({ ...existing, lifecycle: undefined });
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+
+    await saveVideoProject(existing.project, { storageClass: 'temporary' });
+
+    expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lifecycle: {
+          savedAt: existing.updatedAt,
+          storageClass: 'library',
+          updatedAt: 999,
+        },
+      })
+    );
+  });
+  it('rejects an invalid project before starting a durable save', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+
+    await expect(saveVideoProject({ ...createVideoProject(), duration: -1 })).rejects.toThrow(
+      'Invalid video project payload'
+    );
+
+    expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
+  });
+  it('fills a legacy project creation timestamp before saving it permanently', async () => {
+    const { saveVideoProject } = await importProjectsDbModule();
+    const { createdAt: _createdAt, ...legacyProject } = createVideoProject();
+    projectsDbMocks.txGetMock.mockReset().mockResolvedValue(undefined);
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+
+    await saveVideoProject(legacyProject as ReturnType<typeof createVideoProject>);
+
+    expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createdAt: 999,
+        lifecycle: { savedAt: 999, storageClass: 'library', updatedAt: 999 },
       })
     );
   });

@@ -1,5 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
+import {
+  createProjectAssetEntry,
+  createVideoProjectEntryWithMediaClip,
+} from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createGuideProject } from '../../../features/scenario/project/factories';
 
@@ -159,7 +166,7 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
       ]),
     ],
     ['recordings', new Map([[recording.id, recording]])],
-    ['project_assets', new Map([['asset-1', { id: 'asset-1' }]])],
+    ['project_assets', new Map([['asset-1', createProjectAssetEntry({ id: 'asset-1' })]])],
     ['video_projects', new Map()],
   ]);
   persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
@@ -193,13 +200,14 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
   }
   expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
   expect(deletes).toHaveBeenCalledWith('project_assets', 'asset-1');
+  expect(deletes).toHaveBeenCalledWith('asset_refs', createProjectAssetEntry().assetId);
   expect(deletes).toHaveBeenCalledWith('image_workspaces', recordingMedia.id);
   expect(deletes).toHaveBeenCalledWith('image_workspaces', projectAssetMedia.id);
   expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', recordingMedia.id]);
   expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', projectAssetMedia.id]);
 });
 
-it('commits expired linked and standalone draft cleanup through current transactional rows', async () => {
+it('retains legacy project graphs and linked media when clearing drafts', async () => {
   const lifecycle = createLibraryLifecycle('temporary', 1);
   const projectWithAsset = createVideoProjectEntryWithMediaClip();
   const sharedAsset = {
@@ -392,34 +400,20 @@ it('commits expired linked and standalone draft cleanup through current transact
     })
   );
 
-  persistenceMocks.completePhysicalDeleteOperation.mockRejectedValueOnce(
-    new Error('OPFS delete unavailable')
-  );
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-  ).resolves.toEqual({
-    deletedCount: 2,
-    deletedIds: [`video-project:${project.id}`, `scenario:${scenario.id}`],
-  });
-  expect(deletes).toHaveBeenCalledWith('project_assets', 'project-asset-1');
-  expect(deletes).toHaveBeenCalledWith('media_library', projectAssetMedia.id);
-  expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-shared');
-  expect(deletes).not.toHaveBeenCalledWith('media_library', sharedProjectAssetMedia.id);
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `video-project:${project.id}`);
-  expect(deletes).toHaveBeenCalledWith('scenario_assets', scenarioAsset.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_assets', malformedScenarioAsset.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_exports', scenarioExport.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_exports', malformedScenarioExport.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_step_editor_documents', scenarioDocument.stepId);
-  expect(deletes).toHaveBeenCalledWith(
-    'scenario_step_editor_documents',
-    malformedScenarioDocument.stepId
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(deletes).not.toHaveBeenCalled();
+  expect(valuesByStore.get('video_projects')?.has(project.id)).toBe(true);
+  expect(valuesByStore.get('scenario_projects')?.has(scenario.id)).toBe(true);
+  expect(valuesByStore.get('project_assets')?.has('project-asset-1')).toBe(true);
+  expect(valuesByStore.get('media_library')?.has(projectAssetMedia.id)).toBe(true);
+  expect(valuesByStore.get('scenario_assets')?.has(scenarioAsset.id)).toBe(true);
+  expect(valuesByStore.get('scenario_exports')?.has(scenarioExport.id)).toBe(true);
+  expect(valuesByStore.get('scenario_step_editor_documents')?.has(scenarioDocument.stepId)).toBe(
+    true
   );
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `scenario:${scenario.id}`);
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `scenario-export:${scenarioExport.id}`);
-  expect(persistenceMocks.completePhysicalDeleteOperation).toHaveBeenCalledWith(
-    expect.objectContaining({ assetIds: [scenarioAsset.assetId], status: 'pending' })
-  );
+  expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
 
 it('preserves trashed roots even when explicitly clearing every draft', async () => {

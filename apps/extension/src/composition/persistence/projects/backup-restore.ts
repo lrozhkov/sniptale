@@ -36,6 +36,7 @@ import {
   collectProjectAssetOwnership,
   type ProjectAssetOwnership,
 } from './backup-restore-asset-ownership';
+import { createLibraryLifecycle, promoteLibraryLifecycle } from '../library-lifecycle/contracts';
 
 interface Store<T = unknown> {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -275,7 +276,12 @@ export async function putVideoProjectBackupRestore(args: {
       projectId: args.root.entry.id,
       stores: args.stores,
     });
-  await args.stores.projects.put(args.root.entry);
+  const lifecycle =
+    args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
+  await args.stores.projects.put({
+    ...args.root.entry,
+    lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
+  });
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
   await publishProjectSidecars(args.root, args.stores);

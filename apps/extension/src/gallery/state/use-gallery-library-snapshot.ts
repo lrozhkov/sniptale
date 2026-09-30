@@ -17,6 +17,7 @@ import {
   cleanupDrafts,
   DEFAULT_LOCAL_STORAGE_POLICY,
   getDraftRetentionMs,
+  repairTemporaryProjectLifecycles,
 } from '../../composition/persistence/library-lifecycle';
 import { listAggregatePresentations } from '../../composition/persistence/aggregate-presentations';
 import { backfillScenarioLibraryAssets } from '../../composition/persistence/scenario/library-publication';
@@ -36,6 +37,7 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
   estimate: StorageEstimateInfo;
   nextItems: GalleryItem[];
 }> {
+  await repairTemporaryProjectLifecycles();
   await backfillScenarioLibraryAssets();
   const settings = await loadSettings().catch(() => null);
   if (settings) {
