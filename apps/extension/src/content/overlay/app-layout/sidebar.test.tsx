@@ -33,7 +33,7 @@ const SCENARIO_SIDEBAR_TEST_NAME =
 function createScenarioController() {
   return {
     applyCaptureAction: vi.fn(async () => undefined),
-    captureAction: 'download_default' as const,
+    captureAction: 'scenario' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),
     handleScreenshotModeDisabled: vi.fn(async () => undefined),
@@ -94,6 +94,8 @@ function createScenarioProps() {
 function createProps() {
   return {
     isCompletelyHidden: false,
+    isToolbarVisible: true,
+    byClickDisabled: false,
     keepPinnedForAutoBlur: false,
     modeController: {
       handleToggleScreenshotMode: vi.fn(),
@@ -127,9 +129,14 @@ async function clickRenderedSidebarButton() {
 async function verifySidebarHideStates(props: ReturnType<typeof createProps>) {
   props.scenario.state.sidebarVisible = false;
   await renderSidebar(props);
-  expect(container?.textContent).toBe('');
+  expect(container?.textContent).toBe('sidebar');
 
   props.scenario.state.sidebarVisible = true;
+  props.isToolbarVisible = false;
+  await renderSidebar(props);
+  expect(container?.textContent).toBe('');
+
+  props.isToolbarVisible = true;
   props.isCompletelyHidden = true;
   await renderSidebar(props);
   expect(container?.textContent).toBe('');
@@ -261,4 +268,14 @@ describe('ContentScenarioRecorderSidebar first visible highlight', () => {
       })
     );
   });
+});
+
+it('passes a pending first capture to the panel project chooser', async () => {
+  const props = createProps();
+  props.scenario.state.pendingProjectSelection = true;
+  await renderSidebar(props);
+
+  expect(scenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ pendingProjectSelection: true })
+  );
 });

@@ -206,12 +206,9 @@ function expectToolbarSecondaryControlsContract(): void {
   expect(toolbarSecondaryControlsSource).toContain(
     'onDisplayModeChange: args.viewModel.derivedState.setDisplayMode'
   );
-  expect(toolbarCaptureMenuGroupSource).toContain('<ToolbarScenarioControls');
+  expect(toolbarCaptureMenuGroupSource).not.toContain('<ToolbarScenarioControls');
   expect(toolbarCaptureMenuGroupSource).toContain('displayMode={captureProps.displayMode}');
   expect(toolbarCaptureMenuGroupSource.indexOf('<CaptureActionMenuNode')).toBeLessThan(
-    toolbarCaptureMenuGroupSource.indexOf('<ToolbarScenarioControls')
-  );
-  expect(toolbarCaptureMenuGroupSource.indexOf('<ToolbarScenarioControls')).toBeLessThan(
     toolbarCaptureMenuGroupSource.indexOf('<TimerMenuNode')
   );
 }

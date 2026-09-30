@@ -98,7 +98,7 @@ function buildScenarioToolbarProps(args: {
     projectName: args.state.scenarioProjectName,
     projects: args.state.projects,
     pendingProjectSelection: args.state.pendingProjectSelection,
-    sidebarVisible: args.state.sidebarVisible,
+    sidebarVisible: args.state.captureAction === 'scenario' && args.state.scenarioEnabled,
   };
 }
 

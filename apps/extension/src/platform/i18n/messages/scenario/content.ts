@@ -133,6 +133,14 @@ export const scenarioContentMessages = defineMessageSource({
     ru: 'Не удалось создать проект сценария.',
     en: 'Failed to create the scenario project.',
   },
+  selectProjectError: {
+    ru: 'Не удалось выбрать проект сценария.',
+    en: 'Failed to select the scenario project.',
+  },
+  captureModeError: {
+    ru: 'Не удалось изменить способ добавления шагов.',
+    en: 'Failed to change how steps are added.',
+  },
   captureSaveError: {
     ru: 'Не удалось сохранить шаг сценария.',
     en: 'Failed to save the scenario step.',

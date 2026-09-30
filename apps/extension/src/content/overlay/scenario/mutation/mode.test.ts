@@ -62,6 +62,20 @@ describe('scenario-controller-mode-actions', () => {
     expectCaptureModeOptimismAndRollback
   );
 
+  it('restores the previous mode and navigation lock when transport rejects', async () => {
+    const harness = createCaptureModeHarness();
+    transportMocks.setScenarioCaptureModeMock.mockRejectedValueOnce(new Error('Offline'));
+
+    await applyCaptureModeHarness(harness, 'by-click', true, true);
+
+    expect(harness.setOptimisticCaptureMode).toHaveBeenLastCalledWith(null);
+    expect(helperMocks.restoreNavigationLockStateMock).toHaveBeenLastCalledWith(
+      true,
+      harness.setNavigationLockEnabled
+    );
+    expect(harness.applyScenarioResponse).not.toHaveBeenCalled();
+  });
+
   it(
     'routes session flag updates and disables screenshot mode through sidebar/enabled flows',
     expectSessionFlagUpdatesAndScreenshotDisable

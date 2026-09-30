@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ScenarioRecorderSidebar } from '.';
 import type { ScenarioRecorderSidebarPosition } from './position';
 import type { ScenarioRecorderSidebarStep } from './types';
+import type { ScenarioSidebarControlsProps } from './controls';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -61,7 +62,8 @@ async function renderSidebar(
   highlightToken = 0,
   forcedHighlightStepId: string | null = null,
   forcedHighlightVersion = 0,
-  position: ScenarioRecorderSidebarPosition = { x: 300, y: 96 }
+  position: ScenarioRecorderSidebarPosition = { x: 300, y: 96 },
+  controls: Partial<ScenarioSidebarControlsProps & { pendingProjectSelection: boolean }> = {}
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -72,6 +74,15 @@ async function renderSidebar(
   await act(async () => {
     root?.render(
       <ScenarioRecorderSidebar
+        byClickDisabled={false}
+        captureMode="manual"
+        onCreateProject={vi.fn(async () => undefined)}
+        onProjectSelect={vi.fn(async () => undefined)}
+        onSetCaptureMode={vi.fn(async () => undefined)}
+        projectId="project-1"
+        projects={[]}
+        pendingProjectSelection={false}
+        {...controls}
         dragging={false}
         onDeleteStep={onDeleteStep}
         onFinish={vi.fn()}
@@ -94,6 +105,161 @@ beforeEach(() => {
   onDeleteStep.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.useFakeTimers();
+});
+
+it('keeps project selection and capture mode inside the panel', async () => {
+  const onSetCaptureMode = vi.fn(async () => undefined);
+  const onProjectSelect = vi.fn(async () => undefined);
+  await renderSidebar(
+    [],
+    0,
+    null,
+    0,
+    { x: 300, y: 96 },
+    {
+      onSetCaptureMode,
+      onProjectSelect,
+      projects: [{ id: 'project-2', name: 'Another project' }],
+    }
+  );
+
+  expect(container?.textContent).toContain('scenario.content.sidebarEmpty');
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.scenario.sidebar.capture-mode.by-click"]'
+      )
+      ?.click();
+  });
+  expect(onSetCaptureMode).toHaveBeenCalledWith('by-click');
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.project-button"]')
+      ?.click();
+  });
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).not.toBeNull();
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.scenario.sidebar.project-picker.project"]'
+      )
+      ?.click();
+  });
+  expect(onProjectSelect).toHaveBeenCalledWith('project-2');
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).toBeNull();
+});
+
+it('opens project selection when a captured step awaits a project', async () => {
+  await renderSidebar(
+    [],
+    0,
+    null,
+    0,
+    { x: 300, y: 96 },
+    {
+      pendingProjectSelection: true,
+    }
+  );
+
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).not.toBeNull();
+});
+
+it('retains the chooser on a failed project switch and disables by-click during editing', async () => {
+  const onProjectSelect = vi.fn(async () => {
+    throw new Error('Unavailable');
+  });
+  await renderSidebar(
+    [],
+    0,
+    null,
+    0,
+    { x: 300, y: 96 },
+    {
+      byClickDisabled: true,
+      onProjectSelect,
+      projects: [{ id: 'project-2', name: 'Another project' }],
+    }
+  );
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.scenario.sidebar.capture-mode.by-click"]'
+    )?.disabled
+  ).toBe(true);
+
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.project-button"]')
+      ?.click();
+  });
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.scenario.sidebar.project-picker.project"]'
+      )
+      ?.click();
+  });
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).not.toBeNull();
+  expect(container?.textContent).toContain('Scenario');
+});
+
+it('dismisses the project chooser with Escape or an outside pointer press', async () => {
+  await renderSidebar();
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.project-button"]'
+  );
+  act(() => trigger?.click());
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).not.toBeNull();
+
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).toBeNull();
+
+  act(() => trigger?.click());
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).not.toBeNull();
+  act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).toBeNull();
+});
+
+it('closes project selection before opening step confirmation so Escape closes the dialog', async () => {
+  await renderSidebar();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.project-button"]')
+      ?.click()
+  );
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).not.toBeNull();
+
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.step-delete"]')
+      ?.click();
+  });
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.project-picker"]')
+  ).toBeNull();
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(onDeleteStep).not.toHaveBeenCalled();
 });
 
 afterEach(() => {

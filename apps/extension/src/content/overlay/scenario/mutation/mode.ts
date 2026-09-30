@@ -10,6 +10,8 @@ import {
 } from '../runtime/transport/session';
 import type { ScenarioControllerResponse } from '../types';
 import { restoreNavigationLockState } from '../../screenshot/bridge';
+import { translate } from '../../../../platform/i18n';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 
 export async function applyScenarioCaptureAction(args: {
   actionType: CaptureActionType;
@@ -54,7 +56,12 @@ export async function applyScenarioCaptureMode(args: {
     restoreNavigationLockState(false, args.setNavigationLockEnabled);
   }
 
-  const response = await setScenarioCaptureMode(args.captureMode);
+  let response: Awaited<ReturnType<typeof setScenarioCaptureMode>> | null;
+  try {
+    response = await setScenarioCaptureMode(args.captureMode);
+  } catch {
+    response = null;
+  }
   if (response?.success) {
     args.applyScenarioResponse(response);
     return;
@@ -64,6 +71,7 @@ export async function applyScenarioCaptureMode(args: {
   if (args.captureMode === 'by-click' && args.screenshotMode) {
     restoreNavigationLockState(args.navigationLockEnabled, args.setNavigationLockEnabled);
   }
+  showToast(translate('scenario.content.captureModeError'), 'error');
 }
 
 export async function applyScenarioEnabledState(args: {

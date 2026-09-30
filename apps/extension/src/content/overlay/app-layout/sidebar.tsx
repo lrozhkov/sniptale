@@ -7,6 +7,8 @@ import type { ContentAppLayoutScenarioProps, ContentAppModeController } from './
 
 type ContentScenarioRecorderSidebarArgs = {
   isCompletelyHidden: boolean;
+  isToolbarVisible: boolean;
+  byClickDisabled: boolean;
   modeController: Pick<ContentAppModeController, 'handleToggleScreenshotMode'>;
   scenario: ContentAppLayoutScenarioProps;
   setPinToTab: (value: boolean) => void;
@@ -42,6 +44,14 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
       onMoveStep={(stepId, toIndex) => void args.scenario.actions.moveRecentStep(stepId, toIndex)}
       onOpenEditor={(stepId) => void args.scenario.actions.openEditor(stepId)}
       onSidebarHeaderMouseDown={sidebarPosition.handleHeaderMouseDown}
+      captureMode={args.scenario.state.scenarioCaptureMode}
+      byClickDisabled={args.byClickDisabled}
+      onSetCaptureMode={args.scenario.actions.setCaptureMode}
+      onCreateProject={args.scenario.actions.createProject}
+      onProjectSelect={args.scenario.actions.selectProject}
+      projectId={args.scenario.state.scenarioProjectId}
+      pendingProjectSelection={args.scenario.state.pendingProjectSelection}
+      projects={args.scenario.state.projects}
       projectName={args.scenario.state.scenarioProjectName}
       position={sidebarPosition.position}
       uiScale={sidebarPosition.uiScale}

@@ -2,8 +2,8 @@ import { Suspense } from 'react';
 import { ContentDialogStack } from './dialogs';
 import { DesignReviewSurface, useDesignReviewController } from '../design-review/view';
 import { LazyContentScenarioRecorderSidebar } from './sidebar-lazy';
-import { shouldRenderContentScenarioRecorderSidebar } from './sidebar-visibility';
 import { ContentToolbarShell } from './toolbar';
+import { isScenarioByClickBlocked } from './scenario';
 import type { ContentAppLayoutProps } from './types';
 import { DrawingSurface } from '../../drawing/surface';
 import { VideoRecordingSpotlight } from '../video-recording/spotlight/view';
@@ -11,17 +11,14 @@ import { EmbeddedRecordingCamera } from '../video-recording/camera/view';
 
 function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
+  isToolbarVisible: boolean;
+  byClickDisabled: boolean;
   modeController: ContentAppLayoutProps['toolbar']['modeController'];
   scenario: ContentAppLayoutProps['scenario'];
   setPinToTab: ContentAppLayoutProps['toolbar']['setPinToTab'];
   keepPinnedForAutoBlur: boolean;
 }) {
-  if (
-    !shouldRenderContentScenarioRecorderSidebar({
-      isCompletelyHidden: props.isCompletelyHidden,
-      scenario: props.scenario,
-    })
-  ) {
+  if (props.scenario.state.captureAction !== 'scenario' || !props.scenario.state.scenarioEnabled) {
     return null;
   }
 
@@ -29,6 +26,8 @@ function ContentScenarioRecorderSidebarSlot(props: {
     <Suspense fallback={null}>
       <LazyContentScenarioRecorderSidebar
         isCompletelyHidden={props.isCompletelyHidden}
+        isToolbarVisible={props.isToolbarVisible}
+        byClickDisabled={props.byClickDisabled}
         modeController={props.modeController}
         scenario={props.scenario}
         setPinToTab={props.setPinToTab}
@@ -130,6 +129,8 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
       ) : null}
       <ContentScenarioRecorderSidebarSlot
         isCompletelyHidden={props.toolbar.isCompletelyHidden}
+        isToolbarVisible={props.toolbar.isToolbarVisible}
+        byClickDisabled={isScenarioByClickBlocked(props.toolbar.modes)}
         modeController={props.toolbar.modeController}
         scenario={props.scenario}
         setPinToTab={props.toolbar.setPinToTab}

@@ -11,13 +11,33 @@ export async function applyScenarioProjectSelection(args: {
   currentSession: ScenarioSessionState;
   projectId: string | null;
 }) {
-  const response = await setScenarioActiveProject({
-    projectId: args.projectId,
-    rememberProjectSelection: args.currentSession.rememberProjectSelection,
-  });
+  let response: Awaited<ReturnType<typeof setScenarioActiveProject>>;
+  try {
+    response = await setScenarioActiveProject({
+      projectId: args.projectId,
+      rememberProjectSelection: args.currentSession.rememberProjectSelection,
+    });
+  } catch (cause) {
+    const errorMessage = createUserFacingErrorMessage({
+      cause,
+      detail: 'storage',
+      summaryKey: 'scenario.content.selectProjectError',
+    });
+    showToast(errorMessage, 'error');
+    throw new Error(errorMessage, { cause });
+  }
   if (response?.success) {
     args.applyScenarioResponse(response);
+    return;
   }
+
+  const errorMessage = createUserFacingErrorMessage({
+    cause: response?.error,
+    detail: 'storage',
+    summaryKey: 'scenario.content.selectProjectError',
+  });
+  showToast(errorMessage, 'error');
+  throw new Error(errorMessage, { cause: response?.error });
 }
 
 export async function applyScenarioProjectCreation(args: {

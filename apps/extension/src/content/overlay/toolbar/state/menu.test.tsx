@@ -79,17 +79,6 @@ describe('useToolbarMenuState', () => {
     expect(getCurrentState().viewportMenuOpen).toBe(false);
   });
 
-  it('keeps scenario and highlighter utility popovers in the same single-open group', () => {
-    act(() => getCurrentState().toggleMenu('auto-blur'));
-    expect(getCurrentState().activeMenuType).toBe('auto-blur');
-
-    act(() => getCurrentState().toggleMenu('scenario-project'));
-    expect(getCurrentState().activeMenuType).toBe('scenario-project');
-
-    act(() => getCurrentState().toggleMenu('scenario-mode'));
-    expect(getCurrentState().activeMenuType).toBe('scenario-mode');
-  });
-
   it('consumes the first Escape for any active menu and leaves the next Escape to the mode', () => {
     const modeEscapeHandler = vi.fn();
     const handleModeEscape = (event: KeyboardEvent) => {

@@ -20,8 +20,6 @@ export type ToolbarPopoverMenu =
   | 'recording-camera'
   | 'recording-microphone'
   | 'recording-spotlight'
-  | 'scenario-mode'
-  | 'scenario-project'
   | 'settings'
   | 'timer'
   | 'viewport';

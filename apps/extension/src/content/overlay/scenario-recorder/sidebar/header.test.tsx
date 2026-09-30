@@ -26,6 +26,8 @@ function renderHeader() {
       <ScenarioRecorderSidebarHeader
         dragging={false}
         onMouseDown={vi.fn()}
+        onProjectMenuToggle={vi.fn()}
+        projectMenuOpen={false}
         projectName="Scenario"
       />
     );
@@ -59,4 +61,13 @@ it('renders only the project summary without the sidebar steps label', () => {
   expect(
     container?.querySelector('[data-ui="content.scenario.sidebar.drag-handle"]')
   ).not.toBeNull();
+});
+
+it('keeps project selection outside the panel drag handle', () => {
+  renderHeader();
+  const dragHandle = container?.querySelector('[data-ui="content.scenario.sidebar.drag-handle"]');
+  const projectButton = container?.querySelector(
+    '[data-ui="content.scenario.sidebar.project-button"]'
+  );
+  expect(dragHandle?.contains(projectButton ?? null)).toBe(false);
 });
