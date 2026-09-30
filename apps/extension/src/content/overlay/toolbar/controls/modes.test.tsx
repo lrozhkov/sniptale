@@ -388,6 +388,38 @@ it('routes all three mutually exclusive Content Editing choices through one sele
   expect(onSelectPageEditingMode).toHaveBeenNthCalledWith(2, 'ai');
 });
 
+it('does not move keyboard focus to a Page Editing button on pointer press', () => {
+  const onSelectPageEditingMode = vi.fn();
+  renderModeButtons({ onSelectPageEditingMode, quickEditMode: true });
+  for (const mode of ['block-selection', 'direct-text', 'ai']) {
+    const button = document.querySelector<HTMLButtonElement>(
+      `[data-ui="content.toolbar.page-editing-mode.${mode}"]`
+    );
+    expect(button).not.toBeNull();
+    const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    act(() => {
+      button?.dispatchEvent(press);
+      button?.click();
+    });
+    expect(press.defaultPrevented).toBe(true);
+    expect(onSelectPageEditingMode).toHaveBeenLastCalledWith(mode);
+  }
+  expect(onSelectPageEditingMode).toHaveBeenCalledTimes(3);
+});
+
+it('retains keyboard focus and activation on a Page Editing button', () => {
+  const onSelectPageEditingMode = vi.fn();
+  renderModeButtons({ onSelectPageEditingMode, quickEditMode: true });
+  const directText = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.page-editing-mode.direct-text"]'
+  );
+  act(() => directText?.focus());
+  expect(document.activeElement).toBe(directText);
+  act(() => directText?.click());
+  expect(document.activeElement).toBe(directText);
+  expect(onSelectPageEditingMode).toHaveBeenCalledWith('direct-text');
+});
+
 it('blocks conflicting Content Editing actions while the AI transition is pending', () => {
   const onDisableAiPickMode = vi.fn();
   const onSelectPageEditingMode = vi.fn();

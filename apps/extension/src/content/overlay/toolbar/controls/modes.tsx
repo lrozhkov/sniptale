@@ -326,6 +326,7 @@ function PageEditingModeButton(props: {
       dataUi={`content.toolbar.page-editing-mode.${props.mode}`}
       disabled={props.disabled}
       title={copy.title}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={(event) => {
         event.stopPropagation();
         props.onSelect(props.mode);
