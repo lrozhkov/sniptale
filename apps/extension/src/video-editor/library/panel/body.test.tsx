@@ -72,6 +72,19 @@ it('defaults to videos, switches to screenshots and excludes unsupported media',
   expect(container.querySelector('input[type=file]')).toBeNull();
   expect(container.textContent).not.toContain('diagnostics');
 });
+
+it('keeps All materials in the category rail without an icon or shifted label', () => {
+  render();
+  const buttons = container.querySelectorAll<HTMLButtonElement>('nav > div > button');
+  const all = buttons[0]!;
+  const image = buttons[1]!;
+  expect(all.textContent).toBe('gallery.preview.folderAll');
+  expect(all.querySelector('svg')).toBeNull();
+  expect(all.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  expect(image.querySelector('svg')).not.toBeNull();
+  expect(all.className).toContain('text-left');
+  expect(image.className).toContain('text-left');
+});
 it('filters within the active category and restores results when cleared', () => {
   render();
   const input = container.querySelector('input')!;

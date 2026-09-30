@@ -5,6 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { SyntheticEvent } from 'react';
 import { usePreviewImageZoom } from './usePreviewImageZoom';
+import { PreviewZoomControls } from './image-zoom-controls';
+import { translate } from '../../platform/i18n';
 
 const resizeObserverState = vi.hoisted(() => ({
   callback: null as ResizeObserverCallback | null,
@@ -121,6 +123,74 @@ afterEach(() => {
   renderSamples = [];
   resizeObserverState.callback = null;
   vi.unstubAllGlobals();
+});
+
+it('keeps shared image controls usable by both Gallery and insertion preview', () => {
+  const zoomIn = vi.fn();
+  const zoomOut = vi.fn();
+  const resetZoom = vi.fn();
+  const toggleZoomLock = vi.fn();
+  const setZoom = vi.fn();
+  const controls: ReturnType<typeof usePreviewImageZoom>['controls'] = {
+    canZoomIn: true,
+    canZoomOut: true,
+    isZoomedFromFit: false,
+    maximumZoom: 4,
+    minimumZoom: 0.1,
+    resetZoom,
+    setZoom,
+    toggleZoomLock,
+    zoom: 1,
+    zoomIn,
+    zoomLocked: false,
+    zoomOut,
+  };
+  act(() => root?.render(<PreviewZoomControls controls={controls} disabled={false} />));
+  const button = (label: Parameters<typeof translate>[0]) =>
+    container?.querySelector<HTMLButtonElement>(`[aria-label="${translate(label)}"]`);
+  act(() => {
+    button('gallery.preview.zoomIn')?.click();
+    button('gallery.preview.zoomOut')?.click();
+    button('gallery.preview.zoomLockToggle')?.click();
+    container
+      ?.querySelector<HTMLButtonElement>(`[title="${translate('gallery.preview.resetZoom')}"]`)
+      ?.click();
+  });
+  expect(zoomIn).toHaveBeenCalledOnce();
+  expect(zoomOut).toHaveBeenCalledOnce();
+  expect(toggleZoomLock).toHaveBeenCalledOnce();
+  expect(resetZoom).toHaveBeenCalledOnce();
+  expect(button('gallery.preview.zoomLockToggle')?.tabIndex).toBe(-1);
+
+  const group = container?.querySelector<HTMLElement>(
+    '[data-ui="gallery.preview.zoomSliderGroup"]'
+  );
+  act(() => group?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true })));
+  expect(button('gallery.preview.zoomLockToggle')?.tabIndex).toBe(0);
+  const slider = container?.querySelector<HTMLInputElement>(
+    '[data-ui="gallery.preview.zoomSlider"]'
+  );
+  act(() => {
+    if (slider) {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        slider,
+        '1.5'
+      );
+    }
+    slider?.dispatchEvent(new Event('input', { bubbles: true }));
+    slider?.dispatchEvent(new Event('change', { bubbles: true }));
+    group?.dispatchEvent(
+      new FocusEvent('focusout', { bubbles: true, relatedTarget: document.body })
+    );
+    group?.dispatchEvent(new MouseEvent('pointerout', { bubbles: true }));
+  });
+  expect(setZoom).toHaveBeenCalledWith(1.5);
+  expect(button('gallery.preview.zoomLockToggle')?.tabIndex).toBe(-1);
+  act(() =>
+    root?.render(<PreviewZoomControls controls={{ ...controls, zoomLocked: true }} disabled />)
+  );
+  expect(button('gallery.preview.zoomIn')?.disabled).toBe(true);
+  expect(button('gallery.preview.zoomLockToggle')?.getAttribute('aria-pressed')).toBe('true');
 });
 
 it('fits images into the container and supports zoom controls, wheel zoom, clamp, and reset', () => {

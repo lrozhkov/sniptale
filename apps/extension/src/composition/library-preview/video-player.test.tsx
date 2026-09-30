@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PreviewVideo } from './video-player';
 import { VideoThumbnail } from './video-thumbnail';
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../platform/i18n', () => ({
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));

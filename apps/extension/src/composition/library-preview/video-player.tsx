@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import { translate, useAppLocale } from '../../../platform/i18n';
+import { translate, useAppLocale } from '../../platform/i18n';
 import { VideoControls } from './video-controls';
 import { useVideoPlayer } from './video-playback';
 

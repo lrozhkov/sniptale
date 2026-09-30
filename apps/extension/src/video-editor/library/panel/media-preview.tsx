@@ -1,5 +1,6 @@
-import { Music } from 'lucide-react';
+import { Maximize2, Minimize2, Music } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { LibraryMediaAdd } from './media-add';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
@@ -7,7 +8,10 @@ import type { MediaLibraryItem } from '../../../composition/persistence/media-li
 import { translate } from '../../../platform/i18n';
 import { formatDuration, formatSize } from '../../chrome/display';
 import { formatDimensions } from '../items/cards';
-import { LibraryMediaPlayer } from '../../../composition/library-preview/player';
+import { PreviewVideo } from '../../../composition/library-preview/video-player';
+import { PreviewZoomControls } from '../../../composition/library-preview/image-zoom-controls';
+import { usePreviewImageZoom } from '../../../composition/library-preview/usePreviewImageZoom';
+import { useLibraryFullscreen } from '../../../composition/library-preview/viewport';
 
 export function MediaPreviewPane(props: {
   onAddMedia: (mediaId: string) => Promise<void>;
@@ -81,9 +85,95 @@ function LibraryPreviewContent({
       </LibraryAudioPreview>
     );
   return (
-    <LibraryMediaPlayer kind={isImage ? 'image' : 'video'} src={media.url} filename={item.filename}>
-      {fallback}
-    </LibraryMediaPlayer>
+    <div className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg bg-[var(--sniptale-color-surface-canvas)]">
+      {media.url ? (
+        isImage ? (
+          <LibraryImagePreview key={media.url} src={media.url} filename={item.filename} />
+        ) : (
+          <PreviewVideo key={media.url} src={media.url} />
+        )
+      ) : (
+        fallback
+      )}
+    </div>
+  );
+}
+
+function LibraryImagePreview({ src, filename }: { src: string; filename: string }) {
+  const zoom = usePreviewImageZoom(true, src);
+  const [failed, setFailed] = useState(false);
+  const [fullscreenFailed, setFullscreenFailed] = useState(false);
+  const fullscreen = useLibraryFullscreen(setFullscreenFailed);
+  const fullscreenLabel = translate(
+    fullscreen.fullscreen ? 'videoEditor.stage.exitFullscreen' : 'videoEditor.stage.enterFullscreen'
+  );
+  return (
+    <div
+      ref={fullscreen.frame}
+      data-ui="video-editor.library.image-preview"
+      className="flex h-full min-h-0 min-w-0 flex-col bg-[var(--sniptale-color-surface-canvas)]"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && fullscreen.fullscreen) {
+          event.preventDefault();
+          event.stopPropagation();
+          fullscreen.exitFullscreen();
+        }
+      }}
+    >
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 p-2">
+        <PreviewZoomControls controls={zoom.controls} disabled={!zoom.image.ready || failed} />
+        <ContentToolbarButton
+          ref={fullscreen.fullscreen ? undefined : fullscreen.fullscreenButton}
+          type="button"
+          aria-label={fullscreenLabel}
+          title={fullscreenLabel}
+          disabled={!zoom.image.ready || failed}
+          tone="utility"
+          size="compact"
+          className="!h-9 !w-9 !p-0"
+          onClick={fullscreen.fullscreen ? fullscreen.exitFullscreen : fullscreen.enterFullscreen}
+        >
+          {fullscreen.fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </ContentToolbarButton>
+      </div>
+      {fullscreenFailed ? (
+        <p role="alert" className="px-3 text-xs">
+          {translate('videoEditor.sidebar.mediaPreviewActionFailed')}
+        </p>
+      ) : null}
+      <div
+        ref={zoom.viewport.containerRef}
+        onPointerDown={zoom.viewport.handlePointerDown}
+        onPointerMove={zoom.viewport.handlePointerMove}
+        onPointerUp={zoom.viewport.handlePointerEnd}
+        onPointerCancel={zoom.viewport.handlePointerEnd}
+        className={`min-h-0 min-w-0 flex-1 touch-none overflow-auto overscroll-contain p-4 ${
+          zoom.controls.isZoomedFromFit
+            ? zoom.viewport.isPanning
+              ? 'cursor-grabbing'
+              : 'cursor-grab'
+            : ''
+        }`}
+      >
+        <div className="grid h-max min-h-full w-max min-w-full place-items-center">
+          {!failed ? (
+            <img
+              src={src}
+              alt={filename}
+              draggable={false}
+              onLoad={zoom.image.handleImageLoad}
+              onError={() => setFailed(true)}
+              style={{ ...zoom.image.style, visibility: zoom.image.ready ? 'visible' : 'hidden' }}
+              className="block max-h-none max-w-none shrink-0 select-none"
+            />
+          ) : (
+            <p role="alert" className="text-sm text-[var(--sniptale-color-text-primary)]">
+              {translate('videoEditor.sidebar.mediaPreviewImageDecodeFailed')}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -162,13 +252,14 @@ function LibraryMediaInsert(props: {
 type PreviewState = {
   status: 'loading' | 'unavailable' | 'image-not-ready' | 'failed' | 'ready';
   url: string | null;
+  item: MediaLibraryItem | null;
 };
 function useMediaPreview(item: MediaLibraryItem | null): PreviewState {
-  const [state, setState] = useState<PreviewState>({ status: 'loading', url: null });
+  const [state, setState] = useState<PreviewState>({ status: 'loading', url: null, item: null });
   useEffect(() => {
     let disposed = false;
     let objectUrl: string | null = null;
-    setState({ status: 'loading', url: null });
+    setState({ status: 'loading', url: null, item });
     if (!item) return;
     const load = async () => {
       const isImage = item.kind === 'image' || item.kind === 'screenshot';
@@ -178,25 +269,25 @@ function useMediaPreview(item: MediaLibraryItem | null): PreviewState {
         if (presentation?.presentationRevision === (item.workspaceRevision ?? 0))
           blob = presentation.previewBlob;
         if (!blob) {
-          if (!disposed) setState({ status: 'image-not-ready', url: null });
+          if (!disposed) setState({ status: 'image-not-ready', url: null, item });
           return;
         }
       } else blob = await getMediaAssetBlob(item.id);
       if (disposed) return;
       if (!blob?.size) {
-        setState({ status: 'unavailable', url: null });
+        setState({ status: 'unavailable', url: null, item });
         return;
       }
       objectUrl = URL.createObjectURL(blob);
-      setState({ status: 'ready', url: objectUrl });
+      setState({ status: 'ready', url: objectUrl, item });
     };
     void load().catch(() => {
-      if (!disposed) setState({ status: 'failed', url: null });
+      if (!disposed) setState({ status: 'failed', url: null, item });
     });
     return () => {
       disposed = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [item]);
-  return state;
+  return state.item === item ? state : { status: 'loading', url: null, item };
 }

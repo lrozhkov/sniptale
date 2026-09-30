@@ -44,13 +44,21 @@ export function LibraryMediaSection(props: {
                     onClick={() => setSelectedId(item.id)}
                     aria-pressed={selected?.id === item.id}
                     className={[
-                      'flex w-full items-center gap-3 rounded-lg border p-2 pr-10 text-left',
-                      'hover:bg-[var(--sniptale-color-surface-panel)]',
-                      selected?.id === item.id
-                        ? 'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-surface-panel)]'
-                        : 'border-[var(--sniptale-color-border-soft)]',
+                      'relative flex w-full items-center gap-3 rounded-lg border p-2 pr-10 text-left',
+                      'border-[var(--sniptale-color-border-soft)]',
+                      'hover:bg-[var(--sniptale-color-surface-hover)]',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
+                      'focus-visible:ring-[var(--sniptale-color-text-primary)]',
                     ].join(' ')}
                   >
+                    {selected?.id === item.id ? (
+                      <span
+                        data-ui="video-editor.library.selection-mark"
+                        aria-hidden="true"
+                        className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full
+                          bg-[var(--sniptale-color-text-secondary)]"
+                      />
+                    ) : null}
                     <span
                       className={[
                         'flex h-16 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md',

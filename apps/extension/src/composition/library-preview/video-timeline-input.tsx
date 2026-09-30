@@ -1,6 +1,6 @@
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../platform/i18n';
 import { videoTime } from './video-thumbnail';
 import './video-timeline.css';
 import type { VideoFrameHover } from './video-frame-placement';

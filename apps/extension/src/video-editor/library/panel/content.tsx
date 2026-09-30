@@ -23,14 +23,10 @@ export function LibraryPanelDrawerContent(props: LibraryPanelContentProps) {
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row"
         data-ui="video-editor.library.tab-body"
       >
-        <div
-          className={[
-            'max-h-32 shrink-0 overflow-auto lg:max-h-none lg:w-36',
-            '[&_nav]:flex [&_nav]:flex-wrap lg:[&_nav]:block',
-          ].join(' ')}
-        >
+        <div className="max-h-32 shrink-0 overflow-auto lg:max-h-none lg:w-44">
           <LibraryNavigation
             includeAudio
+            showAllIcon={false}
             category={props.category}
             presetId={props.presetId}
             savedViews={props.savedViews}

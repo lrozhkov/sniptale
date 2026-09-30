@@ -7,6 +7,7 @@ type LibraryNavigationProps = {
   presetId: string | null;
   savedViews: GallerySavedView[];
   label?: string;
+  showAllIcon?: boolean;
   t?: Translate;
 } & (
   | {
@@ -38,7 +39,7 @@ export function LibraryNavigation(props: LibraryNavigationProps) {
 }
 function libraryNavigationClass(active: boolean): string {
   return [
-    'flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-sm',
+    'flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-3 text-left text-sm',
     'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-panel)]',
     active ? 'bg-[var(--sniptale-color-surface-panel)] font-medium' : '',
   ].join(' ');
@@ -70,7 +71,11 @@ function LibraryCategory(props: LibraryNavigationProps & { categoryKey: Category
         }}
         className={libraryNavigationClass(active && props.presetId === null)}
       >
-        <Icon size={16} aria-hidden />
+        {category === 'all' && props.showAllIcon === false ? (
+          <span className="size-4 shrink-0" aria-hidden="true" />
+        ) : (
+          <Icon size={16} className="shrink-0" aria-hidden />
+        )}
         {t(labelKey)}
       </button>
       <div className="space-y-0.5 pl-7" data-ui={`library-filters-${category}`}>

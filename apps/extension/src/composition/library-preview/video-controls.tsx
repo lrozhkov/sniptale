@@ -2,7 +2,7 @@ import { LoaderCircle, Maximize, Minimize, Pause, Play, Volume2, VolumeX } from 
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange, ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { ReactNode, RefObject } from 'react';
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../platform/i18n';
 import { videoTime } from './video-thumbnail';
 import { VideoTimeline } from './video-timeline';
 import type { useVideoPlayer } from './video-playback';

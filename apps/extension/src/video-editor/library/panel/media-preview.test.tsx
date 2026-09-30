@@ -51,6 +51,13 @@ const recording: MediaLibraryItem = {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
   vi.stubGlobal('URL', {
     createObjectURL: vi.fn(() => 'blob:recording-preview'),
@@ -80,12 +87,11 @@ it('loads the selected recording into a playable and zoomable preview', async ()
   const video = container.querySelector('video');
   expect(video?.getAttribute('src')).toBe('blob:recording-preview');
   expect(video?.hasAttribute('controls')).toBe(false);
-  expect(container.querySelector('[aria-label="videoEditor.timeline.play"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="gallery.preview.player.play"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="gallery.preview.player.scale"]')).not.toBeNull();
   expect(
-    container
-      .querySelector('[aria-label="videoEditor.sidebar.mediaPreviewZoomLabel"]')
-      ?.classList.contains('sniptale-range')
-  ).toBe(true);
+    container.querySelector('[aria-label="gallery.preview.player.fullscreen"]')
+  ).not.toBeNull();
 });
 
 it('keeps metadata and retry-safe actions available when preview media is missing', async () => {
@@ -125,11 +131,7 @@ it('hides the previous media immediately while the newly selected recording load
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:first');
   await act(async () => resolve(new Blob(['second'])));
   expect(container.querySelector('video')?.getAttribute('src')).toBe('blob:second');
-  expect(
-    container.querySelector<HTMLInputElement>(
-      '[aria-label="videoEditor.sidebar.mediaPreviewZoomLabel"]'
-    )?.value
-  ).toBe('1');
+  expect(container.querySelector('[aria-label="gallery.preview.player.play"]')).not.toBeNull();
 });
 
 it('previews the edited screenshot without video controls or original fallback', async () => {
@@ -153,7 +155,69 @@ it('previews the edited screenshot without video controls or original fallback',
   expect(getMediaAssetBlob).not.toHaveBeenCalled();
   expect(container.querySelector('img')?.getAttribute('src')).toBe('blob:recording-preview');
   expect(container.querySelector('video')).toBeNull();
-  expect(container.querySelector('[aria-label="videoEditor.timeline.play"]')).toBeNull();
+  expect(container.querySelector('[aria-label="gallery.preview.player.play"]')).toBeNull();
+  expect(container.querySelector('[aria-label="gallery.preview.zoomIn"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="gallery.preview.zoomSlider"]')).not.toBeNull();
+  expect(
+    container.querySelector('[aria-label="videoEditor.stage.enterFullscreen"]')
+  ).not.toBeNull();
+});
+
+it('enters and exits fullscreen for a ready image while retaining insert controls', async () => {
+  getMediaAssetBlob.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  await act(async () =>
+    root.render(
+      <MediaPreviewPane
+        item={{ ...recording, kind: 'image', mimeType: 'image/png' }}
+        onAddMedia={vi.fn()}
+      />
+    )
+  );
+  const image = container.querySelector('img')!;
+  Object.defineProperties(image, {
+    naturalWidth: { configurable: true, value: 1280 },
+    naturalHeight: { configurable: true, value: 720 },
+  });
+  await act(async () => image.dispatchEvent(new Event('load')));
+  const frame = container.querySelector<HTMLElement>(
+    '[data-ui="video-editor.library.image-preview"]'
+  )!;
+  let activeFullscreen: Element | null = null;
+  const requestFullscreen = vi.fn(async () => {
+    activeFullscreen = frame;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  });
+  const exitFullscreen = vi.fn(async () => {
+    activeFullscreen = null;
+    document.dispatchEvent(new Event('fullscreenchange'));
+  });
+  Object.defineProperty(document, 'fullscreenElement', {
+    configurable: true,
+    get: () => activeFullscreen,
+  });
+  Object.defineProperty(frame, 'requestFullscreen', {
+    configurable: true,
+    value: requestFullscreen,
+  });
+  Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exitFullscreen });
+  try {
+    const enter = container.querySelector<HTMLButtonElement>(
+      '[aria-label="videoEditor.stage.enterFullscreen"]'
+    )!;
+    expect(enter.disabled).toBe(false);
+    await act(async () => enter.click());
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+    expect(container.querySelector('footer button')).not.toBeNull();
+    const exit = container.querySelector<HTMLButtonElement>(
+      '[aria-label="videoEditor.stage.exitFullscreen"]'
+    )!;
+    await act(async () => exit.click());
+    expect(exitFullscreen).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(enter);
+  } finally {
+    Reflect.deleteProperty(document, 'fullscreenElement');
+    Reflect.deleteProperty(document, 'exitFullscreen');
+  }
 });
 
 it('shows insertion failure, allows retry and reports success only after completion', async () => {

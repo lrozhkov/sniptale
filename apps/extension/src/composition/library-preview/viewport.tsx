@@ -128,7 +128,7 @@ export function useLibraryViewport(src: string | null, setFailed: (failed: boole
     },
   };
 }
-function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
+export function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
   const frame = useRef<HTMLDivElement>(null);
   const fullscreenButton = useRef<HTMLButtonElement>(null);
   const previousFullscreen = useRef(false);

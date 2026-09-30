@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { translate } from '../../platform/i18n';
 import type { VideoFrameSnapshot } from './video-frame-cache';
 
 /** Displays only the frame and timestamp returned for the current sampled position. */
