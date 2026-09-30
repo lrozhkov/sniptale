@@ -27,14 +27,10 @@ function getToolbarVisibilityStyle(
 function clearPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElement>) {
   if (event.button !== 0 || !(event.target instanceof Element)) return;
   const button = event.target.closest<HTMLButtonElement>('button.sniptale-btn');
-  if (
-    button &&
-    event.currentTarget.contains(button) &&
-    !button.disabled &&
-    button.matches(':focus')
-  ) {
-    button.blur();
-  }
+  if (!button || !event.currentTarget.contains(button) || button.disabled) return;
+  // Both native mousedown and the activation bridge focus after this handler unless cancelled.
+  event.preventDefault();
+  if (button.matches(':focus')) button.blur();
 }
 
 export function ToolbarShellContent(props: {

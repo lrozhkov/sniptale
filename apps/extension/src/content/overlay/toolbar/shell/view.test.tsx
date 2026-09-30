@@ -5,6 +5,12 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolbarShellContent } from './view';
+import { installContentUiActivationBridge } from '../../../runtime/ui-activation-bridge';
+
+vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/trusted-events')>()),
+  isTrustedPointerEvent: vi.fn(() => true),
+}));
 
 const { useContentUiScaleMock } = vi.hoisted(() => ({
   useContentUiScaleMock: vi.fn(() => 1),
@@ -54,10 +60,14 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
-  it('clears keyboard focus before a primary mouse click on toolbar buttons', () => {
+  it.each([false, true])('keeps pointer focus cleared with activation bridge=%s', (bridged) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const shadow = host.attachShadow({ mode: 'open' });
     const container = document.createElement('div');
-    document.body.append(container);
+    shadow.append(container);
     const root = createRoot(container);
+    const disposeBridge = bridged ? installContentUiActivationBridge(shadow) : () => {};
     act(() => {
       root.render(
         <ToolbarShellContent
@@ -99,11 +109,19 @@ describe('ToolbarShellContent', () => {
       button.addEventListener('click', click);
       toolbar?.append(button);
       button.focus();
-      const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+      expect(shadow.activeElement).toBe(button);
+      const press = new MouseEvent(bridged ? 'pointerdown' : 'mousedown', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        button: 0,
+      });
       act(() => icon.dispatchEvent(press));
-      expect(document.activeElement).not.toBe(button);
-      expect(press.defaultPrevented).toBe(false);
-      act(() => button.click());
+      expect(shadow.activeElement).not.toBe(button);
+      if (!bridged) {
+        expect(press.defaultPrevented).toBe(true);
+        act(() => button.click());
+      }
     }
     expect(click).toHaveBeenCalledTimes(6);
 
@@ -111,15 +129,21 @@ describe('ToolbarShellContent', () => {
     toolbar?.append(input);
     input.focus();
     act(() => input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })));
-    expect(document.activeElement).toBe(input);
+    expect(shadow.activeElement).toBe(input);
 
     const button = toolbar?.querySelector<HTMLButtonElement>('button');
     button?.focus();
     act(() => button?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 })));
-    expect(document.activeElement).toBe(button);
+    expect(shadow.activeElement).toBe(button);
 
+    // Keyboard activation has no mousedown and must retain the focused button.
+    act(() => button?.click());
+    expect(shadow.activeElement).toBe(button);
+    expect(click).toHaveBeenCalledTimes(7);
+
+    disposeBridge();
     act(() => root.unmount());
-    container.remove();
+    host.remove();
   });
 
   it('starts toolbar dragging from pointerdown', () => {
