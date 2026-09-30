@@ -275,7 +275,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   const initialSummaries = Array.from(container?.querySelectorAll('summary') ?? []);
   expect(container?.firstElementChild?.className).toContain('shrink-0');
   for (const summary of initialSummaries) {
-    expect(summary.className).toContain('h-8');
+    expect(summary.className).toContain('h-7');
     expect(summary.className).toContain('mx-1.5');
     expect(summary.className).toContain('rounded-[var(--sniptale-radius-sm)]');
     expect(summary.className).toContain('hover:shadow-[6px_0_0_var(');
@@ -285,6 +285,9 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
     expect(chevron?.getAttribute('class')).toContain('group-open:rotate-0');
     expect(chevron?.getAttribute('class')).toContain('motion-reduce:transition-none');
   }
+  for (const section of Array.from(container?.querySelectorAll('details') ?? [])) {
+    expect(section.className).toContain('py-1');
+  }
   expect(initialSummaries[0]?.textContent).toContain(`${translate('gallery.app.facetSelected')} 2`);
   expect(initialSummaries[1]?.textContent).toContain('beta');
   expect(initialSummaries[1]?.textContent).not.toContain(
@@ -293,13 +296,12 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
 
   const labels = Array.from(container?.querySelectorAll('label') ?? []);
   const selectedLabel = labels.find((label) => label.textContent?.includes('beta'));
-  expect(selectedLabel?.className).toContain('relative');
+  expect(selectedLabel?.className).toContain('has-[:focus-visible]:ring-2');
   expect(selectedLabel?.className).not.toContain('focus-within:ring-2');
   expect(selectedLabel?.className).toContain('border-transparent');
   expect(selectedLabel?.className).not.toContain('bg-[var(--sniptale-color-surface-hover)]');
-  const hoverSurface = selectedLabel?.querySelector(':scope > span[aria-hidden="true"]');
-  expect(hoverSurface?.className).toContain('inset-x-1.5 inset-y-1');
-  expect(hoverSurface?.className).toContain('group-hover:bg-[var(--sniptale-color-surface-hover)]');
+  expect(selectedLabel?.querySelector(':scope > span[class*="pointer-events-none"]')).toBeNull();
+  expect(selectedLabel?.className).not.toContain('group-hover:');
   expect(selectedLabel?.querySelector('[aria-hidden="true"]')?.className).not.toContain('accent');
   click(labels.find((label) => label.textContent?.includes('alpha')));
   click(labels.find((label) => label.textContent?.includes('Сохранённые')));
