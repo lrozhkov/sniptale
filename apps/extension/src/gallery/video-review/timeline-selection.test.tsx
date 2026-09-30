@@ -32,6 +32,9 @@ function renderLane(args: {
   onChangeEdit: (edit: ReviewEdit, range: ReviewAnchor) => void;
   time: number;
   selection: ReviewAnchor;
+  boundaries?: number[];
+  snapToKeyframes?: boolean;
+  plane?: { left: number; width: number };
 }) {
   act(() => {
     root.render(
@@ -41,7 +44,8 @@ function renderLane(args: {
         selection={args.selection}
         annotations={[]}
         edits={args.edits}
-        boundaries={[0, 2, 4, 6, 8, 10]}
+        boundaries={args.boundaries ?? [0, 2, 4, 6, 8, 10]}
+        {...(args.snapToKeyframes ? { snapToKeyframes: true } : {})}
         onEdit={vi.fn()}
         onChangeEdit={args.onChangeEdit}
         onSeek={vi.fn()}
@@ -51,7 +55,9 @@ function renderLane(args: {
     );
   });
   const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
-  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 48));
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(args.plane?.left ?? 0, 0, args.plane?.width ?? 1000, 48)
+  );
   const button = lane.querySelector<HTMLButtonElement>('button')!;
   const block = button.parentElement!;
   Object.assign(block, {
@@ -177,6 +183,99 @@ it('snaps boundary drags to candidates inside the pixel threshold with a shift b
   await lane.event(lane.block, 'pointermove', 605, { shiftKey: true });
   await lane.event(lane.block, 'pointerup', 605);
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6.05 });
+});
+
+it('keeps a whole source edit at its original width when only one edge meets a magnet', async () => {
+  const change = vi.fn();
+  const edit = cut(2, 4);
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 5,
+    selection: { kind: 'point', time: 5 },
+  });
+  await lane.event(lane.block, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 305);
+  expect(lane.block.style.left).toBe('30%');
+  expect(lane.block.style.width).toBe('20%');
+  await lane.event(lane.block, 'pointerup', 305);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 3, end: 5 });
+
+  await lane.event(lane.block, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 305, { shiftKey: true });
+  expect(parseFloat(lane.block.style.width)).toBeCloseTo(20);
+  await lane.event(lane.block, 'pointerup', 305);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 3.05, end: 5.05 });
+});
+
+it('keeps a basic edit in place when the target keyframe has no equal-length partner', async () => {
+  const change = vi.fn();
+  const edit = cut(0, 2);
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    boundaries: [0, 2, 4, 7, 9, 10],
+    snapToKeyframes: true,
+  });
+  await lane.event(lane.block, 'pointerdown', 0);
+  await lane.event(lane.block, 'pointermove', 400);
+  expect(lane.block.style.left).toBe('0%');
+  expect(lane.block.style.width).toBe('20%');
+  await lane.event(lane.block, 'pointerup', 400);
+  expect(change).not.toHaveBeenCalled();
+  await lane.event(lane.block, 'pointerdown', 0);
+  await lane.event(lane.block, 'pointermove', 700);
+  expect(lane.block.style.left).toBe('70%');
+  expect(lane.block.style.width).toBe('20%');
+  await lane.event(lane.block, 'pointerup', 700);
+  expect(change).toHaveBeenCalledWith(edit, { kind: 'range', start: 7, end: 9 });
+});
+
+it.each([
+  { left: 0, width: 500, travel: 124.5 },
+  { left: -240, width: 1500, travel: 373.5 },
+])('moves a speed block near the track end at width $width and scroll $left', async (plane) => {
+  const change = vi.fn();
+  const edit: ReviewEdit = {
+    ...cut(5.5, 7.5),
+    kind: 'speed',
+    rate: 2,
+    audio: 'speed',
+  };
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    boundaries: [8.01, 9.95],
+    plane,
+  });
+  await lane.event(lane.block, 'pointerdown', 0);
+  await lane.event(lane.block, 'pointermove', plane.travel);
+  expect(Number.parseFloat(lane.block.style.width)).toBeCloseTo(20);
+  expect(Number.parseFloat(lane.block.style.left)).toBeCloseTo(79.5);
+  await lane.event(lane.block, 'pointerup', plane.travel);
+  const committed = change.mock.calls[0]?.[1] as ReviewAnchor;
+  expect(committed.kind).toBe('range');
+  if (committed.kind === 'range') {
+    expect(committed.start).toBeCloseTo(7.95);
+    expect(committed.end).toBeCloseTo(9.95);
+    expect(committed.end - committed.start).toBeCloseTo(2);
+  }
+  renderLane({
+    edits: [{ ...edit, start: 7.95, end: 9.95 }],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    plane,
+  });
+  expect(
+    Number.parseFloat(
+      host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.editBlock"]')!.style.width
+    )
+  ).toBeCloseTo(20);
 });
 
 it('keeps resize geometry while a deferred commit is pending and restores it on rejection', async () => {

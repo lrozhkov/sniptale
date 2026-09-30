@@ -5,6 +5,44 @@ import { expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { useReviewEdits } from './use-edits';
 
+it('refuses a whole move when independent keyframe snapping would resize the edit', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  const existing: ReviewEdit = {
+    id: 'cut',
+    kind: 'cut',
+    start: 0,
+    end: 2,
+    requestedStart: 0,
+    requestedEnd: 2,
+  };
+  const commit = vi.fn(async () => true);
+  let hook!: ReturnType<typeof useReviewEdits>;
+  function Harness() {
+    hook = useReviewEdits({
+      duration: 10,
+      boundaries: [0, 2, 4, 7, 9, 10],
+      snapToKeyframes: true,
+      edits: [existing],
+      pause: vi.fn(),
+      seek: vi.fn(),
+      setSelection: vi.fn(),
+      commit,
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    await act(async () => hook.commitRange({ kind: 'range', start: 4, end: 6 }, existing));
+    expect(commit).not.toHaveBeenCalled();
+    await act(async () => hook.commitRange({ kind: 'range', start: 7, end: 9 }, existing));
+    expect(commit).toHaveBeenCalledWith(existing, expect.objectContaining({ start: 7, end: 9 }));
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
 it('keeps creation defaults separate from inspector edits and preserves both after a failed commit', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const root = createRoot(document.createElement('div'));

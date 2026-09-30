@@ -3,6 +3,7 @@ import {
   createReviewCut,
   createReviewSpeed,
   nearestReviewBoundary,
+  placeReviewEditMove,
   reviewPlaybackTime,
   reviewPlaybackSettings,
 } from './cuts';
@@ -32,6 +33,22 @@ it('supports full-video speed and source-aligned sound policy without allowing o
   const cut = { ...createReviewCut(input)!, start: 0, end: 2 };
   expect(reviewPlaybackSettings(1, [cut, speed])).toEqual({ time: 2, rate: 2, muted: true });
   expect(reviewPlaybackSettings(4, [cut, speed])).toEqual({ time: 4, rate: 1, muted: false });
+});
+
+it('places a whole edit only on a safe pair of the same length without same-kind overlap', () => {
+  const current = createReviewCut({ ...input, selection: { kind: 'range', start: 0, end: 2 } })!;
+  const context = {
+    current,
+    duration: 10,
+    boundaries: [0, 2, 4, 7, 9, 10],
+    edits: [current],
+  };
+  expect(placeReviewEditMove({ ...context, requestedStart: 4 })).toEqual({ start: 0, end: 2 });
+  expect(placeReviewEditMove({ ...context, requestedStart: 7.1 })).toEqual({ start: 7, end: 9 });
+  const neighbor = { ...current, id: 'neighbor', start: 7, end: 9 };
+  expect(
+    placeReviewEditMove({ ...context, edits: [current, neighbor], requestedStart: 7 })
+  ).toEqual({ start: 0, end: 2 });
 });
 it('snaps to real boundaries and preserves requested timing', () => {
   expect(createReviewCut(input)).toEqual({

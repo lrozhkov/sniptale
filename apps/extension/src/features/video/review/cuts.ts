@@ -12,6 +12,34 @@ export function nearestReviewBoundary(time: number, boundaries: readonly number[
   return nearest;
 }
 
+/** A body drag may land only where both safe boundaries retain its source duration. */
+export function placeReviewEditMove(args: {
+  current: ReviewEdit;
+  requestedStart: number;
+  boundaries: readonly number[];
+  duration: number;
+  edits: readonly ReviewEdit[];
+}): { start: number; end: number } {
+  const original = { start: args.current.start, end: args.current.end };
+  if (!Number.isFinite(args.requestedStart) || !args.boundaries.length) return original;
+  const start = nearestReviewBoundary(args.requestedStart, args.boundaries);
+  const end = start + args.current.end - args.current.start;
+  if (
+    start < 0 ||
+    end > args.duration ||
+    !args.boundaries.some((boundary) => Math.abs(boundary - end) < 0.000001) ||
+    args.edits.some(
+      (edit) =>
+        edit.id !== args.current.id &&
+        edit.kind === args.current.kind &&
+        edit.start < end &&
+        edit.end > start
+    )
+  )
+    return original;
+  return { start, end };
+}
+
 /** Returns a non-overlapping effective cut while preserving the user's requested interval. */
 export function createReviewCut(args: {
   id: string;

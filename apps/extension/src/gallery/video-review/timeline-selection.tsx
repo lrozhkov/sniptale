@@ -4,15 +4,11 @@ import { useRef, useState } from 'react';
 import { Film, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
-import {
-  SNAP_THRESHOLD_PX,
-  getSnapCandidates,
-  snapTimelineTime,
-} from '../../features/video/review/snap';
 import { reviewTimeLabel } from './controls';
 import { ReviewTrackRow } from './track-row';
 import { ReviewCommentMarkers } from './timeline-comment-markers';
 import { useReviewDragEscape } from './timeline-drag';
+import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
   duration: number;
@@ -22,6 +18,7 @@ type SelectionProps = {
   edits?: readonly ReviewEdit[];
   selectedEditId?: string | undefined;
   boundaries?: readonly number[];
+  snapToKeyframes?: boolean;
   onEdit?(edit: ReviewEdit): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onSeek(time: number): void;
@@ -130,32 +127,18 @@ function ReviewEditBlock(
       onPointerMove={(event) => {
         const current = drag.current;
         if (!current || current.width <= 0) return;
-        const delta = ((event.clientX - current.x) / current.width) * duration;
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
-        const length = edit.end - edit.start;
-        let start =
-          current.edge === 'end'
-            ? edit.start
-            : Math.max(
-                0,
-                Math.min(duration - (current.edge === 'move' ? length : 0), edit.start + delta)
-              );
-        let end =
-          current.edge === 'start'
-            ? edit.end
-            : current.edge === 'move'
-              ? start + length
-              : Math.max(0, Math.min(duration, edit.end + delta));
         const snapped = snapReviewEditDrag({
           edge: current.edge,
-          start,
-          end,
+          deltaPx: event.clientX - current.x,
           duration,
           widthPx: current.width,
           bypass: event.shiftKey,
           edits: props.edits,
           boundaries: props.boundaries,
           playhead: props.time,
+          current: edit,
+          keyframeMove: !!props.snapToKeyframes,
         });
         onSnap(snapped.guide);
         if (snapped.start < snapped.end) {
@@ -172,7 +155,11 @@ function ReviewEditBlock(
           event.currentTarget.releasePointerCapture(event.pointerId);
         committing.current = true;
         try {
-          if (current?.moved) await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
+          if (
+            current?.moved &&
+            (current.range.start !== edit.start || current.range.end !== edit.end)
+          )
+            await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
         } finally {
           committing.current = false;
           setPreview(null);
@@ -323,39 +310,4 @@ function ReviewEditEdge(props: {
       <span aria-hidden="true" className="h-4 w-px bg-current opacity-60" />
     </button>
   );
-}
-
-/** Trim snaps only the dragged edge; a whole-block move keeps both edges magnetic. */
-function snapReviewEditDrag(args: {
-  edge: 'start' | 'end' | 'move';
-  start: number;
-  end: number;
-  duration: number;
-  widthPx: number;
-  bypass: boolean;
-  edits: readonly ReviewEdit[] | undefined;
-  boundaries: readonly number[] | undefined;
-  playhead: number;
-}): { start: number; end: number; guide: number | null } {
-  if (args.bypass || !args.edits || args.widthPx <= 0)
-    return { start: args.start, end: args.end, guide: null };
-  const threshold = (SNAP_THRESHOLD_PX * args.duration) / args.widthPx;
-  const candidates = getSnapCandidates({
-    edits: args.edits,
-    playhead: args.playhead,
-    ...(args.boundaries ? { boundaries: args.boundaries } : {}),
-  });
-  let guide: number | null = null;
-  let { start, end } = args;
-  if (args.edge !== 'end') {
-    const snap = snapTimelineTime(start, candidates, threshold);
-    start = snap.time;
-    guide = snap.candidate;
-  }
-  if (args.edge !== 'start') {
-    const snap = snapTimelineTime(end, candidates, threshold);
-    end = snap.time;
-    guide = snap.candidate ?? guide;
-  }
-  return { start, end, guide };
 }

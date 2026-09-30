@@ -1,6 +1,10 @@
 import { useRef, useState } from 'react';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { createReviewCut, createReviewSpeed } from '../../features/video/review/cuts';
+import {
+  createReviewCut,
+  createReviewSpeed,
+  placeReviewEditMove,
+} from '../../features/video/review/cuts';
 
 type Speed = Extract<ReviewEdit, { kind: 'speed' }>;
 /** Each completed gesture or property change writes one reversible history operation. */
@@ -42,9 +46,22 @@ export function useReviewEdits(props: {
     selection: ReviewAnchor,
     before: ReviewEdit | null = null
   ) => {
+    const movedRange =
+      before &&
+      selection.kind === 'range' &&
+      props.snapToKeyframes !== false &&
+      Math.abs(selection.end - selection.start - (before.end - before.start)) < 0.000001
+        ? placeReviewEditMove({
+            current: before,
+            requestedStart: selection.start,
+            boundaries: props.boundaries ?? [],
+            duration: props.duration,
+            edits: props.edits,
+          })
+        : null;
     const range = {
       id: before?.id ?? 'pending-edit',
-      selection,
+      selection: movedRange ? { kind: 'range' as const, ...movedRange } : selection,
       boundaries: props.boundaries ?? [],
       snapToKeyframes: props.snapToKeyframes !== false,
       duration: props.duration,

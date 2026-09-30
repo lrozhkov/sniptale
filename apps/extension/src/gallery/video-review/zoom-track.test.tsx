@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomTrack } from './zoom-track';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { ReviewEdit } from '../../features/video/review/types';
+import { createTrackProjection } from './track-projection';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -55,6 +56,7 @@ function renderTrack(
     onLink?: (id: string, targetId: string | null) => void;
     onSelectLink?: (id: string) => void;
     linkSelectedId?: string | null;
+    projection?: ReturnType<typeof createTrackProjection>;
   }
 ) {
   act(() => {
@@ -66,6 +68,7 @@ function renderTrack(
         edits={overrides?.edits ?? edits}
         boundaries={[0, 2, 4, 6, 8, 10]}
         toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
+        projection={overrides?.projection}
         selectedId={null}
         onSelect={vi.fn()}
         onAdd={onAdd}
@@ -101,6 +104,43 @@ it('adds regions through the lane button', async () => {
   expect(onAdd).toHaveBeenCalledOnce();
 });
 
+it('keeps result duration while projected width changes across a speed segment', async () => {
+  const speed: ReviewEdit = {
+    id: 'speed',
+    kind: 'speed',
+    start: 2,
+    end: 6,
+    requestedStart: 2,
+    requestedEnd: 6,
+    rate: 2,
+    audio: 'speed',
+  };
+  const projection = createTrackProjection(10, [speed]);
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), null, {
+    projection,
+    toOutputTime: projection.output,
+  });
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  expect(block.style.width).toBe('20%');
+  await track.event(block, 'pointerdown', 0);
+  await track.event(block, 'pointermove', 300, true);
+  expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(35);
+  await track.event(block, 'pointerup', 300, true);
+  expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 4.5 }, 'move');
+  renderTrack([zoom('a', 2.5, 4.5)], commit, vi.fn(), null, {
+    projection,
+    toOutputTime: projection.output,
+  });
+  expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(35);
+});
+
 it('snaps to edit edges projected into result time (R03)', async () => {
   const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);
   const sourceEdits: ReviewEdit[] = [
@@ -119,6 +159,7 @@ it('snaps to edit edges projected into result time (R03)', async () => {
   });
   await track.event(first, 'pointerdown', 100);
   await track.event(first, 'pointermove', 400);
+  expect(Number.parseFloat(first.style.width)).toBeCloseTo(20);
   await track.event(first, 'pointerup', 400);
   // Source edge 6 projects to result 3: the move snaps there instead of 2.75.
   expect(commit).toHaveBeenLastCalledWith('a', { start: 3, end: 5 }, 'move');

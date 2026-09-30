@@ -179,7 +179,7 @@ export function ReviewTimeline(props: TimelineProps) {
                 />
               </ReviewTrackRow>
             ) : null}
-            <ReviewSourceLane {...props} />
+            <ReviewSourceLane {...props} snapToKeyframes={!!props.boundaries} />
           </div>
           <div
             aria-hidden="true"

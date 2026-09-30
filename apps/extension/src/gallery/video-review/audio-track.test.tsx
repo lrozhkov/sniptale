@@ -252,6 +252,47 @@ it('keeps the preview duration while moving near the timeline end (A3)', async (
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 8);
 });
 
+it('keeps music playback duration while its source-axis width changes at a speed segment', async () => {
+  const speed = {
+    id: 'speed',
+    kind: 'speed' as const,
+    start: 2,
+    end: 6,
+    requestedStart: 2,
+    requestedEnd: 6,
+    rate: 2 as const,
+    audio: 'speed' as const,
+  };
+  const projection = createTrackProjection(10, [speed]);
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [clip('music', 0, 2)],
+  };
+  const lanes = renderTrack(audio, false, [], true, undefined, projection);
+  const lane = lanes[2]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+  const send = (kind: string, x: number) =>
+    act(async () =>
+      block.dispatchEvent(
+        new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey: true })
+      )
+    );
+  await send('pointerdown', 0);
+  await send('pointermove', 300);
+  expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(35);
+  await send('pointerup', 300);
+  expect(onMoveClip).toHaveBeenCalledWith('music', 'music', 2.5);
+  renderTrack({ ...audio, music: [clip('music', 2.5, 2)] }, false, [], true, undefined, projection);
+  expect(
+    Number.parseFloat(lane.querySelector<HTMLElement>('[role="button"]')!.style.width)
+  ).toBeCloseTo(35);
+});
+
 it('discards a drag preview on pointer cancellation without committing it', async () => {
   const lanes = renderTrack({
     original: { muted: false, volume: 1 },
@@ -294,10 +335,12 @@ it('snaps audio placement to projected edit edges and allows Shift to bypass', a
     });
   await send('pointerdown', 0);
   await send('pointermove', 95);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   await send('pointerup', 95);
   expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 3);
   await send('pointerdown', 0);
   await send('pointermove', 95, true);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   await send('pointerup', 95, true);
   expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 2.95);
 });
@@ -394,6 +437,8 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
     block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 340 }))
   );
   expect(parseFloat(block.style.left)).toBeCloseTo(35);
+  expect(parseFloat(block.style.width)).toBeCloseTo(32.5);
+  expect(recording.duration).toBe(2);
   await act(async () =>
     block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 340 }))
   );
