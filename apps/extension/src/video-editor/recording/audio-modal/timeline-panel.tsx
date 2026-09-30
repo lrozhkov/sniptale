@@ -6,6 +6,7 @@ import { translate } from '../../../platform/i18n';
 import type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
 import { formatDurationLabel } from '../../../composition/audio-recording/format';
 import { renderAudioRecordingTrimPanel } from '../../../composition/audio-recording/dialog/trim';
+import { RecordingLevelMeter } from '../../../composition/audio-recording/dialog/level-meter';
 
 /** Transport and take review share one compact strip anchored to the recording interval. */
 export function TimelineRecordingPanel(props: {
@@ -27,7 +28,11 @@ export function TimelineRecordingPanel(props: {
   const paused = transport.status === 'paused';
   const busy = props.starting || props.saving;
   const recordButton = (
-    <ProductActionButton tone="secondary" disabled={busy} onClick={props.onStart}>
+    <ProductActionButton
+      tone={trim ? 'secondary' : 'primary'}
+      disabled={busy}
+      onClick={props.onStart}
+    >
       {trim ? <RotateCcw size={16} /> : <Mic size={16} />}
       {translate(trim ? 'videoEditor.app.recordAudioAgain' : 'videoEditor.app.recordAudioStart')}
     </ProductActionButton>
@@ -107,6 +112,7 @@ export function TimelineRecordingPanel(props: {
               )}
             </div>
           </div>
+          <RecordingLevelMeter meter={props.controller.meter} preparing={props.starting} />
         </>
       )}
       {renderAudioRecordingTrimPanel(

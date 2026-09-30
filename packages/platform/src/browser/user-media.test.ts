@@ -139,6 +139,47 @@ describe('user media adapter', () => {
     vi.useRealTimers();
   });
 
+  it('reports analyser activation failure and releases its context on construction failure', async () => {
+    const close = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        close = close;
+        createMediaStreamSource = () => {
+          throw new Error('source unavailable');
+        };
+      }
+    );
+    vi.stubGlobal('MediaStream', class {});
+    expect(() => observeMicrophoneLevel({} as MediaStreamTrack, vi.fn())).toThrow(
+      'source unavailable'
+    );
+    expect(close).toHaveBeenCalledOnce();
+
+    vi.useFakeTimers();
+    const source = { connect: vi.fn(), disconnect: vi.fn() };
+    const analyser = {
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      getByteTimeDomainData: vi.fn(),
+      disconnect: vi.fn(),
+    };
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        close = close;
+        createMediaStreamSource = () => source;
+        createAnalyser = () => analyser;
+        resume = vi.fn().mockRejectedValue(new Error('suspended'));
+      }
+    );
+    const unavailable = vi.fn();
+    const monitor = observeMicrophoneLevel({} as MediaStreamTrack, vi.fn(), unavailable);
+    await Promise.resolve();
+    expect(unavailable).toHaveBeenCalledOnce();
+    monitor.dispose();
+  });
+
   it.each([
     ['NotAllowedError', 'denied'],
     ['NotFoundError', 'no-device'],

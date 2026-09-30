@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { beginRecordingSession, recordingElapsed } from './capture';
 import { formatDurationLabel, resolveRecordingMimeType } from './format';
+import { useRecordingLevelSession } from './level-session';
 import type {
   AudioRecordingControllerState,
   AudioRecordingStatus,
@@ -288,6 +289,7 @@ export function useAudioRecordingSession(
 ): AudioRecordingControllerState {
   const state = useAudioRecordingState();
   const refs = useAudioRecordingRefs();
+  const meter = useRecordingLevelSession(state.status, refs.streamRef);
   const resetSession = useRecordingReset(state, refs);
   useRecordingLifecycle(isOpen, resetSession, state);
   const playbackControls = useRecordingPlaybackControls(state, errors);
@@ -303,6 +305,7 @@ export function useAudioRecordingSession(
   const recordedDuration = Math.max(0, state.recordedDuration || state.durationSeconds);
 
   return {
+    meter,
     save: {
       audioBlob: state.audioBlob,
       resetSession,

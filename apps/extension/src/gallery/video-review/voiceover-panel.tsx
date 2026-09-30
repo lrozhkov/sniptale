@@ -7,6 +7,7 @@ import { useAudioRecordingDialogSession } from '../../composition/audio-recordin
 import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog-focus';
 import { AudioRecordingDeviceSelect } from '../../composition/audio-recording/dialog/controls';
 import { RecordingPlaybackChoice } from '../../composition/audio-recording/dialog/playback-choice';
+import { RecordingLevelMeter } from '../../composition/audio-recording/dialog/level-meter';
 import { renderAudioRecordingTrimPanel } from '../../composition/audio-recording/dialog/trim';
 import { formatDurationLabel } from '../../composition/audio-recording/format';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
@@ -139,6 +140,7 @@ export function ReviewVoiceoverRecording(props: {
               onLimitSeconds={setLimitSeconds}
             />
             <VoiceoverTransport session={session} remaining={remaining} limit={effectiveLimit} />
+            <RecordingLevelMeter meter={controller.meter} preparing={starting} />
           </>
         )}
         {starting ? <p role="status">{translate('videoEditor.app.recordAudioPreparing')}</p> : null}
@@ -164,7 +166,12 @@ function VoiceoverCaptureOptions(props: {
 }) {
   const disabled = props.session.starting || props.capturing;
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div
+      className={[
+        'flex flex-wrap items-center gap-2 rounded-md border p-2',
+        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
+      ].join(' ')}
+    >
       <div className="w-44 min-w-0">
         <AudioRecordingDeviceSelect
           value={props.session.deviceId}
@@ -177,18 +184,22 @@ function VoiceoverCaptureOptions(props: {
         disabled={disabled || props.session.isSaving}
         onChange={props.onPlayVideo}
       />
-      <div className="ml-auto flex items-center gap-2">
-        <label className="flex items-center gap-2 whitespace-nowrap text-xs">
-          <input
-            type="checkbox"
-            checked={props.limitEnabled}
-            disabled={disabled}
-            onChange={(event) => props.onLimitEnabled(event.target.checked)}
-          />
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <ProductActionButton
+          tone="toggle"
+          compact
+          active={props.limitEnabled}
+          aria-pressed={props.limitEnabled}
+          data-ui="audio-recording.duration-limit"
+          disabled={disabled || props.session.isSaving}
+          onClick={() => props.onLimitEnabled(!props.limitEnabled)}
+        >
           {translate('gallery.videoReview.voiceoverDurationLimit')}
-        </label>
+        </ProductActionButton>
         {props.limitEnabled ? (
           <ProductSelect
+            containerClassName="!w-24 shrink-0"
+            className="whitespace-nowrap"
             aria-label={translate('gallery.videoReview.voiceoverDurationLimit')}
             controlSize="sm"
             value={String(props.limitSeconds)}
@@ -242,7 +253,7 @@ function VoiceoverTransport(props: {
         </ProductActionButton>
       ) : (
         <ProductActionButton
-          tone="secondary"
+          tone="primary"
           disabled={props.session.starting || props.remaining <= 0}
           onClick={props.session.startRecording}
         >

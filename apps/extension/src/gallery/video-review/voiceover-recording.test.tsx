@@ -98,20 +98,28 @@ it('shows a bottom strip with an optional visible duration cap', () => {
   expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
   expect(modal!.textContent).toContain('videoEditor.app.recordAudioStart');
   expect(modal!.textContent).toContain('gallery.videoReview.voiceoverDurationLimit');
-  const limit = modal!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
-  expect(limit.checked).toBe(true);
+  const limit = modal!.querySelector<HTMLButtonElement>(
+    '[data-ui="audio-recording.duration-limit"]'
+  )!;
+  expect(limit.getAttribute('aria-pressed')).toBe('true');
+  const duration = [...modal!.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+    button.getAttribute('aria-label')?.includes('voiceoverDurationLimit')
+  );
+  expect(duration?.parentElement?.className).toContain('w-24');
+  expect(duration?.className).toContain('whitespace-nowrap');
+  expect(modal!.querySelector('input[type="checkbox"]')).toBeNull();
   act(() => limit.click());
-  expect(limit.checked).toBe(false);
+  expect(limit.getAttribute('aria-pressed')).toBe('false');
   expect(modal!.textContent).toContain('00:07');
 });
 
 it('offers a visible video playback choice before capture and keeps the placement visible', () => {
   renderRecording(true);
-  const playback = host.querySelector<HTMLInputElement>('[data-ui="audio-recording.play-video"]');
-  expect(playback?.checked).toBe(true);
+  const playback = host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.play-video"]');
+  expect(playback?.getAttribute('aria-pressed')).toBe('true');
   expect(host.textContent).toContain('00:03');
   act(() => playback?.click());
-  expect(playback?.checked).toBe(false);
+  expect(playback?.getAttribute('aria-pressed')).toBe('false');
 });
 
 it('stays closed when isOpen is false', () => {

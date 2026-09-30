@@ -5,6 +5,15 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useAudioRecordingSession } from './session';
 import type { AudioRecordingControllerState, AudioRecordingTimeline } from './session-types';
 
+const levelObserver = vi.hoisted(() => ({
+  observe: vi.fn(),
+  dispose: vi.fn(),
+  frame: null as null | ((frame: { level: number; peaks: number[] }) => void),
+}));
+vi.mock('@sniptale/platform/browser/user-media', () => ({
+  observeMicrophoneLevel: levelObserver.observe,
+}));
+
 const errors = {
   noSupport: 'unsupported',
   permissionDenied: 'denied',
@@ -46,7 +55,18 @@ beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('MediaRecorder', Recorder);
   stopped = vi.fn();
-  acquire = vi.fn().mockResolvedValue({ getTracks: () => [{ stop: stopped }] });
+  const track = Object.assign(new EventTarget(), {
+    stop: stopped,
+    enabled: true,
+    muted: false,
+    readyState: 'live',
+  });
+  acquire = vi.fn().mockResolvedValue({ getTracks: () => [track], getAudioTracks: () => [track] });
+  levelObserver.dispose.mockClear();
+  levelObserver.observe.mockReset().mockImplementation((_track, listener) => {
+    levelObserver.frame = listener;
+    return { dispose: levelObserver.dispose };
+  });
   vi.stubGlobal('navigator', { mediaDevices: { getUserMedia: acquire } });
   revoke = vi.fn();
   vi.stubGlobal('URL', { createObjectURL: () => 'blob:voice', revokeObjectURL: revoke });
@@ -121,6 +141,82 @@ it('retains captured audio for trim and retry then releases its URL on unmount',
   await act(async () => root.unmount());
   root = createRoot(host);
   expect(revoke).toHaveBeenCalledWith('blob:voice');
+});
+
+it('monitors the captured track, clears the level on pause, and disposes on stop', async () => {
+  await act(async () => latest.transport.startRecording());
+  expect(acquire).toHaveBeenCalledOnce();
+  const activeTrack = (
+    await acquire.mock.results[0]!.value
+  ).getAudioTracks()[0] as MediaStreamTrack;
+  expect(levelObserver.observe).toHaveBeenCalledWith(
+    activeTrack,
+    expect.any(Function),
+    expect.any(Function)
+  );
+  await act(async () => levelObserver.frame?.({ level: 0.4, peaks: [0.4] }));
+  expect(latest.meter.status).toBe('voice');
+  await act(async () => levelObserver.frame?.({ level: 0, peaks: [0] }));
+  expect(latest.meter.status).toBe('silence');
+  Object.defineProperty(activeTrack, 'muted', { value: true, configurable: true });
+  await act(async () => activeTrack.dispatchEvent(new Event('mute')));
+  expect(latest.meter.status).toBe('unavailable');
+  await act(async () => levelObserver.frame?.({ level: 0.5, peaks: [0.5] }));
+  expect(latest.meter.status).toBe('unavailable');
+  Object.defineProperty(activeTrack, 'muted', { value: false, configurable: true });
+  await act(async () => activeTrack.dispatchEvent(new Event('unmute')));
+  expect(latest.meter.status).toBe('listening');
+  await act(async () => latest.transport.pauseRecording());
+  expect(latest.meter.status).toBe('paused');
+  expect(latest.meter.level).toBe(0);
+  expect(levelObserver.dispose).toHaveBeenCalledOnce();
+  await act(async () => latest.transport.resumeRecording());
+  expect(levelObserver.observe).toHaveBeenCalledTimes(2);
+  await act(async () => levelObserver.frame?.({ level: 0.5, peaks: [0.5] }));
+  expect(latest.meter.status).toBe('voice');
+  await act(async () => latest.transport.stopRecording());
+  expect(levelObserver.dispose).toHaveBeenCalledTimes(2);
+  await act(async () => levelObserver.frame?.({ level: 0.5, peaks: [0.5] }));
+  expect(latest.meter.status).toBe('idle');
+});
+
+it('keeps recording when level analysis is unavailable', async () => {
+  levelObserver.observe.mockImplementation(() => {
+    throw new Error('analyser unavailable');
+  });
+  await act(async () => latest.transport.startRecording());
+  expect(latest.transport.status).toBe('recording');
+  expect(latest.meter.status).toBe('unavailable');
+  await act(async () => latest.transport.stopRecording());
+  expect(latest.save.audioBlob?.size).toBe(5);
+});
+
+it('does not announce silence after audio analysis fails to start', async () => {
+  await act(async () => latest.transport.startRecording());
+  const unavailable = levelObserver.observe.mock.calls[0]?.[2] as () => void;
+  await act(async () => unavailable());
+  expect(latest.meter.status).toBe('unavailable');
+  await act(async () => levelObserver.frame?.({ level: 0, peaks: [0] }));
+  expect(latest.meter.status).toBe('unavailable');
+  expect(latest.transport.status).toBe('recording');
+});
+
+it('recovers the live meter when a microphone starts muted and later unmutes', async () => {
+  const track = Object.assign(new EventTarget(), {
+    stop: stopped,
+    enabled: true,
+    muted: true,
+    readyState: 'live',
+  });
+  const stream = { getTracks: () => [track], getAudioTracks: () => [track] };
+  acquire.mockResolvedValue(stream);
+  acquire.mockClear();
+  await act(async () => latest.transport.startRecording());
+  expect(latest.meter.status).toBe('unavailable');
+  Object.defineProperty(track, 'muted', { value: false, configurable: true });
+  await act(async () => track.dispatchEvent(new Event('unmute')));
+  await act(async () => levelObserver.frame?.({ level: 0.5, peaks: [0.5] }));
+  expect(latest.meter.status).toBe('voice');
 });
 
 it('excludes paused wall time and can stop a paused recording', async () => {

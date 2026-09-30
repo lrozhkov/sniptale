@@ -1,4 +1,6 @@
 import { translate } from '../../../platform/i18n';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { Play } from 'lucide-react';
 
 /** Capture-only setting; preview sound stays silent while the microphone is live. */
 export function RecordingPlaybackChoice(props: {
@@ -7,15 +9,17 @@ export function RecordingPlaybackChoice(props: {
   onChange(checked: boolean): void;
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs">
-      <input
-        type="checkbox"
-        data-ui="audio-recording.play-video"
-        checked={props.checked}
-        disabled={props.disabled}
-        onChange={(event) => props.onChange(event.target.checked)}
-      />
+    <ProductActionButton
+      tone="toggle"
+      compact
+      active={props.checked}
+      data-ui="audio-recording.play-video"
+      aria-pressed={props.checked}
+      disabled={props.disabled}
+      onClick={() => props.onChange(!props.checked)}
+    >
+      <Play size={14} aria-hidden="true" />
       {translate('videoEditor.app.recordAudioPlayVideo')}
-    </label>
+    </ProductActionButton>
   );
 }

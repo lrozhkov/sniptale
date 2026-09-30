@@ -1,5 +1,10 @@
 import type React from 'react';
 export type AudioRecordingStatus = 'idle' | 'recording' | 'paused' | 'recorded';
+export interface AudioRecordingMeter {
+  status: 'idle' | 'listening' | 'voice' | 'silence' | 'paused' | 'unavailable';
+  level: number;
+  peaks: readonly number[];
+}
 export interface AudioTrimRange {
   trimStart: number;
   trimEnd: number;
@@ -88,6 +93,7 @@ export interface AudioRecordingTrimController {
 }
 
 export interface AudioRecordingControllerState {
+  meter: AudioRecordingMeter;
   save: AudioRecordingSaveController;
   transport: AudioRecordingTransportController;
   trim: AudioRecordingTrimController | null;
