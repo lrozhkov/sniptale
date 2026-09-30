@@ -5,6 +5,31 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ContextMenuTree } from '../../../../../contracts/settings/context-menu-layout';
 import { ContextMenuTreeView } from './context-menu-tree';
 
+vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
+  ProductConfirmDialog: ({
+    title,
+    message,
+    onConfirm,
+    onCancel,
+  }: {
+    title: string;
+    message: string;
+    onConfirm(): void;
+    onCancel(): void;
+  }) => (
+    <div role="dialog">
+      <h2>{title}</h2>
+      <p>{message}</p>
+      <button type="button" onClick={onConfirm}>
+        Confirm removal
+      </button>
+      <button type="button" onClick={onCancel}>
+        Cancel removal
+      </button>
+    </div>
+  ),
+}));
+
 const initial: ContextMenuTree = {
   version: 2,
   nodes: [
@@ -23,13 +48,13 @@ const catalog = [
   { command: 'sniptale.settings', label: 'Settings', group: 'Open', available: true },
   { command: 'sniptale.gallery', label: 'Gallery', group: 'Open', available: true },
   { command: 'sniptale.video.tab', label: 'Tab video', group: 'Video', available: true },
+  { command: 'sniptale.export.start', label: 'Export', group: 'Export', available: true },
 ];
 let container: HTMLDivElement;
 let root: Root;
 let latest: ContextMenuTree;
-
-function Harness() {
-  const [tree, setTree] = useState(initial);
+function Harness({ start = initial }: { start?: ContextMenuTree }) {
+  const [tree, setTree] = useState(start);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   latest = tree;
@@ -47,7 +72,6 @@ function Harness() {
     />
   );
 }
-
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
@@ -60,56 +84,48 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
 });
-
 function row(key: string): HTMLElement {
-  const found = [...container.querySelectorAll<HTMLElement>('[role="treeitem"]')].find(
-    (entry) => entry.dataset['treeKey'] === key
-  );
+  const found = container.querySelector<HTMLElement>(`[data-tree-key="${key}"]`);
   if (!found) throw new Error(`Missing row ${key}`);
   return found;
 }
-async function click(label: string) {
-  const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
-    (entry) => entry.getAttribute('aria-label') === label || entry.textContent?.trim() === label
+async function key(target: HTMLElement, value: string, altKey = false) {
+  await act(async () =>
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: value, altKey, bubbles: true }))
   );
-  if (!button) throw new Error(`Missing button ${label}`);
-  await act(async () => button.click());
+}
+async function click(label: string) {
+  const found = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.getAttribute('aria-label') === label || button.textContent?.trim() === label
+  );
+  if (!found) throw new Error(`Missing button ${label}`);
+  await act(async () => found.click());
 }
 
-it('navigates visible nodes with arrows and preserves focus after keyboard-equivalent moves', async () => {
-  const settings = row('command:sniptale.settings');
-  await act(async () => settings.focus());
-  await act(async () =>
-    settings.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
-  );
+it('keeps tree arrow navigation and uses Alt+arrows for movement without move buttons', async () => {
+  await act(async () => row('command:sniptale.settings').focus());
+  await key(row('command:sniptale.settings'), 'ArrowDown');
   expect(document.activeElement).toBe(row('section:tools'));
-  await act(async () =>
-    row('section:tools').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
-    )
-  );
-  expect(row('command:sniptale.gallery')).toBeTruthy();
-  await act(async () =>
-    row('section:tools').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
-    )
-  );
+  await key(row('section:tools'), 'ArrowRight');
+  await key(row('section:tools'), 'ArrowRight');
   expect(document.activeElement).toBe(row('command:sniptale.gallery'));
-  await click('Move out of section: Gallery');
-  expect(latest.nodes.map((node) => (node.type === 'section' ? node.id : node.command))).toEqual([
-    'sniptale.settings',
-    'tools',
-    'sniptale.gallery',
-    'sniptale.video.tab',
-  ]);
-  expect(document.activeElement).toBe(row('command:sniptale.gallery'));
-  await click('Move into section: Gallery');
-  expect(latest.nodes[1]).toMatchObject({ children: [{ command: 'sniptale.gallery' }] });
-  expect(document.activeElement).toBe(row('command:sniptale.gallery'));
+  await key(row('command:sniptale.gallery'), 'ArrowLeft');
+  expect(document.activeElement).toBe(row('section:tools'));
+  expect(container.querySelector('button[aria-label^="Move up"]')).toBeNull();
+  await key(row('command:sniptale.video.tab'), 'ArrowUp', true);
+  expect(latest.nodes[1]).toMatchObject({ command: 'sniptale.video.tab' });
+  await key(row('command:sniptale.video.tab'), 'ArrowDown', true);
+  expect(latest.nodes[2]).toMatchObject({ command: 'sniptale.video.tab' });
 });
 
-it('commits a valid pointer drop and rejects section nesting', async () => {
-  const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn() };
+it('accepts pointer nesting, rejects self drops and allows an empty root drop target', async () => {
+  const dataTransfer = {
+    effectAllowed: '',
+    dropEffect: '',
+    setData: vi.fn(),
+    getData: () => '',
+    types: ['text/plain'],
+  };
   const source = row('command:sniptale.video.tab').querySelector('[draggable]')!;
   const target = row('section:tools');
   vi.spyOn(target, 'getBoundingClientRect').mockReturnValue({
@@ -150,7 +166,7 @@ it('commits a valid pointer drop and rejects section nesting', async () => {
     )
   );
   await act(async () =>
-    row('section:tools').dispatchEvent(
+    target.dispatchEvent(
       Object.assign(new Event('dragover', { bubbles: true, cancelable: true }), {
         dataTransfer,
         clientX: 100,
@@ -161,101 +177,153 @@ it('commits a valid pointer drop and rejects section nesting', async () => {
   expect(dataTransfer.dropEffect).toBe('none');
 });
 
-it('supports boundary navigation, disclosure, enablement, and adjacent reorder', async () => {
-  await act(async () => row('section:tools').focus());
-  await act(async () =>
-    row('section:tools').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
-  );
-  expect(document.activeElement).toBe(row('command:sniptale.settings'));
-  await act(async () =>
-    row('command:sniptale.settings').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'End', bubbles: true })
-    )
-  );
-  expect(document.activeElement).toBe(row('command:sniptale.video.tab'));
-  await act(async () =>
-    row('command:sniptale.video.tab').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
-    )
-  );
-  expect(latest.nodes[2]).toMatchObject({ enabled: false });
-  await click('Move up: Tab video');
-  expect(latest.nodes[1]).toMatchObject({ command: 'sniptale.video.tab' });
-  await click('Move down: Tab video');
-  expect(latest.nodes[2]).toMatchObject({ command: 'sniptale.video.tab' });
-  await act(async () =>
-    row('section:tools').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
-    )
-  );
-  await act(async () =>
-    row('command:sniptale.gallery').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })
-    )
-  );
-  expect(document.activeElement).toBe(row('section:tools'));
-});
-
-it('removes a section while preserving its commands in the parent menu', async () => {
-  await click('Remove section and move items to main menu: Tools');
-  expect(latest.nodes.map((node) => (node.type === 'section' ? node.id : node.command))).toEqual([
+it('confirms section removal and moves descendants to its parent without loss', async () => {
+  await click('Remove section and move actions to its parent: Tools');
+  expect(container.querySelector('[role="dialog"]')).toBeTruthy();
+  expect(latest.nodes[1]).toMatchObject({ id: 'tools' });
+  await click('Confirm removal');
+  expect(latest.nodes.map((node) => (node.type === 'command' ? node.command : node.id))).toEqual([
     'sniptale.settings',
     'sniptale.gallery',
     'sniptale.video.tab',
   ]);
-  expect(
-    [...container.querySelectorAll<HTMLElement>('[role="treeitem"][aria-selected="true"]')].map(
-      (entry) => entry.dataset['treeKey']
-    )
-  ).toEqual(['command:sniptale.gallery']);
 });
 
-it('restores a keyboard tab stop after cancelling a new section by Escape or empty name', async () => {
+it('creates a section inside a selected section and commits its name before saving', async () => {
+  await act(async () => row('section:tools').focus());
   await click('Create section here');
-  const firstInput = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
-  await act(async () =>
-    firstInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  );
-  expect(container.querySelector('input[aria-label="Section name"]')).toBeNull();
-  expect(row('command:sniptale.video.tab').tabIndex).toBe(0);
-  expect(document.activeElement).toBe(row('command:sniptale.video.tab'));
-
-  await click('Create section here');
-  const secondInput = container.querySelector<HTMLInputElement>(
-    'input[aria-label="Section name"]'
-  )!;
-  await act(async () =>
-    secondInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-  );
-  expect(container.querySelector('input[aria-label="Section name"]')).toBeNull();
-  expect(row('command:sniptale.video.tab').tabIndex).toBe(0);
-});
-
-it('returns focus to an existing section after cancelling or clearing its rename', async () => {
-  await click('Rename: Tools');
-  const firstInput = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
-  await act(async () =>
-    firstInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
-  );
-  expect(document.activeElement).toBe(row('section:tools'));
-
-  await click('Rename: Tools');
-  const secondInput = container.querySelector<HTMLInputElement>(
-    'input[aria-label="Section name"]'
-  )!;
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
   await act(async () => {
-    secondInput.value = '';
-    secondInput.dispatchEvent(new Event('input', { bubbles: true }));
-    secondInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(input, 'Nested');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   });
-  expect(latest.nodes[1]).toMatchObject({ title: 'Tools' });
-  expect(document.activeElement).toBe(row('section:tools'));
+  expect(latest.nodes[1]).toMatchObject({
+    children: [{ command: 'sniptale.gallery' }, { type: 'section', title: 'Nested' }],
+  });
 });
 
-it('moves focus to the section when collapsing its selected child', async () => {
-  await click('Expand: Tools');
-  await act(async () => row('command:sniptale.gallery').focus());
-  await click('Collapse: Tools');
-  expect(row('section:tools').tabIndex).toBe(0);
-  expect(document.activeElement).toBe(row('section:tools'));
+it('renames an existing section with F2 without permanent row controls', async () => {
+  await key(row('section:tools'), 'F2');
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(input, 'Tools updated');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(latest.nodes[1]).toMatchObject({ id: 'tools', title: 'Tools updated' });
+});
+
+it('renames a section with a pointer double-click', async () => {
+  await act(async () =>
+    row('section:tools')
+      .querySelector('[title="Tools"]')
+      ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+  );
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
+  expect(input?.value).toBe('Tools');
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(input, 'Pointer tools');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+  expect(latest.nodes[1]).toMatchObject({ title: 'Pointer tools' });
+});
+
+it('does not turn a displayed command label into a title override on pointer blur', async () => {
+  await act(async () =>
+    row('command:sniptale.settings')
+      .querySelector('[title="Settings"]')
+      ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+  );
+  const input = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
+  expect(input.value).toBe('');
+  expect(input.placeholder).toBe('Settings');
+  await act(async () => input.blur());
+  expect(latest.nodes[0]).toMatchObject({ command: 'sniptale.settings' });
+  expect(latest.nodes[0]).not.toHaveProperty('title');
+});
+
+it('moves keyboard focus to the first rendered child when an earlier child is disabled', async () => {
+  const start: ContextMenuTree = {
+    version: 2,
+    nodes: [
+      {
+        type: 'section',
+        id: 'tools',
+        title: 'Tools',
+        enabled: true,
+        children: [
+          { type: 'command', command: 'sniptale.gallery', enabled: false },
+          { type: 'command', command: 'sniptale.settings', enabled: true },
+        ],
+      },
+    ],
+  };
+  await act(async () => root.render(<Harness key="disabled-child" start={start} />));
+  await act(async () => row('section:tools').focus());
+  await key(row('section:tools'), 'ArrowRight');
+  await key(row('section:tools'), 'ArrowRight');
+  expect(document.activeElement).toBe(row('command:sniptale.settings'));
+});
+
+it('offers one-time recovery when an imported section is disabled and empty', async () => {
+  const start: ContextMenuTree = {
+    version: 2,
+    nodes: [{ type: 'section', id: 'hidden', title: 'Hidden', enabled: false, children: [] }],
+  };
+  await act(async () => root.render(<Harness key="hidden" start={start} />));
+  expect(container.querySelector('[data-tree-key="section:hidden"]')).toBeNull();
+  await click('Restore hidden sections');
+  expect(row('section:hidden')).toBeTruthy();
+  expect(container.textContent).not.toContain('Restore hidden sections');
+});
+
+it('accepts an available catalog action at the chosen drop position and rejects unknown drag data', async () => {
+  const target = row('section:tools');
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 300,
+    height: 40,
+    right: 300,
+    bottom: 40,
+    x: 0,
+    y: 0,
+    toJSON: () => undefined,
+  });
+  const drag = async (command: string) => {
+    const dataTransfer = {
+      effectAllowed: '',
+      dropEffect: '',
+      setData: vi.fn(),
+      getData: () => `command:${command}`,
+      types: ['text/plain'],
+    };
+    await act(async () =>
+      target.dispatchEvent(
+        Object.assign(new Event('dragover', { bubbles: true, cancelable: true }), {
+          dataTransfer,
+          clientX: 100,
+          clientY: 20,
+        })
+      )
+    );
+    await act(async () =>
+      target.dispatchEvent(
+        Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer })
+      )
+    );
+  };
+  await drag('sniptale.export.start');
+  expect(latest.nodes[1]).toMatchObject({
+    children: [{ command: 'sniptale.gallery' }, { command: 'sniptale.export.start' }],
+  });
+  await drag('sniptale.screenshots.prepare');
+  expect(latest.nodes[1]).toMatchObject({
+    children: [{ command: 'sniptale.gallery' }, { command: 'sniptale.export.start' }],
+  });
 });

@@ -1,11 +1,13 @@
 import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
 import { translate } from '../../../platform/i18n';
+import { contextMenuSectionTitle } from '../../../platform/i18n/context-menu-section-title';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
 import { getViewportPresetDisplayName } from '../../../features/viewport-presets/display-name';
 import {
   isContextMenuCommandAvailable,
   parseContextMenuTree,
   resolveContextMenuTree,
+  type ContextMenuTreeNode,
 } from '../../../contracts/settings/context-menu-layout';
 import type { ContextMenuSettings, QuickAction, ViewportPreset } from '../../../contracts/settings';
 import {
@@ -97,17 +99,25 @@ export function buildContextMenuDescriptors(args: {
     descriptors.push({ id: node.command, parentId, title });
     return true;
   };
-  for (const node of tree.nodes) {
+  const appendNode = (node: ContextMenuTreeNode, parentId: string): boolean => {
     if (node.type === 'command') {
-      appendCommand(node, CONTEXT_MENU_ROOT_ID);
-      continue;
+      return appendCommand(node, parentId);
     }
-    if (!node.enabled) continue;
-    const parentId = `sniptale.section.${node.id}`;
+    if (!node.enabled) return false;
+    const sectionId = `sniptale.section.${node.id}`;
     const parentIndex = descriptors.length;
-    descriptors.push({ id: parentId, parentId: CONTEXT_MENU_ROOT_ID, title: node.title });
-    for (const child of node.children) appendCommand(child, parentId);
-    if (descriptors.length === parentIndex + 1) descriptors.pop();
-  }
+    descriptors.push({
+      id: sectionId,
+      parentId,
+      title: contextMenuSectionTitle(node.id, node.title),
+    });
+    for (const child of node.children) appendNode(child, sectionId);
+    if (descriptors.length === parentIndex + 1) {
+      descriptors.pop();
+      return false;
+    }
+    return true;
+  };
+  for (const node of tree.nodes) appendNode(node, CONTEXT_MENU_ROOT_ID);
   return descriptors;
 }

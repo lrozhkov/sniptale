@@ -1,4 +1,3 @@
-import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
 import { parseSettingsTransferPackageText } from '../../../contracts/settings-transfer';
 vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
@@ -661,7 +660,26 @@ function settingsFixture() {
 }
 
 it('exports the complete menu layout in interface preferences and preserves it on revalidation', async () => {
-  const layout = createContextMenuLayout();
+  const layout = {
+    version: 2 as const,
+    nodes: [
+      {
+        type: 'section' as const,
+        id: 'custom',
+        title: 'Custom',
+        enabled: true,
+        children: [
+          {
+            type: 'section' as const,
+            id: 'nested',
+            title: 'Nested',
+            enabled: true,
+            children: [{ type: 'command' as const, command: 'sniptale.gallery', enabled: true }],
+          },
+        ],
+      },
+    ],
+  };
   mocks.settings.mockResolvedValue({
     ...settingsFixture(),
     contextMenu: { enabled: true, layout },

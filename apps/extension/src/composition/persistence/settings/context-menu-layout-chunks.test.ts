@@ -10,11 +10,27 @@ import {
 it('round-trips a large tree through individually quota-safe sync items', async () => {
   const layout: ContextMenuTree = {
     version: 2,
-    nodes: Array.from({ length: 100 }, (_, index) => ({
-      type: 'command',
-      command: `sniptale.screenshots.quick-action.action-${index}`,
-      enabled: true,
-    })),
+    nodes: [
+      {
+        type: 'section',
+        id: 'screenshots',
+        title: 'Screenshots',
+        enabled: true,
+        children: [
+          {
+            type: 'section',
+            id: 'quick-actions',
+            title: 'Quick actions',
+            enabled: true,
+            children: Array.from({ length: 100 }, (_, index) => ({
+              type: 'command' as const,
+              command: `sniptale.screenshots.quick-action.action-${index}`,
+              enabled: true,
+            })),
+          },
+        ],
+      },
+    ],
   };
   const { manifest, values } = await encodeContextMenuLayoutChunks(layout);
   expect(parseContextMenuLayoutChunkManifest(manifest)).toEqual(manifest);

@@ -87,7 +87,7 @@ export interface ContextMenuSectionNode {
   id: string;
   title: string;
   enabled: boolean;
-  children: ContextMenuCommandNode[];
+  children: ContextMenuTreeNode[];
 }
 export type ContextMenuTreeNode = ContextMenuSectionNode | ContextMenuCommandNode;
 export interface ContextMenuTree {
@@ -96,8 +96,9 @@ export interface ContextMenuTree {
 }
 export type ContextMenuLayout = LegacyContextMenuLayout | ContextMenuTree;
 
-export const CONTEXT_MENU_MAX_SECTIONS = 9;
+export const CONTEXT_MENU_MAX_SECTIONS = 64;
 export const CONTEXT_MENU_MAX_NODES = 1024;
+const CONTEXT_MENU_MAX_DEPTH = 64;
 export const CONTEXT_MENU_SECTION_ID_PATTERN = /^[a-z][a-z0-9-]{0,31}$/;
 const QUICK_ACTION_PREFIX = 'sniptale.screenshots.quick-action.';
 const WINDOW_PRESET_PREFIX = 'sniptale.window-resize.preset.';
@@ -147,33 +148,43 @@ const commandSchema = z
     title: titleSchema.optional(),
   })
   .strict();
-const sectionSchema = z
-  .object({
-    type: z.literal('section'),
-    id: z
-      .string()
-      .regex(CONTEXT_MENU_SECTION_ID_PATTERN)
-      .refine((id) => id !== 'root'),
-    title: titleSchema,
-    enabled: z.boolean(),
-    children: z.array(commandSchema).max(CONTEXT_MENU_MAX_NODES),
-  })
-  .strict();
+const sectionSchema: z.ZodType<ContextMenuSectionNode> = z.lazy(() =>
+  z
+    .object({
+      type: z.literal('section'),
+      id: z
+        .string()
+        .regex(CONTEXT_MENU_SECTION_ID_PATTERN)
+        .refine((id) => id !== 'root'),
+      title: titleSchema,
+      enabled: z.boolean(),
+      children: z.array(nodeSchema).max(CONTEXT_MENU_MAX_NODES),
+    })
+    .strict()
+);
+const nodeSchema: z.ZodType<ContextMenuTreeNode> = z.lazy(() =>
+  z.union([commandSchema, sectionSchema])
+);
 const treeSchema = z
   .object({
     version: z.literal(2),
-    nodes: z.array(z.union([commandSchema, sectionSchema])).max(CONTEXT_MENU_MAX_NODES),
+    nodes: z.array(nodeSchema).max(CONTEXT_MENU_MAX_NODES),
   })
   .strict()
   .superRefine((tree, context) => {
-    const sections = tree.nodes.filter((node) => node.type === 'section');
-    const commands = tree.nodes.flatMap((node) =>
-      node.type === 'section' ? node.children : [node]
-    );
+    const sections: ContextMenuSectionNode[] = [];
+    const commands: ContextMenuCommandNode[] = [];
+    const pending = [...tree.nodes];
+    while (pending.length) {
+      const node = pending.pop()!;
+      if (node.type === 'section') {
+        sections.push(node);
+        pending.push(...node.children);
+      } else commands.push(node);
+    }
     if (
       sections.length > CONTEXT_MENU_MAX_SECTIONS ||
-      tree.nodes.length + sections.reduce((count, section) => count + section.children.length, 0) >
-        CONTEXT_MENU_MAX_NODES ||
+      sections.length + commands.length > CONTEXT_MENU_MAX_NODES ||
       new Set(sections.map((section) => section.id)).size !== sections.length ||
       new Set(commands.map((node) => node.command)).size !== commands.length
     )
@@ -181,8 +192,32 @@ const treeSchema = z
   });
 
 export function parseContextMenuTree(value: unknown): ContextMenuTree | null {
+  if (!isBoundedTree(value)) return null;
   const parsed = treeSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
+}
+
+function isBoundedTree(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const nodes = (value as { nodes?: unknown }).nodes;
+  if (!Array.isArray(nodes)) return false;
+  const pending: Array<{ node: unknown; depth: number }> = (nodes as unknown[]).map((node) => ({
+    node,
+    depth: 1,
+  }));
+  const seen = new Set<object>();
+  let count = 0;
+  while (pending.length) {
+    const { node, depth } = pending.pop()!;
+    if (!node || typeof node !== 'object' || Array.isArray(node) || seen.has(node)) return false;
+    if (depth > CONTEXT_MENU_MAX_DEPTH || ++count > CONTEXT_MENU_MAX_NODES) return false;
+    seen.add(node);
+    const children = (node as { children?: unknown }).children;
+    if (children === undefined) continue;
+    if (!Array.isArray(children)) return false;
+    for (const child of children) pending.push({ node: child, depth: depth + 1 });
+  }
+  return true;
 }
 
 /** Storage-only repair. Imported layouts must pass the strict parser instead. */
@@ -194,44 +229,63 @@ export function repairStoredContextMenuTree(value: unknown): ContextMenuTree | n
   const commandIds = new Set<string>();
   const sectionIds = new Set<string>();
   let nodeCount = 0;
-  const addCommand = (input: unknown, target: ContextMenuTreeNode[], parentEnabled = true) => {
-    if (nodeCount >= CONTEXT_MENU_MAX_NODES) return;
-    const parsed = commandSchema.safeParse(input);
-    if (!parsed.success || commandIds.has(parsed.data.command)) return;
-    commandIds.add(parsed.data.command);
-    target.push({ ...parsed.data, enabled: parsed.data.enabled && parentEnabled });
-    nodeCount += 1;
-  };
-  const storedNodes = candidate['nodes'] as unknown[];
-  for (const rawNode of storedNodes.slice(0, CONTEXT_MENU_MAX_NODES * 5)) {
-    if (!rawNode || typeof rawNode !== 'object' || Array.isArray(rawNode)) continue;
-    const node = rawNode as Record<string, unknown>;
+  const seen = new Set<object>();
+  let inspected = 0;
+  const visit = (
+    input: unknown,
+    target: ContextMenuTreeNode[],
+    parentEnabled: boolean,
+    depth: number
+  ) => {
+    if (
+      !input ||
+      typeof input !== 'object' ||
+      Array.isArray(input) ||
+      depth > CONTEXT_MENU_MAX_DEPTH ||
+      nodeCount >= CONTEXT_MENU_MAX_NODES ||
+      ++inspected > CONTEXT_MENU_MAX_NODES * 5 ||
+      seen.has(input)
+    )
+      return;
+    seen.add(input);
+    const node = input as Record<string, unknown>;
     if (node['type'] === 'command') {
-      addCommand(node, nodes);
-      continue;
+      const parsed = commandSchema.safeParse(node);
+      if (!parsed.success || commandIds.has(parsed.data.command)) return;
+      commandIds.add(parsed.data.command);
+      target.push({ ...parsed.data, enabled: parsed.data.enabled && parentEnabled });
+      nodeCount += 1;
+      return;
     }
-    if (node['type'] !== 'section') continue;
-    const children: unknown[] = Array.isArray(node['children'])
-      ? (node['children'] as unknown[]).slice(0, CONTEXT_MENU_MAX_NODES * 5)
-      : [];
+    if (node['type'] !== 'section') return;
     const header = sectionSchema.safeParse({ ...node, children: [] });
-    const canKeepSection =
+    const keep =
       header.success &&
       !sectionIds.has(header.data.id) &&
-      sectionIds.size < CONTEXT_MENU_MAX_SECTIONS &&
-      nodeCount < CONTEXT_MENU_MAX_NODES;
+      sectionIds.size < CONTEXT_MENU_MAX_SECTIONS;
     const section: ContextMenuSectionNode | null =
-      canKeepSection && header.success ? header.data : null;
+      keep && header.success
+        ? { ...header.data, enabled: header.data.enabled && parentEnabled }
+        : null;
     if (section) {
       sectionIds.add(section.id);
-      nodes.push(section);
+      target.push(section);
       nodeCount += 1;
     }
+    const children = Array.isArray(node['children'])
+      ? (node['children'] as unknown[]).slice(0, CONTEXT_MENU_MAX_NODES * 5)
+      : [];
     for (const child of children) {
-      if (section) addCommand(child, section.children);
-      else addCommand(child, nodes, node['enabled'] === true);
+      visit(
+        child,
+        section?.children ?? target,
+        section ? parentEnabled : parentEnabled && node['enabled'] === true,
+        depth + 1
+      );
     }
-  }
+  };
+  for (const node of (candidate['nodes'] as unknown[]).slice(0, CONTEXT_MENU_MAX_NODES * 5))
+    visit(node, nodes, true, 1);
   return nodes.length > 0 ? { version: 2, nodes } : null;
 }
 
@@ -345,25 +399,49 @@ function projectedBlock(
   return commands.map((command) => ({ type: 'command', command, enabled }));
 }
 
-/** Pure read projection. Legacy booleans apply only until an explicit v2 layout is saved. */
-export function resolveContextMenuTree(
+type RecommendedTitles = Partial<
+  Record<'screenshots' | 'video' | 'export' | 'pageLink' | 'window', string>
+>;
+const BLOCK_SECTIONS: Partial<
+  Record<ContextMenuItemKey, { id: string; title: string; titleKey: keyof RecommendedTitles }>
+> = {
+  showScreenshots: { id: 'screenshots', title: 'Screenshots', titleKey: 'screenshots' },
+  showVideo: { id: 'video', title: 'Video', titleKey: 'video' },
+  showExport: { id: 'export', title: 'Export', titleKey: 'export' },
+  showPageLinkCopy: { id: 'page-link', title: 'Copy title and link', titleKey: 'pageLink' },
+  showWindowResize: { id: 'window', title: 'Window size', titleKey: 'window' },
+};
+
+function projectLegacyTree(
   settings: ReturnType<typeof createRecommendedContextMenuSettings>,
   quickActions: ContextMenuQuickActionInventory,
-  viewportPresets: ContextMenuViewportPresetInventory
+  viewportPresets: ContextMenuViewportPresetInventory,
+  mode: 'block' | 'recommended',
+  titles: RecommendedTitles = {}
 ): ContextMenuTree {
-  const explicit = parseContextMenuTree(settings.layout);
-  if (explicit) return explicit;
-
   const legacy = parseLegacyContextMenuLayout(settings.layout) ?? createContextMenuLayout();
   const seen = new Set<string>();
-  const projectItems = (items: readonly ContextMenuItemKey[]): ContextMenuCommandNode[] =>
-    items
-      .flatMap((key) => projectedBlock(key, settings[key], quickActions, viewportPresets))
-      .filter((node) => {
-        if (seen.has(node.command)) return false;
-        seen.add(node.command);
-        return true;
-      });
+  const projectItems = (items: readonly ContextMenuItemKey[]): ContextMenuTreeNode[] =>
+    items.flatMap((key): ContextMenuTreeNode[] => {
+      const commands = projectedBlock(key, settings[key], quickActions, viewportPresets).filter(
+        (node) => {
+          if (seen.has(node.command)) return false;
+          seen.add(node.command);
+          return true;
+        }
+      );
+      const group = BLOCK_SECTIONS[key];
+      if (!group || commands.length === 0) return commands;
+      return [
+        {
+          type: 'section' as const,
+          id: `${mode}-${group.id}`,
+          title: titles[group.titleKey] ?? group.title,
+          enabled: commands.some((node) => node.enabled),
+          children: commands,
+        },
+      ];
+    });
   const nodes: ContextMenuTreeNode[] = [];
   for (const section of legacy.sections) {
     if (section.id === 'root') {
@@ -381,14 +459,33 @@ export function resolveContextMenuTree(
   return { version: 2, nodes };
 }
 
-/** Recommended editor draft; caller supplies current dynamic inventories. */
-export function createRecommendedContextMenuTree(
+/** Pure read projection. Legacy booleans apply only until an explicit v2 layout is saved. */
+export function resolveContextMenuTree(
+  settings: ReturnType<typeof createRecommendedContextMenuSettings>,
   quickActions: ContextMenuQuickActionInventory,
   viewportPresets: ContextMenuViewportPresetInventory
 ): ContextMenuTree {
-  return resolveContextMenuTree(
+  const explicit = parseContextMenuTree(settings.layout);
+  if (explicit) return explicit;
+  return projectLegacyTree(
+    settings,
+    quickActions,
+    viewportPresets,
+    parseLegacyContextMenuLayout(settings.layout) ? 'block' : 'recommended'
+  );
+}
+
+/** Recommended editor draft; caller supplies current dynamic inventories. */
+export function createRecommendedContextMenuTree(
+  quickActions: ContextMenuQuickActionInventory,
+  viewportPresets: ContextMenuViewportPresetInventory,
+  titles: RecommendedTitles = {}
+): ContextMenuTree {
+  return projectLegacyTree(
     createRecommendedContextMenuSettings(),
     quickActions,
-    viewportPresets
+    viewportPresets,
+    'recommended',
+    titles
   );
 }

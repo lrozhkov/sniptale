@@ -1,12 +1,8 @@
 import type { DragEvent, KeyboardEvent, RefObject } from 'react';
 import {
-  ArrowDown,
-  ArrowUp,
   Camera,
   ChevronDown,
   ChevronRight,
-  CornerDownLeft,
-  CornerUpLeft,
   Download,
   Film,
   Folder,
@@ -15,7 +11,6 @@ import {
   Library,
   Link2,
   Monitor,
-  Pencil,
   Settings2,
   Trash2,
   Video,
@@ -23,7 +18,6 @@ import {
 import type { AppLocale } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
 import type { ContextMenuTreeNode } from '../../../../../contracts/settings/context-menu-layout';
-import { SettingsSwitch } from '../../../../section-surface/panel-controls';
 
 type TreeRow = {
   key: string;
@@ -46,10 +40,6 @@ type RowActions = {
   editValue(value: string): void;
   commitRename(): void;
   cancelRename(key: string): void;
-  toggleEnabled(key: string, enabled: boolean): void;
-  moveRelative(key: string, offset: number): void;
-  moveInside(key: string): void;
-  moveOutside(key: string): void;
   remove(key: string): void;
 };
 
@@ -77,7 +67,7 @@ function CommandIcon({ command }: { command: string }) {
   return <Settings2 {...props} />;
 }
 
-function rowClass(selected: boolean, level: number, dropEdge?: DropEdge): string {
+function rowClass(selected: boolean, dropEdge?: DropEdge): string {
   return [
     'relative min-w-0 rounded-lg border py-1.5 pr-1 transition-colors',
     'focus-visible:outline-none focus-visible:ring-2',
@@ -85,7 +75,7 @@ function rowClass(selected: boolean, level: number, dropEdge?: DropEdge): string
     selected
       ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-surface-hover)]'
       : 'border-transparent hover:bg-[var(--sniptale-color-surface-hover)]',
-    level === 2 ? 'ml-5 pl-1' : 'pl-1',
+    'pl-1',
     dropEdge === 'inside' ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
     dropEdge === 'before' ? 'border-t-[var(--sniptale-color-accent)]' : '',
     dropEdge === 'after' ? 'border-b-[var(--sniptale-color-accent)]' : '',
@@ -102,9 +92,6 @@ export function ContextMenuTreeRow(props: {
   unavailable: boolean;
   editingValue: string | undefined;
   inputRef: RefObject<HTMLInputElement | null>;
-  siblingIndex: number;
-  siblingCount: number;
-  hasSections: boolean;
   locale: AppLocale;
   actions: RowActions;
 }) {
@@ -127,7 +114,8 @@ export function ContextMenuTreeRow(props: {
       onKeyDown={(event) => actions.keyDown(event, key, node)}
       onDragOver={(event) => actions.dragOver(event, key, node)}
       onDrop={actions.drop}
-      className={rowClass(props.selected, level, props.dropEdge)}
+      className={rowClass(props.selected, props.dropEdge)}
+      style={{ marginInlineStart: `${(level - 1) * 18}px` }}
     >
       <div className="flex min-w-0 items-center gap-1">
         {node.type === 'section' ? (
@@ -175,6 +163,7 @@ export function ContextMenuTreeRow(props: {
             ].join(' ')}
             maxLength={40}
             value={props.editingValue}
+            placeholder={label}
             onChange={(event) => actions.editValue(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -188,23 +177,21 @@ export function ContextMenuTreeRow(props: {
             onBlur={actions.commitRename}
           />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-sm" title={label}>
+          <span
+            className="min-w-0 flex-1 truncate text-sm"
+            title={label}
+            onDoubleClick={() => actions.edit(key, node.title ?? '')}
+          >
             {label}
           </span>
         )}
-        <SettingsSwitch
-          size="sm"
-          checked={node.enabled}
-          aria-label={`${t('settings.appearance.contextMenuEnabledLabel')}: ${label}`}
-          onClick={() => actions.toggleEnabled(key, !node.enabled)}
-        />
+        <RowControls row={row} label={label} locale={props.locale} actions={actions} />
       </div>
       {props.unavailable ? (
         <p className="pl-12 text-xs text-[var(--sniptale-color-text-muted)]">
           {t('settings.appearance.contextMenuUnavailable')}
         </p>
       ) : null}
-      <RowControls {...props} />
     </div>
   );
 }
@@ -212,67 +199,17 @@ export function ContextMenuTreeRow(props: {
 function RowControls(props: {
   row: TreeRow;
   label: string;
-  siblingIndex: number;
-  siblingCount: number;
-  hasSections: boolean;
   locale: AppLocale;
   actions: RowActions;
 }) {
   const {
-    row: { key, node, parentId },
+    row: { key, node },
     label,
     actions,
   } = props;
   const t = (id: Parameters<typeof translate>[0]) => translate(id, props.locale);
   return (
-    <div className="flex min-w-0 items-center justify-end gap-1 pl-10">
-      <button
-        type="button"
-        className={treeIconButton}
-        aria-label={`${t('settings.appearance.contextMenuRename')}: ${label}`}
-        onClick={() => actions.edit(key, node.title ?? label)}
-      >
-        <Pencil size={15} />
-      </button>
-      <button
-        type="button"
-        className={treeIconButton}
-        aria-label={`${t('settings.appearance.contextMenuUp')}: ${label}`}
-        disabled={props.siblingIndex === 0}
-        onClick={() => actions.moveRelative(key, -1)}
-      >
-        <ArrowUp size={15} />
-      </button>
-      <button
-        type="button"
-        className={treeIconButton}
-        aria-label={`${t('settings.appearance.contextMenuDown')}: ${label}`}
-        disabled={props.siblingIndex === props.siblingCount - 1}
-        onClick={() => actions.moveRelative(key, 1)}
-      >
-        <ArrowDown size={15} />
-      </button>
-      {node.type === 'command' && !parentId ? (
-        <button
-          type="button"
-          className={treeIconButton}
-          aria-label={`${t('settings.appearance.contextMenuInside')}: ${label}`}
-          disabled={!props.hasSections}
-          onClick={() => actions.moveInside(key)}
-        >
-          <CornerDownLeft size={15} />
-        </button>
-      ) : null}
-      {parentId ? (
-        <button
-          type="button"
-          className={treeIconButton}
-          aria-label={`${t('settings.appearance.contextMenuOutside')}: ${label}`}
-          onClick={() => actions.moveOutside(key)}
-        >
-          <CornerUpLeft size={15} />
-        </button>
-      ) : null}
+    <div className="flex shrink-0 items-center justify-end">
       <button
         type="button"
         className={treeIconButton}

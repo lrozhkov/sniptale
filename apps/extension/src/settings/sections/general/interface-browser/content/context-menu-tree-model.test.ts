@@ -7,8 +7,11 @@ import {
   addContextMenuCommand,
   addContextMenuSection,
   contextMenuNodePosition,
+  hasDisabledContextMenuSection,
   moveContextMenuNode,
   removeContextMenuNode,
+  reactivateContextMenuCommand,
+  restoreContextMenuSections,
   updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
@@ -32,6 +35,112 @@ const tree: ContextMenuTree = {
 };
 
 describe('context menu tree mutations', () => {
+  it('restores disabled empty sections without enabling their disabled commands', () => {
+    const hidden: ContextMenuTree = {
+      version: 2,
+      nodes: [
+        { type: 'section', id: 'empty', title: 'Empty', enabled: false, children: [] },
+        {
+          type: 'section',
+          id: 'tools',
+          title: 'Tools',
+          enabled: false,
+          children: [{ type: 'command', command: 'sniptale.gallery', enabled: false }],
+        },
+      ],
+    };
+    expect(hasDisabledContextMenuSection(hidden.nodes)).toBe(true);
+    const restored = restoreContextMenuSections(hidden);
+    expect(restored.nodes).toMatchObject([
+      { id: 'empty', enabled: true, children: [] },
+      { id: 'tools', enabled: true, children: [{ enabled: false }] },
+    ]);
+    expect(parseContextMenuTree(restored)).not.toBeNull();
+  });
+  it('reactivates a retained command with its disabled ancestor chain and placement', () => {
+    const disabled: ContextMenuTree = {
+      version: 2,
+      nodes: [
+        {
+          type: 'section',
+          id: 'outer',
+          title: 'Outer',
+          enabled: false,
+          children: [
+            {
+              type: 'section',
+              id: 'inner',
+              title: 'Inner',
+              enabled: false,
+              children: [{ type: 'command', command: 'sniptale.gallery', enabled: false }],
+            },
+          ],
+        },
+      ],
+    };
+    const restored = reactivateContextMenuCommand(disabled, 'sniptale.gallery');
+    expect(restored.nodes[0]).toMatchObject({
+      enabled: true,
+      children: [{ enabled: true, children: [{ command: 'sniptale.gallery', enabled: true }] }],
+    });
+    expect(parseContextMenuTree(restored)).not.toBeNull();
+  });
+  it('shows only active nodes and reactivates a stored disabled command when added', () => {
+    const disabled: ContextMenuTree = {
+      version: 2,
+      nodes: [
+        { type: 'command', command: 'sniptale.gallery', enabled: false },
+        { type: 'section', id: 'tools', title: 'Tools', enabled: true, children: [] },
+      ],
+    };
+    expect(visibleContextMenuNodes(disabled, new Set()).map((row) => row.key)).toEqual([
+      'section:tools',
+    ]);
+    const added = addContextMenuCommand(disabled, 'sniptale.gallery', {
+      parentId: 'tools',
+      index: 0,
+    });
+    expect(added.nodes[0]).toMatchObject({
+      children: [{ command: 'sniptale.gallery', enabled: true }],
+    });
+    expect(parseContextMenuTree(added)).not.toBeNull();
+  });
+  it('moves nested sections with descendants and rejects dropping into their own descendants', () => {
+    const nested: ContextMenuTree = {
+      version: 2,
+      nodes: [
+        {
+          type: 'section',
+          id: 'outer',
+          title: 'Outer',
+          enabled: true,
+          children: [
+            {
+              type: 'section',
+              id: 'inner',
+              title: 'Inner',
+              enabled: true,
+              children: [{ type: 'command', command: 'sniptale.gallery', enabled: true }],
+            },
+          ],
+        },
+        { type: 'command', command: 'sniptale.settings', enabled: true },
+      ],
+    };
+    expect(contextMenuNodePosition(nested, 'command:sniptale.gallery')).toEqual({
+      parentId: 'inner',
+      index: 0,
+    });
+    expect(moveContextMenuNode(nested, 'section:outer', { parentId: 'inner', index: 0 })).toBe(
+      nested
+    );
+    const moved = moveContextMenuNode(nested, 'section:inner', { parentId: null, index: 1 });
+    expect(moved.nodes[1]).toMatchObject({
+      id: 'inner',
+      children: [{ command: 'sniptale.gallery' }],
+    });
+    expect(parseContextMenuTree(moved)).not.toBeNull();
+  });
   it('uses one index rule for same-parent and cross-parent moves', () => {
     const moved = moveContextMenuNode(tree, 'command:sniptale.video.tab', {
       parentId: 'tools',

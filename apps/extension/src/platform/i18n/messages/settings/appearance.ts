@@ -210,16 +210,20 @@ export const settingsAppearanceMessages = defineMessageSource({
   contextMenuCustomize: { ru: 'Настроить дерево команд', en: 'Customize command tree' },
   contextMenuRoot: { ru: 'Основное меню', en: 'Main menu' },
   contextMenuEditorHelp: {
-    ru: 'Выберите команду в каталоге и добавьте её в основной список или раздел. Меняйте порядок перетаскиванием или кнопками строки. Изменения применятся после сохранения.',
-    en: 'Choose a command in the catalog and add it to the main list or a section. Reorder with drag and drop or row buttons. Changes take effect after saving.',
+    ru: 'Слева — действующее меню, справа — неиспользуемые действия. Перетащите действие в нужное место или выберите его с клавиатуры. Изменения сохраняются автоматически.',
+    en: 'The active menu is on the left and unused actions are on the right. Drag an action into place or choose it with the keyboard. Changes save automatically.',
   },
   contextMenuSectionName: { ru: 'Название раздела', en: 'Section name' },
   contextMenuSection: { ru: 'Раздел', en: 'Section' },
   contextMenuUp: { ru: 'Выше', en: 'Move up' },
   contextMenuDown: { ru: 'Ниже', en: 'Move down' },
   contextMenuRemoveSection: {
-    ru: 'Убрать раздел, перенести пункты в основное меню',
-    en: 'Remove section and move items to main menu',
+    ru: 'Удалить раздел и перенести действия к родителю',
+    en: 'Remove section and move actions to its parent',
+  },
+  contextMenuSectionRemovalMessage: {
+    ru: 'Все вложенные действия перейдут к родительскому разделу в прежнем порядке.',
+    en: 'All nested actions will move to the parent section in their current order.',
   },
   contextMenuNewSection: { ru: 'Новый раздел', en: 'New section' },
   contextMenuAddSection: { ru: 'Добавить раздел', en: 'Add section' },
@@ -228,8 +232,8 @@ export const settingsAppearanceMessages = defineMessageSource({
     en: 'Restore recommended configuration',
   },
   contextMenuInvalidName: {
-    ru: 'Проверьте названия и команды. В новом меню допускается не более 9 разделов и 80 пунктов; старое меню продолжит работать, пока вы не сохраните подходящую структуру.',
-    en: 'Check names and commands. The new menu supports up to 9 sections and 80 items; the old menu remains active until you save a valid structure.',
+    ru: 'Проверьте название нового раздела. Пока структура недопустима, сохранённое меню остаётся прежним.',
+    en: 'Check the new section name. The saved menu stays unchanged until the structure is valid.',
   },
   contextMenuSaveFailed: {
     ru: 'Не удалось сохранить меню. Повторите попытку.',
@@ -237,8 +241,8 @@ export const settingsAppearanceMessages = defineMessageSource({
   },
   contextMenuSaving: { ru: 'Сохранение меню…', en: 'Saving menu\u2026' },
   contextMenuUnsaved: {
-    ru: 'Изменения применятся после сохранения. Отмена сохранит прежнее меню.',
-    en: 'Changes take effect after saving. Cancel keeps the previous menu.',
+    ru: 'Сохраним изменения через мгновение…',
+    en: 'Saving changes shortly…',
   },
   contextMenuReady: { ru: 'Меню готово к редактированию', en: 'Menu ready to edit' },
   contextMenuSave: { ru: 'Сохранить меню', en: 'Save menu' },
@@ -271,6 +275,7 @@ export const settingsAppearanceMessages = defineMessageSource({
   contextMenuInsideSelected: { ru: 'В выбранный раздел', en: 'Inside selected section' },
   contextMenuCreateSection: { ru: 'Создать раздел здесь', en: 'Create section here' },
   contextMenuEmptyCatalog: { ru: 'Команды не найдены', en: 'No commands found' },
+  contextMenuRetrySave: { ru: 'Повторить сохранение', en: 'Retry saving' },
   contextMenuEmptyTree: {
     ru: 'Добавьте команду из каталога',
     en: 'Add a command from the catalog',
@@ -286,8 +291,12 @@ export const settingsAppearanceMessages = defineMessageSource({
   },
   contextMenuCatalogRetry: { ru: 'Повторить загрузку', en: 'Retry loading' },
   contextMenuMoveHelp: {
-    ru: 'Стрелки перемещают фокус по дереву. Для изменения порядка используйте кнопки строки или перетаскивание.',
-    en: 'Arrow keys move focus through the tree. Use row buttons or drag to reorder.',
+    ru: 'Стрелки перемещают фокус. Alt+стрелки меняют порядок и вложенность; F2 или двойной щелчок меняют название, Delete убирает пункт.',
+    en: 'Arrow keys move focus. Alt+arrow keys change order and nesting; F2 or a double-click edits the name, Delete removes an item.',
+  },
+  contextMenuRestoreHiddenSections: {
+    ru: 'Восстановить скрытые разделы',
+    en: 'Restore hidden sections',
   },
   contextMenuNoPreview: { ru: 'Включённых команд пока нет', en: 'No enabled commands yet' },
   contextMenuDrag: { ru: 'Перетащить пункт', en: 'Drag item' },

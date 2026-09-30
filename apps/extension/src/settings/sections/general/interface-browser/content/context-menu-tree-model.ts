@@ -3,10 +3,52 @@ import type {
   ContextMenuTree,
   ContextMenuTreeNode,
 } from '../../../../../contracts/settings/context-menu-layout';
+import { CONTEXT_MENU_MAX_SECTIONS } from '../../../../../contracts/settings/context-menu-layout';
 
 type Position = { parentId: string | null; index: number };
 
-export function contextMenuNodeKey(node: ContextMenuTreeNode): string {
+export function countContextMenuSections(nodes: ContextMenuTreeNode[]): number {
+  return nodes.reduce(
+    (count, node) =>
+      count + (node.type === 'section' ? 1 + countContextMenuSections(node.children) : 0),
+    0
+  );
+}
+
+export function hasDisabledContextMenuSection(nodes: ContextMenuTreeNode[]): boolean {
+  return nodes.some(
+    (node) =>
+      node.type === 'section' && (!node.enabled || hasDisabledContextMenuSection(node.children))
+  );
+}
+
+export function restoreContextMenuSections(tree: ContextMenuTree): ContextMenuTree {
+  if (!hasDisabledContextMenuSection(tree.nodes)) return tree;
+  const next = structuredClone(tree);
+  const pending = [...next.nodes];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (node.type !== 'section') continue;
+    node.enabled = true;
+    pending.push(...node.children);
+  }
+  return next;
+}
+
+export function isContextMenuDescendant(
+  tree: ContextMenuTree,
+  key: string,
+  ancestorId: string
+): boolean {
+  let parentId = contextMenuNodePosition(tree, key)?.parentId;
+  while (parentId) {
+    if (parentId === ancestorId) return true;
+    parentId = contextMenuNodePosition(tree, `section:${parentId}`)?.parentId ?? null;
+  }
+  return false;
+}
+
+function contextMenuNodeKey(node: ContextMenuTreeNode): string {
   return node.type === 'section' ? `section:${node.id}` : `command:${node.command}`;
 }
 
@@ -14,23 +56,22 @@ export function findContextMenuNode(
   tree: ContextMenuTree,
   key: string
 ): ContextMenuTreeNode | null {
-  for (const node of tree.nodes) {
+  const pending = [...tree.nodes];
+  while (pending.length) {
+    const node = pending.pop()!;
     if (contextMenuNodeKey(node) === key) return node;
-    if (node.type === 'section') {
-      const child = node.children.find((entry) => contextMenuNodeKey(entry) === key);
-      if (child) return child;
-    }
+    if (node.type === 'section') pending.push(...node.children);
   }
   return null;
 }
 
 export function contextMenuNodePosition(tree: ContextMenuTree, key: string): Position | null {
-  for (let index = 0; index < tree.nodes.length; index += 1) {
-    const node = tree.nodes[index]!;
-    if (contextMenuNodeKey(node) === key) return { parentId: null, index };
-    if (node.type === 'section') {
-      const childIndex = node.children.findIndex((entry) => contextMenuNodeKey(entry) === key);
-      if (childIndex >= 0) return { parentId: node.id, index: childIndex };
+  const pending = [{ nodes: tree.nodes, parentId: null as string | null }];
+  while (pending.length) {
+    const { nodes, parentId } = pending.pop()!;
+    for (const [index, node] of nodes.entries()) {
+      if (contextMenuNodeKey(node) === key) return { parentId, index };
+      if (node.type === 'section') pending.push({ nodes: node.children, parentId: node.id });
     }
   }
   return null;
@@ -38,7 +79,7 @@ export function contextMenuNodePosition(tree: ContextMenuTree, key: string): Pos
 
 function getItems(tree: ContextMenuTree, parentId: string | null): ContextMenuTreeNode[] | null {
   if (parentId === null) return tree.nodes;
-  const section = tree.nodes.find((node) => node.type === 'section' && node.id === parentId);
+  const section = findContextMenuNode(tree, `section:${parentId}`);
   return section?.type === 'section' ? section.children : null;
 }
 
@@ -52,7 +93,16 @@ export function moveContextMenuNode(
   const node = findContextMenuNode(tree, key);
   const targetItems = getItems(tree, destination.parentId);
   if (!source || !node || !targetItems) return tree;
-  if (node.type === 'section' && destination.parentId !== null) return tree;
+  if (node.type === 'section' && destination.parentId !== null) {
+    const pending = [...node.children];
+    if (destination.parentId === node.id) return tree;
+    while (pending.length) {
+      const descendant = pending.pop()!;
+      if (descendant.type !== 'section') continue;
+      if (descendant.id === destination.parentId) return tree;
+      pending.push(...descendant.children);
+    }
+  }
   if (
     !Number.isInteger(destination.index) ||
     destination.index < 0 ||
@@ -74,19 +124,27 @@ export function moveContextMenuNode(
 
 export function addContextMenuSection(
   tree: ContextMenuTree,
-  index: number
+  index: number,
+  parentId: string | null = null
 ): {
   tree: ContextMenuTree;
   key: string;
 } | null {
-  if (tree.nodes.filter((node) => node.type === 'section').length >= 9) return null;
-  if (!Number.isInteger(index) || index < 0 || index > tree.nodes.length) return null;
+  const destination = getItems(tree, parentId);
+  if (!destination || !Number.isInteger(index) || index < 0 || index > destination.length)
+    return null;
+  if (countContextMenuSections(tree.nodes) >= CONTEXT_MENU_MAX_SECTIONS) return null;
   let number = 1;
-  while (tree.nodes.some((node) => node.type === 'section' && node.id === `section-${number}`))
-    number += 1;
+  while (findContextMenuNode(tree, `section:section-${number}`)) number += 1;
   const id = `section-${number}`;
   const next = structuredClone(tree);
-  next.nodes.splice(index, 0, { type: 'section', id, title: '', enabled: true, children: [] });
+  getItems(next, parentId)!.splice(index, 0, {
+    type: 'section',
+    id,
+    title: '',
+    enabled: true,
+    children: [],
+  });
   return { tree: next, key: `section:${id}` };
 }
 
@@ -95,18 +153,52 @@ export function addContextMenuCommand(
   command: string,
   destination: Position
 ): ContextMenuTree {
-  if (findContextMenuNode(tree, `command:${command}`)) return tree;
-  const next = structuredClone(tree);
-  const target = getItems(next, destination.parentId);
+  const existing = findContextMenuNode(tree, `command:${command}`);
+  if (existing?.type === 'command' && isContextMenuCommandActive(tree, command)) return tree;
   if (
-    !target ||
-    !Number.isInteger(destination.index) ||
-    destination.index < 0 ||
-    destination.index > target.length
+    destination.parentId &&
+    !findContextMenuNode(tree, `section:${destination.parentId}`)?.enabled
   )
     return tree;
-  const commandNode: ContextMenuCommandNode = { type: 'command', command, enabled: true };
-  target.splice(destination.index, 0, commandNode);
+  const next = structuredClone(tree);
+  const source = existing ? contextMenuNodePosition(next, `command:${command}`) : null;
+  if (source) getItems(next, source.parentId)!.splice(source.index, 1);
+  const target = getItems(next, destination.parentId);
+  const adjustedIndex =
+    source?.parentId === destination.parentId && source.index < destination.index
+      ? destination.index - 1
+      : destination.index;
+  if (
+    !target ||
+    !Number.isInteger(adjustedIndex) ||
+    adjustedIndex < 0 ||
+    adjustedIndex > target.length
+  )
+    return tree;
+  const commandNode: ContextMenuCommandNode =
+    existing?.type === 'command'
+      ? { ...existing, enabled: true }
+      : { type: 'command', command, enabled: true };
+  target.splice(adjustedIndex, 0, commandNode);
+  return next;
+}
+
+/** Catalog activation restores retained placement and every disabled ancestor. */
+export function reactivateContextMenuCommand(
+  tree: ContextMenuTree,
+  command: string
+): ContextMenuTree {
+  const key = `command:${command}`;
+  if (!findContextMenuNode(tree, key) || isContextMenuCommandActive(tree, command)) return tree;
+  const next = structuredClone(tree);
+  const node = findContextMenuNode(next, key);
+  if (node) node.enabled = true;
+  let parentId = contextMenuNodePosition(next, key)?.parentId;
+  while (parentId) {
+    const section = findContextMenuNode(next, `section:${parentId}`);
+    if (section) section.enabled = true;
+    parentId = contextMenuNodePosition(next, `section:${parentId}`)?.parentId ?? null;
+  }
   return next;
 }
 
@@ -116,12 +208,15 @@ export function removeContextMenuNode(tree: ContextMenuTree, key: string): Conte
   const next = structuredClone(tree);
   const items = getItems(next, source.parentId)!;
   const [removed] = items.splice(source.index, 1);
-  if (removed?.type === 'section')
-    items.splice(
-      source.index,
-      0,
-      ...removed.children.map((child) => ({ ...child, enabled: removed.enabled && child.enabled }))
-    );
+  if (removed?.type === 'section') {
+    const flatten = (children: ContextMenuTreeNode[], enabled: boolean): ContextMenuCommandNode[] =>
+      children.flatMap((child) =>
+        child.type === 'command'
+          ? [{ ...child, enabled: child.enabled && enabled }]
+          : flatten(child.children, enabled && child.enabled)
+      );
+    items.splice(source.index, 0, ...flatten(removed.children, removed.enabled));
+  }
   return next;
 }
 
@@ -145,19 +240,33 @@ export function visibleContextMenuNodes(
   tree: ContextMenuTree,
   expanded: ReadonlySet<string>
 ): Array<{ key: string; node: ContextMenuTreeNode; level: number; parentId: string | null }> {
-  return tree.nodes.flatMap((node) => {
-    const key = contextMenuNodeKey(node);
-    const entry = { key, node, level: 1, parentId: null };
-    return node.type === 'section' && expanded.has(node.id)
-      ? [
-          entry,
-          ...node.children.map((child) => ({
-            key: contextMenuNodeKey(child),
-            node: child,
-            level: 2,
-            parentId: node.id,
-          })),
-        ]
-      : [entry];
-  });
+  const result: Array<{
+    key: string;
+    node: ContextMenuTreeNode;
+    level: number;
+    parentId: string | null;
+  }> = [];
+  const visit = (nodes: ContextMenuTreeNode[], parentId: string | null, level: number) => {
+    for (const node of nodes) {
+      if (!node.enabled) continue;
+      result.push({ key: contextMenuNodeKey(node), node, level, parentId });
+      if (node.type === 'section' && expanded.has(node.id))
+        visit(node.children, node.id, level + 1);
+    }
+  };
+  visit(tree.nodes, null, 1);
+  return result;
+}
+
+export function isContextMenuCommandActive(tree: ContextMenuTree, command: string): boolean {
+  const key = `command:${command}`;
+  return visibleContextMenuNodes(tree, new Set(collectSectionIds(tree.nodes))).some(
+    (row) => row.key === key
+  );
+}
+
+function collectSectionIds(nodes: ContextMenuTreeNode[]): string[] {
+  return nodes.flatMap((node) =>
+    node.type === 'section' ? [node.id, ...collectSectionIds(node.children)] : []
+  );
 }

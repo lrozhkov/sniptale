@@ -270,11 +270,15 @@ function collectContextMenuDependencies(
   if (!layout) return [];
   const quickActions = itemIds(asRecord(domains['capture.quick-actions']?.data)?.['items']);
   const viewports = itemIds(asRecord(domains['capture.viewport-presets']?.data)?.['items']);
-  const commands = layout.nodes.flatMap((node) =>
-    node.type === 'section' ? node.children : [node]
-  );
+  const commands: string[] = [];
+  const pending = [...layout.nodes];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (node.type === 'section') pending.push(...node.children);
+    else commands.push(node.command);
+  }
   const dependencies = new Set<string>();
-  for (const { command } of commands) {
+  for (const command of commands) {
     const quickActionPrefix = 'sniptale.screenshots.quick-action.';
     const viewportPrefix = 'sniptale.window-resize.preset.';
     if (command.startsWith(quickActionPrefix)) {

@@ -69,7 +69,7 @@ describe('ContextMenuControls', () => {
     expect(container?.textContent).toContain('Контекстное меню браузера');
     expect(container?.querySelector('[role="tree"]')).toBeTruthy();
     expect(container?.textContent).toContain('Каталог команд');
-    expect(container?.textContent).toContain('Предпросмотр меню');
+    expect(container?.textContent).not.toContain('Предпросмотр меню');
     const ownerToggle = container?.querySelector<HTMLButtonElement>(
       'button[aria-label="Показывать меню Sniptale"]'
     );

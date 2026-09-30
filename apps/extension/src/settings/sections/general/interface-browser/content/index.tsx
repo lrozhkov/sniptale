@@ -47,7 +47,7 @@ export function AppearanceSectionContent(props: {
       <section
         ref={contextMenuRef}
         hidden={view !== 'context-menu'}
-        className={`${settingsSectionClassName} ${settingsCompactWorkbenchClassName}`}
+        className={settingsSectionClassName}
       >
         <ContextMenuControls state={state} visible={view === 'context-menu'} />
       </section>

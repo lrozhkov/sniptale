@@ -9,9 +9,13 @@ import { translate } from '../../../../../platform/i18n';
 import type { AppearanceSectionState } from './types';
 import { buildContextMenuCatalog } from './context-menu-catalog';
 import { ContextMenuCatalogPanel } from './context-menu-catalog-panel';
-import { ContextMenuPreview } from './context-menu-preview';
 import { ContextMenuTreeView } from './context-menu-tree';
 import { findContextMenuNode } from './context-menu-tree-model';
+import {
+  clearPendingContextMenuDraft,
+  keepPendingContextMenuDraft,
+  readPendingContextMenuDraft,
+} from './context-menu-draft-recovery';
 
 const buttonClass = [
   'inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg',
@@ -45,6 +49,10 @@ function useContextMenuDraft(state: ContextMenuEditorState) {
   const [announcement, setAnnouncement] = useState('');
   const saving = useRef(false);
   const draftRevision = useRef(0);
+  const savedRevision = useRef(0);
+  const latestTree = useRef<ContextMenuTree | null>(null);
+  const updateSettings = useRef(state.updateContextMenu);
+  updateSettings.current = state.updateContextMenu;
   const projectedSource = useRef<{
     settings: ContextMenuEditorState['contextMenu'];
     actions: ContextMenuEditorState['contextMenuQuickActions'];
@@ -71,8 +79,17 @@ function useContextMenuDraft(state: ContextMenuEditorState) {
       source.actions !== actions ||
       source.presets !== presets
     ) {
-      const next = resolveContextMenuTree(state.contextMenu, actions, presets);
+      const stored = resolveContextMenuTree(state.contextMenu, actions, presets);
+      const pending = !tree ? readPendingContextMenuDraft() : null;
+      const recovered = pending && JSON.stringify(pending) !== JSON.stringify(stored);
+      if (pending && !recovered) clearPendingContextMenuDraft(pending);
+      const next = recovered ? pending : stored;
+      if (recovered) {
+        draftRevision.current += 1;
+        setStatus('failed');
+      }
       setTree(next);
+      latestTree.current = next;
       setSelectedKey((current) => (current && findContextMenuNode(next, current) ? current : null));
       projectedSource.current = { settings: state.contextMenu, actions, presets };
     }
@@ -85,34 +102,30 @@ function useContextMenuDraft(state: ContextMenuEditorState) {
     status,
     tree,
   ]);
-  const reset = () => {
-    if (state.contextMenuCatalogStatus !== 'ready' || state.contextMenuSettingsStatus !== 'ready')
-      return;
-    setTree(resolveContextMenuTree(state.contextMenu, actions, presets));
-    projectedSource.current = { settings: state.contextMenu, actions, presets };
-    setSelectedKey(null);
-    setExpanded(new Set());
-    setStatus('ready');
-  };
   const restore = () => {
-    setTree(createRecommendedContextMenuTree(actions, presets));
+    changeTree(createRecommendedContextMenuTree(actions, presets));
     setSelectedKey(null);
     setExpanded(new Set());
-    setStatus('editing');
   };
   const changeTree = (next: ContextMenuTree) => {
     draftRevision.current += 1;
+    latestTree.current = next;
     setTree(next);
-    if (!saving.current) setStatus('editing');
+    const valid = Boolean(parseContextMenuTree(next));
+    const protectedDraft = valid && keepPendingContextMenuDraft(next);
+    if (!saving.current) setStatus(!valid || protectedDraft ? 'editing' : 'failed');
   };
   const save = async () => {
-    if (saving.current || !tree || !parseContextMenuTree(tree)) return;
+    const candidate = latestTree.current;
+    if (saving.current || !candidate || !parseContextMenuTree(candidate)) return;
     saving.current = true;
     const submittedRevision = draftRevision.current;
     setStatus('saving');
     try {
-      await state.updateContextMenu({ layout: tree });
+      await updateSettings.current({ layout: candidate });
+      savedRevision.current = submittedRevision;
       const stillCurrent = draftRevision.current === submittedRevision;
+      if (stillCurrent) clearPendingContextMenuDraft(candidate);
       setStatus(stillCurrent ? 'saved' : 'editing');
       setAnnouncement(
         t(
@@ -122,11 +135,28 @@ function useContextMenuDraft(state: ContextMenuEditorState) {
         )
       );
     } catch {
-      setStatus('failed');
+      setStatus(draftRevision.current === submittedRevision ? 'failed' : 'editing');
     } finally {
       saving.current = false;
     }
   };
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    if (status !== 'editing' || !tree || !parseContextMenuTree(tree)) return;
+    const timer = setTimeout(() => void saveRef.current(), 350);
+    return () => clearTimeout(timer);
+  }, [tree, status]);
+  useEffect(
+    () => () => {
+      const pending = latestTree.current;
+      if (pending && draftRevision.current > savedRevision.current && parseContextMenuTree(pending))
+        void updateSettings.current({ layout: pending }).catch(() => {
+          // The page-local draft remains available for retry when settings reopen.
+        });
+    },
+    []
+  );
   return {
     tree,
     setTree: changeTree,
@@ -138,19 +168,12 @@ function useContextMenuDraft(state: ContextMenuEditorState) {
     announcement,
     setAnnouncement,
     catalog,
-    reset,
     restore,
     save,
   };
 }
 
-export function ContextMenuEditor({
-  state,
-  visible = true,
-}: {
-  state: ContextMenuEditorState;
-  visible?: boolean;
-}) {
+export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; visible?: boolean }) {
   const {
     tree,
     setTree,
@@ -162,7 +185,6 @@ export function ContextMenuEditor({
     announcement,
     setAnnouncement,
     catalog,
-    reset,
     restore,
     save,
   } = useContextMenuDraft(state);
@@ -202,7 +224,7 @@ export function ContextMenuEditor({
       <p className="max-w-[65rem] text-sm leading-6 text-[var(--sniptale-color-text-muted)]">
         {t('settings.appearance.contextMenuEditorHelp')}
       </p>
-      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(18rem,1fr)]">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,0.9fr)]">
         <ContextMenuTreeView
           tree={tree}
           catalog={catalog}
@@ -215,13 +237,12 @@ export function ContextMenuEditor({
           onExpanded={setExpanded}
           onAnnounce={setAnnouncement}
         />
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0">
           <ContextMenuCatalogPanel
             tree={tree}
             catalog={catalog}
             locale={state.locale}
             selectedKey={selectedKey}
-            visible={visible}
             onChange={setTree}
             onSelect={(key) => {
               setSelectedKey(key);
@@ -231,7 +252,6 @@ export function ContextMenuEditor({
             expanded={expanded}
             onExpanded={setExpanded}
           />
-          <ContextMenuPreview tree={tree} catalog={catalog} locale={state.locale} />
         </div>
       </div>
       <div aria-live="polite" className="sr-only">
@@ -242,45 +262,29 @@ export function ContextMenuEditor({
           {t('settings.appearance.contextMenuInvalidName')}
         </p>
       ) : null}
-      <p
-        role={status === 'failed' ? 'alert' : 'status'}
-        className="text-sm text-[var(--sniptale-color-text-muted)]"
-      >
-        {t(
-          status === 'failed'
-            ? 'settings.appearance.contextMenuSaveFailed'
-            : status === 'saving'
-              ? 'settings.appearance.contextMenuSaving'
-              : status === 'saved'
-                ? 'settings.appearance.contextMenuSaved'
-                : status === 'ready'
-                  ? 'settings.appearance.contextMenuReady'
+      {status !== 'ready' ? (
+        <p
+          role={status === 'failed' ? 'alert' : 'status'}
+          className="text-sm text-[var(--sniptale-color-text-muted)]"
+        >
+          {t(
+            status === 'failed'
+              ? 'settings.appearance.contextMenuSaveFailed'
+              : status === 'saving'
+                ? 'settings.appearance.contextMenuSaving'
+                : status === 'saved'
+                  ? 'settings.appearance.contextMenuSaved'
                   : 'settings.appearance.contextMenuUnsaved'
-        )}
-      </p>
+          )}
+        </p>
+      ) : null}
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={status === 'saving' || status === 'saved' || !parseContextMenuTree(tree)}
-          onClick={() => void save()}
-        >
-          {t('settings.appearance.contextMenuSave')}
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={status === 'saving'}
-          onClick={reset}
-        >
-          {t('settings.appearance.contextMenuResetDraft')}
-        </button>
-        <button
-          type="button"
-          className={buttonClass}
-          disabled={status === 'saving'}
-          onClick={restore}
-        >
+        {status === 'failed' ? (
+          <button type="button" className={buttonClass} onClick={() => void save()}>
+            {t('settings.appearance.contextMenuRetrySave')}
+          </button>
+        ) : null}
+        <button type="button" className={buttonClass} onClick={restore}>
           {t('settings.appearance.contextMenuRestore')}
         </button>
       </div>

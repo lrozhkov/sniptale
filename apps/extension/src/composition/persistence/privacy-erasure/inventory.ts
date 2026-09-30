@@ -33,6 +33,7 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale:trace:namespaces',
   'sniptale.gallery.filters',
   'sniptale.gallery.facet-disclosures',
+  'sniptale.context-menu.pending-layout',
 ] as const;
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [

@@ -7,22 +7,34 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { Folder } from 'lucide-react';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import type { AppLocale } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
+import { contextMenuSectionTitle } from '../../../../../platform/i18n/context-menu-section-title';
 import type {
   ContextMenuTree,
   ContextMenuTreeNode,
 } from '../../../../../contracts/settings/context-menu-layout';
+import { CONTEXT_MENU_MAX_SECTIONS } from '../../../../../contracts/settings/context-menu-layout';
 import type { ContextMenuCatalogItem } from './context-menu-catalog';
 import { contextMenuCommandLabel } from './context-menu-catalog';
 import { ContextMenuTreeRow, treeIconButton } from './context-menu-tree-row';
 import {
-  addContextMenuSection,
-  contextMenuNodeKey,
+  createSectionAtSelection,
+  createTreeReorder,
+  finishTreeRename,
+  handleTreeMutationKey,
+  toggleTreeSection,
+} from './context-menu-tree-controller';
+import {
+  addContextMenuCommand,
   contextMenuNodePosition,
+  countContextMenuSections,
   findContextMenuNode,
+  hasDisabledContextMenuSection,
   moveContextMenuNode,
   removeContextMenuNode,
+  restoreContextMenuSections,
   updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
@@ -70,11 +82,10 @@ function handleTreeKey(
     expanded: ReadonlySet<string>;
     tree: ContextMenuTree;
     toggleExpanded(id: string): void;
-    apply(next: ContextMenuTree, focusKey: string): void;
     select(key: string): void;
   }
 ) {
-  const { rows, expanded, tree, toggleExpanded, apply, select } = context;
+  const { rows, expanded, tree, toggleExpanded, select } = context;
   if (event.target !== event.currentTarget) return;
   const index = rows.findIndex((row) => row.key === key);
   let nextKey: string | undefined;
@@ -94,7 +105,9 @@ function handleTreeKey(
     case 'ArrowRight':
       if (node.type === 'section') {
         if (!expanded.has(node.id)) toggleExpanded(node.id);
-        else nextKey = node.children[0] ? contextMenuNodeKey(node.children[0]) : undefined;
+        else
+          nextKey =
+            rows[index + 1]?.level === rows[index]!.level + 1 ? rows[index + 1]?.key : undefined;
       }
       break;
     case 'ArrowLeft':
@@ -107,7 +120,6 @@ function handleTreeKey(
     case 'Enter':
     case ' ':
       if (node.type === 'section') toggleExpanded(node.id);
-      else apply(updateContextMenuNode(tree, key, { enabled: !node.enabled }), key);
       break;
     default:
       return;
@@ -118,11 +130,14 @@ function handleTreeKey(
 
 /** Pointer drop targets are resolved against the same pure move operation as row controls. */
 function useTreeDrop(
-  props: Pick<TreeViewProps, 'tree' | 'locale' | 'expanded' | 'onExpanded' | 'onAnnounce'> & {
+  props: Pick<
+    TreeViewProps,
+    'tree' | 'catalog' | 'locale' | 'expanded' | 'onExpanded' | 'onAnnounce'
+  > & {
     apply(next: ContextMenuTree, focusKey: string): void;
   }
 ) {
-  const { tree, locale, expanded, onExpanded, onAnnounce, apply } = props;
+  const { tree, catalog, locale, expanded, onExpanded, onAnnounce, apply } = props;
   const dragKey = useRef<string | null>(null);
   const expandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [drop, setDrop] = useState<DropTarget | null>(null);
@@ -142,7 +157,8 @@ function useTreeDrop(
     rowKey: string,
     node: ContextMenuTreeNode
   ) => {
-    if (!dragKey.current) return;
+    const external = event.dataTransfer.types?.includes('text/plain') ?? false;
+    if (!dragKey.current && !external) return;
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
     const inside = node.type === 'section' && event.clientX > rect.left + 54;
@@ -165,9 +181,9 @@ function useTreeDrop(
           rowKey,
           edge,
         };
-    const possible = moveContextMenuNode(tree, dragKey.current, target);
+    const possible = dragKey.current ? moveContextMenuNode(tree, dragKey.current, target) : tree;
     event.dataTransfer.dropEffect = possible === tree ? 'none' : 'move';
-    setDrop(possible === tree ? null : target);
+    setDrop(dragKey.current && possible === tree ? null : target);
     if (inside && node.type === 'section' && !expanded.has(node.id) && !expandTimer.current) {
       expandTimer.current = setTimeout(() => {
         onExpanded(new Set([...expanded, node.id]));
@@ -191,13 +207,28 @@ function useTreeDrop(
     dragOver,
     dropOnRow: (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      if (dragKey.current && drop) {
-        const next = moveContextMenuNode(tree, dragKey.current, drop);
+      event.stopPropagation();
+      const external = event.dataTransfer.getData?.('text/plain') ?? '';
+      const command = external.startsWith('command:') ? external.slice('command:'.length) : null;
+      if (
+        drop &&
+        (dragKey.current ||
+          (command && catalog.some((item) => item.command === command && item.available)))
+      ) {
+        const next = dragKey.current
+          ? moveContextMenuNode(tree, dragKey.current, drop)
+          : addContextMenuCommand(tree, command!, drop);
         if (next !== tree && drop.parentId) onExpanded(new Set([...expanded, drop.parentId]));
-        apply(next, dragKey.current);
+        apply(next, dragKey.current ?? external);
         if (next !== tree) onAnnounce(t('settings.appearance.contextMenuMoved'));
       }
       dragEnd();
+    },
+    rootDragOver: (event: DragEvent<HTMLDivElement>) => {
+      if ((event.target as HTMLElement).closest('[role="treeitem"]')) return;
+      if (!dragKey.current && !event.dataTransfer.types?.includes('text/plain')) return;
+      event.preventDefault();
+      setDrop({ parentId: null, index: tree.nodes.length, rowKey: 'root', edge: 'inside' });
     },
   };
 }
@@ -233,13 +264,23 @@ function useTreeFocus(props: TreeViewProps, editingKey: string | undefined) {
 
 /** Owns keyboard, pointer and editing transactions for one disposable tree draft. */
 function useContextMenuTree(props: TreeViewProps) {
-  const { tree, locale, selectedKey, onSelect, onChange, expanded, onExpanded, onAnnounce } = props;
+  const {
+    tree,
+    catalog,
+    locale,
+    selectedKey,
+    onSelect,
+    onChange,
+    expanded,
+    onExpanded,
+    onAnnounce,
+  } = props;
   const [editing, setEditing] = useState<{ key: string; value: string; isNew: boolean } | null>(
     null
   );
+  const [pendingSectionRemoval, setPendingSectionRemoval] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const rows = visibleContextMenuNodes(tree, expanded);
-  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   const { rootRef, select } = useTreeFocus(props, editing?.key);
   useEffect(() => {
     inputRef.current?.focus();
@@ -256,83 +297,60 @@ function useContextMenuTree(props: TreeViewProps) {
     if (nextKey) select(nextKey);
     else onSelect(null);
   };
-  const drag = useTreeDrop({ tree, locale, expanded, onExpanded, onAnnounce, apply });
+  const drag = useTreeDrop({ tree, catalog, locale, expanded, onExpanded, onAnnounce, apply });
   const toggleExpanded = (id: string) => {
-    const next = new Set(expanded);
-    if (next.has(id)) {
-      next.delete(id);
-      if (selectedKey && contextMenuNodePosition(tree, selectedKey)?.parentId === id)
-        select(`section:${id}`);
-    } else next.add(id);
-    onExpanded(next);
+    const result = toggleTreeSection(tree, id, expanded, selectedKey);
+    if (result.focusKey) select(result.focusKey);
+    onExpanded(result.expanded);
   };
   const removeNode = (key: string) => {
     const { next, focusKey } = removeWithNeighbor(tree, key, expanded);
     apply(next, focusKey);
   };
+  const requestRemove = (key: string) => {
+    if (findContextMenuNode(tree, key)?.type === 'section') setPendingSectionRemoval(key);
+    else removeNode(key);
+  };
   const commitRename = () => {
-    if (!editing) return;
-    const value = editing.value.trim();
-    if (value) apply(updateContextMenuNode(tree, editing.key, { title: value }), editing.key);
-    else if (editing.isNew) removeNode(editing.key);
-    else if (editing.key.startsWith('command:'))
-      apply(updateContextMenuNode(tree, editing.key, { title: '' }), editing.key);
-    setEditing(null);
-    if (!editing.isNew) select(editing.key);
+    finishTreeRename({
+      tree,
+      editing,
+      apply,
+      remove: removeNode,
+      select,
+      close: () => setEditing(null),
+    });
   };
   const addSection = () => {
-    const position = selectedKey ? contextMenuNodePosition(tree, selectedKey) : null;
-    const rootIndex = position?.parentId
-      ? tree.nodes.findIndex((node) => node.type === 'section' && node.id === position.parentId) + 1
-      : position
-        ? position.index + 1
-        : tree.nodes.length;
-    const result = addContextMenuSection(tree, rootIndex);
+    const result = createSectionAtSelection(tree, selectedKey);
     if (!result) return;
+    if (result.parentId) onExpanded(new Set([...expanded, result.parentId]));
     apply(result.tree, result.key);
     setEditing({ key: result.key, value: '', isNew: true });
   };
-  const moveRelative = (key: string, offset: number) => {
-    const position = contextMenuNodePosition(tree, key);
-    if (!position) return;
-    const nextIndex = offset < 0 ? position.index - 1 : position.index + 2;
-    const next = moveContextMenuNode(tree, key, { parentId: position.parentId, index: nextIndex });
-    apply(next, key);
-    if (next !== tree)
-      onAnnounce(
-        offset < 0
-          ? t('settings.appearance.contextMenuUp')
-          : t('settings.appearance.contextMenuDown')
-      );
-  };
-  const moveInside = (key: string) => {
-    const position = contextMenuNodePosition(tree, key);
-    if (!position || position.parentId || key.startsWith('section:')) return;
-    const nearby = [
-      ...tree.nodes.slice(0, position.index).reverse(),
-      ...tree.nodes.slice(position.index + 1),
-    ].find((node) => node.type === 'section');
-    if (nearby?.type !== 'section') return;
-    const next = moveContextMenuNode(tree, key, {
-      parentId: nearby.id,
-      index: nearby.children.length,
+  const { moveRelative, moveInside, moveOutside } = createTreeReorder({
+    tree,
+    locale,
+    expanded,
+    onExpanded,
+    apply,
+    onAnnounce,
+  });
+  const keyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    key: string,
+    node: ContextMenuTreeNode
+  ) => {
+    handleTreeMutationKey(event, key, node, {
+      rename: (item, value) => setEditing({ key: item, value, isNew: false }),
+      moveRelative,
+      moveInside,
+      moveOutside,
+      remove: requestRemove,
+      navigate: () =>
+        handleTreeKey(event, key, node, { rows, expanded, tree, toggleExpanded, select }),
     });
-    onExpanded(new Set([...expanded, nearby.id]));
-    apply(next, key);
-    if (next !== tree) onAnnounce(`${t('settings.appearance.contextMenuInside')}: ${nearby.title}`);
   };
-  const moveOutside = (key: string) => {
-    const position = contextMenuNodePosition(tree, key);
-    if (!position?.parentId) return;
-    const sectionIndex = tree.nodes.findIndex(
-      (node) => node.type === 'section' && node.id === position.parentId
-    );
-    const next = moveContextMenuNode(tree, key, { parentId: null, index: sectionIndex + 1 });
-    apply(next, key);
-    if (next !== tree) onAnnounce(t('settings.appearance.contextMenuOutside'));
-  };
-  const keyDown = (event: KeyboardEvent<HTMLDivElement>, key: string, node: ContextMenuTreeNode) =>
-    handleTreeKey(event, key, node, { rows, expanded, tree, toggleExpanded, apply, select });
   const rowActions = {
     select: onSelect,
     toggleExpanded,
@@ -354,25 +372,62 @@ function useContextMenuTree(props: TreeViewProps) {
     moveRelative,
     moveInside,
     moveOutside,
-    remove: removeNode,
+    remove: requestRemove,
   };
-  return { rootRef, inputRef, rows, drop: drag.drop, editing, addSection, rowActions };
+  return {
+    rootRef,
+    inputRef,
+    rows,
+    drop: drag.drop,
+    rootDragOver: drag.rootDragOver,
+    rootDrop: drag.dropOnRow,
+    editing,
+    addSection,
+    rowActions,
+    pendingSectionRemoval,
+    cancelSectionRemoval: () => setPendingSectionRemoval(null),
+    confirmSectionRemoval: () => {
+      if (pendingSectionRemoval) removeNode(pendingSectionRemoval);
+      setPendingSectionRemoval(null);
+    },
+  };
 }
 
 export function ContextMenuTreeView(props: TreeViewProps) {
   const { tree, catalog, locale, selectedKey, expanded } = props;
-  const { rootRef, inputRef, rows, drop, editing, addSection, rowActions } =
-    useContextMenuTree(props);
+  const {
+    rootRef,
+    inputRef,
+    rows,
+    drop,
+    rootDragOver,
+    rootDrop,
+    editing,
+    addSection,
+    rowActions,
+    pendingSectionRemoval,
+    cancelSectionRemoval,
+    confirmSectionRemoval,
+  } = useContextMenuTree(props);
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">{t('settings.appearance.contextMenuTree')}</h3>
+        {hasDisabledContextMenuSection(tree.nodes) ? (
+          <button
+            type="button"
+            className={`${treeIconButton} w-auto px-2`}
+            onClick={() => props.onChange(restoreContextMenuSections(tree))}
+          >
+            {t('settings.appearance.contextMenuRestoreHiddenSections')}
+          </button>
+        ) : null}
         <button
           type="button"
           className={`${treeIconButton} w-auto gap-1 px-2`}
           onClick={addSection}
-          disabled={tree.nodes.filter((node) => node.type === 'section').length >= 9}
+          disabled={countContextMenuSections(tree.nodes) >= CONTEXT_MENU_MAX_SECTIONS}
         >
           <Folder size={15} />
           {t('settings.appearance.contextMenuCreateSection')}
@@ -385,10 +440,13 @@ export function ContextMenuTreeView(props: TreeViewProps) {
         ref={rootRef}
         role="tree"
         aria-label={t('settings.appearance.contextMenuTree')}
+        onDragOver={rootDragOver}
+        onDrop={rootDrop}
         className={[
-          'max-h-[34rem] min-h-20 space-y-1 overflow-y-auto rounded-xl border',
+          'max-h-[34rem] min-h-20 space-y-1 overflow-auto rounded-xl border',
           'border-[var(--sniptale-color-border-soft)]',
           'bg-[var(--sniptale-color-surface-canvas)] p-2',
+          drop?.rowKey === 'root' ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
         ].join(' ')}
       >
         {rows.length === 0 ? (
@@ -397,17 +455,12 @@ export function ContextMenuTreeView(props: TreeViewProps) {
           </p>
         ) : null}
         {rows.map((row) => {
-          const { key, node, parentId } = row;
+          const { key, node } = row;
           const label =
             node.type === 'section'
-              ? node.title || t('settings.appearance.contextMenuNewSection')
+              ? contextMenuSectionTitle(node.id, node.title, locale) ||
+                t('settings.appearance.contextMenuNewSection')
               : contextMenuCommandLabel(node, catalog, locale);
-          const position = contextMenuNodePosition(tree, key)!;
-          const parent = parentId
-            ? tree.nodes.find((entry) => entry.type === 'section' && entry.id === parentId)
-            : null;
-          const siblingCount =
-            parent?.type === 'section' ? parent.children.length : tree.nodes.length;
           const unavailable =
             node.type === 'command' &&
             !catalog.find((item) => item.command === node.command)?.available;
@@ -423,15 +476,22 @@ export function ContextMenuTreeView(props: TreeViewProps) {
               unavailable={unavailable}
               editingValue={editing?.key === key ? editing.value : undefined}
               inputRef={inputRef}
-              siblingIndex={position.index}
-              siblingCount={siblingCount}
-              hasSections={tree.nodes.some((entry) => entry.type === 'section')}
               locale={locale}
               actions={rowActions}
             />
           );
         })}
       </div>
+      {pendingSectionRemoval ? (
+        <ProductConfirmDialog
+          title={t('settings.appearance.contextMenuRemoveSection')}
+          message={t('settings.appearance.contextMenuSectionRemovalMessage')}
+          cancelText={t('common.actions.cancel')}
+          confirmText={t('common.actions.delete')}
+          onCancel={cancelSectionRemoval}
+          onConfirm={confirmSectionRemoval}
+        />
+      ) : null}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../../../platform/i18n';
 import { buildAppearanceContextMenuOptions, buildPopupStartupOptions } from '../copy';
 import { AppearanceSectionContent } from './index';
+import { CONTEXT_MENU_PENDING_DRAFT_KEY } from './context-menu-draft-recovery';
 
 type AppearanceSectionContentState = Parameters<typeof AppearanceSectionContent>[0]['state'];
 
@@ -77,20 +78,15 @@ describe('AppearanceSectionContent', () => {
   afterEach(cleanupAppearanceContentTest);
 
   it('renders the context menu controls including the settings toggle', verifyContextMenuControls);
-  it(
-    'toggles the targeted context menu item through the provided handler',
-    verifyContextMenuToggle
-  );
+  it('removes an action and adds it back from the catalog', verifyContextMenuToggle);
   it('does not expose retired raw diagnostics as a settings toggle', verifyRawDiagnosticsHidden);
-  it(
-    'preserves an editor draft and closes its portal when history switches views',
-    verifyEditorViewSwitch
-  );
+  it('preserves a section draft when history switches views', verifyEditorViewSwitch);
   it('keeps a failed save draft and never focuses hidden editor controls', verifyHiddenSave);
 });
 
 function setupAppearanceContentTest(): void {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  window.localStorage.removeItem(CONTEXT_MENU_PENDING_DRAFT_KEY);
 }
 
 function cleanupAppearanceContentTest(): void {
@@ -100,6 +96,7 @@ function cleanupAppearanceContentTest(): void {
   root = null;
   container?.remove();
   container = null;
+  window.localStorage.removeItem(CONTEXT_MENU_PENDING_DRAFT_KEY);
   vi.unstubAllGlobals();
 }
 
@@ -131,27 +128,36 @@ async function verifyContextMenuControls(): Promise<void> {
 function expectContextMenuButtons(): void {
   expect(container?.querySelector('button[aria-label="Показывать меню Sniptale"]')).toBeTruthy();
   expect(container?.querySelector('[role="tree"]')).toBeTruthy();
-  expect(container?.textContent).toContain('Предпросмотр меню');
+  expect(container?.textContent).toContain('Каталог команд');
+  expect(container?.textContent).not.toContain('Предпросмотр меню');
 }
 
 async function verifyContextMenuToggle(): Promise<void> {
   const state = createState();
 
   await renderWithState(state, 'context-menu');
-
-  const commandToggle = container?.querySelector<HTMLButtonElement>(
-    'button[aria-label^="Показывать меню Sniptale: Подготовка страницы"]'
+  const screenshots = container?.querySelector<HTMLElement>(
+    '[data-tree-key="section:recommended-screenshots"]'
   );
-  expect(commandToggle).toBeTruthy();
+  await act(async () =>
+    screenshots?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
 
-  await act(async () => {
-    commandToggle?.click();
-  });
+  const command = container?.querySelector<HTMLElement>(
+    '[data-tree-key="command:sniptale.screenshots.prepare"]'
+  );
+  expect(command).toBeTruthy();
+  const remove = command?.querySelector<HTMLButtonElement>('.justify-end button');
+  await act(async () => remove?.click());
+  const add = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="Добавить команду: Подготовка страницы"]'
+  );
+  expect(add).toBeTruthy();
   expect(state.updateContextMenu).not.toHaveBeenCalled();
-  const save = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
-    (button) => button.textContent === translate('settings.appearance.contextMenuSave', 'ru')
-  );
-  await act(async () => save?.click());
+  await act(async () => add?.click());
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  });
   expect(state.updateContextMenu).toHaveBeenCalledWith({
     layout: expect.objectContaining({ version: 2 }),
   });
@@ -188,13 +194,8 @@ async function verifyEditorViewSwitch(): Promise<void> {
       name.dispatchEvent(new Event('input', { bubbles: true }));
     }
   });
-  const menuSelect = container?.querySelector<HTMLButtonElement>('[aria-controls]');
-  await act(async () => menuSelect?.click());
-  expect(document.querySelector('[role="listbox"]')).not.toBeNull();
-
   await renderWithState(state, 'interface');
-  expect(document.querySelector('[role="listbox"]')).toBeNull();
-  expect(document.activeElement?.getAttribute('aria-current')).toBe('page');
+  expect(container?.querySelector('section[hidden] input:focus')).toBeNull();
   expect(state.updateContextMenu).not.toHaveBeenCalled();
 
   await renderWithState(state, 'context-menu');
@@ -224,7 +225,9 @@ async function verifyHiddenSave(): Promise<void> {
     });
   };
   await clickText(translate('settings.appearance.contextMenuRestore', 'ru'));
-  await clickText(translate('settings.appearance.contextMenuSave', 'ru'));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  });
   expect(updateContextMenu).toHaveBeenCalledTimes(1);
   await renderWithState(state, 'interface');
   await act(async () => rejectWrite?.(new Error('write failed')));
@@ -233,7 +236,7 @@ async function verifyHiddenSave(): Promise<void> {
   expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
     translate('settings.appearance.contextMenuSaveFailed', 'ru')
   );
-  await clickText(translate('settings.appearance.contextMenuSave', 'ru'));
+  await clickText(translate('settings.appearance.contextMenuRetrySave', 'ru'));
   expect(updateContextMenu).toHaveBeenCalledTimes(2);
   expect(updateContextMenu).toHaveBeenLastCalledWith({
     layout: expect.objectContaining({ version: 2 }),
