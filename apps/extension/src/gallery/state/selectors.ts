@@ -260,6 +260,7 @@ export function getFilteredScenarioProjects(args: {
   });
 
   result.sort((left, right) => {
+    if (args.sortMode === 'recently-modified') return compareRecentlyModified(left, right);
     if (args.sortMode === 'oldest') {
       return left.updatedAt - right.updatedAt;
     }
@@ -276,6 +277,18 @@ export function getFilteredScenarioProjects(args: {
   });
 
   return result;
+}
+
+function compareRecentlyModified(
+  left: Pick<GalleryItem, 'id' | 'createdAt' | 'updatedAt'>,
+  right: Pick<GalleryItem, 'id' | 'createdAt' | 'updatedAt'>
+) {
+  const timestamp = (item: typeof left) => {
+    if (Number.isFinite(item.updatedAt) && item.updatedAt >= 0) return item.updatedAt;
+    return Number.isFinite(item.createdAt) && item.createdAt >= 0 ? item.createdAt : 0;
+  };
+  const difference = timestamp(right) - timestamp(left);
+  return difference || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
 }
 
 export function getAllGalleryTags(items: GalleryItem[]): string[] {
@@ -341,6 +354,7 @@ export function getFilteredGalleryItems(args: {
   });
 
   result.sort((left, right) => {
+    if (args.sortMode === 'recently-modified') return compareRecentlyModified(left, right);
     if (args.sortMode === 'oldest') {
       return left.createdAt - right.createdAt;
     }

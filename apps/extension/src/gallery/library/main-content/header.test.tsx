@@ -179,7 +179,7 @@ it('wires compact search, sort, and centered view-mode controls without manual r
   expect(productSelectPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       className: expect.stringContaining('!h-8'),
-      containerClassName: expect.stringContaining('w-[9.5rem]'),
+      containerClassName: expect.stringContaining('w-[10.5rem]'),
       controlSize: 'sm',
       value: 'newest',
     })
@@ -218,6 +218,11 @@ it('keeps canonical name sorts and removes size sorting for scenarios', () => {
     .find((props) => props.value === 'newest');
   expect(sortProps.options).toEqual(
     expect.arrayContaining([{ value: 'name-asc', label: 'gallery.app.sortNameAsc' }])
+  );
+  expect(sortProps.options).toEqual(
+    expect.arrayContaining([
+      { value: 'recently-modified', label: 'gallery.app.sortRecentlyModified' },
+    ])
   );
   expect(sortProps.options).not.toEqual(
     expect.arrayContaining([expect.objectContaining({ value: 'size-desc' })])

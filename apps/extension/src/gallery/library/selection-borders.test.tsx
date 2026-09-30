@@ -89,6 +89,7 @@ it.each([false, true])('uses the same bordered material row in Trash=%s', (trash
     'data-[selected=true]:border-[var(--sniptale-color-border-accent-strong)]'
   );
   expect(row?.className).toContain('border');
+  expect(row?.className).not.toContain('bg-[var(--sniptale-color-accent-soft)]');
   expect(row?.querySelector('button[aria-pressed]')?.className).toContain(
     'focus-visible:ring-[var(--sniptale-color-focus-ring)]'
   );
@@ -132,6 +133,7 @@ it.each([false, true])(
       />
     );
     const card = container.querySelector('[data-ui="gallery.recording-group.card"]');
+    expect(card?.className).not.toContain('var(--sniptale-color-accent-soft)_');
     expect(card?.className.includes('border-[var(--sniptale-color-border-accent-strong)]')).toBe(
       allSelected
     );
@@ -148,6 +150,7 @@ it.each([false, true])(
       />
     );
     const listGroup = container.querySelector('[role="rowgroup"]');
+    expect(listGroup?.className).not.toContain('var(--sniptale-color-accent-soft)_');
     expect(
       listGroup?.className.includes('border-[var(--sniptale-color-border-accent-strong)]')
     ).toBe(allSelected);

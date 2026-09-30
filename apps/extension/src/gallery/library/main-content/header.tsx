@@ -313,12 +313,12 @@ function GalleryHeaderSortControl(
   props: Pick<GalleryMainContentProps, 'folderFilter' | 'onSortModeChange' | 'sortMode'>
 ) {
   return (
-    <ProductSelect
+    <ProductSelect<GalleryMainContentProps['sortMode']>
       aria-label={translate('gallery.app.sortLabel')}
       value={props.sortMode}
-      onChange={(value) => props.onSortModeChange(value as typeof props.sortMode)}
+      onChange={props.onSortModeChange}
       controlSize="sm"
-      containerClassName="w-[9.5rem] shrink-0"
+      containerClassName="w-[10.5rem] shrink-0"
       className="!h-8 !min-h-8 w-full"
       options={[
         { value: 'newest', label: translate('gallery.app.sortNewest') },
@@ -327,7 +327,8 @@ function GalleryHeaderSortControl(
         { value: 'name-desc', label: translate('gallery.app.sortNameDesc') },
         ...(props.folderFilter === 'scenario'
           ? []
-          : [{ value: 'size-desc', label: translate('gallery.app.sortSizeDesc') }]),
+          : [{ value: 'size-desc' as const, label: translate('gallery.app.sortSizeDesc') }]),
+        { value: 'recently-modified', label: translate('gallery.app.sortRecentlyModified') },
       ]}
     />
   );

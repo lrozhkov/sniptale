@@ -23,7 +23,13 @@ export type GalleryFolderCounts = Record<
   'video-project'?: number;
 };
 
-export type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size-desc';
+export type SortMode =
+  | 'newest'
+  | 'oldest'
+  | 'name-asc'
+  | 'name-desc'
+  | 'size-desc'
+  | 'recently-modified';
 export type GalleryScope = LibraryFilterScope;
 export type GalleryViewMode = 'list' | 'compact-grid' | 'large-grid';
 

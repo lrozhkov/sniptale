@@ -108,9 +108,7 @@ function getGalleryGridCardClassName(
           'shadow-sm',
         ].join(' '),
     selected
-      ? viewMode === 'list'
-        ? 'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)]'
-        : 'border-[var(--sniptale-color-border-accent-strong)]'
+      ? 'border-[var(--sniptale-color-border-accent-strong)]'
       : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
   );
 }
@@ -436,7 +434,7 @@ function GalleryRecordingGroupGridCard(props: {
         'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)]',
         'border shadow-sm transition',
         'border-[var(--sniptale-color-border-accent-soft)]',
-        'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-accent-soft)_34%,transparent),',
+        'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
         'color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent))]',
         allSelected && 'border-[var(--sniptale-color-border-accent-strong)]'
       )}
@@ -594,7 +592,7 @@ export function GalleryMediaList(
             key={unit.groupId}
             className={cx(
               'my-2 overflow-hidden rounded-[8px] border',
-              'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_28%,transparent)]',
+              'bg-[var(--sniptale-color-surface-panel)]',
               allSelected
                 ? 'border-[var(--sniptale-color-border-accent-strong)]'
                 : 'border-[var(--sniptale-color-border-accent-soft)]'

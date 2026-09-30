@@ -138,6 +138,13 @@ it('routes refresh through the override when provided and falls back to controll
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
 });
 
+it('offers recently modified sorting and commits its typed mode', () => {
+  const { action, controller } = findAction('gallery-filter-sort-recently-modified');
+  expect(action.title).toBe('gallery.app.sortRecentlyModified');
+  action.onSelect?.();
+  expect(controller.actions.filters.setSortMode).toHaveBeenCalledWith('recently-modified');
+});
+
 it('disables selection and preview actions without context and enables them when context exists', () => {
   const empty = findAction('gallery-selection-delete');
   const selection = findAction('gallery-selection-delete', {

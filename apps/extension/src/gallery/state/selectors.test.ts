@@ -44,6 +44,61 @@ function createItem(overrides: Partial<MediaLibraryItem> = {}): MediaLibraryItem
   };
 }
 
+it('sorts recently modified items by update time, falls back to creation, and breaks ties by id', () => {
+  const items: GalleryItem[] = [
+    createItem({ id: 'new-created', createdAt: 100, updatedAt: 100 }),
+    createItem({ id: 'old-edited', createdAt: 1, updatedAt: 200 }),
+    createItem({ id: 'tie-b', updatedAt: 50 }),
+    createItem({ id: 'tie-a', updatedAt: 50 }),
+    createItem({ id: 'fallback', createdAt: 40, updatedAt: Number.NaN }),
+    createItem({ id: 'unknown', createdAt: Number.NaN, updatedAt: Number.NaN }),
+    createScenarioItem({ id: 'scenario', createdAt: 2, updatedAt: 300 }),
+    createVideoProjectItem({ id: 'video-project', createdAt: 3, updatedAt: 250 }),
+  ];
+  const args = {
+    activeTags: [],
+    folderFilter: 'all' as const,
+    items,
+    search: '',
+    scope: 'all' as const,
+  };
+  expect(getFilteredIds({ ...args, sortMode: 'recently-modified' })).toEqual([
+    'scenario',
+    'video-project',
+    'old-edited',
+    'new-created',
+    'tie-a',
+    'tie-b',
+    'fallback',
+    'unknown',
+  ]);
+  expect(getFilteredIds({ ...args, items: items.slice(0, 2), sortMode: 'newest' })).toEqual([
+    'new-created',
+    'old-edited',
+  ]);
+  expect(
+    getFilteredIds({ ...args, items: [...items].reverse(), sortMode: 'recently-modified' })
+  ).toEqual(getFilteredIds({ ...args, sortMode: 'recently-modified' }));
+});
+
+it('keeps recently modified sorting after filtering and reorders edited media on refresh', () => {
+  const items = [
+    createItem({ id: 'one', filename: 'capture one.png', tags: ['work'], updatedAt: 10 }),
+    createItem({ id: 'two', filename: 'capture two.png', tags: ['work'], updatedAt: 20 }),
+    createItem({ id: 'other', tags: ['other'], updatedAt: 30 }),
+  ];
+  const args = {
+    activeTags: ['work'],
+    folderFilter: 'screenshot' as const,
+    search: 'capture',
+    sortMode: 'recently-modified' as const,
+  };
+  expect(getFilteredIds({ ...args, items })).toEqual(['two', 'one']);
+  expect(
+    getFilteredIds({ ...args, items: [{ ...items[0]!, updatedAt: 40 }, ...items.slice(1)] })
+  ).toEqual(['one', 'two']);
+});
+
 function createCountAndTagItems(): MediaLibraryItem[] {
   return [
     createItem({ id: 'shot', kind: 'screenshot', tags: ['beta', 'alpha'] }),
@@ -547,7 +602,7 @@ it('computes visible grid rows and resolves storage pressure classes', () => {
   expect(getActiveStorageBarClass(undefined)).toBe('bg-emerald-400');
 });
 
-it('keeps later ordinary rows visible after a taller project row and clamps stale scroll', () => {
+it('keeps equal-height project and ordinary rows visible and clamps stale scroll', () => {
   const project = createVideoProjectItem();
   const ordinary = Array.from({ length: 18 }, (_, index) => createItem({ id: `asset-${index}` }));
   const items = [project, ...ordinary];
@@ -558,7 +613,7 @@ it('keeps later ordinary rows visible after a taller project row and clamps stal
     viewMode: 'compact-grid',
     viewportHeight: 200,
   });
-  expect(middle.rowTops[1]).toBeGreaterThan(middle.rowTops[2]! - middle.rowTops[1]!);
+  expect(middle.rowTops[1]).toBe(middle.rowTops[2]! - middle.rowTops[1]!);
   expect(middle.startRow).toBeGreaterThan(0);
   expect(middle.visibleItems).toContain(ordinary[14]);
 

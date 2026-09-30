@@ -33,6 +33,7 @@ const sortModeIcons: Record<SortMode, typeof Search> = {
   'name-asc': Search,
   'name-desc': Search,
   'size-desc': Boxes,
+  'recently-modified': Search,
 };
 
 function buildGalleryFolderFilterActions(
@@ -76,6 +77,7 @@ function buildGallerySortActions(
     'name-asc',
     'name-desc',
     ...(controller.state.filters.folderFilter === 'scenario' ? [] : (['size-desc'] as const)),
+    'recently-modified',
   ];
 
   return sortModes.map((sortMode) => {
@@ -86,6 +88,7 @@ function buildGallerySortActions(
       'name-asc': translate('gallery.app.sortNameAsc'),
       'name-desc': translate('gallery.app.sortNameDesc'),
       'size-desc': translate('gallery.app.sortSizeDesc'),
+      'recently-modified': translate('gallery.app.sortRecentlyModified'),
     }[sortMode];
 
     return createCommandPaletteToggleAction({

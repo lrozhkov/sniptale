@@ -378,6 +378,7 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Сначала новые',
     en: 'Newest first',
   },
+  sortRecentlyModified: { ru: 'Недавно изменённые', en: 'Recently modified' },
   sortOldest: {
     ru: 'Сначала старые',
     en: 'Oldest first',
