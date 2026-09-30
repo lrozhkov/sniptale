@@ -111,3 +111,14 @@ it('does not handle Delete while a preview, menu, dialog or blocking operation d
   del(document.body);
   expect(onDelete).not.toHaveBeenCalled();
 });
+
+it('keeps Delete behind an open menu even when focus is on the list', () => {
+  const menu = document.createElement('div');
+  menu.setAttribute('role', 'menu');
+  document.body.append(menu);
+  expect(del(grid).defaultPrevented).toBe(false);
+  expect(onDelete).not.toHaveBeenCalled();
+  menu.remove();
+  expect(del(grid).defaultPrevented).toBe(true);
+  expect(onDelete).toHaveBeenCalledOnce();
+});

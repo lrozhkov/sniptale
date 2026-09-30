@@ -83,7 +83,7 @@ it('commits Enter immediately while ignoring an active IME composition', () => {
   expect(galleryAppMessages.trashSearchPlaceholder).toEqual({ ru: 'Поиск', en: 'Search' });
   expect(galleryAppMessages.trashSearchLabel).toEqual({
     ru: 'Поиск в корзине',
-    en: 'Search Trash',
+    en: 'Search Trash Bin',
   });
   act(() => typeSearch(input!, 'deleted material'));
 
@@ -100,3 +100,43 @@ it('commits Enter immediately while ignoring an active IME composition', () => {
   expect(commit).toHaveBeenCalledOnce();
   expect(commit).toHaveBeenLastCalledWith('deleted material');
 });
+
+it.each([false, true])(
+  'consumes search Escape and returns to the list without changing its query, Trash=%s',
+  (trashMode) => {
+    const grid = document.createElement('div');
+    grid.tabIndex = -1;
+    container?.append(grid);
+    const searchRef = { current: null as HTMLInputElement | null };
+    const onExit = vi.fn(() => grid.focus());
+    const onSearchChange = vi.fn();
+    const bubble = vi.fn();
+    window.addEventListener('keydown', bubble);
+    act(() =>
+      root?.render(
+        <GalleryHeaderSearchField
+          folderFilter="all"
+          trashMode={trashMode}
+          search="keep this query"
+          onSearchChange={onSearchChange}
+          onSearchCommit={commit}
+          searchNavigation={{ inputRef: searchRef, onExit }}
+        />
+      )
+    );
+    // Render replaces the root children; keep the list surface outside that root.
+    document.body.append(grid);
+    const input = searchRef.current;
+    input?.focus();
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    act(() => input?.dispatchEvent(escape));
+    expect(escape.defaultPrevented).toBe(true);
+    expect(bubble).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(grid);
+    expect(input?.value).toBe('keep this query');
+    expect(onSearchChange).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+    window.removeEventListener('keydown', bubble);
+    grid.remove();
+  }
+);

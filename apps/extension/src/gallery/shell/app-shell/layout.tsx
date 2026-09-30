@@ -1,4 +1,6 @@
-import type { Ref } from 'react';
+import { useRef, type Ref } from 'react';
+import { useGalleryLibraryShortcuts } from '../../library/keyboard/use-library-shortcuts';
+import { isGalleryListInteractionEnabled } from './list-interaction';
 import { GalleryHeader } from '../../library/main-content/header';
 import { GalleryMainContent } from '../../library/main-content';
 import { GalleryOverlays } from './overlays';
@@ -134,6 +136,15 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 }
 
 export function GalleryAppLayout(props: GalleryAppLayoutProps) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  useGalleryLibraryShortcuts({
+    enabled: isGalleryListInteractionEnabled(props.state),
+    gridRef: props.gridViewportRef,
+    searchRef,
+    selectedCount: props.state.selection.selectedItems.length,
+    onSelectAll: props.onSelectAllFiltered,
+    onClearSelection: props.onClearSelection,
+  });
   return (
     <GalleryImportDropTarget
       disabled={props.state.storage.isBusy}
@@ -152,6 +163,10 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
       ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
         <GalleryHeader
+          searchNavigation={{
+            inputRef: searchRef,
+            onExit: () => props.gridViewportRef.current?.focus(),
+          }}
           resultActions={{
             visible: props.state.derived.hasResultContext,
             count: props.state.derived.filteredItems.length,

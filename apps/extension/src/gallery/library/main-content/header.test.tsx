@@ -375,3 +375,17 @@ it('replaces Found with selection actions and restores it after deselection', ()
   renderHeader({ resultActions, trashMode: true });
   expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
 });
+
+it('passes the shell search navigation contract through the header controls', () => {
+  const inputRef = { current: null as HTMLInputElement | null };
+  const onExit = vi.fn();
+  renderHeader({ searchNavigation: { inputRef, onExit }, search: 'preserved' });
+  expect(inputRef.current).toBe(container?.querySelector('input'));
+  act(() =>
+    inputRef.current?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(onExit).toHaveBeenCalledOnce();
+  expect(inputRef.current?.value).toBe('preserved');
+});

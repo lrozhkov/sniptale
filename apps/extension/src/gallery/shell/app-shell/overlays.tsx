@@ -1,3 +1,4 @@
+import { isGalleryListInteractionEnabled } from './list-interaction';
 import { useGalleryDeleteShortcut } from '../../library/deletion/use-gallery-delete-shortcut';
 import { GalleryDeletionMenu } from '../../library/deletion/menu';
 import { getGalleryDeletionContextKey } from '../../library/deletion/types';
@@ -244,19 +245,8 @@ function GalleryPreviewOverlay(props: GalleryPreviewOverlayProps) {
 }
 
 export function GalleryOverlays(props: GalleryAppLayoutProps) {
-  const storage = props.state.storage;
   useGalleryDeleteShortcut({
-    enabled:
-      !storage.isBusy &&
-      !storage.isLoading &&
-      !storage.confirmDialog &&
-      !storage.deletionRequest &&
-      !storage.pendingImport &&
-      !storage.pendingMediaImport &&
-      !storage.pendingWebSnapshotImport &&
-      !storage.pendingExport &&
-      !storage.activeImport &&
-      !props.state.preview.session.item,
+    enabled: isGalleryListInteractionEnabled(props.state),
     selectedItems: props.state.selection.selectedItems,
     gridRef: props.gridViewportRef,
     onDelete: props.onDeleteMany,

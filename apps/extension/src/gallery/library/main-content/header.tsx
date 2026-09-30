@@ -27,7 +27,7 @@ import {
   GallerySelectionBar,
   type GalleryFoundResultsProps,
 } from './selection-bar';
-import { GalleryHeaderSearchField } from './header-search';
+import { GalleryHeaderSearchField, type GallerySearchNavigation } from './header-search';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -443,6 +443,7 @@ function GalleryHeaderControls(
   > &
     GalleryHeaderStorageProps & {
       onSearchCommit: (value: string) => void;
+      searchNavigation?: GallerySearchNavigation;
       stackWhenNarrow: boolean;
     }
 ) {
@@ -456,6 +457,7 @@ function GalleryHeaderControls(
       data-ui="gallery.header.controls"
     >
       <GalleryHeaderSearchField
+        {...(props.searchNavigation ? { searchNavigation: props.searchNavigation } : {})}
         folderFilter={props.folderFilter}
         trashMode={Boolean(props.trashMode)}
         search={props.search}
@@ -526,6 +528,7 @@ export function GalleryHeader(
   > &
     GalleryHeaderStorageProps & {
       onSearchCommit: (value: string) => void;
+      searchNavigation?: GallerySearchNavigation;
       resultActions: GalleryFoundResultsProps & { visible: boolean };
     }
 ) {

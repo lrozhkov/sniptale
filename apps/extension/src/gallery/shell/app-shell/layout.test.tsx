@@ -430,3 +430,61 @@ it('shares the current filtered result count and selection authority with the si
   header.resultActions.onSelectAll();
   expect(props.onSelectAllFiltered).toHaveBeenCalledOnce();
 });
+
+it('wires list keyboard commands and search exit through the existing shell handlers', () => {
+  const props = {
+    ...createLayoutProps(),
+    gridViewportRef: { current: null as HTMLDivElement | null },
+  };
+  const grid = document.createElement('div');
+  grid.tabIndex = -1;
+  document.body.append(grid);
+  props.gridViewportRef.current = grid;
+  props.state.selection.selectedItems = [createMediaItem()];
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  const header = headerPropsMock.mock.lastCall?.[0] as {
+    searchNavigation: {
+      inputRef: { current: HTMLInputElement | null };
+      onExit(): void;
+    };
+  };
+  const input = document.createElement('input');
+  input.value = 'current';
+  document.body.append(input);
+  header.searchNavigation.inputRef.current = input;
+  act(() =>
+    grid.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'KeyA',
+        key: 'a',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(props.onSelectAllFiltered).toHaveBeenCalledOnce();
+  act(() =>
+    grid.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(props.onClearSelection).toHaveBeenCalledOnce();
+  act(() =>
+    grid.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'KeyF',
+        key: 'f',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(document.activeElement).toBe(input);
+  expect(input.selectionEnd).toBe(7);
+  header.searchNavigation.onExit();
+  expect(document.activeElement).toBe(grid);
+  grid.remove();
+  input.remove();
+});

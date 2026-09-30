@@ -1,23 +1,7 @@
 import { useEffect, type RefObject } from 'react';
 import type { GalleryItem } from '../items';
 import type { GalleryDeletionOpening } from './types';
-
-const ownKeyboardControlSelector = [
-  'textarea',
-  'select',
-  'input:not([type="checkbox"])',
-  '[contenteditable]:not([contenteditable="false"])',
-  '[role="listbox"]',
-  '[role="combobox"]',
-  '[role="slider"]',
-  '[role="spinbutton"]',
-  '[role="menu"]',
-  '[role="dialog"]',
-  '[aria-haspopup="listbox"]',
-  '[aria-haspopup="menu"]',
-  '[role="tablist"]',
-  '[role="tree"]',
-].join(',');
+import { hasGalleryKeyboardLayer, isGalleryListKeyboardTarget } from '../keyboard/context';
 
 function canHandleGalleryDelete(event: KeyboardEvent, grid: HTMLElement | null): boolean {
   if (
@@ -31,9 +15,7 @@ function canHandleGalleryDelete(event: KeyboardEvent, grid: HTMLElement | null):
     event.shiftKey
   )
     return false;
-  const target = event.target;
-  if (!(target instanceof HTMLElement) || target.closest(ownKeyboardControlSelector)) return false;
-  return Boolean(grid && (target === document.body || grid.contains(target)));
+  return !hasGalleryKeyboardLayer() && isGalleryListKeyboardTarget(event.target, grid);
 }
 
 export function useGalleryDeleteShortcut({

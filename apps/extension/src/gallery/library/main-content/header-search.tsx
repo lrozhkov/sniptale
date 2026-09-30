@@ -1,12 +1,18 @@
 import { Search, X } from 'lucide-react';
-import { useRef, type Dispatch, type SetStateAction } from 'react';
+import { useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
+
+export interface GallerySearchNavigation {
+  inputRef: RefObject<HTMLInputElement | null>;
+  onExit(): void;
+}
 
 export function GalleryHeaderSearchField(props: {
   folderFilter: FolderFilter;
   trashMode?: boolean;
   search: string;
+  searchNavigation?: GallerySearchNavigation;
   onSearchChange: Dispatch<SetStateAction<string>>;
   onSearchCommit: (value: string) => void;
 }) {
@@ -27,13 +33,19 @@ export function GalleryHeaderSearchField(props: {
         aria-hidden="true"
       />
       <input
-        ref={inputRef}
+        ref={props.searchNavigation?.inputRef ?? inputRef}
         aria-label={translate(
           props.trashMode ? 'gallery.app.trashSearchLabel' : 'gallery.app.searchLabel'
         )}
         value={props.search}
         onChange={(event) => props.onSearchChange(event.target.value)}
         onKeyDown={(event) => {
+          if (event.key === 'Escape' && !event.nativeEvent.isComposing && props.searchNavigation) {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!event.repeat) props.searchNavigation.onExit();
+            return;
+          }
           if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
             event.preventDefault();
             props.onSearchCommit(event.currentTarget.value);
@@ -58,7 +70,7 @@ export function GalleryHeaderSearchField(props: {
           title={translate('gallery.app.clearSearch')}
           onClick={() => {
             props.onSearchCommit('');
-            inputRef.current?.focus();
+            (props.searchNavigation?.inputRef ?? inputRef).current?.focus();
           }}
           className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center
             rounded-[6px] text-[var(--sniptale-color-text-muted)] transition-colors
