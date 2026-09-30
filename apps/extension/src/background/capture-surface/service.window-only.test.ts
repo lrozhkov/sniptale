@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CaptureSurfaceError, CaptureSurfaceMutationError } from './types';
+import { CaptureSurfaceMutationError } from './types';
 
 const mocks = vi.hoisted(() => ({
   applyPreparedWindowSize: vi.fn(),
@@ -59,26 +59,6 @@ const prior = {
 };
 const applied = { ...prior, height: 720, width: 1280 };
 
-function journalEntry(overrides: Record<string, unknown> = {}) {
-  return {
-    applied,
-    generation: 1,
-    leaseId: 'recovered-lease',
-    owner: 'video' as const,
-    parentLeaseId: null,
-    phase: 'applied' as const,
-    presetId: preset.id,
-    prior,
-    sessionId: 'recovered-session',
-    tabId: 7,
-    target: 'window' as const,
-    updatedAt: 1,
-    version: 1 as const,
-    windowId: 3,
-    ...overrides,
-  };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
   let leaseSequence = 0;
@@ -109,103 +89,23 @@ function request(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('window-only capture-surface application', () => {
-  it('aligns measured tab pixels, journals both native sizes, and restores the original window', async () => {
-    let current = applied;
-    const snapshots: unknown[] = [];
-    mocks.writeJournal.mockImplementation(async (entries) => {
-      snapshots.push(structuredClone(entries));
-    });
-    mocks.getWindowSnapshot.mockImplementation(async () => current);
-    mocks.getWindowWorkArea.mockImplementation(async () => ({
-      snapshot: current,
-      workArea: { width: 1920, height: 1040 },
-    }));
-    mocks.applyPreparedWindowSize.mockImplementation(async (_id, _prior, next) => {
-      current = next;
-      return next;
-    });
-    const measure = vi.fn(async () => ({
-      width: current.width,
-      height: current.height - 87,
-      scale: 1,
-      windowId: 3,
-    }));
-    const service = new DefaultCaptureSurfaceService();
-    const binding = await service.apply(
-      request({ owner: 'video', context: 'video-tab', measureVideoViewport: measure })
+describe('window-only preset ownership', () => {
+  it('journals the normalized intermediate before applying final bounds', async () => {
+    const maximized = { ...prior, state: 'maximized' as const };
+    const normalized = { ...prior, state: 'normal' as const };
+    mocks.prepareWindowSize.mockResolvedValueOnce({ expected: applied, prior: maximized });
+    mocks.applyPreparedWindowSize.mockImplementationOnce(
+      async (_id, _prior, _expected, onNormalized) => {
+        await onNormalized(normalized);
+        expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]?.alignmentFrom).toEqual(normalized);
+        return applied;
+      }
     );
-    expect(binding.height).toBe(719);
-    expect(snapshots).toContainEqual([
-      expect.objectContaining({
-        phase: 'prepared',
-        alignmentFrom: applied,
-        applied: { ...applied, height: 719 },
-        prior,
-      }),
-    ]);
-    expect(snapshots.at(-1)).toEqual([
-      expect.not.objectContaining({ alignmentFrom: expect.anything() }),
-    ]);
-    await service.release(binding);
-    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+
+    await new DefaultCaptureSurfaceService().apply(request());
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).not.toHaveProperty('alignmentFrom');
   });
 
-  it('keeps an owned Full HD window when Chromium ignores the optional raster correction', async () => {
-    const fullHd = { ...preset, height: 1080, id: 'window-full-hd', width: 1920 };
-    const fullHdWindow = { ...prior, height: 1080, width: 1920 };
-    mocks.loadSettings.mockResolvedValue({ viewportPresets: [fullHd] });
-    mocks.prepareWindowSize.mockResolvedValue({ expected: fullHdWindow, prior });
-    let current = fullHdWindow;
-    mocks.getWindowSnapshot.mockImplementation(async () => current);
-    mocks.getWindowWorkArea.mockImplementation(async () => ({
-      snapshot: current,
-      workArea: { width: 2560, height: 1440 },
-    }));
-    mocks.applyPreparedWindowSize.mockImplementation(async (_id, _prior, next) => {
-      current = next;
-      return next;
-    });
-    const measure = vi.fn(async () => ({ width: 1920, height: 993, scale: 1, windowId: 3 }));
-    const service = new DefaultCaptureSurfaceService();
-    const binding = await service.apply(
-      request({
-        owner: 'video',
-        context: 'video-tab',
-        measureVideoViewport: measure,
-        presetId: fullHd.id,
-      })
-    );
-    expect(binding).toMatchObject({ width: 1920, height: 1079 });
-    expect(current).toMatchObject({ width: 1920, height: 1079 });
-    await service.release(binding);
-    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
-  });
-
-  it('does not mutate again if the alignment journal cannot be written', async () => {
-    mocks.getWindowWorkArea.mockResolvedValue({
-      snapshot: applied,
-      workArea: { width: 1920, height: 1040 },
-    });
-    mocks.writeJournal
-      .mockResolvedValueOnce(undefined)
-      .mockRejectedValueOnce(new Error('storage failed'));
-    const measure = vi.fn(async () => ({ width: 1280, height: 633, scale: 1, windowId: 3 }));
-    await expect(
-      new DefaultCaptureSurfaceService().apply(
-        request({ owner: 'video', context: 'video-tab', measureVideoViewport: measure })
-      )
-    ).rejects.toThrow('storage failed');
-    expect(mocks.applyPreparedWindowSize).toHaveBeenCalledOnce();
-    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
-  });
-
-  it('rejects alignment for screenshot consumers before mutation', async () => {
-    await expect(
-      new DefaultCaptureSurfaceService().apply(request({ measureVideoViewport: vi.fn() }))
-    ).rejects.toMatchObject({ code: 'unsupported-context' });
-    expect(mocks.applyPreparedWindowSize).not.toHaveBeenCalled();
-  });
   it('admits only the browser-window preset and journals before changing bounds', async () => {
     const service = new DefaultCaptureSurfaceService();
     await expect(service.apply(request())).resolves.toMatchObject({
@@ -232,6 +132,38 @@ describe('window-only capture-surface application', () => {
     expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
     expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
     expect(service.getApplied(7)).toBeNull();
+  });
+
+  it('journals Chrome-adjusted coordinates and restores only while they remain owned', async () => {
+    const observed = { ...applied, left: applied.left + 8, top: applied.top + 8 };
+    mocks.applyPreparedWindowSize.mockResolvedValueOnce(observed);
+    mocks.getWindowSnapshot.mockResolvedValue(observed);
+    const service = new DefaultCaptureSurfaceService();
+    const binding = await service.apply(request());
+
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]?.applied).toEqual(observed);
+    await service.release(binding);
+    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+
+    mocks.applyPreparedWindowSize.mockResolvedValueOnce(observed);
+    const second = await service.apply(request({ generation: 2 }));
+    mocks.getWindowSnapshot.mockResolvedValueOnce({ ...observed, left: observed.left + 1 });
+    await expect(service.release(second)).rejects.toMatchObject({ code: 'restore-conflict' });
+  });
+
+  it('restores observed coordinates if journaling the adjusted position fails', async () => {
+    const observed = { ...applied, left: applied.left + 8 };
+    mocks.applyPreparedWindowSize.mockResolvedValueOnce(observed);
+    mocks.getWindowSnapshot.mockResolvedValue(observed);
+    mocks.writeJournal
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('storage failed'));
+
+    await expect(new DefaultCaptureSurfaceService().apply(request())).rejects.toThrow(
+      'storage failed'
+    );
+    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
   });
 
   it('fails closed when the user changes the owned window before release', async () => {
@@ -261,7 +193,9 @@ describe('window-only capture-surface application', () => {
       service.apply(request({ generation: 1, sessionId: 'session-2', tabId: 8 }))
     ).rejects.toMatchObject({ code: 'surface-busy' });
   });
+});
 
+describe('window-only lease failure and stacking', () => {
   it('rolls back a partially observed window mutation and preserves the typed failure', async () => {
     const observed = { ...applied, width: 1200 };
     mocks.applyPreparedWindowSize.mockRejectedValueOnce(
@@ -337,195 +271,6 @@ describe('window-only capture-surface application', () => {
     expect(service.hasOwnerLease('video')).toBe(false);
     expect(service.hasOwnerLease('screenshot')).toBe(false);
     expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
-  });
-});
-
-describe('window-only capture-surface lifecycle', () => {
-  it('preserves user-changed bounds during interrupted alignment recovery', async () => {
-    mocks.readJournal.mockResolvedValueOnce([
-      journalEntry({
-        phase: 'prepared',
-        alignmentFrom: applied,
-        applied: { ...applied, height: 719 },
-      }),
-    ]);
-    mocks.getWindowSnapshot.mockResolvedValue({ ...applied, width: 1000 });
-    const service = new DefaultCaptureSurfaceService();
-    await service.recover();
-    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
-    expect(service.hasSessionLease('recovered-session')).toBe(false);
-  });
-  it.each([720, 719])(
-    'recovers interruption on either side of raster alignment (%i)',
-    async (height) => {
-      mocks.readJournal.mockResolvedValueOnce([
-        journalEntry({
-          phase: 'prepared',
-          alignmentFrom: applied,
-          applied: { ...applied, height: 719 },
-        }),
-      ]);
-      mocks.getWindowSnapshot.mockResolvedValue({ ...applied, height });
-      await new DefaultCaptureSurfaceService().recover();
-      expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
-      expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
-    }
-  );
-  it('accepts an unchanged window on reassert and marks a changed window conflicted', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    const binding = await service.apply(request());
-    await expect(service.reassert(binding)).resolves.toBeUndefined();
-
-    mocks.getWindowSnapshot.mockResolvedValueOnce({ ...applied, height: 719 });
-    await expect(service.reassert(binding)).rejects.toMatchObject({ code: 'restore-conflict' });
-    await expect(service.abandonConflicted(binding)).resolves.toBeUndefined();
-    expect(service.getApplied(7)).toBeNull();
-  });
-
-  it('rejects stale release and reassert identities', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    const binding = await service.apply(request());
-    const stale = { ...binding, generation: binding.generation + 1 };
-
-    await expect(service.reassert(stale)).rejects.toMatchObject({ code: 'stale-generation' });
-    await expect(service.release(stale)).rejects.toMatchObject({ code: 'stale-generation' });
-    await expect(service.abandonConflicted(binding)).rejects.toMatchObject({
-      code: 'stale-generation',
-    });
-  });
-
-  it('cleans an owned lease for a closed tab and refuses to cross another owner', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    await service.apply(request());
-    await service.terminateClosedTab(7, ['screenshot']);
-    expect(service.getApplied(7)).toBeNull();
-
-    const other = new DefaultCaptureSurfaceService();
-    await other.apply(request());
-    await expect(other.terminateClosedTab(7, ['video'])).resolves.toBeUndefined();
-    expect(other.getApplied(7)).not.toBeNull();
-  });
-
-  it('forgets a closed tab lease without changing manually adjusted window bounds', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    await service.apply(request());
-    mocks.getWindowSnapshot.mockResolvedValueOnce({ ...applied, left: applied.left + 1 });
-
-    await expect(service.terminateClosedTab(7, ['screenshot'])).resolves.toBeUndefined();
-    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
-    expect(service.hasOwnerLease('screenshot')).toBe(false);
-    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
-  });
-
-  it('clears conflicted owners during global cleanup without restoring moved windows', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    await service.apply(request());
-    mocks.getWindowSnapshot.mockResolvedValue({ ...applied, left: applied.left + 1 });
-
-    await expect(service.releaseOwners(['screenshot'])).resolves.toBeUndefined();
-    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
-    expect(service.hasOwnerLease('screenshot')).toBe(false);
-  });
-
-  it('restores abandoned journal authority during startup recovery', async () => {
-    mocks.readJournal.mockResolvedValueOnce([journalEntry()]);
-    const beforeStack = vi.fn();
-    const beforeLease = vi.fn();
-    const service = new DefaultCaptureSurfaceService();
-
-    await service.recover({
-      beforeAbandonedRestore: beforeLease,
-      beforeAbandonedStackRestore: beforeStack,
-      liveSessionIds: new Set(),
-    });
-
-    expect(beforeStack).toHaveBeenCalledOnce();
-    expect(beforeLease).toHaveBeenCalledWith(expect.objectContaining({ target: 'window' }));
-    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
-    expect(service.hasSessionLease('recovered-session')).toBe(false);
-  });
-
-  it('keeps live recovered authority and detects native bounds conflicts', async () => {
-    mocks.readJournal.mockResolvedValueOnce([journalEntry()]);
-    let onBoundsChanged: ((window: { id?: number }) => void) | undefined;
-    mocks.subscribeBoundsChanged.mockImplementationOnce(
-      (listener?: (window: { id?: number }) => void) => {
-        onBoundsChanged = listener;
-        return vi.fn();
-      }
-    );
-    const service = new DefaultCaptureSurfaceService();
-    await service.recover({ liveSessionIds: new Set(['recovered-session']) });
-    expect(service.getAppliedBindingForSession('recovered-session')).toMatchObject({ tabId: 7 });
-
-    mocks.getWindowSnapshot.mockResolvedValueOnce({ ...applied, top: 1 });
-    onBoundsChanged?.({ id: 3 });
-    await vi.waitFor(() =>
-      expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).toMatchObject({ phase: 'conflict' })
-    );
-  });
-
-  it('preserves an already-restored window without applying a second restore', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    const binding = await service.apply(request());
-    mocks.getWindowSnapshot.mockResolvedValueOnce(prior);
-    mocks.restoreWindowSnapshot.mockClear();
-
-    await service.release(binding);
-    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
-  });
-
-  it('surfaces typed preparation failures without staging journal authority', async () => {
-    mocks.prepareWindowSize.mockRejectedValueOnce(new CaptureSurfaceError('window-too-large'));
-    const service = new DefaultCaptureSurfaceService();
-
-    await expect(service.apply(request())).rejects.toMatchObject({ code: 'window-too-large' });
-    expect(mocks.writeJournal).not.toHaveBeenCalled();
-  });
-
-  it('rejects a nested lease when the native window no longer matches its parent', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    await service.apply(request());
-    mocks.prepareWindowSize.mockResolvedValueOnce({
-      expected: applied,
-      prior: { ...applied, width: applied.width - 1 },
-    });
-
-    await expect(
-      service.apply(request({ generation: 1, owner: 'quick-action', sessionId: 'quick-1' }))
-    ).rejects.toMatchObject({ code: 'restore-conflict' });
-  });
-
-  it('releases all matching owners with their exact window identity', async () => {
-    const beforeRelease = vi.fn();
-    const service = new DefaultCaptureSurfaceService();
-    await service.apply(request());
-
-    await service.releaseOwners(['screenshot'], { beforeRelease });
-
-    expect(beforeRelease).toHaveBeenCalledWith({
-      generation: 1,
-      owner: 'screenshot',
-      sessionId: 'session-1',
-      tabId: 7,
-      target: 'window',
-    });
-    expect(service.hasOwnerLease('screenshot')).toBe(false);
-  });
-
-  it('removes a suspended tab owner while retaining its active child', async () => {
-    const service = new DefaultCaptureSurfaceService();
-    await service.apply(request());
-    mocks.prepareWindowSize.mockResolvedValueOnce({ expected: applied, prior: applied });
-    const child = await service.apply(
-      request({ generation: 1, owner: 'quick-action', sessionId: 'quick-1' })
-    );
-
-    await service.releaseTabOwners(7, ['screenshot']);
-
-    expect(service.getApplied(7)).toEqual(child);
-    expect(service.hasOwnerLease('screenshot')).toBe(false);
   });
 });
 

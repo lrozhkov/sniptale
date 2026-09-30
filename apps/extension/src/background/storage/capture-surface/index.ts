@@ -76,7 +76,9 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
     !applied ||
     alignmentFrom === null ||
     (alignmentFrom !== undefined &&
-      (value['owner'] !== 'video' || value['phase'] !== 'prepared')) ||
+      (value['phase'] !== 'prepared' ||
+        (value['owner'] !== 'video' &&
+          (prior.state === 'normal' || alignmentFrom.state !== 'normal')))) ||
     typeof value['phase'] !== 'string' ||
     !phases.has(value['phase'] as CaptureSurfaceJournalPhase) ||
     (value['parentLeaseId'] !== null && typeof value['parentLeaseId'] !== 'string') ||

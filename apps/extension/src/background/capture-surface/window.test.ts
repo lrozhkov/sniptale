@@ -46,7 +46,7 @@ beforeEach(() => {
   mocks.updateWindow.mockResolvedValue(undefined);
 });
 
-describe('capture-surface browser window operations', () => {
+describe('browser window sizing and normalization', () => {
   it('prepares an exact normal-state size clamped inside a negative-coordinate work area', async () => {
     await expect(prepareWindowSize(3, 1280, 720)).resolves.toEqual({
       prior,
@@ -73,6 +73,25 @@ describe('capture-surface browser window operations', () => {
       top: expected.top,
       width: expected.width,
       height: expected.height,
+    });
+  });
+
+  it('accepts Chrome-adjusted position when the requested size and normal state settle', async () => {
+    const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
+    const observed = { ...expected, left: expected.left + 8, top: expected.top + 8 };
+    mocks.getWindow.mockResolvedValue({ id: 3, ...observed });
+    mocks.updateWindow.mockResolvedValue({ id: 3, ...observed });
+
+    await expect(applyPreparedWindowSize(3, prior, expected)).resolves.toEqual(observed);
+  });
+
+  it('rejects a position change after Chrome reports the applied bounds', async () => {
+    const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
+    mocks.updateWindow.mockResolvedValue({ id: 3, ...expected });
+    mocks.getWindow.mockResolvedValue({ id: 3, ...expected, left: expected.left + 8 });
+
+    await expect(applyPreparedWindowSize(3, prior, expected)).rejects.toMatchObject({
+      message: 'verification-failed',
     });
   });
 
@@ -114,6 +133,104 @@ describe('capture-surface browser window operations', () => {
       vi.useRealTimers();
     }
   });
+});
+
+describe('browser window transition and bounds retry', () => {
+  it('waits for Chrome to restore a maximized window before sending bounds', async () => {
+    vi.useFakeTimers();
+    try {
+      const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
+      let current: Omit<typeof prior, 'state'> & { state: 'normal' | 'maximized' } = maximized;
+      let normalReads = 0;
+      mocks.getWindow.mockImplementation(async () => {
+        if (mocks.updateWindow.mock.calls.some(([, update]) => update.state === 'normal')) {
+          normalReads += 1;
+          if (normalReads >= 3 && current.state === 'maximized') {
+            current = { ...prior, state: 'normal' };
+          }
+        }
+        return { id: 3, ...current };
+      });
+      mocks.updateWindow.mockImplementation(async (_id, update) => {
+        if (update.width !== undefined && current.state === 'normal') current = expected;
+      });
+
+      const resize = applyPreparedWindowSize(3, maximized, expected);
+      const result = expect(resize).resolves.toEqual(expected);
+      await vi.advanceTimersByTimeAsync(2500);
+      await result;
+      expect(mocks.updateWindow).toHaveBeenNthCalledWith(2, 3, {
+        left: expected.left,
+        top: expected.top,
+        width: expected.width,
+        height: expected.height,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('records normalized bounds before applying the requested size', async () => {
+    vi.useFakeTimers();
+    try {
+      const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
+      const normalized = { ...prior, state: 'normal' as const };
+      let current: typeof normalized | typeof expected = normalized;
+      mocks.getWindow.mockImplementation(async () => ({ id: 3, ...current }));
+      mocks.updateWindow.mockImplementation(async (_id, update) => {
+        if (update.width !== undefined) current = expected;
+      });
+      const onNormalized = vi.fn(async () => {
+        expect(mocks.updateWindow).toHaveBeenCalledTimes(1);
+      });
+
+      const result = expect(
+        applyPreparedWindowSize(3, maximized, expected, onNormalized)
+      ).resolves.toEqual(expected);
+      await vi.advanceTimersByTimeAsync(1000);
+      await result;
+      expect(onNormalized).toHaveBeenCalledWith(normalized);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a browser bounds update that resolved without changing size', async () => {
+    vi.useFakeTimers();
+    try {
+      const expected = { ...prior, width: 1280, height: 720 };
+      let current = prior;
+      mocks.getWindow.mockImplementation(async () => ({ id: 3, ...current }));
+      mocks.updateWindow.mockImplementation(async () => {
+        if (mocks.updateWindow.mock.calls.length === 2) current = expected;
+      });
+
+      const result = expect(applyPreparedWindowSize(3, prior, expected)).resolves.toEqual(expected);
+      await vi.advanceTimersByTimeAsync(3500);
+      await result;
+      expect(mocks.updateWindow).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails after one retry when the browser keeps the original bounds', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.getWindow.mockResolvedValue({ id: 3, ...prior });
+      const expected = { ...prior, width: 1280, height: 720 };
+
+      const failure = expect(applyPreparedWindowSize(3, prior, expected)).rejects.toMatchObject({
+        message: 'verification-failed',
+        observedSnapshot: prior,
+      });
+      await vi.advanceTimersByTimeAsync(3500);
+      await failure;
+      expect(mocks.updateWindow).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('fails closed when the window manager clamps requested bounds', async () => {
     const expected = { ...prior, width: 1280, height: 720, state: 'normal' as const };
@@ -136,7 +253,9 @@ describe('capture-surface browser window operations', () => {
       observedSnapshot: prior,
     });
   });
+});
 
+describe('browser window restoration', () => {
   it('restores exact bounds before restoring the prior maximized state', async () => {
     mocks.getWindow.mockResolvedValue({ id: 3, ...maximized });
 

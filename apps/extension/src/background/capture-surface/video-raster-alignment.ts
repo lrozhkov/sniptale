@@ -85,7 +85,11 @@ export async function alignVideoCaptureSurface(
   state.entry.alignmentFrom = snapshot;
   state.entry.applied = expected;
   await registry.persist();
-  await applyPreparedWindowSize(state.entry.windowId, snapshot, expected);
+  const observed = await applyPreparedWindowSize(state.entry.windowId, snapshot, expected);
+  if (!windowSnapshotsEqual(observed, expected)) {
+    state.entry.applied = observed;
+    await registry.persist();
+  }
   const verified = await readStableViewport(state, measure);
   const verifiedSize = resolveVideoRasterWindowSize(expected, verified, workArea);
   if (verifiedSize.width !== expected.width || verifiedSize.height !== expected.height) {

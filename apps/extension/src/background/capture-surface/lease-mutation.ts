@@ -2,7 +2,7 @@ import type { CaptureSurfaceLeaseRegistry } from './lease-registry';
 import { transitionCaptureSurfaceSnapshot, type WindowSnapshot } from './restoration';
 import type { CaptureSurfaceLeaseRequest, CaptureSurfaceLeaseState } from './types';
 import { CaptureSurfaceMutationError } from './types';
-import { applyPreparedWindowSize } from './window';
+import { applyPreparedWindowSize, windowSnapshotsEqual } from './window';
 import { alignVideoCaptureSurface } from './video-raster-alignment';
 
 export class CaptureSurfaceLeaseMutation {
@@ -22,11 +22,24 @@ export class CaptureSurfaceLeaseMutation {
     measure?: CaptureSurfaceLeaseRequest['measureVideoViewport']
   ): Promise<void> {
     try {
-      await applyPreparedWindowSize(
+      const observed = await applyPreparedWindowSize(
         state.entry.windowId,
         state.prior as WindowSnapshot,
+        state.entry.applied as WindowSnapshot,
+        async (normalized) => {
+          state.entry.alignmentFrom = normalized;
+          await this.registry.persist();
+        }
+      );
+      const positionChanged = !windowSnapshotsEqual(
+        observed,
         state.entry.applied as WindowSnapshot
       );
+      if (positionChanged || state.entry.alignmentFrom) {
+        state.entry.applied = observed;
+        delete state.entry.alignmentFrom;
+        await this.registry.persist();
+      }
       if (measure) await alignVideoCaptureSurface(state, measure, this.registry);
     } catch (error) {
       if (error instanceof CaptureSurfaceMutationError && error.observedSnapshot) {
