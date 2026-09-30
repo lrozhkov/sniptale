@@ -233,6 +233,18 @@ it('places autosave directly after redo and binds its switch', () => {
   expect(redo.nextElementSibling?.className).toContain('w-px');
   const autosave = redo.nextElementSibling?.nextElementSibling;
   expect(autosave?.getAttribute('data-ui')).toBe('autosave-control');
+  expect(autosave?.nextElementSibling?.getAttribute('data-ui')).toBe(
+    'video-editor.timeline.toolbar.separator'
+  );
+  const separators = container!.querySelectorAll(
+    '[data-ui="video-editor.timeline.toolbar.separator"]'
+  );
+  expect(separators).toHaveLength(4);
+  for (const separator of separators) {
+    expect(separator.classList.contains('h-4')).toBe(true);
+    expect(separator.classList.contains('self-center')).toBe(true);
+    expect(separator.getAttribute('aria-hidden')).toBe('true');
+  }
   act(() => autosave!.querySelector<HTMLButtonElement>('button')!.click());
   act(() => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
   expect(history.onAutosaveChange).toHaveBeenCalledWith(false);

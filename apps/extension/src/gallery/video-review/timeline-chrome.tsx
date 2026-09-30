@@ -222,14 +222,22 @@ export function ReviewHistoryControls(props: {
       <ReviewResetControl busy={props.busy} onReset={async () => props.onHistory('reset')} />
       {props.autosave && (
         <>
-          <span
-            aria-hidden="true"
-            className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
-          />
+          <ReviewToolbarSeparator />
           <ReviewAutosaveControl {...props.autosave} />
+          <ReviewToolbarSeparator />
         </>
       )}
     </>
+  );
+}
+
+function ReviewToolbarSeparator() {
+  return (
+    <span
+      data-ui="gallery.videoReview.toolbar.separator"
+      aria-hidden="true"
+      className="mx-1 h-4 w-px shrink-0 self-center bg-[var(--sniptale-color-border-soft)]"
+    />
   );
 }
 

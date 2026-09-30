@@ -1,4 +1,5 @@
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
+import { ToolbarSeparator } from './separator';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProjectMenu } from './project-menu';
 import { Redo2, Undo2, Magnet } from 'lucide-react';
@@ -146,6 +147,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         </ContentToolbarButton>
         <ToolbarSeparator />
         <TimelineAutosaveControl />
+        <ToolbarSeparator />
         <ProjectTimelineToolbarTrailingActions
           {...createToolbarTrailingControlsProps(controlsProps)}
         />
@@ -167,15 +169,6 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         )}
       </div>
     </div>
-  );
-}
-
-function ToolbarSeparator() {
-  return (
-    <span
-      aria-hidden="true"
-      className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
-    />
   );
 }
 
