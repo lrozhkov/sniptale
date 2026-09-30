@@ -215,3 +215,38 @@ it('projects accessible iframe distances and excludes siblings clipped by the fr
     { direction: 'right', distance: 20, x1: 250, x2: 270, y1: 230 },
   ]);
 });
+
+it('keeps actual long label boxes disjoint around a tiny selected element', () => {
+  const original = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      if (this.tagName !== 'SPAN') return original.call(this);
+      return new DOMRect(
+        Number.parseFloat(this.style.left) || 0,
+        Number.parseFloat(this.style.top) || 0,
+        130,
+        20
+      );
+    }
+  );
+  const parent = box(499, 299, 4, 4).element;
+  const target = box(500, 300, 2, 2, parent).element;
+  const runtime = createDesignReviewMeasurements();
+  runtime.hover(target);
+  runtime.setEnabled(true);
+  runtime.setExpanded(true);
+  const labels = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-ui="content.design-review.measurements"] span')
+  ).filter((label) => !label.hidden);
+  expect(labels.length).toBeGreaterThan(4);
+  const rectangles = labels.map((label) => label.getBoundingClientRect());
+  for (let i = 0; i < rectangles.length; i += 1) {
+    const a = rectangles[i]!;
+    for (const b of rectangles.slice(i + 1)) {
+      expect(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top).toBe(
+        true
+      );
+    }
+  }
+  runtime.dispose();
+});

@@ -1,5 +1,4 @@
 import { Link2, Unlink2 } from 'lucide-react';
-import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
@@ -59,11 +58,18 @@ function LinkToggle(props: {
     props.linked ? 'content.designReview.unlinkedSides' : 'content.designReview.linkedSides'
   );
   return (
-    <ProductGlassIconButton
-      active={props.linked}
+    <button
+      type="button"
       aria-label={title}
       aria-pressed={props.linked}
-      className="h-7 w-7 shrink-0"
+      className={[
+        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent',
+        'hover:brightness-110 disabled:opacity-50 focus:outline-none',
+        'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        props.linked
+          ? 'text-[var(--sniptale-color-accent)]'
+          : 'text-[var(--sniptale-color-text-secondary)]',
+      ].join(' ')}
       data-side-link={props.name}
       disabled={props.disabled}
       onClick={props.onClick}
@@ -74,7 +80,7 @@ function LinkToggle(props: {
       ) : (
         <Unlink2 aria-hidden="true" size={14} />
       )}
-    </ProductGlassIconButton>
+    </button>
   );
 }
 

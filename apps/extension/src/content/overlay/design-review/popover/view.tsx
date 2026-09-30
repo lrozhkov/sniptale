@@ -203,7 +203,7 @@ export function DesignReviewPopover(props: {
           <DesignReviewElementBar
             deleteRequested={view.deleteRequested}
             hasFeedback={props.state.comment.marker !== null}
-            onCopyElement={() => void props.actions.copyElement()}
+            onCopyElement={props.actions.copyElement}
             onCopyPath={() => void props.actions.copyPath()}
             onDeleteRequest={() => {
               props.actions.setSettingsOpen(false);

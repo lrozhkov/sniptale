@@ -84,6 +84,9 @@ it('shows one compact value while all sides are linked', () => {
   expect(container.querySelectorAll('input')).toHaveLength(1);
   const unlink = container.querySelector<HTMLButtonElement>('button[data-side-link="all"]');
   expect(unlink?.getAttribute('aria-pressed')).toBe('true');
+  expect(unlink?.className).toContain('border-0');
+  expect(unlink?.className).toContain('bg-transparent');
+  expect(unlink?.className).not.toContain('sniptale-glass-icon-button');
   act(() => unlink?.click());
   expect(onLinkedChange).toHaveBeenCalledWith(fieldKey, false);
 

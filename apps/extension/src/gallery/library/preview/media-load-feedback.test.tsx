@@ -397,5 +397,5 @@ it('keeps first-open loading quiet, ignores late readiness after close, and resp
   ImagePreloaderStub.deferLoad = false;
   renderNode(<PreviewMedia {...createProps()} />);
   expect(animate).not.toHaveBeenCalled();
-  delete HTMLElement.prototype.animate;
+  Reflect.deleteProperty(HTMLElement.prototype, 'animate');
 });

@@ -13,7 +13,7 @@ const actions: DesignReviewActions = {
     startComposition: vi.fn(),
     updateDraft: vi.fn(),
   },
-  copyElement: vi.fn(async () => undefined),
+  copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
   delete: vi.fn(),
   resetValue: vi.fn(),

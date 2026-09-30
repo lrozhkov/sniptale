@@ -103,7 +103,7 @@ vi.mock('../runtime/record', () => ({
 }));
 
 vi.mock('./clipboard', () => ({
-  copyDesignReviewText: vi.fn(async () => undefined),
+  copyDesignReviewText: vi.fn(async () => true),
 }));
 
 import { useDesignReviewController } from './controller';
