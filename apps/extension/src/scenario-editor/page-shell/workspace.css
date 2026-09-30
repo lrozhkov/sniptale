@@ -959,6 +959,62 @@
 .guide-action-menu button:last-child {
   margin-top: 0.25rem;
 }
+.guide-action-menu--insert .guide-insert-actions {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 4.5rem;
+  padding: 0.375rem 0.25rem 2rem;
+}
+.guide-action-menu--insert .guide-insert-actions > button {
+  position: static;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  box-shadow: none;
+}
+.guide-action-menu--insert .guide-insert-actions > button:is(:hover, :focus-visible),
+.guide-action-menu--insert .guide-insert-actions > button[aria-pressed='true'] {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary-strong);
+  box-shadow: none;
+}
+.guide-action-menu--insert .guide-insert-actions > button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 1px;
+}
+.guide-action-menu--insert .guide-insert-actions > button:disabled {
+  opacity: 0.4;
+}
+.guide-insert-tooltip {
+  position: absolute;
+  inset-inline: 0.25rem;
+  bottom: 0.25rem;
+  display: none;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font: 0.75rem/1.2 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+  pointer-events: none;
+}
+.guide-insert-actions > button:is(:hover, :focus-visible) > .guide-insert-tooltip {
+  display: block;
+}
 
 .guide-library-panel > button {
   min-height: 2rem;
@@ -1004,6 +1060,17 @@
   border-radius: var(--sniptale-radius-sm);
   background: var(--guide-paper) !important;
   color: var(--guide-muted) !important;
+}
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button {
+  border: 0;
+  border-radius: 50%;
+  background: transparent !important;
+  color: var(--guide-ink) !important;
+  box-shadow: none;
+}
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:hover:not(:disabled),
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
+  background: var(--guide-tool-hover-surface) !important;
 }
 .guide-insertion {
   position: relative;
@@ -1908,6 +1975,60 @@ html[data-guide-height-resizing] * {
 .guide-center-panel .guide-block:focus-within > .guide-block-height,
 .guide-center-panel [data-width-preview] > .guide-block-height {
   transition: none;
+}
+
+/* Contextual Guide controls use the same quiet surface in either document theme. */
+.guide-document
+  :is(
+    .guide-item-actions .guide-action-menu-anchor > button,
+    .guide-block-actions .guide-action-menu-anchor > button,
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-image-tools > button,
+    .guide-voice-control > button
+  ) {
+  border: 0;
+  color: var(--guide-ink) !important;
+  box-shadow: none;
+}
+.guide-document
+  :is(
+    .guide-item-actions .guide-action-menu-anchor > button,
+    .guide-block-actions .guide-action-menu-anchor > button,
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-image-tools > button,
+    .guide-voice-control > button
+  ):not(:hover):not(:active):not([aria-expanded='true']):not([aria-pressed='true']) {
+  background: transparent !important;
+}
+.guide-document
+  :is(.guide-item-actions, .guide-block-actions)
+  .guide-action-menu-anchor
+  > button[aria-expanded='true'] {
+  background: var(--guide-tool-hover-surface) !important;
+}
+.guide-page .guide-voice-control > button {
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  box-shadow: none;
+}
+.guide-page .guide-voice-control > button:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary-strong);
+}
+.guide-outline-row .guide-item-actions .guide-action-menu-anchor > button {
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  box-shadow: none;
+}
+.guide-outline-row .guide-item-actions .guide-action-menu-anchor > button:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary-strong);
 }
 
 .guide-block-drop-preview {

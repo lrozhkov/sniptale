@@ -1,4 +1,3 @@
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   FileText,
   Heading,
@@ -86,6 +85,23 @@ export function GuideDocumentInsert({
               ...(before === undefined ? {} : { beforeBlockId: before }),
             }),
         }));
+  const rowStartItem =
+    target.kind === 'block' && target.beforeBlockId && rowStart !== undefined
+      ? {
+          label: t(
+            rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
+          ),
+          icon: <CornerDownLeft size={15} aria-hidden="true" />,
+          pressed: rowStart,
+          onSelect: () =>
+            onOperate({
+              kind: 'set-row-start',
+              itemId: target.itemId,
+              blockId: target.beforeBlockId!,
+              rowStart: !rowStart,
+            }),
+        }
+      : null;
   return (
     <div
       className={`guide-insertion guide-insertion-${target.kind}`}
@@ -93,25 +109,6 @@ export function GuideDocumentInsert({
       data-insert-before={before ?? 'end'}
     >
       <div className="guide-insertion-chrome">
-        {target.kind === 'block' && target.beforeBlockId && rowStart !== undefined && (
-          <ContentToolbarButton
-            title={t(
-              rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
-            )}
-            aria-pressed={rowStart}
-            disabled={disabled}
-            onClick={() =>
-              onOperate({
-                kind: 'set-row-start',
-                itemId: target.itemId,
-                blockId: target.beforeBlockId!,
-                rowStart: !rowStart,
-              })
-            }
-          >
-            <CornerDownLeft size={15} aria-hidden="true" />
-          </ContentToolbarButton>
-        )}
         <GuideActionMenu
           label={t(
             target.kind === 'item'
@@ -119,9 +116,10 @@ export function GuideDocumentInsert({
               : 'scenario.editor.guideAddBlock'
           )}
           icon={<Plus size={16} aria-hidden="true" />}
-          items={items}
+          items={rowStartItem ? [...items, rowStartItem] : items}
           disabled={disabled}
           openOnHover
+          variant="insert"
         />
       </div>
     </div>
