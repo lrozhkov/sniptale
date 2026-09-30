@@ -84,6 +84,7 @@ function createCallbackProps() {
     onViewModeChange: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
   };
 }
 

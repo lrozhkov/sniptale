@@ -1,3 +1,7 @@
+import type {
+  GallerySelectionRange,
+  GalleryToggleSelectionOptions,
+} from '../keyboard/selection-range';
 import type { GalleryDeletionOpening } from '../deletion/types';
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
@@ -12,6 +16,9 @@ import type { GalleryItem } from '../items';
 
 export interface GalleryMainContentProps {
   trashMode?: boolean;
+  keyboardEnabled: boolean;
+  navigationContext: string;
+  previewOpen: boolean;
   trashItemCount?: number;
   allTags?: string[];
   banner: string | null;
@@ -47,6 +54,7 @@ export interface GalleryMainContentProps {
   onSelectionBackup: () => void;
   onSelectionZip: () => void;
   onSortModeChange: Dispatch<SetStateAction<SortMode>>;
-  onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  onToggleSelection: (assetId: string, options?: GalleryToggleSelectionOptions) => void;
+  onSelectRange: (range: GallerySelectionRange) => ReadonlySet<string>;
   onViewModeChange: Dispatch<SetStateAction<GalleryViewMode>>;
 }

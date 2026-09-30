@@ -1,3 +1,7 @@
+import type {
+  GallerySelectionRange,
+  GalleryToggleSelectionOptions,
+} from '../../library/keyboard/selection-range';
 import type { GalleryDeletionOpening } from '../../library/deletion/types';
 import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
@@ -99,7 +103,8 @@ export interface GalleryAppLayoutProps {
   onSelectionZip: () => void;
   onDeleteMany: (items: GalleryItem[], opening?: GalleryDeletionOpening) => void;
   onClearSelection: () => void;
-  onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  onToggleSelection: (assetId: string, options?: GalleryToggleSelectionOptions) => void;
+  onSelectRange: (range: GallerySelectionRange) => ReadonlySet<string>;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;
   onProjectOpen?: (item: GalleryItem) => void;
   onRecordingGroupOpen?: (item: GalleryItem) => void;

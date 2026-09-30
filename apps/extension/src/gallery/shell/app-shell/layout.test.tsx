@@ -107,6 +107,7 @@ function createLayoutProps() {
     onViewModeChange: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
     state: createGalleryState(),
     viewMode: 'compact-grid' as const,
   };

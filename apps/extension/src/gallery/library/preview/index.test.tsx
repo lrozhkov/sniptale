@@ -309,12 +309,13 @@ it('hides the inspector sidebar when collapsed and closes on Escape', () => {
   expect(props.onClose).toHaveBeenCalledTimes(1);
 });
 
-it('focuses Trash Restore and returns focus to opener or surviving search on close', async () => {
+it('retains external opener and search fallback when the list owns its own preview return', async () => {
   const opener = document.createElement('button');
   document.body.append(opener);
   opener.focus();
   const props = createProps({
     trashMode: true,
+    listFocusReturn: true,
     inspectorCollapsed: true,
     onRestoreTrash: vi.fn(async () => true),
   });

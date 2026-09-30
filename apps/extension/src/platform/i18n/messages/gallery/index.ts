@@ -1,3 +1,4 @@
+import { galleryKeyboardMessages } from './keyboard';
 import { galleryVideoReviewMessages } from './video-review';
 import { defineMessageSource } from '../source';
 import { galleryAppMessages } from './app';
@@ -9,6 +10,7 @@ import { galleryStorageErrorMessages } from './storage-errors';
 
 export const galleryMessages = defineMessageSource({
   app: galleryAppMessages,
+  keyboard: galleryKeyboardMessages,
   backupExportModal: galleryBackupExportModalMessages,
   preview: galleryPreviewMessages,
   videoReview: galleryVideoReviewMessages,

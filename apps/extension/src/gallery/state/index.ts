@@ -1,3 +1,7 @@
+import {
+  resolveGallerySelectionRange,
+  type GalleryToggleSelectionOptions,
+} from '../library/keyboard/selection-range';
 import { useEffect, useRef } from 'react';
 import type { GalleryAppStateController, GalleryViewMode } from './types';
 import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../library/items';
@@ -17,11 +21,14 @@ function toggleSelectedGalleryItem(
   filteredItems: GalleryItem[],
   selectionAnchorRef: { current: string | null },
   assetId: string,
-  shiftKey = false
+  options: GalleryToggleSelectionOptions = {}
 ) {
-  const selectableIds = filteredItems.filter(isGallerySelectableItem).map((item) => item.id);
+  const selectable = new Set(filteredItems.filter(isGallerySelectableItem).map((item) => item.id));
+  const selectableIds = options.orderedIds
+    ? options.orderedIds.filter((id) => selectable.has(id))
+    : [...selectable];
 
-  if (shiftKey && selectionAnchorRef.current) {
+  if (options.shiftKey && selectionAnchorRef.current) {
     const rangeStart = selectableIds.indexOf(selectionAnchorRef.current);
     const rangeEnd = selectableIds.indexOf(assetId);
 
@@ -162,6 +169,15 @@ function buildGalleryAppActions(args: {
       setTagDrafts: args.preview.actions.setTagDrafts,
     },
     selection: {
+      selectRange: (range) => {
+        const next = resolveGallerySelectionRange(
+          range,
+          new Set(args.derived.filteredItems.filter(isGallerySelectableItem).map((item) => item.id))
+        );
+        if (!next) return args.filters.state.selectedIds;
+        args.filters.actions.setSelectedIds(next);
+        return next;
+      },
       setSelectedIds: args.filters.actions.setSelectedIds,
       setSelectionTagDraft: args.filters.actions.setSelectionTagDraft,
       toggleSelection: (assetId, options) =>
@@ -170,7 +186,7 @@ function buildGalleryAppActions(args: {
           args.derived.filteredItems,
           args.selectionAnchorRef,
           assetId,
-          options?.shiftKey
+          options
         ),
     },
     storage: {

@@ -192,6 +192,7 @@ function renderPreviewOverlayPanel(
 ) {
   return (
     <PreviewPanel
+      listFocusReturn
       trashMode={Boolean(
         props.state.filters.trashMode || previewItem.lifecycle?.trashedAt !== undefined
       )}

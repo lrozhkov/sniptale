@@ -16,6 +16,8 @@ export interface PreviewPanelProps {
   onPresented?: ((presentation: GalleryPreviewPresentation) => void) | undefined;
   initialMode?: 'edit';
   trashMode?: boolean;
+  /** The mounted library list restores focus for previews opened from its material wrappers. */
+  listFocusReturn?: boolean;
   onRestoreTrash?: () => Promise<boolean>;
   restoreBusy?: boolean;
   allTags?: string[];

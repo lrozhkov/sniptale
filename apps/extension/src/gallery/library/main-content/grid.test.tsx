@@ -41,6 +41,10 @@ function createProps(overrides: Partial<Parameters<typeof GalleryGrid>[0]> = {})
     search: '',
     onPreviewOpen: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
+    keyboardEnabled: true,
+    previewOpen: false,
+    navigationContext: 'test',
     selectedIds: new Set<string>(),
     viewMode: 'compact-grid' as const,
     visibleItems: [],
@@ -129,7 +133,10 @@ it('renders visible items and wires preview and selection actions', () => {
 
   expect(props.gridViewportRef.current).toBeInstanceOf(HTMLDivElement);
   expect(surface?.className).toContain('p-4');
-  expect(props.onToggleSelection).toHaveBeenCalledWith('asset-1', { shiftKey: false });
+  expect(props.onToggleSelection).toHaveBeenCalledWith('asset-1', {
+    shiftKey: false,
+    orderedIds: ['asset-1', 'asset-2'],
+  });
   expect(props.onPreviewOpen).toHaveBeenCalledWith(firstItem);
   expect(container?.textContent).toContain('alpha');
   expect(container?.textContent).toContain('date:1');
@@ -178,4 +185,22 @@ it('renders scenario items inside the shared grid flow', () => {
   expect(surface?.className).not.toContain('p-4');
   expect(container?.textContent).toContain('flow');
   expect(container?.textContent).toContain('date:1');
+});
+
+it('keeps a Tab entry when the active card is outside the virtualized window', () => {
+  const items = ['first', 'last'].map((id) => createMediaItem({ id, filename: id }));
+  const props = createProps({
+    filteredItems: items,
+    visibleItems: [items[1]!],
+    gridMetrics: { columnCount: 1, rowTops: [0, 100, 200], startRow: 1, totalRows: 2 },
+  });
+  renderGrid(props);
+  const surface = container?.querySelector<HTMLElement>('[data-ui="gallery.content.surface"]');
+  expect(surface?.tabIndex).toBe(0);
+  act(() => surface?.focus());
+  renderGrid({ ...props, visibleItems: items, gridMetrics: { ...props.gridMetrics, startRow: 0 } });
+  expect(container?.querySelector('[data-gallery-keyboard-id="first"]')).toBe(
+    document.activeElement
+  );
+  expect(surface?.tabIndex).toBe(-1);
 });

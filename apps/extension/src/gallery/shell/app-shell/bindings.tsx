@@ -210,6 +210,7 @@ function buildGallerySelectionHandlers(
         )
       ),
     onToggleSelection: controller.actions.selection.toggleSelection,
+    onSelectRange: controller.actions.selection.selectRange,
   };
 }
 

@@ -1,3 +1,4 @@
+import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { Search, X } from 'lucide-react';
 import { useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { translate } from '../../../platform/i18n';
@@ -36,6 +37,10 @@ export function GalleryHeaderSearchField(props: {
         ref={props.searchNavigation?.inputRef ?? inputRef}
         aria-label={translate(
           props.trashMode ? 'gallery.app.trashSearchLabel' : 'gallery.app.searchLabel'
+        )}
+        title={getGalleryShortcutTitle(
+          translate(props.trashMode ? 'gallery.app.trashSearchLabel' : 'gallery.app.searchLabel'),
+          getGalleryPrimaryShortcut('F')
         )}
         value={props.search}
         onChange={(event) => props.onSearchChange(event.target.value)}

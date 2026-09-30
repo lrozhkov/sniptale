@@ -1,3 +1,4 @@
+import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { useState } from 'react';
 import { Check, ChevronDown, RotateCcw, Search, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -327,6 +328,10 @@ export function GalleryFacetFilters(props: GallerySidebarProps) {
             <button
               type="button"
               disabled={props.filteredItemCount === 0}
+              title={getGalleryShortcutTitle(
+                translate('gallery.app.selectAllResults'),
+                getGalleryPrimaryShortcut('A')
+              )}
               onClick={props.onSelectAll}
               className="shrink-0 rounded-[7px] px-2 py-1 text-xs font-semibold
                 text-[var(--sniptale-color-text-primary)] transition-colors

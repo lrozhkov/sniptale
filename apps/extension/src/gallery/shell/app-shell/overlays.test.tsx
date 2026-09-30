@@ -120,6 +120,7 @@ function createLayoutProps() {
     onViewModeChange: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
     state: createGalleryState(),
     viewMode: 'compact-grid' as const,
   };
@@ -503,6 +504,7 @@ it('marks a trashed preview read-only and wires its single restore action', asyn
   act(() => root?.render(<GalleryOverlays {...props} />));
   const preview = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
   expect(preview.trashMode).toBe(true);
+  expect(previewPanelPropsMock.mock.lastCall?.[0].listFocusReturn).toBe(true);
   expect(await preview.onRestoreTrash?.()).toBe(true);
   expect(props.onPreviewRestoreTrash).toHaveBeenCalledWith(item);
 });

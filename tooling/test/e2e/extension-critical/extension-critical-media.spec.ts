@@ -1052,3 +1052,108 @@ browserTest(
     }
   }
 );
+
+browserTest(
+  'gallery keyboard navigation materializes offscreen cards and returns from preview at HD',
+  async ({ page }) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const body = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (char) =>
+          char.charCodeAt(0)
+        );
+        window.__sniptaleHarnessBootstrap = {
+          storage: { 'sniptale-locale-preference': 'ru' },
+          mediaLibrary: Array.from({ length: 67 }, (_, index) => ({
+            entry: {
+              id: `keyboard-${index}`,
+              kind: 'screenshot',
+              source: { kind: 'screenshot' },
+              filename: `keyboard-${String(index).padStart(2, '0')}.png`,
+              originalFilename: 'keyboard.png',
+              createdAt: 100 - index,
+              updatedAt: 100 - index,
+              size: body.byteLength,
+              mimeType: 'image/png',
+              width: 1,
+              height: 1,
+              duration: null,
+              sourceUrl: null,
+              sourceTitle: null,
+              sourceFavicon: null,
+              tags: [],
+              lifecycle: {
+                savedAt: 1,
+                storageClass: 'library',
+                updatedAt: 1,
+                ...(index >= 64 ? { trashedAt: Date.now() } : {}),
+              },
+              blob: new Blob([body], { type: 'image/png' }),
+            },
+          })),
+        };
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.addStyleTag({
+        content: await readFile('apps/extension/src/gallery/shell/app-shell/startup.css', 'utf8'),
+      });
+      const grid = page.locator('[data-ui="gallery.content.surface"]');
+      const card = (id: number) => grid.locator(`[data-gallery-keyboard-id="keyboard-${id}"]`);
+      for (const mode of [
+        'gallery.app.viewModeCompactGrid',
+        'gallery.app.viewModeLargeGrid',
+        'gallery.app.viewModeList',
+      ] as const) {
+        await page.getByRole('button', { name: translate(mode, 'ru'), exact: true }).click();
+        await expect(card(0)).toBeAttached();
+        await card(0).focus();
+        await page.keyboard.press('End');
+        await expect(card(63)).toBeFocused();
+        expect(await grid.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+        const bounds = (await card(63).boundingBox())!;
+        const viewport = (await grid.boundingBox())!;
+        expect(bounds.y).toBeGreaterThanOrEqual(viewport.y);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.y + viewport.height + 1);
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(card(63)).toBeFocused();
+        await page.keyboard.press('Home');
+        await expect(card(0)).toBeFocused();
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        await page.keyboard.press('Space');
+        await expect(page.locator('[data-ui="gallery.selection.toolbar"]')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('[data-ui="gallery.selection.toolbar"]')).toHaveCount(0);
+      }
+      await page
+        .getByRole('button', { name: translate('gallery.keyboard.title', 'ru'), exact: true })
+        .click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(
+        page.getByRole('button', { name: translate('gallery.keyboard.title', 'ru'), exact: true })
+      ).toBeFocused();
+      await page.locator('[data-ui="gallery.sidebar.footer"]').getByRole('button').click();
+      await expect(card(64)).toBeAttached();
+      await card(64).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.locator('[data-ui="gallery.preview.restore"]').click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(card(64)).toHaveCount(0);
+      await expect(card(65)).toBeFocused();
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+);

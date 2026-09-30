@@ -1,3 +1,4 @@
+import { hasGalleryKeyboardLayer } from '../keyboard/context';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
 import { translate } from '../../../platform/i18n';
@@ -268,18 +269,23 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
   useEffect(() => {
     if (!props.trashMode) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialogRef.current
-      ?.querySelector<HTMLButtonElement>('[data-ui="gallery.preview.restore"]')
-      ?.focus();
+    const managedByList =
+      props.listFocusReturn && Boolean(opener?.closest('[data-gallery-keyboard-id]'));
     return () => {
       queueMicrotask(() => {
-        if (document.querySelector('[data-ui="gallery.preview.surface"]')) return;
+        if (managedByList || hasGalleryKeyboardLayer()) return;
         const fallback = document.querySelector<HTMLElement>(
           '[data-ui="gallery.header.search"] input, [data-ui="gallery.sidebar.footer"] button'
         );
         (opener?.isConnected ? opener : fallback)?.focus();
       });
     };
+  }, [props.trashMode, props.listFocusReturn]);
+  useEffect(() => {
+    if (props.trashMode)
+      dialogRef.current
+        ?.querySelector<HTMLButtonElement>('[data-ui="gallery.preview.restore"]')
+        ?.focus();
   }, [props.trashMode, item.id]);
 
   return (

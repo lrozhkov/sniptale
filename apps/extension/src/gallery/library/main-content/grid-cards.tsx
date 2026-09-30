@@ -1,3 +1,5 @@
+import type { GalleryCardNavigation } from './keyboard-navigation';
+import { buildGalleryListUnits } from './recording-units';
 import { GalleryProjectDetails } from '../ui/project-presentation';
 import { GRID_GAP } from '../constants';
 import { getGalleryGridCardHeight, getGalleryGridCardWidth } from '../grid-layout';
@@ -38,6 +40,11 @@ const GALLERY_LIST_ROW_CLASS_NAME = [
   'hover:bg-[var(--sniptale-color-surface-hover)]',
 ].join(' ');
 
+const galleryMaterialFocusClassName = [
+  'focus-visible:outline-2 focus-visible:outline-offset-[-3px]',
+  'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+].join(' ');
+
 type GalleryPreviewOpenHandler = (
   item: GalleryItem,
   options?: { inspectorCollapsed?: boolean }
@@ -45,52 +52,15 @@ type GalleryPreviewOpenHandler = (
 
 type GalleryGridCardProps = {
   item: GalleryItem;
+  navigation?: GalleryCardNavigation;
   onPreviewOpen: GalleryPreviewOpenHandler;
   onProjectOpen?: (item: GalleryItem) => void;
   previewRecoveryAllowed: boolean;
-  onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  onToggleSelection: GalleryMainContentProps['onToggleSelection'];
   selected: boolean;
   style?: { height?: string; left?: string; top?: string; width?: string };
   viewMode: GalleryMainContentProps['viewMode'];
 };
-
-type GalleryListUnit =
-  | { kind: 'item'; item: GalleryItem }
-  | { groupId: string; items: GalleryItem[]; kind: 'recording-group'; memberCount: number };
-
-function buildGalleryListUnits(items: GalleryItem[]): GalleryListUnit[] {
-  const groupedItems = new Map<string, GalleryItem[]>();
-  items.forEach((item) => {
-    if (!isGalleryMediaItem(item) || !item.recordingGroupView) return;
-    const members = groupedItems.get(item.recordingGroupView.groupId) ?? [];
-    members.push(item);
-    groupedItems.set(item.recordingGroupView.groupId, members);
-  });
-  groupedItems.forEach((members) => {
-    members.sort((left, right) => {
-      if (!isGalleryMediaItem(left) || !isGalleryMediaItem(right)) return 0;
-      return (left.recordingGroupView?.order ?? 0) - (right.recordingGroupView?.order ?? 0);
-    });
-  });
-
-  const emittedGroups = new Set<string>();
-  return items.flatMap((item): GalleryListUnit[] => {
-    if (!isGalleryMediaItem(item) || !item.recordingGroupView) {
-      return [{ item, kind: 'item' }];
-    }
-    const { groupId, memberCount } = item.recordingGroupView;
-    if (emittedGroups.has(groupId)) return [];
-    emittedGroups.add(groupId);
-    return [
-      {
-        groupId,
-        items: groupedItems.get(groupId) ?? [item],
-        kind: 'recording-group',
-        memberCount,
-      },
-    ];
-  });
-}
 
 function getGalleryGridCardClassName(
   selected: boolean,
@@ -179,7 +149,7 @@ function GalleryGridCardSelectionControl(props: {
   canSelect: boolean;
   isList: boolean;
   itemId: string;
-  onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  onToggleSelection: GalleryMainContentProps['onToggleSelection'];
   selected: boolean;
 }) {
   if (!props.canSelect || props.isList) {
@@ -251,8 +221,16 @@ function GalleryGridCard(props: GalleryGridCardProps) {
             ? { position: 'absolute', ...props.style }
             : undefined
       }
-      className={getGalleryGridCardClassName(props.selected, props.viewMode)}
-      role={isList ? 'row' : undefined}
+      className={cx(
+        getGalleryGridCardClassName(props.selected, props.viewMode),
+        props.navigation && galleryMaterialFocusClassName
+      )}
+      role={isList ? 'row' : 'group'}
+      data-gallery-keyboard-id={props.item.id}
+      tabIndex={
+        props.navigation ? (props.navigation.activeId === props.item.id ? 0 : -1) : undefined
+      }
+      aria-label={props.item.filename}
       data-ui={isList ? 'gallery.list.row' : undefined}
       data-selected={isList ? props.selected : undefined}
     >
@@ -412,6 +390,8 @@ function GalleryRecordingGroupDetails(props: {
 }
 
 function GalleryRecordingGroupGridCard(props: {
+  representativeId: string;
+  navigation?: GalleryCardNavigation;
   items: GalleryItem[];
   onPreviewOpen: GalleryPreviewOpenHandler;
   onRecordingGroupOpen?: (item: GalleryItem) => void;
@@ -430,8 +410,19 @@ function GalleryRecordingGroupGridCard(props: {
     <article
       style={props.style ? { position: 'absolute', ...props.style } : undefined}
       data-ui="gallery.recording-group.card"
+      data-gallery-keyboard-id={props.representativeId}
+      tabIndex={
+        props.navigation
+          ? props.navigation.activeId === props.representativeId
+            ? 0
+            : -1
+          : undefined
+      }
+      role="group"
+      aria-label={`${translate('gallery.preview.multiTrackRecording')}: ${firstItem.filename}`}
       className={cx(
         'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)]',
+        props.navigation && galleryMaterialFocusClassName,
         'border shadow-sm transition',
         allSelected
           ? 'border-[var(--sniptale-color-border-accent-strong)]'
@@ -486,10 +477,11 @@ function GalleryRecordingGroupGridCard(props: {
             type="button"
             aria-label={translate('gallery.app.selectRecordingGroup')}
             aria-pressed={allSelected}
-            onClick={() => {
+            onClick={(event) => {
               selectableItems.forEach((item) => {
-                if (allSelected || !props.selectedIds.has(item.id)) {
-                  props.onToggleSelection(item.id);
+                if (event.shiftKey || allSelected || !props.selectedIds.has(item.id)) {
+                  if (event.shiftKey) props.onToggleSelection(item.id, { shiftKey: true });
+                  else props.onToggleSelection(item.id);
                 }
               });
             }}
@@ -520,7 +512,7 @@ export function GalleryMediaList(
     | 'onProjectOpen'
     | 'onToggleSelection'
     | 'selectedIds'
-  >
+  > & { navigation?: GalleryCardNavigation }
 ) {
   const units = buildGalleryListUnits(props.filteredItems);
 
@@ -570,6 +562,7 @@ export function GalleryMediaList(
             <GalleryGridCard
               key={unit.item.id}
               item={unit.item}
+              {...(props.navigation ? { navigation: props.navigation } : {})}
               onPreviewOpen={props.onPreviewOpen}
               {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
               onToggleSelection={props.onToggleSelection}
@@ -635,6 +628,7 @@ export function GalleryMediaList(
               <GalleryGridCard
                 key={item.id}
                 item={item}
+                {...(props.navigation ? { navigation: props.navigation } : {})}
                 onPreviewOpen={props.onPreviewOpen}
                 {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
                 onToggleSelection={props.onToggleSelection}
@@ -682,7 +676,7 @@ export function GalleryGridCanvas(
     | 'selectedIds'
     | 'viewMode'
     | 'visibleItems'
-  >
+  > & { navigation?: GalleryCardNavigation }
 ) {
   const { gridMetrics, gridWidth, onPreviewOpen, onToggleSelection, selectedIds, viewMode } = props;
   const cardWidth = getGalleryGridCardWidth(gridWidth, gridMetrics.columnCount);
@@ -711,6 +705,8 @@ export function GalleryGridCanvas(
             <GalleryRecordingGroupGridCard
               key={`recording-group:${isGalleryMediaItem(item) ? item.recordingGroupView?.groupId : item.id}`}
               items={groupItems}
+              representativeId={item.id}
+              {...(props.navigation ? { navigation: props.navigation } : {})}
               onPreviewOpen={onPreviewOpen}
               {...(!props.trashMode && props.onRecordingGroupOpen
                 ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
@@ -727,6 +723,7 @@ export function GalleryGridCanvas(
           <GalleryGridCard
             key={item.id}
             item={item}
+            {...(props.navigation ? { navigation: props.navigation } : {})}
             onPreviewOpen={onPreviewOpen}
             {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
             onToggleSelection={onToggleSelection}

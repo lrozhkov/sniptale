@@ -1,3 +1,4 @@
+import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
 import { isGalleryScenarioExportItem } from '../items';
 import { Archive, Download, FolderArchive, Trash2, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -80,7 +81,7 @@ function GallerySelectionActions(
       <button
         type="button"
         aria-label={translate('common.actions.delete')}
-        title={translate('common.actions.delete')}
+        title={getGalleryShortcutTitle(translate('common.actions.delete'), 'Del')}
         onClick={(event) =>
           props.onDeleteMany(props.selectedItems, {
             anchor: event.currentTarget,
@@ -144,7 +145,7 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
       <button
         type="button"
         aria-label={translate('gallery.app.clearSelection')}
-        title={translate('gallery.app.clearSelection')}
+        title={getGalleryShortcutTitle(translate('gallery.app.clearSelection'), 'Escape')}
         onClick={onClearSelection}
         className={galleryClearSelectionClassName}
       >
@@ -212,6 +213,10 @@ export function GalleryFoundResultsBar(props: GalleryFoundResultsProps) {
         type="button"
         disabled={props.disabled || props.count === 0}
         className={gallerySelectionActionClassName}
+        title={getGalleryShortcutTitle(
+          translate('gallery.app.selectAllResults'),
+          getGalleryPrimaryShortcut('A')
+        )}
         onClick={props.onSelectAll}
       >
         {translate('gallery.app.selectAllResults')}

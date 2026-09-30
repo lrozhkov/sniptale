@@ -96,6 +96,19 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 
   return (
     <GalleryMainContent
+      navigationContext={JSON.stringify([
+        state.filters.trashMode,
+        state.filters.folderFilter,
+        state.filters.scope,
+        state.filters.appliedSearch,
+        state.filters.activeTags,
+        state.filters.facetFilters,
+        state.filters.activeSavedView?.id,
+        state.filters.sortMode,
+        props.viewMode,
+      ])}
+      keyboardEnabled={isGalleryListInteractionEnabled(state)}
+      previewOpen={Boolean(state.preview.session.item)}
       trashMode={Boolean(state.filters.trashMode)}
       trashItemCount={state.derived.allItems.length}
       allTags={state.derived.allTags}
@@ -130,6 +143,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       onSelectionZip={props.onSelectionZip}
       onSortModeChange={props.onSortModeChange}
       onToggleSelection={props.onToggleSelection}
+      onSelectRange={props.onSelectRange}
       onViewModeChange={props.onViewModeChange}
     />
   );

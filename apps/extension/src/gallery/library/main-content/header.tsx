@@ -1,3 +1,4 @@
+import { GalleryKeyboardHelp } from './keyboard-help';
 import type { GalleryDeletionOpening } from '../deletion/types';
 import { useEffect, useRef, useState, type RefObject, type MouseEventHandler } from 'react';
 import {
@@ -471,6 +472,7 @@ function GalleryHeaderControls(
       />
       <GalleryViewModeToggle viewMode={props.viewMode} onViewModeChange={props.onViewModeChange} />
       {!props.trashMode ? <GalleryHeaderStorage {...props} /> : null}
+      <GalleryKeyboardHelp />
     </div>
   );
 }

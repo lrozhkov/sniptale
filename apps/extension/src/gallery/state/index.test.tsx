@@ -339,3 +339,36 @@ it('opens the requested recording once when gallery is entered from a recording 
   });
   expect(window.location.search).toBe('');
 });
+
+it('uses supplied rendered order for Shift-click and publishes reversible keyboard ranges', () => {
+  currentSelectedIds = new Set();
+  getFilteredGalleryItemsMock.mockReturnValue(
+    ['webcam', 'middle', 'display', 'tail'].map((id) => createItem({ id }))
+  );
+  const controller = renderHook();
+  const orderedIds = ['display', 'webcam', 'middle', 'tail'];
+  act(() => {
+    controller.actions.selection.toggleSelection('display');
+    controller.actions.selection.toggleSelection('middle', { shiftKey: true, orderedIds });
+  });
+  expect(currentSelectedIds).toEqual(new Set(['display', 'webcam', 'middle']));
+  const baseSelectedIds = new Set(['outside']);
+  act(() =>
+    controller.actions.selection.selectRange({
+      anchorId: 'webcam',
+      targetId: 'tail',
+      orderedIds,
+      baseSelectedIds,
+    })
+  );
+  expect(currentSelectedIds).toEqual(new Set(['outside', 'webcam', 'middle', 'tail']));
+  act(() =>
+    controller.actions.selection.selectRange({
+      anchorId: 'webcam',
+      targetId: 'display',
+      orderedIds,
+      baseSelectedIds,
+    })
+  );
+  expect(currentSelectedIds).toEqual(new Set(['outside', 'display', 'webcam']));
+});

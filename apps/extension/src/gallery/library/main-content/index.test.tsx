@@ -64,6 +64,10 @@ function createProps(overrides: Partial<Parameters<typeof GalleryMainContent>[0]
     onSelectionZip: vi.fn(),
     onSortModeChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
+    keyboardEnabled: true,
+    previewOpen: false,
+    navigationContext: 'test',
     onViewModeChange: vi.fn(),
     ...overrides,
   };

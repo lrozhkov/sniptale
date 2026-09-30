@@ -1,3 +1,7 @@
+import type {
+  GallerySelectionRange,
+  GalleryToggleSelectionOptions,
+} from '../library/keyboard/selection-range';
 import type { GalleryDeletionRequest } from '../library/deletion/types';
 import type { GalleryPreviewPresentation } from '../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
@@ -171,7 +175,8 @@ interface GalleryAppFilterActions {
 interface GalleryAppSelectionActions {
   setSelectedIds: Dispatch<SetStateAction<Set<string>>>;
   setSelectionTagDraft: Dispatch<SetStateAction<string>>;
-  toggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  toggleSelection: (assetId: string, options?: GalleryToggleSelectionOptions) => void;
+  selectRange: (range: GallerySelectionRange) => ReadonlySet<string>;
 }
 
 interface GalleryAppPreviewActions {

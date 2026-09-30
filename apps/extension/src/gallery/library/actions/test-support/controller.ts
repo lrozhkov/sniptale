@@ -106,6 +106,7 @@ function createControllerActions(
         stateRef,
       }),
       toggleSelection: () => undefined,
+      selectRange: () => new Set(),
     },
     storage: {
       refresh: vi.fn(async () => undefined),
