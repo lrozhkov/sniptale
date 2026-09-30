@@ -433,10 +433,11 @@ function GalleryRecordingGroupGridCard(props: {
       className={cx(
         'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)]',
         'border shadow-sm transition',
-        'border-[var(--sniptale-color-border-accent-soft)]',
+        allSelected
+          ? 'border-[var(--sniptale-color-border-accent-strong)]'
+          : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]',
         'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
-        'color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent))]',
-        allSelected && 'border-[var(--sniptale-color-border-accent-strong)]'
+        'color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent))]'
       )}
     >
       <div
@@ -595,7 +596,7 @@ export function GalleryMediaList(
               'bg-[var(--sniptale-color-surface-panel)]',
               allSelected
                 ? 'border-[var(--sniptale-color-border-accent-strong)]'
-                : 'border-[var(--sniptale-color-border-accent-soft)]'
+                : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
             )}
             role="rowgroup"
           >

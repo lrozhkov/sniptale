@@ -152,6 +152,12 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
       ) : null}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
         <GalleryHeader
+          resultActions={{
+            visible: props.state.derived.hasResultContext,
+            count: props.state.derived.filteredItems.length,
+            disabled: props.state.storage.isBusy,
+            onSelectAll: props.onSelectAllFiltered,
+          }}
           trashMode={Boolean(props.state.filters.trashMode)}
           activeStorageBarClass={props.state.derived.activeStorageBarClass}
           allTags={props.state.derived.allTags}

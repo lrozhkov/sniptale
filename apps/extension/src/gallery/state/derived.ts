@@ -19,6 +19,18 @@ type GalleryFiltersState = ReturnType<typeof useGalleryFilterState>;
 type GalleryLibraryState = ReturnType<typeof useGalleryLibraryState>;
 type GalleryViewportState = ReturnType<typeof useGalleryViewportState>;
 
+function hasGalleryResultContext(state: GalleryFiltersState['state']): boolean {
+  return (
+    !state.trashMode &&
+    (state.folderFilter !== 'all' ||
+      state.scope !== 'all' ||
+      Boolean(state.activeSavedView) ||
+      state.appliedSearch.trim().length > 0 ||
+      state.activeTags.length > 0 ||
+      Object.values(state.facetFilters).some((values) => values.length > 0))
+  );
+}
+
 const TRASH_ACTIVE_TAGS: string[] = [];
 const TRASH_FACET_FILTERS: GalleryFiltersState['state']['facetFilters'] = {
   created: [],
@@ -230,6 +242,7 @@ export function useGalleryDerivedState(props: {
 
   return {
     activeStorageBarClass: getGalleryStoragePressureClass(library.storageInfo),
+    hasResultContext: hasGalleryResultContext(filters.state),
     allItems: library.items,
     allTags: filterState.allTags,
     counts: filterState.counts,
@@ -248,6 +261,7 @@ export function useGalleryDerivedState(props: {
     | 'facets'
     | 'filteredItems'
     | 'gridMetrics'
+    | 'hasResultContext'
     | 'trashSummary'
   > &
     Pick<GalleryAppState['selection'], 'selectedItems' | 'selectedSize'> & {

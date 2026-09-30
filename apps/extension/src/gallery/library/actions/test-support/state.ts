@@ -67,6 +67,7 @@ function haveLegacyDraftsChanged(overrides: GalleryStateOverride) {
 function createGalleryDerivedState(overrides: GalleryStateOverride): GalleryAppState['derived'] {
   return {
     activeStorageBarClass: '',
+    hasResultContext: false,
     allItems: overrides.filteredItems ?? [],
     allTags: overrides.allTags ?? [],
     counts: overrides.counts ?? {

@@ -403,3 +403,30 @@ it('forwards facet, scope, grouped-recording, selection, and delete callbacks', 
     fallbackMainProps.onScopeChange('all');
   }).not.toThrow();
 });
+
+it('shares the current filtered result count and selection authority with the sidebar', () => {
+  const props = createLayoutProps();
+  props.state.derived.hasResultContext = true;
+  props.state.derived.filteredItems = [createMediaItem({ id: 'matching' })];
+  props.state.storage.isBusy = true;
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  const header = headerPropsMock.mock.lastCall?.[0] as { resultActions: { onSelectAll(): void } };
+  expect(headerPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      resultActions: {
+        visible: true,
+        count: 1,
+        disabled: true,
+        onSelectAll: props.onSelectAllFiltered,
+      },
+    })
+  );
+  expect(sidebarPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      filteredItemCount: 1,
+      onSelectAll: props.onSelectAllFiltered,
+    })
+  );
+  header.resultActions.onSelectAll();
+  expect(props.onSelectAllFiltered).toHaveBeenCalledOnce();
+});

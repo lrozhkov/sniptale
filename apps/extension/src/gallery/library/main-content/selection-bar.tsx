@@ -186,3 +186,36 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
     </div>
   );
 }
+
+/** Result actions use the same current filtered set and selection callback as the sidebar. */
+export interface GalleryFoundResultsProps {
+  count: number;
+  disabled: boolean;
+  onSelectAll(): void;
+}
+
+export function GalleryFoundResultsBar(props: GalleryFoundResultsProps) {
+  return (
+    <div
+      role="toolbar"
+      aria-label={translate('gallery.app.facetResults')}
+      data-ui="gallery.results.toolbar"
+      className="flex h-8 min-w-0 items-center gap-2"
+    >
+      <span className="whitespace-nowrap px-1 text-xs text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.app.facetResults')}:{' '}
+        <span className="font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+          {props.count}
+        </span>
+      </span>
+      <button
+        type="button"
+        disabled={props.disabled || props.count === 0}
+        className={gallerySelectionActionClassName}
+        onClick={props.onSelectAll}
+      >
+        {translate('gallery.app.selectAllResults')}
+      </button>
+    </div>
+  );
+}

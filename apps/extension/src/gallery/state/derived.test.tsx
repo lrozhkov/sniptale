@@ -325,3 +325,49 @@ it('keeps the complete Trash summary when search and type filters hide visible r
     size: { status: 'ready', bytes: 3670016 },
   });
 });
+
+it('shows result actions only for committed Library result contexts', () => {
+  const props = createProbeProps('healthy');
+  const baseline: typeof props.filters.state = {
+    ...props.filters.state,
+    activeTags: [],
+    appliedSearch: '',
+    search: '',
+    scope: 'all' as const,
+  };
+  const contexts: Partial<typeof baseline>[] = [
+    { folderFilter: 'screenshot' as const },
+    { scope: 'library' as const },
+    { appliedSearch: 'needle' },
+    { activeTags: ['alpha'] },
+    {
+      activeSavedView: {
+        id: 'saved-view',
+        name: 'Saved',
+        createdAt: 1,
+        updatedAt: 1,
+        folderFilter: 'all',
+        filters: { scope: 'all', activeTags: [], facetFilters: baseline.facetFilters },
+      },
+    },
+    { facetFilters: { ...baseline.facetFilters, format: ['png'] } },
+  ];
+  function renderState(overrides: Partial<typeof baseline>) {
+    act(() =>
+      root?.render(
+        <HookProbe
+          {...props}
+          filters={{ ...props.filters, state: { ...baseline, ...overrides } }}
+        />
+      )
+    );
+    return latestValue?.hasResultContext;
+  }
+  expect(renderState({})).toBe(false);
+  expect(renderState({ search: 'unfinished query' })).toBe(false);
+  expect(renderState({ appliedSearch: '  ' })).toBe(false);
+  for (const context of contexts) {
+    expect(renderState(context)).toBe(true);
+    expect(renderState({ ...context, trashMode: true })).toBe(false);
+  }
+});

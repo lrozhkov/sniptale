@@ -273,24 +273,30 @@ it('renders one composite grid card for raw recording tracks without a project',
   const onRecordingGroupOpen = vi.fn();
   const onToggleSelection = vi.fn();
 
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={[display, webcam]}
-        gridMetrics={metrics([display], 800, 'compact-grid', 2)}
-        gridWidth={800}
-        onPreviewOpen={onPreviewOpen}
-        onRecordingGroupOpen={onRecordingGroupOpen}
-        onToggleSelection={onToggleSelection}
-        selectedIds={new Set()}
-        viewMode="compact-grid"
-        visibleItems={[display]}
-      />
-    );
-  });
+  const render = (selectedIds = new Set<string>()) =>
+    act(() => {
+      root?.render(
+        <GalleryGridCanvas
+          filteredItems={[display, webcam]}
+          gridMetrics={metrics([display], 800, 'compact-grid', 2)}
+          gridWidth={800}
+          onPreviewOpen={onPreviewOpen}
+          onRecordingGroupOpen={onRecordingGroupOpen}
+          onToggleSelection={onToggleSelection}
+          selectedIds={selectedIds}
+          viewMode="compact-grid"
+          visibleItems={[display]}
+        />
+      );
+    });
+  render();
 
   const recordingGroupCard = container?.querySelector('[data-ui="gallery.recording-group.card"]');
   expect(recordingGroupCard).not.toBeNull();
+  expect(recordingGroupCard?.className).toContain('border-[var(--sniptale-color-border-soft)]');
+  expect(recordingGroupCard?.className).not.toContain(
+    'border-[var(--sniptale-color-border-accent-soft)]'
+  );
   expect(recordingGroupCard?.className).toContain('rounded-[var(--sniptale-radius-lg)]');
   expect(container?.querySelectorAll('[data-ui="test.thumb"]')).toHaveLength(2);
   expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
@@ -325,6 +331,14 @@ it('renders one composite grid card for raw recording tracks without a project',
   expect(onRecordingGroupOpen).not.toHaveBeenCalled();
   expect(onToggleSelection).toHaveBeenCalledWith('recording:display');
   expect(onToggleSelection).toHaveBeenCalledWith('recording:webcam');
+  render(new Set([display.id]));
+  expect(container?.querySelector('[data-ui="gallery.recording-group.card"]')?.className).toContain(
+    'border-[var(--sniptale-color-border-soft)]'
+  );
+  render(new Set([display.id, webcam.id]));
+  const selectedCard = container?.querySelector('[data-ui="gallery.recording-group.card"]');
+  expect(selectedCard?.className).toContain('border-[var(--sniptale-color-border-accent-strong)]');
+  expect(selectedCard?.className).not.toContain('border-[var(--sniptale-color-border-soft)]');
 });
 
 it('renders one unduplicated recording-group title in large grid', () => {
@@ -610,17 +624,19 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   });
   const onRecordingGroupOpen = vi.fn();
 
-  act(() => {
-    root?.render(
-      <GalleryMediaList
-        filteredItems={[item]}
-        onPreviewOpen={vi.fn()}
-        onRecordingGroupOpen={onRecordingGroupOpen}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-      />
-    );
-  });
+  const render = (selectedIds = new Set<string>()) =>
+    act(() => {
+      root?.render(
+        <GalleryMediaList
+          filteredItems={[item]}
+          onPreviewOpen={vi.fn()}
+          onRecordingGroupOpen={onRecordingGroupOpen}
+          onToggleSelection={vi.fn()}
+          selectedIds={selectedIds}
+        />
+      );
+    });
+  render();
 
   const thumbnailCell = container
     ?.querySelector('[data-ui="test.thumb"]')
@@ -628,11 +644,17 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   expect(container?.textContent).toContain('Веб-камера');
   expect(container?.textContent).toContain('Дорожек в группе: 2');
   expect(container?.textContent).toContain('Запись из нескольких источников');
-  expect(container?.querySelector('[role="rowgroup"]')).not.toBeNull();
+  expect(container?.querySelector('[role="rowgroup"]')?.className).toContain(
+    'border-[var(--sniptale-color-border-soft)]'
+  );
   expect(thumbnailCell?.textContent).not.toContain('Веб-камера');
   const openButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent?.includes('Открыть в редакторе')
   );
   act(() => openButton?.click());
   expect(onRecordingGroupOpen).toHaveBeenCalledWith(item);
+  render(new Set([item.id]));
+  expect(container?.querySelector('[role="rowgroup"]')?.className).toContain(
+    'border-[var(--sniptale-color-border-accent-strong)]'
+  );
 });

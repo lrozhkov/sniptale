@@ -69,6 +69,7 @@ function clickButton(button: Element | null | undefined) {
 
 function renderHeader(props: Partial<Parameters<typeof GalleryHeader>[0]> = {}) {
   const headerProps = {
+    resultActions: { visible: false, count: 0, disabled: false, onSelectAll: vi.fn() },
     allTags: [],
     activeStorageBarClass: 'storage-normal',
     folderFilter: 'all' as const,
@@ -351,4 +352,26 @@ it('renders banner actions only when warning copy exists', () => {
     root?.render(<GalleryHeaderBanner banner={null} onBannerDismiss={vi.fn()} />);
   });
   expect(container?.textContent).not.toContain('Storage warning');
+});
+
+it('replaces Found with selection actions and restores it after deselection', () => {
+  expect(renderHeader().resultActions.visible).toBe(false);
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
+  const resultActions = { visible: true, count: 7, disabled: false, onSelectAll: vi.fn() };
+  renderHeader({ resultActions });
+  const results = container?.querySelector('[data-ui="gallery.results.toolbar"]');
+  expect(results?.textContent).toContain('gallery.app.facetResults: 7');
+  expect(container?.querySelector('header')?.className).toContain('max-2xl:h-[5.25rem]');
+  clickButton(results?.querySelector('button'));
+  expect(resultActions.onSelectAll).toHaveBeenCalledOnce();
+  const selectedItems = [createMediaItem({ id: 'selected' })];
+  const selected = renderHeader({ resultActions, selectedItems });
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
+  expect(container?.textContent).toContain('gallery.app.selectedPrefix 1');
+  clickButton(container?.querySelector('button[aria-label="gallery.app.clearSelection"]'));
+  expect(selected.onClearSelection).toHaveBeenCalledOnce();
+  renderHeader({ resultActions, selectedItems: [] });
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).not.toBeNull();
+  renderHeader({ resultActions, trashMode: true });
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
 });

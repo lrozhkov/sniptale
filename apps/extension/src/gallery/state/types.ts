@@ -114,6 +114,8 @@ interface GalleryAppStorageState {
 }
 
 interface GalleryAppDerivedState {
+  /** Whether current committed filters or category justify result selection actions. */
+  hasResultContext: boolean;
   allItems: GalleryItem[];
   allTags: string[];
   counts: GalleryFolderCounts;

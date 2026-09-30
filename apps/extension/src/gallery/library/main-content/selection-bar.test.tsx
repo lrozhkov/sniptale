@@ -17,7 +17,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => {
   };
 });
 
-import { GallerySelectionBar } from './selection-bar';
+import { GalleryFoundResultsBar, GallerySelectionBar } from './selection-bar';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -228,4 +228,31 @@ it('offers catalogue deletion without resource actions for export-only selection
     anchor: deletion,
     keyboard: false,
   });
+});
+
+it('uses current result count and prevents selecting empty or busy results', () => {
+  const onSelectAll = vi.fn();
+  const render = (count: number, disabled = false) => {
+    act(() =>
+      root?.render(
+        <GalleryFoundResultsBar count={count} disabled={disabled} onSelectAll={onSelectAll} />
+      )
+    );
+    return container?.querySelector('button');
+  };
+  const enabled = render(3);
+  expect(container?.querySelector('[role="toolbar"]')?.getAttribute('aria-label')).toBe(
+    'gallery.app.facetResults'
+  );
+  expect(container?.textContent).toContain('gallery.app.facetResults: 3');
+  expect(enabled?.textContent).toBe('gallery.app.selectAllResults');
+  act(() => enabled?.click());
+  expect(onSelectAll).toHaveBeenCalledOnce();
+  const empty = render(0);
+  expect(empty?.disabled).toBe(true);
+  act(() => empty?.click());
+  const busy = render(3, true);
+  expect(busy?.disabled).toBe(true);
+  act(() => busy?.click());
+  expect(onSelectAll).toHaveBeenCalledOnce();
 });

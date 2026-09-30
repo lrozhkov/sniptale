@@ -22,7 +22,11 @@ import { INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS } from '@sniptale/ui/inspector-she
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { GalleryViewMode } from '../types';
 import type { GalleryMainContentProps } from './types';
-import { GallerySelectionBar } from './selection-bar';
+import {
+  GalleryFoundResultsBar,
+  GallerySelectionBar,
+  type GalleryFoundResultsProps,
+} from './selection-bar';
 import { GalleryHeaderSearchField } from './header-search';
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -520,9 +524,13 @@ export function GalleryHeader(
     | 'trashMode'
     | 'viewMode'
   > &
-    GalleryHeaderStorageProps & { onSearchCommit: (value: string) => void }
+    GalleryHeaderStorageProps & {
+      onSearchCommit: (value: string) => void;
+      resultActions: GalleryFoundResultsProps & { visible: boolean };
+    }
 ) {
   const hasSelection = !props.trashMode && props.selectedItems.length > 0;
+  const hasWorkspaceActions = hasSelection || (!props.trashMode && props.resultActions.visible);
 
   return (
     <header
@@ -530,7 +538,7 @@ export function GalleryHeader(
         'relative z-30 flex h-12 min-h-12 shrink-0 items-center gap-4',
         'rounded-[var(--sniptale-radius-lg)] border py-1.5',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] shadow-sm',
-        hasSelection && 'max-2xl:h-[5.25rem] max-2xl:min-h-[5.25rem]'
+        hasWorkspaceActions && 'max-2xl:h-[5.25rem] max-2xl:min-h-[5.25rem]'
       )}
     >
       <div
@@ -556,7 +564,7 @@ export function GalleryHeader(
       <div
         className={cx(
           'flex min-w-0 flex-1 flex-nowrap items-center gap-2 pr-3',
-          hasSelection &&
+          hasWorkspaceActions &&
             'max-2xl:grid max-2xl:h-full max-2xl:grid-cols-1 max-2xl:grid-rows-[2rem_2rem] max-2xl:gap-y-2'
         )}
         data-ui="gallery.header.workspace"
@@ -565,13 +573,17 @@ export function GalleryHeader(
           <div
             className={cx(
               'min-w-0 flex-1',
-              hasSelection && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
+              hasWorkspaceActions && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
             )}
           >
-            <GallerySelectionBar {...props} />
+            {hasSelection ? (
+              <GallerySelectionBar {...props} />
+            ) : props.resultActions.visible ? (
+              <GalleryFoundResultsBar {...props.resultActions} />
+            ) : null}
           </div>
         ) : null}
-        <GalleryHeaderControls {...props} stackWhenNarrow={hasSelection} />
+        <GalleryHeaderControls {...props} stackWhenNarrow={hasWorkspaceActions} />
       </div>
     </header>
   );
