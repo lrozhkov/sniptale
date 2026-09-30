@@ -4,28 +4,75 @@ import { LOCAL_STORAGE_RETENTION_DAY_OPTIONS } from '../../../composition/persis
 import { translate } from '../../../platform/i18n';
 import type { GalleryTrashRetentionProps } from './types';
 
-export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
+const detailsTriggerClassName = [
+  'cursor-pointer rounded-sm focus-visible:outline-2',
+  'focus-visible:outline-[var(--sniptale-color-accent)]',
+].join(' ');
+
+function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
   const policy = props.policy;
+  if (!policy) return null;
   const disabled = props.status !== 'ready' || !policy || props.saving;
-  const enabled = policy?.trashCleanupEnabled ?? false;
+  const enabled = policy.trashCleanupEnabled ?? false;
   const dayOptions = LOCAL_STORAGE_RETENTION_DAY_OPTIONS.map((days) => ({
     value: String(days),
     label: `${days} ${translate('gallery.app.trashRetentionDaySuffix')}`,
   }));
 
   return (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor="gallery-trash-retention-enabled" className="min-w-0 text-xs">
+          {translate('gallery.app.trashRetentionEnabled')}
+        </label>
+        <ProductToggle
+          id="gallery-trash-retention-enabled"
+          aria-label={translate('gallery.app.trashRetentionEnabled')}
+          checked={enabled}
+          disabled={disabled}
+          size="sm"
+          onClick={() => props.onChange({ trashCleanupEnabled: !enabled })}
+        />
+      </div>
+      {enabled ? (
+        <>
+          <div className="flex min-w-0 items-center justify-between gap-2">
+            <label
+              htmlFor="gallery-trash-retention-days"
+              className="shrink-0 whitespace-nowrap text-xs"
+            >
+              {translate('gallery.app.trashRetentionDays')}
+            </label>
+            <ProductSelect<string>
+              id="gallery-trash-retention-days"
+              aria-label={translate('gallery.app.trashRetentionDays')}
+              controlSize="sm"
+              containerClassName="!w-auto min-w-0 shrink-0"
+              disabled={disabled}
+              options={dayOptions}
+              value={String(policy.trashRetentionDays ?? 30)}
+              onChange={(days) => props.onChange({ trashRetentionDays: Number(days) })}
+            />
+          </div>
+          <details className="text-xs text-[var(--sniptale-color-text-secondary)]">
+            <summary className={detailsTriggerClassName}>
+              {translate('gallery.app.trashRetentionDetails')}
+            </summary>
+            <p className="pt-2 leading-5">{translate('gallery.app.trashRetentionExplanation')}</p>
+          </details>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
+  return (
     <section
       data-ui="gallery.trash.retention"
-      aria-labelledby="gallery-trash-retention-title"
-      className={[
-        'space-y-2 rounded-[var(--sniptale-radius-sm)] border',
-        'border-[var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-panel)] p-3',
-      ].join(' ')}
+      aria-label={translate('gallery.app.trashRetentionTitle')}
+      className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
     >
-      <h2 id="gallery-trash-retention-title" className="text-sm font-semibold">
-        {translate('gallery.app.trashRetentionTitle')}
-      </h2>
       {props.status === 'loading' ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('gallery.app.trashRetentionLoading')}
@@ -45,40 +92,7 @@ export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
           </button>
         </div>
       ) : null}
-      {policy ? (
-        <>
-          <div className="flex items-center justify-between gap-2">
-            <label htmlFor="gallery-trash-retention-enabled" className="min-w-0 text-xs">
-              {translate('gallery.app.trashRetentionEnabled')}
-            </label>
-            <ProductToggle
-              id="gallery-trash-retention-enabled"
-              aria-label={translate('gallery.app.trashRetentionEnabled')}
-              checked={enabled}
-              disabled={disabled}
-              size="sm"
-              onClick={() => props.onChange({ trashCleanupEnabled: !enabled })}
-            />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label htmlFor="gallery-trash-retention-days" className="text-xs">
-              {translate('gallery.app.trashRetentionDays')}
-            </label>
-            <ProductSelect<string>
-              id="gallery-trash-retention-days"
-              aria-label={translate('gallery.app.trashRetentionDays')}
-              controlSize="sm"
-              disabled={disabled || !enabled}
-              options={dayOptions}
-              value={String(policy.trashRetentionDays ?? 30)}
-              onChange={(days) => props.onChange({ trashRetentionDays: Number(days) })}
-            />
-          </div>
-        </>
-      ) : null}
-      <p className="text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-        {translate('gallery.app.trashRetentionExplanation')}
-      </p>
+      <TrashRetentionSettings {...props} />
       {props.saving ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('gallery.app.trashRetentionSaving')}

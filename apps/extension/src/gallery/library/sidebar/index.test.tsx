@@ -122,7 +122,9 @@ it('composes folder and tag sections inside the shared shell', () => {
   );
   expect(trashButton?.classList.contains('w-full')).toBe(true);
   expect(trashButton?.textContent).toContain('3');
-  expect(trashButton?.textContent).toContain(formatBytes(1536));
+  expect(trashButton?.textContent).not.toContain(formatBytes(1536));
+  expect(trashButton?.className).toContain('flex-row');
+  expect(trashButton?.textContent).not.toContain(translate('gallery.app.trashSummaryCount'));
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
 });
@@ -153,6 +155,9 @@ it('offers trash navigation and replaces library filters with recoverable action
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
   expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(
     formatBytes(1536)
+  );
+  expect(container?.querySelector('[data-ui="gallery.trash.summary"]')?.textContent).toContain(
+    translate('gallery.app.trashTotalSize')
   );
   const scrollContent = container!.querySelector('[data-ui="gallery.sidebar.scroll"]')!;
   const summary = scrollContent.querySelector('[data-ui="gallery.trash.summary"]')!;
@@ -197,14 +202,15 @@ it('shows zero, loading and unavailable Trash totals without a misleading size',
       <GallerySidebar {...props} trashSummary={{ count: 0, size: { status: 'ready', bytes: 0 } }} />
     )
   );
-  expect(footerButton()?.textContent).toContain(formatBytes(0));
+  expect(footerButton()?.textContent).toContain('0');
+  expect(footerButton()?.textContent).not.toContain(formatBytes(0));
 
   act(() =>
     root?.render(
       <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'loading' } }} />
     )
   );
-  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeLoading'));
+  expect(footerButton()?.textContent).not.toContain(translate('gallery.app.trashSizeLoading'));
   expect(footerButton()?.textContent).not.toContain(formatBytes(0));
 
   act(() =>
@@ -212,5 +218,7 @@ it('shows zero, loading and unavailable Trash totals without a misleading size',
       <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'unavailable' } }} />
     )
   );
-  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeUnavailable'));
+  expect(footerButton()?.textContent).not.toContain(translate('gallery.app.trashSizeUnavailable'));
+  act(() => root?.render(<GallerySidebar {...props} countsKnown={false} />));
+  expect(footerButton()?.textContent).not.toContain('0');
 });

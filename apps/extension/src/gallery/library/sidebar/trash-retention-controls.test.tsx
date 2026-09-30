@@ -60,19 +60,22 @@ it('shows committed toggle and days, blocks input while saving, and explains lat
   const props = createProps();
   render(props);
   const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]')!;
-  const select = container.querySelector<HTMLButtonElement>(
+  let select = container.querySelector<HTMLButtonElement>(
     `[aria-label="${translate('gallery.app.trashRetentionDays')}"]`
-  )!;
+  );
   expect(toggle.getAttribute('aria-checked')).toBe('false');
-  expect(select.disabled).toBe(true);
-  expect(select.textContent).toContain('30');
+  expect(select).toBeNull();
+  expect(container.textContent).not.toContain(translate('gallery.app.trashRetentionExplanation'));
   act(() => toggle.click());
   expect(props.onChange).toHaveBeenCalledWith({ trashCleanupEnabled: true });
-  expect(container.textContent).toContain(translate('gallery.app.trashRetentionExplanation'));
 
   render({ ...props, policy: { trashCleanupEnabled: true, trashRetentionDays: 14 }, saving: true });
+  expect(container.textContent).toContain(translate('gallery.app.trashRetentionExplanation'));
   expect(toggle.disabled).toBe(true);
-  expect(select.disabled).toBe(true);
+  select = container.querySelector<HTMLButtonElement>(
+    `[aria-label="${translate('gallery.app.trashRetentionDays')}"]`
+  );
+  expect(select?.disabled).toBe(true);
   expect(container.textContent).toContain(translate('gallery.app.trashRetentionSaving'));
 
   render({
@@ -81,7 +84,7 @@ it('shows committed toggle and days, blocks input while saving, and explains lat
     policy: { trashCleanupEnabled: true, trashRetentionDays: 14 },
   });
   expect(toggle.disabled).toBe(true);
-  expect(select.disabled).toBe(true);
+  expect(select?.disabled).toBe(true);
 
   render({
     ...props,
@@ -89,10 +92,10 @@ it('shows committed toggle and days, blocks input while saving, and explains lat
     feedback: 'saved',
   });
   expect(toggle.getAttribute('aria-checked')).toBe('true');
-  expect(select.disabled).toBe(false);
-  expect(select.textContent).toContain('14');
+  expect(select?.disabled).toBe(false);
+  expect(select?.textContent).toContain('14');
   expect(container.textContent).toContain(translate('gallery.app.trashRetentionSaved'));
-  act(() => select.click());
+  act(() => select?.click());
   const options = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'));
   expect(options.map((option) => Number(option.textContent?.match(/\d+/)?.[0]))).toEqual([
     1, 3, 7, 14, 30, 60, 90, 180, 365,

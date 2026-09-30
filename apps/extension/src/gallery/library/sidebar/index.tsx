@@ -29,7 +29,7 @@ const gallerySidebarPanelClassName = [
 ].join(' ');
 
 const trashButtonClassName = [
-  'flex min-h-14 min-w-0 w-full cursor-pointer flex-col items-center justify-center gap-1',
+  'flex min-h-10 min-w-0 w-full cursor-pointer flex-row items-center justify-center gap-2',
   'rounded-[var(--sniptale-radius-sm)] border border-[var(--sniptale-color-border-soft)]',
   'bg-transparent px-2 py-2 text-center transition-colors',
   'hover:border-[var(--sniptale-color-border-strong)] hover:bg-[var(--sniptale-color-surface-hover)]',
@@ -51,10 +51,13 @@ function GalleryTrashSummaryText({ summary }: { summary: GalleryTrashSummary | u
 
   return (
     <>
-      {translate('gallery.app.trashSummaryCount')}:{' '}
-      {formatNumber(summary?.count ?? 0, undefined, getCurrentLocale())}
-      <span aria-hidden="true"> · </span>
-      {sizeText}
+      <span>
+        {translate('gallery.app.trashSummaryCount')}:{' '}
+        {formatNumber(summary?.count ?? 0, undefined, getCurrentLocale())}
+      </span>
+      <span>
+        {translate('gallery.app.trashTotalSize')}: {sizeText}
+      </span>
     </>
   );
 }
@@ -90,20 +93,26 @@ export function GallerySidebar(props: GallerySidebarProps) {
             className={trashButtonClassName}
             onClick={() => props.onTrashModeChange?.(!props.trashMode)}
           >
-            <span className="flex min-w-0 items-center justify-center gap-2 text-xs font-semibold">
+            <span className="flex min-w-0 items-center justify-center gap-2 whitespace-nowrap text-xs font-semibold">
               {props.trashMode ? (
                 <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
               ) : (
                 <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
               )}
-              {translate(
-                props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle'
-              )}
+              <span className="truncate">
+                {translate(
+                  props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle'
+                )}
+              </span>
             </span>
             {!props.trashMode ? (
-              <span className="max-w-full truncate text-[11px] text-[var(--sniptale-color-text-secondary)]">
-                <GalleryTrashSummaryText summary={props.trashSummary} />
-              </span>
+              props.countsKnown ? (
+                <span className="shrink-0 text-xs tabular-nums text-[var(--sniptale-color-text-secondary)]">
+                  {formatNumber(props.trashSummary?.count ?? 0, undefined, getCurrentLocale())}
+                </span>
+              ) : (
+                <span className="sr-only">{translate('gallery.app.trashCountLoading')}</span>
+              )
             ) : null}
           </button>
         </div>
@@ -116,33 +125,47 @@ function GalleryTrashControls(props: GallerySidebarProps) {
   const trashRetention = useTrashRetentionPolicy();
   return (
     <section className="flex flex-col gap-3 pb-6" aria-label={translate('gallery.app.trashTitle')}>
-      <p className="text-sm" role="status">
-        {translate('gallery.app.selectedPrefix')} {props.selectedCount ?? 0}
+      <p className="text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.app.trashDescription')}
       </p>
-      <button
-        type="button"
-        disabled={props.busy || !props.filteredItemCount}
-        className={getControlSecondaryButtonClassName({ density: 'compact' })}
-        onClick={props.onSelectAll}
-      >
-        {translate('gallery.app.trashSelectAll')}
-      </button>
-      <button
-        type="button"
-        disabled={props.busy || !props.selectedCount}
-        className={getControlSecondaryButtonClassName({ density: 'compact' })}
-        onClick={props.onRestoreTrash}
-      >
-        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-        {translate('gallery.app.restoreTrash')}
-      </button>
-      <p
+      <div
         data-ui="gallery.trash.summary"
         role="status"
-        className="text-xs text-[var(--sniptale-color-text-secondary)]"
+        className="flex flex-col gap-1 text-xs text-[var(--sniptale-color-text-secondary)]"
       >
-        <GalleryTrashSummaryText summary={props.trashSummary} />
+        {props.countsKnown ? (
+          <GalleryTrashSummaryText summary={props.trashSummary} />
+        ) : (
+          translate('gallery.app.trashCountLoading')
+        )}
+      </div>
+      <p className="text-sm" role="status">
+        {translate('gallery.app.selectedPrefix')}{' '}
+        {formatNumber(props.selectedCount ?? 0, undefined, getCurrentLocale())}
       </p>
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          disabled={
+            props.busy ||
+            !props.filteredItemCount ||
+            (props.selectedCount ?? 0) >= props.filteredItemCount
+          }
+          className={getControlSecondaryButtonClassName({ density: 'compact' })}
+          onClick={props.onSelectAll}
+        >
+          {translate('gallery.app.trashSelectAll')}
+        </button>
+        <button
+          type="button"
+          disabled={props.busy || !props.selectedCount}
+          className={getControlSecondaryButtonClassName({ density: 'compact' })}
+          onClick={props.onRestoreTrash}
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          {translate('gallery.app.restoreTrash')}
+        </button>
+      </div>
       <TrashRetentionControls {...trashRetention} />
       <div className="mt-3 flex flex-col gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <button

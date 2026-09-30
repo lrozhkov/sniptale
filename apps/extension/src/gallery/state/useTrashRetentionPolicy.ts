@@ -83,6 +83,16 @@ export function useTrashRetentionPolicy() {
     };
   }, [publish, reload]);
 
+  useEffect(() => {
+    if (state.feedback !== 'saved') return;
+    const timeout = window.setTimeout(() => {
+      if (stateRef.current.feedback === 'saved') {
+        publish({ ...stateRef.current, feedback: null });
+      }
+    }, 3000);
+    return () => window.clearTimeout(timeout);
+  }, [state.feedback, publish]);
+
   const commit = useCallback(
     async (patch: Partial<LocalStoragePolicy>, sourceRevision: number) => {
       const base = stateRef.current.policy;

@@ -111,6 +111,21 @@ it('retains the committed value after a failed save and retries the same patch',
   expect(state).toMatchObject({ policy: { ...base, trashRetentionDays: 7 }, feedback: 'saved' });
 });
 
+it('clears successful save feedback after a short interval', async () => {
+  mocks.load.mockResolvedValue({ localStoragePolicy: base });
+  mocks.patch.mockResolvedValue({ localStoragePolicy: { ...base, trashCleanupEnabled: true } });
+  await act(async () => root.render(<Probe />));
+  vi.useFakeTimers();
+  try {
+    await act(async () => state.onChange({ trashCleanupEnabled: true }));
+    expect(state.feedback).toBe('saved');
+    act(() => vi.advanceTimersByTime(3000));
+    expect(state.feedback).toBeNull();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it('blocks duplicate input while saving and preserves a newer external policy', async () => {
   const save = deferred<{ localStoragePolicy: LocalStoragePolicy }>();
   mocks.load.mockResolvedValue({ localStoragePolicy: base });
