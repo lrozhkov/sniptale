@@ -468,3 +468,52 @@ it("does not traverse an equivalent item's unrelated large nested graph", async 
   expect(onBanner).not.toHaveBeenCalled();
   expect(onPreviewItemRefresh).toHaveBeenCalledOnce();
 });
+
+it.each(['reject', 'empty'] as const)(
+  'ignores old usage completion after a newer %s refresh',
+  async (outcome) => {
+    const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+    const trashed = createMediaItem({
+      id: 'trash',
+      lifecycle: {
+        storageClass: 'library',
+        savedAt: 1,
+        updatedAt: 1,
+        trashedAt: 0,
+      },
+    });
+    loadGalleryLibrarySnapshotMock.mockResolvedValue({
+      estimate: { usage: 0, quota: 20 },
+      nextItems: [trashed],
+    });
+    let resolveOld: (value: { trashBytes: number }) => void = () => undefined;
+    let rejectOld: (reason: Error) => void = () => undefined;
+    getLibraryStorageUsageMock.mockReturnValueOnce(
+      new Promise<{ trashBytes: number }>((resolve, reject) => {
+        resolveOld = resolve;
+        rejectOld = reject;
+      })
+    );
+    renderConnectedProbe(values, {
+      onBanner: vi.fn(),
+      onPreviewItemRefresh: vi.fn(),
+      onSelectionRefresh: vi.fn(),
+    });
+    await flushLibraryState();
+    if (outcome === 'empty')
+      loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
+        estimate: { usage: 0, quota: 20 },
+        nextItems: [],
+      });
+    else getLibraryStorageUsageMock.mockResolvedValueOnce({ trashBytes: 42 });
+    await act(async () => values.at(-1)?.refresh());
+    await flushLibraryState();
+    const expected = { status: 'ready', bytes: outcome === 'empty' ? 0 : 42 };
+    expect(values.at(-1)?.trashUsage).toEqual(expected);
+    await act(async () => {
+      if (outcome === 'empty') resolveOld({ trashBytes: 99 });
+      else rejectOld(new Error('stale read failed'));
+    });
+    expect(values.at(-1)?.trashUsage).toEqual(expected);
+  }
+);

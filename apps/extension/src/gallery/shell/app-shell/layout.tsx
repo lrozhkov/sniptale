@@ -53,6 +53,7 @@ function GallerySidebarSection(props: GalleryAppLayoutProps) {
       trashMode={Boolean(state.filters.trashMode)}
       busy={state.storage.isBusy}
       selectedCount={state.selection.selectedItems.length}
+      onClearSelection={props.onClearSelection}
       trashSummary={state.derived.trashSummary}
       {...(props.onTrashModeChange ? { onTrashModeChange: props.onTrashModeChange } : {})}
       {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}

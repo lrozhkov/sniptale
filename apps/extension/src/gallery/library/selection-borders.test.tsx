@@ -251,6 +251,7 @@ it('marks checked facet rows and keeps their keyboard ring distinct', () => {
       onActiveTagsChange={vi.fn()}
       onFacetFilterChange={vi.fn()}
       onFolderFilterChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}

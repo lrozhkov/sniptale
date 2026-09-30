@@ -29,9 +29,12 @@ function TrashRetentionSettings(props: GalleryTrashRetentionProps) {
           id="gallery-trash-retention-enabled"
           aria-label={translate('gallery.app.trashRetentionEnabled')}
           checked={enabled}
-          disabled={disabled}
+          disabled={props.status !== 'ready'}
+          aria-busy={props.saving}
           size="sm"
-          onClick={() => props.onChange({ trashCleanupEnabled: !enabled })}
+          onClick={() => {
+            if (!props.saving) props.onChange({ trashCleanupEnabled: !enabled });
+          }}
         />
       </div>
       {enabled ? (
@@ -96,10 +99,6 @@ export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
       {props.saving ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('gallery.app.trashRetentionSaving')}
-        </p>
-      ) : props.feedback === 'saved' ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('gallery.app.trashRetentionSaved')}
         </p>
       ) : props.feedback === 'error' ? (
         <div className="space-y-2">

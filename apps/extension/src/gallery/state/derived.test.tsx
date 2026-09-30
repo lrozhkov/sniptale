@@ -292,3 +292,36 @@ it.each([false, true])('keeps the %s mode selector idle for raw search edits', (
     expect.objectContaining({ search: 'cap', sortMode: 'oldest' })
   );
 });
+
+it('keeps the complete Trash summary when search and type filters hide visible rows', () => {
+  const props = createProbeProps('healthy');
+  props.library.items = [
+    item,
+    {
+      ...item,
+      id: 'trash',
+      lifecycle: {
+        storageClass: 'library',
+        savedAt: 1,
+        updatedAt: 1,
+        trashedAt: 0,
+      },
+    },
+  ];
+  props.library.trashUsage = { status: 'ready', bytes: 3670016 };
+  props.filters.state.trashMode = true;
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.trashSummary).toEqual({
+    count: 1,
+    size: { status: 'ready', bytes: 3670016 },
+  });
+  selectorMocks.getFilteredGalleryItems.mockReturnValue([]);
+  props.filters.state.appliedSearch = 'no-match';
+  props.filters.state.folderFilter = 'recording';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.filteredItems).toEqual([]);
+  expect(latestValue?.trashSummary).toEqual({
+    count: 1,
+    size: { status: 'ready', bytes: 3670016 },
+  });
+});

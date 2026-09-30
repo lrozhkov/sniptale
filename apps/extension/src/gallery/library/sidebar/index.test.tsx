@@ -42,6 +42,7 @@ let root: Root | null = null;
 
 function createProps(): GallerySidebarProps {
   return {
+    onClearSelection: vi.fn(),
     activeTags: ['alpha'],
     allTags: ['alpha', 'beta'],
     countsKnown: true,
@@ -122,8 +123,8 @@ it('composes folder and tag sections inside the shared shell', () => {
   );
   expect(trashButton?.classList.contains('w-full')).toBe(true);
   expect(trashButton?.textContent).toContain('3');
-  expect(trashButton?.textContent).not.toContain(formatBytes(1536));
-  expect(trashButton?.className).toContain('flex-row');
+  expect(trashButton?.textContent).toContain(formatBytes(1536));
+  expect(trashButton?.className).toContain('!flex-col');
   expect(trashButton?.textContent).not.toContain(translate('gallery.app.trashSummaryCount'));
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
@@ -203,14 +204,14 @@ it('shows zero, loading and unavailable Trash totals without a misleading size',
     )
   );
   expect(footerButton()?.textContent).toContain('0');
-  expect(footerButton()?.textContent).not.toContain(formatBytes(0));
+  expect(footerButton()?.textContent).toContain(formatBytes(0));
 
   act(() =>
     root?.render(
       <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'loading' } }} />
     )
   );
-  expect(footerButton()?.textContent).not.toContain(translate('gallery.app.trashSizeLoading'));
+  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeLoading'));
   expect(footerButton()?.textContent).not.toContain(formatBytes(0));
 
   act(() =>
@@ -218,7 +219,74 @@ it('shows zero, loading and unavailable Trash totals without a misleading size',
       <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'unavailable' } }} />
     )
   );
-  expect(footerButton()?.textContent).not.toContain(translate('gallery.app.trashSizeUnavailable'));
+  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeUnavailable'));
   act(() => root?.render(<GallerySidebar {...props} countsKnown={false} />));
   expect(footerButton()?.textContent).not.toContain('0');
+});
+
+it.each([1, 2])(
+  'clears partial or full Trash selection (%s) and updates actions',
+  (selectedCount) => {
+    const props = { ...createProps(), trashMode: true, selectedCount };
+    const clear = () =>
+      container!.querySelector<HTMLButtonElement>(
+        `button[aria-label="${translate('gallery.app.trashDeselectAll')}"]`
+      );
+    act(() => root?.render(<GallerySidebar {...props} />));
+    expect(clear()).not.toBeNull();
+    act(() => clear()!.click());
+    expect(props.onClearSelection).toHaveBeenCalledOnce();
+    act(() => root?.render(<GallerySidebar {...props} busy />));
+    expect(clear()!.disabled).toBe(true);
+    act(() => root?.render(<GallerySidebar {...props} selectedCount={0} />));
+    expect(clear()).toBeNull();
+    const restore = Array.from(container!.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes(translate('gallery.app.restoreTrash'))
+    );
+    expect(restore!.disabled).toBe(true);
+  }
+);
+
+it.each([
+  { status: 'ready' as const, bytes: 3670016 },
+  { status: 'loading' as const },
+  { status: 'unavailable' as const },
+])('uses the same full-Trash size in both surfaces for $status', (size) => {
+  const props = { ...createProps(), trashSummary: { count: 3, size } };
+  act(() => root?.render(<GallerySidebar {...props} />));
+  const footerSize = container!.querySelector<HTMLElement>(
+    '[data-ui="gallery.trash.footerSummary"] span[title]'
+  )!;
+  const sizeText = footerSize.textContent!;
+  expect(footerSize.title).toBe(translate('gallery.app.trashSizeExplanation'));
+  act(() => root?.render(<GallerySidebar {...props} trashMode />));
+  expect(container!.querySelector('[data-ui="gallery.trash.summary"]')!.textContent).toContain(
+    sizeText
+  );
+});
+
+it('shows count loading and makes size semantics reachable from keyboard controls', () => {
+  const props = createProps();
+  act(() => root?.render(<GallerySidebar {...props} countsKnown={false} />));
+  const footer = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.sidebar.footer"] button'
+  )!;
+  const loading = Array.from(footer.querySelectorAll('span')).find(
+    (span) => span.textContent === translate('gallery.app.trashCountLoading')
+  )!;
+  expect(loading.className).not.toContain('sr-only');
+  const description = document.getElementById(footer.getAttribute('aria-describedby')!)!;
+  expect(description.textContent).toContain(translate('gallery.app.trashSizeExplanation'));
+  act(() => root?.render(<GallerySidebar {...props} trashMode />));
+  const disclosure = container!.querySelector<HTMLDetailsElement>(
+    '[data-ui="gallery.trash.summary"] details'
+  )!;
+  const summary = disclosure.querySelector<HTMLElement>('summary')!;
+  summary.focus();
+  expect(document.activeElement).toBe(summary);
+  act(() => summary.click());
+  expect(disclosure.open).toBe(true);
+  expect(disclosure.querySelector('p')!.textContent).toBe(
+    translate('gallery.app.trashSizeExplanation')
+  );
 });

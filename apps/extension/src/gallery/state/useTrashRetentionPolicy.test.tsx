@@ -108,17 +108,17 @@ it('retains the committed value after a failed save and retries the same patch',
   expect(state).toMatchObject({ policy: base, saving: false, feedback: 'error' });
   await act(async () => state.onRetry());
   expect(mocks.patch).toHaveBeenNthCalledWith(2, { trashRetentionDays: 7 }, base);
-  expect(state).toMatchObject({ policy: { ...base, trashRetentionDays: 7 }, feedback: 'saved' });
+  expect(state).toMatchObject({ policy: { ...base, trashRetentionDays: 7 }, feedback: null });
 });
 
-it('clears successful save feedback after a short interval', async () => {
+it('commits an automatic save without success feedback', async () => {
   mocks.load.mockResolvedValue({ localStoragePolicy: base });
   mocks.patch.mockResolvedValue({ localStoragePolicy: { ...base, trashCleanupEnabled: true } });
   await act(async () => root.render(<Probe />));
   vi.useFakeTimers();
   try {
     await act(async () => state.onChange({ trashCleanupEnabled: true }));
-    expect(state.feedback).toBe('saved');
+    expect(state.feedback).toBeNull();
     act(() => vi.advanceTimersByTime(3000));
     expect(state.feedback).toBeNull();
   } finally {

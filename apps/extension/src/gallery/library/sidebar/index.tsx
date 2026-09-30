@@ -1,7 +1,11 @@
-import { Library, RotateCcw, Trash2 } from 'lucide-react';
+import { useId } from 'react';
+import { Library, RotateCcw, Trash2, X } from 'lucide-react';
 import { formatNumber, getCurrentLocale, translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
+import {
+  getControlIconButtonClassName,
+  getControlSecondaryButtonClassName,
+} from '@sniptale/ui/control-language';
 import type { GallerySidebarProps } from './types';
 import type { GalleryTrashSummary } from '../types';
 import {
@@ -38,7 +42,13 @@ const trashButtonClassName = [
   'disabled:cursor-not-allowed disabled:opacity-55',
 ].join(' ');
 
-function GalleryTrashSummaryText({ summary }: { summary: GalleryTrashSummary | undefined }) {
+function GalleryTrashSummaryText({
+  summary,
+  compact = false,
+}: {
+  summary: GalleryTrashSummary | undefined;
+  compact?: boolean;
+}) {
   const size = summary?.size;
   const sizeText =
     size?.status === 'ready'
@@ -52,17 +62,31 @@ function GalleryTrashSummaryText({ summary }: { summary: GalleryTrashSummary | u
   return (
     <>
       <span>
-        {translate('gallery.app.trashSummaryCount')}:{' '}
+        {compact ? null : `${translate('gallery.app.trashSummaryCount')}: `}
         {formatNumber(summary?.count ?? 0, undefined, getCurrentLocale())}
       </span>
-      <span>
-        {translate('gallery.app.trashTotalSize')}: {sizeText}
-      </span>
+      {compact ? <span aria-hidden="true">·</span> : null}
+      {compact ? (
+        <span title={translate('gallery.app.trashSizeExplanation')}>{sizeText}</span>
+      ) : (
+        <details>
+          <summary
+            className="cursor-pointer rounded-[7px] focus-visible:outline-2
+            focus-visible:outline-[var(--sniptale-color-accent)]"
+          >
+            {translate('gallery.app.trashTotalSize')}: {sizeText}
+          </summary>
+          <p className="pt-1 text-xs font-normal">
+            {translate('gallery.app.trashSizeExplanation')}
+          </p>
+        </details>
+      )}
     </>
   );
 }
 
 export function GallerySidebar(props: GallerySidebarProps) {
+  const sizeDescriptionId = useId();
   return (
     <InspectorShellFrame
       expandedWidthClassName={INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS}
@@ -90,10 +114,11 @@ export function GallerySidebar(props: GallerySidebarProps) {
           <button
             type="button"
             disabled={props.busy}
-            className={trashButtonClassName}
+            aria-describedby={props.trashMode ? undefined : sizeDescriptionId}
+            className={`${trashButtonClassName} !flex-col`}
             onClick={() => props.onTrashModeChange?.(!props.trashMode)}
           >
-            <span className="flex min-w-0 items-center justify-center gap-2 whitespace-nowrap text-xs font-semibold">
+            <span className="flex min-w-0 items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold">
               {props.trashMode ? (
                 <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
               ) : (
@@ -107,14 +132,23 @@ export function GallerySidebar(props: GallerySidebarProps) {
             </span>
             {!props.trashMode ? (
               props.countsKnown ? (
-                <span className="shrink-0 text-xs tabular-nums text-[var(--sniptale-color-text-secondary)]">
-                  {formatNumber(props.trashSummary?.count ?? 0, undefined, getCurrentLocale())}
+                <span
+                  data-ui="gallery.trash.footerSummary"
+                  className="flex min-w-0 flex-wrap justify-center gap-x-2 text-sm font-medium
+                    tabular-nums text-[var(--sniptale-color-text-secondary)]"
+                >
+                  <GalleryTrashSummaryText summary={props.trashSummary} compact />
                 </span>
               ) : (
-                <span className="sr-only">{translate('gallery.app.trashCountLoading')}</span>
+                <span className="text-sm text-[var(--sniptale-color-text-secondary)]">
+                  {translate('gallery.app.trashCountLoading')}
+                </span>
               )
             ) : null}
           </button>
+          <span id={sizeDescriptionId} className="sr-only">
+            {translate('gallery.app.trashSizeExplanation')}
+          </span>
         </div>
       </InspectorShellPanel>
     </InspectorShellFrame>
@@ -125,13 +159,10 @@ function GalleryTrashControls(props: GallerySidebarProps) {
   const trashRetention = useTrashRetentionPolicy();
   return (
     <section className="flex flex-col gap-3 pb-6" aria-label={translate('gallery.app.trashTitle')}>
-      <p className="text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-        {translate('gallery.app.trashDescription')}
-      </p>
       <div
         data-ui="gallery.trash.summary"
         role="status"
-        className="flex flex-col gap-1 text-xs text-[var(--sniptale-color-text-secondary)]"
+        className="flex flex-col gap-1 text-sm font-medium tabular-nums text-[var(--sniptale-color-text-secondary)]"
       >
         {props.countsKnown ? (
           <GalleryTrashSummaryText summary={props.trashSummary} />
@@ -139,10 +170,24 @@ function GalleryTrashControls(props: GallerySidebarProps) {
           translate('gallery.app.trashCountLoading')
         )}
       </div>
-      <p className="text-sm" role="status">
-        {translate('gallery.app.selectedPrefix')}{' '}
-        {formatNumber(props.selectedCount ?? 0, undefined, getCurrentLocale())}
-      </p>
+      <div className="flex items-center gap-2">
+        <p className="text-sm" role="status">
+          {translate('gallery.app.selectedPrefix')}{' '}
+          {formatNumber(props.selectedCount ?? 0, undefined, getCurrentLocale())}
+        </p>
+        {props.selectedCount ? (
+          <button
+            type="button"
+            aria-label={translate('gallery.app.trashDeselectAll')}
+            title={translate('gallery.app.trashDeselectAll')}
+            disabled={props.busy}
+            className={getControlIconButtonClassName({ density: 'compact' })}
+            onClick={props.onClearSelection}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
       <div className="flex flex-col gap-2">
         <button
           type="button"

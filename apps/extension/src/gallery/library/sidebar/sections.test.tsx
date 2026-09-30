@@ -266,6 +266,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
       onActiveTagsChange={onActiveTagsChange}
       onFacetFilterChange={onFacetFilterChange}
       onFolderFilterChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onResetFilters={onResetFilters}
       onScopeChange={onScopeChange}
@@ -386,6 +387,7 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
     />
   );
@@ -454,6 +456,7 @@ it('updates a changed active saved view instead of opening the name field', asyn
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onUpdateSavedView={onUpdateSavedView}
     />
@@ -506,6 +509,7 @@ it('hides reset and update actions while the active saved view matches its basel
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onUpdateSavedView={vi.fn()}
     />
@@ -546,6 +550,7 @@ it('shows search and scrolling only for facet lists with more than ten values', 
       onFacetFilterChange={vi.fn()}
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onScopeChange={vi.fn()}
     />
@@ -603,6 +608,7 @@ it('shows result selection for a non-default section without a redundant filter 
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={onSelectAll}
     />
   );
@@ -649,6 +655,7 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
     />
   );
@@ -699,6 +706,7 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
     onResetFilters: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectAll: vi.fn(),
+    onClearSelection: vi.fn(),
   };
 
   render(<GalleryFacetFilters {...facetProps} />);

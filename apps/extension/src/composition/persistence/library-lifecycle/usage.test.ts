@@ -492,7 +492,7 @@ it('charges scenario and video retained graphs to their own trashed roots', asyn
     draftsBytes:
       jsonBytes(scenario.project) + jsonBytes(stepDocument) + 17 + 19 + 13 + 3 + 5 + 5 + 7,
     libraryBytes: jsonBytes(video.project) + 7 + 1 + 9,
-    trashBytes: retained,
+    trashBytes: retained - 13 - 5,
     totalBytes: retained + 9,
   });
 });
@@ -520,3 +520,79 @@ function createRef(assetId: string, size: number) {
     size,
   };
 }
+
+it.each([
+  { parentTrashed: false, exportTrashed: true },
+  { parentTrashed: true, exportTrashed: false },
+  { parentTrashed: true, exportTrashed: true },
+  { parentTrashed: false, exportTrashed: false },
+])(
+  'charges export body and thumbnail by their own Trash marker ($parentTrashed/$exportTrashed)',
+  async ({ parentTrashed, exportTrashed }) => {
+    const project = { title: 'Scenario' };
+    const projectBytes = new TextEncoder().encode(JSON.stringify(project)).byteLength;
+    mocks.listMediaLibrary.mockResolvedValue([]);
+    mocks.listScenarioProjectEntries.mockResolvedValue([
+      {
+        id: 'scenario',
+        project,
+        lifecycle: { storageClass: 'temporary', ...(parentTrashed ? { trashedAt: 0 } : {}) },
+      },
+    ]);
+    mocks.listScenarioExports.mockResolvedValue([
+      {
+        id: 'export',
+        size: 13,
+        ...(exportTrashed ? { trashState: { updatedAt: 1, trashedAt: 0 } } : {}),
+      },
+    ]);
+    mocks.getMediaThumbnail.mockImplementation(async (id: string) =>
+      id === 'scenario-export:export' ? { blob: new Blob([new Uint8Array(7)]) } : undefined
+    );
+    mocks.runMutation.mockImplementation(async (effect) =>
+      effect({ getAll: vi.fn(async () => []) })
+    );
+    await expect(getLibraryStorageUsage()).resolves.toEqual({
+      draftsBytes: projectBytes + 20,
+      libraryBytes: 0,
+      totalBytes: projectBytes + 20,
+      trashBytes: (parentTrashed ? projectBytes : 0) + (exportTrashed ? 20 : 0),
+    });
+  }
+);
+
+it('includes a 1.5 MB image and 2 MB retained resource once alongside workspace metadata and thumbnails', async () => {
+  const imageBytes = 1.5 * 1024 * 1024;
+  const assetBytes = 2 * 1024 * 1024;
+  const workspace = {
+    aggregateId: 'image',
+    document: { assets: [{ assetId: 'shared' }, { assetId: 'shared' }] },
+  };
+  mocks.listMediaLibrary.mockResolvedValue([
+    {
+      id: 'image',
+      size: imageBytes,
+      hasThumbnail: true,
+      source: { kind: 'screenshot' },
+      lifecycle: { storageClass: 'library', trashedAt: 0 },
+    },
+    { id: 'active', size: assetBytes, source: { kind: 'stored-asset', assetId: 'shared' } },
+  ]);
+  mocks.recoverAndListStoredImageWorkspaces.mockResolvedValue([workspace]);
+  mocks.getMediaThumbnail.mockResolvedValue({ blob: new Blob([new Uint8Array(11)]) });
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: vi.fn(async (store: string) =>
+        store === 'asset_refs' ? [createRef('shared', assetBytes)] : []
+      ),
+    })
+  );
+  const retained =
+    imageBytes + assetBytes + 11 + new TextEncoder().encode(JSON.stringify(workspace)).byteLength;
+  await expect(getLibraryStorageUsage()).resolves.toEqual({
+    draftsBytes: 0,
+    libraryBytes: retained,
+    totalBytes: retained,
+    trashBytes: retained,
+  });
+});

@@ -71,7 +71,8 @@ it('shows committed toggle and days, blocks input while saving, and explains lat
 
   render({ ...props, policy: { trashCleanupEnabled: true, trashRetentionDays: 14 }, saving: true });
   expect(container.textContent).toContain(translate('gallery.app.trashRetentionExplanation'));
-  expect(toggle.disabled).toBe(true);
+  expect(toggle.disabled).toBe(false);
+  expect(toggle.getAttribute('aria-busy')).toBe('true');
   select = container.querySelector<HTMLButtonElement>(
     `[aria-label="${translate('gallery.app.trashRetentionDays')}"]`
   );
@@ -89,12 +90,12 @@ it('shows committed toggle and days, blocks input while saving, and explains lat
   render({
     ...props,
     policy: { trashCleanupEnabled: true, trashRetentionDays: 14 },
-    feedback: 'saved',
+    feedback: null,
   });
   expect(toggle.getAttribute('aria-checked')).toBe('true');
   expect(select?.disabled).toBe(false);
   expect(select?.textContent).toContain('14');
-  expect(container.textContent).toContain(translate('gallery.app.trashRetentionSaved'));
+  expect(container.textContent).not.toMatch(/Saved|Сохранено/);
   act(() => select?.click());
   const options = Array.from(document.body.querySelectorAll<HTMLButtonElement>('[role="option"]'));
   expect(options.map((option) => Number(option.textContent?.match(/\d+/)?.[0]))).toEqual([
@@ -116,4 +117,15 @@ it('keeps the committed value visible and offers retry after a failed save', () 
   );
   act(() => retry?.click());
   expect(props.onRetry).toHaveBeenCalledOnce();
+});
+
+it('keeps pointer availability and committed state during a pending save without duplicate writes', () => {
+  const props = createProps();
+  render({ ...props, saving: true });
+  const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]')!;
+  expect(toggle.disabled).toBe(false);
+  expect(toggle.getAttribute('aria-busy')).toBe('true');
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  act(() => toggle.click());
+  expect(props.onChange).not.toHaveBeenCalled();
 });

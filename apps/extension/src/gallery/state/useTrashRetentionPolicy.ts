@@ -11,7 +11,7 @@ type RetentionState = {
   status: 'loading' | 'ready' | 'unavailable';
   policy: LocalStoragePolicy | null;
   saving: boolean;
-  feedback: 'saved' | 'error' | null;
+  feedback: 'error' | null;
 };
 
 const initialState: RetentionState = {
@@ -83,16 +83,6 @@ export function useTrashRetentionPolicy() {
     };
   }, [publish, reload]);
 
-  useEffect(() => {
-    if (state.feedback !== 'saved') return;
-    const timeout = window.setTimeout(() => {
-      if (stateRef.current.feedback === 'saved') {
-        publish({ ...stateRef.current, feedback: null });
-      }
-    }, 3000);
-    return () => window.clearTimeout(timeout);
-  }, [state.feedback, publish]);
-
   const commit = useCallback(
     async (patch: Partial<LocalStoragePolicy>, sourceRevision: number) => {
       const base = stateRef.current.policy;
@@ -108,7 +98,7 @@ export function useTrashRetentionPolicy() {
             status: 'ready',
             policy: settings.localStoragePolicy,
             saving: false,
-            feedback: 'saved',
+            feedback: null,
           });
         } else if (
           stateRef.current.policy?.trashCleanupEnabled ===
@@ -116,7 +106,7 @@ export function useTrashRetentionPolicy() {
           stateRef.current.policy?.trashRetentionDays ===
             settings.localStoragePolicy.trashRetentionDays
         ) {
-          publish({ ...stateRef.current, saving: false, feedback: 'saved' });
+          publish({ ...stateRef.current, saving: false, feedback: null });
         }
         pending.current = null;
       } catch (error) {

@@ -16,7 +16,7 @@ export interface GalleryTrashRetentionProps {
   status: 'loading' | 'ready' | 'unavailable';
   policy: Pick<LocalStoragePolicy, 'trashCleanupEnabled' | 'trashRetentionDays'> | null;
   saving: boolean;
-  feedback: 'saved' | 'error' | null;
+  feedback: 'error' | null;
   onChange(patch: { trashCleanupEnabled?: boolean; trashRetentionDays?: number }): void;
   onRetry(): void;
 }
@@ -26,6 +26,7 @@ export interface GallerySidebarProps {
   trashMode?: boolean;
   busy?: boolean;
   selectedCount?: number;
+  onClearSelection: () => void;
   onTrashModeChange?: (value: boolean) => void;
   onRestoreTrash?: () => void;
   onDeleteTrash?: (opening: GalleryDeletionOpening) => void;

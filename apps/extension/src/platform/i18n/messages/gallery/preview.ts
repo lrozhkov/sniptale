@@ -10,7 +10,7 @@ export const galleryPreviewMessages = defineMessageSource({
   folderVideoProject: { ru: 'Видеопроекты', en: 'Video projects' },
   restoreProjectFirst: {
     ru: 'Восстановите проект из корзины для редактирования',
-    en: 'Restore this project from Trash to edit it',
+    en: 'Restore this project from Trash Bin to edit it',
   },
   editableProject: { ru: 'Можно продолжить редактирование', en: 'Ready to continue editing' },
   clips: { ru: 'Клипы', en: 'Clips' },

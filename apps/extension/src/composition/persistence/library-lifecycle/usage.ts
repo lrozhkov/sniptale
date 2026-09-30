@@ -18,7 +18,7 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 export interface LibraryStorageUsage {
   draftsBytes: number;
   libraryBytes: number;
-  /** Logical bytes retained by trashed roots, including shared assets once within Trash. */
+  /** Logical bytes retained by trashed roots and exports, including shared assets once within Trash. */
   trashBytes: number;
   totalBytes: number;
 }
@@ -126,9 +126,10 @@ export async function getLibraryStorageUsage(
     }
     if (legacyThumbnail) addBytes(legacyThumbnail.blob.size, storageClass, trashed);
     for (const scenarioExport of exports) {
-      addBytes(scenarioExport.size, storageClass, trashed);
+      const exportTrashed = scenarioExport.trashState?.trashedAt !== undefined;
+      addBytes(scenarioExport.size, storageClass, exportTrashed);
       const exportThumbnail = await getMediaThumbnail(`scenario-export:${scenarioExport.id}`);
-      if (exportThumbnail) addBytes(exportThumbnail.blob.size, storageClass, trashed);
+      if (exportThumbnail) addBytes(exportThumbnail.blob.size, storageClass, exportTrashed);
     }
   }
   for (const presentation of presentations) {
