@@ -85,6 +85,15 @@ function renderEditor(overrides: Partial<React.ComponentProps<typeof LayerEffect
     applyLayerEffect: vi.fn(async () => undefined),
     applyLayerTransformation: vi.fn(async () => undefined),
     layer: createLayer(),
+    selection: {
+      hasSelection: true,
+      selectedObjectCount: 1,
+      selectedObjectHeight: 120,
+      selectedObjectId: 'layer-1',
+      selectedObjectIds: ['layer-1'],
+      selectedObjectType: 'image',
+      selectedObjectWidth: 160,
+    },
     layerAspectRatio: 4 / 3,
     layerEffectsState: {
       activeEffectId: 'gamma',
@@ -238,6 +247,15 @@ it('shows resize controls for source-image layers with raster effects', () => {
   renderEditor({
     activeEffectId: null,
     layer: createLayer({ id: 'source-layer', type: 'source-image' }),
+    selection: {
+      hasSelection: true,
+      selectedObjectCount: 1,
+      selectedObjectHeight: 120,
+      selectedObjectId: 'source-layer',
+      selectedObjectIds: ['source-layer'],
+      selectedObjectType: 'source-image',
+      selectedObjectWidth: 160,
+    },
     layerEffectsState: {
       activeEffectId: null,
       category: 'transformations',
@@ -248,3 +266,22 @@ it('shows resize controls for source-image layers with raster effects', () => {
 
   expect(container?.querySelector('[data-testid="resize-controls"]')).not.toBeNull();
 });
+
+it.each(['adjustments', 'filters'] as const)(
+  'ends %s with the Apply action without a bottom divider',
+  (category) => {
+    renderEditor({
+      activeEffectId: category === 'filters' ? 'blur' : 'gamma',
+      layerEffectsState: {
+        activeEffectId: category === 'filters' ? 'blur' : 'gamma',
+        category,
+        layerId: 'layer-1',
+        query: '',
+      },
+    });
+    const apply = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+      button.textContent?.includes('editor.toolbar.layerEffectsApply')
+    );
+    expect(apply?.parentElement?.className).not.toContain('border-b');
+  }
+);

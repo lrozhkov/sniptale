@@ -58,13 +58,11 @@ function isCurrentSingleLayerSelection(
 interface UseEditorInspectorLayerEffectsStateArgs {
   inspector: string;
   layers: EditorLayerItem[];
-  setInspector: (inspector: 'tool') => void;
-  syncActiveTool: (tool: 'select') => void;
   selection: EditorSelectionState;
 }
 
 export function useEditorInspectorLayerEffectsState(args: UseEditorInspectorLayerEffectsStateArgs) {
-  const { inspector, layers, selection, setInspector, syncActiveTool } = args;
+  const { inspector, layers, selection } = args;
   const [state, setState] = useState(DEFAULT_EDITOR_LAYER_EFFECTS_STATE);
 
   useEffect(() => {
@@ -97,9 +95,11 @@ export function useEditorInspectorLayerEffectsState(args: UseEditorInspectorLaye
       return;
     }
 
-    syncActiveTool('select');
-    setInspector('tool');
-  }, [inspector, layers, selection, setInspector, syncActiveTool, state.layerId]);
+    const selectedId = selection.selectedObjectCount === 1 ? selection.selectedObjectId : null;
+    if (selectedId && layers.some((layer) => layer.id === selectedId)) {
+      setState((current) => ({ ...current, layerId: selectedId }));
+    }
+  }, [inspector, layers, selection, state.layerId]);
 
   return {
     layerEffectsState: state,

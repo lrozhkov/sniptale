@@ -276,6 +276,49 @@ it('renders compact transformation actions and forwards immediate actions plus r
   expect(props.onResizeLayer).toHaveBeenCalledWith('layer-1', 160, 120);
 });
 
+it('does not offer Resize Apply while the inspected layer has no valid single selection', () => {
+  const props = renderPanel({
+    layerEffectsState: {
+      activeEffectId: null,
+      category: 'transformations',
+      layerId: 'layer-1',
+      query: '',
+    },
+    layerSizeDraft: { width: 1, height: 1 },
+    selection: {
+      ...DEFAULT_SELECTION,
+      hasSelection: false,
+      selectedObjectCount: 0,
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      selectedObjectWidth: null,
+      selectedObjectHeight: null,
+    },
+  });
+  expect(container?.textContent).not.toContain('editor.toolbar.layerEffectsApplyResize');
+  expect(container?.textContent).toContain('editor.layerEffects.flipAndRotate');
+  act(() =>
+    root?.render(
+      <EditorInspectorLayerEffectsPanel
+        {...props}
+        layerSizeDraft={{ width: 320, height: 180 }}
+        layerSizeText="320 x 180"
+        selection={{
+          ...DEFAULT_SELECTION,
+          selectedObjectWidth: 320,
+          selectedObjectHeight: 180,
+        }}
+      />
+    )
+  );
+  const apply = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    button.textContent?.includes('editor.toolbar.layerEffectsApplyResize')
+  );
+  expect(apply).toBeDefined();
+  act(() => apply?.click());
+  expect(props.onResizeLayer).toHaveBeenCalledWith('layer-1', 320, 180);
+});
+
 it('sorts catalog entries with applied effects first inside compact lists', () => {
   renderPanel({
     layerEffectsState: {

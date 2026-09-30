@@ -1,6 +1,9 @@
 import React from 'react';
 import { FlipHorizontal2, FlipVertical2, Move, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import type {
+  EditorLayerItem,
+  EditorSelectionState,
+} from '../../../features/editor/document/types';
 import type { EditorRasterEffect } from '../../../features/editor/document/effects';
 import {
   createDefaultEditorRasterEffect,
@@ -191,7 +194,7 @@ function RasterEffectActions(props: {
   const applied = isAppliedRasterEffect(props.layer, props.draftEffect.id);
 
   return (
-    <div className="flex items-center gap-3 border-b border-[color:var(--sniptale-color-border-soft)] pb-3">
+    <div className="flex items-center gap-3 pb-3">
       <button
         type="button"
         className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
@@ -242,6 +245,7 @@ type LayerEffectsEditorProps = Pick<
 > & {
   activeEffectId: EditorLayerEffectCommandId | null;
   layer: EditorLayerItem;
+  selection: EditorSelectionState;
 };
 
 function useLayerEffectPreview(
@@ -266,6 +270,11 @@ function useLayerEffectPreview(
 export function LayerEffectsEditor(props: LayerEffectsEditorProps) {
   const { draftEffect, setDraftEffect } = useDraftRasterEffect(props.activeEffectId, props.layer);
   useLayerEffectPreview(props, draftEffect);
+  const resizeSelectionReady =
+    props.selection.selectedObjectCount === 1 &&
+    props.selection.selectedObjectId === props.layer.id &&
+    (props.selection.selectedObjectWidth ?? 0) > 0 &&
+    (props.selection.selectedObjectHeight ?? 0) > 0;
 
   if (props.layerEffectsState.category === 'transformations') {
     return (
@@ -279,7 +288,7 @@ export function LayerEffectsEditor(props: LayerEffectsEditorProps) {
         onResizeLayer={props.onResizeLayer}
         setLayerSizeDraft={props.setLayerSizeDraft}
         setLayerSizeLocked={props.setLayerSizeLocked}
-        showResizeControls
+        showResizeControls={resizeSelectionReady}
         updateLockedDraft={props.updateLockedDraft}
       />
     );

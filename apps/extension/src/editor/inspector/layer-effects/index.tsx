@@ -172,6 +172,7 @@ function LayerEffectsBody(
             activeEffectId={props.layerEffectsState.activeEffectId}
             layer={props.activeLayer}
             layerEffectsState={props.layerEffectsState}
+            selection={props.selection}
           />
         }
       />
@@ -181,6 +182,7 @@ function LayerEffectsBody(
           activeEffectId={props.layerEffectsState.activeEffectId}
           layer={props.activeLayer}
           layerEffectsState={props.layerEffectsState}
+          selection={props.selection}
         />
       ) : null}
     </div>

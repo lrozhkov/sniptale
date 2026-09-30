@@ -187,7 +187,7 @@ async function expectWorkspaceColorState() {
   expect(getMatchingHookValue()?.workspaceColor.matchesDefault).toBe(true);
 }
 
-async function expectLayerEffectsSelectionExit() {
+async function expectLayerEffectsSelectionRetarget() {
   const syncActiveTool = vi.fn();
   const setInspector = vi.fn();
   const getHookValue = renderHarness({
@@ -215,8 +215,13 @@ async function expectLayerEffectsSelectionExit() {
     await flushMicrotasks();
   });
 
-  expect(syncActiveTool).toHaveBeenCalledWith('select');
-  expect(setInspector).toHaveBeenCalledWith('tool');
+  expect(getHookValue()?.layerEffectsState).toMatchObject({
+    category: 'filters',
+    activeEffectId: 'blur',
+    layerId: 'layer-2',
+  });
+  expect(syncActiveTool).not.toHaveBeenCalled();
+  expect(setInspector).not.toHaveBeenCalled();
 }
 
 describe('useEditorInspectorSidebarLocalState', () => {
@@ -234,7 +239,7 @@ describe('useEditorInspectorSidebarLocalState', () => {
     await expectWorkspaceColorState();
   });
 
-  it('normalizes back to select when layer-effects loses its single-layer selection', async () => {
-    await expectLayerEffectsSelectionExit();
+  it('keeps layer effects open and retargets them to the selected layer', async () => {
+    await expectLayerEffectsSelectionRetarget();
   });
 });

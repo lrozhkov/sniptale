@@ -244,6 +244,79 @@ it('keeps image, canvas, and layer drafts stable across unchanged and clamped in
   expect(hook.getValue()?.canvasSizeDraft).toBe(initialCanvasDraft);
 });
 
+it('preserves the inspected layer size during a temporary selection gap', () => {
+  const selection: EditorSelectionState = {
+    ...DEFAULT_SELECTION,
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectId: 'layer-1',
+    selectedObjectIds: ['layer-1'],
+    selectedObjectType: 'image',
+    selectedObjectWidth: 640,
+    selectedObjectHeight: 360,
+  };
+  const args = {
+    canvasHeight: 720,
+    canvasWidth: 1280,
+    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    inspector: 'layer-effects',
+    sceneBackgroundPresets: createDefaultEditorPresetStorageState().sceneBackground,
+    isResizableLayerSelection: true,
+    selection,
+    sourceHeight: 720,
+    sourceName: 'capture',
+    sourceWidth: 1280,
+  };
+  const hook = renderHook(args);
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 640, height: 360 });
+  hook.rerender({ ...args, isResizableLayerSelection: false, selection: DEFAULT_SELECTION });
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 640, height: 360 });
+  hook.rerender({
+    ...args,
+    selection: { ...selection, selectedObjectWidth: 320, selectedObjectHeight: 180 },
+  });
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 320, height: 180 });
+});
+
+it('resets an edited resize draft when a different equal-sized layer is selected', () => {
+  const selection: EditorSelectionState = {
+    ...DEFAULT_SELECTION,
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectId: 'layer-1',
+    selectedObjectIds: ['layer-1'],
+    selectedObjectType: 'image',
+    selectedObjectWidth: 640,
+    selectedObjectHeight: 360,
+  };
+  const args = {
+    canvasHeight: 720,
+    canvasWidth: 1280,
+    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    inspector: 'layer-effects',
+    sceneBackgroundPresets: createDefaultEditorPresetStorageState().sceneBackground,
+    isResizableLayerSelection: true,
+    selection,
+    sourceHeight: 720,
+    sourceName: 'capture',
+    sourceWidth: 1280,
+  };
+  const hook = renderHook(args);
+  act(() => hook.getValue()?.setLayerSizeDraft({ width: 900, height: 500 }));
+  hook.rerender({ ...args, isResizableLayerSelection: false, selection: DEFAULT_SELECTION });
+  hook.rerender(args);
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 900, height: 500 });
+  hook.rerender({
+    ...args,
+    selection: {
+      ...selection,
+      selectedObjectId: 'layer-2',
+      selectedObjectIds: ['layer-2'],
+    },
+  });
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 640, height: 360 });
+});
+
 it('keeps image dimensions editable after a crop leaves fractional source geometry', () => {
   const hook = renderHook({
     canvasHeight: 1000,

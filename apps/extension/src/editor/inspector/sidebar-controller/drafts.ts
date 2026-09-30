@@ -150,20 +150,63 @@ function useLayerDraftState(args: {
   isResizableLayerSelection: boolean;
   selection: EditorSelectionState;
 }) {
+  const selectedObjectId = args.selection.selectedObjectId;
+  const selectedObjectWidth = args.selection.selectedObjectWidth;
+  const selectedObjectHeight = args.selection.selectedObjectHeight;
+  const validSelection =
+    args.selection.selectedObjectCount === 1 &&
+    selectedObjectId !== null &&
+    !!selectedObjectWidth &&
+    !!selectedObjectHeight;
+  const lastValidSelection = useRef<{
+    id: string;
+    width: number;
+    height: number;
+    resizable: boolean;
+  } | null>(
+    validSelection
+      ? {
+          id: selectedObjectId,
+          width: selectedObjectWidth,
+          height: selectedObjectHeight,
+          resizable: args.isResizableLayerSelection,
+        }
+      : null
+  );
   const [layerSizeDraft, setLayerSizeDraft] = useState(
-    createSizeDraft(args.selection.selectedObjectWidth, args.selection.selectedObjectHeight)
+    createSizeDraft(selectedObjectWidth, selectedObjectHeight)
   );
   const [layerSizeLocked, setLayerSizeLocked] = useState(args.isResizableLayerSelection);
 
   useEffect(() => {
-    setLayerSizeDraft(
-      createSizeDraft(args.selection.selectedObjectWidth, args.selection.selectedObjectHeight)
-    );
+    if (!validSelection) {
+      return;
+    }
+    const nextSelection = {
+      id: selectedObjectId,
+      width: selectedObjectWidth,
+      height: selectedObjectHeight,
+      resizable: args.isResizableLayerSelection,
+    };
+    const previous = lastValidSelection.current;
+    if (
+      previous?.id === nextSelection.id &&
+      previous.width === nextSelection.width &&
+      previous.height === nextSelection.height &&
+      previous.resizable === nextSelection.resizable
+    ) {
+      return;
+    }
+    lastValidSelection.current = nextSelection;
+    setLayerSizeDraft(createSizeDraft(selectedObjectWidth, selectedObjectHeight));
     setLayerSizeLocked(args.isResizableLayerSelection);
   }, [
     args.isResizableLayerSelection,
-    args.selection.selectedObjectHeight,
-    args.selection.selectedObjectWidth,
+    args.selection.selectedObjectCount,
+    selectedObjectHeight,
+    selectedObjectId,
+    selectedObjectWidth,
+    validSelection,
   ]);
 
   return {
