@@ -252,3 +252,43 @@ it('offers audio and imports the selected audio through the material owner', asy
   );
   expect(onAddMedia).toHaveBeenCalledWith('audio');
 });
+
+it('applies a nonempty format preset to filenames and extensionless MIME metadata', () => {
+  render({
+    items: [
+      { ...item('screenshot'), id: 'file', filename: 'File.png' },
+      { ...item('screenshot'), id: 'fallback', filename: 'Extensionless' },
+      { ...item('screenshot'), id: 'jpeg', filename: 'Other.jpg', mimeType: 'image/jpeg' },
+    ],
+    savedViews: [
+      {
+        id: 'format-view',
+        name: 'PNG files',
+        folderFilter: 'all',
+        createdAt: 1,
+        updatedAt: 1,
+        filters: {
+          activeTags: [],
+          scope: 'all',
+          facetFilters: {
+            created: [],
+            updated: [],
+            format: ['png'],
+            size: [],
+            resolution: [],
+            duration: [],
+            source: [],
+          },
+        },
+      },
+    ],
+  });
+  const preset = Array.from(container.querySelectorAll<HTMLButtonElement>('nav button')).find(
+    (button) => button.textContent === 'PNG files'
+  )!;
+  act(() => preset.click());
+  const list = container.querySelector('[data-ui="recordings-scroll"]')!.textContent!;
+  expect(list).toContain('File.png');
+  expect(list).toContain('Extensionless');
+  expect(list).not.toContain('Other.jpg');
+});

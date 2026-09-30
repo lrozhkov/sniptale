@@ -675,8 +675,8 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
   expect(onFacetFilterChange).toHaveBeenCalledWith('source', []);
 });
 
-it('restores expanded facet sections after remounting the sidebar', async () => {
-  const facetProps = {
+function createFacetProps(searchable = false) {
+  return {
     activeTags: [],
     allTags: [],
     countsKnown: true,
@@ -693,7 +693,7 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
     facets: [
       {
         id: 'format' as const,
-        searchable: false,
+        searchable,
         options: [{ count: 1, label: 'PNG', value: 'png' }],
       },
     ],
@@ -708,6 +708,10 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
     onSelectAll: vi.fn(),
     onClearSelection: vi.fn(),
   };
+}
+
+it('restores expanded facet sections after remounting the sidebar', async () => {
+  const facetProps = createFacetProps();
 
   render(<GalleryFacetFilters {...facetProps} />);
   click(container?.querySelector('summary'));
@@ -736,4 +740,18 @@ it('shows the Audio count and selects its section', () => {
   expect(button?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
   click(button);
   expect(onFolderFilterChange).toHaveBeenCalledWith('audio');
+});
+
+it('preserves the Find query and accessible name through focus and blur', () => {
+  render(<GalleryFacetFilters {...createFacetProps(true)} />);
+  click(container?.querySelector('summary'));
+  const input = container!.querySelector<HTMLInputElement>('input[type="text"],input:not([type])')!;
+  const label = `${translate('gallery.app.facetSearch')} ${translate('gallery.app.facetTitle.format')}`;
+  expect(input.getAttribute('aria-label')).toBe(label);
+  act(() => input.focus());
+  act(() => updateInputValue(input, 'PNG'));
+  act(() => input.blur());
+  expect(input.value).toBe('PNG');
+  expect(input.getAttribute('aria-label')).toBe(label);
+  expect(container!.querySelector('label')!.textContent).toContain('PNG');
 });

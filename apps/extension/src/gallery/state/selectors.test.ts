@@ -748,3 +748,33 @@ it('keeps project folders disjoint from ready materials and counts the same resu
     expect(getGalleryCounts(items)[folderFilter]).toBe(expected.length);
   }
 });
+
+it('builds File Type only from real files and filters independently of legacy project titles', () => {
+  const items = [
+    createScenarioItem({ filename: 'Guide.2026.09.30' }),
+    createVideoProjectItem({ filename: 'Recording.project.pdf' }),
+    createScenarioExportItem({ filename: 'actual-export.pdf', format: 'pdf' }),
+    createItem({ filename: 'image.png', mimeType: 'image/png' }),
+  ];
+  const format = getGalleryFacets(items).find((facet) => facet.id === 'format')!;
+  expect(format.options.map((option) => option.value)).toEqual(['pdf', 'png']);
+  const filters = {
+    created: [],
+    updated: [],
+    format: ['pdf'],
+    size: [],
+    resolution: [],
+    duration: [],
+    source: [],
+  };
+  expect(
+    getFilteredGalleryItems({
+      items,
+      folderFilter: 'all',
+      activeTags: [],
+      search: '',
+      sortMode: 'newest',
+      facetFilters: filters,
+    }).map((item) => item.id)
+  ).toEqual([items[2]!.id]);
+});

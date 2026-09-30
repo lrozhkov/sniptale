@@ -14,7 +14,7 @@ function cx(...values: Array<string | false | null | undefined>): string {
 }
 
 const facetOptionRowClassName = [
-  'flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border border-transparent px-1.5',
+  'relative flex h-8 cursor-pointer items-center gap-2 rounded-[7px] border border-transparent px-1.5',
   'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset',
   'has-[:focus-visible]:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
@@ -34,7 +34,7 @@ const facetSearchClassName = [
 
 const facetSearchInputClassName = [
   'min-w-0 flex-1 bg-transparent text-xs outline-none',
-  'placeholder:text-[var(--sniptale-color-text-muted)]',
+  'placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent',
 ].join(' ');
 
 function getFacetTitle(id: GallerySidebarProps['facets'][number]['id']): string {
@@ -77,7 +77,10 @@ function GalleryFacetOptionRow(props: {
   return (
     <label
       aria-disabled={props.disabled || undefined}
-      className={cx(facetOptionRowClassName, props.disabled && 'cursor-default opacity-55')}
+      className={cx(
+        facetOptionRowClassName,
+        props.disabled ? 'cursor-default opacity-55' : 'group/facet-row'
+      )}
     >
       <input
         type="checkbox"
@@ -103,7 +106,8 @@ function GalleryFacetOptionRow(props: {
       </span>
       <span
         className={cx(
-          'min-w-0 flex-1 truncate text-xs',
+          'min-w-0 flex-1 truncate text-xs transition-colors',
+          'group-hover/facet-row:text-[var(--sniptale-color-text-primary-strong)]',
           props.checked
             ? 'font-semibold text-[var(--sniptale-color-text-primary-strong)]'
             : 'text-[var(--sniptale-color-text-secondary)]'
@@ -187,7 +191,7 @@ function GalleryFacetSection(props: {
           aria-hidden="true"
         />
       </summary>
-      <div className="pb-2">
+      <div className="mt-1 pb-2">
         {props.facet.searchable ? (
           <div className={facetSearchClassName}>
             <Search className="h-3.5 w-3.5 text-[var(--sniptale-color-text-muted)]" />

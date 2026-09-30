@@ -266,3 +266,41 @@ it('keeps a native drag source mounted while focus refreshes library metadata', 
   await act(async () => finish([{ ...item }]));
   expect(host.querySelector('.guide-library-card')).toBe(card);
 });
+
+it('applies a nonempty format preset to filenames and extensionless MIME metadata', async () => {
+  io.list.mockResolvedValue([
+    { ...item, id: 'file', filename: 'File.png' },
+    { ...item, id: 'fallback', filename: 'Extensionless' },
+    { ...item, id: 'jpeg', filename: 'Other.jpg', mimeType: 'image/jpeg' },
+  ]);
+  io.views.mockResolvedValue([
+    {
+      id: 'format-view',
+      name: 'PNG files',
+      folderFilter: 'all',
+      createdAt: 1,
+      updatedAt: 1,
+      filters: {
+        activeTags: [],
+        scope: 'all',
+        facetFilters: {
+          created: [],
+          updated: [],
+          format: ['png'],
+          size: [],
+          resolution: [],
+          duration: [],
+          source: [],
+        },
+      },
+    },
+  ]);
+  await render();
+  await click('PNG files');
+  const cards = Array.from(host.querySelectorAll('.guide-library-card')).map(
+    (card) => card.textContent
+  );
+  expect(cards.join(' ')).toContain('File.png');
+  expect(cards.join(' ')).toContain('Extensionless');
+  expect(cards.join(' ')).not.toContain('Other.jpg');
+});

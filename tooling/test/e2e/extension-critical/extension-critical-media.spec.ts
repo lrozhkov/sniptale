@@ -1,6 +1,6 @@
 import { expect, test as browserTest, type Page } from '@playwright/test';
 import { BlobReader, ZipReader } from '@zip.js/zip.js';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
@@ -951,3 +951,104 @@ test('editor frame utility opens from the floating layers navigation', async ({
   await openEditorHarness(page, hostOrigin);
   await openEditorFrameUtility(page);
 });
+
+browserTest(
+  'gallery lower filter toggles preserve page, sidebar and list scroll at HD',
+  async ({ page }) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript(() => {
+        localStorage.setItem(
+          'sniptale.gallery.facet-disclosures',
+          JSON.stringify(['status', 'tags', 'source', 'format'])
+        );
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const body = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (char) =>
+          char.charCodeAt(0)
+        );
+        window.__sniptaleHarnessBootstrap = {
+          storage: { 'sniptale-locale-preference': 'ru' },
+          mediaLibrary: Array.from({ length: 45 }, (_, index) => ({
+            entry: {
+              id: `filter-${index}`,
+              kind: 'screenshot',
+              source: { kind: 'screenshot' },
+              filename: index === 44 ? 'last.zip' : `image.a${String(index).padStart(2, '0')}`,
+              originalFilename: 'filter-file.png',
+              createdAt: 1,
+              updatedAt: 1,
+              size: body.byteLength,
+              mimeType: 'image/png',
+              width: 1,
+              height: 1,
+              duration: null,
+              sourceUrl: `https://source${String(index).padStart(2, '0')}.example.test`,
+              sourceTitle: null,
+              sourceFavicon: null,
+              tags: [`tag-${index}`],
+              lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+              blob: new Blob([body], { type: 'image/png' }),
+            },
+          })),
+        };
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.addStyleTag({
+        content: await readFile('apps/extension/src/gallery/shell/app-shell/startup.css', 'utf8'),
+      });
+      const title = translate('gallery.app.facetTitle.format', 'ru');
+      const section = page
+        .locator('details')
+        .filter({ has: page.locator('summary', { hasText: title }) });
+      const list = section.locator('.max-h-56');
+      const sidebar = page.locator('[data-ui="gallery.sidebar.scroll"]');
+      const shell = page.locator('[data-ui="gallery.sidebar.shell"]');
+      await expect(section.getByText('ZIP', { exact: true })).toBeAttached();
+      await sidebar.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await list.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      const positions = async () => ({
+        page: await page.evaluate(() => window.scrollY),
+        body: await page.evaluate(() => document.body.scrollTop),
+        document: await page.evaluate(() => document.documentElement.scrollTop),
+        sidebar: await sidebar.evaluate((element) => element.scrollTop),
+        list: await list.evaluate((element) => element.scrollTop),
+        shell: (await shell.boundingBox())!.y,
+        stage: await page.locator('[data-ui="gallery.content.surface"]').boundingBox(),
+      });
+      const before = await positions();
+      expect(
+        await page.locator('[data-ui="gallery.content.surface"] article').count()
+      ).toBeGreaterThan(1);
+      await section.getByText('ZIP', { exact: true }).click();
+      await expect(section.getByRole('checkbox', { name: 'ZIP', exact: false })).toBeChecked();
+      await expect(page.locator('[data-ui="gallery.content.surface"] article')).toHaveCount(1);
+      await expect(
+        page
+          .locator('[data-ui="gallery.content.surface"] article')
+          .getByRole('button', { name: 'last.zip', exact: true })
+          .first()
+      ).toBeAttached();
+      expect(await positions()).toEqual(before);
+      const checkbox = section.getByRole('checkbox', { name: 'ZIP', exact: false });
+      await expect(checkbox).toBeFocused();
+      await checkbox.focus();
+      await page.keyboard.press('Space');
+      await expect(checkbox).not.toBeChecked();
+      expect(
+        await page.locator('[data-ui="gallery.content.surface"] article').count()
+      ).toBeGreaterThan(1);
+      await expect(checkbox).toBeFocused();
+      expect(await positions()).toEqual(before);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+);
