@@ -216,13 +216,13 @@ function expectModeMenuIcon(mode: 'quick-edit'): void {
 }
 
 describe('ToolbarPrimaryControls', () => {
-  it('keeps the mode selector neutral in cursor mode and active in editing modes', async () => {
+  it('shows the selected mode without a persistent active frame', async () => {
     const inactive = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(inactive.props);
 
     const modeButton = queryModeSelectorButton();
 
-    expect(modeButton?.getAttribute('data-active')).toBe('true');
+    expect(modeButton?.getAttribute('data-active')).toBeNull();
     expect(modeButton?.getAttribute('title')).toBe('Обычная работа со страницей');
 
     const active = createToolbarPrimaryControlsProps({ aiPickMode: true, isCursorMode: false });
@@ -232,7 +232,7 @@ describe('ToolbarPrimaryControls', () => {
       '[data-ui="content.toolbar.mode-selector-button"]'
     ) as HTMLButtonElement | null;
 
-    expect(activeModeButton?.getAttribute('data-active')).toBe('true');
+    expect(activeModeButton?.getAttribute('data-active')).toBeNull();
     expect(activeModeButton?.getAttribute('title')).toBe('Редактирование контента');
   });
 
@@ -294,7 +294,7 @@ describe('ToolbarPrimaryControls pending mode', () => {
 
     const modeButton = queryModeSelectorButton();
 
-    expect(modeButton?.getAttribute('data-active')).toBe('true');
+    expect(modeButton?.getAttribute('data-active')).toBeNull();
     expect(modeButton?.getAttribute('title')).toBe('Редактирование контента');
   });
 });

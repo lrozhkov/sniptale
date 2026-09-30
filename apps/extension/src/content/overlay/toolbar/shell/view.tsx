@@ -24,6 +24,19 @@ function getToolbarVisibilityStyle(
   } as const;
 }
 
+function clearPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElement>) {
+  if (event.button !== 0 || !(event.target instanceof Element)) return;
+  const button = event.target.closest<HTMLButtonElement>('button.sniptale-btn');
+  if (
+    button &&
+    event.currentTarget.contains(button) &&
+    !button.disabled &&
+    button.matches(':focus')
+  ) {
+    button.blur();
+  }
+}
+
 export function ToolbarShellContent(props: {
   toolbarProps: ToolbarProps;
   viewModel: ToolbarViewModel;
@@ -55,6 +68,7 @@ export function ToolbarShellContent(props: {
           data-display-mode={derivedState.displayMode}
           data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
           data-menu-open={menuOpen ? 'true' : undefined}
+          onMouseDownCapture={clearPointerActivatedToolbarFocus}
           onMouseOverCapture={onHoverCapture}
         >
           <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>

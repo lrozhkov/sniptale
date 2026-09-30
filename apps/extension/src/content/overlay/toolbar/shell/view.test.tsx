@@ -54,6 +54,74 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
+  it('clears keyboard focus before a primary mouse click on toolbar buttons', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <ToolbarShellContent
+          toolbarProps={{} as never}
+          viewModel={
+            {
+              derivedState: {
+                toolbarRef: { current: null },
+                isDragging: false,
+                displayMode: 'horizontal',
+                position: { x: 24, y: 12 },
+                positionReady: true,
+                handleMouseDown: vi.fn(),
+              },
+              toolbarMenuState: { activeMenuType: null },
+            } as never
+          }
+          onHoverCapture={vi.fn()}
+          onViewportChange={vi.fn()}
+        />
+      );
+    });
+
+    const toolbar = container.querySelector('[data-ui="content.toolbar.root"]');
+    const click = vi.fn();
+    for (const id of [
+      'settings-button',
+      'timer-button',
+      'viewport-button',
+      'capture-action-button',
+      'mode-selector-button',
+      'page-editing-mode.direct-text',
+    ]) {
+      const button = document.createElement('button');
+      button.className = 'sniptale-btn';
+      button.dataset['ui'] = `content.toolbar.${id}`;
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      button.append(icon);
+      button.addEventListener('click', click);
+      toolbar?.append(button);
+      button.focus();
+      const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+      act(() => icon.dispatchEvent(press));
+      expect(document.activeElement).not.toBe(button);
+      expect(press.defaultPrevented).toBe(false);
+      act(() => button.click());
+    }
+    expect(click).toHaveBeenCalledTimes(6);
+
+    const input = document.createElement('input');
+    toolbar?.append(input);
+    input.focus();
+    act(() => input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })));
+    expect(document.activeElement).toBe(input);
+
+    const button = toolbar?.querySelector<HTMLButtonElement>('button');
+    button?.focus();
+    act(() => button?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 })));
+    expect(document.activeElement).toBe(button);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   it('starts toolbar dragging from pointerdown', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
