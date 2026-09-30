@@ -18,15 +18,13 @@ export function PreviewFloatingControl(props: {
       tabIndex={props.tabIndex}
       disabled={props.disabled}
       onClick={props.onClick}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-[8px] border
-        border-[var(--sniptale-color-border-soft)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]
-        text-[var(--sniptale-color-text-primary)] shadow-sm transition
-        hover:border-[var(--sniptale-color-border-strong)]
-        hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]
-        aria-pressed:border-[var(--sniptale-color-border-strong)]
-        aria-pressed:bg-[var(--sniptale-color-surface-panel)]
-        aria-pressed:text-[var(--sniptale-color-accent-emphasis)]
+      className="inline-flex h-9 w-9 items-center justify-center rounded-[8px]
+        border-0 bg-transparent text-[var(--sniptale-color-text-muted-strong)] transition
+        hover:bg-[var(--sniptale-color-surface-hover)]
+        hover:text-[var(--sniptale-color-text-primary)]
+        active:bg-[var(--sniptale-color-surface-hover)]
+        aria-pressed:bg-[var(--sniptale-color-surface-hover)]
+        aria-pressed:text-[var(--sniptale-color-text-primary)]
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]
         disabled:cursor-not-allowed disabled:opacity-40"
     >

@@ -68,9 +68,8 @@ function PreviewNavigationControls({
         <ChevronLeft className="h-[18px] w-[18px]" />
       </PreviewFloatingControl>
       <span
-        className="min-w-14 rounded-[8px] border border-[var(--sniptale-color-border-soft)]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]
-          px-2 py-2 text-center text-xs font-medium"
+        className="min-w-14 px-2 py-2 text-center text-xs font-medium
+          tabular-nums text-[var(--sniptale-color-text-primary)]"
       >
         {navigation.current} / {navigation.total}
       </span>
@@ -215,7 +214,15 @@ function PreviewMediaContent(
   }
 
   if (isGalleryVideoProjectItem(props.item)) {
-    return <MediaThumb item={props.item} fit="contain" />;
+    return (
+      <div
+        data-ui="gallery.preview.project-thumbnail"
+        className="grid h-full max-h-[360px] w-full max-w-[640px] place-items-center
+          overflow-hidden"
+      >
+        <MediaThumb item={props.item} fit="contain" />
+      </div>
+    );
   }
 
   return null;
@@ -315,6 +322,22 @@ export function PreviewMedia(
           var(--sniptale-color-surface-canvas)_100%
         )]"
     >
+      {props.navigation ? (
+        <>
+          <div
+            aria-hidden="true"
+            data-ui="gallery.preview.navigationRail.previous"
+            className="pointer-events-none absolute inset-y-0 left-0 w-6
+              bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_35%,transparent)]"
+          />
+          <div
+            aria-hidden="true"
+            data-ui="gallery.preview.navigationRail.next"
+            className="pointer-events-none absolute inset-y-0 right-0 w-6
+              bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_35%,transparent)]"
+          />
+        </>
+      ) : null}
       <PreviewMediaControls
         trashMode={Boolean(props.trashMode)}
         inspectorCollapsed={props.inspectorCollapsed}
@@ -326,7 +349,7 @@ export function PreviewMedia(
         imageZoom={imageZoom}
       />
       <div data-ui="gallery.preview.content-row" className="relative flex min-h-0 flex-1">
-        {!props.trashMode ? (
+        {!props.trashMode && isGalleryScenarioItem(props.item) ? (
           <div className="absolute bottom-4 left-4 z-20">
             <GalleryProjectOpenAction item={props.item} onOpen={() => props.onEdit()} />
           </div>

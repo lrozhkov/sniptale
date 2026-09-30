@@ -236,6 +236,9 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(videoMarkup).toContain('gallery.preview.videoLoading');
   expect(audioMarkup).toContain('<audio');
   expect(videoProjectMarkup).toContain('lucide-video');
+  expect(videoProjectMarkup).toContain('data-ui="gallery.preview.project-thumbnail"');
+  expect(videoProjectMarkup).toContain('max-h-[360px]');
+  expect(videoProjectMarkup).not.toContain('gallery.preview.openInEditor');
   expect(emptyMarkup).not.toContain('<img');
   expect(emptyMarkup).not.toContain('<video');
   expect(emptyMarkup).not.toContain('<audio');
@@ -644,13 +647,15 @@ it('keeps video menu arrow keys from navigating adjacent Gallery items', () => {
   expect(onNext).not.toHaveBeenCalled();
 });
 
-it('keeps the project editor action available with the inspector collapsed', () => {
-  const props = createProps({ item: createVideoProjectItem(), inspectorCollapsed: true });
-  renderNode(<PreviewMedia {...props} />);
-  const open = [...container!.querySelectorAll('button')].find(
+it('keeps video project editor action in the inspector, not over the preview', () => {
+  const props = createProps({ item: createVideoProjectItem() });
+  renderNode(<PreviewPanel {...props} />);
+  expect(container?.querySelector('[data-ui="gallery.preview.project-thumbnail"]')).toBeTruthy();
+  const open = [...container!.querySelectorAll('button')].filter(
     (button) => button.textContent === 'gallery.preview.openInEditor'
   );
-  expect(open).toBeDefined();
-  act(() => open?.click());
+  expect(open).toHaveLength(1);
+  expect(open[0]?.closest('aside')).toBeTruthy();
+  act(() => open[0]?.click());
   expect(props.onEdit).toHaveBeenCalledOnce();
 });

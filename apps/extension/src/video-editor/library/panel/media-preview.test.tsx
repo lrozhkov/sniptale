@@ -158,6 +158,11 @@ it('previews the edited screenshot without video controls or original fallback',
   expect(container.querySelector('[aria-label="gallery.preview.player.play"]')).toBeNull();
   expect(container.querySelector('[aria-label="gallery.preview.zoomIn"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="gallery.preview.zoomSlider"]')).not.toBeNull();
+  const zoomPanel = container.querySelector<HTMLElement>(
+    '[data-ui="gallery.preview.zoomSliderPanel"]'
+  );
+  expect(zoomPanel?.className).toContain('top-full');
+  expect(zoomPanel?.className).toContain('right-0');
   expect(
     container.querySelector('[aria-label="videoEditor.stage.enterFullscreen"]')
   ).not.toBeNull();

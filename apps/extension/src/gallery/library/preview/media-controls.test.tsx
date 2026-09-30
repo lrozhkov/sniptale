@@ -206,20 +206,34 @@ it('changes image zoom through the slider and preserves it when the lock is enab
     slider?.closest('[data-ui="gallery.preview.zoomSliderGroup"]')
   );
   expect(lock?.tabIndex).toBe(-1);
-  expect(lock?.parentElement?.className).toContain('invisible');
+  const sliderPanel = container?.querySelector<HTMLElement>(
+    '[data-ui="gallery.preview.zoomSliderPanel"]'
+  );
+  expect(sliderPanel?.className).toContain('invisible');
+  expect(sliderPanel?.className).toContain('right-0 top-full');
+  expect(slider?.tabIndex).toBe(-1);
+  expect(slider?.style.getPropertyValue('--sniptale-range-track-height')).toBe('4px');
 
   const sliderGroup = slider?.closest<HTMLElement>('[data-ui="gallery.preview.zoomSliderGroup"]');
   act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })));
   expect(lock?.tabIndex).toBe(0);
+  expect(sliderPanel?.className).not.toContain('invisible');
   act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerout', { bubbles: true })));
   expect(lock?.tabIndex).toBe(-1);
 
   if (!slider) throw new Error('Expected zoom slider');
+  act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })));
   setInputValue(slider, '1.5');
   expect(lock?.tabIndex).toBe(0);
   expect(slider.valueAsNumber).toBe(1.5);
   expect(slider.getAttribute('aria-valuetext')).toBe('150%');
   expect(container?.textContent).toContain('150%');
+  act(() => slider.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerout', { bubbles: true })));
+  expect(sliderPanel?.className).not.toContain('invisible');
+  act(() => window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+  expect(sliderPanel?.className).toContain('invisible');
+  act(() => sliderGroup?.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })));
 
   act(() => {
     container
@@ -243,6 +257,46 @@ it('changes image zoom through the slider and preserves it when the lock is enab
     />
   );
   expect(container?.textContent).toContain('150%');
+  expect(sliderPanel?.className).not.toContain('invisible');
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('button[aria-label="gallery.preview.zoomLockToggle"]')
+      ?.click();
+  });
+  expect(container?.textContent).not.toContain('150%');
+});
+
+it('keeps the zoom slider open while keyboard focus moves from percent to slider and lock', () => {
+  renderNode(<PreviewMedia {...createProps()} />);
+  const group = container?.querySelector<HTMLElement>(
+    '[data-ui="gallery.preview.zoomSliderGroup"]'
+  );
+  const trigger = group?.querySelector<HTMLButtonElement>('button[aria-expanded]');
+  const slider = group?.querySelector<HTMLInputElement>('[data-ui="gallery.preview.zoomSlider"]');
+  const lock = group?.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.zoomLockToggle"]'
+  );
+  const panel = group?.querySelector<HTMLElement>('[data-ui="gallery.preview.zoomSliderPanel"]');
+  expect(trigger?.className).toContain('w-16');
+  expect(panel?.hasAttribute('inert')).toBe(true);
+
+  act(() => {
+    trigger?.focus();
+    trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  });
+  expect(panel?.hasAttribute('inert')).toBe(false);
+  expect(slider?.tabIndex).toBe(0);
+  act(() => slider?.focus());
+  act(() => group?.dispatchEvent(new PointerEvent('pointerout', { bubbles: true })));
+  expect(panel?.className).not.toContain('invisible');
+  act(() => lock?.focus());
+  expect(lock?.tabIndex).toBe(0);
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('button[aria-label="common.actions.close"]')
+      ?.focus()
+  );
+  expect(panel?.className).toContain('invisible');
 });
 
 it('keeps adjacent navigation in the fixed toolbar and exposes video readiness', () => {
@@ -266,6 +320,12 @@ it('keeps adjacent navigation in the fixed toolbar and exposes video readiness',
 
   const previousButton = container?.querySelector('button[aria-label="gallery.preview.previous"]');
   const nextButton = container?.querySelector('button[aria-label="gallery.preview.next"]');
+  expect(previousButton?.className).toContain('border-0 bg-transparent');
+  expect(previousButton?.className).toContain('text-[var(--sniptale-color-text-muted-strong)]');
+  expect(previousButton?.className).toContain('hover:text-[var(--sniptale-color-text-primary)]');
+  expect(container?.querySelector('[data-ui="gallery.preview.toolbar"]')?.textContent).toContain(
+    '2 / 3'
+  );
   const previousZone = container?.querySelector<HTMLButtonElement>(
     '[data-ui="gallery.preview.navigationZone.previous"]'
   );
@@ -277,6 +337,14 @@ it('keeps adjacent navigation in the fixed toolbar and exposes video readiness',
   expect(viewport?.nextElementSibling).toBe(nextZone);
   expect(previousZone?.disabled).toBe(false);
   expect(nextZone?.disabled).toBe(false);
+  for (const direction of ['previous', 'next']) {
+    const rail = container?.querySelector<HTMLElement>(
+      `[data-ui="gallery.preview.navigationRail.${direction}"]`
+    );
+    expect(rail?.getAttribute('aria-hidden')).toBe('true');
+    expect(rail?.className).toContain('inset-y-0');
+    expect(rail?.className).toContain('pointer-events-none');
+  }
   const video = container?.querySelector('video');
   if (video) {
     Object.defineProperty(video, 'duration', { configurable: true, value: 12 });
