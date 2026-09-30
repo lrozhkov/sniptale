@@ -185,7 +185,7 @@ export class GalleryGridFocusController {
     if (
       target instanceof HTMLElement &&
       !this.options.gridRef.current?.contains(target) &&
-      !target.closest('[role="dialog"]')
+      !target.closest(layerSelector)
     )
       this.cancel();
   };

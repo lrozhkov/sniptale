@@ -242,7 +242,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(videoMarkup).toContain('data-ui="gallery.preview.video-frame"');
   expect(videoMarkup).toContain('data-ui="preview.media.contained"');
   expect(videoMarkup).toContain('preload="metadata"');
-  expect(videoMarkup).toContain('class="block h-full w-full bg-black object-contain"');
+  expect(videoMarkup).toContain('class="block h-full w-full bg-transparent object-contain"');
   expect(videoMarkup).toContain('gallery.preview.videoLoading');
   expect(audioMarkup).toContain('<audio');
   expect(videoProjectMarkup).toContain('lucide-video');

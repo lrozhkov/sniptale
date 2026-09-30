@@ -467,3 +467,94 @@ it('disposes old fullscreen/source deadlines and retains intrinsic and fit video
   advance();
   expect(host.querySelector('video')).toBeNull();
 });
+
+it('gates Gallery Space during transitions and keeps other PreviewVideo hosts with their keyboard owner', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  const press = () => {
+    const event = new KeyboardEvent('keydown', {
+      code: 'Space',
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => button('scale').dispatchEvent(event));
+    return event;
+  };
+  mount();
+  expect(press().defaultPrevented).toBe(true);
+  expect(play).not.toHaveBeenCalled();
+  act(() => root.render(<PreviewVideo src="blob:clip" spacePlayback="blocked" />));
+  const control = button('scale');
+  act(() => control.focus());
+  expect(press().defaultPrevented).toBe(true);
+  expect(play).not.toHaveBeenCalled();
+  act(() => root.render(<PreviewVideo src="blob:clip" spacePlayback="enabled" />));
+  await act(async () => {
+    press();
+  });
+  expect(play).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(control);
+  expect(button('play').title).toContain('(Space)');
+  act(() => root.render(<PreviewVideo src="blob:clip" prepare spacePlayback="enabled" />));
+  const native = vi.fn();
+  button('scale').addEventListener('keydown', native);
+  press();
+  expect(native).toHaveBeenCalledOnce();
+  expect(play).toHaveBeenCalledOnce();
+  act(() => root.render(null));
+  const after = new KeyboardEvent('keydown', { code: 'Space', bubbles: true, cancelable: true });
+  act(() => window.dispatchEvent(after));
+  expect(after.defaultPrevented).toBe(false);
+});
+
+it('toggles the same Gallery video once per press, consumes holds and keeps rejected Play retryable', async () => {
+  const video = mount();
+  const play = vi
+    .spyOn(HTMLMediaElement.prototype, 'play')
+    .mockRejectedValueOnce(new Error('denied'))
+    .mockImplementation(function (this: HTMLMediaElement) {
+      Object.defineProperty(this, 'paused', { configurable: true, value: false });
+      this.dispatchEvent(new Event('play'));
+      return Promise.resolve();
+    });
+  const pause = vi
+    .mocked(HTMLMediaElement.prototype.pause)
+    .mockImplementation(function (this: HTMLMediaElement) {
+      Object.defineProperty(this, 'paused', { configurable: true, value: true });
+      this.dispatchEvent(new Event('pause'));
+    });
+  act(() => root.render(<PreviewVideo src="blob:clip" spacePlayback="enabled" />));
+  const action = document.createElement('input');
+  action.type = 'checkbox';
+  host.append(action);
+  action.focus();
+  const press = (repeat = false) => {
+    const event = new KeyboardEvent('keydown', {
+      code: 'Space',
+      key: ' ',
+      repeat,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => action.dispatchEvent(event));
+    return event;
+  };
+  await act(async () => {
+    press();
+  });
+  expect(play).toHaveBeenCalledOnce();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('actionFailed');
+  await act(async () => {
+    press();
+  });
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(video.paused).toBe(false);
+  press(true);
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(pause).not.toHaveBeenCalled();
+  press();
+  expect(pause).toHaveBeenCalledOnce();
+  expect(video.paused).toBe(true);
+  expect(action.checked).toBe(false);
+  expect(document.activeElement).toBe(action);
+});

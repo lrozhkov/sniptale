@@ -140,6 +140,7 @@ function PreviewMediaContent(
     onImageLoad: ReturnType<typeof usePreviewImageZoom>['image']['handleImageLoad'];
     onMediaError: () => void;
     prepareVideo?: boolean;
+    spacePlayback?: Parameters<typeof PreviewVideo>[0]['spacePlayback'];
     onVideoReady?: (() => void) | undefined;
   }
 ) {
@@ -169,6 +170,7 @@ function PreviewMediaContent(
           src={props.previewUrl}
           trashMode={Boolean(props.trashMode)}
           prepare={props.prepareVideo ?? false}
+          {...(props.spacePlayback ? { spacePlayback: props.spacePlayback } : {})}
           onReady={props.onVideoReady}
           onMediaError={props.onMediaError}
         />
@@ -286,6 +288,7 @@ function PreviewMediaFrames(
               onImageLoad={imageZoom.image.handleImageLoad}
               onMediaError={prepared || !transition.pending ? transition.fail : () => undefined}
               prepareVideo={prepared}
+              spacePlayback={prepared ? undefined : transition.pending ? 'blocked' : 'enabled'}
               onVideoReady={prepared ? transition.commitVideo : undefined}
             />
           </div>

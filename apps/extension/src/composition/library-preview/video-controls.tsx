@@ -20,6 +20,7 @@ import type { useVideoControlsVisibility } from './video-controls-visibility';
 
 function PlayerButton(props: {
   label: string;
+  shortcut?: string;
   onClick(): void;
   disabled?: boolean;
   children: ReactNode;
@@ -28,7 +29,7 @@ function PlayerButton(props: {
     <ContentToolbarButton
       type="button"
       aria-label={props.label}
-      title={props.label}
+      title={props.shortcut ? `${props.label} (${props.shortcut})` : props.label}
       onClick={props.onClick}
       disabled={props.disabled}
       tone="utility"
@@ -45,8 +46,10 @@ export function VideoControls({
   src,
   player,
   visibility,
+  spaceShortcut = false,
 }: {
   src: string;
+  spaceShortcut?: boolean;
   player: ReturnType<typeof useVideoPlayer>;
   visibility: ReturnType<typeof useVideoControlsVisibility>;
 }) {
@@ -88,6 +91,7 @@ export function VideoControls({
             label={translate(
               playing ? 'gallery.preview.player.pause' : 'gallery.preview.player.play'
             )}
+            {...(spaceShortcut ? { shortcut: 'Space' } : {})}
             disabled={!ready || pending}
             onClick={() => void togglePlayback()}
           >

@@ -98,6 +98,7 @@ function GalleryKeyboardHelpDialog(props: { onClose(): void }) {
             <CommandList
               commands={[
                 [translate('gallery.keyboard.previewNavigate'), '← / →'],
+                [translate('gallery.keyboard.videoToggle'), 'Space'],
                 [translate('gallery.keyboard.previewClose'), 'Escape'],
               ]}
             />

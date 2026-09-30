@@ -184,3 +184,26 @@ it('completes Trash focus return after the busy restore refresh has finished', a
   render({ trash: true, enabled: true, ids: ['a', 'c'] });
   expect(document.activeElement).toBe(card('c'));
 });
+
+it('preserves the preview opener through pointer selection in a portaled menu or listbox', () => {
+  for (const role of ['listbox', 'menu']) {
+    act(() => card('b').focus());
+    render({ preview: true });
+    const layer = document.createElement('div');
+    layer.setAttribute('role', role);
+    const option = document.createElement('button');
+    layer.append(option);
+    document.body.append(layer);
+    try {
+      act(() => {
+        option.focus();
+        option.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      });
+      layer.remove();
+      render();
+      expect(document.activeElement).toBe(card('b'));
+    } finally {
+      layer.remove();
+    }
+  }
+});

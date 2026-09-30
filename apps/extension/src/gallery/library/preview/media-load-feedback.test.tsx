@@ -399,3 +399,79 @@ it('keeps first-open loading quiet, ignores late readiness after close, and resp
   expect(animate).not.toHaveBeenCalled();
   Reflect.deleteProperty(HTMLElement.prototype, 'animate');
 });
+
+it('uses Space for the presented video instead of activating its focused size control', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  const item = createItem({ id: 'keyboard-video', kind: 'video', mimeType: 'video/webm' });
+  renderNode(<PreviewMedia {...createProps({ item, previewUrl: 'blob:keyboard-video' })} />);
+  const video = container!.querySelector('video')!;
+  Object.defineProperty(video, 'duration', { configurable: true, value: 12 });
+  act(() => {
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('loadeddata'));
+  });
+  const scale = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.preview.player.scale"]'
+  )!;
+  act(() => scale.focus());
+  const nativeKey = vi.fn();
+  scale.addEventListener('keydown', nativeKey);
+  const space = new KeyboardEvent('keydown', {
+    code: 'Space',
+    key: ' ',
+    bubbles: true,
+    cancelable: true,
+  });
+  await act(async () => scale.dispatchEvent(space));
+  expect(nativeKey).not.toHaveBeenCalled();
+  expect(play).toHaveBeenCalledOnce();
+  expect(container!.querySelector('[role="listbox"]')).toBeNull();
+  expect(space.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(scale);
+});
+
+it('keeps one Space owner while preparing a replacement and never toggles the retained source', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  const press = () => {
+    const event = new KeyboardEvent('keydown', {
+      code: 'Space',
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => document.body.dispatchEvent(event));
+    return event;
+  };
+  const first = createItem({ id: 'first-video', kind: 'video', mimeType: 'video/webm' });
+  const second = createItem({ ...first, id: 'second-video' });
+  renderNode(<PreviewMedia {...createProps({ item: first, previewUrl: 'blob:first' })} />);
+  const current = container!.querySelector('video')!;
+  Object.defineProperty(current, 'duration', { configurable: true, value: 12 });
+  act(() => {
+    current.dispatchEvent(new Event('loadedmetadata'));
+    current.dispatchEvent(new Event('loadeddata'));
+  });
+  await act(async () => {
+    expect(press().defaultPrevented).toBe(true);
+  });
+  expect(play).toHaveBeenCalledOnce();
+  renderNode(<PreviewMedia {...createProps({ item: second, previewUrl: 'blob:second' })} />);
+  const next = container!.querySelector<HTMLVideoElement>('video[src="blob:second"]')!;
+  Object.defineProperty(next, 'duration', { configurable: true, value: 12 });
+  act(() => next.dispatchEvent(new Event('loadedmetadata')));
+  await act(async () => {
+    expect(press().defaultPrevented).toBe(true);
+  });
+  expect(play).toHaveBeenCalledOnce();
+  expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
+  expect(next.closest('[inert]')).not.toBeNull();
+  act(() => next.dispatchEvent(new Event('loadeddata')));
+  await act(async () => {
+    expect(press().defaultPrevented).toBe(true);
+  });
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(play.mock.contexts).toEqual([current, next]);
+  renderNode(null);
+  expect(press().defaultPrevented).toBe(false);
+  expect(play).toHaveBeenCalledTimes(2);
+});

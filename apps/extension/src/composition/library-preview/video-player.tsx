@@ -1,3 +1,4 @@
+import { usePlaybackSpaceShortcut } from './shortcuts';
 import { useEffect, type KeyboardEvent } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { VideoControls } from './video-controls';
@@ -12,8 +13,10 @@ export function PreviewVideo({
   prepare = false,
   onReady,
   onMediaError,
+  spacePlayback,
 }: {
   src: string;
+  spacePlayback?: 'enabled' | 'blocked';
   trashMode?: boolean;
   prepare?: boolean;
   onReady?: (() => void) | undefined;
@@ -21,6 +24,14 @@ export function PreviewVideo({
 }) {
   useAppLocale();
   const player = useVideoPlayer();
+  const ownsSpace = spacePlayback !== undefined && !prepare;
+  usePlaybackSpaceShortcut(
+    () => {
+      if (spacePlayback === 'enabled') void player.togglePlayback();
+    },
+    ownsSpace,
+    'all-targets'
+  );
   const {
     video,
     mediaEvents,
@@ -121,7 +132,7 @@ export function PreviewVideo({
           )}
         </div>
       ) : null}
-      <VideoControls src={src} player={player} visibility={visibility} />
+      <VideoControls src={src} player={player} visibility={visibility} spaceShortcut={ownsSpace} />
     </div>
   );
 }

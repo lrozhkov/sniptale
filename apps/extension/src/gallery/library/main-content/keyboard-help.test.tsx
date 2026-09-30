@@ -28,6 +28,7 @@ it('opens an accessible bounded help dialog, traps Tab and restores its trigger 
   const title = document.getElementById(dialog.getAttribute('aria-labelledby')!);
   expect(title?.textContent).toBe(trigger.getAttribute('aria-label'));
   expect(dialog.textContent).toContain('Space');
+  expect(dialog.textContent).toContain('Видео:');
   expect(dialog.textContent).toContain('Ctrl+A');
   const close = dialog.querySelector<HTMLButtonElement>('button')!;
   expect(close.getAttribute('aria-label')).toBeTruthy();

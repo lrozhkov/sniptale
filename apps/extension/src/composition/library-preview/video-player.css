@@ -35,3 +35,11 @@
     transition: none;
   }
 }
+
+/* Playback preserves focus and Tab position without incidental keyboard paint. */
+:root[data-video-editor-focus='playback'] [data-ui='gallery.preview.surface'] :focus-visible,
+:root[data-video-editor-focus='playback'] [data-ui='gallery.preview.player'] :focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  transition: none !important;
+}

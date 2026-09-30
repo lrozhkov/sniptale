@@ -3610,3 +3610,155 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`gallery video owns Space from every focused control at HD (${variant.locale}/${variant.theme})`, async ({
+    page,
+  }) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.addStyleTag({
+        content: await readFile('apps/extension/src/gallery/shell/app-shell/startup.css', 'utf8'),
+      });
+      const card = page.getByRole('group', { name: 'beta-v1.webm', exact: true });
+      await card.focus();
+      await page.keyboard.press('Enter');
+      const surface = page.locator('[data-ui="gallery.preview.surface"]');
+      const player = surface.locator('[data-ui="gallery.preview.player"]');
+      const video = player.locator('video');
+      await expect
+        .poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState))
+        .toBeGreaterThanOrEqual(2);
+      const controls = [
+        player.getByRole('button', { name: label('gallery.preview.player.scale'), exact: true }),
+        player.getByRole('button', { name: label('gallery.preview.player.speed'), exact: true }),
+        player.getByRole('slider', { name: label('gallery.preview.player.volume'), exact: true }),
+        player.getByRole('button', { name: label('gallery.preview.player.mute'), exact: true }),
+      ];
+      for (const control of controls) {
+        await control.focus();
+        const before = await video.evaluate((node: HTMLVideoElement) => ({
+          paused: node.paused,
+          muted: node.muted,
+          volume: node.volume,
+          speed: node.playbackRate,
+        }));
+        await page.keyboard.press('Space');
+        await expect
+          .poll(() => video.evaluate((node: HTMLVideoElement) => node.paused))
+          .toBe(!before.paused);
+        await expect(control).toBeFocused();
+        await expect(page.getByRole('listbox')).toHaveCount(0);
+        expect(
+          await video.evaluate((node: HTMLVideoElement) => ({
+            muted: node.muted,
+            volume: node.volume,
+            speed: node.playbackRate,
+          }))
+        ).toEqual({ muted: before.muted, volume: before.volume, speed: before.speed });
+        expect(
+          await control.evaluate((node) => {
+            const css = getComputedStyle(node);
+            return { outline: css.outlineStyle, shadow: css.boxShadow };
+          })
+        ).toEqual({ outline: 'none', shadow: 'none' });
+      }
+      await controls[0]!.focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Tab');
+      await expect(page.locator('html')).not.toHaveAttribute('data-video-editor-focus');
+      // Native probes exercise browser default actions outside the player's own control subtree.
+      await surface.evaluate((node) => {
+        const probes = document.createElement('div');
+        probes.dataset.spaceProbes = '';
+        probes.innerHTML =
+          '<input aria-label="Space checkbox probe" type="checkbox"><input aria-label="Space text probe" value="unchanged"><details><summary>Space disclosure probe</summary>Details</details>';
+        node.append(probes);
+      });
+      const probes = [
+        surface.getByRole('checkbox', { name: 'Space checkbox probe' }),
+        surface.getByRole('textbox', { name: 'Space text probe' }),
+        surface.locator('[data-space-probes] summary'),
+      ];
+      for (const probe of probes) {
+        await probe.focus();
+        const paused = await video.evaluate((node: HTMLVideoElement) => node.paused);
+        await page.keyboard.press('Space');
+        await expect
+          .poll(() => video.evaluate((node: HTMLVideoElement) => node.paused))
+          .toBe(!paused);
+        await expect(probe).toBeFocused();
+      }
+      await expect(probes[0]!).not.toBeChecked();
+      await expect(probes[1]!).toHaveValue('unchanged');
+      await expect(surface.locator('[data-space-probes] details')).not.toHaveAttribute('open');
+      // A held key cannot toggle twice, even when the native repeat is delivered.
+      const paused = await video.evaluate((node: HTMLVideoElement) => node.paused);
+      await page.keyboard.down('Space');
+      await expect
+        .poll(() => video.evaluate((node: HTMLVideoElement) => node.paused))
+        .toBe(!paused);
+      await page.keyboard.down('Space');
+      await page.keyboard.up('Space');
+      expect(await video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(!paused);
+      await surface.locator('[data-space-probes]').evaluate((node) => node.remove());
+      // The native scroll viewport can own focus while fullscreen controls are hidden.
+      await controls[0]!.click();
+      await page
+        .getByRole('option', { name: label('gallery.preview.player.original'), exact: true })
+        .click();
+      await player
+        .getByRole('button', { name: label('gallery.preview.player.fullscreen'), exact: true })
+        .click();
+      await expect(player).toHaveAttribute('data-fullscreen', 'true');
+      const viewport = player.locator(':scope > [tabindex="0"]');
+      await viewport.focus();
+      if (await video.evaluate((node: HTMLVideoElement) => node.paused))
+        await page.keyboard.press('Space');
+      await page.mouse.move(30, 30);
+      await expect(player.locator('[data-ui="gallery.preview.player.controls"]')).toHaveAttribute(
+        'data-visible',
+        'false',
+        { timeout: 5000 }
+      );
+      await page.keyboard.press('Space');
+      await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
+      await expect(viewport).toBeFocused();
+      await expect(player.locator('[data-ui="gallery.preview.player.controls"]')).toHaveAttribute(
+        'data-visible',
+        'true'
+      );
+      await page.keyboard.press('Escape');
+      await expect(player).toHaveAttribute('data-fullscreen', 'false');
+      await page.keyboard.press('Escape');
+      await expect(surface).toHaveCount(0);
+      await expect(page.locator('html')).not.toHaveAttribute('data-video-editor-focus');
+      await expect(card).toBeFocused();
+      await page.keyboard.press('Space');
+      await expect(page.locator('[data-ui="gallery.selection.toolbar"]')).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(
+        true
+      );
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
