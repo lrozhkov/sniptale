@@ -26,9 +26,7 @@ const ARROW_DESIGNS: readonly DrawingArrowDesign[] = ['standard', 'freehand'];
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const isColor = (value: unknown): value is string =>
-  typeof value === 'string' && OPAQUE_HEX_COLOR.test(value);
-const isColorWithOptionalAlpha = (value: unknown): value is string =>
-  isColor(value) || (typeof value === 'string' && ALPHA_HEX_COLOR.test(value));
+  typeof value === 'string' && (OPAQUE_HEX_COLOR.test(value) || ALPHA_HEX_COLOR.test(value));
 const isNumberOption = (value: unknown, options: readonly number[]): value is number =>
   typeof value === 'number' && options.includes(value);
 const isStringOption = <Value extends string>(
@@ -63,7 +61,7 @@ function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingTo
     !(
       shape['fillColor'] === undefined ||
       shape['fillColor'] === null ||
-      isColorWithOptionalAlpha(shape['fillColor'])
+      isColor(shape['fillColor'])
     ) ||
     !isStringOption(shape['kind'], SHAPE_KINDS) ||
     !isNumberOption(shape['width'], DRAWING_OUTLINE_WIDTHS) ||
@@ -79,7 +77,7 @@ function parseDefaults(value: unknown, fallback: DrawingToolDefaults): DrawingTo
     ) ||
     !isRecord(text) ||
     !isColor(text['color']) ||
-    !(text['backgroundColor'] === null || isColorWithOptionalAlpha(text['backgroundColor'])) ||
+    !(text['backgroundColor'] === null || isColor(text['backgroundColor'])) ||
     !isStringOption<DrawingFontFamily>(text['fontFamily'], DRAWING_TEXT_FONT_FAMILIES) ||
     !isNumberOption(text['fontSize'], DRAWING_TEXT_SIZES)
   ) {

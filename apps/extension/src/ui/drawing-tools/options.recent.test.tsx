@@ -19,11 +19,13 @@ vi.mock('../../composition/persistence/recent-colors', () => ({
 
 vi.mock('../color-selector', () => ({
   CompactColorSelector: ({
+    allowAlpha,
     className,
     onChange,
     onPreviewChange,
     onPreviewReset,
   }: {
+    allowAlpha?: boolean;
     className: string;
     onChange: (color: string) => void;
     onPreviewChange?: (color: string) => void;
@@ -31,6 +33,7 @@ vi.mock('../color-selector', () => ({
   }) => (
     <button
       data-ui="test.color-picker"
+      data-allow-alpha={String(allowAlpha)}
       className={className}
       onClick={() => onChange(persistence.pickerColor)}
     >
@@ -83,6 +86,50 @@ it('forwards picker preview and rollback without selecting a quick color', async
   expect(onPreview).toHaveBeenCalledWith('#abcdef');
   expect(onPreviewReset).toHaveBeenCalledWith('#123456');
   expect(onSelect).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
+it('shows alpha and preserves it for quick RGB swatches while picker commits exact alpha', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  persistence.pickerColor = '#abcdef';
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const onSelect = vi.fn();
+  await act(async () =>
+    root.render(
+      <DrawingColorOptions
+        allowAlpha
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        label="Line color"
+        value="#12345680"
+        onSelect={onSelect}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-ui="test.color-picker"]')?.getAttribute('data-allow-alpha')
+  ).toBe('true');
+  act(() => host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  expect(onSelect).toHaveBeenLastCalledWith('#60a5fa80');
+  act(() => host.querySelector<HTMLButtonElement>('[data-ui="test.color-picker"]')?.click());
+  expect(onSelect).toHaveBeenLastCalledWith('#abcdef');
+  await act(async () =>
+    root.render(
+      <DrawingColorOptions
+        allowAlpha
+        colors={palette}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        label="Line color"
+        value="#12345600"
+        onSelect={onSelect}
+      />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
+  expect(onSelect).toHaveBeenLastCalledWith('#22c55e00');
   act(() => root.unmount());
 });
 

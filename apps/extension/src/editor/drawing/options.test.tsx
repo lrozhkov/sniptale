@@ -8,13 +8,18 @@ import { expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   colorOptions: vi.fn(
     (props: {
+      allowAlpha?: boolean;
       floatingPlacement: string;
       vertical: boolean;
+      value: string;
       onPreview?: (color: string) => void;
+      onPreviewReset?: (color: string) => void;
       onSelect: (color: string) => void;
     }) => (
       <span
         data-placement={props.floatingPlacement}
+        data-alpha={String(props.allowAlpha)}
+        data-value={props.value}
         data-ui="mock.color-options"
         data-vertical={String(props.vertical)}
       >
@@ -27,6 +32,11 @@ const mocks = vi.hoisted(() => ({
           type="button"
           data-ui="mock.apply-color"
           onClick={() => props.onSelect('#abcdef')}
+        />
+        <button
+          type="button"
+          data-ui="mock.cancel-color"
+          onClick={() => props.onPreviewReset?.(props.value)}
         />
       </span>
     )
@@ -129,6 +139,75 @@ it('previews a selected pencil color without committing, then applies it once', 
   await act(async () => root.unmount());
 });
 
+it('shows legacy marker effective alpha and commits picker color without double opacity', async () => {
+  storeState.updateDrawingToolSettings.mockClear();
+  storeState.updateSelectionDrawingToolSettings.mockClear();
+  storeState.toolSettings.marker = { color: '#ffff00', opacity: 0.3, width: 24 };
+  Object.assign(storeState.selectionToolSettings, storeState.toolSettings);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <EditorDrawingOptions
+        onApplyToSelection={vi.fn()}
+        onPreviewSelection={vi.fn()}
+        onDirectionChange={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        selectedType="marker"
+        tool="marker"
+      />
+    )
+  );
+  const picker = host.querySelector<HTMLElement>('[data-ui="mock.color-options"]');
+  expect(picker?.dataset['alpha']).toBe('true');
+  expect(picker?.dataset['value']).toBe('#ffff004d');
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="mock.apply-color"]')?.click()
+  );
+  expect(storeState.updateDrawingToolSettings).toHaveBeenCalledWith('marker', {
+    color: '#abcdef',
+    opacity: 1,
+  });
+  expect(storeState.updateSelectionDrawingToolSettings).toHaveBeenCalledWith('marker', {
+    color: '#abcdef',
+    opacity: 1,
+  });
+  await act(async () => root.unmount());
+});
+
+it('restores the original marker color and multiplier when picker preview is cancelled', async () => {
+  storeState.updateSelectionDrawingToolSettings.mockClear();
+  storeState.toolSettings.marker = { color: '#ffff00', opacity: 0.3, width: 24 };
+  Object.assign(storeState.selectionToolSettings, storeState.toolSettings);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <EditorDrawingOptions
+        onApplyToSelection={vi.fn()}
+        onPreviewSelection={vi.fn()}
+        onDirectionChange={vi.fn()}
+        onClearSelection={vi.fn()}
+        onDeleteSelection={vi.fn()}
+        selectedType="marker"
+        tool="marker"
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="mock.preview-color"]')?.click()
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[data-ui="mock.cancel-color"]')?.click()
+  );
+  expect(storeState.updateSelectionDrawingToolSettings).toHaveBeenLastCalledWith('marker', {
+    color: '#ffff00',
+    opacity: 0.3,
+  });
+  await act(async () => root.unmount());
+});
+
 vi.mock('../state/useEditorStore', () => ({
   useEditorStore: Object.assign(
     (selector: (state: typeof storeState) => unknown) => selector(storeState),
@@ -187,9 +266,8 @@ it('renders editor tool settings as a horizontal toolbar like content drawing mo
   expect(markup).toContain('[&amp;_button:active]:!transform-none');
   expect(markup).toContain('[&amp;_button:active]:!translate-y-0');
   expect(markup).toContain('data-ui="mock.divider" data-vertical="false"');
-  expect(markup).toContain(
-    'data-placement="auto" data-ui="mock.color-options" data-vertical="false"'
-  );
+  expect(markup).toContain('data-placement="auto" data-alpha="true"');
+  expect(markup).toContain('data-ui="mock.color-options" data-vertical="false"');
 });
 
 it.each([

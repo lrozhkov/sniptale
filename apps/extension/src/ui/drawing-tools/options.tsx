@@ -1,6 +1,7 @@
 import { ArrowDownLeft, Blend, Circle, PaintBucket, Square, Triangle, Type } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
 import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
@@ -113,7 +114,7 @@ export function MarkerOpacityOptions(props: { value: number; onChange: (value: n
     return (
       <QuickOptionButton
         key={value}
-        active={props.value === value}
+        active={Math.round(props.value * 100) === percent}
         dataUi={`content.toolbar.drawing-options.marker.opacity-${percent}`}
         label={`${translate('content.toolbar.drawingOpacity')}: ${percent}%`}
         onClick={() => props.onChange(value)}
@@ -305,6 +306,8 @@ export function DrawingColorOptions(props: {
   const { quickColors, selectColor } = useQuickDrawingColors(props.colors, props.onSelect);
   const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
   const previewReset = props.onPreviewReset ?? props.onPreview;
+  const resolveQuickColor = (color: string) =>
+    getColorAlpha(color) === 1 ? (replaceColorChannels(props.value, color) ?? color) : color;
   return (
     <div
       role="group"
@@ -341,14 +344,14 @@ export function DrawingColorOptions(props: {
         data-ui="content.toolbar.drawing-options.quick-colors"
       >
         {quickColors.map((color) => {
-          const active = selectedValue?.toLowerCase() === color.toLowerCase();
+          const active = selectedValue?.toLowerCase() === resolveQuickColor(color).toLowerCase();
           return (
             <ProductGlassColorOption
               key={color}
               active={active}
               aria-label={`${props.label}: ${color}`}
               aria-pressed={active}
-              onClick={() => selectColor(color)}
+              onClick={() => selectColor(resolveQuickColor(color))}
               style={{ backgroundColor: color }}
               title={color}
             />
@@ -523,6 +526,7 @@ export function DrawingTextOptions(props: {
       ))}
       <DrawingOptionsDivider extended vertical={props.vertical} />
       <DrawingColorOptions
+        allowAlpha
         colors={props.colors}
         floatingBoundaryRef={props.floatingBoundaryRef}
         floatingPlacement={props.floatingPlacement}

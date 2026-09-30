@@ -24,6 +24,12 @@ import {
   MarkerOpacityOptions,
 } from '../../ui/drawing-tools/options';
 import { translate } from '../../platform/i18n';
+import { getColorAlpha } from '@sniptale/foundation/color';
+import {
+  markerColorAtOpacity,
+  markerColorPatch,
+  markerVisibleColor,
+} from '../../ui/drawing-tools/marker-color';
 import { useEditorStore } from '../state/useEditorStore';
 
 type ConfigurableTool = keyof DrawingToolDefaults;
@@ -71,6 +77,7 @@ function PencilOptions(props: {
   return (
     <>
       <DrawingColorOptions
+        allowAlpha
         {...props.common}
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
@@ -94,14 +101,31 @@ function MarkerOptions(props: {
   update: DrawingSettingsUpdate;
   preview: DrawingSettingsUpdate;
 }) {
+  const visibleColor = markerVisibleColor(props.settings.color, props.settings.opacity);
+  const previewOriginRef = useRef<{ color: string; opacity: number } | null>(null);
   return (
     <>
       <DrawingColorOptions
+        allowAlpha
         {...props.common}
         label={translate('content.toolbar.drawingColor')}
-        value={props.settings.color}
-        onSelect={(color) => props.update('marker', { color })}
-        onPreview={(color) => props.preview('marker', { color })}
+        value={visibleColor}
+        onSelect={(color) => {
+          previewOriginRef.current = null;
+          props.update('marker', markerColorPatch(color));
+        }}
+        onPreview={(color) => {
+          previewOriginRef.current ??= {
+            color: props.settings.color,
+            opacity: props.settings.opacity,
+          };
+          props.preview('marker', markerColorPatch(color));
+        }}
+        onPreviewReset={() => {
+          const origin = previewOriginRef.current;
+          previewOriginRef.current = null;
+          if (origin) props.preview('marker', origin);
+        }}
       />
       <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
@@ -112,8 +136,8 @@ function MarkerOptions(props: {
       />
       <DrawingOptionsDivider vertical={false} />
       <MarkerOpacityOptions
-        value={props.settings.opacity}
-        onChange={(opacity) => props.update('marker', { opacity })}
+        value={getColorAlpha(visibleColor) ?? 1}
+        onChange={(opacity) => props.update('marker', markerColorAtOpacity(visibleColor, opacity))}
       />
     </>
   );
@@ -140,6 +164,7 @@ function ShapeOptions(props: {
       />
       <DrawingOptionsDivider vertical={false} />
       <DrawingColorOptions
+        allowAlpha
         {...props.common}
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}
@@ -168,6 +193,7 @@ function ArrowOptions(props: {
   return (
     <>
       <DrawingColorOptions
+        allowAlpha
         {...props.common}
         label={translate('content.toolbar.drawingColor')}
         value={props.settings.color}

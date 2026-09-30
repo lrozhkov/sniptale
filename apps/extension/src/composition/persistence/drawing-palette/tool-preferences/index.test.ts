@@ -51,6 +51,30 @@ it('restores every tool parameter but has no active-tool field', async () => {
   expect(restored).not.toHaveProperty('activeTool');
 });
 
+it('round trips alpha colors for every drawing tool and preserves opaque legacy defaults', async () => {
+  const translucent = {
+    ...customized,
+    pencil: { ...customized.pencil, color: '#12345600' },
+    marker: { ...customized.marker, color: '#abcdef80' },
+    shape: { ...customized.shape, color: '#1122337f' },
+    arrow: { ...customized.arrow, color: '#445566cc' },
+    text: { ...customized.text, color: '#01020340' },
+  };
+  const set = vi.spyOn(browserStorage.local, 'set').mockResolvedValue(undefined);
+  await expect(saveDrawingToolPreferences(translucent, fallback)).resolves.toBe('applied');
+  expect(set).toHaveBeenCalledWith(
+    expect.objectContaining({
+      [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: { schemaVersion: 1, defaults: translucent },
+    }),
+    expect.anything()
+  );
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: { schemaVersion: 1, defaults: translucent },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toEqual(translucent);
+  await expect(loadDrawingToolPreferences(customized)).resolves.toEqual(translucent);
+});
+
 it('loads legacy preferences without blur and validates persisted blur levels', async () => {
   const { blur: _blur, ...legacy } = customized;
   vi.spyOn(browserStorage.local, 'get').mockResolvedValue({

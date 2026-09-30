@@ -19,6 +19,12 @@ import {
   type DrawingShapeObject,
 } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
+import { getColorAlpha } from '@sniptale/foundation/color';
+import {
+  markerColorAtOpacity,
+  markerColorPatch,
+  markerVisibleColor,
+} from '../../../../ui/drawing-tools/marker-color';
 import {
   ArrowWidthModeOptions,
   ArrowDrawDirectionOption,
@@ -270,6 +276,19 @@ function isStrokeColorObject(
   return object.kind !== 'blur' && object.kind !== 'text';
 }
 
+function visibleStrokeColor(object: Exclude<DrawingObject, { kind: 'blur' | 'text' }>): string {
+  return object.kind === 'marker' ? markerVisibleColor(object.color, object.opacity) : object.color;
+}
+
+function applyStrokeColor(
+  object: Exclude<DrawingObject, { kind: 'blur' | 'text' }>,
+  color: string
+) {
+  return object.kind === 'marker'
+    ? { ...object, ...markerColorPatch(color) }
+    : { ...object, color };
+}
+
 function ToolbarDrawingSelectionOptions(props: {
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
@@ -302,6 +321,7 @@ function ToolbarDrawingSelectionOptions(props: {
   const vertical = props.displayMode === 'vertical';
   const strokeObjects = props.selected.filter(isStrokeColorObject);
   const hasSharedStrokeColor = strokeObjects.length === props.selected.length;
+  const firstStrokeColor = strokeObjects[0] ? visibleStrokeColor(strokeObjects[0]) : null;
   const first = selectedQuick[0] ?? null;
   return (
     <>
@@ -330,25 +350,26 @@ function ToolbarDrawingSelectionOptions(props: {
         />
       ) : hasSharedStrokeColor ? (
         <DrawingColorOptions
+          allowAlpha
           colors={[...props.controller.getPalette()]}
           floatingBoundaryRef={props.panelRef}
           floatingPlacement={vertical ? 'side' : 'auto'}
           label={translate('content.toolbar.drawingColor')}
           selectedValue={
-            strokeObjects.every((object) => object.color === strokeObjects[0]!.color)
-              ? strokeObjects[0]!.color
+            strokeObjects.every((object) => visibleStrokeColor(object) === firstStrokeColor)
+              ? firstStrokeColor
               : null
           }
           vertical={vertical}
-          value={strokeObjects[0]?.color ?? props.controller.getPalette()[0] ?? '#000000'}
+          value={firstStrokeColor ?? props.controller.getPalette()[0] ?? '#000000'}
           onSelect={(color) =>
             props.controller.session.replaceObjects(
-              strokeObjects.map((object) => ({ ...object, color }))
+              strokeObjects.map((object) => applyStrokeColor(object, color))
             )
           }
           onPreview={(color) =>
             props.controller.session.previewObjects(
-              strokeObjects.map((object) => ({ ...object, color }))
+              strokeObjects.map((object) => applyStrokeColor(object, color))
             )
           }
           onPreviewReset={resetPreview}
@@ -443,16 +464,15 @@ function DrawingMarkerToolOptions(props: {
   vertical: boolean;
   update: (next: QuickToolUpdate) => void;
 }) {
+  const marker =
+    props.selected?.kind === 'marker' ? props.selected : props.snapshot.defaults.marker;
+  const visibleColor = markerVisibleColor(marker.color, marker.opacity);
   return (
     <>
       <DrawingOptionsDivider vertical={props.vertical} />
       <MarkerOpacityOptions
-        value={
-          props.selected?.kind === 'marker'
-            ? props.selected.opacity
-            : props.snapshot.defaults.marker.opacity
-        }
-        onChange={(opacity) => props.update({ opacity })}
+        value={getColorAlpha(visibleColor) ?? 1}
+        onChange={(opacity) => props.update(markerColorAtOpacity(visibleColor, opacity))}
       />
     </>
   );
@@ -503,6 +523,10 @@ function DrawingNonTextToolOptions(props: {
 }) {
   const { controller, displayMode, panelRef, selected, snapshot, tool, update } = props;
   const values = selected ?? snapshot.defaults[tool];
+  const visibleColor =
+    tool === 'marker'
+      ? markerVisibleColor(values.color, (values as typeof snapshot.defaults.marker).opacity)
+      : values.color;
   const selectedShape = resolveSelectedShape(selected);
   const width = 'width' in values ? values.width : snapshot.defaults.pencil.width;
   const vertical = displayMode === 'vertical';
@@ -519,14 +543,17 @@ function DrawingNonTextToolOptions(props: {
         </>
       ) : null}
       <DrawingColorOptions
+        allowAlpha
         colors={[...controller.getPalette()]}
         floatingBoundaryRef={panelRef}
         floatingPlacement={floatingPlacement}
         label={translate('content.toolbar.drawingColor')}
         vertical={vertical}
-        value={values.color}
-        onSelect={(color) => update({ color })}
-        onPreview={(color) => props.preview({ color })}
+        value={visibleColor}
+        onSelect={(color) => update(tool === 'marker' ? markerColorPatch(color) : { color })}
+        onPreview={(color) =>
+          props.preview(tool === 'marker' ? markerColorPatch(color) : { color })
+        }
         onPreviewReset={props.resetPreview}
       />
       <DrawingOptionsDivider vertical={vertical} />

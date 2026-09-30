@@ -81,6 +81,49 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   act(() => root.unmount());
 });
 
+it('uses the effective alpha for a mixed legacy marker selection', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const onDocumentCommit = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit });
+  session.commitObject({
+    color: '#ffff00',
+    id: 'marker',
+    kind: 'marker',
+    opacity: 0.3,
+    samples: [
+      { x: 0, y: 0, t: 0 },
+      { x: 20, y: 0, t: 10 },
+    ],
+    width: 12,
+  });
+  session.commitObject({
+    color: '#ffff00',
+    id: 'pencil',
+    kind: 'pencil',
+    samples: [
+      { x: 0, y: 20, t: 0 },
+      { x: 20, y: 20, t: 10 },
+    ],
+    width: 4,
+  });
+  session.setActiveTool('select');
+  session.setSelection(['marker', 'pencil']);
+  onDocumentCommit.mockClear();
+  const { host, root } = renderSelectionToolbar(session);
+  const panel = host.querySelector('[data-ui="content.toolbar.drawing-options.selection"]');
+  const picker = panel?.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.color-selector.picker-trigger"]'
+  );
+  expect(picker?.title).toBe('#FFFF004D');
+  act(() => panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click());
+  expect(session.getSnapshot().document.objects).toMatchObject([
+    { color: '#60a5fa4d', kind: 'marker', opacity: 1 },
+    { color: '#60a5fa4d', kind: 'pencil' },
+  ]);
+  expect(onDocumentCommit).toHaveBeenCalledTimes(1);
+  act(() => root.unmount());
+});
+
 it('moves and duplicates a selected page drawing from the separate action panel', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const commits = vi.fn(() => true);

@@ -651,8 +651,8 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   act(() => opacity30?.click());
   act(() => green?.click());
   expect(session.getSnapshot().defaults.marker).toMatchObject({
-    color: '#22c55e',
-    opacity: 0.3,
+    color: '#22c55e4d',
+    opacity: 1,
     width: 44,
   });
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.marker"]')).not.toBeNull();

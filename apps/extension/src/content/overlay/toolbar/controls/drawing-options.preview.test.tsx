@@ -66,20 +66,27 @@ it('previews a selected shape color in the picker and commits only on Apply', as
   };
 
   await act(async () => button('shared.ui.colorSelectorChooseColor')?.click());
-  await editColor('#123456');
-  expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#123456' });
+  await editColor('#12345680');
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#12345680' });
   expect(onDocumentCommit).not.toHaveBeenCalled();
   await act(async () => button('shared.ui.colorSelectorCancel')?.click());
   expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#ef4444' });
   expect(onDocumentCommit).not.toHaveBeenCalled();
 
   await act(async () => button('shared.ui.colorSelectorChooseColor')?.click());
-  await editColor('#654321');
+  await editColor('#65432100');
   await act(async () => button('shared.ui.colorSelectorApply')?.click());
-  expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#654321' });
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#65432100' });
   expect(onDocumentCommit).toHaveBeenCalledOnce();
   expect(onDocumentCommit.mock.calls[0]?.[0].before.objects[0]).toMatchObject({
     color: '#ef4444',
   });
+  expect(onDocumentCommit.mock.calls[0]?.[0].after.objects[0]).toMatchObject({
+    color: '#65432100',
+  });
+  onDocumentCommit.mock.calls[0]?.[0].replay(onDocumentCommit.mock.calls[0]?.[0].before);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#ef4444' });
+  onDocumentCommit.mock.calls[0]?.[0].replay(onDocumentCommit.mock.calls[0]?.[0].after);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ color: '#65432100' });
   await act(async () => root.unmount());
 });
