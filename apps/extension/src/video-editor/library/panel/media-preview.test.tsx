@@ -162,7 +162,7 @@ it('previews the edited screenshot without video controls or original fallback',
     '[data-ui="gallery.preview.zoomSliderPanel"]'
   );
   expect(zoomPanel?.className).toContain('top-full');
-  expect(zoomPanel?.className).toContain('right-0');
+  expect(zoomPanel?.className).toContain('inset-x-0');
   expect(
     container.querySelector('[aria-label="videoEditor.stage.enterFullscreen"]')
   ).not.toBeNull();

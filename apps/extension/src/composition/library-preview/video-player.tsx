@@ -2,6 +2,8 @@ import { useEffect, type KeyboardEvent } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { VideoControls } from './video-controls';
 import { useVideoPlayer } from './video-playback';
+import { useVideoControlsVisibility } from './video-controls-visibility';
+import './video-player.css';
 
 /** Gallery controls remain inside their fullscreen and locale owner. */
 export function PreviewVideo({
@@ -30,6 +32,12 @@ export function PreviewVideo({
     error,
     toggleFullscreen,
   } = player;
+  const visibility = useVideoControlsVisibility({
+    container,
+    src,
+    fullscreen: player.fullscreen,
+    canHide: player.playing && !pending && !buffering && !error,
+  });
   useEffect(() => {
     const element = video.current;
     if (element && element.getAttribute('src') !== src) {
@@ -47,6 +55,7 @@ export function PreviewVideo({
     <div
       ref={container}
       data-ui="gallery.preview.player"
+      data-fullscreen={player.fullscreen}
       className="@container/player relative flex h-full w-full min-h-0 min-w-0 flex-col
         bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary)]"
       aria-busy={pending || buffering}
@@ -83,8 +92,8 @@ export function PreviewVideo({
             onContextMenu={trashMode ? (event) => event.preventDefault() : undefined}
             className={
               fit
-                ? 'block h-full w-full bg-black object-contain'
-                : 'block max-h-none max-w-none bg-black'
+                ? 'block h-full w-full bg-transparent object-contain'
+                : 'block max-h-none max-w-none bg-transparent'
             }
             {...mediaEvents}
             onLoadedData={(event) => {
@@ -112,7 +121,7 @@ export function PreviewVideo({
           )}
         </div>
       ) : null}
-      <VideoControls src={src} player={player} />
+      <VideoControls src={src} player={player} visibility={visibility} />
     </div>
   );
 }

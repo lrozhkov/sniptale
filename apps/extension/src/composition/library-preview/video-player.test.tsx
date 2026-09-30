@@ -118,11 +118,11 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   const volume = host.querySelector<HTMLInputElement>(
     'input[aria-label="gallery.preview.player.volume"]'
   )!;
-  expect(Number(volume.value)).toBe(1);
-  expect(volume.getAttribute('aria-valuetext')).toBe('100%');
+  expect(Number(volume.value)).toBe(0);
+  expect(volume.getAttribute('aria-valuetext')).toBe('0%');
   expect(
     host.querySelector('[data-ui="gallery.preview.player.volumeGroup"]')?.textContent
-  ).toContain('100%');
+  ).toContain('0%');
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(volume, '0.5');
     volume.dispatchEvent(new Event('input', { bubbles: true }));
@@ -174,9 +174,9 @@ it('distinguishes zero volume from mute and mirrors external volume changes', ()
     video.volume = 1;
     video.dispatchEvent(new Event('volumechange'));
   });
-  expect(Number(volume.value)).toBe(1);
+  expect(Number(volume.value)).toBe(0);
   expect(button('unmute')).not.toBeNull();
-  expect(volume.getAttribute('aria-valuetext')).toBe('100%');
+  expect(volume.getAttribute('aria-valuetext')).toBe('0%');
 });
 
 it('keeps hover decoding separate from playback and disables seeking after media errors', () => {
@@ -306,4 +306,164 @@ it('clamps the hover frame to the player at both timeline edges', () => {
   expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).not.toBeNull();
   act(() => timeline.dispatchEvent(new MouseEvent('pointerout', { bubbles: true })));
   expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).not.toBeNull();
+});
+
+it('reports muted zero without discarding the volume restored by unmute', () => {
+  const video = mount();
+  const range = host.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.preview.player.volume"]'
+  )!;
+  act(() => {
+    video.volume = 0.37;
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  act(() => {
+    button('mute').click();
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  expect(video.muted).toBe(true);
+  expect(video.volume).toBe(0.37);
+  expect(range.valueAsNumber).toBe(0);
+  expect(range.getAttribute('aria-valuetext')).toBe('0%');
+  act(() => {
+    button('unmute').click();
+    video.dispatchEvent(new Event('volumechange'));
+  });
+  expect(video.muted).toBe(false);
+  expect(video.volume).toBe(0.37);
+  expect(range.valueAsNumber).toBe(0.37);
+  expect(range.getAttribute('aria-valuetext')).toBe('37%');
+});
+
+function fullscreenPlayer() {
+  const player = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player"]')!;
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: player });
+  act(() => document.dispatchEvent(new Event('fullscreenchange')));
+  return player;
+}
+function controlsVisible() {
+  return host
+    .querySelector('[data-ui="gallery.preview.player.controls"]')
+    ?.getAttribute('data-visible');
+}
+function advance(ms = 2100) {
+  act(() => vi.advanceTimersByTime(ms));
+}
+function pointer(target: EventTarget, type: string) {
+  act(() => target.dispatchEvent(new MouseEvent(type, { bubbles: true })));
+}
+
+it('hides only idle playing fullscreen controls and reveals them on activity or pause', () => {
+  vi.useFakeTimers();
+  const video = mount();
+  act(() => video.dispatchEvent(new Event('play')));
+  advance();
+  expect(controlsVisible()).toBe('true');
+  fullscreenPlayer();
+  advance(1000);
+  act(() => video.dispatchEvent(new Event('timeupdate')));
+  advance(1000);
+  expect(controlsVisible()).toBe('false');
+  pointer(video, 'pointermove');
+  expect(controlsVisible()).toBe('true');
+  advance();
+  expect(controlsVisible()).toBe('false');
+  act(() => video.dispatchEvent(new Event('pause')));
+  advance();
+  expect(controlsVisible()).toBe('true');
+});
+
+it('pins active hover and keyboard focus and starts a fresh interval when they leave', async () => {
+  vi.useFakeTimers();
+  const video = mount();
+  const player = fullscreenPlayer();
+  act(() => video.dispatchEvent(new Event('play')));
+  const control = button('mute');
+  pointer(control, 'pointermove');
+  advance();
+  expect(controlsVisible()).toBe('true');
+  pointer(player, 'pointerleave');
+  advance();
+  expect(controlsVisible()).toBe('false');
+  act(() => {
+    control.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    control.focus();
+  });
+  advance();
+  expect(controlsVisible()).toBe('true');
+  const outside = document.createElement('button');
+  document.body.append(outside);
+  await act(async () => outside.focus());
+  advance(1999);
+  expect(controlsVisible()).toBe('true');
+  advance(1);
+  expect(controlsVisible()).toBe('false');
+  outside.remove();
+});
+
+it('keeps a range gesture alive outside controls until release or cancellation', () => {
+  vi.useFakeTimers();
+  const video = mount();
+  const player = fullscreenPlayer();
+  act(() => video.dispatchEvent(new Event('play')));
+  const seek = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
+  for (const completion of ['pointerup', 'pointercancel']) {
+    pointer(seek, 'pointerdown');
+    pointer(player, 'pointerleave');
+    advance();
+    expect(controlsVisible()).toBe('true');
+    pointer(window, completion);
+    advance();
+    expect(controlsVisible()).toBe('false');
+  }
+});
+
+it('pins actual expanded settings and portal focus until pointer selection closes the menu', async () => {
+  vi.useFakeTimers();
+  const video = mount();
+  const player = fullscreenPlayer();
+  act(() => video.dispatchEvent(new Event('play')));
+  const speed = button('speed');
+  pointer(speed, 'pointerdown');
+  pointer(window, 'pointerup');
+  await act(async () => speed.click());
+  expect(speed.getAttribute('aria-expanded')).toBe('true');
+  const option = player.querySelector<HTMLButtonElement>('[role="listbox"] [role="option"]')!;
+  await act(async () => option.focus());
+  advance();
+  expect(controlsVisible()).toBe('true');
+  // jsdom always treats programmatic focus as keyboard focus; emulate this pointer restoration.
+  const nativeMatches = speed.matches.bind(speed);
+  vi.spyOn(speed, 'matches').mockImplementation((selector) =>
+    selector === ':focus-visible' ? false : nativeMatches(selector)
+  );
+  await act(async () => option.click());
+  expect(speed.getAttribute('aria-expanded')).toBe('false');
+  pointer(video, 'pointermove');
+  advance();
+  expect(controlsVisible()).toBe('false');
+});
+
+it('disposes old fullscreen/source deadlines and retains intrinsic and fit video geometry', () => {
+  vi.useFakeTimers();
+  const video = mount();
+  const player = fullscreenPlayer();
+  act(() => video.dispatchEvent(new Event('play')));
+  advance(1500);
+  act(() => root.render(<PreviewVideo src="blob:replacement" />));
+  advance(1000);
+  expect(controlsVisible()).toBe('true');
+  advance(1000);
+  expect(controlsVisible()).toBe('false');
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+  act(() => document.dispatchEvent(new Event('fullscreenchange')));
+  advance();
+  expect(controlsVisible()).toBe('true');
+  expect(video.className).toContain('object-contain');
+  expect(video.className).toContain('bg-transparent');
+  expect(video.className).not.toContain('bg-black');
+  expect(player.getAttribute('data-fullscreen')).toBe('false');
+  act(() => root.render(null));
+  advance();
+  expect(host.querySelector('video')).toBeNull();
 });

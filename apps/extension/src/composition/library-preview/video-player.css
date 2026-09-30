@@ -1,0 +1,37 @@
+[data-ui='gallery.preview.player'][data-fullscreen='true'],
+[data-ui='gallery.preview.player'][data-fullscreen='true'] video {
+  background: #000;
+}
+
+[data-ui='gallery.preview.player.controls'][data-fullscreen='true'] {
+  --sniptale-color-text-primary: #fff;
+  --sniptale-color-text-primary-strong: #fff;
+  --sniptale-text-main: #fff;
+  --sniptale-color-text-muted: rgba(255, 255, 255, 0.85);
+  --sniptale-color-text-secondary: rgba(255, 255, 255, 0.85);
+  --sniptale-color-text-dim: rgba(255, 255, 255, 0.7);
+  --sniptale-color-surface-panel: rgba(24, 24, 28, 0.8);
+  --sniptale-color-surface-input: rgba(255, 255, 255, 0.12);
+  --sniptale-color-surface-hover: rgba(255, 255, 255, 0.18);
+  --sniptale-color-border-soft: rgba(255, 255, 255, 0.24);
+  position: absolute;
+  inset-inline: 12px;
+  bottom: 12px;
+  z-index: 30;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-lg);
+  background: rgba(24, 24, 28, 0.8);
+  backdrop-filter: blur(12px);
+  transition: opacity 160ms ease;
+}
+
+[data-ui='gallery.preview.player.controls'][data-visible='false'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-ui='gallery.preview.player.controls'][data-fullscreen='true'] {
+    transition: none;
+  }
+}

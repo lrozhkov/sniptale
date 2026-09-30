@@ -16,6 +16,7 @@ import { translate } from '../../platform/i18n';
 import { videoTime } from './video-thumbnail';
 import { VideoTimeline } from './video-timeline';
 import type { useVideoPlayer } from './video-playback';
+import type { useVideoControlsVisibility } from './video-controls-visibility';
 
 function PlayerButton(props: {
   label: string;
@@ -43,9 +44,11 @@ function PlayerButton(props: {
 export function VideoControls({
   src,
   player,
+  visibility,
 }: {
   src: string;
   player: ReturnType<typeof useVideoPlayer>;
+  visibility: ReturnType<typeof useVideoControlsVisibility>;
 }) {
   const {
     video,
@@ -69,6 +72,10 @@ export function VideoControls({
   } = player;
   return (
     <div
+      ref={visibility.controls}
+      data-ui="gallery.preview.player.controls"
+      data-fullscreen={fullscreen}
+      data-visible={visibility.visible}
       className="shrink-0 border-t border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] px-3 py-2"
     >
@@ -167,14 +174,14 @@ function PlaybackSettings({
   volume: number;
   speed: number;
 }) {
+  const audibleVolume = muted ? 0 : volume;
   return (
     <div className="flex shrink-0 items-center gap-1.5">
       <div
         data-ui="gallery.preview.player.volumeGroup"
         role="group"
         aria-label={translate('gallery.preview.player.volume')}
-        className="flex shrink-0 items-center gap-1 rounded-[8px]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_45%,transparent)] pr-1"
+        className="flex shrink-0 items-center gap-1"
       >
         <PlayerButton
           label={translate(muted ? 'gallery.preview.player.unmute' : 'gallery.preview.player.mute')}
@@ -194,12 +201,12 @@ function PlaybackSettings({
         </PlayerButton>
         <ProductRange
           aria-label={translate('gallery.preview.player.volume')}
-          aria-valuetext={`${Math.round(volume * 100)}%`}
+          aria-valuetext={`${Math.round(audibleVolume * 100)}%`}
           type="range"
           min={0}
           max={1}
           step={0.01}
-          value={volume}
+          value={audibleVolume}
           style={
             {
               '--sniptale-range-track-height': '4px',
@@ -217,10 +224,10 @@ function PlaybackSettings({
         />
         <output
           aria-hidden="true"
-          className="w-9 shrink-0 text-right tabular-nums
+          className="w-9 shrink-0 text-right text-xs font-medium tabular-nums
             text-[var(--sniptale-color-text-secondary)]"
         >
-          {Math.round(volume * 100)}%
+          {Math.round(audibleVolume * 100)}%
         </output>
       </div>
       <ProductSelect<string>
