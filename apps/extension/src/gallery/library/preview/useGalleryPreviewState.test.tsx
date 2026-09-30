@@ -561,3 +561,52 @@ it('ignores stale blob-load failures after the preview item changes', async () =
 
   expect(latest()?.state.session.url).toBe('blob:preview');
 });
+
+it('retains acknowledged media through navigation until presentation, then releases on close', async () => {
+  const values: ReturnType<typeof useGalleryPreviewState>[] = [];
+  vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:next');
+  getAggregatePreviewBlobMock.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  act(() => root?.render(<HookProbe onValue={(value) => values.push(value)} />));
+  const latest = () => values.at(-1)!;
+  act(() =>
+    latest().actions.setPreview({ inspectorCollapsed: false, item: createItem(), url: null })
+  );
+  await flushEffects();
+  const firstRevision = latest().state.session.requestRevision!;
+  act(() =>
+    latest().actions.acknowledgePresented({
+      requestRevision: firstRevision,
+      url: 'blob:first',
+      outcome: 'presented',
+    })
+  );
+  act(() =>
+    latest().actions.setPreview({
+      inspectorCollapsed: false,
+      item: { ...createItem(), id: 'next' },
+      url: null,
+    })
+  );
+  await flushEffects();
+  const nextRevision = latest().state.session.requestRevision!;
+  expect(nextRevision).toBeGreaterThan(firstRevision);
+  expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  act(() =>
+    latest().actions.acknowledgePresented({
+      requestRevision: firstRevision,
+      url: null,
+      outcome: 'terminal',
+    })
+  );
+  expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  act(() =>
+    latest().actions.acknowledgePresented({
+      requestRevision: nextRevision,
+      url: 'blob:next',
+      outcome: 'presented',
+    })
+  );
+  expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:first');
+  act(() => latest().actions.setPreview({ inspectorCollapsed: false, item: null, url: null }));
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:next');
+});

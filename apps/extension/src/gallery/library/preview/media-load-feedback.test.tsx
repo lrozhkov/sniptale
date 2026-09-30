@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectItem } from '../actions/test-support';
 import type { GalleryMediaItem } from '../items';
+import { PreviewPanel } from './index';
 import { PreviewMedia } from './media';
 import type { PreviewPanelProps } from './types';
 
@@ -96,9 +97,11 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   vi.stubGlobal('Image', ImagePreloaderStub);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
 });
 
-it('hides the old frame until a new URL for the same item finishes preloading', () => {
+it('retains the old frame without a loading flash until the replacement is ready', () => {
   const item = createItem();
   renderNode(
     <PreviewMedia {...createProps({ item, previewUrl: 'blob:old', previewLoadStatus: 'ready' })} />
@@ -109,10 +112,8 @@ it('hides the old frame until a new URL for the same item finishes preloading', 
   renderNode(
     <PreviewMedia {...createProps({ item, previewUrl: 'blob:new', previewLoadStatus: 'ready' })} />
   );
-  expect(container?.querySelector('img')).toBeNull();
-  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
-    'gallery.preview.mediaLoading'
-  );
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:old');
+  expect(container?.querySelector('[role="status"]')).toBeNull();
 
   act(() => ImagePreloaderStub.instances.at(-1)?.onload?.());
   expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:new');
@@ -125,9 +126,11 @@ afterEach(() => {
   container = null;
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
-it('shows item-scoped loading, missing, and load-error feedback without an old media frame', () => {
+it('delays named loading feedback and clears the old frame on terminal failure', () => {
+  vi.useFakeTimers();
   const first = createItem({ id: 'first' });
   const next = createItem({ id: 'next' });
   renderNode(<PreviewMedia {...createProps({ item: first, previewUrl: 'blob:first' })} />);
@@ -137,10 +140,13 @@ it('shows item-scoped loading, missing, and load-error feedback without an old m
       {...createProps({ item: next, previewUrl: null, previewLoadStatus: 'loading' })}
     />
   );
-  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+  expect(container?.querySelector('[role="status"]')).toBeNull();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
+  act(() => vi.advanceTimersByTime(350));
+  expect(container?.querySelector('[role="status"]')?.textContent).toContain(
     'gallery.preview.mediaLoading'
   );
-  expect(container?.querySelector('img')).toBeNull();
+  expect(container?.querySelector('[role="status"]')?.textContent).toContain(next.filename);
 
   renderNode(
     <PreviewMedia
@@ -198,10 +204,10 @@ it('keeps zoom controls in place through delayed loading and unavailable image f
     nextZone
   );
   expect(slider?.disabled).toBe(true);
-  expect(container?.querySelector('img')).toBeNull();
-  act(() => vi.advanceTimersByTime(320));
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
+  act(() => vi.advanceTimersByTime(350));
   expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
-  expect(container?.querySelector('img')).toBeNull();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
 
   renderNode(
     <PreviewMedia
@@ -243,7 +249,7 @@ it('ignores an obsolete image preload during rapid A to B to C navigation', () =
   );
   const thirdPreload = ImagePreloaderStub.instances.at(-1);
   act(() => secondPreload?.onload?.());
-  expect(container?.querySelector('img')).toBeNull();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
   expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(slider);
   act(() => thirdPreload?.onload?.());
   expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:third');
@@ -270,13 +276,11 @@ it('reports image decode failure for the current item and clears it for another 
   expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:good');
 });
 
-it('clears image loading feedback when the current image renders', () => {
+it('does not flash loading for an immediately decoded first image', () => {
   renderNode(
     <PreviewMedia {...createProps({ previewUrl: 'blob:image', previewLoadStatus: 'ready' })} />
   );
-  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
-    'gallery.preview.mediaLoading'
-  );
+  expect(container?.querySelector('[role="status"]')).toBeNull();
   act(() => {
     container?.querySelector('img')?.dispatchEvent(new Event('load', { bubbles: true }));
   });
@@ -305,4 +309,93 @@ it('does not show media loading feedback for a project preview without a blob UR
     <PreviewMedia {...createProps({ item: createVideoProjectItem(), previewUrl: null })} />
   );
   expect(container?.querySelector('[data-ui="gallery.preview.mediaStatus"]')).toBeNull();
+});
+
+it('prepares the actual next video without resetting the current player or autoplaying', () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
+  const first = createItem({ id: 'video-a', kind: 'video', mimeType: 'video/webm' });
+  const second = createItem({ id: 'video-b', kind: 'video', mimeType: 'video/webm' });
+  const onPresented = vi.fn();
+  renderNode(<PreviewMedia {...createProps({ item: first, previewUrl: 'blob:a', onPresented })} />);
+  const current = container?.querySelector('video');
+  expect(current?.preload).toBe('auto');
+  act(() => current?.dispatchEvent(new Event('loadeddata')));
+  if (current) current.currentTime = 7;
+  renderNode(
+    <PreviewMedia {...createProps({ item: second, previewUrl: 'blob:b', onPresented })} />
+  );
+  const next = container?.querySelector<HTMLVideoElement>('video[src="blob:b"]');
+  expect(container?.querySelector('video[src="blob:a"]')).toBe(current);
+  expect(current?.currentTime).toBe(7);
+  expect(HTMLMediaElement.prototype.pause).not.toHaveBeenCalled();
+  expect(next?.closest('[inert]')).not.toBeNull();
+  act(() => next?.dispatchEvent(new Event('loadedmetadata')));
+  expect(container?.querySelector('video[src="blob:a"]')).toBe(current);
+  act(() => next?.dispatchEvent(new Event('loadeddata')));
+  expect(container?.querySelector('video')).toBe(next);
+  expect(next?.closest('[inert]')).toBeNull();
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalledOnce();
+  expect(play).not.toHaveBeenCalled();
+  expect(onPresented).toHaveBeenLastCalledWith({
+    requestRevision: 0,
+    url: 'blob:b',
+    outcome: 'presented',
+  });
+});
+
+it('blocks requested-item actions and retained-frame zoom until presentation or terminal feedback', () => {
+  const first = createItem({ id: 'a' });
+  const next = createItem({ id: 'b' });
+  renderNode(
+    <PreviewPanel
+      {...createProps({ item: first, previewUrl: 'blob:a', previewRequestRevision: 1 })}
+    />
+  );
+  expect(
+    container?.querySelector('[data-ui="gallery.preview.inspector"]')?.hasAttribute('inert')
+  ).toBe(false);
+  ImagePreloaderStub.deferLoad = true;
+  renderNode(
+    <PreviewPanel
+      {...createProps({ item: next, previewUrl: 'blob:b', previewRequestRevision: 2 })}
+    />
+  );
+  const inspector = container?.querySelector('[data-ui="gallery.preview.inspector"]');
+  expect(inspector?.hasAttribute('inert')).toBe(true);
+  const image = container?.querySelector('img');
+  const style = image?.getAttribute('style');
+  act(() =>
+    image?.dispatchEvent(new WheelEvent('wheel', { bubbles: true, ctrlKey: true, deltaY: -240 }))
+  );
+  expect(image?.getAttribute('style')).toBe(style);
+  act(() => ImagePreloaderStub.instances.at(-1)?.onerror?.());
+  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+    'gallery.preview.mediaInvalid'
+  );
+  expect(inspector?.hasAttribute('inert')).toBe(false);
+  expect(container?.querySelector('img')).toBeNull();
+});
+
+it('keeps first-open loading quiet, ignores late readiness after close, and respects reduced motion', () => {
+  vi.useFakeTimers();
+  ImagePreloaderStub.deferLoad = true;
+  const onPresented = vi.fn();
+  renderNode(<PreviewMedia {...createProps({ onPresented })} />);
+  expect(container?.querySelector('img')).toBeNull();
+  expect(container?.querySelector('[role="status"]')).toBeNull();
+  act(() => vi.advanceTimersByTime(350));
+  expect(container?.querySelector('[role="status"]')?.textContent).toContain(
+    'gallery.preview.mediaLoading'
+  );
+  const lateLoad = ImagePreloaderStub.instances.at(-1)?.onload;
+  renderNode(null);
+  act(() => lateLoad?.());
+  expect(onPresented).not.toHaveBeenCalled();
+  vi.stubGlobal('matchMedia', () => ({ matches: true }));
+  const animate = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, 'animate', { configurable: true, value: animate });
+  ImagePreloaderStub.deferLoad = false;
+  renderNode(<PreviewMedia {...createProps()} />);
+  expect(animate).not.toHaveBeenCalled();
+  delete HTMLElement.prototype.animate;
 });

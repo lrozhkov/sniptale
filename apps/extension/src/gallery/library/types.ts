@@ -69,9 +69,17 @@ export interface GalleryGridMetrics {
 }
 
 export interface GalleryPreviewSessionState {
+  requestRevision?: number | undefined;
   initialMode?: 'edit';
   inspectorCollapsed: boolean;
   item: GalleryItem | null;
   url: string | null;
   loadStatus?: 'loading' | 'ready' | 'missing' | 'error' | undefined;
+}
+
+/** Confirms that the requested frame or its terminal feedback replaced the previous frame. */
+export interface GalleryPreviewPresentation {
+  requestRevision: number;
+  url: string | null;
+  outcome: 'presented' | 'terminal';
 }

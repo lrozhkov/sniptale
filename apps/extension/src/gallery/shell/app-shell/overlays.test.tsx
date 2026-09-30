@@ -92,6 +92,7 @@ function createLayoutProps() {
     onPendingImportClose: vi.fn(),
     onPendingMediaImportClose: vi.fn(),
     onMediaImportConfirm: vi.fn(),
+    onPreviewPresented: vi.fn(),
     onPreviewClose: vi.fn(),
     onPreviewInspectorToggle: vi.fn(),
     onPreviewCopy: vi.fn(),
@@ -248,7 +249,13 @@ it('keeps the real zoom toolbar mounted while navigating to a loading image', ()
     filteredItems: [first, second],
   });
   props.state.preview.session.loadStatus = 'ready';
+  props.state.preview.session.requestRevision = 1;
   act(() => root?.render(<GalleryOverlays {...props} />));
+  expect(props.onPreviewPresented).toHaveBeenCalledWith({
+    requestRevision: 1,
+    url: 'blob:first',
+    outcome: 'presented',
+  });
   const image = container?.querySelector('img');
   if (image) {
     Object.defineProperties(image, {
@@ -266,7 +273,9 @@ it('keeps the real zoom toolbar mounted while navigating to a loading image', ()
     toolbar?.dispatchEvent(new Event('input', { bubbles: true }));
     toolbar?.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  const lock = toolbar?.closest('.group')?.querySelector<HTMLButtonElement>('[aria-pressed]');
+  const lock = toolbar
+    ?.closest('[data-ui="gallery.preview.zoomSliderPanel"]')
+    ?.querySelector<HTMLButtonElement>('[aria-pressed]');
   expect(lock?.disabled).toBe(false);
   act(() => lock?.click());
   expect(lock?.getAttribute('aria-pressed')).toBe('true');

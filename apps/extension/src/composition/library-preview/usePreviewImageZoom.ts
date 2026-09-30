@@ -323,7 +323,8 @@ function usePreviewImagePan(input: {
 export function usePreviewImageZoom(
   enabled: boolean,
   resetKey: string | null,
-  preparedNaturalSize: PreviewSize | null = null
+  preparedNaturalSize: PreviewSize | null = null,
+  interactionEnabled = enabled
 ) {
   const { baseSize, containerRef, handleImageLoad, naturalSize, ready } = usePreviewImageBaseSize(
     enabled,
@@ -407,8 +408,17 @@ export function usePreviewImageZoom(
     }
   }, [resetKey, zoomLocked]);
 
-  usePreviewWheelZoom({ containerRef, enabled: enabled && ready, requestScale, scaleRef });
-  const imagePan = usePreviewImagePan({ enabled: enabled && ready, isZoomedFromFit, resetKey });
+  usePreviewWheelZoom({
+    containerRef,
+    enabled: enabled && ready && interactionEnabled,
+    requestScale,
+    scaleRef,
+  });
+  const imagePan = usePreviewImagePan({
+    enabled: enabled && ready && interactionEnabled,
+    isZoomedFromFit,
+    resetKey,
+  });
 
   return {
     controls: {

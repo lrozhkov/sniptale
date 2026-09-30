@@ -16,6 +16,7 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
 });
 afterEach(() => {
   act(() => root.unmount());

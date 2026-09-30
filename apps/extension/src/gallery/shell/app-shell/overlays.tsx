@@ -120,6 +120,7 @@ type GalleryPreviewOverlayProps = Pick<
   GalleryAppLayoutProps,
   | 'onAddTag'
   | 'onFilenameChange'
+  | 'onPreviewPresented'
   | 'onPreviewClose'
   | 'onPreviewInspectorToggle'
   | 'onPreviewNavigate'
@@ -206,6 +207,8 @@ function renderPreviewOverlayPanel(
       item={previewItem}
       previewUrl={props.state.preview.session.url}
       previewLoadStatus={props.state.preview.session.loadStatus}
+      previewRequestRevision={props.state.preview.session.requestRevision}
+      onPresented={props.onPreviewPresented}
       inspectorCollapsed={props.state.preview.session.inspectorCollapsed}
       filenameDraft={props.state.preview.draft.filename}
       tagDraft={props.state.preview.draft.tagInput}

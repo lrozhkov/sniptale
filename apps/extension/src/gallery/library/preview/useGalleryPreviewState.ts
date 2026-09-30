@@ -11,7 +11,8 @@ import {
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import { getWebSnapshotScreenshotFile } from '../../../composition/persistence/web-snapshots';
 import { isGalleryMediaItem } from '../items';
-import type { GalleryPreviewSessionState } from '../types';
+import { createPreviewResources } from './resources';
+import type { GalleryPreviewPresentation, GalleryPreviewSessionState } from '../types';
 import { getAggregatePreviewBlob } from '../../../composition/persistence/aggregate-presentations';
 import { validateWebSnapshotScreenshotBlob } from '../../../features/web-snapshot/screenshot-validation';
 
@@ -51,6 +52,7 @@ function normalizePreviewSelectionChange(
   current: GalleryPreviewSessionState,
   next: GalleryPreviewSessionState
 ): GalleryPreviewSessionState {
+  if (current === next) return current;
   const nextWithRememberedInspector = next.item
     ? next
     : { ...next, inspectorCollapsed: current.inspectorCollapsed };
@@ -64,6 +66,8 @@ function normalizePreviewSelectionChange(
   ) {
     return {
       ...nextWithRememberedInspector,
+      requestRevision:
+        currentItemId !== nextItemId ? (current.requestRevision ?? 0) + 1 : current.requestRevision,
       url: null,
       loadStatus:
         nextWithRememberedInspector.item && isGalleryMediaItem(nextWithRememberedInspector.item)
@@ -72,11 +76,13 @@ function normalizePreviewSelectionChange(
     };
   }
 
-  if (
-    current.item !== nextWithRememberedInspector.item &&
-    nextWithRememberedInspector.url === null
-  ) {
-    return { ...nextWithRememberedInspector, loadStatus: 'loading' };
+  if (current.item !== nextWithRememberedInspector.item) {
+    return {
+      ...nextWithRememberedInspector,
+      requestRevision: (current.requestRevision ?? 0) + 1,
+      url: null,
+      loadStatus: 'loading',
+    };
   }
 
   return nextWithRememberedInspector;
@@ -115,62 +121,6 @@ function applyPreviewItemDraftState(
     },
     args
   );
-}
-
-function syncPreviewUrl(
-  previewItem: GalleryPreviewSessionState['item'],
-  setPreview: Dispatch<SetStateAction<GalleryPreviewSessionState>>
-) {
-  let active = true;
-  let objectUrl: string | null = null;
-
-  if (!previewItem || !isGalleryMediaItem(previewItem)) {
-    setPreview((current) =>
-      current.url === null && current.loadStatus === undefined
-        ? current
-        : { ...current, url: null, loadStatus: undefined }
-    );
-    return () => undefined;
-  }
-
-  void loadPreviewBlob(previewItem)
-    .then((blob) => {
-      if (!active) {
-        return;
-      }
-
-      if (!blob) {
-        setPreview((current) =>
-          current.item?.id === previewItem.id
-            ? { ...current, url: null, loadStatus: 'missing' }
-            : current
-        );
-        return;
-      }
-
-      objectUrl = URL.createObjectURL(blob);
-      setPreview((current) =>
-        current.item?.id === previewItem.id
-          ? { ...current, url: objectUrl, loadStatus: 'ready' }
-          : current
-      );
-    })
-    .catch(() => {
-      if (active) {
-        setPreview((current) =>
-          current.item?.id === previewItem.id
-            ? { ...current, url: null, loadStatus: 'error' }
-            : current
-        );
-      }
-    });
-
-  return () => {
-    active = false;
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
 }
 
 function haveTagDraftsChanged(initialTagDrafts: string[], tagDrafts: string[]) {
@@ -229,7 +179,7 @@ function usePreviewItemSync(
       applyPreviewItemDraftState(previewItem, draftSetters);
     }
     previousItemId.current = previewItem.id;
-    return syncPreviewUrl(previewItem, setPreview);
+    return undefined;
   }, [draftSetters, previewItem, setPreview, touched]);
 }
 
@@ -264,6 +214,37 @@ export function useGalleryPreviewState() {
   const [initialTagDrafts, setInitialTagDrafts] = useState<string[]>([]);
   const touched = useRef({ filename: false, tags: false });
   const previewItem = preview.item;
+  const resources = useMemo(() => createPreviewResources((url) => URL.revokeObjectURL(url)), []);
+  const requestRevision = preview.requestRevision ?? 0;
+  useEffect(() => () => resources.dispose(), [resources]);
+  useEffect(() => {
+    resources.begin(requestRevision);
+    if (!previewItem || !isGalleryMediaItem(previewItem)) {
+      resources.dispose();
+      return;
+    }
+    let active = true;
+    const publish = (url: string | null, loadStatus: GalleryPreviewSessionState['loadStatus']) => {
+      if (!active) return;
+      setPreviewState((current) =>
+        current.requestRevision === requestRevision ? { ...current, url, loadStatus } : current
+      );
+    };
+    void loadPreviewBlob(previewItem)
+      .then((blob) => {
+        if (!active) return;
+        if (!blob) {
+          publish(null, 'missing');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        if (resources.offer(requestRevision, url)) publish(url, 'ready');
+      })
+      .catch(() => publish(null, 'error'));
+    return () => {
+      active = false;
+    };
+  }, [previewItem, requestRevision, resources]);
   const draftSetters = useMemo<GalleryPreviewDraftStateSetters>(
     () => ({
       setFilenameDraft,
@@ -295,6 +276,8 @@ export function useGalleryPreviewState() {
 
   return {
     actions: {
+      acknowledgePresented: (presentation: GalleryPreviewPresentation) =>
+        resources.acknowledge(presentation),
       setFilenameDraft: (value: SetStateAction<string>) => {
         touched.current.filename = true;
         setFilenameDraft(value);

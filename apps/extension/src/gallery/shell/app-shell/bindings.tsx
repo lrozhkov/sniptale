@@ -1,3 +1,4 @@
+import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { GalleryAppStateController, GalleryViewMode } from '../../state/types';
@@ -81,6 +82,8 @@ function buildGalleryPreviewHandlers(
   messaging: Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>
 ) {
   return {
+    onPreviewPresented: (presentation: GalleryPreviewPresentation) =>
+      controller.actions.preview.acknowledgePresented?.(presentation),
     onPreviewClose: () => {
       if (isReadOnlyTrashPreview(controller)) {
         openPreview(controller, null, { inspectorCollapsed: false });

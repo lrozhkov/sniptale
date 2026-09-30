@@ -1,3 +1,4 @@
+import type { GalleryPreviewPresentation } from '../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
   MediaHubBackupExportOptions,
@@ -170,6 +171,7 @@ interface GalleryAppSelectionActions {
 }
 
 interface GalleryAppPreviewActions {
+  acknowledgePresented?: (presentation: GalleryPreviewPresentation) => void;
   setPreview: Dispatch<SetStateAction<GalleryPreviewSessionState>>;
   setFilenameDraft: Dispatch<SetStateAction<string>>;
   setTagDraft: Dispatch<SetStateAction<string>>;

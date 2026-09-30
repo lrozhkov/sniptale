@@ -1,3 +1,4 @@
+import type { GalleryPreviewPresentation } from '../types';
 import type { GalleryItem } from '../items';
 
 interface PreviewNavigationProps {
@@ -10,6 +11,8 @@ interface PreviewNavigationProps {
 }
 
 export interface PreviewPanelProps {
+  previewRequestRevision?: number | undefined;
+  onPresented?: ((presentation: GalleryPreviewPresentation) => void) | undefined;
   initialMode?: 'edit';
   trashMode?: boolean;
   onRestoreTrash?: () => Promise<boolean>;

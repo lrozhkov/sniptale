@@ -154,6 +154,7 @@ function buildGalleryAppActions(args: {
       updateSavedView: args.filters.actions.updateSavedView,
     },
     preview: {
+      acknowledgePresented: args.preview.actions.acknowledgePresented,
       setFilenameDraft: args.preview.actions.setFilenameDraft,
       setPreview: args.preview.actions.setPreview,
       setTagDraft: args.preview.actions.setTagDraft,

@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, PanelRightClose, PanelRightOpen, X } from 'lucide-react';
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
+import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { GalleryProjectOpenAction } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
 import {
@@ -164,6 +165,8 @@ function PreviewMediaContent(
     isImagePreview: boolean;
     onImageLoad: ReturnType<typeof usePreviewImageZoom>['image']['handleImageLoad'];
     onMediaError: () => void;
+    prepareVideo?: boolean;
+    onVideoReady?: (() => void) | undefined;
   }
 ) {
   if (props.isImagePreview) {
@@ -191,6 +194,9 @@ function PreviewMediaContent(
           key={props.previewUrl}
           src={props.previewUrl}
           trashMode={Boolean(props.trashMode)}
+          prepare={props.prepareVideo ?? false}
+          onReady={props.onVideoReady}
+          onMediaError={props.onMediaError}
         />
       </div>
     );
@@ -228,7 +234,10 @@ function PreviewMediaContent(
   return null;
 }
 
-function PreviewMediaLoadFeedback(props: { status: 'loading' | 'missing' | 'error' | 'invalid' }) {
+function PreviewMediaLoadFeedback(props: {
+  status: 'loading' | 'missing' | 'error' | 'invalid';
+  filename: string;
+}) {
   const messageKey = {
     loading: 'gallery.preview.mediaLoading',
     missing: 'gallery.preview.mediaMissing',
@@ -245,7 +254,70 @@ function PreviewMediaLoadFeedback(props: { status: 'loading' | 'missing' | 'erro
         text-[var(--sniptale-color-text-primary)]"
     >
       {translate(messageKey[props.status])}
+      {props.status === 'loading' ? (
+        <span className="mt-1 block break-words text-xs">{props.filename}</span>
+      ) : null}
     </p>
+  );
+}
+
+function PreviewMediaFrames(
+  props: Pick<PreviewPanelProps, 'item' | 'previewUrl' | 'trashMode'> & {
+    transition: ReturnType<typeof usePreviewMediaTransition>;
+    imageZoom: ReturnType<typeof usePreviewImageZoom>;
+  }
+) {
+  const { transition, imageZoom } = props;
+  const frame = transition.frame;
+  const isImagePreview = Boolean(
+    frame?.previewUrl &&
+    isGalleryMediaItem(frame.item) &&
+    (isImageKind(frame.item.kind) || frame.item.kind === 'web-archive')
+  );
+  const layers = frame ? [frame] : [];
+  if (transition.prepareVideo)
+    layers.push({
+      item: props.item,
+      previewUrl: props.previewUrl,
+      naturalSize: null,
+      direction: 0,
+      revision: 0,
+      requestKey: 'prepared',
+    });
+
+  return (
+    <>
+      {layers.map((layer) => {
+        const prepared = layer.requestKey === 'prepared';
+        return (
+          <div
+            key={`${layer.item.id}:${layer.previewUrl ?? ''}`}
+            data-ui="gallery.preview.frame"
+            data-presented={!prepared}
+            inert={prepared || transition.pending}
+            aria-hidden={prepared || transition.pending}
+            className={
+              prepared
+                ? 'pointer-events-none absolute inset-4 invisible'
+                : 'col-start-1 row-start-1 h-full min-h-0 w-full min-w-0 grid place-items-center'
+            }
+          >
+            <PreviewMediaContent
+              item={layer.item}
+              trashMode={Boolean(props.trashMode)}
+              previewUrl={layer.previewUrl}
+              imageStyle={imageZoom.image.style}
+              imageReady={imageZoom.image.ready}
+              isImagePreview={!prepared && isImagePreview}
+              onImageLoad={imageZoom.image.handleImageLoad}
+              onMediaError={prepared || !transition.pending ? transition.fail : () => undefined}
+              prepareVideo={prepared}
+              onVideoReady={prepared ? transition.commitVideo : undefined}
+            />
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -259,58 +331,46 @@ export function PreviewMedia(
     | 'onInspectorToggle'
     | 'previewUrl'
     | 'previewLoadStatus'
+    | 'previewRequestRevision'
+    | 'onPresented'
     | 'onEdit'
     | 'trashMode'
   >
 ) {
-  const [decodeFailure, setDecodeFailure] = useState<{ id: string; url: string } | null>(null);
   const isMediaItem = isGalleryMediaItem(props.item);
   const isImageTarget =
     isMediaItem && (isImageKind(props.item.kind) || props.item.kind === 'web-archive');
-  const status = isMediaItem
-    ? (props.previewLoadStatus ?? (props.previewUrl ? 'ready' : 'loading'))
-    : null;
-  const transitionFrame = usePreviewMediaTransition({
+  const transition = usePreviewMediaTransition({
     item: props.item,
     navigationPosition: props.navigation?.current,
     previewUrl: props.previewUrl,
+    loadStatus: props.previewLoadStatus,
+    requestRevision: props.previewRequestRevision,
+    onPresented: props.onPresented,
   });
-  const transitionRef = useRef<HTMLDivElement>(null);
-  const frameIsCurrent =
-    transitionFrame.item.id === props.item.id && transitionFrame.previewUrl === props.previewUrl;
-  const isImagePreview =
-    transitionFrame.previewUrl !== null &&
-    isGalleryMediaItem(transitionFrame.item) &&
-    (isImageKind(transitionFrame.item.kind) || transitionFrame.item.kind === 'web-archive') &&
-    (props.previewLoadStatus === undefined || (status === 'ready' && frameIsCurrent));
+  const frame = transition.frame;
+  const isImagePreview = Boolean(
+    frame?.previewUrl &&
+    isGalleryMediaItem(frame.item) &&
+    (isImageKind(frame.item.kind) || frame.item.kind === 'web-archive')
+  );
   const imageZoom = usePreviewImageZoom(
     isImagePreview,
-    transitionFrame.previewUrl,
-    transitionFrame.naturalSize
+    frame?.previewUrl ?? null,
+    frame?.naturalSize ?? null,
+    !transition.pending
   );
-  usePreviewMediaTransitionAnimation(transitionRef, transitionFrame);
-  const currentDecodeFailed =
-    decodeFailure?.id === props.item.id && decodeFailure.url === props.previewUrl;
+  const transitionRef = useRef<HTMLDivElement>(null);
+  usePreviewMediaTransitionAnimation(transitionRef, frame);
+  const feedbackStatus = transition.invalid
+    ? 'invalid'
+    : props.previewLoadStatus === 'missing' || props.previewLoadStatus === 'error'
+      ? props.previewLoadStatus
+      : transition.pending
+        ? 'loading'
+        : null;
   const zoomCommandsEnabled =
-    isImagePreview && imageZoom.image.ready && frameIsCurrent && !currentDecodeFailed;
-  let feedbackStatus: 'loading' | 'missing' | 'error' | 'invalid' | null = null;
-  if (isMediaItem) {
-    if (currentDecodeFailed) {
-      feedbackStatus = 'invalid';
-    } else if (status === 'missing' || status === 'error') {
-      feedbackStatus = status;
-    } else if (
-      status === 'loading' ||
-      (props.previewLoadStatus !== undefined && !frameIsCurrent) ||
-      (isImagePreview && !imageZoom.image.ready)
-    ) {
-      feedbackStatus = 'loading';
-    }
-  }
-  const showFrame =
-    !isMediaItem || props.previewLoadStatus === undefined
-      ? !currentDecodeFailed
-      : status === 'ready' && frameIsCurrent && !currentDecodeFailed;
+    isImagePreview && imageZoom.image.ready && !transition.pending && !transition.invalid;
 
   return (
     <div
@@ -363,23 +423,27 @@ export function PreviewMedia(
           isImagePreview={isImagePreview}
           transitionRef={transitionRef}
         >
-          {showFrame ? (
-            <PreviewMediaContent
-              item={transitionFrame.item}
-              trashMode={Boolean(props.trashMode)}
-              previewUrl={transitionFrame.previewUrl}
-              imageStyle={imageZoom.image.style}
-              imageReady={imageZoom.image.ready}
-              isImagePreview={isImagePreview}
-              onImageLoad={imageZoom.image.handleImageLoad}
-              onMediaError={() => {
-                if (frameIsCurrent && props.previewUrl) {
-                  setDecodeFailure({ id: props.item.id, url: props.previewUrl });
-                }
-              }}
-            />
+          <PreviewMediaFrames
+            transition={transition}
+            imageZoom={imageZoom}
+            item={props.item}
+            previewUrl={props.previewUrl}
+            trashMode={Boolean(props.trashMode)}
+          />
+          {feedbackStatus ? (
+            <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center p-4">
+              {feedbackStatus === 'loading' ? (
+                <DelayedLoadingFallback
+                  key={`${props.previewRequestRevision}:${props.item.id}:${props.previewUrl}`}
+                  fallback={
+                    <PreviewMediaLoadFeedback status="loading" filename={props.item.filename} />
+                  }
+                />
+              ) : (
+                <PreviewMediaLoadFeedback status={feedbackStatus} filename={props.item.filename} />
+              )}
+            </div>
           ) : null}
-          {feedbackStatus ? <PreviewMediaLoadFeedback status={feedbackStatus} /> : null}
         </PreviewMediaSurface>
         {props.navigation ? (
           <PreviewNavigationZone direction="next" navigation={props.navigation} />

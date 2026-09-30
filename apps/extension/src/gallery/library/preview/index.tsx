@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
 import { translate } from '../../../platform/i18n';
 import { PreviewSourceField } from './source-field';
 import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
+import type { GalleryPreviewPresentation } from '../types';
 import type { PreviewPanelProps } from './types';
 import { PreviewMedia } from './media';
 import {
@@ -99,9 +100,14 @@ function PreviewFilenameField(
   );
 }
 
-function PreviewPanelSidebar(props: PreviewPanelProps & { onReview?: () => void }) {
+function PreviewPanelSidebar(
+  props: PreviewPanelProps & { onReview?: () => void; pending?: boolean }
+) {
   return (
     <aside
+      inert={props.pending}
+      aria-busy={props.pending}
+      data-ui="gallery.preview.inspector"
       className="min-h-0 w-full overflow-y-auto border-l border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
     >
@@ -234,9 +240,29 @@ export function PreviewPanel(props: PreviewPanelProps) {
 /** Preview-only layout; the parent owns editor mode and keyboard/focus lifecycle. */
 function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
   const { onReview, ...panel } = props;
-  const { item, previewUrl, onClose } = panel;
+  const { item, previewUrl, onClose, onPresented } = panel;
   const inspectorCollapsed = !props.trashMode && props.inspectorCollapsed;
   const dialogRef = useRef<HTMLDivElement>(null);
+  const [presentation, setPresentation] = useState<{
+    itemId: string;
+    requestRevision: number;
+    url: string | null;
+    outcome: 'presented' | 'terminal';
+  } | null>(null);
+  const handlePresented = useCallback(
+    (next: GalleryPreviewPresentation) => {
+      setPresentation({ ...next, itemId: item.id });
+      onPresented?.(next);
+    },
+    [item.id, onPresented]
+  );
+  const pending =
+    isGalleryMediaItem(item) &&
+    !(
+      presentation?.itemId === item.id &&
+      presentation.requestRevision === (props.previewRequestRevision ?? 0) &&
+      (presentation.outcome === 'terminal' || presentation.url === previewUrl)
+    );
   useEffect(() => {
     if (!props.trashMode) return;
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -266,7 +292,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
           event.currentTarget.querySelectorAll<HTMLElement>(
             'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)'
           )
-        );
+        ).filter((control) => !control.closest('[inert]'));
         const first = controls[0];
         const last = controls.at(-1);
         if (!first || !last) return;
@@ -298,6 +324,8 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             item={item}
             previewUrl={previewUrl}
             previewLoadStatus={props.previewLoadStatus}
+            previewRequestRevision={props.previewRequestRevision}
+            onPresented={handlePresented}
             inspectorCollapsed={inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
             onInspectorToggle={props.onInspectorToggle}
@@ -306,6 +334,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
           {inspectorCollapsed ? null : (
             <PreviewPanelSidebar
               {...panel}
+              pending={pending}
               {...(!props.trashMode &&
               isGalleryMediaItem(item) &&
               item.mimeType.startsWith('video/') &&

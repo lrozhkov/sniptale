@@ -30,6 +30,9 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 type TestLayoutProps = {
+  onPreviewPresented: (
+    presentation: import('../../library/types').GalleryPreviewPresentation
+  ) => void;
   onAddTag: (tag?: string) => void;
   onApplySelectionTag: (tag?: string) => void;
   onBackupExportConfirm: (options: unknown) => void;
@@ -386,4 +389,13 @@ it('opens trashed material read-only, navigates without saving, and restores onl
   act(() => layoutProps.onPreviewClose());
   expect(getState().preview.session.item).toBeNull();
   expect(actions.preview.close).not.toHaveBeenCalled();
+});
+
+it('forwards presentation acknowledgements to the resource owner without rewriting the request', () => {
+  const { controller, layoutProps } = renderBindings();
+  const acknowledgePresented = vi.fn();
+  controller.actions.preview.acknowledgePresented = acknowledgePresented;
+  const presentation = { requestRevision: 4, url: null, outcome: 'terminal' as const };
+  layoutProps.onPreviewPresented(presentation);
+  expect(acknowledgePresented).toHaveBeenCalledExactlyOnceWith(presentation);
 });

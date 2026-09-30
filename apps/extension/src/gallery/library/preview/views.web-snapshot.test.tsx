@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { PreviewMedia } from './media';
@@ -66,11 +68,36 @@ function createProps(): PreviewPanelProps {
   };
 }
 
-it('renders the saved page screenshot as the web snapshot preview', () => {
-  const markup = renderToStaticMarkup(<PreviewMedia {...createProps()} />);
-
-  expect(markup).toContain('<img');
-  expect(markup).toContain('blob:snapshot-preview');
+it('renders the saved page screenshot after the image preparation finishes', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  vi.stubGlobal(
+    'Image',
+    class {
+      naturalWidth = 1280;
+      naturalHeight = 720;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    }
+  );
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    act(() => root.render(<PreviewMedia {...createProps()} />));
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('blob:snapshot-preview');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
 });
 
 it('renders web snapshot actions without image copy affordances', () => {

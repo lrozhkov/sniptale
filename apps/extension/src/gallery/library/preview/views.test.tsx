@@ -163,6 +163,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', PreviewResizeObserverStub);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   PreviewImagePreloaderStub.autoLoad = true;
   PreviewImagePreloaderStub.instances = [];
   vi.stubGlobal('Image', PreviewImagePreloaderStub);
@@ -181,13 +183,21 @@ afterEach(() => {
   container = null;
   Reflect.deleteProperty(HTMLElement.prototype, 'animate');
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
+function renderMediaMarkup(node: ReactNode) {
+  renderNode(null);
+  renderNode(node);
+  act(() => container?.querySelector('video')?.dispatchEvent(new Event('loadeddata')));
+  return container?.innerHTML ?? '';
+}
+
 it('renders media previews for image, video, audio, and empty states', () => {
-  const imageMarkup = renderToStaticMarkup(
+  const imageMarkup = renderMediaMarkup(
     <PreviewMedia {...createProps({ previewUrl: 'blob:image' })} />
   );
-  const videoMarkup = renderToStaticMarkup(
+  const videoMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
@@ -195,7 +205,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
       })}
     />
   );
-  const audioMarkup = renderToStaticMarkup(
+  const audioMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createItem({ kind: 'audio', mimeType: 'audio/mpeg' }),
@@ -203,7 +213,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
       })}
     />
   );
-  const emptyMarkup = renderToStaticMarkup(
+  const emptyMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createItem(),
@@ -211,7 +221,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
       })}
     />
   );
-  const videoProjectMarkup = renderToStaticMarkup(
+  const videoProjectMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createVideoProjectItem({ id: 'video-project:project-1' }),

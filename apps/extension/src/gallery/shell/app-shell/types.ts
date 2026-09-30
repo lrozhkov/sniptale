@@ -1,3 +1,4 @@
+import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { MediaHubImportConflictStrategy } from '../../../workflows/media-hub-backup/index';
 import type {
@@ -51,6 +52,7 @@ export interface GalleryAppLayoutProps {
     options: MediaHubBackupExportOptions
   ) => Promise<MediaHubLocalBackupSummary>;
   onImport: (strategy: MediaHubImportConflictStrategy) => void;
+  onPreviewPresented?: ((presentation: GalleryPreviewPresentation) => void) | undefined;
   onPreviewClose: () => void;
   onPreviewInspectorToggle: () => void;
   onFilenameChange: Dispatch<SetStateAction<string>>;

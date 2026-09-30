@@ -1,10 +1,22 @@
-import type { KeyboardEvent } from 'react';
+import { useEffect, type KeyboardEvent } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { VideoControls } from './video-controls';
 import { useVideoPlayer } from './video-playback';
 
 /** Gallery controls remain inside their fullscreen and locale owner. */
-export function PreviewVideo({ src, trashMode = false }: { src: string; trashMode?: boolean }) {
+export function PreviewVideo({
+  src,
+  trashMode = false,
+  prepare = false,
+  onReady,
+  onMediaError,
+}: {
+  src: string;
+  trashMode?: boolean;
+  prepare?: boolean;
+  onReady?: (() => void) | undefined;
+  onMediaError?: (() => void) | undefined;
+}) {
   useAppLocale();
   const player = useVideoPlayer();
   const {
@@ -18,6 +30,19 @@ export function PreviewVideo({ src, trashMode = false }: { src: string; trashMod
     error,
     toggleFullscreen,
   } = player;
+  useEffect(() => {
+    const element = video.current;
+    if (element && element.getAttribute('src') !== src) {
+      element.setAttribute('src', src);
+      element.load();
+    }
+    return () => {
+      if (!element) return;
+      element.pause();
+      element.removeAttribute('src');
+      element.load();
+    };
+  }, [src, video]);
   return (
     <div
       ref={container}
@@ -52,7 +77,7 @@ export function PreviewVideo({ src, trashMode = false }: { src: string; trashMod
           <video
             ref={video}
             src={src}
-            preload="metadata"
+            preload={prepare ? 'auto' : 'metadata'}
             playsInline
             controlsList={trashMode ? 'nodownload' : undefined}
             onContextMenu={trashMode ? (event) => event.preventDefault() : undefined}
@@ -62,6 +87,14 @@ export function PreviewVideo({ src, trashMode = false }: { src: string; trashMod
                 : 'block max-h-none max-w-none bg-black'
             }
             {...mediaEvents}
+            onLoadedData={(event) => {
+              mediaEvents.onLoadedData?.(event);
+              onReady?.();
+            }}
+            onError={(event) => {
+              mediaEvents.onError?.(event);
+              onMediaError?.();
+            }}
           />
         </div>
       </div>
