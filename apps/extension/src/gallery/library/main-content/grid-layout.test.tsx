@@ -41,15 +41,20 @@ const metrics = (
 ) => createGridMetricsFixture({ items, gridWidth, viewMode, columnCount });
 
 it.each(['compact-grid', 'large-grid'] as const)(
-  'reserves a readable landscape cover beside project details in %s',
+  'gives project and image cards the same landscape geometry in %s',
   (viewMode) => {
+    const image = createMediaItem({ id: 'image' });
+    const project = createVideoProjectItem();
     const layout = getGalleryGridLayout({
       columnCount: 1,
       gridWidth: viewMode === 'compact-grid' ? 220 : 320,
-      items: [createVideoProjectItem()],
+      items: [image, project],
       viewMode,
     });
-    expect(layout.rowHeights[0]! - 144).toBeGreaterThanOrEqual(layout.cardWidth * (9 / 16));
+    expect(layout.rowHeights[0]).toBe(layout.rowHeights[1]);
+    expect(layout.rowHeights[0]).toBe(
+      Math.ceil(layout.cardWidth * (9 / 16) + (viewMode === 'compact-grid' ? 40 : 72))
+    );
   }
 );
 
@@ -82,7 +87,7 @@ it.each([
   }
 );
 
-it('places mixed-height rows below the tallest card while preserving each preview height', () => {
+it('places mixed rows at the image-card pitch', () => {
   const ordinary = createMediaItem({ id: 'ordinary' });
   const project = createVideoProjectItem();
   const next = createMediaItem({ id: 'next' });
@@ -108,7 +113,7 @@ it('places mixed-height rows below the tallest card while preserving each previe
   const ordinaryHeight = Number.parseFloat(cards?.[0]?.style.height ?? '');
   const projectHeight = Number.parseFloat(cards?.[1]?.style.height ?? '');
   const nextTop = Number.parseFloat(cards?.[2]?.style.top ?? '');
-  expect(ordinaryHeight).toBeLessThan(projectHeight);
-  expect(nextTop).toBe(projectHeight + GRID_GAP);
+  expect(ordinaryHeight).toBe(projectHeight);
+  expect(nextTop).toBe(ordinaryHeight + GRID_GAP);
   expect(Number.parseFloat(cards?.[2]?.style.height ?? '')).toBe(ordinaryHeight);
 });

@@ -369,8 +369,8 @@ function GalleryRecordingGroupDetails(props: {
         isCompact
           ? `h-10 shrink-0 border-t border-[var(--sniptale-color-border-soft)]
             px-3 py-3`
-          : `grid h-[94px] shrink-0 grid-rows-[32px_minmax(0,1fr)_16px]
-            border-t border-[var(--sniptale-color-border-soft)] px-4 py-3.5`
+          : `flex h-[72px] shrink-0 flex-col justify-between
+            border-t border-[var(--sniptale-color-border-soft)] px-4 py-2`
       }
       data-ui={isCompact ? 'gallery.compact.group-details' : 'gallery.large.group-details'}
     >
@@ -395,7 +395,6 @@ function GalleryRecordingGroupDetails(props: {
           ) : null}
         </div>
       ) : null}
-      {!isCompact ? <div aria-hidden="true" /> : null}
       <div
         data-ui={isCompact ? 'gallery.compact.group-metadata' : 'gallery.large.group-metadata'}
         className="flex items-center justify-between gap-2 whitespace-nowrap text-xs
@@ -702,7 +701,7 @@ export function GalleryGridCanvas(
         const groupItems = getRecordingGroupItems(props.filteredItems, item);
         const style = resolveGalleryGridCardStyle({
           absoluteIndex,
-          cardHeight: getGalleryGridCardHeight(item, gridMode, cardWidth),
+          cardHeight: getGalleryGridCardHeight(gridMode, cardWidth),
           cardWidth,
           columnCount: gridMetrics.columnCount,
           rowTops: gridMetrics.rowTops,

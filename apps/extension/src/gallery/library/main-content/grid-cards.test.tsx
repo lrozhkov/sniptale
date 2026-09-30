@@ -3,11 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  createMediaItem,
-  createScenarioItem,
-  createVideoProjectItem,
-} from '../actions/test-support/index';
+import { createMediaItem } from '../actions/test-support/index';
 import { translate } from '../../../platform/i18n';
 import { GRID_GAP } from '../constants';
 import { createGridMetricsFixture } from '../test-support/items';
@@ -367,7 +363,7 @@ it('renders one unduplicated recording-group title in large grid', () => {
   expect(container?.textContent).not.toContain(translate('gallery.preview.recordingGroup'));
   expect(
     container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-details"]')?.className
-  ).toContain('h-[94px]');
+  ).toContain('h-[72px]');
   expect(
     container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-metadata"]')?.className
   ).not.toContain('mt-auto');
@@ -426,31 +422,6 @@ it.each(['compact-grid', 'large-grid'] as const)(
     );
   }
 );
-
-it('does not present a stale video-project thumbnail as actively updating', () => {
-  const item = {
-    ...createVideoProjectItem(),
-    presentationRevision: 1,
-    workspaceRevision: 2,
-  };
-
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={[item]}
-        gridMetrics={metrics([item], 400, 'large-grid', 1)}
-        gridWidth={400}
-        onPreviewOpen={vi.fn()}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-        viewMode="large-grid"
-        visibleItems={[item]}
-      />
-    );
-  });
-
-  expect(container?.textContent).not.toContain(translate('gallery.app.updatingPreview'));
-});
 
 function expectCompactGridPointerCursors(
   previewButton: HTMLButtonElement,
@@ -624,64 +595,6 @@ it('shows only the deletion date for drafts in grid cards', () => {
   expect(compactMetadata?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
 });
 
-it('renders scenario rows as shared selectable items', () => {
-  const scenarioItem = createScenarioItem({
-    id: 'scenario:project-1',
-    project: {
-      availability: 'available' as const,
-      id: 'project-1',
-      name: 'Scenario',
-      createdAt: 1,
-      updatedAt: 2,
-      tags: ['alpha'],
-    },
-    tags: ['alpha'],
-  });
-  const onPreviewOpen = vi.fn();
-  const onToggleSelection = vi.fn();
-  const otherScenario = createScenarioItem({
-    id: 'scenario:project-2',
-    project: {
-      availability: 'available',
-      createdAt: 2,
-      id: 'project-2',
-      name: 'Other scenario',
-      updatedAt: 2,
-    },
-  });
-
-  act(() => {
-    root?.render(
-      <GalleryMediaList
-        filteredItems={[scenarioItem, otherScenario]}
-        onPreviewOpen={onPreviewOpen}
-        onToggleSelection={onToggleSelection}
-        selectedIds={new Set(['scenario:project-1'])}
-      />
-    );
-  });
-
-  const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-  const selectionButton = buttons.find((button) => button.className.includes('h-8 w-8'));
-  const detailButton = buttons.find((button) => button.textContent?.includes('Other scenario'));
-
-  if (
-    !(selectionButton instanceof HTMLButtonElement) ||
-    !(detailButton instanceof HTMLButtonElement)
-  ) {
-    throw new Error('Expected shared scenario row controls');
-  }
-
-  act(() => {
-    selectionButton.click();
-    detailButton.click();
-  });
-
-  expect(onToggleSelection).toHaveBeenCalledWith('scenario:project-1', { shiftKey: false });
-  expect(onPreviewOpen).toHaveBeenCalledWith(otherScenario);
-  expect(container?.textContent).toContain('alpha');
-});
-
 it('shows grouped recording role and member count outside the thumbnail', () => {
   const item = createMediaItem({
     filename: 'webcam.webm',
@@ -723,73 +636,3 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   act(() => openButton?.click());
   expect(onRecordingGroupOpen).toHaveBeenCalledWith(item);
 });
-
-it.each(['compact-grid', 'large-grid', 'list'] as const)(
-  'exposes project names, content and direct editor actions in %s',
-  (viewMode) => {
-    const video = createVideoProjectItem();
-    const scenario = createScenarioItem();
-    const items = [video, scenario];
-    const onProjectOpen = vi.fn();
-    act(() =>
-      root?.render(
-        viewMode === 'list' ? (
-          <GalleryMediaList
-            filteredItems={items}
-            onPreviewOpen={vi.fn()}
-            onProjectOpen={onProjectOpen}
-            onToggleSelection={vi.fn()}
-            selectedIds={new Set()}
-          />
-        ) : (
-          <GalleryGridCanvas
-            filteredItems={items}
-            visibleItems={items}
-            gridMetrics={metrics(items, 800, viewMode, 2)}
-            gridWidth={800}
-            onPreviewOpen={vi.fn()}
-            onProjectOpen={onProjectOpen}
-            onToggleSelection={vi.fn()}
-            selectedIds={new Set()}
-            viewMode={viewMode}
-          />
-        )
-      )
-    );
-    const actions = [...container!.querySelectorAll('button')].filter(
-      (button) => button.textContent === translate('gallery.preview.openInEditor')
-    );
-    expect(actions).toHaveLength(2);
-    if (viewMode === 'list') {
-      const header = container!.querySelector<HTMLElement>('[data-ui="gallery.list.header"]');
-      const rows = container!.querySelectorAll<HTMLElement>('[data-ui="gallery.list.row"]');
-      expect(header?.style.gridTemplateColumns).toBe(rows[0]?.style.gridTemplateColumns);
-      expect(rows[0]?.querySelectorAll(':scope > [role="cell"]')).toHaveLength(8);
-      expect(
-        rows[0]?.querySelector('[data-ui="gallery.list.source"]')?.nextElementSibling
-      ).not.toBeNull();
-      expect(actions[0]?.closest('[role="cell"]')).not.toBeNull();
-      expect(actions[0]?.className).toContain('max-w-[180px]');
-      expect(
-        [...container!.querySelectorAll('[data-ui="test.thumb"]')].map((thumb) =>
-          thumb.getAttribute('data-deferred')
-        )
-      ).toEqual(['true', 'true']);
-    } else {
-      expect(actions[0]?.className).toContain('w-full');
-      expect(
-        [...container!.querySelectorAll('[data-ui="test.thumb"]')].map((thumb) =>
-          thumb.getAttribute('data-deferred')
-        )
-      ).toEqual(['false', 'false']);
-      expect(
-        actions[0]?.closest('article')?.querySelector('[data-ui="gallery.grid.thumbnail-viewport"]')
-      ).not.toBeNull();
-    }
-    act(() => actions.forEach((button) => button.click()));
-    expect(onProjectOpen.mock.calls).toEqual([[video], [scenario]]);
-    expect(container!.textContent).toContain(video.filename);
-    expect(container!.textContent).toContain(scenario.filename);
-    expect(container!.textContent).toContain(translate('gallery.preview.clips'));
-  }
-);

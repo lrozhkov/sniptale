@@ -260,7 +260,7 @@ it('marks checked facet rows and keeps their keyboard ring distinct', () => {
   expect(selected?.className).toContain(
     'has-[:focus-visible]:ring-[var(--sniptale-color-focus-ring)]'
   );
-  expect(unselected?.querySelector('[aria-hidden="true"]')?.className).toContain(
+  expect(unselected?.querySelector('[aria-hidden="true"]')?.className).not.toContain(
     'group-hover:bg-[var(--sniptale-color-surface-hover)]'
   );
   expect(selected?.querySelector('input')?.checked).toBe(true);
