@@ -1,6 +1,11 @@
 import { defineMessageSource } from '../source';
 
 export const scenarioContentMessages = defineMessageSource({
+  collapsePanel: { ru: 'Свернуть панель сценария', en: 'Collapse scenario panel' },
+  restorePanel: { ru: 'Развернуть панель сценария', en: 'Show scenario panel' },
+  moveStepUp: { ru: 'Переместить выше', en: 'Move up' },
+  moveStepDown: { ru: 'Переместить ниже', en: 'Move down' },
+  capturedStepTitle: { ru: 'Снимок страницы', en: 'Page capture' },
   toggle: {
     ru: 'Сценарий',
     en: 'Scenario',

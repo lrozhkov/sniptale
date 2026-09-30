@@ -7,14 +7,12 @@ export function useScenarioRecorderSidebarTransientState(
   sidebarRef: RefObject<HTMLElement | null>
 ) {
   const [deleteStepId, setDeleteStepId] = useState<string | null>(null);
-  const [dragStepId, setDragStepId] = useState<string | null>(null);
   const [inspectedStep, setInspectedStep] = useState<ScenarioRecorderSidebarStep | null>(null);
   const [previewStep, setPreviewStep] = useState<ScenarioRecorderSidebarStep | null>(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
 
   useEffect(() => {
     setDeleteStepId(null);
-    setDragStepId(null);
     setInspectedStep(null);
     setPreviewStep(null);
     setProjectMenuOpen(false);
@@ -68,7 +66,6 @@ export function useScenarioRecorderSidebarTransientState(
         ?.focus();
     },
     deleteStepId,
-    dragStepId,
     inspectedStep,
     openDeleteStep: (stepId: string) => {
       setProjectMenuOpen(false);
@@ -85,7 +82,6 @@ export function useScenarioRecorderSidebarTransientState(
     previewStep,
     projectMenuOpen,
     setDeleteStepId,
-    setDragStepId,
     setProjectMenuOpen,
   };
 }

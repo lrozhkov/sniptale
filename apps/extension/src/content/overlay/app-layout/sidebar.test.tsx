@@ -1,21 +1,45 @@
 // @vitest-environment jsdom
 
-import { act } from 'react';
+import { act, type MouseEvent } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ContentAppLayoutScenarioProps } from './types';
 
+const captureMocks = vi.hoisted(() => ({
+  source: vi.fn<(event: Event) => { kind: 'trusted-content-event' } | null>(),
+  error: vi.fn(),
+}));
+vi.mock('../../application/privileged-action-intent', () => ({
+  createTrustedContentActionIntentSource: captureMocks.source,
+}));
+vi.mock('../screenshot/feedback', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../screenshot/feedback')>()),
+  showScreenshotError: captureMocks.error,
+}));
+
 const { scenarioRecorderSidebarMock } = vi.hoisted(() => ({
   scenarioRecorderSidebarMock: vi.fn((props: Record<string, unknown>) => (
-    <button
-      data-ui="content.scenario-sidebar"
-      onClick={() => {
-        void (props['onFinish'] as () => void)();
-      }}
-      type="button"
-    >
-      sidebar
-    </button>
+    <>
+      <button
+        data-ui="content.scenario-sidebar"
+        onClick={() => {
+          void (props['onFinish'] as () => void)();
+        }}
+        type="button"
+      >
+        sidebar
+      </button>
+      <button
+        type="button"
+        data-ui="capture-probe"
+        disabled={props['captureBusy'] === true}
+        onClick={(event) =>
+          void (
+            props['onCaptureVisible'] as (event: MouseEvent<HTMLButtonElement>) => Promise<void>
+          )(event)
+        }
+      />
+    </>
   )),
 }));
 
@@ -94,8 +118,10 @@ function createScenarioProps() {
 function createProps() {
   return {
     isCompletelyHidden: false,
+    captureSuspended: false,
     isToolbarVisible: true,
     byClickDisabled: false,
+    handleTakeScreenshot: vi.fn<() => Promise<void>>(async () => undefined),
     keepPinnedForAutoBlur: false,
     modeController: {
       handleToggleScreenshotMode: vi.fn(),
@@ -129,12 +155,12 @@ async function clickRenderedSidebarButton() {
 async function verifySidebarHideStates(props: ReturnType<typeof createProps>) {
   props.scenario.state.sidebarVisible = false;
   await renderSidebar(props);
-  expect(container?.textContent).toBe('sidebar');
+  expect(container?.querySelector('[data-ui="content.scenario.sidebar.restore"]')).not.toBeNull();
 
   props.scenario.state.sidebarVisible = true;
   props.isToolbarVisible = false;
   await renderSidebar(props);
-  expect(container?.textContent).toBe('');
+  expect(container?.textContent).toBe('sidebar');
 
   props.isToolbarVisible = true;
   props.isCompletelyHidden = true;
@@ -178,6 +204,7 @@ function createRecentStep(id: string, title: string) {
 function registerContentScenarioRecorderSidebarTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
+    captureMocks.source.mockReturnValue({ kind: 'trusted-content-event' });
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   });
 
@@ -278,4 +305,58 @@ it('passes a pending first capture to the panel project chooser', async () => {
   expect(scenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
     expect.objectContaining({ pendingProjectSelection: true })
   );
+});
+
+it('keeps the panel suspended between countdown expiry and capture completion', async () => {
+  const props = createProps();
+  await renderSidebar(props);
+  props.captureSuspended = true;
+  props.isToolbarVisible = false;
+  await renderSidebar(props);
+  expect(container?.textContent).toBe('');
+  props.captureSuspended = false;
+  await renderSidebar(props);
+  expect(container?.textContent).toBe('');
+  props.isToolbarVisible = true;
+  await renderSidebar(props);
+  expect(container?.textContent).toBe('sidebar');
+});
+
+it('keeps pending capture ownership through hidden panel remounts and allows failure retry', async () => {
+  const props = createProps();
+  let finish = () => {};
+  props.handleTakeScreenshot.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await renderSidebar(props);
+  const click = () =>
+    container?.querySelector<HTMLButtonElement>('[data-ui="capture-probe"]')?.click();
+  act(() => {
+    click();
+    click();
+  });
+  expect(props.handleTakeScreenshot).toHaveBeenCalledExactlyOnceWith('visible', {
+    kind: 'trusted-content-event',
+  });
+  expect(captureMocks.source.mock.calls[0]?.[0]).toBeInstanceOf(Event);
+  props.isCompletelyHidden = true;
+  await renderSidebar(props);
+  props.isCompletelyHidden = false;
+  await renderSidebar(props);
+  expect(container?.querySelector<HTMLButtonElement>('[data-ui="capture-probe"]')?.disabled).toBe(
+    true
+  );
+  await act(async () => finish());
+  props.handleTakeScreenshot.mockRejectedValueOnce(new Error('capture failed'));
+  await act(async () => click());
+  expect(captureMocks.error).toHaveBeenCalledTimes(1);
+  expect(container?.querySelector<HTMLButtonElement>('[data-ui="capture-probe"]')?.disabled).toBe(
+    false
+  );
+  captureMocks.source.mockReturnValue(null);
+  await act(async () => click());
+  expect(props.handleTakeScreenshot).toHaveBeenCalledTimes(2);
 });

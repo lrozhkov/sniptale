@@ -86,6 +86,9 @@ async function renderSidebar(
         dragging={false}
         onDeleteStep={onDeleteStep}
         onFinish={vi.fn()}
+        onCollapse={vi.fn()}
+        onCaptureVisible={vi.fn(async () => undefined)}
+        captureBusy={false}
         onMoveStep={vi.fn()}
         onOpenEditor={vi.fn()}
         onSidebarHeaderMouseDown={vi.fn()}
@@ -325,7 +328,8 @@ it('renders hover actions inside the left rail under the step number in the requ
     button.getAttribute('title')
   );
   expect(actionTitles).toEqual([
-    'scenario.content.reorderStep',
+    'scenario.content.moveStepUp',
+    'scenario.content.moveStepDown',
     'scenario.content.viewMetadata',
     'scenario.content.deleteStep',
   ]);
@@ -531,4 +535,12 @@ it('cancels deletion with Escape and ignores a target removed while confirmation
     confirm.click();
   });
   expect(onDeleteStep).not.toHaveBeenCalled();
+});
+
+it('keeps manual capture concise and exposes the panel capture action', async () => {
+  await renderSidebar();
+  expect(container?.textContent).not.toContain('scenario.content.modeManualHint');
+  expect(
+    container?.querySelector('[data-ui="content.scenario.sidebar.capture-visible"]')
+  ).not.toBeNull();
 });

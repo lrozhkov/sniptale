@@ -196,3 +196,17 @@ describe('useScenarioController.capture', () => {
     await expectStaleSelectionCaptureSkipsScenarioResponseApplication();
   });
 });
+
+it('gives untargeted and unnamed-target captures a readable page title', () => {
+  document.title = '  Capture   page  ';
+  const builder = createScenarioCapturePayloadBuilder({
+    screenshotMode: true,
+    session: createScenarioSession(true),
+  });
+  expect(builder('visible', 'manual')?.title).toBe('Capture page');
+  const target = document.createElement('div');
+  document.body.append(target);
+  expect(builder('visible', 'manual', target)?.title).toBe('Capture page');
+  document.title = '';
+  expect(builder('visible', 'manual')?.title).toBe('scenario.content.capturedStepTitle');
+});

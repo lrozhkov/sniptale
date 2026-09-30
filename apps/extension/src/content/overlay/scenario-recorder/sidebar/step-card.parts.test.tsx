@@ -80,6 +80,9 @@ function verifiesRailActions() {
 
   renderNode(
     <ScenarioRecorderStepRail
+      onMoveStep={vi.fn()}
+      moveUpIndex={null}
+      moveDownIndex={null}
       onDeleteStep={onDeleteStep}
       onInspectStep={onInspectStep}
       step={step}
@@ -91,7 +94,8 @@ function verifiesRailActions() {
   );
 
   expect(actionTitles).toEqual([
-    'scenario.content.reorderStep',
+    'scenario.content.moveStepUp',
+    'scenario.content.moveStepDown',
     'scenario.content.viewMetadata',
     'scenario.content.deleteStep',
   ]);
@@ -115,7 +119,8 @@ function verifiesPreviewOpen() {
 
   renderNode(<ScenarioRecorderStepBody onPreviewOpen={onPreviewOpen} step={step} />);
 
-  expect(container?.textContent).toContain('step-1');
+  expect(container?.textContent).toContain('scenario.content.step 1');
+  expect(container?.textContent).not.toContain('step-1');
 
   act(() => {
     container
@@ -133,6 +138,9 @@ describe('ScenarioRecorderStepRail', () => {
     const remove = vi.fn();
     renderNode(
       <ScenarioRecorderStepRail
+        onMoveStep={vi.fn()}
+        moveUpIndex={null}
+        moveDownIndex={null}
         step={createStep({ numberLabel: null })}
         onDeleteStep={remove}
         onInspectStep={vi.fn()}
@@ -147,6 +155,9 @@ describe('ScenarioRecorderStepRail', () => {
     expect(remove).toHaveBeenCalledWith('step-1');
     renderNode(
       <ScenarioRecorderStepRail
+        onMoveStep={vi.fn()}
+        moveUpIndex={null}
+        moveDownIndex={null}
         step={createStep({ numberLabel: '<b>A.1</b>' })}
         onDeleteStep={remove}
         onInspectStep={vi.fn()}
@@ -169,7 +180,7 @@ describe('ScenarioRecorderStepBody', () => {
   afterEach(unmountPartsTestRoot);
 
   it(
-    'opens the preview from the preview button and falls back to the step id when title is empty',
+    'opens the preview from the preview button and falls back to the readable step number when title is empty',
     verifiesPreviewOpen
   );
 });

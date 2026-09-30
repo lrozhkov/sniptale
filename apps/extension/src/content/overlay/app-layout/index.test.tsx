@@ -286,6 +286,8 @@ async function verifiesLayoutComposition() {
   expect(sidebarCall?.[0]).toEqual({
     isCompletelyHidden: props.toolbar.isCompletelyHidden,
     isToolbarVisible: props.toolbar.isToolbarVisible,
+    captureSuspended: props.dialogs.countdown !== null,
+    handleTakeScreenshot: props.toolbar.handleTakeScreenshot,
     byClickDisabled: false,
     keepPinnedForAutoBlur: false,
     modeController: props.toolbar.modeController,

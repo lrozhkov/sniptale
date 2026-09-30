@@ -13,6 +13,8 @@ function ContentScenarioRecorderSidebarSlot(props: {
   isCompletelyHidden: boolean;
   isToolbarVisible: boolean;
   byClickDisabled: boolean;
+  handleTakeScreenshot: ContentAppLayoutProps['toolbar']['handleTakeScreenshot'];
+  captureSuspended: boolean;
   modeController: ContentAppLayoutProps['toolbar']['modeController'];
   scenario: ContentAppLayoutProps['scenario'];
   setPinToTab: ContentAppLayoutProps['toolbar']['setPinToTab'];
@@ -28,6 +30,8 @@ function ContentScenarioRecorderSidebarSlot(props: {
         isCompletelyHidden={props.isCompletelyHidden}
         isToolbarVisible={props.isToolbarVisible}
         byClickDisabled={props.byClickDisabled}
+        handleTakeScreenshot={props.handleTakeScreenshot}
+        captureSuspended={props.captureSuspended}
         modeController={props.modeController}
         scenario={props.scenario}
         setPinToTab={props.setPinToTab}
@@ -131,6 +135,8 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
         isCompletelyHidden={props.toolbar.isCompletelyHidden}
         isToolbarVisible={props.toolbar.isToolbarVisible}
         byClickDisabled={isScenarioByClickBlocked(props.toolbar.modes)}
+        handleTakeScreenshot={props.toolbar.handleTakeScreenshot}
+        captureSuspended={props.dialogs.countdown !== null}
         modeController={props.toolbar.modeController}
         scenario={props.scenario}
         setPinToTab={props.toolbar.setPinToTab}

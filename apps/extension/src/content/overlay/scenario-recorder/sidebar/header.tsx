@@ -1,21 +1,27 @@
-import { Grip, FileStack, ChevronDown } from 'lucide-react';
-import type { MouseEventHandler } from 'react';
+import { Grip, FileStack, ChevronDown, ChevronsDown } from 'lucide-react';
+import type { MouseEvent, MouseEventHandler } from 'react';
 import { translate } from '../../../../platform/i18n';
 
-function ScenarioRecorderSidebarProjectSummary(props: {
-  projectName: string | null;
+export function ScenarioRecorderSidebarHeader(props: {
+  dragging: boolean;
+  onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+  onMouseDown: MouseEventHandler<HTMLDivElement>;
   onProjectMenuToggle: () => void;
   projectMenuOpen: boolean;
+  projectName: string | null;
 }) {
   return (
-    <div className="min-w-0 overflow-hidden">
+    <div className="flex min-w-0 items-center gap-2 rounded-[14px] bg-[var(--sniptale-color-surface-hover)] p-2">
       <div
-        className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em]
-          text-[var(--sniptale-color-text-muted-strong)]"
+        data-ui="content.scenario.sidebar.drag-handle"
+        onMouseDown={props.onMouseDown}
+        title={translate('scenario.content.project')}
+        className="flex h-8 w-5 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing"
       >
-        <FileStack className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{translate('scenario.content.project')}</span>
-        <Grip className="ml-auto h-3 w-3 shrink-0" />
+        <Grip
+          aria-hidden="true"
+          className="h-4 w-4 text-[var(--sniptale-color-text-muted-strong)]"
+        />
       </div>
       <button
         type="button"
@@ -23,53 +29,31 @@ function ScenarioRecorderSidebarProjectSummary(props: {
         aria-expanded={props.projectMenuOpen}
         data-ui="content.scenario.sidebar.project-button"
         title={translate('scenario.content.projectButton')}
-        className="mt-1 flex w-full min-w-0 items-center gap-1 rounded-lg text-left text-sm font-semibold
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm font-semibold
           text-[var(--sniptale-color-text-primary)] hover:text-[var(--sniptale-color-accent-emphasis)]
           focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-border-accent-strong)]"
       >
+        <FileStack aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate">
           {props.projectName || translate('scenario.content.noProject')}
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0" />
-      </button>
-    </div>
-  );
-}
-
-export function ScenarioRecorderSidebarHeader(props: {
-  dragging: boolean;
-  onMouseDown: MouseEventHandler<HTMLDivElement>;
-  onProjectMenuToggle: () => void;
-  projectMenuOpen: boolean;
-  projectName: string | null;
-}) {
-  return (
-    <div
-      className="min-w-0 rounded-[18px] border
-        border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_82%,transparent)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_42%,transparent)] p-3
-        transition-colors hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-strong)_70%,transparent)]"
-    >
-      <div
-        data-ui="content.scenario.sidebar.drag-handle"
-        onMouseDown={props.onMouseDown}
-        className="mb-1 flex h-5 cursor-grab items-center justify-end active:cursor-grabbing"
-      >
-        <Grip className="h-3 w-3" />
-      </div>
-      <div
-        className={
-          props.dragging
-            ? 'text-[var(--sniptale-color-text-primary)]'
-            : 'text-[var(--sniptale-color-text-muted-strong)]'
-        }
-      >
-        <ScenarioRecorderSidebarProjectSummary
-          projectName={props.projectName}
-          onProjectMenuToggle={props.onProjectMenuToggle}
-          projectMenuOpen={props.projectMenuOpen}
+        <ChevronDown
+          aria-hidden="true"
+          className={`h-4 w-4 shrink-0 ${props.projectMenuOpen ? 'rotate-180' : ''}`}
         />
-      </div>
+      </button>
+      <button
+        type="button"
+        onClick={props.onCollapse}
+        aria-label={translate('scenario.content.collapsePanel')}
+        title={translate('scenario.content.collapsePanel')}
+        data-ui="content.scenario.sidebar.collapse"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent
+          text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]
+          focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-border-accent-strong)]"
+      >
+        <ChevronsDown aria-hidden="true" size={16} />
+      </button>
     </div>
   );
 }

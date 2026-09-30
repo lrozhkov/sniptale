@@ -52,15 +52,11 @@ export function ScenarioSidebarCaptureMode(props: ScenarioSidebarControlsProps) 
           );
         })}
       </div>
-      <p className="text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
-        {translate(
-          props.byClickDisabled
-            ? 'scenario.content.modeByClickDisabledHint'
-            : props.captureMode === 'manual'
-              ? 'scenario.content.modeManualHint'
-              : 'scenario.content.modeByClickHint'
-        )}
-      </p>
+      {props.byClickDisabled ? (
+        <p className="text-xs leading-4 text-[var(--sniptale-color-text-muted)]">
+          {translate('scenario.content.modeByClickDisabledHint')}
+        </p>
+      ) : null}
     </fieldset>
   );
 }
@@ -89,7 +85,8 @@ export function ScenarioSidebarProjectPicker(
   return (
     <div
       data-ui="content.scenario.sidebar.project-picker"
-      className="min-h-0 overflow-auto rounded-[14px] border border-[var(--sniptale-color-border-soft)] p-2"
+      className="min-h-0 rounded-[14px] border border-[var(--sniptale-color-border-soft)] p-2
+        [&_[data-ui$='project-list']]:max-h-[148px] [&_[data-ui$='project-list']]:gap-1"
     >
       <SearchableProjectPicker
         activeProjectId={props.projectId}
@@ -101,6 +98,22 @@ export function ScenarioSidebarProjectPicker(
         onCreateProject={() => run(() => props.onCreateProject(query))}
         onSearchQueryChange={setQuery}
         onSelectProject={(projectId) => void run(() => props.onProjectSelect(projectId))}
+        renderProjectRow={({ active, dataUi, onSelect, project }) => (
+          <button
+            type="button"
+            data-ui={dataUi}
+            onClick={onSelect}
+            disabled={busy}
+            aria-pressed={active}
+            title={project.name}
+            className="flex min-h-8 w-full min-w-0 items-center rounded-md border-0 px-2 py-1 text-left text-xs
+              text-[var(--sniptale-color-text-primary)] aria-pressed:bg-[var(--sniptale-color-surface-hover)]
+              hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-2
+              focus-visible:outline-[var(--sniptale-color-border-accent-strong)] disabled:opacity-50"
+          >
+            <span className="truncate">{project.name}</span>
+          </button>
+        )}
         presentation="compact"
         projects={props.projects}
         recentProjectsLabel={translate('scenario.content.recentProjects')}

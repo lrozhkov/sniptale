@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type MouseEvent,
   type MouseEventHandler,
   type RefObject,
   type SetStateAction,
@@ -87,6 +88,9 @@ export function ScenarioRecorderSidebar(
     forcedHighlightVersion?: number;
     onDeleteStep: (stepId: string) => void;
     onFinish: () => void;
+    onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+    onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
+    captureBusy: boolean;
     onMoveStep: (stepId: string, toIndex: number) => void;
     onOpenEditor: (stepId?: string | null) => void;
     onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
@@ -117,7 +121,6 @@ export function ScenarioRecorderSidebar(
     <>
       <ScenarioRecorderSidebarSurface
         {...props}
-        dragStepId={sidebarState.dragStepId}
         highlightedStepId={highlightedStepId}
         onDeleteStep={sidebarState.openDeleteStep}
         onInspectStep={sidebarState.openInspectedStep}
@@ -126,7 +129,6 @@ export function ScenarioRecorderSidebar(
         onProjectMenuToggle={() => sidebarState.setProjectMenuOpen((open) => !open)}
         onProjectMenuClose={sidebarState.closeProjectMenu}
         projectMenuOpen={sidebarState.projectMenuOpen}
-        setDragStepId={sidebarState.setDragStepId}
         stepsContainerRef={stepsContainerRef}
       />
       {renderScenarioRecorderSidebarOverlays(sidebarState)}

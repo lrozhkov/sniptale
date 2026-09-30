@@ -28,18 +28,3 @@ export function getScenarioRecorderSidebarStepCardClassName(highlighted: boolean
 export function handleStepActionClick(event: MouseEvent<HTMLButtonElement>) {
   event.stopPropagation();
 }
-
-export function handleStepDrop(args: {
-  dragStepId: string | null;
-  stepId: string;
-  stepPosition: number;
-  onMoveStep: (stepId: string, toIndex: number) => void;
-  setDragStepId: (stepId: string | null) => void;
-}) {
-  if (!args.dragStepId || args.dragStepId === args.stepId) {
-    return;
-  }
-
-  args.onMoveStep(args.dragStepId, args.stepPosition);
-  args.setDragStepId(null);
-}
