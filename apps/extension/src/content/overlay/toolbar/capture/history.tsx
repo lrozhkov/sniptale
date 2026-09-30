@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
+import { Redo2, Undo2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { normalizeHotkeyKey } from '../../../../features/keyboard-shortcuts/hotkeys';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
+import type { ToolbarMenuState } from '../state/menu';
+import { ToolbarResetConfirmControl } from './reset-confirm';
 import { ToolbarLocalSaveControl } from './local-save';
 import { isFrameEditing } from '../../../selection/highlighter';
 import { addFrameEditingChangedListener } from '../../../platform/page-context/mode-events';
@@ -137,6 +140,8 @@ function HistoryButton(props: { action: 'undo' | 'redo'; canRun: boolean }) {
 
 export function ToolbarHistoryControls(props: {
   screenshotMode: boolean;
+  displayMode: ContentToolbarDisplayMode;
+  toolbarMenuState: ToolbarMenuState;
   isNavigationMode?: boolean;
   canClearPagePreparation?: boolean;
   onClearPagePreparation?: () => void;
@@ -156,17 +161,12 @@ export function ToolbarHistoryControls(props: {
     <>
       {props.isNavigationMode ? null : <HistoryButton action="undo" canRun={canUndo} />}
       {props.isNavigationMode ? null : <HistoryButton action="redo" canRun={canRedo} />}
-      <ContentToolbarButton
-        type="button"
-        dataUi="content.toolbar.reset-all-button"
-        title={translate('content.toolbar.clearPagePreparation')}
-        aria-label={translate('content.toolbar.clearPagePreparation')}
-        disabled={!props.canClearPagePreparation}
-        tone="danger"
-        onClick={props.onClearPagePreparation}
-      >
-        <RotateCcw size={18} strokeWidth={2} />
-      </ContentToolbarButton>
+      <ToolbarResetConfirmControl
+        displayMode={props.displayMode}
+        toolbarMenuState={props.toolbarMenuState}
+        available={Boolean(props.canClearPagePreparation && props.onClearPagePreparation)}
+        onConfirm={props.onClearPagePreparation}
+      />
       {props.screenshotMode ? <ToolbarLocalSaveControl /> : null}
     </>
   );

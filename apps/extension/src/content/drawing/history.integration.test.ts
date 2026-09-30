@@ -7,10 +7,20 @@ import { DEFAULT_BORDER_PRESET } from '../../features/highlighter/style/defaults
 import { createPagePreparationHistoryStore } from '../parser/page-preparation/history/store';
 import { pagePreparationHistory } from '../parser/page-preparation/history';
 import type { PagePreparationSessionSnapshot } from '../parser/page-preparation/history/types';
+import { useToolbarMenuState } from '../overlay/toolbar/state/menu';
 import { ToolbarHistoryControls } from '../overlay/toolbar/capture/history';
 import type { ContentDrawingController } from './controller';
 import { createPagePreparationDrawingSession } from './history';
 import { createDrawingModeController } from './mode';
+
+function HistoryHarness() {
+  const toolbarMenuState = useToolbarMenuState();
+  return createElement(ToolbarHistoryControls, {
+    screenshotMode: true,
+    displayMode: 'horizontal',
+    toolbarMenuState,
+  });
+}
 
 function createSnapshot(label: string): PagePreparationSessionSnapshot {
   return {
@@ -264,7 +274,7 @@ it('drives Drawing undo and redo through the existing toolbar history controls',
   document.body.append(host);
   const root = createRoot(host);
 
-  act(() => root.render(createElement(ToolbarHistoryControls, { screenshotMode: true })));
+  act(() => root.render(createElement(HistoryHarness)));
   act(() => session.commitObject(createBlur('toolbar-drawing')));
   const undo = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.history-undo-button"]'

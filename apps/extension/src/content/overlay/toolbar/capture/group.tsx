@@ -98,6 +98,8 @@ export function ToolbarCaptureActionGroup(
           <ContentToolbarGroup dataUi="content.toolbar.history-group">
             <ToolbarHistoryControls
               screenshotMode={captureProps.screenshotMode}
+              displayMode={captureProps.displayMode}
+              toolbarMenuState={captureProps.toolbarMenuState}
               isNavigationMode={captureProps.isNavigationMode ?? false}
               canClearPagePreparation={captureProps.canClearPagePreparation ?? false}
               {...(captureProps.onClearPagePreparation === undefined

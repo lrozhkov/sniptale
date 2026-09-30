@@ -277,6 +277,10 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Сбросить всё',
     en: 'Reset all',
   },
+  resetPagePreparationMessage: {
+    ru: 'Сбросить все изменения Sniptale на этой странице за текущую сессию?',
+    en: 'Reset all Sniptale changes on this page from the current session?',
+  },
   autoBlur: {
     ru: 'Размытие данных',
     en: 'Sensitive data blur',

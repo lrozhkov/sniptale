@@ -4,6 +4,7 @@ import React, { useRef } from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
+import { useToolbarMenuState } from '../state/menu';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
 import {
   getPointerDistanceFromRect,
@@ -137,4 +138,45 @@ it('keeps a floating menu open nearby and uses the non-focus close path far away
   });
   expect(onFarPointerClose).toHaveBeenCalledOnce();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+function EscapeHarness(props: { onClose: () => void; onEscapeClose?: () => void }) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuState = useToolbarMenuState();
+  useToolbarFloatingMenuDismissal({
+    open: menuState.activeMenuType !== null,
+    menuRef,
+    triggerRef,
+    onClose: props.onClose,
+    onEscapeClose: props.onEscapeClose,
+  });
+  return (
+    <>
+      <button ref={triggerRef} onClick={() => menuState.toggleMenu('reset-confirm')}>
+        Open
+      </button>
+      <div ref={menuRef}>Menu</div>
+    </>
+  );
+}
+
+it('routes shared capture Escape separately from ordinary dismissal', () => {
+  const onClose = vi.fn();
+  const onEscapeClose = vi.fn();
+  const host = render(<EscapeHarness onClose={onClose} onEscapeClose={onEscapeClose} />);
+  act(() => host.querySelector('button')?.click());
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(onEscapeClose).toHaveBeenCalledOnce();
+  expect(onClose).not.toHaveBeenCalled();
+  act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('retains onClose as the shared Escape fallback', () => {
+  const onClose = vi.fn();
+  const host = render(<EscapeHarness onClose={onClose} />);
+  act(() => host.querySelector('button')?.click());
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(onClose).toHaveBeenCalledOnce();
 });

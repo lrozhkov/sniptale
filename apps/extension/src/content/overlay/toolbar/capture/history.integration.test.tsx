@@ -15,6 +15,18 @@ import { clearAllSniptaleIds } from '../../../platform/frame';
 import { createQuickEditHistoryTracker } from '../../../selection/quick-edit-runtime/history';
 import { createQuickEditDocumentModeHistoryTracker } from '../../../selection/quick-edit-runtime/document-mode.history';
 import { ToolbarHistoryControls } from './history';
+import { useToolbarMenuState } from '../state/menu';
+
+function HistoryHarness() {
+  const toolbarMenuState = useToolbarMenuState();
+  return (
+    <ToolbarHistoryControls
+      screenshotMode
+      displayMode="horizontal"
+      toolbarMenuState={toolbarMenuState}
+    />
+  );
+}
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -93,7 +105,7 @@ it('replays a finished Page Edit text change through the toolbar redo button', (
   tracker.commit(target, 'edit-1');
 
   act(() => {
-    root.render(<ToolbarHistoryControls screenshotMode />);
+    root.render(<HistoryHarness />);
   });
 
   const undoButton = container.querySelector<HTMLButtonElement>(
@@ -125,7 +137,7 @@ it('replays a finished direct-on-page text change through the toolbar redo butto
   tracker.commit();
 
   act(() => {
-    root.render(<ToolbarHistoryControls screenshotMode />);
+    root.render(<HistoryHarness />);
   });
 
   const undoButton = container.querySelector<HTMLButtonElement>(
@@ -157,7 +169,7 @@ it('keeps Page Edit redo locators when AI cleanup clears transient ids', () => {
   tracker.commit(target, 'edit-with-transient-cleanup');
 
   act(() => {
-    root.render(<ToolbarHistoryControls screenshotMode />);
+    root.render(<HistoryHarness />);
   });
   const undoButton = container.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.history-undo-button"]'

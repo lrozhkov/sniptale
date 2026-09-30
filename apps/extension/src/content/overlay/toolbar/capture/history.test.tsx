@@ -5,6 +5,20 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { ToolbarHistoryControls } from './history';
+import { useToolbarMenuState } from '../state/menu';
+
+function HistoryHarness(
+  props: Omit<Parameters<typeof ToolbarHistoryControls>[0], 'displayMode' | 'toolbarMenuState'>
+) {
+  const toolbarMenuState = useToolbarMenuState();
+  return (
+    <ToolbarHistoryControls
+      {...props}
+      displayMode="horizontal"
+      toolbarMenuState={toolbarMenuState}
+    />
+  );
+}
 import { dispatchFrameEditingChanged } from '../../../platform/page-context/mode-events';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -34,7 +48,7 @@ function renderComponent(
 
   act(() => {
     root?.render(
-      <ToolbarHistoryControls
+      <HistoryHarness
         screenshotMode={screenshotMode}
         isNavigationMode={isNavigationMode}
         {...reset}
@@ -267,7 +281,8 @@ describe('ToolbarHistoryControls', () => {
     expect(reset?.querySelector('svg')?.classList.contains('lucide-rotate-ccw')).toBe(true);
     expect(reset?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
     act(() => reset?.click());
-    expect(onClearPagePreparation).toHaveBeenCalledOnce();
+    expect(onClearPagePreparation).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
     expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
   });
   it('refreshes button state from the subscribed history store', verifySubscribedStateRefresh);

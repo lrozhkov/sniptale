@@ -210,6 +210,7 @@ export function useToolbarFloatingMenuDismissal(params: {
   triggerRef: RefObject<HTMLElement | null>;
   menuRef: RefObject<HTMLElement | null>;
   onClose: () => void;
+  onEscapeClose?: (() => void) | undefined;
   onFarPointerClose?: (() => void) | undefined;
 }) {
   const {
@@ -218,6 +219,7 @@ export function useToolbarFloatingMenuDismissal(params: {
     triggerRef,
     menuRef,
     onClose,
+    onEscapeClose,
     onFarPointerClose,
   } = params;
 
@@ -258,7 +260,7 @@ export function useToolbarFloatingMenuDismissal(params: {
         }
       : undefined;
 
-    const unregisterEscapeOwner = registerToolbarMenuEscapeOwner(onClose);
+    const unregisterEscapeOwner = registerToolbarMenuEscapeOwner(onEscapeClose ?? onClose);
     const unbindHandlers = bindToolbarFloatingMenuDismissalHandlers({
       handleFocusIn,
       handlePointerDown,
@@ -269,5 +271,5 @@ export function useToolbarFloatingMenuDismissal(params: {
       unregisterEscapeOwner();
       unbindHandlers();
     };
-  }, [closeOnFarPointer, menuRef, onClose, onFarPointerClose, open, triggerRef]);
+  }, [closeOnFarPointer, menuRef, onClose, onEscapeClose, onFarPointerClose, open, triggerRef]);
 }
