@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { translate } from '../../platform/i18n';
 import { GuideDocumentInsert } from './document-insert';
+beforeEach(() => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(100, 100, 32, 32)
+  );
+});
+afterEach(() => vi.restoreAllMocks());
 
 it('offers step and section operations from one visible insertion trigger', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

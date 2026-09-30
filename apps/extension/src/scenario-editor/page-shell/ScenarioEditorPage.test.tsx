@@ -65,7 +65,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import type { GuideLibraryBrowser } from './library-browser';
-import { clickGuideControl } from './test-support/guide-controls';
+import { clickGuideControl, openGuideInsertionMenu } from './test-support/guide-controls';
 
 let root: Root;
 let container: HTMLDivElement;
@@ -779,7 +779,7 @@ it('inserts at a block boundary and focuses the new field before typing', async 
     '[data-insert-before="b"] .guide-action-menu-anchor > button'
   );
   expect(trigger).not.toBeNull();
-  await act(async () => trigger?.click());
+  await openGuideInsertionMenu(trigger);
   const command = [
     ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
   ].find((button) => button.textContent === 'Heading');

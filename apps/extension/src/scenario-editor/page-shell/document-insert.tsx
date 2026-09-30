@@ -1,15 +1,7 @@
-import {
-  FileText,
-  Heading,
-  Image,
-  ListPlus,
-  MessageSquare,
-  CornerDownLeft,
-  Plus,
-} from 'lucide-react';
+import { FileText, Heading, Image, ListPlus, MessageSquare, CornerDownLeft } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
-import { GuideActionMenu } from './action-menu';
+import { GuideInsertActions } from './insert-actions';
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
@@ -109,17 +101,14 @@ export function GuideDocumentInsert({
       data-insert-before={before ?? 'end'}
     >
       <div className="guide-insertion-chrome">
-        <GuideActionMenu
+        <GuideInsertActions
           label={t(
             target.kind === 'item'
               ? 'scenario.editor.guideInsertItem'
               : 'scenario.editor.guideAddBlock'
           )}
-          icon={<Plus size={16} aria-hidden="true" />}
           items={rowStartItem ? [...items, rowStartItem] : items}
           disabled={disabled}
-          openOnHover
-          variant="insert"
         />
       </div>
     </div>

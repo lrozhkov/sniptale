@@ -959,20 +959,25 @@
 .guide-action-menu button:last-child {
   margin-top: 0.25rem;
 }
+/* Insertion is a row of independent circles, replacing its anchor on the same line. */
 .guide-action-menu--insert .guide-insert-actions {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   gap: 0.5rem;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  min-height: 4.5rem;
-  padding: 0.375rem 0.25rem 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .guide-action-menu--insert .guide-insert-actions > button {
-  position: static;
+  position: relative;
   flex: none;
   width: 2rem;
   height: 2rem;
@@ -984,15 +989,14 @@
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: transparent;
+  background: var(--sniptale-color-surface-panel);
   color: var(--sniptale-color-text-primary);
-  box-shadow: none;
+  box-shadow: var(--sniptale-shadow-sm);
 }
 .guide-action-menu--insert .guide-insert-actions > button:is(:hover, :focus-visible),
 .guide-action-menu--insert .guide-insert-actions > button[aria-pressed='true'] {
   background: var(--sniptale-color-surface-hover);
   color: var(--sniptale-color-text-primary-strong);
-  box-shadow: none;
 }
 .guide-action-menu--insert .guide-insert-actions > button:focus-visible {
   outline: 2px solid var(--sniptale-color-accent);
@@ -1003,17 +1007,31 @@
 }
 .guide-insert-tooltip {
   position: absolute;
-  inset-inline: 0.25rem;
-  bottom: 0.25rem;
+  left: 50%;
+  bottom: calc(100% + 0.375rem);
+  transform: translateX(-50%);
   display: none;
-  overflow-wrap: anywhere;
+  width: max-content;
+  max-width: 8rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: var(--sniptale-radius-sm);
   text-align: center;
   font: 0.75rem/1.2 var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-panel);
+  box-shadow: var(--sniptale-shadow-sm);
   pointer-events: none;
+}
+.guide-action-menu--insert[data-tooltip-below='true'] .guide-insert-tooltip {
+  bottom: auto;
+  top: calc(100% + 0.375rem);
 }
 .guide-insert-actions > button:is(:hover, :focus-visible) > .guide-insert-tooltip {
   display: block;
+}
+.guide-action-menu-anchor[data-insert-open] > button {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .guide-library-panel > button {
@@ -1064,46 +1082,52 @@
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button {
   border: 0;
   border-radius: 50%;
-  background: transparent !important;
-  color: var(--guide-ink) !important;
-  box-shadow: none;
+  background: var(--sniptale-color-surface-panel) !important;
+  color: var(--sniptale-color-text-primary) !important;
+  box-shadow: var(--sniptale-shadow-sm);
 }
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:hover:not(:disabled),
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
-  background: var(--guide-tool-hover-surface) !important;
+  background: var(--sniptale-color-surface-hover) !important;
 }
 .guide-insertion {
   position: relative;
-  height: 2.5rem;
+  height: 0;
   z-index: 3;
 }
 .guide-insertion::before {
   content: '';
   position: absolute;
-  inset: -0.5rem 0 auto;
-  height: 1rem;
+  inset: -1.75rem 0 auto;
+  height: 2rem;
 }
 .guide-insertion-item::before {
-  inset-block-start: -0.75rem;
-  height: 1.5rem;
+  inset-block-start: -1.75rem;
+  height: 2rem;
 }
 .guide-insertion-chrome {
   position: absolute;
-  top: 0.25rem;
+  top: -1.75rem;
   left: 50%;
   transform: translateX(-50%);
   opacity: 1;
   pointer-events: auto;
 }
+.guide-insertion-block > .guide-insertion-chrome {
+  top: -1rem;
+}
+.guide-insertion-block::before {
+  top: -1rem;
+}
 .guide-insertion-block {
   position: absolute;
-  top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5 - 1.25rem);
+  top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
   left: 0;
   right: 0;
 }
 .guide-insertion-block[data-end='true'] {
   top: auto;
-  bottom: -2.5rem;
+  bottom: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
 }
 .guide-empty-step {
   position: relative;
@@ -2159,4 +2183,35 @@ html[data-guide-height-resizing] * {
   .guide-page .guide-left-navigation .guide-section-tab {
     transition: none;
   }
+}
+
+/* Custom document paper does not own insertion-command contrast. */
+.guide-document
+  .guide-insertion-chrome
+  .guide-action-menu-anchor
+  > button:is(:hover, :active, :focus-visible):not(:disabled) {
+  background: var(--sniptale-color-surface-hover) !important;
+  color: var(--sniptale-color-text-primary) !important;
+}
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
+  outline-color: var(--sniptale-color-accent);
+}
+.guide-insert-actions > button:first-child > .guide-insert-tooltip {
+  left: 0;
+  transform: none;
+}
+.guide-insert-actions > button:last-child > .guide-insert-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.guide-document > .guide-insertion-item:first-child > .guide-insertion-chrome {
+  top: -1.25rem;
+}
+.guide-document > .guide-insertion-item:first-child::before {
+  top: -1.25rem;
+}
+.guide-insert-actions:has(> button:hover) > button:not(:hover) > .guide-insert-tooltip {
+  display: none;
 }

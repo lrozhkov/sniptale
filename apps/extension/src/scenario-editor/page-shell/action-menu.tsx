@@ -21,36 +21,13 @@ type GuideMenuItem = {
 function GuideMenuItems({
   label,
   items,
-  variant,
   close,
 }: {
   label: string;
   items: GuideMenuItem[];
-  variant: 'default' | 'insert';
   close: () => void;
 }) {
-  return variant === 'insert' ? (
-    <ProductDropdownMenu role="group" aria-label={label} className="guide-insert-actions">
-      {items.map((item) => (
-        <ContentToolbarButton
-          key={item.label}
-          type="button"
-          title={item.label}
-          aria-pressed={item.pressed}
-          disabled={item.disabled ?? false}
-          onClick={() => {
-            close();
-            item.onSelect();
-          }}
-        >
-          {item.icon}
-          <span role="tooltip" className="guide-insert-tooltip">
-            {item.label}
-          </span>
-        </ContentToolbarButton>
-      ))}
-    </ProductDropdownMenu>
-  ) : (
+  return (
     <ProductDropdownMenu role="group" aria-label={label}>
       {items.map((item) => (
         <ProductDropdownItem
@@ -78,7 +55,6 @@ export function GuideActionMenu({
   disabled = false,
   tone = 'default',
   openOnHover = false,
-  variant = 'default',
 }: {
   label: string;
   icon: ReactNode;
@@ -86,7 +62,6 @@ export function GuideActionMenu({
   disabled?: boolean;
   tone?: 'default' | 'utility';
   openOnHover?: boolean;
-  variant?: 'default' | 'insert';
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +76,7 @@ export function GuideActionMenu({
     setIsOpen: setOpen,
     containerRef,
     menuRef,
-    menuWidth: variant === 'insert' ? Math.max(136, 8 + items.length * 40) : 232,
+    menuWidth: 232,
   });
   const hover = useGuideMenuHover(openOnHover, disabled, menuRef, setOpen);
   const close = () => {
@@ -169,12 +144,7 @@ export function GuideActionMenu({
             ref={menuRef}
             id={id}
             data-theme={theme ?? undefined}
-            className={[
-              'sniptale-ai-modal-root guide-action-menu',
-              variant === 'insert' && 'guide-action-menu--insert',
-            ]
-              .filter(Boolean)
-              .join(' ')}
+            className="sniptale-ai-modal-root guide-action-menu"
             style={portalStyle}
             onMouseEnter={hover.cancel}
             onMouseLeave={hover.leave}
@@ -190,22 +160,15 @@ export function GuideActionMenu({
                   []),
               ];
               const current = buttons.findIndex((button) => button === document.activeElement);
-              if (
-                event.key === 'ArrowDown' ||
-                event.key === 'ArrowUp' ||
-                (variant === 'insert' && (event.key === 'ArrowRight' || event.key === 'ArrowLeft'))
-              ) {
+              if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault();
                 buttons[
-                  (current +
-                    (event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : -1) +
-                    buttons.length) %
-                    buttons.length
+                  (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
                 ]?.focus();
               }
             }}
           >
-            <GuideMenuItems label={label} items={items} variant={variant} close={close} />
+            <GuideMenuItems label={label} items={items} close={close} />
           </div>,
           resolveThemeSafePortalTarget(containerRef.current)
         )}
