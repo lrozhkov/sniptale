@@ -55,6 +55,7 @@ const initialViewport: EditorViewportState = {
 export const useEditorStore = create<EditorState>()((set) => ({
   activeTool: 'select',
   inspector: 'file',
+  freshImageBackgroundPending: false,
   inspectorCollapsed: false,
   layerEffectsCategory: 'adjustments',
   viewportPreviewOpen: false,

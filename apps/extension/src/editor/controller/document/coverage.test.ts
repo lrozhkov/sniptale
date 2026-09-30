@@ -9,6 +9,7 @@ const storeState = {
   setBrowserFrame: vi.fn(),
   setImageData: vi.fn(),
   setInspector: vi.fn(),
+  setFreshImageBackgroundPending: vi.fn(),
   setPageTitle: vi.fn(),
   setShowOutsideCanvas: vi.fn(),
   toolSettings: {

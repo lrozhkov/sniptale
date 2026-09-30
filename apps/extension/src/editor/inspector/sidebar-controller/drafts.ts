@@ -1,9 +1,22 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import type {
   EditorFrameSettings,
   EditorSelectionState,
 } from '../../../features/editor/document/types';
-import { normalizeEditorFrameSettings } from '../../../features/editor/document/constants';
+import {
+  normalizeEditorFrameSettings,
+  normalizeEditorImageSettings,
+} from '../../../features/editor/document/constants';
+import { createEditorFrameGradientPatch } from '../../../features/editor/document/frame-gradient';
+import { getShowcaseGradient } from '../../../features/highlighter/showcase-resources';
+import { useEditorStore } from '../../state/useEditorStore';
 import type { EditorPresetStorageState } from '../../../features/editor/document/presets';
 
 function createSizeDraft(width: number | null | undefined, height: number | null | undefined) {
@@ -161,7 +174,28 @@ function useLayerDraftState(args: {
   };
 }
 
-function useFrameDraftState(args: { frame: EditorFrameSettings }) {
+function recommendedNewBackgroundDraft(frame: EditorFrameSettings): EditorFrameSettings {
+  const gradient = getShowcaseGradient('system-sunset');
+  if (gradient.type !== 'linear') throw new Error('The default image background must be linear');
+  return {
+    ...frame,
+    backgroundMode: 'gradient',
+    backgroundGradientAngle: gradient.angle,
+    ...createEditorFrameGradientPatch(
+      frame,
+      gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }))
+    ),
+    layoutMode: 'expand-canvas',
+    paddingTop: 32,
+    paddingRight: 32,
+    paddingBottom: 32,
+    paddingLeft: 32,
+    sourceImage: { ...normalizeEditorImageSettings(frame.sourceImage), radius: 12, shadow: 14 },
+  };
+}
+
+function useFrameDraftState(args: { frame: EditorFrameSettings; inspector: string }) {
+  const freshImageBackgroundPending = useEditorStore((state) => state.freshImageBackgroundPending);
   const [frameDraft, setFrameDraft] = useState(() => normalizeEditorFrameSettings(args.frame));
   const lastFillModeRef = useRef<'color' | 'gradient'>(
     args.frame.backgroundMode === 'gradient' ? 'gradient' : 'color'
@@ -170,9 +204,15 @@ function useFrameDraftState(args: { frame: EditorFrameSettings }) {
     lastFillModeRef.current = frameDraft.backgroundMode;
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setFrameDraft(normalizeEditorFrameSettings(args.frame));
   }, [args.frame]);
+
+  useLayoutEffect(() => {
+    if (!freshImageBackgroundPending || args.inspector !== 'frame') return;
+    setFrameDraft(recommendedNewBackgroundDraft(normalizeEditorFrameSettings(args.frame)));
+    useEditorStore.getState().setFreshImageBackgroundPending(false);
+  }, [args.frame, args.inspector, freshImageBackgroundPending]);
 
   const resetFrameDraft = () => setFrameDraft(normalizeEditorFrameSettings(args.frame));
 
@@ -196,6 +236,7 @@ export function useInspectorSidebarDraftState(args: {
   const layerDrafts = useLayerDraftState(args);
   const frameDraftState = useFrameDraftState({
     frame: args.frame,
+    inspector: args.inspector,
   });
 
   return {

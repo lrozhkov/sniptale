@@ -2,9 +2,14 @@ import { type EditorFrameSettings } from '../../../features/editor/document/type
 import type { EditorImageSettings } from '../../../features/editor/document/image-types';
 import { type EditorToolSettings } from '../../../features/editor/document/tool-settings-types';
 import { translate } from '../../../platform/i18n';
+import { getGradientPresetDisplayName } from '../../../features/highlighter/gradient-presets/display-name';
+import {
+  getShowcaseGradient,
+  SHOWCASE_GRADIENT_IDS,
+} from '../../../features/highlighter/showcase-resources';
+import type { EditorGradientColorStop } from '../../../features/editor/document/gradient';
 import type { CompactSelectOption } from '../../chrome/ui';
 export { GRID_COLOR_PALETTE, WORKSPACE_BACKGROUND_PALETTE } from './data';
-import { FRAME_GRADIENT_PRESET_DATA } from './data';
 export { loadRecentColors, pushRecentColor } from '../../../composition/persistence/recent-colors';
 
 export const GRID_SIZE_MIN = 8;
@@ -91,11 +96,29 @@ export interface BackgroundGradientPreset {
   from: string;
   to: string;
   angle: number;
+  stops?: EditorGradientColorStop[];
 }
 
 export function getFrameGradientPresets(): BackgroundGradientPreset[] {
-  return FRAME_GRADIENT_PRESET_DATA.map(({ labelKey, ...preset }) => ({
-    ...preset,
-    label: translate(labelKey),
-  }));
+  return SHOWCASE_GRADIENT_IDS.map((id) => ({ id, gradient: getShowcaseGradient(id) }))
+    .filter(
+      (
+        preset
+      ): preset is {
+        id: (typeof SHOWCASE_GRADIENT_IDS)[number];
+        gradient: Extract<ReturnType<typeof getShowcaseGradient>, { type: 'linear' }>;
+      } => preset.gradient.type === 'linear'
+    )
+    .slice(0, 10)
+    .map(({ id, gradient }) => {
+      const stops = gradient.stops.map((stop) => ({ color: stop.color, offset: stop.position }));
+      return {
+        id,
+        label: getGradientPresetDisplayName({ id, name: id, origin: 'system' }),
+        from: stops[0]!.color,
+        to: stops.at(-1)!.color,
+        angle: gradient.angle,
+        stops,
+      };
+    });
 }

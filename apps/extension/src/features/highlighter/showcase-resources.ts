@@ -9,6 +9,8 @@ export const SHOWCASE_GRADIENT_IDS = [
   'system-mint',
   'system-midnight',
   'system-graphite',
+  'system-dusk',
+  'system-sand',
   'system-radial-glow',
   'system-radial-spotlight',
   'system-conic-spectrum',
@@ -64,6 +66,8 @@ const gradients: Record<ShowcaseGradientId, Gradient> = {
   'system-mint': linear('system-mint', ['#0f766eff', '#2dd4bfff', '#bef264ff'], 145),
   'system-midnight': linear('system-midnight', ['#020617ff', '#1e1b4bff', '#4c1d95ff'], 145),
   'system-graphite': linear('system-graphite', ['#f8fafcff', '#94a3b8ff', '#1e293bff'], 135),
+  'system-dusk': linear('system-dusk', ['#312e81ff', '#7c3aedff', '#e879f9ff'], 135),
+  'system-sand': linear('system-sand', ['#78350fff', '#d97706ff', '#fde68aff'], 125),
   'system-radial-glow': radial('system-radial-glow', ['#fde68aff', '#f97316b8', '#ec489900']),
   'system-radial-spotlight': radial(
     'system-radial-spotlight',

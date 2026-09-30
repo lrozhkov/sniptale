@@ -93,7 +93,10 @@ export function useEditorInspectorSidebarActions(args: SidebarActionArgs, hasIma
   };
   const editorActions = {
     copyRenderedImageDisabledReason: null,
-    onApplyFrame: () => controller.applyFrameSettings(args.frameDraft),
+    onApplyFrame: () => {
+      controller.applyFrameSettings(args.frameDraft);
+      useEditorStore.getState().setFreshImageBackgroundPending(false);
+    },
     onCopyRenderedImage: async (options?: EditorRenderedImageOptions) => {
       if (!hasImage) return;
       try {

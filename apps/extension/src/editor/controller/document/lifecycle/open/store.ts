@@ -10,6 +10,7 @@ export function syncOpenedDocumentState(options: {
 
   store.setShowOutsideCanvas(false);
   store.setInspector('file');
+  store.setFreshImageBackgroundPending(true);
   store.setImageData(options.dataUrl);
   store.setPageTitle(options.pageTitle);
   store.setBrowserFrame({
@@ -24,5 +25,6 @@ export function syncLoadedDocumentState(sourceImageData: string): void {
 
   store.setShowOutsideCanvas(false);
   store.setInspector('file');
+  store.setFreshImageBackgroundPending(false);
   store.setImageData(sourceImageData);
 }

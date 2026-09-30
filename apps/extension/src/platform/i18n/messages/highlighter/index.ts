@@ -102,6 +102,8 @@ export const highlighterMessages = defineMessageSource({
       mint: { ru: 'Свежая мята', en: 'Mint' },
       midnight: { ru: 'Полночь', en: 'Midnight' },
       graphite: { ru: 'Графит', en: 'Graphite' },
+      dusk: { ru: 'Сумерки', en: 'Dusk' },
+      sand: { ru: 'Золотой песок', en: 'Golden sand' },
       radialGlow: { ru: 'Радиальное свечение', en: 'Radial glow' },
       radialSpotlight: { ru: 'Мягкий прожектор', en: 'Soft spotlight' },
       spectrum: { ru: 'Спектр', en: 'Spectrum' },

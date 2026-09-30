@@ -111,7 +111,7 @@ export function EditorInspectorFrameSourceImageEffects(
 ) {
   const settings = normalizeEditorImageSettings(props.frameDraft.sourceImage);
   return (
-    <div className="space-y-4 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+    <div className="space-y-3">
       <SourceImageShadowSection props={props} settings={settings} />
       <SourceImageBorderSection props={props} settings={settings} />
     </div>

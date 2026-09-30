@@ -36,7 +36,7 @@ async function enterValue(value: string) {
     field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   );
 }
-it('keeps a full-width slider and supports manual padding above its common range', async () => {
+it('keeps a compact slider and supports manual padding above its common range', async () => {
   const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
   expect(range.max).toBe('256');
   expect(range.value).toBe('32');
@@ -71,12 +71,16 @@ it('offers four independently editable sides without short inline sliders', asyn
   });
 });
 
-it('places the linked padding slider below the complete label and value row', () => {
+it('places the linked padding slider below its value with a complete focus outline', () => {
   const fields = container.querySelector('[data-ui="shared.linked-padding-fields"]');
   const row = fields?.firstElementChild;
   const range = fields?.querySelector('input[type="range"]');
   expect(row?.querySelector('input[type="text"]')).not.toBeNull();
-  expect(range?.parentElement).toBe(fields);
+  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')).not.toBeNull();
+  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain(
+    'w-[4.75rem]'
+  );
+  expect(row?.querySelector('[data-focus-appearance="accent-box"]')).not.toBeNull();
 });
 
 it('reveals just one side slider while unlinked padding labels are hovered', async () => {

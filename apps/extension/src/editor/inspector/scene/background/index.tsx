@@ -5,7 +5,10 @@ import {
   createEditorFrameGradientPatch,
   normalizeEditorFrameGradientColorStops,
 } from '../../../../features/editor/document/frame-gradient';
-import { createEditorGradientColorStopColor } from '../../../../features/editor/document/gradient';
+import {
+  createEditorGradientColorStopColor,
+  createEditorGradientCssStops,
+} from '../../../../features/editor/document/gradient';
 import { translate } from '../../../../platform/i18n';
 import { CompactPaintSelector } from '../../../../ui/paint-selector';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
@@ -59,15 +62,22 @@ function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorP
   return (
     <div
       data-ui="editor.frame.gradient-presets"
-      className="grid grid-cols-3 gap-1.5"
+      className="grid grid-cols-5 gap-1.5"
       role="group"
       aria-label={translate('editor.compact.frameBackgroundModeGradient')}
     >
       {props.gradientPresets.map((preset) => {
+        const presetStops = preset.stops ?? [
+          { color: preset.from, offset: 0 },
+          { color: preset.to, offset: 1 },
+        ];
         const active =
           props.frameDraft.backgroundGradientAngle === preset.angle &&
-          stops[0]?.color === preset.from &&
-          stops.at(-1)?.color === preset.to;
+          stops.length === presetStops.length &&
+          stops.every(
+            (stop, index) =>
+              stop.color === presetStops[index]?.color && stop.offset === presetStops[index]?.offset
+          );
         return (
           <button
             key={preset.id}
@@ -82,7 +92,7 @@ function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorP
               active ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
             ].join(' ')}
             style={{
-              backgroundImage: `linear-gradient(${preset.angle}deg, ${preset.from}, ${preset.to})`,
+              backgroundImage: `linear-gradient(${preset.angle}deg, ${createEditorGradientCssStops(presetStops)})`,
             }}
             onClick={() => props.applyGradientPreset(preset)}
           />

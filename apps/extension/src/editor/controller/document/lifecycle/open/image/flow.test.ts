@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   createBaseDocumentMock: vi.fn(),
   setBrowserFrameMock: vi.fn(),
   setImageDataMock: vi.fn(),
+  setFreshImageBackgroundPendingMock: vi.fn(),
   setInspectorMock: vi.fn(),
   setPageTitleMock: vi.fn(),
   setShowOutsideCanvasMock: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../../../../../state/useEditorStore', async (importOriginal) => ({
     getState: () => ({
       setBrowserFrame: mocks.setBrowserFrameMock,
       setImageData: mocks.setImageDataMock,
+      setFreshImageBackgroundPending: mocks.setFreshImageBackgroundPendingMock,
       setInspector: mocks.setInspectorMock,
       setPageTitle: mocks.setPageTitleMock,
       setShowOutsideCanvas: mocks.setShowOutsideCanvasMock,
@@ -120,6 +122,7 @@ async function expectAppliedOpenDocumentSync(): Promise<void> {
   expect(mocks.traceEditorImageDocumentAppliedMock).toHaveBeenCalledWith({ version: 1 });
   expect(scheduleZoomToFit).toHaveBeenCalledOnce();
   expect(mocks.setInspectorMock).toHaveBeenCalledWith('file');
+  expect(mocks.setFreshImageBackgroundPendingMock).toHaveBeenCalledWith(true);
   expect(mocks.setImageDataMock).toHaveBeenCalledWith('data:image/png;base64,opened');
   expect(mocks.setPageTitleMock).toHaveBeenCalledWith('Opened page');
   expect(mocks.setBrowserFrameMock).toHaveBeenCalledWith({
@@ -133,6 +136,7 @@ async function expectLoadedDocumentSync(): Promise<void> {
   syncLoadedDocumentState('data:image/png;base64,loaded');
 
   expect(mocks.setInspectorMock).toHaveBeenCalledWith('file');
+  expect(mocks.setFreshImageBackgroundPendingMock).toHaveBeenCalledWith(false);
   expect(mocks.setImageDataMock).toHaveBeenCalledWith('data:image/png;base64,loaded');
   expect(mocks.setPageTitleMock).not.toHaveBeenCalled();
   expect(mocks.setBrowserFrameMock).not.toHaveBeenCalled();

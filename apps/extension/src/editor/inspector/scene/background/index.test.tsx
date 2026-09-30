@@ -9,6 +9,7 @@ import type { EditorFrameSettings } from '../../../../features/editor/document/t
 import { translate } from '../../../../platform/i18n';
 import { EditorInspectorFrameBackgroundFillEditor } from './';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
+import { getFrameGradientPresets } from '../../sidebar-shared/options';
 
 vi.mock('../../../chrome/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../chrome/ui')>()),
@@ -171,13 +172,7 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   await renderUi(
     <EditorInspectorFrameBackgroundFillEditor
       frameDraft={{ ...FRAME, backgroundMode: 'gradient' }}
-      gradientPresets={Array.from({ length: 6 }, (_, index) => ({
-        id: `preset-${index}`,
-        label: `Preset ${index}`,
-        from: '#000',
-        to: '#fff',
-        angle: 45,
-      }))}
+      gradientPresets={getFrameGradientPresets()}
       frameBackgroundPalette={['#111111']}
       frameBackgroundImageFitOptions={[{ value: 'cover', label: 'Cover' }]}
       recentColors={['#222222']}
@@ -198,8 +193,8 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   ).toBe('linear');
   expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
   const presets = container?.querySelector('[data-ui="editor.frame.gradient-presets"]');
-  expect(presets?.className).toContain('grid-cols-3');
-  expect(presets?.querySelectorAll('button')).toHaveLength(6);
+  expect(presets?.className).toContain('grid-cols-5');
+  expect(presets?.querySelectorAll('button')).toHaveLength(10);
   await act(async () => {
     container
       ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.gradient-presets"] button')

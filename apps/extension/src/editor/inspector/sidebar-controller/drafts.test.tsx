@@ -7,6 +7,7 @@ import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document
 import type { EditorSelectionState } from '../../../features/editor/document/types';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
 import { useInspectorSidebarDraftState } from './drafts';
+import { useEditorStore } from '../../state/useEditorStore';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -63,6 +64,47 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  useEditorStore.getState().setFreshImageBackgroundPending(false);
+});
+
+it('suggests a gradient card only for a newly opened image background draft', () => {
+  useEditorStore.getState().setFreshImageBackgroundPending(true);
+  const cleanOpenFrame = createCleanOpenFrame();
+  const args = {
+    canvasHeight: 720,
+    canvasWidth: 1280,
+    frame: cleanOpenFrame,
+    inspector: 'frame',
+    sceneBackgroundPresets: createDefaultEditorPresetStorageState().sceneBackground,
+    isResizableLayerSelection: false,
+    selection: DEFAULT_SELECTION,
+    sourceHeight: 720,
+    sourceName: 'capture',
+    sourceWidth: 1280,
+  };
+  const hook = renderHook(args);
+  expect(hook.getValue()?.frameDraft).toMatchObject({
+    backgroundMode: 'gradient',
+    backgroundGradientFrom: '#f97316ff',
+    backgroundGradientTo: '#ec4899ff',
+    paddingTop: 32,
+    paddingRight: 32,
+    paddingBottom: 32,
+    paddingLeft: 32,
+    sourceImage: { radius: 12, shadow: 14 },
+  });
+  expect(cleanOpenFrame).toMatchObject({ backgroundMode: 'color', paddingTop: 0 });
+  expect(useEditorStore.getState().freshImageBackgroundPending).toBe(false);
+  act(() => hook.getValue()?.setFrameDraft((draft) => ({ ...draft, paddingTop: 0 })));
+  hook.rerender({ ...args, inspector: 'tool' });
+  hook.rerender(args);
+  expect(hook.getValue()?.frameDraft.paddingTop).toBe(0);
+  expect(hook.getValue()?.frameDraft.backgroundMode).toBe('gradient');
+  act(() => hook.getValue()?.resetFrameDraft());
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
+  hook.rerender({ ...args, inspector: 'tool' });
+  hook.rerender(args);
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
 });
 
 it('keeps frame drafts aligned with authoritative defaults without suggested padding bootstrap', () => {

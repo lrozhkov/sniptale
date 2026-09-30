@@ -80,15 +80,17 @@ export function FramePaddingFields(props: {
         padding={selectFramePadding(props.frameDraft)}
         onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
         renderUniformField={({ onChange, value }) => (
-          <CompactRange
-            aria-label={translate('highlighter.editor.paddingLabel')}
-            min={0}
-            max={256}
-            step={1}
-            value={Math.min(256, value)}
-            onChange={(event) => onChange(Number(event.currentTarget.value))}
-            onValueCommit={onChange}
-          />
+          <div className="ml-auto mr-[2.125rem] w-[4.75rem]" data-ui="editor.frame.padding-slider">
+            <CompactRange
+              aria-label={translate('highlighter.editor.paddingLabel')}
+              min={0}
+              max={256}
+              step={1}
+              value={Math.min(256, value)}
+              onChange={(event) => onChange(Number(event.currentTarget.value))}
+              onValueCommit={onChange}
+            />
+          </div>
         )}
         renderValueField={({ compact, label, onChange, side, value }) => (
           <div className="min-w-0" data-padding-side={side}>
@@ -120,7 +122,7 @@ function PaddingValue(props: {
       {props.compact ? (
         <NumericValueField
           className="w-full!"
-          focusAppearance="quiet"
+          focusAppearance="accent-box"
           label={props.label}
           max={4096}
           min={0}

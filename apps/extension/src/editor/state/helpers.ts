@@ -34,6 +34,7 @@ type ResetDocumentState = Pick<
   EditorState,
   | 'activeTool'
   | 'inspector'
+  | 'freshImageBackgroundPending'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
@@ -144,6 +145,7 @@ function createResetDocumentUiState(
   ResetDocumentState,
   | 'activeTool'
   | 'inspector'
+  | 'freshImageBackgroundPending'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
@@ -161,6 +163,7 @@ function createResetDocumentUiState(
   return {
     activeTool: 'select',
     inspector: 'file',
+    freshImageBackgroundPending: false,
     inspectorCollapsed: false,
     layerEffectsCategory: 'adjustments',
     viewportPreviewOpen: state.viewportPreviewAutomationBlockedInSession

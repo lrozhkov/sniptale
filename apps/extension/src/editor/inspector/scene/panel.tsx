@@ -68,8 +68,10 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
             setFrameDraft={props.setFrameDraft}
           />
         </div>
-        <EditorInspectorFrameSourceImageBasics {...sourceImageProps(props)} />
-        <EditorInspectorFrameSourceImageEffects {...sourceImageProps(props)} />
+        <div className="space-y-2.5">
+          <EditorInspectorFrameSourceImageBasics {...sourceImageProps(props)} />
+          <EditorInspectorFrameSourceImageEffects {...sourceImageProps(props)} />
+        </div>
       </div>
       <div data-ui="editor.frame.actions" className="px-3 pb-3 pt-2">
         <FrameApplyButton onApplyFrame={props.onApplyFrame} />

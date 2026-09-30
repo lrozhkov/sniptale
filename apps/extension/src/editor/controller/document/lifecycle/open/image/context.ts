@@ -1,4 +1,7 @@
-import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../../../features/editor/document/constants';
+import {
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+  DEFAULT_EDITOR_IMAGE_SETTINGS,
+} from '../../../../../../features/editor/document/constants';
 import { type EditorFrameSettings } from '../../../../../../features/editor/document/types';
 import { useEditorStore } from '../../../../../state/useEditorStore';
 import type { OpenImageOptions } from '../../../../core/types';
@@ -25,10 +28,14 @@ function resolveOpenedImageFrame(frame: EditorStoreState['frame']): EditorFrameS
     backgroundColor: 'transparent',
     // Fresh image open starts as a clean document; scene-tool defaults stay in preset storage.
     backgroundGradientFrom: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientFrom,
+    backgroundGradientStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientStops,
+    backgroundGradientColorStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientColorStops,
     backgroundGradientTo: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientTo,
     backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundImageData: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageData,
     backgroundImageFit: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageFit,
+    backgroundBlurAmount: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundBlurAmount,
+    sourceImage: DEFAULT_EDITOR_IMAGE_SETTINGS,
   };
 }
 

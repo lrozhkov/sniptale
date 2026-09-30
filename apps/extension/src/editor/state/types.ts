@@ -55,6 +55,7 @@ export interface EditorRichShapeToolSelection {
 interface EditorUiState {
   activeTool: EditorTool;
   inspector: EditorInspector;
+  freshImageBackgroundPending: boolean;
   inspectorCollapsed: boolean;
   layerEffectsCategory: EditorLayerEffectCategory;
   viewportPreviewOpen: boolean;
@@ -92,6 +93,7 @@ interface EditorUiActions {
   setActiveTool: (tool: EditorTool) => void;
   syncActiveTool: (tool: EditorTool) => void;
   setInspector: (inspector: EditorInspector) => void;
+  setFreshImageBackgroundPending: (pending: boolean) => void;
   setLayerEffectsCategory: (category: EditorLayerEffectCategory) => void;
   setInspectorCollapsed: (collapsed: boolean) => void;
   setViewportPreviewOpenFromUser: (open: boolean) => void;

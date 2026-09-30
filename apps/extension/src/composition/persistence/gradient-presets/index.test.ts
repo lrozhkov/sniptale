@@ -43,9 +43,92 @@ beforeEach(() => {
 });
 
 describe('gradient preset catalog model', () => {
+  it('migrates saved revision-three catalog without discarding user choices', () => {
+    const base = createDefaultGradientPresetCatalog();
+    const previous = base.presets
+      .filter((preset) => preset.id !== 'system-dusk' && preset.id !== 'system-sand')
+      .map((preset, order) => ({ ...preset, order }));
+    const customized = previous.map((preset) =>
+      preset.id === 'system-ocean' ? { ...preset, name: 'My ocean', customized: true } : preset
+    );
+    const user = {
+      ...customized[0]!,
+      id: 'user-kept',
+      name: 'User gradient',
+      origin: 'user' as const,
+      customized: false,
+      order: customized.length,
+    };
+    const parsed = parseGradientPresetCatalog({
+      revision: 3,
+      presets: [...customized, user],
+      favoriteIdsBySurface: { 'highlighter-frame-fill': ['user-kept'] },
+      defaultPresetIdBySurface: { 'highlighter-frame-fill': 'user-kept' },
+    });
+    expect(parsed.unsafeForWrite).toBe(false);
+    expect(parsed.catalog.presets).toHaveLength(15);
+    expect(parsed.catalog.presets.find((preset) => preset.id === 'system-ocean')?.name).toBe(
+      'My ocean'
+    );
+    expect(parsed.catalog.presets.find((preset) => preset.id === 'user-kept')?.gradient).toEqual(
+      user.gradient
+    );
+    expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual(['user-kept']);
+    expect(parsed.catalog.defaultPresetIdBySurface['highlighter-frame-fill']).toBe('user-kept');
+    expect(parseGradientPresetCatalog(parsed.catalog).unsafeForWrite).toBe(false);
+  });
+
+  it('remaps a valid revision-three user preset that collides with a new system ID', () => {
+    const oldSystems = createDefaultGradientPresetCatalog()
+      .presets.filter((preset) => preset.id !== 'system-dusk' && preset.id !== 'system-sand')
+      .map((preset, order) => ({ ...preset, order }));
+    const user = {
+      ...oldSystems[0]!,
+      id: 'system-sand',
+      name: 'My former system-sand',
+      origin: 'user' as const,
+      customized: false,
+      order: oldSystems.length,
+    };
+    const parsed = parseGradientPresetCatalog({
+      revision: 3,
+      presets: [...oldSystems, user],
+      favoriteIdsBySurface: { 'highlighter-frame-fill': ['system-sand'] },
+      defaultPresetIdBySurface: { 'highlighter-frame-fill': 'system-sand' },
+    });
+    expect(parsed.unsafeForWrite).toBe(false);
+    const migratedUser = parsed.catalog.presets.find((preset) => preset.origin === 'user');
+    expect(migratedUser?.id).not.toBe('system-sand');
+    expect(migratedUser?.name).toBe(user.name);
+    expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual([
+      migratedUser?.id,
+    ]);
+    expect(parsed.catalog.defaultPresetIdBySurface['highlighter-frame-fill']).toBe(
+      migratedUser?.id
+    );
+    expect(parseGradientPresetCatalog(parsed.catalog).unsafeForWrite).toBe(false);
+  });
+
+  it('rejects inconsistent revision-three customization metadata before migration', () => {
+    const oldSystems = createDefaultGradientPresetCatalog()
+      .presets.filter((preset) => preset.id !== 'system-dusk' && preset.id !== 'system-sand')
+      .map((preset, order) => ({ ...preset, order }));
+    const corrupted = oldSystems.map((preset) =>
+      preset.id === 'system-ocean' ? { ...preset, name: 'Changed without marker' } : preset
+    );
+    expect(
+      parseGradientPresetCatalog({
+        revision: 3,
+        presets: corrupted,
+        favoriteIdsBySurface: {},
+        defaultPresetIdBySurface: { 'highlighter-frame-fill': 'system-sunset' },
+      }).unsafeForWrite
+    ).toBe(true);
+  });
+
   it('supports complete system and user management with default invariants', () => {
     const base = createDefaultGradientPresetCatalog();
-    expect(base.presets).toHaveLength(12);
+    expect(base.presets).toHaveLength(14);
     expect(new Set(base.presets.map((preset) => preset.gradient.type))).toEqual(
       new Set(['linear', 'radial', 'conic'])
     );
@@ -154,9 +237,57 @@ describe('gradient preset catalog model', () => {
       favoriteIdsBySurface: { 'highlighter-frame-fill': ['user-1', 'missing'] },
     });
     expect(parsed.unsafeForWrite).toBe(false);
-    expect(parsed.catalog.revision).toBe(3);
+    expect(parsed.catalog.revision).toBe(4);
     expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual(['user-1']);
   });
+
+  it('remaps a revision-zero user ID that became a system preset', () => {
+    const system = createDefaultGradientPresetCatalog().presets[0]!;
+    const parsed = parseGradientPresetCatalog({
+      revision: 0,
+      presets: [{ ...system, id: 'system-dusk', name: 'Old dusk', origin: 'user' }],
+      favoriteIdsBySurface: { 'highlighter-frame-fill': ['system-dusk'] },
+    });
+    expect(parsed.unsafeForWrite).toBe(false);
+    const user = parsed.catalog.presets.find((preset) => preset.origin === 'user');
+    expect(user?.name).toBe('Old dusk');
+    expect(user?.id).not.toBe('system-dusk');
+    expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual([user?.id]);
+    expect(parseGradientPresetCatalog(parsed.catalog).unsafeForWrite).toBe(false);
+  });
+});
+
+it('remaps a revision-two user ID and its favorite and default references', () => {
+  const oldSystemIds = new Set([
+    'system-sunset',
+    'system-ocean',
+    'system-aurora',
+    'system-radial-glow',
+    'system-conic-spectrum',
+  ]);
+  const systems = createDefaultGradientPresetCatalog()
+    .presets.filter((preset) => oldSystemIds.has(preset.id))
+    .map((preset, order) => ({ ...preset, order }));
+  const user = {
+    ...systems[0]!,
+    id: 'system-sand',
+    name: 'Old sand',
+    origin: 'user' as const,
+    order: 5,
+  };
+  const parsed = parseGradientPresetCatalog({
+    revision: 2,
+    presets: [...systems, user],
+    favoriteIdsBySurface: { 'highlighter-frame-fill': ['system-sand'] },
+    defaultPresetIdBySurface: { 'highlighter-frame-fill': 'system-sand' },
+  });
+  expect(parsed.unsafeForWrite).toBe(false);
+  const migratedUser = parsed.catalog.presets.find((preset) => preset.origin === 'user');
+  expect(migratedUser?.name).toBe('Old sand');
+  expect(migratedUser?.id).not.toBe('system-sand');
+  expect(parsed.catalog.favoriteIdsBySurface['highlighter-frame-fill']).toEqual([migratedUser?.id]);
+  expect(parsed.catalog.defaultPresetIdBySurface['highlighter-frame-fill']).toBe(migratedUser?.id);
+  expect(parseGradientPresetCatalog(parsed.catalog).unsafeForWrite).toBe(false);
 });
 
 it('migrates the actual revision 2 catalog without discarding system customization', () => {
@@ -238,7 +369,7 @@ it('migrates the actual revision 2 catalog without discarding system customizati
   });
 
   expect(parsed.unsafeForWrite).toBe(false);
-  expect(parsed.catalog.presets).toHaveLength(13);
+  expect(parsed.catalog.presets).toHaveLength(15);
   expect(parsed.catalog.presets.find((preset) => preset.id === 'system-sunset')).toMatchObject({
     customized: true,
     name: 'My sunset',

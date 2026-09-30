@@ -6,6 +6,7 @@ interface EditorInspectorFrameBackgroundGradientPreset {
   from: string;
   to: string;
   angle: number;
+  stops?: Array<{ color: string; offset: number }>;
 }
 
 export interface EditorInspectorFrameBackgroundEditorProps {

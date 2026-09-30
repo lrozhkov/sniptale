@@ -18,6 +18,7 @@ import type { useEditorInspectorSidebarDerived } from './derived';
 import type { useEditorInspectorSidebarLocalState } from './local-state';
 import type { EditorInspectorRichShapeState } from '../types';
 import { closeEditorPageDocument } from '../../workflows/close-page-document';
+import { useEditorStore } from '../../state/useEditorStore';
 
 type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState>;
 type EditorInspectorDerivedState = ReturnType<typeof useEditorInspectorSidebarDerived>;
@@ -136,14 +137,16 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
       DimensionInput,
       backgroundImageInputRef: args.backgroundImageInputRef,
       importSessionInputRef: args.importSessionInputRef,
-      onApplyFrame: () =>
+      onApplyFrame: () => {
         args.controller.applyFrameSettings({
           ...args.frameDraft,
           sourceImage: {
             ...normalizeEditorImageSettings(args.frameDraft.sourceImage),
             opacity: 1,
           },
-        }),
+        });
+        useEditorStore.getState().setFreshImageBackgroundPending(false);
+      },
       onExportSession: () => actionRailHandlers.exportSession(),
       onImportSession: () => args.importSessionInputRef.current?.click(),
       onOpenImage: () => args.openImageInputRef.current?.click(),

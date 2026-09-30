@@ -86,20 +86,28 @@ function normalizeLegacyCatalog(value: Record<string, unknown>): GradientPresetC
   const parsed = value['presets'].map((preset) => parsePreset(preset, true));
   if (parsed.some((preset) => preset === null)) return null;
   const users = (parsed as StoredGradientPreset[]).filter((preset) => preset.origin === 'user');
+  const remapped = remapUserSystemCollisions(users);
   const systems = SYSTEM_GRADIENT_PRESETS.map(cloneGradientPreset);
-  const presets = [...systems, ...users].map((preset, order) => ({ ...preset, order }));
+  const presets = [...systems, ...remapped.previous].map((preset, order) => ({ ...preset, order }));
   const ids = new Set(presets.map((preset) => preset.id));
   if (ids.size !== presets.length || users.length > 100) return null;
-  const favoriteIdsBySurface = parseFavoriteIdsBySurface(value['favoriteIdsBySurface'], ids);
+  const originalIds = new Set([
+    ...systems.map((preset) => preset.id),
+    ...users.map((preset) => preset.id),
+  ]);
+  const favoriteIdsBySurface = parseFavoriteIdsBySurface(
+    value['favoriteIdsBySurface'],
+    originalIds
+  );
   if (!favoriteIdsBySurface) return null;
-  return {
+  return parseCurrentCatalog({
     defaultPresetIdBySurface: {
       'highlighter-frame-fill': systems[0]!.id,
     },
-    favoriteIdsBySurface,
+    favoriteIdsBySurface: remapFavoriteIds(favoriteIdsBySurface, remapped.remapped),
     presets,
     revision: GRADIENT_PRESET_CATALOG_REVISION,
-  };
+  });
 }
 
 const PREVIOUS_SYSTEM_GRADIENT_IDS = new Set([
@@ -145,10 +153,11 @@ function refreshPreviousCatalog(value: Record<string, unknown>): GradientPresetC
       .filter((preset) => preset.origin === 'system' && preset.customized)
       .map((preset) => preset.id)
   );
+  const remapped = remapUserSystemCollisions(previous);
   const refreshed = restoreManagedPresetOrder({
     copyPending: cloneGradientPreset,
     customizedIds,
-    previous,
+    previous: remapped.previous,
     refreshed: SYSTEM_GRADIENT_PRESETS.filter((preset) => !customizedIds.has(preset.id)).map(
       cloneGradientPreset
     ),
@@ -168,20 +177,22 @@ function refreshPreviousCatalog(value: Record<string, unknown>): GradientPresetC
   });
   const currentIds = new Set(presets.map((preset) => preset.id));
   if (currentIds.size !== presets.length) return null;
-  const favoriteIdsBySurface = parseFavoriteIdsBySurface(value['favoriteIdsBySurface'], currentIds);
+  const favoriteIdsBySurface = parseFavoriteIdsBySurface(value['favoriteIdsBySurface'], ids);
   const requestedDefault = value['defaultPresetIdBySurface']['highlighter-frame-fill'];
   if (
     !favoriteIdsBySurface ||
     typeof requestedDefault !== 'string' ||
-    !presets.some((preset) => preset.id === requestedDefault && preset.enabled)
+    !previous.some((preset) => preset.id === requestedDefault && preset.enabled)
   )
     return null;
-  return {
-    defaultPresetIdBySurface: { 'highlighter-frame-fill': requestedDefault },
-    favoriteIdsBySurface,
+  return parseCurrentCatalog({
+    defaultPresetIdBySurface: {
+      'highlighter-frame-fill': remapped.remapped.get(requestedDefault) ?? requestedDefault,
+    },
+    favoriteIdsBySurface: remapFavoriteIds(favoriteIdsBySurface, remapped.remapped),
     presets,
     revision: GRADIENT_PRESET_CATALOG_REVISION,
-  };
+  });
 }
 
 function isSystemCustomizationValid(preset: StoredGradientPreset): boolean {
@@ -195,6 +206,128 @@ function isSystemCustomizationValid(preset: StoredGradientPreset): boolean {
     preset.order !== canonical.order ||
     JSON.stringify(preset.gradient) !== JSON.stringify(canonicalPaint.gradient);
   return preset.customized === customized;
+}
+
+const REVISION_THREE_SYSTEM_IDS = new Set(
+  SYSTEM_GRADIENT_PRESETS.map((preset) => preset.id).filter(
+    (id) => id !== 'system-dusk' && id !== 'system-sand'
+  )
+);
+
+function isRevisionThreeCustomizationValid(preset: StoredGradientPreset): boolean {
+  const canonical = SYSTEM_GRADIENT_PRESETS.filter((item) =>
+    REVISION_THREE_SYSTEM_IDS.has(item.id)
+  ).findIndex((item) => item.id === preset.id);
+  if (canonical < 0) return false;
+  const baseline = SYSTEM_GRADIENT_PRESETS.find((item) => item.id === preset.id)!;
+  const normalized = parsePaint({ kind: 'gradient', gradient: baseline.gradient });
+  if (normalized?.kind !== 'gradient') return false;
+  return (
+    preset.customized ===
+    (preset.name !== baseline.name ||
+      preset.enabled !== baseline.enabled ||
+      preset.order !== canonical ||
+      JSON.stringify(preset.gradient) !== JSON.stringify(normalized.gradient))
+  );
+}
+
+function remapUserSystemCollisions(previous: StoredGradientPreset[]) {
+  const reserved = new Set(SYSTEM_GRADIENT_PRESETS.map((item) => item.id));
+  const occupied = new Set([...reserved, ...previous.map((item) => item.id)]);
+  const remapped = new Map<string, string>();
+  for (const preset of previous) {
+    if (preset.origin !== 'user' || !reserved.has(preset.id)) continue;
+    let suffix = 1;
+    let candidate = `user-migrated-${preset.id}`;
+    while (occupied.has(candidate)) candidate = `user-migrated-${preset.id}-${suffix++}`;
+    remapped.set(preset.id, candidate);
+    occupied.add(candidate);
+  }
+  return {
+    previous: previous.map((item) => ({
+      ...item,
+      id: item.origin === 'user' ? (remapped.get(item.id) ?? item.id) : item.id,
+    })),
+    remapped,
+  };
+}
+
+function remapFavoriteIds(
+  favorites: Partial<Record<GradientPresetSurface, string[]>>,
+  remapped: ReadonlyMap<string, string>
+): Partial<Record<GradientPresetSurface, string[]>> {
+  return Object.fromEntries(
+    Object.entries(favorites).map(([surface, ids]) => [
+      surface,
+      ids?.map((id) => remapped.get(id) ?? id),
+    ])
+  );
+}
+
+function refreshRevisionThreeCatalog(value: Record<string, unknown>): GradientPresetCatalog | null {
+  if (
+    !Array.isArray(value['presets']) ||
+    !record(value['favoriteIdsBySurface']) ||
+    !record(value['defaultPresetIdBySurface'])
+  )
+    return null;
+  const parsed = value['presets'].map((item) => parsePreset(item, false));
+  if (parsed.some((item) => item === null)) return null;
+  const previous = parsed as StoredGradientPreset[];
+  const oldSystems = previous.filter((item) => item.origin === 'system');
+  if (
+    !hasUniqueSequentialPresetOrder(previous) ||
+    oldSystems.length !== REVISION_THREE_SYSTEM_IDS.size ||
+    oldSystems.some((item) => !REVISION_THREE_SYSTEM_IDS.has(item.id)) ||
+    oldSystems.some((item) => !isRevisionThreeCustomizationValid(item)) ||
+    previous.filter((item) => item.origin === 'user').length > 100 ||
+    previous.some((item) => item.origin === 'user' && item.customized)
+  )
+    return null;
+  const ids = new Set(previous.map((item) => item.id));
+  if (ids.size !== previous.length) return null;
+  const favoriteIdsBySurface = parseFavoriteIdsBySurface(value['favoriteIdsBySurface'], ids);
+  const requestedDefault = value['defaultPresetIdBySurface']['highlighter-frame-fill'];
+  if (
+    !favoriteIdsBySurface ||
+    typeof requestedDefault !== 'string' ||
+    !previous.some((item) => item.id === requestedDefault && item.enabled)
+  )
+    return null;
+  const remapped = remapUserSystemCollisions(previous);
+  const customizedIds = new Set(
+    oldSystems.filter((item) => item.customized).map((item) => item.id)
+  );
+  const refreshed = restoreManagedPresetOrder({
+    copyPending: cloneGradientPreset,
+    customizedIds,
+    previous: remapped.previous.toSorted((left, right) => left.order - right.order),
+    refreshed: SYSTEM_GRADIENT_PRESETS.filter((item) => !customizedIds.has(item.id)).map(
+      cloneGradientPreset
+    ),
+  });
+  const presets = refreshed.map((item, order) => {
+    const positioned = { ...item, order };
+    if (positioned.origin === 'user') return positioned;
+    const canonical = SYSTEM_GRADIENT_PRESETS.find((preset) => preset.id === positioned.id)!;
+    return {
+      ...positioned,
+      customized:
+        positioned.name !== canonical.name ||
+        positioned.enabled !== canonical.enabled ||
+        positioned.order !== canonical.order ||
+        JSON.stringify(positioned.gradient) !== JSON.stringify(canonical.gradient),
+    };
+  });
+  const catalog = {
+    revision: GRADIENT_PRESET_CATALOG_REVISION,
+    presets,
+    favoriteIdsBySurface: remapFavoriteIds(favoriteIdsBySurface, remapped.remapped),
+    defaultPresetIdBySurface: {
+      'highlighter-frame-fill': remapped.remapped.get(requestedDefault) ?? requestedDefault,
+    },
+  };
+  return parseCurrentCatalog(catalog);
 }
 
 function parseCurrentCatalog(value: Record<string, unknown>): GradientPresetCatalog | null {
@@ -253,15 +386,18 @@ export function parseGradientPresetCatalog(value: unknown): {
     revision !== 0 &&
     revision !== 1 &&
     revision !== 2 &&
+    revision !== 3 &&
     revision !== GRADIENT_PRESET_CATALOG_REVISION
   )
     return { catalog: createDefaultGradientPresetCatalog(), unsafeForWrite: true };
   const catalog =
     revision === 2
       ? refreshPreviousCatalog(value)
-      : revision < GRADIENT_PRESET_CATALOG_REVISION
-        ? normalizeLegacyCatalog(value)
-        : parseCurrentCatalog(value);
+      : revision === 3
+        ? refreshRevisionThreeCatalog(value)
+        : revision < GRADIENT_PRESET_CATALOG_REVISION
+          ? normalizeLegacyCatalog(value)
+          : parseCurrentCatalog(value);
   return catalog
     ? { catalog, unsafeForWrite: false }
     : { catalog: createDefaultGradientPresetCatalog(), unsafeForWrite: true };

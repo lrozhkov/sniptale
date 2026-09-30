@@ -18,6 +18,7 @@ export type EditorStoreSetters = Pick<
   | 'setActiveTool'
   | 'syncActiveTool'
   | 'setInspector'
+  | 'setFreshImageBackgroundPending'
   | 'setLayerEffectsCategory'
   | 'setInspectorCollapsed'
   | 'setViewportPreviewOpenFromUser'
@@ -56,6 +57,8 @@ export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStore
     setActiveTool: (activeTool) => set({ activeTool, inspector: 'tool' }),
     syncActiveTool: (activeTool) => set({ activeTool }),
     setInspector: (inspector) => set({ inspector }),
+    setFreshImageBackgroundPending: (freshImageBackgroundPending) =>
+      set({ freshImageBackgroundPending }),
     setLayerEffectsCategory: (layerEffectsCategory: EditorLayerEffectCategory) =>
       set({ layerEffectsCategory }),
     setInspectorCollapsed: (inspectorCollapsed) => set({ inspectorCollapsed }),

@@ -10,6 +10,8 @@ const systemNameKeys: Record<string, TranslationKey> = {
   'system-mint': 'highlighter.paintPicker.systemPresets.mint',
   'system-midnight': 'highlighter.paintPicker.systemPresets.midnight',
   'system-graphite': 'highlighter.paintPicker.systemPresets.graphite',
+  'system-dusk': 'highlighter.paintPicker.systemPresets.dusk',
+  'system-sand': 'highlighter.paintPicker.systemPresets.sand',
   'system-radial-glow': 'highlighter.paintPicker.systemPresets.radialGlow',
   'system-radial-spotlight': 'highlighter.paintPicker.systemPresets.radialSpotlight',
   'system-conic-spectrum': 'highlighter.paintPicker.systemPresets.spectrum',
