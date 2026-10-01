@@ -18,6 +18,7 @@ interface QuickEditRuntimeDocumentModeSurface {
 }
 
 export interface QuickEditRuntimeEditingSurface {
+  finishPendingChanges: () => void;
   getEditingElements: () => Map<string, EditableElement>;
 }
 

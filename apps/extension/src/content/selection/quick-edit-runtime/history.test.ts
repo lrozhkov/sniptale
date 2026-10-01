@@ -79,7 +79,11 @@ it('captures text separately from DOM state before opening the transaction', () 
 
   expect(mocks.captureText).toHaveBeenCalledWith(target);
   expect(mocks.captureDomStateMap).toHaveBeenCalledWith([target]);
-  expect(mocks.beginTransaction).toHaveBeenCalledWith('quick-edit:editable-1');
+  expect(mocks.beginTransaction).toHaveBeenCalledWith(
+    'quick-edit:editable-1',
+    null,
+    'content-editing'
+  );
 });
 
 it('publishes committed text before finalizing the same DOM history transaction', () => {

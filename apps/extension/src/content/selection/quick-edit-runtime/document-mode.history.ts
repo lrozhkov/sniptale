@@ -1,3 +1,4 @@
+import { notifyQuickEditChanges } from './history-changes';
 import { addEventListenerToAllWindowsDynamic } from '../../platform/frame';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -22,17 +23,7 @@ import {
 } from './document-mode.targets';
 
 const DOCUMENT_MODE_HISTORY_KEY = 'quick-edit-document-mode';
-const DOCUMENT_MODE_CHANGE_EVENT = 'sniptale-document-mode-history-changed';
 const logger = createLogger({ namespace: 'ContentQuickEditDocumentModeHistory' });
-
-export function subscribeToQuickEditDocumentModeChanges(listener: () => void): () => void {
-  window.addEventListener(DOCUMENT_MODE_CHANGE_EVENT, listener);
-  return () => window.removeEventListener(DOCUMENT_MODE_CHANGE_EVENT, listener);
-}
-
-function notifyDocumentModeChanges(): void {
-  window.dispatchEvent(new Event(DOCUMENT_MODE_CHANGE_EVENT));
-}
 
 interface DocumentModeHistoryState {
   annotationCaptures: Map<HTMLElement, QuickEditTextAnnotationCapture>;
@@ -119,7 +110,7 @@ function resetDocumentModeHistoryState(state: DocumentModeHistoryState): void {
   state.failure = null;
   state.isActive = false;
   state.pendingInputRecovery = null;
-  notifyDocumentModeChanges();
+  notifyQuickEditChanges();
 }
 
 function resolveConnectedDirtyRoots(state: DocumentModeHistoryState): HTMLElement[] {
@@ -198,7 +189,7 @@ function markDirtyTarget(
 
   captureBeforeState(state, root);
   state.dirtyRoots.add(root);
-  notifyDocumentModeChanges();
+  notifyQuickEditChanges();
 }
 
 function beginDocumentModeHistory(
@@ -209,7 +200,9 @@ function beginDocumentModeHistory(
     return;
   }
 
-  if (!pagePreparationHistory.beginTransaction(DOCUMENT_MODE_HISTORY_KEY)) {
+  if (
+    !pagePreparationHistory.beginTransaction(DOCUMENT_MODE_HISTORY_KEY, null, 'content-editing')
+  ) {
     throw new Error('Quick Edit document-mode history transaction is unavailable');
   }
   state.isActive = true;
@@ -443,7 +436,7 @@ function createBatchWithCapturedBefore(
         before: {
           ...capturedBefore,
           attributes: {
-            ...capturedBefore.attributes,
+            ...patch.after.attributes,
             ...(locatorId ? { 'data-sniptale-id': locatorId } : {}),
           },
         },

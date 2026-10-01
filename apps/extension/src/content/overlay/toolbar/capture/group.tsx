@@ -102,6 +102,7 @@ export function ToolbarCaptureActionGroup(
               toolbarMenuState={captureProps.toolbarMenuState}
               isNavigationMode={captureProps.isNavigationMode ?? false}
               canClearPagePreparation={captureProps.canClearPagePreparation ?? false}
+              resetScope={captureProps.resetScope ?? 'all'}
               {...(captureProps.onClearPagePreparation === undefined
                 ? {}
                 : { onClearPagePreparation: captureProps.onClearPagePreparation })}

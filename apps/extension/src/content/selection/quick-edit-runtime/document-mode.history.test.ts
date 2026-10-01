@@ -163,7 +163,11 @@ it('begins a document-mode history transaction', () => {
 
   tracker.begin();
 
-  expect(mocks.beginTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
+  expect(mocks.beginTransaction).toHaveBeenCalledWith(
+    'quick-edit-document-mode',
+    null,
+    'content-editing'
+  );
   tracker.cancel();
 });
 

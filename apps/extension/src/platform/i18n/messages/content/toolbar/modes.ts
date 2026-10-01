@@ -281,6 +281,26 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Сбросить все изменения Sniptale на этой странице за текущую сессию?',
     en: 'Reset all Sniptale changes on this page from the current session?',
   },
+  modeChangesCleared: {
+    ru: 'Изменения текущего режима сброшены',
+    en: 'Changes in the current mode reset',
+  },
+  resetDrawingMessage: {
+    ru: 'Сбросить все рисунки в Drawing? Изменения остальных режимов сохранятся.',
+    en: 'Reset all drawings in Drawing? Changes from other modes will be kept.',
+  },
+  resetAnnotationMessage: {
+    ru: 'Сбросить все рамки, эффекты и комментарии Annotation? Изменения остальных режимов сохранятся.',
+    en: 'Reset all frames, effects and comments in Annotation? Changes from other modes will be kept.',
+  },
+  resetContentEditingMessage: {
+    ru: 'Сбросить все изменения Content Editing? Изменения остальных режимов сохранятся.',
+    en: 'Reset all Content Editing changes? Changes from other modes will be kept.',
+  },
+  resetDesignReviewMessage: {
+    ru: 'Сбросить все свойства и комментарии Design Review? Изменения остальных режимов сохранятся.',
+    en: 'Reset all Design Review properties and comments? Changes from other modes will be kept.',
+  },
   autoBlur: {
     ru: 'Размытие данных',
     en: 'Sensitive data blur',

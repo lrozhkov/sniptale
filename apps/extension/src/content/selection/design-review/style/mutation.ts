@@ -380,6 +380,7 @@ function createRecoveryHistoryEffect(
       }
       return result;
     },
+    targets: [batch.target],
     hasChanges: batchHasChanges(batch),
     recoveryOnly: true,
   };
@@ -411,6 +412,7 @@ export function createPageStyleHistoryEffect(
       }
       return result;
     },
+    targets: [batch.target],
     hasChanges: batchHasChanges(batch),
   };
 }

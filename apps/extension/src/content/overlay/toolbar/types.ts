@@ -1,3 +1,4 @@
+import type { PagePreparationResetScope } from '../../parser/page-preparation/history';
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
@@ -85,6 +86,7 @@ export interface ToolbarCaptureActionsProps {
   isNavigationMode?: boolean;
   autoBlurEnabled?: boolean;
   canClearPagePreparation?: boolean;
+  resetScope?: PagePreparationResetScope;
   onClearPagePreparation?: () => void;
   isLoading: boolean;
   captureAction: CaptureActionType;
@@ -190,6 +192,7 @@ export interface ToolbarProps {
   onClearHighlights: () => void;
   onClearPagePreparation?: () => void;
   canClearPagePreparation?: boolean;
+  resetScope?: PagePreparationResetScope;
   autoBlur?: ToolbarAutoBlurProps;
   onToggleNavigationLock?: (enabled: boolean) => void;
   timerDelay: number;

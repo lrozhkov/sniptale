@@ -4,6 +4,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarCaptureActionGroup } from './group';
+import { ToolbarCaptureActions } from '.';
+const historyControlMock = vi.hoisted(() => vi.fn());
 import type { ToolbarMenuState } from '../state/menu';
 import { translate } from '../../../../platform/i18n';
 
@@ -17,7 +19,10 @@ vi.mock('./menu-group', () => ({
 }));
 
 vi.mock('./history', () => ({
-  ToolbarHistoryControls: () => <div data-ui="test.history-controls" />,
+  ToolbarHistoryControls: (props: unknown) => {
+    historyControlMock(props);
+    return <div data-ui="test.history-controls" />;
+  },
 }));
 
 vi.mock('./settings', () => ({
@@ -28,6 +33,10 @@ vi.mock('./use-menus', () => ({
   useToolbarCaptureMenus: () => ({
     activeMenuType: null,
   }),
+}));
+
+vi.mock('./persistence', () => ({
+  useCaptureActionPersistence: () => vi.fn(),
 }));
 
 let container: HTMLDivElement | null = null;
@@ -54,10 +63,13 @@ function renderGroup(
   canClearPagePreparation = false,
   isNavigationMode = false,
   autoBlurEnabled = false,
-  videoRecordingMode = false
+  videoRecordingMode = false,
+  throughCapture = false
 ) {
   const onPinToTabChange = vi.fn();
   const onClose = vi.fn();
+  const onClearPagePreparation = vi.fn();
+  const Capture = throughCapture ? ToolbarCaptureActions : ToolbarCaptureActionGroup;
   if (!container) {
     container = document.createElement('div');
     document.body.append(container);
@@ -66,12 +78,14 @@ function renderGroup(
 
   act(() => {
     root?.render(
-      <ToolbarCaptureActionGroup
+      <Capture
         screenshotMode={screenshotMode}
         videoRecordingMode={videoRecordingMode}
         isNavigationMode={isNavigationMode}
         autoBlurEnabled={autoBlurEnabled}
         canClearPagePreparation={canClearPagePreparation}
+        onClearPagePreparation={onClearPagePreparation}
+        resetScope="design-review"
         isLoading={false}
         captureAction="download_default"
         compactMenus={false}
@@ -96,7 +110,7 @@ function renderGroup(
       />
     );
   });
-  return { onClose, onPinToTabChange };
+  return { onClose, onPinToTabChange, onClearPagePreparation };
 }
 
 beforeEach(() => {
@@ -185,5 +199,18 @@ describe('ToolbarCaptureActionGroup', () => {
     );
     expect(pin?.disabled).toBe(true);
     expect(pin?.title).toBe(translate('content.toolbar.pinToTabAutoBlurLockedHint'));
+  });
+});
+
+it('passes actual reset availability, callback and scope through the capture component', () => {
+  const handlers = renderGroup(true, true, false, false, false, true);
+  expect(historyControlMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    canClearPagePreparation: true,
+    onClearPagePreparation: handlers.onClearPagePreparation,
+    resetScope: 'design-review',
+  });
+  renderGroup(true, false, false, false, false, true);
+  expect(historyControlMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    canClearPagePreparation: false,
   });
 });

@@ -17,29 +17,7 @@ export const ToolbarCaptureActions: React.FC<ToolbarCaptureActionsProps> = (prop
 
   return (
     <ToolbarCaptureActionGroup
-      screenshotMode={props.screenshotMode}
-      isNavigationMode={props.isNavigationMode ?? false}
-      autoBlurEnabled={props.autoBlurEnabled ?? false}
-      isLoading={props.isLoading}
-      captureAction={props.captureAction}
-      compactMenus={props.compactMenus}
-      displayMode={props.displayMode}
-      pinToTab={props.pinToTab}
-      pinToTabAvailable={props.pinToTabAvailable}
-      pinToTabLocked={props.pinToTabLocked}
-      onCompactMenusChange={props.onCompactMenusChange}
-      onDisplayModeChange={props.onDisplayModeChange}
-      onPinToTabChange={props.onPinToTabChange}
-      onCaptureActionChange={props.onCaptureActionChange}
-      onClose={props.onClose}
-      onDisableScreenshotMode={props.onDisableScreenshotMode}
-      timerDelay={props.timerDelay}
-      onTimerDelayChange={props.onTimerDelayChange}
-      currentViewport={props.currentViewport}
-      onViewportChange={props.onViewportChange}
-      toolbarMenuState={props.toolbarMenuState}
-      onTakeScreenshot={props.onTakeScreenshot}
-      scenario={props.scenario}
+      {...props}
       menus={menus}
       onSelectCaptureAction={handleSelectCaptureAction}
     />

@@ -43,7 +43,7 @@ export function commitPropertiesComment(args: {
 
   const rollbackPoint = browserAnnotationSession.captureFailedMutationRollbackPoint();
   const transactionId = createPropertiesCommentTransactionId();
-  if (!pagePreparationHistory.beginTransaction(transactionId)) {
+  if (!pagePreparationHistory.beginTransaction(transactionId, null, 'design-review')) {
     throw new Error('Properties comment history transaction is unavailable');
   }
 

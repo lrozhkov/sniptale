@@ -12,7 +12,14 @@ import {
   type HistoryStoreRuntimeState,
 } from './store-state';
 import { createHistoryStoreCommitApi } from './transactions';
-import type { PagePreparationHistoryBridge, PagePreparationHistoryState } from './types';
+import { resetHistoryScope } from './scoped-reset';
+import { applyScopedSnapshotDelta } from './snapshot-delta';
+import { hasDomMutationChanges } from './dom-delta';
+import type {
+  PagePreparationChangeScope,
+  PagePreparationHistoryBridge,
+  PagePreparationHistoryState,
+} from './types';
 
 const HISTORY_APPLIED_EVENT = 'sniptale-page-preparation-history-applied';
 const logger = createLogger({ namespace: 'ContentPagePreparationHistory' });
@@ -34,14 +41,39 @@ function createHistoryStoreStateApi(state: HistoryStoreRuntimeState) {
     getState(): PagePreparationHistoryState {
       return readHistoryState(state);
     },
-    hasOpenTransactions(): boolean {
-      return state.transactions.size > 0;
+    hasOpenTransactions(scope?: PagePreparationChangeScope): boolean {
+      return [...state.transactions.values()].some(
+        (pending) => scope === undefined || pending.scope === scope
+      );
     },
-    hasPendingSnapshotChanges(): boolean {
+    hasChanges(scope?: PagePreparationChangeScope): boolean {
+      if (scope === undefined) return state.past.length > 0;
+      const entries = state.past.filter((entry) => entry.scope === scope);
+      const first = entries[0];
+      const current = captureHistorySnapshot(state);
+      if (!first || !current) return false;
+      return (
+        !snapshotsEqual(current, applyScopedSnapshotDelta(current, first.before, current, scope)) ||
+        hasDomMutationChanges(entries.map((entry) => entry.domBatch)) ||
+        entries.some(
+          (entry) =>
+            entry.domEffect?.hasCurrentChanges?.() ?? entry.domEffect?.recoveryOnly === true
+        )
+      );
+    },
+    resetScope(scope: PagePreparationChangeScope): boolean {
+      return resetHistoryScope(state, scope, HISTORY_APPLIED_EVENT);
+    },
+    hasPendingSnapshotChanges(scope?: PagePreparationChangeScope): boolean {
       const current = captureHistorySnapshot(state);
       if (!current) return false;
       return [...state.transactions.values(), ...state.deferredCommits.values()].some(
-        ({ before }) => !snapshotsEqual(before, current)
+        (pending) =>
+          (scope === undefined || pending.scope === scope) &&
+          !snapshotsEqual(
+            current,
+            applyScopedSnapshotDelta(current, pending.before, current, pending.scope)
+          )
       );
     },
     isApplying(): boolean {

@@ -1,7 +1,10 @@
 import { applyDomMutationBatch } from './dom';
+import { rebaseDomMutationBatch } from './dom-delta';
+import { applyScopedSnapshotDelta } from './snapshot-delta';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type {
   PageDomMutationBatch,
+  PagePreparationChangeScope,
   PagePreparationHistoryDomEffect,
   PagePreparationHistoryBridge,
   PagePreparationHistoryEntry,
@@ -12,11 +15,13 @@ import type {
 const logger = createLogger({ namespace: 'ContentPagePreparationHistoryApply' });
 
 type DeferredCommit = {
+  scope: PagePreparationChangeScope;
   before: PagePreparationSessionSnapshot;
   id: number;
 };
 
 type OpenTransaction = {
+  scope: PagePreparationChangeScope;
   before: PagePreparationSessionSnapshot;
   domBatch: PageDomMutationBatch | null;
 };
@@ -266,6 +271,7 @@ function createHistoryRecoveryOutcome(args: {
   dispatchEventName: string;
   effect: PagePreparationHistoryDomEffect;
   previousSnapshot: PagePreparationSessionSnapshot;
+  scope: PagePreparationChangeScope;
   state: HistoryStoreRuntimeState;
 }): HistoryApplyOutcome {
   const recoverySnapshot = captureHistorySnapshot(args.state);
@@ -276,6 +282,7 @@ function createHistoryRecoveryOutcome(args: {
   dispatchHistoryApplied(args.dispatchEventName);
   return {
     entry: {
+      scope: args.scope,
       after: recoverySnapshot,
       before: args.previousSnapshot,
       domBatch: null,
@@ -289,6 +296,7 @@ function createHistoryRecoveryOutcome(args: {
 function createSnapshotOnlyRecoveryOutcome(args: {
   dispatchEventName: string;
   targetSnapshot: PagePreparationSessionSnapshot;
+  scope: PagePreparationChangeScope;
   state: HistoryStoreRuntimeState;
 }): HistoryApplyOutcome {
   const factualSnapshot = captureHistorySnapshot(args.state);
@@ -299,6 +307,7 @@ function createSnapshotOnlyRecoveryOutcome(args: {
   dispatchHistoryApplied(args.dispatchEventName);
   return {
     entry: {
+      scope: args.scope,
       after: factualSnapshot,
       before: args.targetSnapshot,
       domBatch: null,
@@ -324,9 +333,18 @@ export function applyHistoryEntry(
     return { status: 'unchanged' };
   }
 
+  let domBatch: PageDomMutationBatch | null = null;
+  let targetSnapshot = previousSnapshot;
   state.isApplying = true;
   try {
-    const domApplyResult = applyDomMutationBatch(entry.domBatch, direction);
+    domBatch = rebaseDomMutationBatch(entry.domBatch, direction);
+    targetSnapshot = applyScopedSnapshotDelta(
+      direction === 'undo' ? entry.after : entry.before,
+      direction === 'undo' ? entry.before : entry.after,
+      previousSnapshot,
+      entry.scope
+    );
+    const domApplyResult = applyDomMutationBatch(domBatch, 'redo');
     if (!domApplyResult.success) {
       logger.warn('Skipped history apply because DOM targets were missing', {
         direction,
@@ -340,10 +358,7 @@ export function applyHistoryEntry(
       success: true,
     };
     if (!effectApplyResult.success) {
-      const domRollbackResult = applyDomMutationBatch(
-        entry.domBatch,
-        direction === 'undo' ? 'redo' : 'undo'
-      );
+      const domRollbackResult = applyDomMutationBatch(domBatch, 'undo');
       logger.warn('Skipped history apply because owner DOM effects failed', {
         direction,
         failures: effectApplyResult.failures,
@@ -352,6 +367,7 @@ export function applyHistoryEntry(
         return createHistoryRecoveryOutcome({
           dispatchEventName,
           effect: effectApplyResult.recovery.effect,
+          scope: entry.scope,
           previousSnapshot,
           state,
         });
@@ -359,7 +375,7 @@ export function applyHistoryEntry(
       return { status: 'unchanged' };
     }
 
-    state.bridge.applySnapshot(direction === 'undo' ? entry.before : entry.after);
+    state.bridge.applySnapshot(targetSnapshot);
     dispatchHistoryApplied(dispatchEventName);
     return { status: 'applied' };
   } catch (error) {
@@ -373,7 +389,7 @@ export function applyHistoryEntry(
         failures: effectRollbackResult.failures,
       });
     }
-    const rollbackResult = applyDomMutationBatch(entry.domBatch, rollbackDirection);
+    const rollbackResult = applyDomMutationBatch(domBatch, 'undo');
     if (!rollbackResult.success) {
       logger.error('Failed to rollback DOM history state after snapshot apply failure', {
         missingLocators: rollbackResult.missingLocators,
@@ -385,6 +401,7 @@ export function applyHistoryEntry(
       return createHistoryRecoveryOutcome({
         dispatchEventName,
         effect: effectRollbackResult.recovery.effect,
+        scope: entry.scope,
         previousSnapshot,
         state,
       });
@@ -401,7 +418,8 @@ export function applyHistoryEntry(
       return createSnapshotOnlyRecoveryOutcome({
         dispatchEventName,
         state,
-        targetSnapshot: entry.before,
+        targetSnapshot,
+        scope: entry.scope,
       });
     }
 

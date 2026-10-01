@@ -69,7 +69,7 @@ export function createQuickEditHistoryTracker() {
   return {
     begin(element: HTMLElement, id: string) {
       const transactionId = `quick-edit:${id}`;
-      if (!pagePreparationHistory.beginTransaction(transactionId)) {
+      if (!pagePreparationHistory.beginTransaction(transactionId, null, 'content-editing')) {
         throw new Error('Quick Edit history transaction is unavailable');
       }
       try {
@@ -110,7 +110,7 @@ export function createQuickEditHistoryTracker() {
               before: {
                 ...openHistory.beforeState,
                 attributes: {
-                  ...openHistory.beforeState.attributes,
+                  ...patch.after.attributes,
                   ...(locatorId ? { 'data-sniptale-id': locatorId } : {}),
                 },
               },

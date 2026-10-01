@@ -15,10 +15,12 @@ type DrawingHistoryCommitPort = Pick<
 const EMPTY_DRAWING_DOCUMENT: DrawingDocumentV1 = { version: 1, objects: [] };
 
 function createDrawingHistoryEffect(
-  commit: DrawingDocumentCommit
+  commit: DrawingDocumentCommit,
+  hasCurrentChanges: () => boolean
 ): PagePreparationHistoryDomEffect {
   return {
     hasChanges: true,
+    hasCurrentChanges,
     apply(direction) {
       const applied = commit.replay(direction === 'undo' ? commit.before : commit.after);
       return applied
@@ -41,7 +43,13 @@ export function createPagePreparationDrawingSession(
       if (!session) return false;
       const previousReplay = replayLatestDocument;
       replayLatestDocument = commit.replay;
-      const accepted = history.commitEntry({ domEffect: createDrawingHistoryEffect(commit) });
+      const accepted = history.commitEntry({
+        scope: 'drawing',
+        domEffect: createDrawingHistoryEffect(
+          commit,
+          () => (session?.getSnapshot().document.objects.length ?? 0) > 0
+        ),
+      });
       if (!accepted) replayLatestDocument = previousReplay;
       return accepted;
     },

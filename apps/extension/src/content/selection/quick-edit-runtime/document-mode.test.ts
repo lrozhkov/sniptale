@@ -103,7 +103,11 @@ it('begins a document-mode history transaction on enable', () => {
 
   documentMode.enable();
 
-  expect(historyMocks.beginTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
+  expect(historyMocks.beginTransaction).toHaveBeenCalledWith(
+    'quick-edit-document-mode',
+    null,
+    'content-editing'
+  );
   expect(document.body.classList.contains('sniptale-quick-edit-text-cursor')).toBe(false);
   documentMode.disable();
 });

@@ -1,3 +1,4 @@
+import { notifyQuickEditChanges } from './history-changes';
 import type { EditableElement } from '../../../features/highlighter/contracts';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { buildEditableElementRecord } from './elements';
@@ -76,12 +77,15 @@ export function createQuickEditEditingActions(props: QuickEditEditingActionProps
       props.setInputShieldSuspended(props.editingElements.size > 0);
       throw error;
     }
+    element.addEventListener('input', notifyQuickEditChanges);
+    notifyQuickEditChanges();
     logger.log('Element made editable', id);
   }
 
   function finishEditing(element: HTMLElement): void {
     const id = element.dataset['sniptaleEditableId'];
 
+    element.removeEventListener('input', notifyQuickEditChanges);
     finishEditableElement(props.editingElements, clearElementEditingState, element);
     if (props.editingElements.size === 0) props.setInputShieldSuspended(false);
     historyTracker.commit(element, id);
@@ -90,6 +94,7 @@ export function createQuickEditEditingActions(props: QuickEditEditingActionProps
   function cancelEditing(element: HTMLElement): void {
     const id = element.dataset['sniptaleEditableId'];
 
+    element.removeEventListener('input', notifyQuickEditChanges);
     cancelEditableElement(props.editingElements, clearElementEditingState, element);
     if (props.editingElements.size === 0) props.setInputShieldSuspended(false);
     historyTracker.cancel(id);

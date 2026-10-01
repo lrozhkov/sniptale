@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ToolbarResetConfirmControl } from './reset-confirm';
 import { useToolbarMenuState } from '../state/menu';
+import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 
 vi.mock('../../../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../../../platform/i18n')>()),
@@ -13,11 +14,18 @@ let root: Root | undefined;
 let host: HTMLElement | undefined;
 let scope: ShadowRoot;
 const confirm = vi.fn();
-function Harness({ available = true }: { available?: boolean }) {
+function Harness({
+  available = true,
+  resetScope = 'all',
+}: {
+  available?: boolean;
+  resetScope?: PagePreparationResetScope;
+}) {
   const toolbarMenuState = useToolbarMenuState();
   return (
     <ToolbarResetConfirmControl
       available={available}
+      scope={resetScope}
       displayMode="horizontal"
       toolbarMenuState={toolbarMenuState}
       onConfirm={confirm}
@@ -168,4 +176,19 @@ it('places the vertical popup using layout height unaffected by entrance animati
   act(() => root?.render(<Vertical />));
   click(trigger());
   expect(scope.querySelector<HTMLElement>('.sniptale-popover-menu')?.style.top).toBe('-82px');
+});
+
+it.each([
+  ['all', 'resetPagePreparationMessage'],
+  ['drawing', 'resetDrawingMessage'],
+  ['annotation', 'resetAnnotationMessage'],
+  ['content-editing', 'resetContentEditingMessage'],
+  ['design-review', 'resetDesignReviewMessage'],
+] as const)('confirms only the advertised %s scope', (resetScope, message) => {
+  render();
+  act(() => root?.render(<Harness resetScope={resetScope} />));
+  click(trigger());
+  expect(scope.querySelector('[role="alertdialog"]')?.textContent).toContain(
+    `content.toolbar.${message}`
+  );
 });

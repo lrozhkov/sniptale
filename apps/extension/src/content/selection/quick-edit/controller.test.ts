@@ -16,6 +16,7 @@ function createRuntimeControllerStub() {
       isEnabled: vi.fn(() => false),
     },
     editing: {
+      finishPendingChanges: vi.fn(),
       getEditingElements: vi.fn(() => new Map()),
     },
     mode: {
@@ -148,4 +149,12 @@ it('forwards document mode controls only while quick-edit is enabled', () => {
   expect(runtimeController.documentMode.enable).toHaveBeenCalledTimes(1);
   expect(runtimeController.documentMode.disable).toHaveBeenCalledTimes(1);
   expect(controller.isDocumentModeEnabled()).toBe(false);
+});
+
+it('finishes pending inline edits through the existing runtime without disabling its mode', () => {
+  const runtime = createRuntimeControllerStub();
+  const controller = createQuickEditController({ createRuntimeController: () => runtime });
+  controller.finishPendingElementChanges();
+  expect(runtime.editing.finishPendingChanges).toHaveBeenCalledOnce();
+  expect(runtime.mode.disable).not.toHaveBeenCalled();
 });

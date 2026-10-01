@@ -20,6 +20,7 @@ interface QuickEditControllerDeps {
 }
 
 interface QuickEditController {
+  finishPendingElementChanges: () => void;
   disableMode: () => void;
   disableDocumentMode: () => void;
   enableMode: () => void;
@@ -101,6 +102,7 @@ export function createQuickEditController(deps: QuickEditControllerDeps = {}): Q
     isDocumentModeEnabled: () => runtimeController.documentMode.isEnabled(),
     hasPendingDocumentModeChanges: () => runtimeController.documentMode.hasPendingChanges(),
     getEditingElements: () => runtimeController.editing.getEditingElements(),
+    finishPendingElementChanges: () => runtimeController.editing.finishPendingChanges(),
   };
 
   return controller;

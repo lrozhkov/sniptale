@@ -2,14 +2,19 @@ import { flushSync } from 'react-dom';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { clearAllPagePreparationChanges } from '../../application/page-preparation-reset';
-import { pagePreparationHistory } from '../../parser/page-preparation/history';
+import {
+  pagePreparationHistory,
+  type PagePreparationResetScope,
+} from '../../parser/page-preparation/history';
 import { browserAnnotationSession } from '../../parser/page-preparation/annotations';
 import { clearAllHighlights, clearFrameEditing } from '../../selection/highlighter';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
 import {
   hasPendingQuickEditDocumentModeChanges,
+  hasPendingQuickEditElementChanges,
+  finalizeQuickEditElementChanges,
   isQuickEditDocumentModeEnabled,
-  subscribeToQuickEditDocumentModeChanges,
+  subscribeToQuickEditChanges,
 } from '../../selection/quick-edit';
 import { translate } from '../../../platform/i18n';
 import { flushPendingPageStyleHistory } from '../design-review/runtime/actions';
@@ -30,7 +35,7 @@ export function subscribeResetAvailability(
 ): () => void {
   const unsubscribeHistory = pagePreparationHistory.subscribe(listener);
   const unsubscribeAnnotations = browserAnnotationSession.subscribe(listener);
-  const unsubscribeDocumentMode = subscribeToQuickEditDocumentModeChanges(listener);
+  const unsubscribeDocumentMode = subscribeToQuickEditChanges(listener);
   const unsubscribeDrawing = drawingController?.subscribePendingTextChange?.(listener);
   const unsubscribeComment = subscribeToDesignReviewCommentDraft(listener);
   return () => {
@@ -42,13 +47,31 @@ export function subscribeResetAvailability(
   };
 }
 
-export function canResetPagePreparation(drawingController?: ContentDrawingController): boolean {
+export function getPagePreparationResetScope(
+  modes: ContentAppLayoutToolbarProps['modes']
+): PagePreparationResetScope {
+  if (modes.drawingMode) return 'drawing';
+  if (modes.designReviewMode) return 'design-review';
+  if (modes.highlighterMode) return 'annotation';
+  if (modes.quickEditMode || modes.quickEditDocumentMode || modes.aiPickMode)
+    return 'content-editing';
+  return 'all';
+}
+
+export function canResetPagePreparation(
+  drawingController?: ContentDrawingController,
+  scope: PagePreparationResetScope = 'all'
+): boolean {
+  const includes = (owner: PagePreparationResetScope) => scope === 'all' || scope === owner;
   return (
-    pagePreparationHistory.getState().canUndo ||
-    pagePreparationHistory.hasPendingSnapshotChanges() ||
-    hasPendingQuickEditDocumentModeChanges() ||
-    drawingController?.hasPendingTextChange?.() === true ||
-    hasPendingDesignReviewCommentDraft()
+    (scope === 'all'
+      ? pagePreparationHistory.getState().canUndo
+      : pagePreparationHistory.hasChanges(scope)) ||
+    pagePreparationHistory.hasPendingSnapshotChanges(scope === 'all' ? undefined : scope) ||
+    (includes('content-editing') &&
+      (hasPendingQuickEditDocumentModeChanges() || hasPendingQuickEditElementChanges())) ||
+    (includes('drawing') && drawingController?.hasPendingTextChange?.() === true) ||
+    (includes('design-review') && hasPendingDesignReviewCommentDraft())
   );
 }
 
@@ -64,6 +87,8 @@ function finalizePendingChanges(toolbar: ContentAppLayoutToolbarProps): void {
     toolbar.modeController.handleToggleQuickEditDocumentMode(false);
     if (isQuickEditDocumentModeEnabled()) throw new Error('Page Edit could not finish');
   }
+  finalizeQuickEditElementChanges();
+  if (hasPendingQuickEditElementChanges()) throw new Error('Inline Page Edit could not finish');
   flushPendingPageStyleHistory();
   flushSync(() => {
     finalizeInteractiveFrameEditsForReset();
@@ -81,17 +106,19 @@ export function clearPagePreparation(toolbar: ContentAppLayoutToolbarProps): voi
     showToast(translate('content.toolbar.someChangesCouldNotBeCleared'), 'error');
     return;
   }
-  const fullyCleared = clearAllPagePreparationChanges({
-    clearHighlights: clearAllHighlights,
-    history: pagePreparationHistory,
-    resetAnnotations: browserAnnotationSession.resetForDocument,
-  });
+  const scope = getPagePreparationResetScope(toolbar.modes);
+  const fullyCleared =
+    scope === 'all'
+      ? clearAllPagePreparationChanges({
+          clearHighlights: clearAllHighlights,
+          history: pagePreparationHistory,
+          resetAnnotations: browserAnnotationSession.resetForDocument,
+        })
+      : pagePreparationHistory.resetScope(scope);
+  const successMessage =
+    scope === 'all' ? 'content.toolbar.allChangesCleared' : 'content.toolbar.modeChangesCleared';
   showToast(
-    translate(
-      fullyCleared
-        ? 'content.toolbar.allChangesCleared'
-        : 'content.toolbar.someChangesCouldNotBeCleared'
-    ),
+    translate(fullyCleared ? successMessage : 'content.toolbar.someChangesCouldNotBeCleared'),
     fullyCleared ? 'info' : 'error'
   );
 }

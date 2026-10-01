@@ -119,7 +119,11 @@ it('makes an element editable and starts a quick-edit history transaction', () =
     throw new Error('Expected editable activation call');
   }
   const [, editableId, editableRecord, options] = firstActivationCall;
-  expect(mocks.beginTransaction).toHaveBeenCalledWith(`quick-edit:${editableId}`);
+  expect(mocks.beginTransaction).toHaveBeenCalledWith(
+    `quick-edit:${editableId}`,
+    null,
+    'content-editing'
+  );
   expect(editableRecord).toEqual({ editable: true });
   options.setupResizeObserver();
   expect(overlayActions.setupResizeObserver).toHaveBeenCalledWith(element, expect.any(Function));
@@ -378,4 +382,32 @@ it('reuses the same child-link suppressor for activation and clear-state callbac
   const activationOptions = mocks.activateEditableElement.mock.calls[0]?.[3];
   const clearOptions = mocks.clearEditableElementState.mock.calls[0]?.[2];
   expect(activationOptions?.handleChildLinkClick).toBe(clearOptions?.handleChildLinkClick);
+});
+
+it('signals inline iframe input to the top runtime and removes the listener on cancellation', () => {
+  const iframe = document.createElement('iframe');
+  document.body.append(iframe);
+  const element = iframe.contentDocument!.createElement('div');
+  iframe.contentDocument!.body.append(element);
+  const overlayActions = createOverlayActions();
+  const actions = createQuickEditEditingActions({
+    editingElements: new Map(),
+    overlayActions,
+    setInputShieldSuspended: vi.fn(),
+    updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
+  });
+  const listener = vi.fn();
+  window.addEventListener('sniptale-document-mode-history-changed', listener);
+  try {
+    actions.makeElementEditable(element);
+    listener.mockClear();
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(listener).toHaveBeenCalledOnce();
+    actions.cancelEditing(element);
+    listener.mockClear();
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(listener).not.toHaveBeenCalled();
+  } finally {
+    window.removeEventListener('sniptale-document-mode-history-changed', listener);
+  }
 });

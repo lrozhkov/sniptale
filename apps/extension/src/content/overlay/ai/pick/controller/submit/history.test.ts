@@ -69,7 +69,9 @@ describe('ai-pick-controller-submit-history', () => {
     expect(findAIChangeTargetsMock).toHaveBeenCalledWith(tree, changes);
     expect(captureDomStateMapMock).toHaveBeenCalledWith(expect.any(Array));
     expect(pagePreparationHistoryMock.beginTransaction).toHaveBeenCalledWith(
-      expect.stringMatching(/^ai-apply:/)
+      expect.stringMatching(/^ai-apply:/),
+      null,
+      'content-editing'
     );
     expect(applyAIChangesMock).toHaveBeenCalledWith(tree, changes);
     expect(pagePreparationHistoryMock.commitTransaction).toHaveBeenCalledWith(

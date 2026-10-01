@@ -1,3 +1,4 @@
+import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -13,8 +14,17 @@ import {
   useToolbarFloatingMenuDismissal,
 } from '../menu/floating.helpers';
 
+const RESET_MESSAGES = {
+  all: 'content.toolbar.resetPagePreparationMessage',
+  drawing: 'content.toolbar.resetDrawingMessage',
+  annotation: 'content.toolbar.resetAnnotationMessage',
+  'content-editing': 'content.toolbar.resetContentEditingMessage',
+  'design-review': 'content.toolbar.resetDesignReviewMessage',
+} as const;
+
 export function ToolbarResetConfirmControl(props: {
   available: boolean;
+  scope?: PagePreparationResetScope;
   displayMode: ContentToolbarDisplayMode;
   toolbarMenuState: ToolbarMenuState;
   onConfirm: (() => void) | undefined;
@@ -125,7 +135,7 @@ export function ToolbarResetConfirmControl(props: {
             }}
           >
             <strong id={titleId}>{translate('content.toolbar.clearPagePreparation')}</strong>
-            <p id={messageId}>{translate('content.toolbar.resetPagePreparationMessage')}</p>
+            <p id={messageId}>{translate(RESET_MESSAGES[props.scope ?? 'all'])}</p>
             <div className="flex justify-end gap-2">
               <ProductActionButton
                 compact

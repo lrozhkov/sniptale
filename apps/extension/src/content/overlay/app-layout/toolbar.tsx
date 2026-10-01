@@ -18,7 +18,12 @@ import type { CaptureActionType } from '../../../contracts/settings';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
 import { useFrameUIStore } from '../../selection/frame-runtime/state/frame-ui.store';
-import { canResetPagePreparation, clearPagePreparation, subscribeResetAvailability } from './reset';
+import {
+  canResetPagePreparation,
+  clearPagePreparation,
+  getPagePreparationResetScope,
+  subscribeResetAvailability,
+} from './reset';
 
 const logger = createLogger({ namespace: 'ContentToolbarShell' });
 
@@ -242,7 +247,8 @@ function renderToolbarShell(args: {
         onHide={handleHideToolbar}
         onClearHighlights={modeController.handleClearHighlights}
         onClearPagePreparation={() => clearPagePreparation(args.toolbar)}
-        canClearPagePreparation={args.canClearPagePreparation || args.toolbar.frameCount > 0}
+        canClearPagePreparation={args.canClearPagePreparation}
+        resetScope={getPagePreparationResetScope(modes)}
         autoBlur={autoBlur}
         onToggleNavigationLock={modeController.handleToggleNavigationLock}
         timerDelay={args.toolbar.timerDelay}
@@ -275,9 +281,10 @@ export function ContentToolbarShell({ designReview, scenario, toolbar }: Content
     (listener: () => void) => subscribeResetAvailability(listener, toolbar.drawingController),
     [toolbar.drawingController]
   );
+  const resetScope = getPagePreparationResetScope(toolbar.modes);
   const getResetAvailability = useCallback(
-    () => canResetPagePreparation(toolbar.drawingController),
-    [toolbar.drawingController]
+    () => canResetPagePreparation(toolbar.drawingController, resetScope),
+    [toolbar.drawingController, resetScope]
   );
   const canClearPagePreparation = useSyncExternalStore(
     subscribeAvailability,

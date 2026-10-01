@@ -1,3 +1,4 @@
+import type { PagePreparationResetScope } from '../../../parser/page-preparation/history';
 import { useEffect, useState } from 'react';
 import { Redo2, Undo2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
@@ -144,6 +145,7 @@ export function ToolbarHistoryControls(props: {
   toolbarMenuState: ToolbarMenuState;
   isNavigationMode?: boolean;
   canClearPagePreparation?: boolean;
+  resetScope?: PagePreparationResetScope;
   onClearPagePreparation?: () => void;
 }) {
   const historyState = usePagePreparationHistoryState();
@@ -166,6 +168,7 @@ export function ToolbarHistoryControls(props: {
         toolbarMenuState={props.toolbarMenuState}
         available={Boolean(props.canClearPagePreparation && props.onClearPagePreparation)}
         onConfirm={props.onClearPagePreparation}
+        scope={props.resetScope ?? 'all'}
       />
       {props.screenshotMode ? <ToolbarLocalSaveControl /> : null}
     </>

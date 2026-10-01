@@ -130,6 +130,7 @@ function createCaptureActionProps(args: {
       ? {}
       : { onClearPagePreparation: args.toolbarProps.onClearPagePreparation }),
     canClearPagePreparation: args.toolbarProps.canClearPagePreparation ?? false,
+    resetScope: args.toolbarProps.resetScope ?? 'all',
     onDisableScreenshotMode: (activationEvent?: Event) => {
       void args.viewModel.toggleMode('screenshot', activationEvent);
     },

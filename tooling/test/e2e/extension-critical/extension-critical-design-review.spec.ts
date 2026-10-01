@@ -272,3 +272,106 @@ test('Design Review pointer choices do not inherit keyboard focus paint at HD', 
   await popup.close();
   await page.close();
 });
+
+test('Reset All becomes available after a real Design Review change at HD', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}) => {
+  const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
+  const reset = page.locator('[data-ui="content.toolbar.reset-all-button"]');
+  await expect(reset).toBeDisabled();
+  const target = (await page.locator('#measurement-target').boundingBox())!;
+  await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+  const popover = page.locator('[data-ui="content.design-review.popover"]');
+  await popover
+    .getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
+    .click();
+  await popover
+    .getByRole('navigation')
+    .getByRole('button', {
+      name: /Size and spacing|Размер и отступы/u,
+    })
+    .click();
+  await popover.getByRole('textbox', { name: /^(Width|Ширина)$/u }).fill('50%');
+  await expect
+    .poll(() => page.locator('#measurement-target').evaluate((node) => node.style.width))
+    .toBe('50%');
+  await expect(reset).toBeEnabled();
+  const confirmReset = async (message: RegExp) => {
+    await reset.click();
+    const dialog = page.getByRole('alertdialog');
+    await expect(dialog).toContainText(message);
+    await dialog.getByRole('button', { name: /^(Reset all|Сбросить всё)$/u }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(reset).toBeDisabled();
+  };
+  await confirmReset(/Design Review/u);
+  await expect
+    .poll(() => page.locator('#measurement-target').evaluate((node) => node.style.width))
+    .toBe('100px');
+  const reopened = (await page.locator('#measurement-target').boundingBox())!;
+  await page.mouse.click(reopened.x + reopened.width / 2, reopened.y + reopened.height / 2);
+  await popover
+    .getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
+    .click();
+  await popover
+    .getByRole('navigation')
+    .getByRole('button', { name: /Size and spacing|Размер и отступы/u })
+    .click();
+  await popover.getByRole('textbox', { name: /^(Width|Ширина)$/u }).fill('50%');
+  await expect(reset).toBeEnabled();
+  const switchMode = async (mode: string) => {
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+  };
+  const width = () => page.locator('#measurement-target').evaluate((node) => node.style.width);
+  await switchMode('drawing');
+  await expect(reset).toBeDisabled();
+  await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+  await page.mouse.click(600, 430);
+  const textDraft = page.locator('[data-ui="content.drawing.text-input"]');
+  await textDraft.fill('Temporary drawing');
+  await expect(reset).toBeEnabled();
+  await confirmReset(/Drawing/u);
+  await expect(page.locator('[data-ui="content.drawing.text-object"]')).toHaveCount(0);
+  await expect.poll(width).toBe('50%');
+  await switchMode('highlighter');
+  await expect(reset).toBeDisabled();
+  const currentTarget = (await page.locator('#measurement-target').boundingBox())!;
+  await page.mouse.click(
+    currentTarget.x + currentTarget.width / 2,
+    currentTarget.y + currentTarget.height / 2
+  );
+  await expect(page.locator('.sniptale-frame-container')).toHaveCount(1);
+  await expect(reset).toBeEnabled();
+  await confirmReset(/Annotation/u);
+  await expect(page.locator('.sniptale-frame-container')).toHaveCount(0);
+  await expect.poll(width).toBe('50%');
+  await page.evaluate(() => {
+    const text = document.createElement('div');
+    text.id = 'reset-text';
+    text.textContent = 'Original content';
+    text.style.cssText = 'position:absolute;left:600px;top:350px;width:180px;height:40px';
+    document.body.append(text);
+  });
+  await switchMode('quick-edit');
+  await expect(reset).toBeDisabled();
+  await page.mouse.click(640, 365);
+  const content = page.locator('#reset-text');
+  await expect(content).toHaveAttribute('contenteditable', 'true');
+  await content.fill('Edited content');
+  const modeSelector = page.locator('[data-ui="content.toolbar.mode-selector-button"]');
+  await modeSelector.click();
+  await modeSelector.click();
+  await expect(reset).toBeEnabled();
+  await confirmReset(/Content Editing/u);
+  await expect(content).toHaveText('Original content');
+  await expect.poll(width).toBe('50%');
+  await switchMode('cursor');
+  await expect(reset).toBeEnabled();
+  await confirmReset(/current session|текущую сессию/u);
+  await expect.poll(width).toBe('100px');
+  await popup.close();
+  await page.close();
+});

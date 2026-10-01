@@ -63,12 +63,26 @@ export interface PagePreparationHistoryDomEffectResult {
 
 /** Reversible owner effect retained by in-memory page-preparation history. */
 export interface PagePreparationHistoryDomEffect {
+  /** Exact live targets whose identity must survive foreign HTML replacement. */
+  targets?: readonly PagePreparationDomElement[];
   apply: (direction: 'undo' | 'redo') => PagePreparationHistoryDomEffectResult;
   hasChanges: boolean;
+  /** Optional factual availability probe for a document owned outside the session snapshot. */
+  hasCurrentChanges?: () => boolean;
   recoveryOnly?: boolean;
 }
 
+/** Producer-owned changes within the in-memory preparation session. */
+export type PagePreparationChangeScope =
+  | 'annotation'
+  | 'content-editing'
+  | 'design-review'
+  | 'drawing';
+
+export type PagePreparationResetScope = PagePreparationChangeScope | 'all';
+
 export interface PagePreparationHistoryEntry {
+  scope: PagePreparationChangeScope;
   after: PagePreparationSessionSnapshot;
   before: PagePreparationSessionSnapshot;
   domBatch: PageDomMutationBatch | null;
