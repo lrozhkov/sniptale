@@ -203,14 +203,14 @@ it('keeps spotlight settings when the active type is selected again', async () =
       />
     )
   );
-  await act(async () =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.focusType"]')!.click()
-  );
-  await act(async () =>
-    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-      .find((node) => node.textContent?.includes('gallery.videoReview.focusSpotlight'))!
-      .click()
-  );
+  const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
+  expect(group.getAttribute('aria-label')).toBe('gallery.videoReview.focusType');
+  expect(group.querySelectorAll('button')).toHaveLength(2);
+  const active = group.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.focusSpotlight"]'
+  )!;
+  expect(active.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => active.click());
   expect(change).not.toHaveBeenCalled();
 });
 
@@ -294,4 +294,38 @@ it('distinguishes compact nested position from collapsible top-level sections', 
   const parents = host.querySelectorAll('details[data-level="section"]');
   expect(parents.length).toBeGreaterThanOrEqual(2);
   expect([...parents].every((node) => node.hasAttribute('open'))).toBe(true);
+});
+
+it('switches directly between Zoom and Spotlight without resetting the camera', async () => {
+  const change = vi.fn();
+  const render = async (value: QuickEditZoomRegion) =>
+    act(async () =>
+      root.render(
+        <ReviewZoomInspector
+          region={value}
+          onChange={change}
+          onReset={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+    );
+  await render(region);
+  const choose = async (title: string) =>
+    act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(
+          `[data-ui="gallery.videoReview.focusType"] [title="${title}"]`
+        )!
+        .click()
+    );
+  await choose('gallery.videoReview.focusSpotlight');
+  expect(change).toHaveBeenCalledOnce();
+  const patch: QuickEditZoomRegionPatch = change.mock.calls[0]![0];
+  expect(patch.spotlight).toMatchObject({ area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } });
+  expect(patch).not.toHaveProperty('scale');
+  expect(patch).not.toHaveProperty('centerX');
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  await render({ ...region, spotlight: patch.spotlight! });
+  await choose('gallery.videoReview.zoomRegionLabel');
+  expect(change).toHaveBeenLastCalledWith({ spotlight: null });
 });

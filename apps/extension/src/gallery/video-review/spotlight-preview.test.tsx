@@ -100,7 +100,7 @@ it('commits one bounded move or resize and discards cancelled drafts', async () 
     expect.objectContaining({ area: { x: 0.35, y: 0.25, width: 0.5, height: 0.5 } })
   );
   view.onChange.mockClear();
-  await pointer(view.group.querySelector('[data-resize]')!, 'pointerdown', 100);
+  await pointer(view.group.querySelector('[data-resize="se"]')!, 'pointerdown', 100);
   await pointer(view.plane, 'pointermove', 200, 100);
   await pointer(view.plane, 'pointerup', 200, 100);
   expect(view.onChange).toHaveBeenLastCalledWith(
@@ -148,4 +148,49 @@ it('scales the blur mask and removes its observer when it is hidden', async () =
   await act(async () => root.render(<ReviewSpotlightOverlay output={output} frame={null} />));
   expect(host.children).toHaveLength(0);
   expect(disconnect).toHaveBeenCalled();
+});
+
+it.each(['nw', 'ne', 'sw', 'se'])(
+  'resizes Spotlight from %s with the opposite edges anchored',
+  async (corner) => {
+    const view = render();
+    expect(view.group.querySelectorAll('[data-resize]')).toHaveLength(4);
+    const west = corner.endsWith('w'),
+      north = corner.startsWith('n');
+    await pointer(view.group.querySelector(`[data-resize="${corner}"]`)!, 'pointerdown', 100, 50);
+    await pointer(view.plane, 'pointermove', west ? 80 : 120, north ? 40 : 60);
+    expect(view.onChange).not.toHaveBeenCalled();
+    await pointer(view.plane, 'pointerup', west ? 80 : 120, north ? 40 : 60);
+    expect(view.onChange).toHaveBeenCalledTimes(1);
+    const area = view.onChange.mock.calls[0]![0].area;
+    expect(area.x).toBeCloseTo(west ? 0.15 : 0.25);
+    expect(area.y).toBeCloseTo(north ? 0.15 : 0.25);
+    expect(area.width).toBeCloseTo(0.6);
+    expect(area.height).toBeCloseTo(0.6);
+  }
+);
+
+it('bounds Spotlight moving edges and reconciles hover after outside release and cancellation', async () => {
+  const view = render();
+  // Actual group bounds differ from the capture plane; hover must inspect the group.
+  vi.spyOn(view.group, 'getBoundingClientRect').mockReturnValue(new DOMRect(50, 25, 100, 50));
+  await pointer(view.group, 'pointerover', 100, 50);
+  expect(view.group.dataset['controlsVisible']).toBe('true');
+  await pointer(view.group.querySelector('[data-resize="nw"]')!, 'pointerdown', 50, 25);
+  await pointer(view.plane, 'pointermove', 1000, 500);
+  expect(view.group.dataset['controlsVisible']).toBe('true');
+  await pointer(view.plane, 'pointerup', 1000, 500);
+  expect(view.group.dataset['controlsVisible']).toBe('false');
+  const area = view.onChange.mock.calls[0]![0].area;
+  expect(area.width).toBeCloseTo(0.01);
+  expect(area.height).toBeCloseTo(0.01);
+  expect(area.x + area.width).toBeCloseTo(0.75);
+  await pointer(view.group, 'pointerover', 100, 50);
+  expect(view.group.dataset['controlsVisible']).toBe('true');
+  await pointer(view.group, 'pointerdown', 100, 50);
+  await pointer(view.plane, 'pointermove', 1000, 500);
+  await key(view.group, 'Escape');
+  expect(view.group.dataset['controlsVisible']).toBe('false');
+  expect(HTMLElement.prototype.releasePointerCapture).toHaveBeenCalled();
+  expect(view.onChange).toHaveBeenCalledTimes(1);
 });

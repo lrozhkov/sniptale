@@ -1,3 +1,4 @@
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 import {
   computeQuickEditSceneCamera,
   computeQuickEditVisibleSourceRect,
@@ -27,6 +28,7 @@ export function paintZoomPreview(
     view: 'area' | 'result';
     width: number;
     cornerRadius?: number;
+    showControls?: boolean;
   }
 ) {
   const { videoRect, videoTransform } = args.layout;
@@ -51,7 +53,7 @@ export function paintZoomPreview(
     context.fillRect(target.x, target.y, target.width, target.height);
   }
   context.restore();
-  if (args.view === 'area') {
+  if (args.view === 'area' && args.showControls !== false) {
     const visible = computeQuickEditVisibleSourceRect(
       args.layout,
       args.background ?? { enabled: false },
@@ -67,7 +69,7 @@ export function paintZoomPreview(
     context.lineWidth = 2;
     context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   }
-  if (args.view !== 'area') return;
+  if (args.view !== 'area' || args.showControls === false) return;
   context.fillStyle = args.accent;
   context.beginPath();
   context.arc(
@@ -78,4 +80,11 @@ export function paintZoomPreview(
     Math.PI * 2
   );
   context.fill();
+}
+
+/** CSS background paint shared by the source preview and its camera canvas. */
+export function previewBackgroundPaint(background: QuickEditBackgroundSettings): string {
+  if (!background.enabled || background.type === 'image') return '#000000';
+  if (background.type === 'solid') return background.color;
+  return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
 }

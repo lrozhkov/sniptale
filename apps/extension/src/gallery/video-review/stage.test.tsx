@@ -304,7 +304,7 @@ it('moves and resizes spotlight on the stage with live preview and one durable c
   expect(onChange).not.toHaveBeenCalled();
   await stage.event(plane, 'pointercancel', 480, 270);
   expect(onPreview).toHaveBeenLastCalledWith(null);
-  await stage.event(area.querySelector('[data-resize]')!, 'pointerdown', 600, 338);
+  await stage.event(area.querySelector('[data-resize="se"]')!, 'pointerdown', 600, 338);
   await stage.event(plane, 'pointermove', 680, 383);
   await stage.event(plane, 'pointerup', 680, 383);
   expect(onChange).toHaveBeenCalledOnce();

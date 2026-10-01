@@ -13,6 +13,7 @@ import type {
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { Trash2, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
 import { SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   ReviewButton,
   ReviewInterval,
@@ -95,21 +96,7 @@ export function ReviewZoomInspector(props: {
             icon: Scan,
             content: (
               <>
-                <SelectField<'zoom' | 'spotlight'>
-                  className={reviewSelectFieldClassName}
-                  label={translate('gallery.videoReview.focusType')}
-                  value={region.spotlight ? 'spotlight' : 'zoom'}
-                  options={[
-                    { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
-                    { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
-                  ]}
-                  onChange={(type) => {
-                    if ((type === 'spotlight') === !!region.spotlight) return;
-                    onChange({
-                      spotlight: type === 'spotlight' ? createQuickEditSpotlight() : null,
-                    });
-                  }}
-                />
+                <ReviewFocusType region={region} onChange={onChange} />
                 {props.preview}
                 {region.spotlight ? (
                   <ReviewSpotlightInspector
@@ -262,6 +249,39 @@ export function ReviewZoomLinkInspector(props: {
           <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
         </ReviewButton>
       </div>
+    </div>
+  );
+}
+
+/** Direct Focus type choice preserves the active configuration and camera. */
+function ReviewFocusType({
+  region,
+  onChange,
+}: {
+  region: QuickEditZoomRegion;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.videoReview.focusType')}
+      </span>
+      <SegmentedSwitch<'zoom' | 'spotlight'>
+        dataAttribute={{ 'data-ui': 'gallery.videoReview.focusType' }}
+        ariaLabel={translate('gallery.videoReview.focusType')}
+        density="compact"
+        activeId={region.spotlight ? 'spotlight' : 'zoom'}
+        options={[
+          { id: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
+          { id: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+        ]}
+        onChange={(type) => {
+          if ((type === 'spotlight') === !!region.spotlight) return;
+          onChange({
+            spotlight: type === 'spotlight' ? createQuickEditSpotlight() : null,
+          });
+        }}
+      />
     </div>
   );
 }

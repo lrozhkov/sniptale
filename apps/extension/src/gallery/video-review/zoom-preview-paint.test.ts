@@ -82,3 +82,38 @@ it.each(['fixed', 'follow-video'] as const)(
     );
   }
 );
+
+it('omits editor chrome without changing source painting when a DOM frame owns it', () => {
+  const camera = { scale: 2, centerX: 0.5, centerY: 0.5 };
+  const layout = computeQuickEditSceneLayout({
+    output: { width: 480, height: 270 },
+    source: { width: 480, height: 270 },
+    background: createQuickEditAdvancedState().background,
+    camera,
+  });
+  const context = {
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    clip: vi.fn(),
+    drawImage: vi.fn(),
+    strokeRect: vi.fn(),
+    arc: vi.fn(),
+  };
+  const image = {} as CanvasImageSource;
+  paintZoomPreview(context as unknown as CanvasRenderingContext2D, {
+    accent: '#ffffff',
+    camera,
+    layout,
+    width: 480,
+    height: 270,
+    view: 'area',
+    showControls: false,
+    frame: { image, width: 480, height: 270 },
+  });
+  expect(context.drawImage).toHaveBeenCalledWith(image, 0, 0, 480, 270);
+  expect(context.strokeRect).not.toHaveBeenCalled();
+  expect(context.arc).not.toHaveBeenCalled();
+});

@@ -1,122 +1,21 @@
-import { useReviewCameraGesture } from './camera-gesture';
+import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { serializePaintToCss } from '@sniptale/foundation/paint';
+import { useMemo, useState } from 'react';
 import { useReviewBackgroundImage } from './use-review-background';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditBackgroundSettings,
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
-import {
-  computeQuickEditSceneLayout,
-  computeQuickEditSceneCamera,
-  computeQuickEditVisibleSourceRect,
-  computeQuickEditVideoTransform,
-} from '../../features/video/review/advanced/scene';
+import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { ReviewButton } from './controls';
-import { paintZoomPreview, type ZoomPreviewLayout } from './zoom-preview-paint';
-import {
-  useZoomPreviewFrame,
-  type ZoomPreviewFrame,
-  type ZoomPreviewFrameLoader,
-} from './use-zoom-preview-source';
+import { previewBackgroundPaint } from './zoom-preview-paint';
+import { useZoomPreviewFrame, type ZoomPreviewFrameLoader } from './use-zoom-preview-source';
 
 /** Bounded canvas size; scene geometry scales padding into these output pixels. */
 const PREVIEW_WIDTH_PX = 480;
-/**
- * The interactive canvas: pointer drags and arrow keys move the stored camera center;
- * Escape and pointer cancel roll the interaction back to its captured origin.
- */
-function ZoomPreviewCanvas(props: {
-  background: QuickEditBackgroundSettings;
-  imageUrl: string | null | undefined;
-  camera: QuickEditZoomRegion['transform'];
-  disabled?: boolean | undefined;
-  frame: ZoomPreviewFrame | null;
-  layout: ZoomPreviewLayout;
-  output: { width: number; height: number };
-  view: 'area' | 'result';
-  cornerRadius: number;
-  onPreview?: ((center: { centerX: number; centerY: number } | null) => void) | undefined;
-  onCenter(center: { centerX: number; centerY: number }): void;
-}) {
-  const { view } = props;
-  const { camera, handlers } = useReviewCameraGesture({
-    ...props,
-    videoRect: props.layout.videoRect,
-    visibleArea: computeQuickEditVisibleSourceRect(props.layout, props.background, props.output),
-    onCommit: props.onCenter,
-  });
-  const layout = useMemo(
-    () => ({
-      ...props.layout,
-      videoTransform: computeQuickEditVideoTransform({ videoRect: props.layout.videoRect, camera }),
-    }),
-    [props.layout, camera]
-  );
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
-    if (!canvas || !context) return;
-    paintZoomPreview(context, {
-      background: props.background,
-      accent:
-        getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() || '#4f7cff',
-      camera,
-      cornerRadius: props.cornerRadius,
-      frame: props.frame,
-      height: canvas.height,
-      layout,
-      view,
-      width: canvas.width,
-    });
-  }, [layout, props.frame, view, camera, props.cornerRadius, props.background]);
-
-  const motion = computeQuickEditSceneCamera(layout, props.background);
-  const offsetX = (motion.x / props.output.width) * 100;
-  const offsetY = (motion.y / props.output.height) * 100;
-  return (
-    <>
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: previewBackgroundPaint(props.background),
-          transformOrigin: '0 0',
-          transform:
-            view === 'result'
-              ? `translate(${offsetX}%, ${offsetY}%) scale(${motion.scale})`
-              : undefined,
-        }}
-      >
-        {props.imageUrl && props.background.enabled && props.background.type === 'image' ? (
-          <img
-            src={props.imageUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full"
-            style={{ objectFit: props.background.imageFit }}
-          />
-        ) : null}
-      </div>
-      <canvas
-        ref={canvasRef}
-        aria-label={translate('gallery.videoReview.zoomPreview')}
-        tabIndex={props.disabled ? -1 : 0}
-        width={props.output.width}
-        height={props.output.height}
-        style={{ touchAction: 'none' }}
-        className="relative block w-full rounded-[var(--sniptale-radius-sm)] border
-        border-[var(--sniptale-color-border-soft)] outline-none
-        focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]"
-        {...handlers}
-      />
-    </>
-  );
-}
-
 /**
  * Selected-region framing preview: the real source frame at the region midpoint, the
  * scene layout the export applies (background padding plus fitted video), and the zoom
@@ -271,12 +170,6 @@ export function ReviewZoomPreview(props: {
       ) : null}
     </section>
   );
-}
-
-function previewBackgroundPaint(background: QuickEditBackgroundSettings): string {
-  if (!background.enabled || background.type === 'image') return '#000000';
-  if (background.type === 'solid') return background.color;
-  return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
 }
 
 /** Only active framing gestures synchronize transport; loading, Tab and cancel do not seek. */

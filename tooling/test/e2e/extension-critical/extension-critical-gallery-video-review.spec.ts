@@ -937,9 +937,9 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.zoomAdd').first().click();
-      await button('gallery.videoReview.focusType').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+      await dialog
+        .locator('[data-ui="gallery.videoReview.focusType"]')
+        .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -1183,8 +1183,8 @@ for (const variant of [
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first()
         .click();
-      await page.setViewportSize({ width: 800, height: 600 });
-      await expect(button('gallery.videoReview.focusType')).toBeInViewport();
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await expect(dialog.locator('[data-ui="gallery.videoReview.focusType"]')).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('spotlight-minimum.png') });
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -1192,18 +1192,20 @@ for (const variant of [
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first()
         .click();
-      await expect(button('gallery.videoReview.focusType')).toContainText(
-        label('gallery.videoReview.focusSpotlight')
-      );
+      await expect(
+        dialog
+          .locator('[data-ui="gallery.videoReview.focusType"]')
+          .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+      ).toHaveAttribute('aria-pressed', 'true');
       await page.setViewportSize({ width: 1280, height: 720 });
       await timelineGesture(page, 5);
       await button('gallery.videoReview.zoomAdd').first().click();
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(0);
-      await button('gallery.videoReview.focusType').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+      await dialog
+        .locator('[data-ui="gallery.videoReview.focusType"]')
+        .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
       await expect(link).toHaveCount(1);
       await link.click();
@@ -1211,9 +1213,9 @@ for (const variant of [
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await lane.locator('[role="button"]').last().click();
-      await button('gallery.videoReview.focusType').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.zoomRegionLabel'), exact: true })
+      await dialog
+        .locator('[data-ui="gallery.videoReview.focusType"]')
+        .getByRole('button', { name: label('gallery.videoReview.zoomRegionLabel'), exact: true })
         .click();
       await expect(link).toHaveCount(0);
       await button('gallery.videoReview.undo').click();
@@ -1882,9 +1884,9 @@ for (const variant of [
         })
       ).toBeVisible();
       await position.locator('summary').click();
-      await button('gallery.videoReview.focusType').click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
+      await dialog
+        .locator('[data-ui="gallery.videoReview.focusType"]')
+        .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
       await expect(inspector.locator('details[data-level="group"]')).not.toHaveAttribute(
         'open',

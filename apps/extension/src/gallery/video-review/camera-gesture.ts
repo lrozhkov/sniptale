@@ -1,15 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent,
-  type KeyboardEvent,
-} from 'react';
+import { useRef, type PointerEvent, type KeyboardEvent, type RefObject } from 'react';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
-type Center = { centerX: number; centerY: number };
+import { useCapturedPreview } from './captured-preview';
+import { captureCameraPointer, resizeCameraPointer } from './camera-pointer';
+
+type Center = { centerX: number; centerY: number; scale?: number };
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
 type CameraGestureProps = {
@@ -17,6 +13,8 @@ type CameraGestureProps = {
   videoRect: QuickEditRect;
   /** Actual Area footprint in normalized source coordinates, when the scene supplies it. */
   visibleArea?: QuickEditRect;
+  viewport?: QuickEditRect;
+  interactionElement?: RefObject<HTMLElement | null>;
   output: { width: number; height: number };
   view: 'area' | 'result';
   disabled?: boolean | undefined;
@@ -28,60 +26,51 @@ type CameraGestureProps = {
 /** A captured coordinate system prevents camera feedback while the image moves under the pointer. */
 export function useReviewCameraGesture(props: CameraGestureProps) {
   const { onPreview } = props;
-  const [draft, setDraft] = useState<Center | null>(null);
-  const drag = useRef<{
-    id: number;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    origin: Center;
-    pending: Center | null;
-    direction: number;
-  } | null>(null);
+  const { drag, draft, setDraft, cancel } = useCapturedPreview<
+    ReturnType<typeof captureCameraPointer> & { node: HTMLElement; pending: Center | null },
+    Center
+  >(props.disabled, () => onPreview?.(null));
   const baseline = useRef<Center | null>(null);
-  const preview = useRef(onPreview);
-  useEffect(() => {
-    preview.current = onPreview;
-  });
-  useEffect(
-    () => () => {
-      if (drag.current) preview.current?.(null);
-    },
-    []
-  );
-  const cancel = useCallback(() => {
-    if (drag.current) onPreview?.(null);
-    drag.current = null;
-    setDraft(null);
-  }, [onPreview]);
-  useEffect(() => {
-    if (props.disabled) cancel();
-  }, [props.disabled, cancel]);
   const publish = (center: Center) => {
-    const bounded = { centerX: clamp01(center.centerX), centerY: clamp01(center.centerY) };
+    const bounded = {
+      ...(center.scale === undefined ? {} : { scale: center.scale }),
+      centerX: clamp01(center.centerX),
+      centerY: clamp01(center.centerY),
+    };
     if (drag.current) drag.current.pending = bounded;
     setDraft(bounded);
     onPreview?.(bounded);
   };
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
     if (props.disabled || event.button !== 0 || drag.current) return;
-    const bounds = event.currentTarget.getBoundingClientRect();
+    const node = props.interactionElement?.current ?? event.currentTarget;
+    const bounds = node.getBoundingClientRect();
     if (!(bounds.width > 0 && bounds.height > 0)) return;
     event.preventDefault();
     event.stopPropagation();
-    event.currentTarget.focus();
+    node.focus();
     props.onInteract?.();
     const initial = captureCameraPointer(props, event, bounds);
-    drag.current = initial;
+    drag.current = { ...initial, node };
+    setDraft(initial.origin);
     baseline.current = null;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    node.setPointerCapture(event.pointerId);
     onPreview?.(initial.origin);
     if (initial.pending) publish(initial.pending);
   };
   const onPointerMove = (event: PointerEvent<HTMLElement>) => {
     const active = drag.current;
     if (!active || active.id !== event.pointerId) return;
+    if (active.corner) {
+      publish(
+        resizeCameraPointer(
+          active,
+          (event.clientX - active.x) / active.width,
+          (event.clientY - active.y) / active.height
+        )
+      );
+      return;
+    }
     publish({
       centerX:
         active.origin.centerX + (active.direction * (event.clientX - active.x)) / active.width,
@@ -94,8 +83,6 @@ export function useReviewCameraGesture(props: CameraGestureProps) {
     if (!active || active.id !== event.pointerId) return;
     if (active.pending) props.onCommit(active.pending);
     cancel();
-    if (event.currentTarget.hasPointerCapture(event.pointerId))
-      event.currentTarget.releasePointerCapture(event.pointerId);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (props.disabled) return;
@@ -121,6 +108,7 @@ export function useReviewCameraGesture(props: CameraGestureProps) {
   };
   return {
     camera: { ...props.camera, ...draft },
+    captured: !!draft,
     handlers: {
       onPointerDown,
       onPointerMove,
@@ -145,56 +133,4 @@ function cameraKeyDelta(key: string, step: number) {
   if (key === 'ArrowUp') return { x: 0, y: -step };
   if (key === 'ArrowDown') return { x: 0, y: step };
   return null;
-}
-
-function cameraPointerPoint(
-  event: PointerEvent<HTMLElement>,
-  bounds: DOMRect,
-  output: { width: number; height: number },
-  video: QuickEditRect
-): Center {
-  return {
-    centerX:
-      (((event.clientX - bounds.left) * output.width) / bounds.width - video.x) / video.width,
-    centerY:
-      (((event.clientY - bounds.top) * output.height) / bounds.height - video.y) / video.height,
-  };
-}
-
-/** Capture the visible crop origin and pointer scale once, including click-to-place in Area mode. */
-function captureCameraPointer(
-  props: CameraGestureProps,
-  event: PointerEvent<HTMLElement>,
-  bounds: DOMRect
-) {
-  const result = props.view === 'result';
-  const factor = result ? props.camera.scale : 1;
-  const limit = 0.5 / props.camera.scale;
-  const visible = {
-    centerX: Math.max(limit, Math.min(1 - limit, props.camera.centerX)),
-    centerY: Math.max(limit, Math.min(1 - limit, props.camera.centerY)),
-  };
-  const point = cameraPointerPoint(event, bounds, props.output, props.videoRect);
-  const area = props.visibleArea ?? {
-    x: visible.centerX - limit,
-    y: visible.centerY - limit,
-    width: limit * 2,
-    height: limit * 2,
-  };
-  const place =
-    !result &&
-    (point.centerX < area.x ||
-      point.centerX > area.x + area.width ||
-      point.centerY < area.y ||
-      point.centerY > area.y + area.height);
-  return {
-    id: event.pointerId,
-    x: event.clientX,
-    y: event.clientY,
-    width: (props.videoRect.width * factor * bounds.width) / props.output.width,
-    height: (props.videoRect.height * factor * bounds.height) / props.output.height,
-    origin: place ? point : visible,
-    pending: place ? point : null,
-    direction: result ? -1 : 1,
-  };
 }

@@ -265,3 +265,87 @@ it('drags anywhere inside the following-background Area footprint without click-
   await pointer(canvas, 'pointerup', 168, 240);
   expect(onChange).toHaveBeenLastCalledWith({ centerX: 0.6, centerY: 0.5 });
 });
+
+it.each(['nw', 'ne', 'sw', 'se'])(
+  'resizes Zoom Area from %s using the full canvas coordinate system',
+  async (corner) => {
+    const onChange = vi.fn();
+    const onPreview = vi.fn();
+    const view = renderPreview({ onChange, onPreview });
+    await act(async () => Promise.resolve());
+    const canvas = view.canvas();
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
+    Object.assign(canvas, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    const area = host.querySelector<HTMLElement>('[data-focus-frame]')!;
+    vi.spyOn(area, 'getBoundingClientRect').mockReturnValue(new DOMRect(120, 67.5, 240, 135));
+    const grip = area.querySelector<HTMLElement>(`[data-resize="${corner}"]`)!;
+    const west = corner.endsWith('w'),
+      north = corner.startsWith('n');
+    const dispatch = async (target: Element, kind: string, x: number, y: number) =>
+      act(async () => {
+        const event = new MouseEvent(kind, { bubbles: true, button: 0, clientX: x, clientY: y });
+        Object.defineProperty(event, 'pointerId', { value: 7 });
+        target.dispatchEvent(event);
+      });
+    await dispatch(grip, 'pointerdown', west ? 120 : 360, north ? 67.5 : 202.5);
+    expect(canvas.setPointerCapture).toHaveBeenCalledWith(7);
+    await dispatch(canvas, 'pointermove', west ? 72 : 408, north ? 40.5 : 229.5);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scale: expect.any(Number) })
+    );
+    await dispatch(canvas, 'pointerup', west ? 72 : 408, north ? 40.5 : 229.5);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const patch = onChange.mock.calls[0]![0];
+    // Default background has padding: validate actual opposite corner, not an assumed 1/scale crop.
+    expect(patch.scale).toBeGreaterThanOrEqual(1);
+    expect(patch.scale).toBeLessThan(2);
+    expect(canvas.releasePointerCapture).toHaveBeenCalledWith(7);
+    expect(area.dataset['controlsVisible']).toBe('false');
+  }
+);
+
+it.each(['pointercancel', 'lostpointercapture', 'Escape', 'blur'])(
+  'rolls back a corner draft on %s and releases capture before later events',
+  async (cancellation) => {
+    const onChange = vi.fn(),
+      onPreview = vi.fn();
+    const view = renderPreview({ onChange, onPreview });
+    await act(async () => Promise.resolve());
+    const canvas = view.canvas();
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
+    const release = vi.fn(() =>
+      canvas.dispatchEvent(new MouseEvent('lostpointercapture', { bubbles: true }))
+    );
+    Object.assign(canvas, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: release,
+    });
+    const area = host.querySelector<HTMLElement>('[data-focus-frame]')!;
+    await pointer(
+      area.querySelector('[data-resize="se"]')! as HTMLCanvasElement,
+      'pointerdown',
+      350,
+      200
+    );
+    await pointer(canvas, 'pointermove', 470, 250);
+    expect(onPreview).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scale: expect.any(Number) })
+    );
+    await act(async () => {
+      if (cancellation === 'Escape')
+        canvas.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+      else if (cancellation === 'blur') window.dispatchEvent(new Event('blur'));
+      else canvas.dispatchEvent(new MouseEvent(cancellation, { bubbles: true }));
+    });
+    await pointer(canvas, 'pointerup', 470, 250);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+    expect(release).toHaveBeenCalledTimes(1);
+  }
+);
