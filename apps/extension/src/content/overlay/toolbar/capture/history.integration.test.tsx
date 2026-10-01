@@ -33,10 +33,6 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-vi.mock('./local-save', () => ({
-  ToolbarLocalSaveControl: () => null,
-}));
-
 function createFrameSnapshot(): FrameSessionSnapshot {
   return {
     frames: [],

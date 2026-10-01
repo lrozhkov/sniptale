@@ -8,7 +8,6 @@ import { pagePreparationHistory } from '../../../parser/page-preparation/history
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import type { ToolbarMenuState } from '../state/menu';
 import { ToolbarResetConfirmControl } from './reset-confirm';
-import { ToolbarLocalSaveControl } from './local-save';
 import { isFrameEditing } from '../../../selection/highlighter';
 import { addFrameEditingChangedListener } from '../../../platform/page-context/mode-events';
 
@@ -170,7 +169,6 @@ export function ToolbarHistoryControls(props: {
         onConfirm={props.onClearPagePreparation}
         scope={props.resetScope ?? 'all'}
       />
-      {props.screenshotMode ? <ToolbarLocalSaveControl /> : null}
     </>
   );
 }

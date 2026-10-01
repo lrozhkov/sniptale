@@ -3,7 +3,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import {
+  pagePreparationHistory,
+  type PagePreparationResetScope,
+} from '../../../parser/page-preparation/history';
 import { ToolbarHistoryControls } from './history';
 import { useToolbarMenuState } from '../state/menu';
 
@@ -21,6 +24,9 @@ function HistoryHarness(
 }
 import { dispatchFrameEditingChanged } from '../../../platform/page-context/mode-events';
 
+// Vitest exposes the active JSDOM instance for URL changes without recreating the environment.
+declare const jsdom: { reconfigure(options: { url: string }): void };
+
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -34,7 +40,11 @@ let listener: (() => void) | null = null;
 
 function renderComponent(
   screenshotMode = true,
-  reset: { canClearPagePreparation: boolean; onClearPagePreparation: () => void } = {
+  reset: {
+    canClearPagePreparation: boolean;
+    onClearPagePreparation: () => void;
+    resetScope?: PagePreparationResetScope;
+  } = {
     canClearPagePreparation: false,
     onClearPagePreparation: () => undefined,
   },
@@ -319,3 +329,48 @@ describe('ToolbarHistoryControls', () => {
     verifyFrameEditingBlocksHistoryControls
   );
 });
+
+const resetScopes: readonly PagePreparationResetScope[] = [
+  'all',
+  'drawing',
+  'annotation',
+  'content-editing',
+  'design-review',
+];
+it.each(resetScopes)(
+  'omits local file save in %s mode after mode switches and reopening',
+  (resetScope) => {
+    const originalUrl = window.location.href;
+    jsdom.reconfigure({ url: 'file:///tmp/prepared-page.html' });
+    expect(window.location.protocol).toBe('file:');
+    const picker = vi.fn();
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: picker });
+    const reset = { canClearPagePreparation: true, onClearPagePreparation: vi.fn(), resetScope };
+    const assertActions = (navigation: boolean) => {
+      expect(
+        container?.querySelector('[data-ui="content.toolbar.local-html-save-button"]')
+      ).toBeNull();
+      expect(container?.querySelectorAll('button')).toHaveLength(navigation ? 1 : 3);
+      expect(
+        container?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.reset-all-button"]')
+          ?.disabled
+      ).toBe(false);
+    };
+    try {
+      renderComponent(true, reset);
+      assertActions(false);
+      renderComponent(false, reset, true);
+      assertActions(true);
+      act(() => root?.unmount());
+      root = null;
+      container?.remove();
+      container = null;
+      renderComponent(true, reset);
+      assertActions(false);
+      expect(picker).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(window, 'showSaveFilePicker');
+      jsdom.reconfigure({ url: originalUrl });
+    }
+  }
+);
