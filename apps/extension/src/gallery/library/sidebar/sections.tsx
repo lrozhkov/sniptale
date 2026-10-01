@@ -302,7 +302,7 @@ export function GalleryFacetFilters(props: GallerySidebarProps) {
   };
 
   return (
-    <div className="mt-3 shrink-0 border-t border-[var(--sniptale-color-border-soft)] pt-1">
+    <div className="mt-3 shrink-0 border-t border-[var(--sniptale-color-border-soft)]">
       {visibleFacets.map((facet) => (
         <GalleryFacetSection
           key={facet.id}

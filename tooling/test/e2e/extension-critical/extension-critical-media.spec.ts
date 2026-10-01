@@ -1308,3 +1308,165 @@ for (const variant of [
     }
   );
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery sidebar compact rhythm (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        const sidebar = page.locator('[data-ui="gallery.sidebar.panel"]');
+        const footer = sidebar.locator('[data-ui="gallery.sidebar.footer"] button');
+        await expect(footer).toContainText('0');
+        const status = sidebar
+          .locator('summary')
+          .filter({ hasText: translate('gallery.app.facetTitle.status', variant.locale) })
+          .first();
+        await status.hover();
+        const gaps = await status.evaluate((summary) => {
+          const details = summary.parentElement!;
+          const group = details.parentElement!;
+          return {
+            first:
+              summary.getBoundingClientRect().top -
+              group.getBoundingClientRect().top -
+              Number.parseFloat(getComputedStyle(group).borderTopWidth),
+            normal: summary.getBoundingClientRect().top - details.getBoundingClientRect().top,
+          };
+        });
+        expect(gaps.first).toBeCloseTo(gaps.normal, 1);
+        expect((await footer.boundingBox())!.height).toBeLessThanOrEqual(40);
+        expect(await sidebar.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await footer.focus();
+        await page.keyboard.press('Enter');
+        await expect(footer).toContainText(
+          translate('gallery.app.returnToLibrary', variant.locale)
+        );
+        await page.keyboard.press('Enter');
+        await expect(footer).toContainText(translate('gallery.app.trashTitle', variant.locale));
+        await page.screenshot({
+          path: `.tmp/backlog5-wave3/sidebar-${variant.locale}-${variant.theme}.png`,
+        });
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery scenario cards prioritize name and date (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const name = 'A very long scenario project name '.repeat(4);
+      const createdAt = Date.UTC(2026, 9, 2, 10, 0);
+      const scenario = {
+        ...createGuideProject(name),
+        id: 'card-scenario',
+        createdAt,
+        updatedAt: createdAt,
+      };
+      const video = createVideoProject({
+        id: 'card-video',
+        createdAt,
+        updatedAt: createdAt,
+        name: 'Video comparator',
+      });
+      try {
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: {
+            'sniptale-locale-preference': variant.locale,
+            'sniptale-theme-preference': variant.theme,
+          },
+        });
+        await page.addInitScript(
+          (locale) => localStorage.setItem('sniptale-locale-preference', locale),
+          variant.locale
+        );
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedDraftProjectEntries(page, video, scenario, createdAt);
+        await page.reload();
+        const card = page.locator('[data-gallery-keyboard-id="scenario:card-scenario"]');
+        const comparator = page.locator('[data-gallery-keyboard-id="video-project:card-video"]');
+        for (const key of [
+          'gallery.app.viewModeCompactGrid',
+          'gallery.app.viewModeLargeGrid',
+        ] as const) {
+          await page
+            .getByRole('button', { name: translate(key, variant.locale), exact: true })
+            .click();
+          await expect(card).toBeVisible();
+          await expect(card).not.toContainText(
+            translate('gallery.preview.editableProject', variant.locale)
+          );
+          await expect(card).not.toContainText(
+            translate('gallery.preview.projectPreviewMissing', variant.locale)
+          );
+          await expect(card).toContainText('2026');
+          await expect(card.getByRole('button', { name, exact: true }).last()).toHaveAttribute(
+            'title',
+            name
+          );
+          expect(await card.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+          const bounds = (await card.boundingBox())!;
+          const other = (await comparator.boundingBox())!;
+          expect(bounds.height).toBeCloseTo(other.height, 1);
+          expect(bounds.width).toBeCloseTo(other.width, 1);
+          const open = card.getByRole('button', {
+            name: translate('gallery.preview.openInEditor', variant.locale),
+            exact: true,
+          });
+          await expect(open).toBeEnabled();
+          await page.screenshot({ path: `.tmp/backlog5-wave3/cards-${variant.locale}-${key}.png` });
+        }
+        await card
+          .getByRole('button', {
+            name: translate('gallery.app.selectItem', variant.locale),
+            exact: true,
+          })
+          .click();
+        await expect(
+          card.getByRole('button', {
+            name: translate('gallery.app.selectItem', variant.locale),
+            exact: true,
+          })
+        ).toHaveAttribute('aria-pressed', 'true');
+        await card
+          .getByRole('button', {
+            name: translate('gallery.preview.openInEditor', variant.locale),
+            exact: true,
+          })
+          .click();
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                window.__sniptaleHarness
+                  ?.getCreatedTabs()
+                  .some((tab) => tab.url.includes('card-scenario')) ?? false
+            )
+          )
+          .toBe(true);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}

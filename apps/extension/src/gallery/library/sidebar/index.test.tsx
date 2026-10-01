@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { translate } from '../../../platform/i18n';
+import { formatNumber, getCurrentLocale, translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 
 import { act } from 'react';
@@ -123,8 +123,10 @@ it('composes folder and tag sections inside the shared shell', () => {
   );
   expect(trashButton?.classList.contains('w-full')).toBe(true);
   expect(trashButton?.textContent).toContain('3');
-  expect(trashButton?.textContent).toContain(formatBytes(1536));
-  expect(trashButton?.className).toContain('!flex-col');
+  expect(
+    container?.querySelector('[data-ui="gallery.trash.footerSummary"]')?.textContent
+  ).toContain(formatBytes(1536));
+  expect(trashButton?.className).not.toContain('!flex-col');
   expect(trashButton?.textContent).not.toContain(translate('gallery.app.trashSummaryCount'));
   expect(sectionMocks.folderList).toHaveBeenCalledWith(expect.objectContaining(props));
   expect(sectionMocks.facetFilters).toHaveBeenCalledWith(expect.objectContaining(props));
@@ -204,14 +206,18 @@ it('shows zero, loading and unavailable Trash totals without a misleading size',
     )
   );
   expect(footerButton()?.textContent).toContain('0');
-  expect(footerButton()?.textContent).toContain(formatBytes(0));
+  expect(
+    container?.querySelector('[data-ui="gallery.trash.footerSummary"]')?.textContent
+  ).toContain(formatBytes(0));
 
   act(() =>
     root?.render(
       <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'loading' } }} />
     )
   );
-  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeLoading'));
+  expect(
+    container?.querySelector('[data-ui="gallery.trash.footerSummary"]')?.textContent
+  ).toContain(translate('gallery.app.trashSizeLoading'));
   expect(footerButton()?.textContent).not.toContain(formatBytes(0));
 
   act(() =>
@@ -219,7 +225,9 @@ it('shows zero, loading and unavailable Trash totals without a misleading size',
       <GallerySidebar {...props} trashSummary={{ count: 2, size: { status: 'unavailable' } }} />
     )
   );
-  expect(footerButton()?.textContent).toContain(translate('gallery.app.trashSizeUnavailable'));
+  expect(
+    container?.querySelector('[data-ui="gallery.trash.footerSummary"]')?.textContent
+  ).toContain(translate('gallery.app.trashSizeUnavailable'));
   act(() => root?.render(<GallerySidebar {...props} countsKnown={false} />));
   expect(footerButton()?.textContent).not.toContain('0');
 });
@@ -290,3 +298,30 @@ it('shows count loading and makes size semantics reachable from keyboard control
     translate('gallery.app.trashSizeExplanation')
   );
 });
+
+it.each([0, 6, 42, 1234567])(
+  'renders a bounded badge and accessible full Trash count (%s)',
+  (count) => {
+    act(() =>
+      root?.render(
+        <GallerySidebar
+          {...createProps()}
+          trashSummary={{ count, size: { status: 'ready', bytes: 0 } }}
+        />
+      )
+    );
+    const footer = container!.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.sidebar.footer"] button'
+    )!;
+    const badge = footer.querySelector<HTMLElement>('[data-ui="gallery.trash.footerCount"]')!;
+    const full = formatNumber(count, undefined, getCurrentLocale());
+    expect(badge.title).toBe(full);
+    expect(badge.className).toContain('shrink-0');
+    expect(footer.getAttribute('aria-label')).toBe(
+      `${translate('gallery.app.trashTitle')}: ${full}`
+    );
+    expect(footer.className).not.toContain('flex-col');
+    if (count < 1000) expect(badge.textContent).toBe(full);
+    else expect(badge.textContent!.length).toBeLessThan(full.length);
+  }
+);

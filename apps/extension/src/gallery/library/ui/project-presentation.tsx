@@ -1,3 +1,4 @@
+import { formatDate } from './date';
 import type { GalleryViewMode } from '../types';
 import type { GalleryItem } from '../items';
 import { canOpenGalleryProject } from '../items/types';
@@ -78,6 +79,12 @@ export function GalleryProjectDetails(props: {
   if (!summary) return null;
   const isList = props.viewMode === 'list';
   const isCompact = props.viewMode === 'compact-grid';
+  const gridSummary =
+    props.item.type === 'scenario' &&
+    canOpenGalleryProject(props.item) &&
+    props.item.lifecycle?.trashedAt === undefined
+      ? formatDate(props.item.createdAt)
+      : summary;
   return (
     <div
       className={
@@ -103,9 +110,9 @@ export function GalleryProjectDetails(props: {
           <div
             className={`${isCompact ? 'text-[10px] leading-3' : 'text-xs leading-4'}
               truncate text-[var(--sniptale-color-text-secondary)]`}
-            title={summary}
+            title={gridSummary}
           >
-            {summary}
+            {gridSummary}
           </div>
         </div>
       ) : null}

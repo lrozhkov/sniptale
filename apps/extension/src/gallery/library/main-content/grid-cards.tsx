@@ -109,7 +109,7 @@ function GalleryGridCardMedia(props: GalleryGridCardProps) {
         title={props.item.filename}
       />
       <MediaThumb
-        showProjectHint={!isList}
+        showProjectHint={!isList && props.item.type !== 'scenario'}
         item={props.item}
         fit="contain"
         deferUntilVisible={

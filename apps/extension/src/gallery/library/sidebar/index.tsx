@@ -33,9 +33,9 @@ const gallerySidebarPanelClassName = [
 ].join(' ');
 
 const trashButtonClassName = [
-  'flex min-h-10 min-w-0 w-full cursor-pointer flex-row items-center justify-center gap-2',
+  'flex min-h-10 min-w-0 w-full cursor-pointer flex-row items-center justify-between gap-2',
   'rounded-[var(--sniptale-radius-sm)] border border-[var(--sniptale-color-border-soft)]',
-  'bg-transparent px-2 py-2 text-center transition-colors',
+  'bg-transparent px-2 py-1.5 text-center transition-colors',
   'hover:border-[var(--sniptale-color-border-strong)] hover:bg-[var(--sniptale-color-surface-hover)]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
   'focus-visible:ring-[var(--sniptale-color-accent)]',
@@ -86,7 +86,6 @@ function GalleryTrashSummaryText({
 }
 
 export function GallerySidebar(props: GallerySidebarProps) {
-  const sizeDescriptionId = useId();
   return (
     <InspectorShellFrame
       expandedWidthClassName={INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS}
@@ -107,51 +106,86 @@ export function GallerySidebar(props: GallerySidebarProps) {
             </>
           )}
         </div>
-        <div
-          data-ui="gallery.sidebar.footer"
-          className="flex shrink-0 border-t border-[var(--sniptale-color-border-soft)] p-2.5"
-        >
-          <button
-            type="button"
-            disabled={props.busy}
-            aria-describedby={props.trashMode ? undefined : sizeDescriptionId}
-            className={`${trashButtonClassName} !flex-col`}
-            onClick={() => props.onTrashModeChange?.(!props.trashMode)}
-          >
-            <span className="flex min-w-0 items-center justify-center gap-2 whitespace-nowrap text-sm font-semibold">
-              {props.trashMode ? (
-                <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
-              ) : (
-                <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-              )}
-              <span className="truncate">
-                {translate(
-                  props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle'
-                )}
-              </span>
-            </span>
-            {!props.trashMode ? (
-              props.countsKnown ? (
-                <span
-                  data-ui="gallery.trash.footerSummary"
-                  className="flex min-w-0 flex-wrap justify-center gap-x-2 text-sm font-medium
-                    tabular-nums text-[var(--sniptale-color-text-secondary)]"
-                >
-                  <GalleryTrashSummaryText summary={props.trashSummary} compact />
-                </span>
-              ) : (
-                <span className="text-sm text-[var(--sniptale-color-text-secondary)]">
-                  {translate('gallery.app.trashCountLoading')}
-                </span>
-              )
-            ) : null}
-          </button>
-          <span id={sizeDescriptionId} className="sr-only">
-            {translate('gallery.app.trashSizeExplanation')}
-          </span>
-        </div>
+        <GallerySidebarFooter {...props} />
       </InspectorShellPanel>
     </InspectorShellFrame>
+  );
+}
+
+function getTrashCountPresentation(
+  props: Pick<GallerySidebarProps, 'countsKnown' | 'trashSummary'>
+) {
+  const count = props.trashSummary?.count ?? 0;
+  const fullCount = formatNumber(count, undefined, getCurrentLocale());
+  const countLabel = props.countsKnown ? fullCount : translate('gallery.app.trashCountLoading');
+  const compactCount = props.countsKnown
+    ? formatNumber(
+        count,
+        count >= 1000 ? { notation: 'compact', maximumFractionDigits: 1 } : undefined,
+        getCurrentLocale()
+      )
+    : countLabel;
+  return { countLabel, compactCount };
+}
+
+function GallerySidebarFooter(
+  props: Pick<
+    GallerySidebarProps,
+    'busy' | 'trashMode' | 'countsKnown' | 'trashSummary' | 'onTrashModeChange'
+  >
+) {
+  const sizeDescriptionId = useId();
+  const { countLabel, compactCount } = getTrashCountPresentation(props);
+  return (
+    <div
+      data-ui="gallery.sidebar.footer"
+      className="flex shrink-0 border-t border-[var(--sniptale-color-border-soft)] p-2.5"
+    >
+      <button
+        type="button"
+        disabled={props.busy}
+        aria-describedby={props.trashMode ? undefined : sizeDescriptionId}
+        className={trashButtonClassName}
+        aria-label={
+          props.trashMode
+            ? translate('gallery.app.returnToLibrary')
+            : `${translate('gallery.app.trashTitle')}: ${countLabel}`
+        }
+        onClick={() => props.onTrashModeChange?.(!props.trashMode)}
+      >
+        <span className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-sm font-semibold">
+          {props.trashMode ? (
+            <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span className="truncate">
+            {translate(props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle')}
+          </span>
+        </span>
+        {!props.trashMode ? (
+          <>
+            <span
+              data-ui="gallery.trash.footerCount"
+              title={countLabel}
+              aria-hidden="true"
+              className="max-w-24 shrink-0 truncate rounded-full border
+                    border-[var(--sniptale-color-border-soft)] px-2 py-0.5
+                    text-[11px] font-semibold tabular-nums
+                    text-[var(--sniptale-color-text-secondary)]"
+            >
+              {compactCount}
+            </span>
+          </>
+        ) : null}
+      </button>
+      <span id={sizeDescriptionId} data-ui="gallery.trash.footerSummary" className="sr-only">
+        {translate('gallery.app.trashSizeExplanation')}
+        {props.countsKnown ? (
+          <GalleryTrashSummaryText summary={props.trashSummary} compact />
+        ) : null}
+      </span>
+    </div>
   );
 }
 
