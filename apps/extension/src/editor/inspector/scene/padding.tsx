@@ -7,7 +7,8 @@ import {
   ProductGlassLinkedPaddingFields,
   type ProductGlassLinkedPaddingValue,
 } from '@sniptale/ui/product-glass-controls';
-import { CompactRange, NumericRow, NumericValueField } from '../../chrome/ui';
+import { NumericRangeScrub } from '../../../ui/compact-inspector-controls';
+import { NumericRow, NumericValueField } from '../../chrome/ui';
 import { PanelSection } from './shared';
 
 type PaddingHoverSide = keyof ProductGlassLinkedPaddingValue | 'all';
@@ -59,8 +60,11 @@ export function FramePaddingFields(props: {
 }) {
   const [hoveredSide, setHoveredSide] = useState<PaddingHoverSide | null>(null);
   const [focusedSide, setFocusedSide] = useState<PaddingHoverSide | null>(null);
+  const [rangeActive, setRangeActive] = useState(false);
   return (
     <div
+      className="relative"
+      data-ui="editor.frame.padding-fields"
       onPointerMoveCapture={(event) => setHoveredSide(readPaddingHoverSide(event.target))}
       onPointerLeave={() => setHoveredSide(null)}
       onFocusCapture={(event) => setFocusedSide(readPaddingHoverSide(event.target))}
@@ -80,15 +84,25 @@ export function FramePaddingFields(props: {
         padding={selectFramePadding(props.frameDraft)}
         onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
         renderUniformField={({ onChange, value }) => (
-          <div className="w-full min-w-0" data-ui="editor.frame.padding-slider">
-            <CompactRange
-              aria-label={translate('highlighter.editor.paddingLabel')}
-              min={0}
-              max={256}
-              step={1}
-              value={Math.min(256, value)}
-              onChange={(event) => onChange(Number(event.currentTarget.value))}
-              onValueCommit={onChange}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-8"
+            data-ui="editor.frame.padding-slider"
+            data-padding-hover="all"
+          >
+            <NumericRangeScrub
+              active={rangeActive}
+              label={translate('highlighter.editor.paddingLabel')}
+              onActiveChange={setRangeActive}
+              onCommitValue={onChange}
+              onPreviewValue={onChange}
+              scrub={{ min: 0, max: 256, step: 1 }}
+              value={value}
+              visible={
+                rangeActive ||
+                hoveredSide === 'all' ||
+                hoveredSide === 'top' ||
+                focusedSide === 'top'
+              }
             />
           </div>
         )}

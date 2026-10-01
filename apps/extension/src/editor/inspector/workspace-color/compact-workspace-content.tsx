@@ -12,6 +12,7 @@ export function renderCompactWorkspaceColorField(params: InspectorCommandParams)
       value={params.workspace.backgroundColor}
       recentColors={params.recentColors}
       palette={params.workspaceBackgroundPalette}
+      paletteInPicker
       onChange={params.applyWorkspaceColor}
       onPreviewChange={(color) => params.updateWorkspace({ backgroundColor: color })}
       onPreviewReset={(color) => params.updateWorkspace({ backgroundColor: color })}

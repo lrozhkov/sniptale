@@ -27,6 +27,7 @@ export type {
   PanelSectionProps,
 } from './layout';
 export { NumericRow, NumericValueField } from './numeric';
+export { NumericRangeScrub } from './numeric-range-scrub';
 export type { NumericRowProps, NumericValueFieldProps } from './numeric';
 export { MiniScrubber } from './scrubber';
 export type { MiniScrubberProps } from './scrubber';

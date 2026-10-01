@@ -77,7 +77,15 @@ it('places the linked padding slider below its value with a complete focus outli
   const range = fields?.querySelector('input[type="range"]');
   expect(row?.querySelector('input[type="text"]')).not.toBeNull();
   expect(range?.closest('[data-ui="editor.frame.padding-slider"]')).not.toBeNull();
-  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain('w-full');
+  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain(
+    'absolute'
+  );
+  expect(
+    range
+      ?.closest('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+      ?.getAttribute('aria-hidden')
+  ).toBe('true');
+  expect(range?.getAttribute('tabindex')).toBe('-1');
   expect(row?.querySelector('[data-focus-appearance="accent-box"]')).not.toBeNull();
 });
 
@@ -108,4 +116,21 @@ it('keeps the linked padding slider keyboard reachable after numeric input focus
   await act(async () => input.focus());
   expect(range.tabIndex).toBe(0);
   expect(range.closest('[data-ui="shared.linked-padding-fields"]')).not.toBeNull();
+});
+
+it('retains the scrub during dragging after leaving the padding label', async () => {
+  const label = container.querySelector('[data-padding-hover="all"]')!;
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  const fields = container.querySelector('[data-ui="editor.frame.padding-fields"]')!;
+  await act(async () => label.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(range.tabIndex).toBe(0);
+  await act(async () => range.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  await act(async () =>
+    fields.dispatchEvent(
+      new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  expect(range.tabIndex).toBe(0);
+  await act(async () => range.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+  expect(range.tabIndex).toBe(-1);
 });

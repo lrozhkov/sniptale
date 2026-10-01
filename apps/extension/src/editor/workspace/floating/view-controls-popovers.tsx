@@ -28,7 +28,7 @@ export function CompactWorkspacePopoverContent({
   const commands = buildGridCompactCommands(params).filter(
     (command) =>
       command.id !== 'grid-presets' &&
-      (params.workspace.gridEnabled || command.active !== undefined)
+      (params.workspace.gridEnabled || command.id === 'grid-toggle')
   );
 
   return (
@@ -44,27 +44,29 @@ export function CompactWorkspacePopoverContent({
           <CompactWorkspaceColorPanel params={params} />
           <div className="space-y-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
             <SelectionVisibilitySetting />
-            {commands.map((command) => (
-              <div key={command.id}>
-                {command.active === undefined ? (
-                  renderFloatingToolbarCommandBody(command, { hideLabel: true })
-                ) : (
-                  <div
-                    data-inspector-toggle
-                    className="flex min-h-8 items-center justify-between gap-3"
-                  >
-                    <span className="min-w-0 text-xs">{command.title}</span>
-                    <ProductGlassSwitch
-                      aria-label={command.title}
-                      aria-pressed={command.active}
-                      on={command.active}
-                      disabled={command.disabled}
-                      onClick={() => void command.onClick?.()}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+            <div className="space-y-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
+              {commands.map((command) => (
+                <div key={command.id}>
+                  {command.active === undefined ? (
+                    renderFloatingToolbarCommandBody(command, { hideLabel: true })
+                  ) : (
+                    <div
+                      data-inspector-toggle
+                      className="flex min-h-8 items-center justify-between gap-3"
+                    >
+                      <span className="min-w-0 text-xs">{command.title}</span>
+                      <ProductGlassSwitch
+                        aria-label={command.title}
+                        aria-pressed={command.active}
+                        on={command.active}
+                        disabled={command.disabled}
+                        onClick={() => void command.onClick?.()}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
