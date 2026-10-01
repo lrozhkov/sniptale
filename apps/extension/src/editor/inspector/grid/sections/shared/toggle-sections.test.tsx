@@ -75,7 +75,7 @@ it('renders canonical switches with state and action labels', () => {
   });
 
   expect(container?.querySelector('[aria-label="editor.compact.showGrid"]')).not.toBeNull();
-  expect(container?.querySelector('[aria-label="editor.compact.disableSnap"]')).not.toBeNull();
+  expect(container?.querySelector('[aria-label="editor.compact.enableGridSnap"]')).not.toBeNull();
   expect(container?.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
   expect(container?.querySelectorAll('[aria-pressed="false"]')).toHaveLength(1);
   expect(container?.textContent).not.toContain('editor.compact.magnet');

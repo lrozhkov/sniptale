@@ -116,7 +116,11 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
   const { selectLayer, setActiveTool, withHistoryMuted } = createSelectionActionHelpers(
     args.controller
   );
-  const runRasterLayerAction = createRasterLayerActionRunner(selectLayer, withHistoryMuted);
+  const runRasterLayerAction = createRasterLayerActionRunner(
+    selectLayer,
+    withHistoryMuted,
+    args.setInspector
+  );
   const openLayerEffects = createOpenLayerEffectsHandler(
     selectLayer,
     withHistoryMuted,
@@ -227,11 +231,15 @@ function createSelectionActionHelpers(controller: ReturnType<typeof useEditorCon
 
 function createRasterLayerActionRunner(
   selectLayer: ReturnType<typeof useEditorController>['selectLayer'],
-  withHistoryMuted: ReturnType<typeof useEditorController>['withHistoryMuted']
+  withHistoryMuted: ReturnType<typeof useEditorController>['withHistoryMuted'],
+  setInspector: EditorInspectorStoreSlice['setInspector']
 ) {
   return async (layerId: string, action: () => Promise<void>) => {
+    const keepParameters = useEditorStore.getState().inspector === 'layer-effects';
     withHistoryMuted(() => {
       selectLayer(layerId, { focusViewport: false });
+      // Selection enters Select mode; parameter admission keeps its current panel.
+      if (keepParameters) setInspector('layer-effects');
     });
 
     await action();

@@ -43,7 +43,10 @@ export function renderCompactWorkspaceDefaultAction(params: InspectorCommandPara
 
 export function CompactWorkspaceColorPanel({ params }: { params: InspectorCommandParams }) {
   return (
-    <div className="space-y-3">
+    <div
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+      data-ui="editor.workspace.background-default-row"
+    >
       {renderCompactWorkspaceColorField(params)}
       {renderCompactWorkspaceDefaultAction(params)}
     </div>

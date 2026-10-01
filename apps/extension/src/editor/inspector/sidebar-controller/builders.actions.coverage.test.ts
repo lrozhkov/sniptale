@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { useEditorStore } from '../../state/useEditorStore';
 import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../../features/editor/document/image-types';
 
 const actionRailMocks = vi.hoisted(() => ({ exportSession: vi.fn() }));
@@ -123,4 +124,60 @@ it('routes controller actions and rich-shape arrangement branches', async () => 
   expect(controller.sendSelectionToBack).toHaveBeenCalledOnce();
   expect(controller.withHistoryMuted).toHaveBeenCalled();
   expect(richShapeSelectionMocks.updateSelectedRichShapeFormatting).toHaveBeenCalled();
+});
+
+it('keeps layer parameters open when raster action admission selects its target', async () => {
+  const previous = useEditorStore.getState();
+  const store = createStoreSlice();
+  const controller = createController();
+  store.setInspector.mockImplementation((inspector) =>
+    useEditorStore.getState().setInspector(inspector)
+  );
+  controller.selectLayer.mockImplementation(() =>
+    useEditorStore.getState().setActiveTool('select')
+  );
+  try {
+    useEditorStore.setState({ inspector: 'layer-effects' });
+    const props = createControllerActionProps({ controller, store });
+    await props.applyLayerTransformation('image-layer', 'rotate-left');
+    expect(useEditorStore.getState().inspector).toBe('layer-effects');
+    await props.applyLayerEffect('image-layer', { id: 'brightness', amount: 0.25, enabled: true });
+    expect(useEditorStore.getState().inspector).toBe('layer-effects');
+    expect(controller.selectLayer).toHaveBeenCalledWith('image-layer', { focusViewport: false });
+  } finally {
+    useEditorStore.setState(previous);
+  }
+});
+
+it('does not reopen parameters after the user leaves a pending raster action', async () => {
+  const previous = useEditorStore.getState();
+  const store = createStoreSlice();
+  const controller = createController();
+  let finish!: () => void;
+  controller.applyLayerTransformation.mockImplementation(
+    () =>
+      new Promise<undefined>((resolve) => {
+        finish = () => resolve(undefined);
+      })
+  );
+  store.setInspector.mockImplementation((inspector) =>
+    useEditorStore.getState().setInspector(inspector)
+  );
+  controller.selectLayer.mockImplementation(() =>
+    useEditorStore.getState().setActiveTool('select')
+  );
+  try {
+    useEditorStore.setState({ inspector: 'layer-effects' });
+    const pending = createControllerActionProps({ controller, store }).applyLayerTransformation(
+      'image-layer',
+      'rotate-left'
+    );
+    expect(useEditorStore.getState().inspector).toBe('layer-effects');
+    useEditorStore.getState().setInspector('tool');
+    finish();
+    await pending;
+    expect(useEditorStore.getState().inspector).toBe('tool');
+  } finally {
+    useEditorStore.setState(previous);
+  }
 });

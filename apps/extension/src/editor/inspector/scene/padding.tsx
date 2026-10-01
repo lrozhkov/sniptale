@@ -80,7 +80,7 @@ export function FramePaddingFields(props: {
         padding={selectFramePadding(props.frameDraft)}
         onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
         renderUniformField={({ onChange, value }) => (
-          <div className="ml-auto mr-[2.125rem] w-[4.75rem]" data-ui="editor.frame.padding-slider">
+          <div className="w-full min-w-0" data-ui="editor.frame.padding-slider">
             <CompactRange
               aria-label={translate('highlighter.editor.paddingLabel')}
               min={0}

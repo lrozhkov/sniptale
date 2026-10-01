@@ -37,15 +37,14 @@ function buildGridPaletteButtons(params: InspectorCommandParams) {
 
 function buildToggleCompactCommand(options: {
   active: boolean;
-  activeTitle: string;
   icon: ReactNode;
   id: string;
-  inactiveTitle: string;
+  title: string;
   onClick: () => void;
 }): CompactCommand {
   return {
     id: options.id,
-    title: options.active ? options.activeTitle : options.inactiveTitle,
+    title: options.title,
     trigger: options.icon,
     active: options.active,
     onClick: options.onClick,
@@ -57,8 +56,7 @@ function buildGridToggleCompactCommands(params: InspectorCommandParams): Compact
     buildToggleCompactCommand({
       id: 'grid-toggle',
       active: params.workspace.gridEnabled,
-      activeTitle: translate('editor.compact.hideGrid'),
-      inactiveTitle: translate('editor.compact.showGrid'),
+      title: translate('editor.compact.showGrid'),
       icon: params.workspace.gridEnabled ? (
         <EyeOff size={15} strokeWidth={2} />
       ) : (
@@ -69,8 +67,7 @@ function buildGridToggleCompactCommands(params: InspectorCommandParams): Compact
     buildToggleCompactCommand({
       id: 'grid-snap-toggle',
       active: params.workspace.gridSnapEnabled,
-      activeTitle: translate('editor.compact.disableGridSnap'),
-      inactiveTitle: translate('editor.compact.enableGridSnap'),
+      title: translate('editor.compact.enableGridSnap'),
       icon: <Link2 size={15} strokeWidth={2} />,
       onClick: () => params.updateWorkspace({ gridSnapEnabled: !params.workspace.gridSnapEnabled }),
     }),

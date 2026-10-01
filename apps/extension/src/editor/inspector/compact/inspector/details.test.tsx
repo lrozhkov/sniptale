@@ -235,6 +235,9 @@ it('builds grid commands with commit-only color controls', () => {
       gridSnapEnabled: true,
     },
   } as never);
+  expect(activeGridCommands.slice(0, 2).map((command) => command.title)).toEqual(
+    gridCommands.slice(0, 2).map((command) => command.title)
+  );
   const gridControl = ((gridCommands[2]!.content as any).props.children as any).props;
   const gridSizeControl = ((gridCommands[3]!.content as any).props.children as any).props;
   const gridPaletteButtons = ((gridCommands[4]!.content as any).props.children.props.children ??

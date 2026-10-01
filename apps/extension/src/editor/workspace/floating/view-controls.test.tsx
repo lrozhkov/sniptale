@@ -9,7 +9,7 @@ import { EditorFloatingViewControls } from './view-controls';
 
 const mocks = vi.hoisted(() => ({
   gridCommands: vi.fn<() => CompactCommand[]>(() => [
-    { id: 'grid-toggle', title: 'Grid', trigger: 'G', onClick: vi.fn() },
+    { id: 'grid-toggle', title: 'Grid', trigger: 'G', active: false, onClick: vi.fn() },
   ]),
   onApply: vi.fn(async () => undefined),
   saveWorkspaceColorAsDefault: vi.fn(),
@@ -86,7 +86,7 @@ function renderControls(
             workspace: {
               backgroundColor: '#f2f4f7',
               gridColor: '#94a3b8',
-              gridEnabled: false,
+              gridEnabled: overrides.gridEnabled ?? false,
               gridSize: 24,
               gridSnapEnabled: false,
               magnetEnabled: false,
@@ -288,7 +288,7 @@ it('keeps inside clicks open, toggles combined settings closed, and omits scenar
       ),
     },
   ] satisfies CompactCommand[]);
-  renderControls(true);
+  renderControls(true, { gridEnabled: true });
 
   expect(container?.textContent).not.toContain('applyToScenario');
   expect(

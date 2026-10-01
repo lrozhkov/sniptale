@@ -9,17 +9,19 @@ export function GridPanelSections(props: GridPanelBodyProps) {
         gridSnapEnabled={props.gridSnapEnabled}
         updateWorkspace={props.updateWorkspace}
       />
-      <EditorInspectorGridStyleSections
-        applyGridColor={props.applyGridColor}
-        clampGridSize={props.clampGridSize}
-        gridColor={props.gridColor}
-        gridPalette={props.gridPalette}
-        gridSize={props.gridSize}
-        gridSizeMax={props.gridSizeMax}
-        gridSizeMin={props.gridSizeMin}
-        recentColors={props.recentColors}
-        updateWorkspace={props.updateWorkspace}
-      />
+      {props.gridEnabled ? (
+        <EditorInspectorGridStyleSections
+          applyGridColor={props.applyGridColor}
+          clampGridSize={props.clampGridSize}
+          gridColor={props.gridColor}
+          gridPalette={props.gridPalette}
+          gridSize={props.gridSize}
+          gridSizeMax={props.gridSizeMax}
+          gridSizeMin={props.gridSizeMin}
+          recentColors={props.recentColors}
+          updateWorkspace={props.updateWorkspace}
+        />
+      ) : null}
     </div>
   );
 }

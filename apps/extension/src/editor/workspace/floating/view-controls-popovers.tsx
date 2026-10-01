@@ -26,7 +26,9 @@ export function CompactWorkspacePopoverContent({
   const params = createFloatingWorkspaceCommandParams({ documentController, hasImage });
   // The color field already exposes the same palette in its picker.
   const commands = buildGridCompactCommands(params).filter(
-    (command) => command.id !== 'grid-presets'
+    (command) =>
+      command.id !== 'grid-presets' &&
+      (params.workspace.gridEnabled || command.active !== undefined)
   );
 
   return (

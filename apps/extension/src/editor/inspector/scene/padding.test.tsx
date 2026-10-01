@@ -77,9 +77,7 @@ it('places the linked padding slider below its value with a complete focus outli
   const range = fields?.querySelector('input[type="range"]');
   expect(row?.querySelector('input[type="text"]')).not.toBeNull();
   expect(range?.closest('[data-ui="editor.frame.padding-slider"]')).not.toBeNull();
-  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain(
-    'w-[4.75rem]'
-  );
+  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain('w-full');
   expect(row?.querySelector('[data-focus-appearance="accent-box"]')).not.toBeNull();
 });
 
