@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { Activity } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewRuler, ReviewToolbar } from './timeline-chrome';
@@ -15,6 +16,7 @@ import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { reviewTimelineNavigationBounds } from './track-projection';
 
 type TimelineProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   busy?: boolean;
   duration: number;
   time: number;
@@ -81,8 +83,10 @@ export function ReviewTimeline(props: TimelineProps) {
       revealBoundary(viewport.current, props.time, navigation, props.duration, gutter, width, zoom);
   }, [props.time, navigation, props.duration, zoom, gutter, width, viewport]);
   const navigate = (target: number) => {
-    props.onSeek(target, false);
-    revealBoundary(viewport.current, target, navigation, props.duration, gutter, width, zoom);
+    (props.beforeAction ?? ((action) => action()))(() => {
+      props.onSeek(target, false);
+      revealBoundary(viewport.current, target, navigation, props.duration, gutter, width, zoom);
+    });
   };
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   const hover = useReviewTimelineHover({
@@ -108,7 +112,8 @@ export function ReviewTimeline(props: TimelineProps) {
         onNavigate={navigate}
         resultDuration={createReviewTimeMap(props.duration, props.edits ?? []).getDuration()}
         zoom={zoom}
-        onZoom={setZoom}
+        onPlay={() => (props.beforeAction ?? ((action) => action()))(props.onPlay)}
+        onZoom={(value) => (props.beforeAction ?? ((action) => action()))(() => setZoom(value))}
       />
       <div
         ref={viewport}

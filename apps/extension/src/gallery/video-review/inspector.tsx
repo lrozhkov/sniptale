@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ReviewInspectorPresentation } from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
@@ -29,6 +30,7 @@ import {
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
@@ -79,7 +81,9 @@ export function ReviewInspector(props: {
         presentation={presentation}
         section={shown}
         onTogglePresentation={() =>
-          setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
+          (props.beforeAction ?? ((action) => action()))(() =>
+            setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
+          )
         }
       />
       <div className="shrink-0">
@@ -163,7 +167,14 @@ function useReviewInspectorNavigation(props: Parameters<typeof ReviewInspector>[
       : props.settingsAvailable
         ? 'scene'
         : 'comments';
-  const [section, setSection] = useState<Section>(contextSection);
+  const [section, updateSection] = useState<Section>(contextSection);
+  const explicitSection = useRef<Section | null>(null);
+  const setSection = (value: Section) => {
+    (props.beforeAction ?? ((action) => action()))(() => {
+      explicitSection.current = value;
+      updateSection(value);
+    });
+  };
   const scroll = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (scroll.current) scroll.current.scrollTop = 0;
@@ -176,12 +187,15 @@ function useReviewInspectorNavigation(props: Parameters<typeof ReviewInspector>[
     previousSettings.current = props.settingsAvailable;
     const exportRequested = previousExportRequest.current !== (props.exportRequest ?? 0);
     previousExportRequest.current = props.exportRequest ?? 0;
-    setSection((current) =>
+    const explicit = explicitSection.current;
+    explicitSection.current = null;
+    updateSection((current) =>
       exportRequested && exportAvailable
         ? 'export'
-        : !modeChanged && contextSection === 'scene' && current === 'comments'
-          ? current
-          : contextSection
+        : (explicit ??
+          (!modeChanged && contextSection === 'scene' && current === 'comments'
+            ? current
+            : contextSection))
     );
   }, [
     contextKey,
@@ -191,6 +205,9 @@ function useReviewInspectorNavigation(props: Parameters<typeof ReviewInspector>[
     props.exportRequest,
     exportAvailable,
   ]);
+  useEffect(() => {
+    explicitSection.current = null;
+  });
   const shown =
     section === 'selected' && !props.selectionLabel
       ? props.settingsAvailable

@@ -412,7 +412,11 @@ it('closes the preview only after saving the note and preserves it when saving f
     await act(async () => close.click());
     expect(onClose).toHaveBeenCalledOnce();
     expect(fixture.back).not.toHaveBeenCalled();
-    expect(fixture.snapshot.draft?.annotation.text).toBe('Keep this note');
+    expect(fixture.snapshot.draft).toBeNull();
+    expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
+      target: 'annotation',
+      after: { text: 'Keep this note' },
+    });
   } finally {
     await fixture.cleanup();
   }
@@ -497,7 +501,7 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
     expect(field).not.toBeNull();
     expect(document.activeElement).toBe(field);
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
-    expect(buttons[0]!.disabled).toBe(true);
+    expect(buttons[0]!.disabled).toBe(false);
     expect(
       fixture.host.querySelectorAll('[data-ui="gallery.videoReview.commentComposer"]')
     ).toHaveLength(1);

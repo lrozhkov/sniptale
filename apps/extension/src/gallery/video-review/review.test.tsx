@@ -109,7 +109,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     expect(
       host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.addComment"]')
         ?.disabled
-    ).toBe(true);
+    ).toBe(false);
     expect(host.querySelector('input[type="number"]')).toBeNull();
     const stage = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.stage"]')!;
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 360));
@@ -205,7 +205,9 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     expect(host.textContent).toContain('gallery.videoReview.saveFailed');
     await click('back');
     expect(back).toHaveBeenCalledOnce();
-    expect(fixture.snapshot.draft?.annotation.text).toBe('Keep this text');
+    expect(fixture.snapshot.draft).toBeNull();
+    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
+    expect(host.textContent).toContain('Keep this text');
   } finally {
     await fixture.cleanup();
   }

@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
@@ -24,6 +25,7 @@ type Exporter = ReturnType<typeof useReviewExport>;
 
 /** Zoom lane on the result-time scale with shared snap candidates. */
 function ReviewZoomLane(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   advanced: QuickEditAdvancedState;
   projection?: ReviewTrackProjection;
   resultDuration: number;
@@ -37,10 +39,13 @@ function ReviewZoomLane(props: {
 }) {
   return (
     <ReviewZoomTrack
+      beforeAction={props.beforeAction}
       projection={props.projection}
       sourceSelection={props.sourceSelection}
       enabled={props.advanced.zoom.enabled}
-      onToggleEnabled={props.zoom.toggleEnabled}
+      onToggleEnabled={() =>
+        (props.beforeAction ?? ((action) => action()))(props.zoom.toggleEnabled)
+      }
       duration={props.resultDuration}
       time={props.outputTime}
       regions={props.advanced.zoom.regions}
@@ -49,10 +54,14 @@ function ReviewZoomLane(props: {
       toOutputTime={props.toOutputTime}
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}
-      onLink={(id, linkTo) => props.zoom.change(id, { linkTo })}
+      onLink={(id, linkTo) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.zoom.change(id, { linkTo }))
+      }
       linkSelectedId={props.zoom.linkSelection}
-      onSelectLink={props.zoom.setLinkSelection}
-      onAdd={props.onAdd}
+      onSelectLink={(id) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.zoom.setLinkSelection(id))
+      }
+      onAdd={() => (props.beforeAction ?? ((action) => action()))(props.onAdd)}
       onDragCommit={props.zoom.commitDrag}
     />
   );
@@ -60,6 +69,7 @@ function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   edits: readonly ReviewEdit[];
   selectedEditId: string | undefined;
   onOriginalRange(range: ReviewAnchor): void;
@@ -78,6 +88,7 @@ function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      beforeAction={props.beforeAction}
       originalEditor={props.audio}
       selectedEditId={props.selectedEditId}
       edits={props.edits}
@@ -105,6 +116,7 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
     cutting: Editing['cutting'];
     exporter: Exporter;
@@ -157,6 +169,7 @@ function ReviewTimelineToolsBinding(
       className="contents"
     >
       <ReviewTimelineToolbar
+        beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
         focusTool={props.focusTool}
         editing={{
@@ -216,7 +229,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
-      onOpenExport={props.onOpenExport}
+      beforeAction={props.beforeAction}
+      onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
       historyControls={props.historyControls}
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -234,9 +248,15 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       trackControls={
         <ReviewTrackControls
           advanced={props.advanced}
-          setMode={props.setMode}
+          setMode={(mode) =>
+            (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
+          }
           telemetryAvailable={props.telemetryAvailable}
-          setTrackVisibility={props.setTrackVisibility}
+          setTrackVisibility={(track, visible) =>
+            (props.beforeAction ?? ((action) => action()))(() =>
+              props.setTrackVisibility(track, visible)
+            )
+          }
           busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
         />
       }
@@ -245,6 +265,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             zoomTrack: (
               <ReviewZoomLane
+                beforeAction={props.beforeAction}
                 projection={projection}
                 sourceSelection={focus.tool.active ? props.selection : undefined}
                 advanced={props.advanced}
@@ -269,6 +290,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                beforeAction={props.beforeAction}
                 selectedEditId={props.editing.selected?.id}
                 edits={props.edits}
                 onOriginalRange={(range) => {
@@ -327,9 +349,13 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         props.setSelection(range);
       }}
       onPlay={props.onPlay}
-      onMarker={props.onMarker}
+      onMarker={(marker) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.onMarker(marker))
+      }
       onClearSelection={props.onClearSelection}
-      onComment={props.onComment}
+      onComment={(note) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.onComment(note))
+      }
     />
   );
 }

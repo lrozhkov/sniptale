@@ -62,7 +62,10 @@ function setup() {
     }),
     readVideoWorkspace: vi.fn(async () => structuredClone(snapshot)),
     moveVideoWorkspaceHistory: vi.fn(async () => structuredClone(snapshot)),
-    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
+    saveVideoWorkspaceSnapshot: vi.fn(async (args) => {
+      snapshot = { workspace: args.workspace, draft: args.draft };
+      return structuredClone(snapshot);
+    }),
     saveVideoWorkspaceAdvanced: vi.fn(async () => structuredClone(snapshot)),
   } satisfies Parameters<typeof createVideoReviewSession>[1];
   const session = createVideoReviewSession(snapshot, deps);
@@ -170,4 +173,47 @@ it('clears an unchanged edit without adding history and explicitly reloads saved
   await act(async () => composer.discard());
   expect(session.getSnapshot().snapshot.draft).toBeNull();
   expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(0);
+});
+
+it('joins Save and new-note completion and consumes recovery once', async () => {
+  const { session, deps } = setup();
+  act(() => composer.change(annotation, null));
+  await act(async () => {
+    await Promise.all([composer.save(), composer.finishNew(), composer.finishNew()]);
+  });
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(1);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(composer.getCurrent().annotation).toBeNull();
+});
+
+it('finishes whitespace without history and leaves existing edits explicit', async () => {
+  const { session, deps } = setup();
+  act(() => composer.change({ ...annotation, text: '  ' }, null));
+  await act(async () => composer.finishNew());
+  expect(session.getSnapshot().snapshot.draft).toBeNull();
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  act(() => composer.change({ ...annotation, text: 'Edited' }, annotation));
+  await act(async () => composer.finishNew());
+  expect(composer.getCurrent().annotation?.text).toBe('Edited');
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+});
+
+it('retains a failed automatic completion and retries once with autosave disabled', async () => {
+  const { session, deps } = setup();
+  deps.saveVideoWorkspaceDraft.mockRejectedValueOnce(new Error('Quota'));
+  act(() => composer.change(annotation, null));
+  await act(async () => {
+    await expect(composer.finishNew()).rejects.toThrow('Quota');
+  });
+  expect(composer.annotation?.text).toBe(annotation.text);
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  await act(async () => session.setAutosaveEnabled(false));
+  await act(async () => composer.finishNew());
+  expect(session.getSnapshot().document.annotations).toEqual([annotation]);
+  expect(session.getSnapshot().snapshot.draft).toBeNull();
+  expect(session.getSnapshot().dirty).toBe(true);
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  await act(async () => session.setAutosaveEnabled(true));
+  expect(session.getSnapshot().dirty).toBe(false);
+  expect((await deps.readVideoWorkspace()).workspace.history).toHaveLength(1);
 });

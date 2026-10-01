@@ -48,6 +48,9 @@ type InspectorState = Pick<
   | 'seek'
   | 'run'
   | 'canStart'
+  | 'beforeAction'
+  | 'leaveNewNote'
+  | 'runComposer'
   | 'selectComment'
   | 'add'
   | 'advanced'
@@ -150,6 +153,7 @@ function ReviewInspectorBinding({
   };
   return (
     <ReviewInspector
+      beforeAction={state.beforeAction}
       fullHeight={fullHeight}
       exportRequest={exportRequest}
       contextSelection={state.activeSelection}
@@ -163,7 +167,7 @@ function ReviewInspectorBinding({
           editing={editing}
           snapshot={snapshot}
           busy={busy}
-          composerBusy={!!composer.annotation}
+          composerBusy={!!composer.before}
           onExport={() => {
             video.current?.pause();
             void editing.exporter.start();
@@ -200,7 +204,9 @@ function ReviewInspectorBinding({
           busy={busy || editing.exporter.phase !== 'idle'}
           pending={state.backgroundImport.pending}
           failed={state.backgroundImport.failed}
-          onImportImage={state.backgroundImport.importImage}
+          onImportImage={(file) =>
+            state.beforeAction(() => void state.backgroundImport.importImage(file))
+          }
           setBackground={state.setBackground}
         />
       }
@@ -253,12 +259,13 @@ function reviewInspectorNoteActions(
 ): Pick<Parameters<typeof ReviewInspector>[0], 'onEdit' | 'onDelete' | 'onReport'> {
   const { busy, composer, editing, run, session } = state;
   return {
-    onEdit: (annotation) => {
-      if (state.canStart()) {
-        state.selectComment(annotation);
-        composer.change(annotation, annotation);
-      }
-    },
+    onEdit: (annotation) =>
+      state.beforeAction(() => {
+        if (state.canStart()) {
+          state.selectComment(annotation);
+          composer.change(annotation, annotation);
+        }
+      }),
     onDelete: (annotation) => {
       if (state.canStart())
         void run(() =>
@@ -271,14 +278,15 @@ function reviewInspectorNoteActions(
           })
         );
     },
-    onReport: (action) => {
-      if (busy) return;
-      state.setBusy(true);
-      state.setMessage(null);
-      void exportReviewReport(resource, action, editing.exporter.result?.receipt)
-        .catch(() => state.setMessage(translate('gallery.videoReview.reportFailed')))
-        .finally(() => state.setBusy(false));
-    },
+    onReport: (action) =>
+      state.beforeAction(() => {
+        if (busy) return;
+        state.setBusy(true);
+        state.setMessage(null);
+        void exportReviewReport(resource, action, editing.exporter.result?.receipt)
+          .catch(() => state.setMessage(translate('gallery.videoReview.reportFailed')))
+          .finally(() => state.setBusy(false));
+      }),
   };
 }
 
@@ -286,15 +294,19 @@ function ReviewCommentComposer({
   state,
   annotation,
 }: {
-  state: Pick<InspectorState, 'composer' | 'busy' | 'run' | 'selectComment'>;
+  state: Pick<
+    InspectorState,
+    'composer' | 'busy' | 'runComposer' | 'leaveNewNote' | 'selectComment'
+  >;
   annotation: ReviewAnnotation;
 }) {
-  const { composer, busy, run } = state;
+  const { composer, busy, runComposer: run } = state;
   return (
     <ReviewComposer
       key={annotation.id}
       annotation={annotation}
-      busy={busy}
+      busy={busy || composer.finishing}
+      onLeave={state.leaveNewNote}
       onChange={composer.change}
       onSave={() =>
         void run(async () => {
@@ -334,7 +346,7 @@ function ReviewHistoryControlBinding({
   const { busy, composer, editing, snapshot } = state;
   return (
     <ReviewHistoryControls
-      busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
+      busy={busy || !!composer.before || editing.exporter.phase !== 'idle'}
       cursor={snapshot.snapshot.workspace.cursor}
       length={snapshot.snapshot.workspace.history.length}
       onHistory={state.moveHistory}
@@ -346,9 +358,9 @@ function ReviewHistoryControlBinding({
         dirty: snapshot.dirty,
         saving: snapshot.pending > 0,
         busy,
-        onChange: state.session.setAutosaveEnabled,
+        onChange: (enabled) => state.beforeAction(() => state.session.setAutosaveEnabled(enabled)),
         onReload: () =>
-          state.run(async () => {
+          state.runComposer(async () => {
             await state.composer.reload();
             state.resetAdvanced();
           }),
@@ -444,6 +456,7 @@ function ReviewEditor({
           }
         >
           <ReviewTimelineBinding
+            beforeAction={state.beforeAction}
             onOpenExport={() => requestExport((value) => value + 1)}
             historyControls={<ReviewHistoryControlBinding state={state} />}
             editing={editing}
@@ -451,7 +464,7 @@ function ReviewEditor({
             annotations={snapshot.document.annotations}
             source={state.source}
             busy={busy}
-            composerBusy={!!composer.annotation}
+            composerBusy={!!composer.before}
             selection={state.selection}
             setSelection={state.setSelection}
             advanced={advanced}
@@ -472,8 +485,8 @@ function ReviewEditor({
             audio={audio}
             audioState={advanced.audio}
             waveforms={waveforms}
-            onImportAudioFile={onImportAudioFile}
-            onRecordVoiceover={voiceover.open}
+            onImportAudioFile={(...args) => state.beforeAction(() => onImportAudioFile(...args))}
+            onRecordVoiceover={() => state.beforeAction(voiceover.open)}
             onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
             selectedObject={state.activeSelection.kind !== 'none'}
             onMarker={(marker) => {

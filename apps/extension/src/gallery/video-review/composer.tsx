@@ -13,6 +13,7 @@ export function ReviewComposer(props: {
   onChange(value: ReviewAnnotation): void;
   onSave(): void;
   onDiscard(): void;
+  onLeave?(): void;
 }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const voice = useReviewVoice({
@@ -34,6 +35,12 @@ export function ReviewComposer(props: {
   const { anchor } = props.annotation;
   return (
     <section
+      onBlur={(event) => {
+        const target = event.relatedTarget;
+        if (!(target instanceof Element) || event.currentTarget.contains(target)) return;
+        if (target.closest('[data-ui="gallery.videoReview.stage"]')) return;
+        props.onLeave?.();
+      }}
       data-ui="gallery.videoReview.commentComposer"
       className="space-y-2 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3"
     >

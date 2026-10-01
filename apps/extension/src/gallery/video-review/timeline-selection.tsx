@@ -1,3 +1,4 @@
+import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useRef, useState } from 'react';
@@ -11,6 +12,7 @@ import { useReviewDragEscape } from './timeline-drag';
 import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   rangeEnabled?: boolean;
   duration: number;
   time: number;
@@ -77,6 +79,7 @@ function ReviewEditBlock(
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
   const [dragEdge, setDragEdge] = useState<'start' | 'end' | 'move' | null>(null);
   const drag = useRef<{
+    admission: ReturnType<typeof deferReviewGesture>;
     x: number;
     width: number;
     edge: 'start' | 'end' | 'move';
@@ -116,6 +119,7 @@ function ReviewEditBlock(
             : null;
         setDragEdge(edge === 'start' || edge === 'end' ? edge : 'move');
         drag.current = {
+          admission: deferReviewGesture(props.beforeAction, () => props.onEdit?.(edit)),
           x: event.clientX,
           width: event.currentTarget.parentElement!.getBoundingClientRect().width,
           edge: edge === 'start' || edge === 'end' ? edge : 'move',
@@ -125,7 +129,6 @@ function ReviewEditBlock(
           pointerId: event.pointerId,
         };
         event.currentTarget.setPointerCapture(event.pointerId);
-        props.onEdit?.(edit);
       }}
       onPointerMove={(event) => {
         const current = drag.current;
@@ -156,19 +159,23 @@ function ReviewEditBlock(
         onSnap(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        committing.current = true;
-        try {
-          if (
-            current?.moved &&
-            (current.range.start !== edit.start || current.range.end !== edit.end)
-          )
-            await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
-        } finally {
-          committing.current = false;
-          setPreview(null);
-        }
+        if (!current) return;
+        current.admission.commit(async () => {
+          committing.current = true;
+          try {
+            if (
+              current?.moved &&
+              (current.range.start !== edit.start || current.range.end !== edit.end)
+            )
+              await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
+          } finally {
+            committing.current = false;
+            setPreview(null);
+          }
+        });
       }}
       onPointerCancel={() => {
+        drag.current?.admission.cancel();
         drag.current = null;
         setDragEdge(null);
         setPreview(null);
@@ -183,7 +190,8 @@ function ReviewEditBlock(
         className="absolute inset-0 flex cursor-grab items-center justify-center gap-1
             overflow-hidden px-3 active:cursor-grabbing disabled:cursor-default"
         onClick={(event) => {
-          if (event.detail === 0) props.onEdit?.(edit);
+          if (event.detail === 0)
+            (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));
         }}
       >
         <ReviewTimelineLabel

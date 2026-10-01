@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { createReviewHistoryActions } from './history-actions';
 import { useMemo, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
@@ -39,6 +40,7 @@ export function useReviewEditorWiring(args: {
   clearAnnotation: Dispatch<SetStateAction<ReviewAnnotation | null>>;
   time: number;
   timelineDuration: number;
+  beforeAction?: ReviewBeforeAction;
   busy: boolean;
   canStart(): boolean;
   run(action: () => Promise<unknown>): Promise<unknown>;
@@ -125,12 +127,35 @@ export function useReviewEditorWiring(args: {
     },
     reset: () => resetReviewEditor(args, audio, canvasComments),
   });
+  useWiredReviewShortcuts(args, audio, comments, history, removeSelection);
+  return {
+    audio,
+    canvasComments,
+    comments,
+    telemetry: args.telemetry ? args.actionsVisible : false,
+    projected,
+    flushPendingContent: history.flush,
+    moveHistory: history.run,
+    removeSelection,
+    exporter: prepareReviewExporter(args.exporter, args.run, history.flush),
+  };
+}
+
+/** Keyboard commands use the same note admission and complete tool reset as pointer controls. */
+function useWiredReviewShortcuts(
+  args: Parameters<typeof useReviewEditorWiring>[0],
+  audio: ReturnType<typeof useReviewAudio>,
+  comments: ReturnType<typeof useReviewCommentActions>,
+  history: ReturnType<typeof createReviewHistoryActions>,
+  removeSelection: () => void
+) {
   useReviewEditorShortcuts({
     time: args.time,
     navigation: reviewTimelineNavigationBounds(args.sourceDuration, args.document.edits),
     seek: args.seek,
     play: args.play,
-    composerAnnotation: args.composer.annotation,
+    composerAnnotation: args.composer.before,
+    beforeAction: args.beforeAction,
     busy: args.busy,
     exporterPhase: args.exporter.phase,
     exporterAvailable: !!args.exporter.index,
@@ -154,17 +179,6 @@ export function useReviewEditorWiring(args: {
       void args.cuts.toggle('cut');
     },
   });
-  return {
-    audio,
-    canvasComments,
-    comments,
-    telemetry: args.telemetry ? args.actionsVisible : false,
-    projected,
-    flushPendingContent: history.flush,
-    moveHistory: history.run,
-    removeSelection,
-    exporter: prepareReviewExporter(args.exporter, args.run, history.flush),
-  };
 }
 
 /** Pointer selection and Escape share the same reset across the three editing tools. */

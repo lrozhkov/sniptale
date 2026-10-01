@@ -50,6 +50,7 @@ function renderTrack(
   onAdd = vi.fn(),
   time: number | null = 6,
   overrides?: {
+    beforeAction?: Parameters<typeof ReviewZoomTrack>[0]['beforeAction'];
     edits?: ReviewEdit[];
     toOutputTime?: (source: number) => number | null;
     enabled?: boolean;
@@ -62,6 +63,7 @@ function renderTrack(
   act(() => {
     root.render(
       <ReviewZoomTrack
+        beforeAction={overrides?.beforeAction}
         duration={10}
         {...(time === null ? { time: null } : { time })}
         regions={regions}
@@ -347,4 +349,26 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
   expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start');
   expect(projection.source(commit.mock.calls[0]![1].end, 'end')).toBe(4);
   expect(host.querySelector('[data-zoom-guide]')).toBeNull();
+});
+
+it('keeps focus selection and final range through delayed note admission', async () => {
+  let admit!: () => void;
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 2, 4)], commit, vi.fn(), null, {
+    beforeAction: (action) => {
+      admit = action;
+    },
+  });
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block, 'pointerdown', 200);
+  await track.event(block, 'pointermove', 400);
+  await track.event(block, 'pointerup', 400);
+  expect(commit).not.toHaveBeenCalled();
+  await act(async () => admit());
+  expect(commit).toHaveBeenCalledExactlyOnceWith('a', { start: 4, end: 6 }, 'move');
 });

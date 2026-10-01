@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { useEffect } from 'react';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 
@@ -121,6 +122,7 @@ export function useReviewEditorShortcuts(args: {
   seek(value: number, snap?: boolean): void;
   play(): void;
   composerAnnotation: ReviewAnnotation | null;
+  beforeAction?: ReviewBeforeAction | undefined;
   busy: boolean;
   exporterPhase: 'idle' | 'exporting' | 'publishing';
   exporterAvailable: boolean;
@@ -136,11 +138,12 @@ export function useReviewEditorShortcuts(args: {
 }) {
   const editingBlocked = !!args.composerAnnotation;
   const exportBlocked = args.exporterPhase !== 'idle';
+  const admit = args.beforeAction ?? ((action: () => void) => action());
   useReviewKeys({
     time: args.time,
     navigation: args.navigation,
-    seek: args.seek,
-    play: args.play,
+    seek: (...values) => admit(() => args.seek(...values)),
+    play: () => admit(args.play),
     cancelDrawing: args.cancelDrawing,
     undo: () => {
       if (!editingBlocked && !exportBlocked) void args.run(args.undo);
@@ -149,13 +152,15 @@ export function useReviewEditorShortcuts(args: {
       if (!editingBlocked && !exportBlocked) void args.run(args.redo);
     },
     remove: () => {
-      if (!editingBlocked && !args.busy && !exportBlocked) args.remove();
+      if (!editingBlocked && !args.busy && !exportBlocked) admit(args.remove);
     },
-    add: args.addComment,
+    add: () => admit(args.addComment),
     tool: (key) => {
       if (!editingBlocked && !args.busy && !exportBlocked) {
-        if (key === 'v') args.pointTool();
-        else if (args.exporterAvailable) args.toggleCut();
+        admit(() => {
+          if (key === 'v') args.pointTool();
+          else if (args.exporterAvailable) args.toggleCut();
+        });
       }
     },
     ...(args.boundaries ? { boundaries: args.boundaries } : {}),

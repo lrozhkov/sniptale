@@ -1,3 +1,4 @@
+import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
@@ -17,6 +18,7 @@ import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewButton, reviewTrackStatusButtonClassName } from './controls';
 
 type Drag = {
+  admission: ReturnType<typeof deferReviewGesture>;
   pointerId: number;
   node: HTMLDivElement;
   from: number;
@@ -32,6 +34,7 @@ type Drag = {
 
 /** Source-time automation shares video coordinates and never affects added audio clips. */
 export function ReviewOriginalAudioTrack(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   original: QuickEditOriginalAudio;
   waveform?: ReviewWaveform | undefined;
   projection?: ReviewTrackProjection | undefined;
@@ -70,7 +73,11 @@ export function ReviewOriginalAudioTrack(props: {
           aria-pressed={!muted}
           disabled={props.busy}
           className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() => props.onOriginal({ muted: !muted })}
+          onClick={() =>
+            (props.beforeAction ?? ((action) => action()))(() =>
+              props.onOriginal({ muted: !muted })
+            )
+          }
         >
           {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
         </ReviewButton>
@@ -107,7 +114,11 @@ export function ReviewOriginalAudioTrack(props: {
               preview={preview}
               selected={props.editor?.selectedOriginal?.id === range.id}
               busy={props.busy}
-              onSelect={() => props.editor?.selectOriginal(range.id)}
+              onSelect={() =>
+                (props.beforeAction ?? ((action) => action()))(() =>
+                  props.editor?.selectOriginal(range.id)
+                )
+              }
             />
           ))}
           {props.edits
@@ -127,7 +138,7 @@ export function ReviewOriginalAudioTrack(props: {
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  props.onSelectSpeed?.(edit);
+                  (props.beforeAction ?? ((action) => action()))(() => props.onSelectSpeed?.(edit));
                 }}
               >
                 <ReviewTimelineLabel
@@ -224,6 +235,7 @@ function useOriginalAudioGesture(
         event.stopImmediatePropagation();
         const current = drag.current;
         drag.current = null;
+        current.admission.cancel();
         setPreview(null);
         if (current.node.hasPointerCapture?.(current.pointerId))
           current.node.releasePointerCapture(current.pointerId);
@@ -255,8 +267,11 @@ function useOriginalAudioGesture(
         const edge = item?.dataset['audioEdge'];
         const range = props.original.ranges?.find((item) => item.id === id);
         const neighbors = props.original.ranges?.filter((other) => other.id !== id) ?? [];
-        if (id) props.editor.selectOriginal(id);
+        const admission = deferReviewGesture(props.beforeAction, () => {
+          if (id) props.editor?.selectOriginal(id);
+        });
         drag.current = {
+          admission,
           node: event.currentTarget,
           at,
           start: range?.start ?? at,
@@ -312,29 +327,32 @@ function useOriginalAudioGesture(
         setPreview(null);
         event.currentTarget.releasePointerCapture(event.pointerId);
         event.stopPropagation();
-        if (props.busy) return;
-        if (current.id)
-          props.editor?.patchOriginal(current.id, { start: current.from, end: current.to });
-        else {
-          if (!props.editor?.originalTool) return;
-          const range: ReviewAnchor = {
-            kind: 'range',
-            start: Math.min(current.from, current.to),
-            end: Math.max(current.from, current.to),
-          };
-          if (range.end - range.start < 0.01) {
-            props.editor?.addOriginal(range);
-            return;
+        current.admission.commit(() => {
+          if (current.id)
+            props.editor?.patchOriginal(current.id, { start: current.from, end: current.to });
+          else {
+            if (!props.editor?.originalTool) return;
+            const range: ReviewAnchor = {
+              kind: 'range',
+              start: Math.min(current.from, current.to),
+              end: Math.max(current.from, current.to),
+            };
+            if (range.end - range.start < 0.01) {
+              props.editor?.addOriginal(range);
+              return;
+            }
+            props.onRange?.(range);
+            if (props.editor?.originalTool) props.editor.addOriginal(range);
           }
-          props.onRange?.(range);
-          if (props.editor?.originalTool) props.editor.addOriginal(range);
-        }
+        });
       },
       onPointerCancel: () => {
+        drag.current?.admission.cancel();
         drag.current = null;
         setPreview(null);
       },
       onLostPointerCapture: () => {
+        drag.current?.admission.cancel();
         drag.current = null;
         setPreview(null);
       },

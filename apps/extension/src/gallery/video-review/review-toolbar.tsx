@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import type { useReviewAudio } from './use-review-audio';
 import { translate } from '../../platform/i18n';
 import {
@@ -23,6 +24,7 @@ const plain = reviewIconButtonClassName;
 type Editing = ReturnType<typeof useReviewEdits>;
 
 type ToolbarProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   focusTool?: { active: boolean; available: boolean; onToggle(): void };
   originalAudioEditor?: ReturnType<typeof useReviewAudio>;
   editing: {
@@ -51,6 +53,7 @@ type ToolbarProps = {
 /** Tools, comment entry, fragment export, and the advanced shell share one quiet toolbar. */
 export function ReviewTimelineToolbar(props: ToolbarProps) {
   const busy = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
+  const admit = props.beforeAction ?? ((action: () => void) => action());
   const advanced = props.advanced;
   const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
   return (
@@ -60,8 +63,18 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           className="flex shrink-0 items-center gap-0.5"
           data-ui="gallery.videoReview.workspaceTools"
         >
-          <ReviewModeControl advanced={advanced} busy={busy} setMode={props.setMode} />
-          <ReviewHistoryTrackControl {...props} busy={busy} />
+          <ReviewModeControl
+            advanced={advanced}
+            busy={busy}
+            setMode={(mode) => admit(() => props.setMode(mode))}
+          />
+          <ReviewHistoryTrackControl
+            {...props}
+            setTrackVisibility={(track, visible) =>
+              admit(() => props.setTrackVisibility(track, visible))
+            }
+            busy={busy}
+          />
         </div>
       ) : null}
       <div
@@ -92,10 +105,10 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           busy={busy}
           rate={props.editing.rate}
           audio={props.editing.audio}
-          onPointer={() => props.editing.setCutting(false)}
-          onToggle={props.editing.toggle}
-          onRate={props.editing.changeRate}
-          onAudio={props.editing.changeAudio}
+          onPointer={() => admit(() => props.editing.setCutting(false))}
+          onToggle={(kind) => admit(() => props.editing.toggle(kind))}
+          onRate={(rate) => admit(() => props.editing.changeRate(rate))}
+          onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
         />
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewButton
@@ -105,7 +118,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             aria-pressed={props.focusTool.active}
             className={plain}
             disabled={busy || !props.focusTool.available}
-            onClick={props.focusTool.onToggle}
+            onClick={() => admit(props.focusTool!.onToggle)}
           >
             <Focus size={16} aria-hidden="true" />
           </ReviewButton>
@@ -122,16 +135,20 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             aria-pressed={props.originalAudioEditor.originalTool}
             className={plain}
             disabled={busy || !sourceAudioReady}
-            onClick={() => {
-              props.editing.setCutting(false);
-              if (props.originalAudioEditor?.originalTool)
-                props.originalAudioEditor.setOriginalTool(false);
-              else if (!props.selectedObject && props.selection.kind === 'range') {
-                if (!props.originalAudioEditor?.addOriginal(props.selection))
-                  props.originalAudioEditor?.setOriginalTool(true);
-              } else
-                props.originalAudioEditor?.setOriginalTool(!props.originalAudioEditor.originalTool);
-            }}
+            onClick={() =>
+              admit(() => {
+                props.editing.setCutting(false);
+                if (props.originalAudioEditor?.originalTool)
+                  props.originalAudioEditor.setOriginalTool(false);
+                else if (!props.selectedObject && props.selection.kind === 'range') {
+                  if (!props.originalAudioEditor?.addOriginal(props.selection))
+                    props.originalAudioEditor?.setOriginalTool(true);
+                } else
+                  props.originalAudioEditor?.setOriginalTool(
+                    !props.originalAudioEditor.originalTool
+                  );
+              })
+            }
           >
             <Volume2 size={16} aria-hidden="true" />
           </ReviewButton>
@@ -151,7 +168,9 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
               value: String(volume),
               label: `${Math.round(volume * 100)}%`,
             }))}
-            onChange={(value) => props.originalAudioEditor?.setDefaultOriginalVolume(Number(value))}
+            onChange={(value) =>
+              admit(() => props.originalAudioEditor?.setDefaultOriginalVolume(Number(value)))
+            }
           />
         ) : null}
         <ReviewFragmentAction
@@ -160,7 +179,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           index={props.editing.exporter.index}
           edits={props.edits}
           busy={busy}
-          onDownload={props.onDownloadFragment}
+          onDownload={() => admit(props.onDownloadFragment)}
         />
       </div>
     </>

@@ -70,11 +70,13 @@ const renderTrack = (
   hasOriginalAudio = true,
   assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
   projection?: Parameters<typeof ReviewAudioTrack>[0]['projection'],
-  waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms']
+  waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms'],
+  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction']
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
+        beforeAction={beforeAction}
         projection={projection}
         waveforms={waveforms}
         assets={assets}
@@ -489,4 +491,42 @@ it('moves anchored waveform samples with the clip before release and restores on
   await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(block.style.left).toBe('20%');
   expect(peaks()).toBe(before);
+});
+
+it('retains an audio clip move when pointerup precedes note admission', async () => {
+  let admit!: () => void;
+  const lanes = renderTrack(
+    { original: { muted: false, volume: 1 }, voiceover: [], music: [clip('music', 2, 2)] },
+    false,
+    [],
+    true,
+    undefined,
+    undefined,
+    undefined,
+    (action) => {
+      admit = action;
+    }
+  );
+  const lane = lanes[2]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLElement>('[role="button"]')!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  for (const [type, x] of [
+    ['pointerdown', 200],
+    ['pointermove', 400],
+    ['pointerup', 400],
+  ] as const) {
+    await act(async () =>
+      block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
+    );
+  }
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onMoveClip).not.toHaveBeenCalled();
+  await act(async () => admit());
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('music');
+  expect(onMoveClip).toHaveBeenCalledExactlyOnceWith('music', 'music', 4);
 });

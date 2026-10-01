@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useReviewNoteTransitions } from './note-transitions';
+import { useMemo, useRef, useState } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -54,6 +55,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     canStart,
     run,
     composer,
+    beforeAction: core.beforeAction,
     video,
     seek,
     setTimelineSelection: setSelection,
@@ -91,19 +93,34 @@ function useReviewEditorBase(resource: LoadedReview) {
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
   const [voiceoverSilent, setVoiceoverSilent] = useState(false);
   const { selection: activeSelection, setSelection: setActiveSelection } = useReviewSelection();
-  const { actionBusy, setBusy, message, setMessage, run, canStart } = useReviewActionStatus(
-    composer.annotation
-  );
+  const {
+    actionBusy,
+    isBusy,
+    setBusy,
+    message,
+    setMessage,
+    run: raw,
+    canStart,
+  } = useReviewActionStatus(composer);
+  const transitions = useReviewNoteTransitions({
+    isNew: () => !!composer.getCurrent().annotation && !composer.getCurrent().before,
+    finishNew: composer.finishNew,
+    blocked: isBusy,
+    leaveAllowed: () => !snapshot.error,
+    onFailure: () => setMessage(translate('gallery.videoReview.saveFailed')),
+  });
+  const run = (action: () => Promise<unknown>, success?: string) =>
+    Promise.resolve(transitions.perform(() => raw(action, success)));
   const backgroundImport = useReviewBackgroundImport({
     advanced: advancedState,
     session,
     allowed: () =>
       !actionBusy &&
       exporter.phase === 'idle' &&
-      !composer.annotation &&
+      !composer.getCurrent().annotation &&
       advanced.ui.mode === 'advanced',
   });
-  const busy = actionBusy || backgroundImport.pending;
+  const busy = actionBusy || backgroundImport.pending || transitions.pending;
   return {
     session,
     source,
@@ -129,6 +146,9 @@ function useReviewEditorBase(resource: LoadedReview) {
     message,
     setMessage,
     run,
+    runComposer: raw,
+    beforeAction: transitions.beforeAction,
+    leaveNewNote: transitions.leave,
     canStart,
   };
 }
@@ -231,10 +251,13 @@ function assembleReviewEditorState(
     ...reviewAdvancedControls(advancedState, setActiveSelection),
     projected,
     selectComment: (annotation: ReviewAnnotation) => {
-      comments.select(annotation);
-      setActiveSelection({ kind: 'annotation', id: annotation.id });
+      core.beforeAction(() => {
+        comments.select(annotation);
+        setActiveSelection({ kind: 'annotation', id: annotation.id });
+      });
     },
-    add: (marker?: ReviewTelemetryMarker) => comments.add(selection, marker),
+    add: (marker?: ReviewTelemetryMarker) =>
+      core.beforeAction(() => comments.add(selection, marker)),
     displayRegion: reviewRegion(
       time,
       composer.annotation,
@@ -268,11 +291,16 @@ function reviewAdvancedControls(
 }
 
 /** Reports explicit UI action status separately from field recovery; the session serializes writes. */
-function useReviewActionStatus(annotation: ReviewAnnotation | null) {
-  const [busy, setBusy] = useState(false);
+function useReviewActionStatus(composer: ReturnType<typeof useReviewComposer>) {
+  const [busy, updateBusy] = useState(false);
+  const busyRef = useRef(false);
+  const setBusy = (value: boolean) => {
+    busyRef.current = value;
+    updateBusy(value);
+  };
   const [message, setMessage] = useState<string | null>(null);
-  const run = async (action: () => Promise<unknown>, success?: string) => {
-    if (busy) return;
+  const raw = async (action: () => Promise<unknown>, success?: string) => {
+    if (busyRef.current) return;
     setBusy(true);
     setMessage(null);
     try {
@@ -285,11 +313,20 @@ function useReviewActionStatus(annotation: ReviewAnnotation | null) {
     }
   };
   const canStart = () => {
-    if (!annotation) return true;
+    const current = composer.getCurrent();
+    if (!current.annotation || !current.before) return true;
     setMessage(translate('gallery.videoReview.finishComment'));
     return false;
   };
-  return { actionBusy: busy, setBusy, message, setMessage, run, canStart };
+  return {
+    actionBusy: busy,
+    isBusy: () => busyRef.current,
+    setBusy,
+    message,
+    setMessage,
+    run: raw,
+    canStart,
+  };
 }
 
 /** Draft and hover overlays take precedence; saved selections follow current history. */

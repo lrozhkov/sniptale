@@ -1,3 +1,4 @@
+import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ScanEye } from 'lucide-react';
@@ -26,6 +27,7 @@ import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewDragEscape } from './timeline-drag';
 
 type ZoomTrackProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   sourceSelection?: ReviewAnchor | undefined;
   projection?: ReviewTrackProjection | undefined;
   enabled?: boolean;
@@ -53,6 +55,7 @@ type ZoomTrackProps = {
 };
 
 interface ZoomDragState {
+  admission: ReturnType<typeof deferReviewGesture>;
   id: string;
   x: number;
   sourceAtPointer: number;
@@ -418,13 +421,14 @@ function ReviewZoomRegionBlock(
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.stopPropagation();
-    props.onSelect(region.id);
+    const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(region.id));
     const target = event.target;
     const edge =
       target instanceof Element
         ? target.closest('[data-zoom-edge]')?.getAttribute('data-zoom-edge')
         : null;
     props.drag.current = {
+      admission,
       id: region.id,
       x: event.clientX,
       sourceAtPointer:
@@ -487,9 +491,13 @@ function ReviewZoomRegionBlock(
         onGuide(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        if (current?.moved) props.onDragCommit(current.id, current.range, current.edge);
+        if (current?.moved)
+          current.admission.commit(() =>
+            props.onDragCommit(current.id, current.range, current.edge)
+          );
       }}
       onPointerCancel={() => {
+        props.drag.current?.admission.cancel();
         props.drag.current = null;
         onPreview(null);
         onGuide(null);
@@ -497,7 +505,7 @@ function ReviewZoomRegionBlock(
       onKeyDown={(event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
-        props.onSelect(region.id);
+        (props.beforeAction ?? ((action) => action()))(() => props.onSelect(region.id));
       }}
     >
       <span className="pointer-events-none absolute inset-y-0 inset-x-3 text-[10px]">

@@ -1,3 +1,4 @@
+import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
@@ -51,6 +52,7 @@ function dragHasFiles(event: DragEvent<HTMLElement>) {
 }
 
 interface AudioDragState {
+  admission: ReturnType<typeof deferReviewGesture>;
   lane: ReviewAudioLane;
   id: string;
   edge: 'start' | 'end' | 'move';
@@ -71,6 +73,7 @@ const LANES: Array<{
 ];
 
 type ReviewAudioTimelineProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   duration: number;
   projection?: ReviewTrackProjection | undefined;
   snapTimes?: readonly number[] | undefined;
@@ -134,6 +137,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   const cancelDrag = useCallback(() => {
     const current = drag.current;
     drag.current = null;
+    current?.admission.cancel();
     setPreview(null);
     if (current?.node.hasPointerCapture(current.pointerId))
       current.node.releasePointerCapture(current.pointerId);
@@ -159,11 +163,13 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     const assetDuration =
       props.assets?.get(assetId)?.duration ?? props.waveforms?.get(assetId)?.duration;
     const range = reviewVoiceoverRange(shown.clip);
-    if (current.edge === 'start')
-      props.onTrimClip(current.lane, current.id, 'start', range.start, assetDuration);
-    else if (current.edge === 'end')
-      props.onTrimClip(current.lane, current.id, 'end', range.end, assetDuration);
-    else props.onMoveClip(current.lane, current.id, range.start);
+    current.admission.commit(() => {
+      if (current.edge === 'start')
+        props.onTrimClip(current.lane, current.id, 'start', range.start, assetDuration);
+      else if (current.edge === 'end')
+        props.onTrimClip(current.lane, current.id, 'end', range.end, assetDuration);
+      else props.onMoveClip(current.lane, current.id, range.start);
+    });
   };
   return (
     <ReviewTrackRow
@@ -192,6 +198,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
               drag={drag}
               lane={props.lane}
               clips={props.clips}
+              beforeAction={props.beforeAction}
               onSelect={props.onSelect}
               onPreview={(value) =>
                 setPreview(
@@ -238,6 +245,7 @@ function ReviewAudioClipBlock(props: {
   drag: MutableRefObject<AudioDragState | null>;
   lane: ReviewAudioLane;
   clips: readonly QuickEditAudioClip[];
+  beforeAction?: ReviewBeforeAction | undefined;
   onSelect(id: string): void;
   onPreview(value: { clip: QuickEditAudioClip; guide: number | null } | null): void;
   onCommit(): void;
@@ -272,12 +280,13 @@ function ReviewAudioClipBlock(props: {
       onPointerDown={(event) => {
         if (event.button !== 0 || props.busy) return;
         event.stopPropagation();
-        props.onSelect(clip.id);
+        const admission = deferReviewGesture(props.beforeAction, () => props.onSelect(clip.id));
         const edge =
           event.target instanceof Element
             ? event.target.closest('[data-audio-edge]')?.getAttribute('data-audio-edge')
             : null;
         props.drag.current = {
+          admission,
           lane: props.lane,
           id: clip.id,
           edge: edge === 'start' || edge === 'end' ? edge : 'move',
@@ -389,6 +398,7 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
       />
       {props.hasOriginalAudio !== false ? (
         <ReviewOriginalAudioTrack
+          beforeAction={props.beforeAction}
           duration={props.duration}
           editor={props.originalEditor}
           selectedEditId={props.selectedEditId}
@@ -404,6 +414,7 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
       ) : null}
       {props.showAddedAudio !== false ? (
         <ReviewClipLanes
+          beforeAction={props.beforeAction}
           audio={props.audio}
           assets={props.assets}
           waveforms={props.waveforms}
@@ -456,6 +467,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
               ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
               : props.duration
           }
+          beforeAction={props.beforeAction}
           selectedId={props.selectedId}
           busy={props.busy}
           onSelect={props.onSelect}
@@ -502,7 +514,11 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
                   }
                   disabled={props.busy || !props.audio[lane.key].length}
                   className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                  onClick={() => props.onMuteLane?.(lane.key)}
+                  onClick={() =>
+                    (props.beforeAction ?? ((action) => action()))(() =>
+                      props.onMuteLane?.(lane.key)
+                    )
+                  }
                 >
                   {props.audio[lane.key].length > 0 &&
                   props.audio[lane.key].every((clip) => clip.muted) ? (

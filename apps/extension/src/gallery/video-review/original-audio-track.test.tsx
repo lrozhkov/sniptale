@@ -14,7 +14,10 @@ vi.mock('../../composition/persistence/media-library', () => ({
   listMediaLibrary: async () => [],
 }));
 
-function setup(originalVolume = 1) {
+function setup(
+  originalVolume = 1,
+  beforeAction?: Parameters<typeof ReviewOriginalAudioTrack>[0]['beforeAction']
+) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -61,6 +64,7 @@ function setup(originalVolume = 1) {
       <>
         <video ref={playback.video} />
         <ReviewOriginalAudioTrack
+          beforeAction={beforeAction}
           original={audio.original}
           duration={10}
           editor={editor}
@@ -367,6 +371,24 @@ it('renders legacy zero-volume snapshots as muted without changing document stat
     act(() => control.click());
     expect(f.host.querySelector('video')!.muted).toBe(false);
     expect(f.host.querySelector('video')!.volume).toBe(1);
+  } finally {
+    f.close();
+  }
+});
+
+it('commits a source-gain gesture after delayed new-note admission', () => {
+  let admit!: () => void;
+  const f = setup(1, (action) => {
+    admit = action;
+  });
+  try {
+    act(() => f.editor.setOriginalTool(true));
+    f.send('pointerdown', 200);
+    f.send('pointermove', 500);
+    f.send('pointerup', 500);
+    expect(f.editor.selectedOriginal).toBeNull();
+    act(() => admit());
+    expect(f.editor.selectedOriginal).toMatchObject({ start: 2, end: 5, volume: 0.5 });
   } finally {
     f.close();
   }

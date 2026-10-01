@@ -28,6 +28,7 @@ afterEach(async () => {
 });
 
 function renderLane(args: {
+  beforeAction?: Parameters<typeof ReviewSourceLane>[0]['beforeAction'];
   edits: ReviewEdit[];
   onChangeEdit: (edit: ReviewEdit, range: ReviewAnchor) => void;
   time: number;
@@ -39,6 +40,7 @@ function renderLane(args: {
   act(() => {
     root.render(
       <ReviewSourceLane
+        beforeAction={args.beforeAction}
         duration={10}
         time={args.time}
         selection={args.selection}
@@ -296,4 +298,25 @@ it('keeps resize geometry while a deferred commit is pending and restores it on 
   expect(lane.block.style.width).toBe('40%');
   await act(async () => settle());
   expect(lane.block.style.width).toBe('20%');
+});
+
+it('retains the complete edit drag until new-note admission finishes', async () => {
+  let admit!: () => void;
+  const change = vi.fn();
+  const edit = cut(2, 4);
+  const lane = renderLane({
+    edits: [edit],
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    onChangeEdit: change,
+    beforeAction: (action) => {
+      admit = action;
+    },
+  });
+  await lane.event(lane.block, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 400);
+  await lane.event(lane.block, 'pointerup', 400);
+  expect(change).not.toHaveBeenCalled();
+  await act(async () => admit());
+  expect(change).toHaveBeenCalledExactlyOnceWith(edit, { kind: 'range', start: 4, end: 6 });
 });
