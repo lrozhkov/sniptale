@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { RefObject } from 'react';
 import {
   getDrawingObjectRotation,
   hitTestDrawingDocument,
@@ -13,6 +13,7 @@ import type { ContentDrawingController } from './controller';
 import { useDrawingSessionSnapshot } from './controller';
 import { translate } from '../../platform/i18n';
 import { drawDrawingFrame } from './frame';
+import { useDrawingFrameRedraw } from './frame-redraw';
 import { resolveDrawingFrameRenderables } from './frame-renderables';
 import { handleDrawingKeyDown, useDrawingEscapeOwnership } from './keyboard';
 import {
@@ -633,94 +634,6 @@ function useDrawingInteractionLifecycle(args: {
   useEffect(() => {
     if (!active) finalizeInteraction();
   }, [active, finalizeInteraction]);
-}
-
-function useDrawingFrameRedraw(args: {
-  active: boolean;
-  canvasRef: RefObject<HTMLCanvasElement | null>;
-  chromeCanvasRef: RefObject<HTMLCanvasElement | null>;
-  chromeHidden: boolean;
-  controller: ContentDrawingController;
-  draftRef: RefObject<PointerDraft | null>;
-  draftRevision: number;
-  objects: readonly DrawingObject[];
-  selectedIds: readonly string[];
-  showSelectionChrome: boolean;
-  setViewportRevision: Dispatch<SetStateAction<number>>;
-  visualRevision: number;
-  getObjectOpacity?: (objectId: string) => number;
-}) {
-  const {
-    active,
-    canvasRef,
-    chromeCanvasRef,
-    chromeHidden,
-    controller,
-    draftRef,
-    draftRevision,
-    objects,
-    selectedIds,
-    showSelectionChrome,
-    setViewportRevision,
-  } = args;
-  const redraw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    drawDrawingFrame({
-      canvas,
-      objects,
-      draft: draftRef.current,
-      selectedIds,
-      root: controller.getScrollRoot(),
-      showChrome: false,
-      suppressText: true,
-      ...(args.getObjectOpacity ? { getObjectOpacity: args.getObjectOpacity } : {}),
-    });
-    const chromeCanvas = chromeCanvasRef.current;
-    if (chromeCanvas)
-      drawDrawingFrame({
-        canvas: chromeCanvas,
-        objects,
-        draft: draftRef.current,
-        selectedIds,
-        root: controller.getScrollRoot(),
-        showChrome: active && !chromeHidden && showSelectionChrome,
-        renderObjects: false,
-      });
-  }, [
-    active,
-    canvasRef,
-    chromeCanvasRef,
-    chromeHidden,
-    controller,
-    draftRef,
-    objects,
-    selectedIds,
-    showSelectionChrome,
-    args.getObjectOpacity,
-  ]);
-
-  useEffect(() => {
-    let frame = requestAnimationFrame(redraw);
-    const scrollRoot = controller.getScrollRoot();
-    const target: EventTarget = scrollRoot.kind === 'element' ? scrollRoot.element : window;
-    const schedule = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(redraw);
-      setViewportRevision((value) => value + 1);
-    };
-    target.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    window.visualViewport?.addEventListener('resize', schedule);
-    window.visualViewport?.addEventListener('scroll', schedule, { passive: true });
-    return () => {
-      cancelAnimationFrame(frame);
-      target.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-      window.visualViewport?.removeEventListener('resize', schedule);
-      window.visualViewport?.removeEventListener('scroll', schedule);
-    };
-  }, [controller, draftRevision, redraw, setViewportRevision, args.visualRevision]);
 }
 
 function DrawingObjectList(props: {

@@ -3,7 +3,6 @@ import type { PointerDraft } from './interaction';
 
 interface DrawingFrameRenderable {
   readonly object: DrawingObject;
-  readonly preview: boolean;
 }
 
 export function resolveDrawingFrameRenderables(
@@ -27,9 +26,6 @@ export function resolveDrawingFrameRenderables(
             draft.object.id === object.id
           ? draft.object
           : object,
-    preview: false,
   }));
-  return draft?.kind === 'create'
-    ? [...committed, { object: draft.object, preview: true }]
-    : committed;
+  return draft?.kind === 'create' ? [...committed, { object: draft.object }] : committed;
 }

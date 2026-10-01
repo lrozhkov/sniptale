@@ -167,8 +167,8 @@ export const contentToolbarModesMessages = defineMessageSource({
   drawingParallelogram: { ru: 'Параллелограмм', en: 'Parallelogram' },
   drawingArrow: { ru: 'Стрелка', en: 'Arrow' },
   drawingArrowModifierHint: {
-    ru: 'Ctrl — свободный угол; Shift — угол с шагом 15°',
-    en: 'Ctrl — free angle; Shift — angle in 15° steps',
+    ru: 'Свободный угол; Shift — шаг 15°',
+    en: 'Free angle; Shift — 15° steps',
   },
   drawingArrowUniformWidth: { ru: 'Равномерная толщина', en: 'Uniform width' },
   drawingArrowDynamicWidth: { ru: 'Динамическая толщина', en: 'Dynamic width' },

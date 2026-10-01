@@ -55,11 +55,10 @@ export function drawDrawingFrame(args: {
     context.clip();
   }
   if (renderObjects) {
-    resolveDrawingFrameRenderables(objects, draft).forEach(({ object, preview }) => {
+    resolveDrawingFrameRenderables(objects, draft).forEach(({ object }) => {
       if (!suppressText || object.kind !== 'text')
         renderDrawingObject(context, object, projection, {
           opacity: args.getObjectOpacity?.(object.id) ?? 1,
-          ...(preview ? { preview: true } : {}),
         });
     });
   }

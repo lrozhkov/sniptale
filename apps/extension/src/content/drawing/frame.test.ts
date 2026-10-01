@@ -37,8 +37,8 @@ it.each(['move', 'resize'] as const)(
           };
 
     expect(resolveDrawingFrameRenderables([original, untouched], draft)).toEqual([
-      { object: live, preview: false },
-      { object: untouched, preview: false },
+      { object: live },
+      { object: untouched },
     ]);
   }
 );
@@ -71,7 +71,7 @@ it('resolves a multi-selection draft with work proportional to its objects', () 
   expect(draftIdReads).toBeLessThanOrEqual(moved.length * 2);
 });
 
-it('keeps committed objects and appends a lightweight create preview', () => {
+it('keeps committed objects and appends the live create object', () => {
   const draft: PointerDraft = {
     kind: 'create',
     arrowFromTip: false,
@@ -79,8 +79,8 @@ it('keeps committed objects and appends a lightweight create preview', () => {
     start: { x: 10, y: 20 },
   };
   expect(resolveDrawingFrameRenderables([untouched], draft)).toEqual([
-    { object: untouched, preview: false },
-    { object: original, preview: true },
+    { object: untouched },
+    { object: original },
   ]);
 });
 
@@ -107,7 +107,5 @@ it.each(['move', 'resize'] as const)('projects a live blur %s draft into the DOM
           start: { x: 10, y: 20 },
         };
 
-  expect(resolveDrawingFrameRenderables([committed], draft)).toEqual([
-    { object: live, preview: false },
-  ]);
+  expect(resolveDrawingFrameRenderables([committed], draft)).toEqual([{ object: live }]);
 });
