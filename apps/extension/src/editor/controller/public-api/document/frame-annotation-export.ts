@@ -7,7 +7,7 @@ import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft
 import { collectFrameAnnotationProxies } from '../../../frame-annotation/proxy';
 import { rasterizeFrameAnnotations } from '../../../../composition/frame-annotation-raster-client';
 import { createRuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 const frameAnnotationRasterTransport = createRuntimeMessagingTransport();
 const frameAnnotationExportQueues = new WeakMap<Canvas, Promise<void>>();

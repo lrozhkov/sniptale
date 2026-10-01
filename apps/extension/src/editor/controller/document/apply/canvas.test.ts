@@ -2,7 +2,7 @@
 
 import { Canvas } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { EDITOR_WORKSPACE_MARGIN } from '../../viewport/editing-surface';
+import { EDITOR_WORKSPACE_MARGIN } from '../../../document/canvas-surface/editing-surface';
 
 const mocks = vi.hoisted(() => ({
   applyEditorViewportZoom: vi.fn(),

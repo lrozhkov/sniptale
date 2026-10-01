@@ -4,7 +4,7 @@ import type {
   EditorFrameSettings,
 } from '../../../features/editor/document/types';
 import { relayoutEditorScene } from '../document/scene/relayout';
-import { setEditorEditingSurfaceDimensions } from '../viewport/editing-surface';
+import { setEditorEditingSurfaceDimensions } from '../../document/canvas-surface/editing-surface';
 
 import type { SourceState } from '../../document/model/source-state';
 

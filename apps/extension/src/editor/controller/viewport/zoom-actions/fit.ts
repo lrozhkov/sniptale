@@ -1,7 +1,7 @@
 import { clamp } from '../../../document/model';
 import { applyEditorViewportZoom, getEditorViewportFitArea, getEditorViewportMetrics } from '..';
 import { getDevicePixelRatioBaselineOptions, type ZoomContext } from '../actions-types';
-import { EditorCanvas } from '../render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export function zoomEditorToFit(context: ZoomContext): number {
   const {

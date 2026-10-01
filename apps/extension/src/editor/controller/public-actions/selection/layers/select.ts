@@ -1,6 +1,6 @@
 import type { Canvas, FabricObject } from 'fabric';
 import { selectLayerObject } from '../../../layer-actions';
-import { EditorCanvas } from '../../../viewport/render-region';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 
 export function selectEditorLayerById(options: {
   canvas: Canvas | null;

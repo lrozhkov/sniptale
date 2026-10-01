@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type {
   EditorTechnicalDataKind,
   EditorTechnicalDataLayout,
-} from '../controller/tools/technical-data';
+} from '../../features/editor/document/technical-data';
 import {
   loadEditorTechnicalDataPreference,
   saveEditorTechnicalDataPreference,

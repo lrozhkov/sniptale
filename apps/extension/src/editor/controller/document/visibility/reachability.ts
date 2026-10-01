@@ -5,7 +5,7 @@ import type { CanvasSize } from './types';
 import {
   getEditorEditingSurfaceSize,
   getEditorWorkspaceMargin,
-} from '../../viewport/editing-surface';
+} from '../../../document/canvas-surface/editing-surface';
 
 function getReachableVisibleSize(boundsSize: number, canvasSize: number) {
   return Math.min(

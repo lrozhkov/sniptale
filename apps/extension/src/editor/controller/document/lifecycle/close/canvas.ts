@@ -1,7 +1,7 @@
 import type { Canvas } from 'fabric';
 
 import { applyEditorViewportZoom } from '../../../viewport';
-import { setEditorEditingSurfaceDimensions } from '../../../viewport/editing-surface';
+import { setEditorEditingSurfaceDimensions } from '../../../../document/canvas-surface/editing-surface';
 import type { CloseEditorControllerCanvasOptions } from './types';
 
 type CloseEditorControllerCanvasResetOptions = Pick<

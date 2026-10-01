@@ -10,7 +10,7 @@ import {
 } from './actions';
 import { getDevicePixelRatioBaselineOptions } from './actions-types';
 import { getEditorViewportMetrics } from './metrics';
-import { EditorCanvas } from './render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 const CANVAS_SIZE = { width: 200, height: 100 };
 

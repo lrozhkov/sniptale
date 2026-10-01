@@ -14,7 +14,7 @@ import { normalizeFrameAnnotationsInCanvasJson } from '../../../frame-annotation
 import { assertValidEditorDrawingCanvasJson } from '../../../document/import-boundary';
 import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/canonicalize';
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks

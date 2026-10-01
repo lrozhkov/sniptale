@@ -4,7 +4,7 @@ import {
   orderTechnicalDataKinds,
   type EditorTechnicalDataKind,
   type EditorTechnicalDataLayout,
-} from '../technical-data';
+} from '../../../../features/editor/document/technical-data';
 
 function buildTechnicalDataSection(
   kind: EditorTechnicalDataKind,

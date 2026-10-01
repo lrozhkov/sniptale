@@ -11,7 +11,7 @@ import {
   DEFAULT_EDITOR_WORKSPACE_SETTINGS,
 } from '../../features/editor/document/constants';
 import { DEFAULT_BORDER_PRESET } from '../../composition/persistence/highlighter';
-import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../persistence/workspace';
+import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../../features/editor/document/constants';
 import { createEditorStoreActions } from './actions';
 import type { EditorState } from './types';
 

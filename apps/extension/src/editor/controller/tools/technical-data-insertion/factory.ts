@@ -10,7 +10,10 @@ import { createEditorDrawingFabricObject } from '../../../drawing/object/vector'
 import { synchronizeEditorDrawingObjectFromFabric } from '../../../drawing/object/metadata';
 
 import type { SourceState } from '../../../document/model/source-state';
-import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../technical-data';
+import type {
+  EditorTechnicalDataKind,
+  EditorTechnicalDataLayout,
+} from '../../../../features/editor/document/technical-data';
 import { buildTechnicalDataText } from './content';
 import { clampTechnicalDataTextPosition, getTechnicalDataTextInset } from './positioning';
 import { getTechnicalDataTextWidth } from './sizing';

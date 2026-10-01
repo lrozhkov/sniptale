@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_WORKSPACE_SETTINGS } from '../../../features/editor/document/constants';
-import { EditorCanvas } from '../../controller/viewport/render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   cleanupDom,

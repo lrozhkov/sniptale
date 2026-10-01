@@ -176,6 +176,12 @@ export interface EditorHistoryState {
   size: number;
 }
 
+/** Persisted workspace preferences shared by editor state and its storage adapter. */
+export interface EditorWorkspaceDefaults {
+  backgroundColor: string;
+  hideSelectionWhileDragging: boolean;
+}
+
 export interface EditorWorkspaceSettings {
   backgroundColor: string;
   hideSelectionWhileDragging: boolean;

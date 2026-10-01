@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { SavePreset } from '../../../contracts/settings';
-import type { EditorWorkspaceDefaults } from '../../persistence/workspace';
+import type { EditorWorkspaceDefaults } from '../../../features/editor/document/types';
 import type {
   BrowserFrameState,
   EditorFrameSettings,

@@ -4,7 +4,7 @@ import {
   scheduleEditorViewportStateSyncFrame,
   startEditorViewportPan,
 } from '../viewport/interactions';
-import { EditorCanvas } from '../viewport/render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import type {
   EditorControllerEventHandlers,
   EditorControllerEventStateBindings,

@@ -2,8 +2,8 @@ import React from 'react';
 import type { Canvas } from 'fabric';
 import type { EditorTool } from '../../features/editor/document/types';
 import { EDITOR_CANVAS_CROP_OVERLAY } from '../color/palette/constants';
-import { getEditorCanvasWorkspaceInsets } from '../controller/viewport/editing-surface';
-import type { EditorWorkspaceInsets } from '../controller/viewport/workspace-extent';
+import { getEditorCanvasWorkspaceInsets } from '../document/canvas-surface/editing-surface';
+import type { EditorWorkspaceInsets } from '../document/canvas-surface/workspace-extent';
 import { useEditorStore } from '../state/useEditorStore';
 
 type CropBounds = { left: number; top: number; width: number; height: number };

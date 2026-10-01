@@ -3,8 +3,8 @@ import { createCropGuideRect, getEditorFreeCanvasBounds } from '../tools/crop';
 import type { EditorControllerEventBindings } from '../events/types';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { useEditorStore } from '../../state/useEditorStore';
-import { EditorCanvas } from '../viewport/render-region';
-import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
+import { getEditorCanvasWorkspaceInsets } from '../../document/canvas-surface/editing-surface';
 
 export function cropDown(
   bindings: EditorControllerEventBindings,

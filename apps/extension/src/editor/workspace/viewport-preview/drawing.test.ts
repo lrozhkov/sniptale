@@ -3,11 +3,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { startEditorViewportPreviewLoop } from './drawing';
-import { EditorCanvas } from '../../controller/viewport/render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import {
   getEditorEditingSurfaceSize,
   getEditorWorkspaceMargin,
-} from '../../controller/viewport/editing-surface';
+} from '../../document/canvas-surface/editing-surface';
 
 function createPreviewContext() {
   const context = {

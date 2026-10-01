@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../persistence/workspace';
+import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../../features/editor/document/constants';
 import { useEditorStore } from './useEditorStore';
 import { createDefaultDrawingToolDefaults } from '../../features/drawing/public';
 

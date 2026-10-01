@@ -23,7 +23,7 @@ import type { EditorTextInlineStyleCommand } from '../../text-formatting';
 import type {
   EditorTechnicalDataKind,
   EditorTechnicalDataLayout,
-} from '../../tools/technical-data';
+} from '../../../../features/editor/document/technical-data';
 import type { EditorSelectionNudge } from '../../tools/nudge';
 import type { EditorControllerRelayoutOptions } from './shared';
 

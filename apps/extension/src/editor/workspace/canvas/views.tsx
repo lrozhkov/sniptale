@@ -17,7 +17,7 @@ import type { EditorLayerItem, EditorTool } from '../../../features/editor/docum
 import {
   getEditorEditingSurfaceSize,
   getEditorWorkspaceMargin,
-} from '../../controller/viewport/editing-surface';
+} from '../../document/canvas-surface/editing-surface';
 
 const emptyStateButtonClassName = [
   'mt-5',

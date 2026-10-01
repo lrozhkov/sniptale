@@ -6,7 +6,7 @@ import { CanvasWrapperSurface } from './surface';
 import { useCanvasContextMenuOwner } from './use-context-menu';
 import { useCanvasGridStyle } from './grid-style';
 import { useCanvasMountEffect } from './mount-effect';
-import { EditorCanvas } from '../../controller/viewport/render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 interface CanvasWrapperProps {
   hasImage: boolean;

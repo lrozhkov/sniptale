@@ -1,7 +1,10 @@
 import type { EditorTextInlineStyleCommand } from '../text-formatting';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { EditorSelectionNudge } from '../tools/nudge';
-import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../tools/technical-data';
+import type {
+  EditorTechnicalDataKind,
+  EditorTechnicalDataLayout,
+} from '../../../features/editor/document/technical-data';
 import {
   applySelectionSettingsForController,
   applyTextSelectionStyleForController,

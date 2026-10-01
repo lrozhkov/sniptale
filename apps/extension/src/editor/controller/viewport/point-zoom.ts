@@ -2,7 +2,7 @@ import { clamp } from '../../document/model';
 import { getEditorViewportMetrics } from './metrics';
 import { applyEditorViewportZoom } from './zoom';
 import { getDevicePixelRatioBaselineOptions, type ZoomContext } from './actions-types';
-import { EditorCanvas } from './render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 type ViewportPoint = { clientX: number; clientY: number };
 type LocalViewportPoint = { x: number; y: number };

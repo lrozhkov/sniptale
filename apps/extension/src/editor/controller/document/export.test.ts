@@ -9,11 +9,11 @@ import {
 } from './export';
 import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 import { Canvas } from 'fabric';
-import { EditorCanvas } from '../viewport/render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import {
   getEditorWorkspaceMargin,
   setEditorEditingSurfaceDimensions,
-} from '../viewport/editing-surface';
+} from '../../document/canvas-surface/editing-surface';
 
 const writeMock = vi.fn();
 

@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { CanvasEmptyState, CanvasViewport } from './views';
-import { EDITOR_WORKSPACE_MARGIN } from '../../controller/viewport/editing-surface';
+import { EDITOR_WORKSPACE_MARGIN } from '../../document/canvas-surface/editing-surface';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),

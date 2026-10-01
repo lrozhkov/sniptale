@@ -21,8 +21,8 @@ import type { SourceState } from '../../document/model/source-state';
 import {
   getEditorEditingDocumentSize,
   getEditorWorkspaceMargin,
-} from '../viewport/editing-surface';
-import { EditorCanvas } from '../viewport/render-region';
+} from '../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 export function buildEditorCanvasDocument(options: {
   canvas: Canvas | null;

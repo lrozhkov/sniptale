@@ -24,8 +24,8 @@ import {
   normalizeEditorFreeCanvasSelection,
 } from '../tools/crop';
 import { useEditorStore } from '../../state/useEditorStore';
-import { EditorCanvas } from '../viewport/render-region';
-import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
+import { getEditorCanvasWorkspaceInsets } from '../../document/canvas-surface/editing-surface';
 
 function collectFreehandSamples(canvas: Canvas, events: readonly TPointerEvent[]): DrawingSample[] {
   return events.flatMap((event) => {

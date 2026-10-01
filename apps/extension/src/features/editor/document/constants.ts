@@ -1,4 +1,9 @@
-import type { BrowserFrameState, EditorFrameSettings, EditorWorkspaceSettings } from './types';
+import type {
+  BrowserFrameState,
+  EditorFrameSettings,
+  EditorWorkspaceSettings,
+  EditorWorkspaceDefaults,
+} from './types';
 import { DEFAULT_COLOR_GRID, DEFAULT_COLOR_WORKSPACE } from '@sniptale/ui/default-colors/constants';
 import {
   normalizeEditorFrameGradientColorStops,
@@ -86,6 +91,11 @@ export const DEFAULT_EDITOR_WORKSPACE_SETTINGS: EditorWorkspaceSettings = {
   magnetEnabled: false,
   gridSize: 24,
   gridColor: DEFAULT_COLOR_GRID,
+};
+
+export const DEFAULT_EDITOR_WORKSPACE_DEFAULTS: EditorWorkspaceDefaults = {
+  backgroundColor: DEFAULT_EDITOR_WORKSPACE_SETTINGS.backgroundColor,
+  hideSelectionWhileDragging: DEFAULT_EDITOR_WORKSPACE_SETTINGS.hideSelectionWhileDragging,
 };
 
 export function normalizeEditorFrameSettings(

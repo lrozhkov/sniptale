@@ -60,7 +60,6 @@ vi.mock('../../../composition/persistence/editor-presets', async (importOriginal
 
 vi.mock('../../persistence/workspace', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../persistence/workspace')>()),
-  DEFAULT_EDITOR_WORKSPACE_DEFAULTS: { backgroundColor: '#f2f4f7' },
   loadEditorWorkspaceDefaults: loadEditorWorkspaceDefaultsMock,
 }));
 
@@ -134,7 +133,10 @@ function useEditorPageRuntimeTestScope() {
       step: { defaultPresetId: 'step-default', presets: [] },
       text: { defaultPresetId: 'text-default', presets: [] },
     });
-    loadEditorWorkspaceDefaultsMock.mockResolvedValue({ backgroundColor: '#f2f4f7' });
+    loadEditorWorkspaceDefaultsMock.mockResolvedValue({
+      backgroundColor: '#f2f4f7',
+      hideSelectionWhileDragging: true,
+    });
     waitForEditorControllerCanvasMock.mockResolvedValue(undefined);
   });
 }
@@ -192,7 +194,10 @@ async function verifiesDefaultPresetLoading() {
     step: { defaultPresetId: 'step-default', presets: [] },
     text: { defaultPresetId: 'text-default', presets: [] },
   });
-  loadEditorWorkspaceDefaultsMock.mockResolvedValueOnce({ backgroundColor: '#123456' });
+  loadEditorWorkspaceDefaultsMock.mockResolvedValueOnce({
+    backgroundColor: '#123456',
+    hideSelectionWhileDragging: false,
+  });
 
   loadEditorPageDefaults(hydrateDefaults, hydrateWorkspaceDefaults);
   await flushRuntimeDefaultsWork();
@@ -201,7 +206,10 @@ async function verifiesDefaultPresetLoading() {
     borderPreset: expect.objectContaining({ id: 'preset-2' }),
     toolSettings: {},
   });
-  expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({ backgroundColor: '#123456' });
+  expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({
+    backgroundColor: '#123456',
+    hideSelectionWhileDragging: false,
+  });
 
   hydrateDefaults.mockClear();
   hydrateWorkspaceDefaults.mockClear();
@@ -215,7 +223,10 @@ async function verifiesDefaultPresetLoading() {
   expect(hydrateDefaults).toHaveBeenCalledWith({
     borderPreset: expect.objectContaining({ id: 'default-border' }),
   });
-  expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({ backgroundColor: '#f2f4f7' });
+  expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({
+    backgroundColor: '#f2f4f7',
+    hideSelectionWhileDragging: true,
+  });
 }
 
 async function verifiesConditionalAutosaveFlush() {

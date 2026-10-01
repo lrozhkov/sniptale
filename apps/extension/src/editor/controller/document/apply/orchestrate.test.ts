@@ -39,7 +39,7 @@ vi.mock('./load', async (importOriginal) => ({
 }));
 
 import { applyEditorDocumentToCanvas } from './orchestrate';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 function createOptions() {
   return {

@@ -1,7 +1,7 @@
 import type { Canvas, Rect } from 'fabric';
 import { Point } from 'fabric';
-import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
-import { EditorCanvas } from '../viewport/render-region';
+import { getEditorCanvasWorkspaceInsets } from '../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import type { CropSelection } from '../core/types';
 import {
   applyCropGuideSelection,

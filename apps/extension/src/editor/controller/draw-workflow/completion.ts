@@ -7,7 +7,7 @@ import type { DrawWorkflowState } from './completion-types';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { updateEditorDrawingPathDraft } from '../../drawing/object/vector';
 import { useEditorStore } from '../../state/useEditorStore';
-import { getEditorCanvasWorkspaceInsets } from '../viewport/editing-surface';
+import { getEditorCanvasWorkspaceInsets } from '../../document/canvas-surface/editing-surface';
 
 function finalizeFreehandPreview(drawSession: DrawSession): void {
   const object = drawSession.object;

@@ -1,7 +1,7 @@
 import type { Canvas } from 'fabric';
 import { getEditorViewportMetrics } from './metrics';
 import type { ViewportAnchor } from '../core/types';
-import { EditorCanvas } from './render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 export function captureEditorViewportAnchor(options: {
   canvas: Canvas | null;

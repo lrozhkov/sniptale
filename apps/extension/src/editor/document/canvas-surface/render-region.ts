@@ -1,5 +1,5 @@
 import { Canvas, type FabricObject, type TPointerEvent } from 'fabric';
-import { isBackgroundObject, isUserObject } from '../../document/model';
+import { isBackgroundObject, isUserObject } from '../model/index';
 import {
   createEditorWorkspaceInsets,
   getEditorWorkspaceSurfaceSize,

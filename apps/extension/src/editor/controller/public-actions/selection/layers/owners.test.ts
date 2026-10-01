@@ -33,7 +33,7 @@ vi.mock('../../../document/source', async (importOriginal) => ({
 import { renameEditorLayerById } from './rename';
 import { reorderEditorLayer } from './reorder';
 import { selectEditorLayerById } from './select';
-import { EditorCanvas } from '../../../viewport/render-region';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 import { resizeEditorLayerById, toggleEditorLayerVisibility } from './source-mutations';
 
 function createSyncOptions() {

@@ -12,7 +12,7 @@ import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-read
 import { createViewportPresentationContext } from '../viewport-context';
 import { attachEditorCanvasPointerCapture } from './pointer-capture';
 import { mountEditorSelectionChrome } from './selection-chrome';
-import { EditorCanvas } from '../../../viewport/render-region';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 
 export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
   const canvas = new EditorCanvas(canvasElement, {

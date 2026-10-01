@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Rect } from 'fabric';
 import { createFrameAnnotationProxy } from './proxy';
 import { createFabricCanvasFixture } from '../testing/fabric-canvas.test-support';
-import { EditorCanvas } from '../controller/viewport/render-region';
+import { EditorCanvas } from '../document/canvas-surface/render-region';
 import { createDefaultRichShapeObject } from '../../features/editor/document/rich-shape';
 
 const mocks = vi.hoisted(() => ({

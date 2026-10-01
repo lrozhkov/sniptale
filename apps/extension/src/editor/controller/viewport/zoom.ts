@@ -1,7 +1,7 @@
 import type { Canvas } from 'fabric';
 import { resolveEditorViewportScaleCompensation } from './scale';
-import { getEditorEditingSurfaceSize } from './editing-surface';
-import { EditorCanvas } from './render-region';
+import { getEditorEditingSurfaceSize } from '../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 export function applyEditorViewportZoom(
   canvas: Canvas | null,

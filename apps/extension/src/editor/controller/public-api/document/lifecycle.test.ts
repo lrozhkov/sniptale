@@ -4,7 +4,7 @@ import {
   loadEditorDocumentViaController,
   openEditorImageViaController,
 } from './lifecycle';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 const mocks = vi.hoisted(() => ({
   closeDocument: vi.fn(),

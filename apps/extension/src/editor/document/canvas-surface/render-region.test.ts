@@ -3,8 +3,8 @@
 import { Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import { EditorCanvas } from './render-region';
-import { selectEditorLayerById } from '../public-actions/selection/layers/select';
-import { prepareCanvasForDocumentLoad } from '../document/apply/canvas';
+import { selectEditorLayerById } from '../../controller/public-actions/selection/layers/select';
+import { prepareCanvasForDocumentLoad } from '../../controller/document/apply/canvas';
 
 it('keeps replacement documents centered after crop, image resize, undo, and redo', () => {
   const surface = document.createElement('div');

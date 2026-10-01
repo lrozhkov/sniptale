@@ -12,7 +12,7 @@ import { FrameProjection } from './projection';
 import type { ProjectionSettingsMenu } from './projection-settings';
 import { useEditorFrameCoordinateSpace, useProjectionRect } from './projection-space';
 import { EditorCropOverlay } from './crop-overlay';
-import { getEditorDocumentClientRect } from '../controller/viewport/editing-surface';
+import { getEditorDocumentClientRect } from '../document/canvas-surface/editing-surface';
 
 type FrameSettingsSession = {
   anchor: HTMLButtonElement;

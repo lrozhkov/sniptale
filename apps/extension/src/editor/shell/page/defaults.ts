@@ -4,11 +4,9 @@ import {
   loadHighlighterSettings,
 } from '../../../composition/persistence/highlighter';
 import { loadEditorPresetState } from '../../../composition/persistence/editor-presets';
-import {
-  DEFAULT_EDITOR_WORKSPACE_DEFAULTS,
-  loadEditorWorkspaceDefaults,
-  type EditorWorkspaceDefaults,
-} from '../../persistence/workspace';
+import { loadEditorWorkspaceDefaults } from '../../persistence/workspace';
+import type { EditorWorkspaceDefaults } from '../../../features/editor/document/types';
+import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../../../features/editor/document/constants';
 
 type EditorPageDefaults = {
   borderPreset?: typeof DEFAULT_BORDER_PRESET;

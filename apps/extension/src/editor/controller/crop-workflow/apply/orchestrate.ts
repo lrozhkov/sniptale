@@ -2,7 +2,7 @@ import type { Canvas, Rect } from 'fabric';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { normalizeEditorFreeCanvasSelection, normalizeEditorCropSelection } from '../../tools/crop';
 import { useEditorStore } from '../../../state/useEditorStore';
-import { getEditorCanvasWorkspaceInsets } from '../../viewport/editing-surface';
+import { getEditorCanvasWorkspaceInsets } from '../../../document/canvas-surface/editing-surface';
 import type { CropSelection } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
 

@@ -1,5 +1,5 @@
 import type { DEFAULT_BORDER_PRESET } from '../../composition/persistence/highlighter';
-import type { EditorWorkspaceDefaults } from '../persistence/workspace';
+import type { EditorWorkspaceDefaults } from '../../features/editor/document/types';
 import type {
   BrowserFrameState,
   EditorFrameSettings,

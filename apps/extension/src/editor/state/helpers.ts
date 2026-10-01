@@ -5,7 +5,7 @@ import type {
   EditorViewportState,
   EditorWorkspaceSettings,
 } from '../../features/editor/document/types';
-import type { EditorWorkspaceDefaults } from '../persistence/workspace';
+import type { EditorWorkspaceDefaults } from '../../features/editor/document/types';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_FRAME_SETTINGS,

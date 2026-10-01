@@ -1,4 +1,4 @@
-import type { EditorTechnicalDataLayout } from '../technical-data';
+import type { EditorTechnicalDataLayout } from '../../../../features/editor/document/technical-data';
 
 export function getTechnicalDataTextWidth(
   layout: EditorTechnicalDataLayout,

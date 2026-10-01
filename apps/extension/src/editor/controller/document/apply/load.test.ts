@@ -52,7 +52,7 @@ import { undoEditorControllerSnapshot } from '../../public-api/document/history'
 import { createMockDocument } from '../../instance/bindings/test-fixtures-document';
 import { prepareAppliedDocument } from '..';
 import type { EditorDocument } from '../../../../features/editor/document/types';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 function createPreparedDocument() {
   return {

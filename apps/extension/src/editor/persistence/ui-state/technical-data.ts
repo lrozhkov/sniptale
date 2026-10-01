@@ -4,7 +4,7 @@ import { runWithPersistenceDomainMutationLock } from '../../../composition/persi
 import type {
   EditorTechnicalDataKind,
   EditorTechnicalDataLayout,
-} from '../../controller/tools/technical-data';
+} from '../../../features/editor/document/technical-data';
 
 const STORAGE_KEY = 'sniptale_editor_technical_data_preference';
 const kinds = ['url', 'date', 'browser'] as const;

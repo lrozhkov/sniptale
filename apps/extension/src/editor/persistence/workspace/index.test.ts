@@ -14,11 +14,8 @@ vi.mock('../../../composition/persistence/infrastructure/browser-storage', () =>
   },
 }));
 
-import {
-  DEFAULT_EDITOR_WORKSPACE_DEFAULTS,
-  loadEditorWorkspaceDefaults,
-  patchEditorWorkspaceDefaults,
-} from './index';
+import { loadEditorWorkspaceDefaults, patchEditorWorkspaceDefaults } from './index';
+import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../../../features/editor/document/constants';
 
 async function flushWorkspaceStorageMicrotasks() {
   await Promise.resolve();

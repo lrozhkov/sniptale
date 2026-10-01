@@ -1,10 +1,10 @@
 import type { Rect } from 'fabric';
 import type { CropSelection } from '../core/types';
-import { getEditorWorkspaceMargin } from '../viewport/editing-surface';
+import { getEditorWorkspaceMargin } from '../../document/canvas-surface/editing-surface';
 import {
   createEditorWorkspaceInsets,
   type EditorWorkspaceInsets,
-} from '../viewport/workspace-extent';
+} from '../../document/canvas-surface/workspace-extent';
 
 export function createCropSelectionFromRect(cropGuide: Rect): CropSelection {
   return {

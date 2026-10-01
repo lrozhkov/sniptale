@@ -21,7 +21,7 @@ import {
 import { registerFrameAnnotationDraftFlusher } from './draft-coordinator';
 import { applyFrameAnnotationCommand } from './commands';
 import type { EditorFrameAnnotationPlaneController } from './types';
-import { getEditorDocumentClientRect } from '../controller/viewport/editing-surface';
+import { getEditorDocumentClientRect } from '../document/canvas-surface/editing-surface';
 import { createFrameAnnotationFromDefaults } from './creation-defaults';
 import { useFrameAnnotationKeyboard } from './keyboard';
 import { createFrameAnnotationLayerLabel } from './layer-label';

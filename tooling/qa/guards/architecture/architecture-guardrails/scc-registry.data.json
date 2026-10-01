@@ -1,43 +1,15 @@
 [
   {
-    "owners": [
-      "apps/extension/src/editor/browser-frame",
-      "apps/extension/src/editor/controller",
-      "apps/extension/src/editor/document",
-      "apps/extension/src/editor/drawing",
-      "apps/extension/src/editor/frame-annotation",
-      "apps/extension/src/editor/objects",
-      "apps/extension/src/editor/persistence",
-      "apps/extension/src/editor/state"
-    ],
+    "owners": ["apps/extension/src/editor/document", "apps/extension/src/editor/frame-annotation"],
     "edges": [
-      ["apps/extension/src/editor/browser-frame", "apps/extension/src/editor/document"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/browser-frame"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/document"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/drawing"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/frame-annotation"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/objects"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/persistence"],
-      ["apps/extension/src/editor/controller", "apps/extension/src/editor/state"],
       ["apps/extension/src/editor/document", "apps/extension/src/editor/frame-annotation"],
-      ["apps/extension/src/editor/document", "apps/extension/src/editor/persistence"],
-      ["apps/extension/src/editor/document", "apps/extension/src/editor/state"],
-      ["apps/extension/src/editor/drawing", "apps/extension/src/editor/document"],
-      ["apps/extension/src/editor/drawing", "apps/extension/src/editor/objects"],
-      ["apps/extension/src/editor/drawing", "apps/extension/src/editor/state"],
-      ["apps/extension/src/editor/frame-annotation", "apps/extension/src/editor/controller"],
-      ["apps/extension/src/editor/frame-annotation", "apps/extension/src/editor/document"],
-      ["apps/extension/src/editor/frame-annotation", "apps/extension/src/editor/state"],
-      ["apps/extension/src/editor/objects", "apps/extension/src/editor/browser-frame"],
-      ["apps/extension/src/editor/objects", "apps/extension/src/editor/document"],
-      ["apps/extension/src/editor/persistence", "apps/extension/src/editor/controller"],
-      ["apps/extension/src/editor/state", "apps/extension/src/editor/persistence"]
+      ["apps/extension/src/editor/frame-annotation", "apps/extension/src/editor/document"]
     ],
-    "id": "editor-local-document-leaves",
+    "id": "editor-document-annotation-import",
     "owner": "apps/extension/src/editor",
-    "classification": "tool-noise",
-    "reason": "Second-level aggregation combines controller orchestration with independent geometry, metadata, store, and snapshot leaves. The complete module dependency graph is acyclic; these exact edges stay within the image editor runtime and do not create a state-authority or runtime cycle.",
-    "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle.",
-    "debtId": "noise.scc.editor-local-document-leaves"
+    "classification": "accepted-architecture",
+    "reason": "Allowed composition: document import composes the frame-annotation validator; the validator reads immutable document serialization keys. These exact two owner edges have no module cycle, controller back-dependency, persistence authority or runtime authority cycle.",
+    "removalCondition": "Remove when either exact owner edge disappears; reassess any added edge, module cycle or changed state/runtime authority before retaining this composition.",
+    "debtId": "accepted.scc.editor-document-annotation-import"
   }
 ]

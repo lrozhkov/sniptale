@@ -12,7 +12,7 @@ import {
 } from './canvas';
 import { loadPreparedDocumentOnCanvas } from './load';
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 function logPreparedDocument(prepared: PreparedAppliedDocument): void {
   logEditorOpenTrace('canvas:prepare', {

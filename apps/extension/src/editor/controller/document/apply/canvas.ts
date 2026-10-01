@@ -1,7 +1,7 @@
 import type { Canvas } from 'fabric';
 import { applyEditorViewportZoom } from '../../viewport';
-import { setEditorEditingSurfaceDimensions } from '../../viewport/editing-surface';
-import { EditorCanvas } from '../../viewport/render-region';
+import { setEditorEditingSurfaceDimensions } from '../../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export function prepareCanvasForDocumentLoad(options: {
   canvas: Canvas;

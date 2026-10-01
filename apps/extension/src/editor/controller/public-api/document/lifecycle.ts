@@ -4,7 +4,7 @@ import { openEditorControllerImage } from '../../document/lifecycle/open/image/r
 import { openLoadedEditorControllerDocument } from '../../document/lifecycle/open/load/run';
 import type { ApplyDocumentOptions, OpenImageOptions } from '../../core/types';
 import { useEditorStore } from '../../../state/useEditorStore';
-import { EditorCanvas } from '../../viewport/render-region';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 import type {
   EditorDocumentCloseLifecycleController,
   EditorDocumentOpenLifecycleController,

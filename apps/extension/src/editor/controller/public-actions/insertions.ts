@@ -3,8 +3,11 @@ import { useEditorStore } from '../../state/useEditorStore';
 
 import type { SourceState } from '../../document/model/source-state';
 import { createInsertedImageObject, createTechnicalDataTextObject } from '../tools/insertions';
-import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../tools/technical-data';
-import { getEditorEditingDocumentSize } from '../viewport/editing-surface';
+import type {
+  EditorTechnicalDataKind,
+  EditorTechnicalDataLayout,
+} from '../../../features/editor/document/technical-data';
+import { getEditorEditingDocumentSize } from '../../document/canvas-surface/editing-surface';
 
 export async function insertEditorImageObject(options: {
   canvas: Canvas | null;

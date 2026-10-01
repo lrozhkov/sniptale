@@ -6,7 +6,7 @@ import {
   orderTechnicalDataKinds,
   type EditorTechnicalDataLayout,
   type EditorTechnicalDataKind,
-} from '../controller/tools/technical-data';
+} from '../../features/editor/document/technical-data';
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME, INSPECTOR_SECTION_LABEL_CLASS_NAME } from './chrome';
 import { cx } from '../chrome/ui';
 import { useTechnicalDataPreference } from './technical-data-preference';

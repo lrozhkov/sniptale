@@ -3,7 +3,7 @@ import {
   shouldPreserveCanvasForBrowserFrame,
 } from '../../../../browser-frame/layout';
 import { MIN_CANVAS_SIZE } from '../../../../document/model';
-import { setEditorEditingSurfaceDimensions } from '../../../viewport/editing-surface';
+import { setEditorEditingSurfaceDimensions } from '../../../../document/canvas-surface/editing-surface';
 
 import { finalizeSceneResizeMutation } from './finalize';
 import { hasBrowserFrameLayer } from './geometry';

@@ -10,8 +10,8 @@ import {
   getEditorViewportMetrics,
   restoreEditorViewportAnchor,
 } from './';
-import { getEditorEditingSurfaceSize } from './editing-surface';
-import { EditorCanvas } from './render-region';
+import { getEditorEditingSurfaceSize } from '../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 const DEFAULT_CANVAS_SIZE = { width: 200, height: 100 };
 const DEFAULT_SOURCE = { displayHeight: 100, displayWidth: 200, name: 'image.png' } as never;

@@ -1,10 +1,10 @@
 import type { Canvas } from 'fabric';
-import { EditorCanvas } from '../../controller/viewport/render-region';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import { getPreviewContentRect, PREVIEW_FPS } from './helpers';
 import {
   getEditorEditingSurfaceSize,
   getEditorWorkspaceMargin,
-} from '../../controller/viewport/editing-surface';
+} from '../../document/canvas-surface/editing-surface';
 
 function syncPreviewCanvasSize(args: {
   previewCanvas: HTMLCanvasElement;

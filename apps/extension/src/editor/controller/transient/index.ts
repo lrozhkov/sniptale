@@ -18,7 +18,7 @@ import {
   startEditorDrawSession,
 } from './draw-session';
 import type { CropSelection, DrawSession } from '../core/types';
-import type { EditorWorkspaceInsets } from '../viewport/workspace-extent';
+import type { EditorWorkspaceInsets } from '../../document/canvas-surface/workspace-extent';
 
 type RectInstance = Rect<TOptions<RectProps>, SerializedRectProps, ObjectEvents>;
 

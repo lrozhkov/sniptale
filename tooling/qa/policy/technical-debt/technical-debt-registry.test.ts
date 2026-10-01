@@ -92,32 +92,37 @@ describe('technical debt registry smell contract', () => {
     expect(rulesFor(staleRecord)).toContain('technical-debt-unreferenced-entry');
   });
 
-  it('preserves SCC noise classification and rejects classification or exact graph scope drift', () => {
+  it('preserves live SCC classifications and rejects classification or exact graph scope drift', () => {
     const source = JSON.parse(
       fs.readFileSync(
         'tooling/qa/guards/architecture/architecture-guardrails/scc-registry.data.json',
         'utf8'
       )
     );
-    const noise = source.find(
-      (entry: Record<string, unknown>) => entry.classification === 'tool-noise'
-    );
-    expect(noise).toBeDefined();
     const registry = readRegistry();
-    const linked = registry.entries.find((entry) => entry.id === noise.debtId)!;
-    expect(linked.classification).toBe('tool-noise');
     expect(collectTechnicalDebtRegistryViolations({ registry })).toEqual([]);
-    for (const patch of [
-      { classification: 'debt' },
-      { scope: { ...linked.scope, edgeDigest: '0'.repeat(64) } },
-      { scope: { ...linked.scope, owners: [...linked.scope.owners, 'unreviewed-owner'] } },
-    ]) {
-      const invalid = structuredClone(registry);
-      Object.assign(
-        invalid.entries.find((entry) => entry.id === linked.id)!,
-        patch
-      );
-      expect(rulesFor(invalid)).toContain('technical-debt-scope-drift');
+    for (const composition of source) {
+      const classification =
+        composition.classification === 'tool-noise'
+          ? 'tool-noise'
+          : composition.reason.startsWith('Allowed composition:')
+            ? 'accepted-architecture'
+            : 'debt';
+      const linked = registry.entries.find((entry) => entry.id === composition.debtId)!;
+      expect(linked).toBeDefined();
+      expect(linked.classification).toBe(classification);
+      for (const patch of [
+        { classification: classification === 'debt' ? 'tool-noise' : 'debt' },
+        { scope: { ...linked.scope, edgeDigest: '0'.repeat(64) } },
+        { scope: { ...linked.scope, owners: [...linked.scope.owners, 'unreviewed-owner'] } },
+      ]) {
+        const invalid = structuredClone(registry);
+        Object.assign(
+          invalid.entries.find((entry) => entry.id === linked.id)!,
+          patch
+        );
+        expect(rulesFor(invalid)).toContain('technical-debt-scope-drift');
+      }
     }
   });
 
