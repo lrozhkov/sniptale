@@ -13,6 +13,9 @@ export function TimelineRecordingPanel(props: {
   titleId: string;
   startTime: number;
   duration: number;
+  captureDuration?: number;
+  limitInvalid?: boolean;
+  durationOptions?: ReactNode;
   controller: AudioRecordingControllerState;
   device: ReactNode;
   playbackChoice?: ReactNode;
@@ -30,7 +33,7 @@ export function TimelineRecordingPanel(props: {
   const recordButton = (
     <ProductActionButton
       tone={trim ? 'secondary' : 'primary'}
-      disabled={busy}
+      disabled={busy || props.limitInvalid || props.duration <= 0}
       onClick={props.onStart}
     >
       {trim ? <RotateCcw size={16} /> : <Mic size={16} />}
@@ -69,6 +72,7 @@ export function TimelineRecordingPanel(props: {
           <div className="flex flex-wrap items-center gap-3">
             <div className="w-40 min-w-0">{props.device}</div>
             {props.playbackChoice}
+            {props.durationOptions}
             <span
               className="whitespace-nowrap text-xs tabular-nums"
               data-ui="video-editor.audio-recording.limit"
@@ -81,7 +85,12 @@ export function TimelineRecordingPanel(props: {
               <strong>
                 {formatDurationLabel(
                   recording || paused
-                    ? Math.ceil(Math.max(0, props.duration - transport.elapsedSeconds))
+                    ? Math.ceil(
+                        Math.max(
+                          0,
+                          (props.captureDuration ?? props.duration) - transport.elapsedSeconds
+                        )
+                      )
                     : props.duration
                 )}
               </strong>
@@ -115,6 +124,7 @@ export function TimelineRecordingPanel(props: {
           <RecordingLevelMeter meter={props.controller.meter} preparing={props.starting} />
         </>
       )}
+      {trim && props.limitInvalid ? props.durationOptions : null}
       {renderAudioRecordingTrimPanel(
         trim,
         busy,

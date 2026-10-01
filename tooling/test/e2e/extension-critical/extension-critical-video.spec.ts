@@ -762,12 +762,29 @@ for (const variant of [
     await page.locator('[data-ui="video-editor.timeline.record-range"]').first().click();
     const strip = page.locator('[data-ui="video-editor.audio-recording.strip"]');
     await expect(strip).toBeVisible();
-    const playVideo = strip.getByRole('checkbox', {
+    const playVideo = strip.getByRole('switch', {
       name: translate('videoEditor.app.recordAudioPlayVideo', variant.locale),
     });
     await expect(playVideo).toBeChecked();
     await playVideo.uncheck();
     await expect(playVideo).not.toBeChecked();
+    const numericLimit = strip.getByRole('spinbutton', {
+      name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
+    });
+    await expect(numericLimit).toBeVisible();
+    const startCapture = strip.getByRole('button', {
+      name: translate('videoEditor.app.recordAudioStart', variant.locale),
+      exact: true,
+    });
+    await numericLimit.fill('');
+    await expect(startCapture).toBeDisabled();
+    await expect(strip.getByRole('alert')).toBeVisible();
+    await numericLimit.fill('999999');
+    await expect(startCapture).toBeDisabled();
+    await numericLimit.fill('1');
+    await expect(startCapture).toBeEnabled();
+    await expect(numericLimit).toBeInViewport();
+    await expect(startCapture).toBeInViewport();
     await page.screenshot({
       path: testInfo.outputPath(`full-voiceover-ready-${variant.locale}-${variant.theme}.png`),
     });

@@ -5,6 +5,10 @@ import { useAudioRecordingFocus } from '../../../composition/audio-recording/dia
 import { useAudioRecordingDialogSession } from '../../../composition/audio-recording/dialog/controller';
 import { MaterialAudioRecordingModal } from '../../../composition/audio-recording/dialog';
 import { AudioRecordingDeviceSelect } from '../../../composition/audio-recording/dialog/controls';
+import {
+  RecordingDurationLimit,
+  useRecordingDurationLimit,
+} from '../../../composition/audio-recording/dialog/duration-limit';
 import { RecordingPlaybackChoice } from '../../../composition/audio-recording/dialog/playback-choice';
 import { useEffect, useRef } from 'react';
 import type { AudioRecordingModalProps } from '../../../composition/audio-recording/dialog/types';
@@ -27,7 +31,14 @@ function TimelineAudioRecordingModal({
   onPlayVideoChange,
 }: AudioRecordingModalProps): React.JSX.Element | null {
   const { titleId, handleKeyDown } = useAudioRecordingFocus(isOpen);
-  const session = useAudioRecordingDialogSession({ isOpen, onClose, onSave, timeline });
+  const durationLimit = useRecordingDurationLimit(timeline?.duration ?? 0);
+  const session = useAudioRecordingDialogSession({
+    isOpen,
+    onClose,
+    onSave,
+    timeline,
+    captureLimitSeconds: durationLimit.seconds,
+  });
   const {
     deviceId,
     setDeviceId,
@@ -83,6 +94,19 @@ function TimelineAudioRecordingModal({
             titleId={titleId}
             startTime={timeline.startTime}
             duration={timeline.duration}
+            captureDuration={durationLimit.effective}
+            limitInvalid={durationLimit.invalid}
+            durationOptions={
+              <RecordingDurationLimit
+                value={durationLimit}
+                maximum={timeline.duration}
+                disabled={
+                  starting ||
+                  isSaving ||
+                  ['recording', 'paused'].includes(controller.transport.status)
+                }
+              />
+            }
             controller={controller}
             device={device}
             playbackChoice={

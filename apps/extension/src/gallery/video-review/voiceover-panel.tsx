@@ -2,10 +2,13 @@ import { useEffect, useState, type RefObject } from 'react';
 import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { useAudioRecordingDialogSession } from '../../composition/audio-recording/dialog/controller';
 import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog-focus';
 import { AudioRecordingDeviceSelect } from '../../composition/audio-recording/dialog/controls';
+import {
+  RecordingDurationLimit,
+  useRecordingDurationLimit,
+} from '../../composition/audio-recording/dialog/duration-limit';
 import { RecordingPlaybackChoice } from '../../composition/audio-recording/dialog/playback-choice';
 import { RecordingLevelMeter } from '../../composition/audio-recording/dialog/level-meter';
 import { renderAudioRecordingTrimPanel } from '../../composition/audio-recording/dialog/trim';
@@ -55,8 +58,7 @@ export function ReviewVoiceoverRecording(props: {
   onSave(file: File, trim: AudioTrimRange, signal: AbortSignal, take: Blob): Promise<void>;
 }) {
   const remaining = Math.max(0, props.timelineDuration - props.playhead);
-  const [limitEnabled, setLimitEnabled] = useState(true);
-  const [limitSeconds, setLimitSeconds] = useState(60);
+  const durationLimit = useRecordingDurationLimit(remaining);
   const [playVideo, setPlayVideo] = useState(true);
   const { titleId, handleKeyDown } = useAudioRecordingFocus(props.isOpen);
   const session = useAudioRecordingDialogSession({
@@ -73,7 +75,7 @@ export function ReviewVoiceoverRecording(props: {
         await props.onSyncResume?.(playVideo);
       },
     },
-    captureLimitSeconds: limitEnabled ? limitSeconds : undefined,
+    captureLimitSeconds: durationLimit.seconds,
   });
   const { controller, starting, isSaving, saveError } = session;
   const { transport, trim } = controller;
@@ -87,7 +89,6 @@ export function ReviewVoiceoverRecording(props: {
     video.addEventListener('ended', onEnded);
     return () => video.removeEventListener('ended', onEnded);
   }, [playVideo, props.isOpen, props.video, transport.status, stopRecording]);
-  const effectiveLimit = Math.min(remaining, limitEnabled ? limitSeconds : Infinity);
   if (!props.isOpen) return null;
   return (
     <ProductModal
@@ -126,7 +127,11 @@ export function ReviewVoiceoverRecording(props: {
           </ProductActionButton>
         </div>
         {trim ? (
-          <VoiceoverTakeReview session={session} />
+          <VoiceoverTakeReview
+            session={session}
+            durationLimit={durationLimit}
+            maximum={remaining}
+          />
         ) : (
           <>
             <VoiceoverCaptureOptions
@@ -134,12 +139,15 @@ export function ReviewVoiceoverRecording(props: {
               capturing={capturing}
               playVideo={playVideo}
               onPlayVideo={setPlayVideo}
-              limitEnabled={limitEnabled}
-              limitSeconds={limitSeconds}
-              onLimitEnabled={setLimitEnabled}
-              onLimitSeconds={setLimitSeconds}
+              durationLimit={durationLimit}
+              maximum={remaining}
             />
-            <VoiceoverTransport session={session} remaining={remaining} limit={effectiveLimit} />
+            <VoiceoverTransport
+              session={session}
+              remaining={remaining}
+              limit={durationLimit.effective}
+              invalid={durationLimit.invalid}
+            />
             <RecordingLevelMeter meter={controller.meter} preparing={starting} />
           </>
         )}
@@ -159,10 +167,8 @@ function VoiceoverCaptureOptions(props: {
   capturing: boolean;
   playVideo: boolean;
   onPlayVideo(value: boolean): void;
-  limitEnabled: boolean;
-  limitSeconds: number;
-  onLimitEnabled(value: boolean): void;
-  onLimitSeconds(value: number): void;
+  durationLimit: ReturnType<typeof useRecordingDurationLimit>;
+  maximum: number;
 }) {
   const disabled = props.session.starting || props.capturing;
   return (
@@ -184,33 +190,12 @@ function VoiceoverCaptureOptions(props: {
         disabled={disabled || props.session.isSaving}
         onChange={props.onPlayVideo}
       />
-      <div className="ml-auto flex flex-wrap items-center gap-2">
-        <ProductActionButton
-          tone="toggle"
-          compact
-          active={props.limitEnabled}
-          aria-pressed={props.limitEnabled}
-          data-ui="audio-recording.duration-limit"
+      <div className="ml-auto">
+        <RecordingDurationLimit
+          value={props.durationLimit}
+          maximum={props.maximum}
           disabled={disabled || props.session.isSaving}
-          onClick={() => props.onLimitEnabled(!props.limitEnabled)}
-        >
-          {translate('gallery.videoReview.voiceoverDurationLimit')}
-        </ProductActionButton>
-        {props.limitEnabled ? (
-          <ProductSelect
-            containerClassName="!w-24 shrink-0"
-            className="whitespace-nowrap"
-            aria-label={translate('gallery.videoReview.voiceoverDurationLimit')}
-            controlSize="sm"
-            value={String(props.limitSeconds)}
-            disabled={disabled}
-            options={[30, 60, 120, 300].map((seconds) => ({
-              value: String(seconds),
-              label: formatDurationLabel(seconds),
-            }))}
-            onChange={(value) => props.onLimitSeconds(Number(value))}
-          />
-        ) : null}
+        />
       </div>
     </div>
   );
@@ -220,6 +205,7 @@ function VoiceoverTransport(props: {
   session: RecordingSession;
   remaining: number;
   limit: number;
+  invalid: boolean;
 }) {
   const { transport } = props.session.controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
@@ -231,7 +217,7 @@ function VoiceoverTransport(props: {
         )}{' '}
         <strong>
           {formatDurationLabel(
-            capturing ? Math.max(0, props.limit - transport.elapsedSeconds) : props.limit
+            capturing ? Math.max(0, props.limit - transport.elapsedSeconds) : props.remaining
           )}
         </strong>
       </span>
@@ -254,7 +240,7 @@ function VoiceoverTransport(props: {
       ) : (
         <ProductActionButton
           tone="primary"
-          disabled={props.session.starting || props.remaining <= 0}
+          disabled={props.session.starting || props.remaining <= 0 || props.invalid}
           onClick={props.session.startRecording}
         >
           <Mic size={16} aria-hidden="true" />
@@ -265,9 +251,24 @@ function VoiceoverTransport(props: {
   );
 }
 
-function VoiceoverTakeReview({ session }: { session: RecordingSession }) {
+function VoiceoverTakeReview({
+  session,
+  durationLimit,
+  maximum,
+}: {
+  session: RecordingSession;
+  durationLimit: ReturnType<typeof useRecordingDurationLimit>;
+  maximum: number;
+}) {
   return (
     <>
+      {durationLimit.invalid ? (
+        <RecordingDurationLimit
+          value={durationLimit}
+          maximum={maximum}
+          disabled={session.isSaving || session.starting}
+        />
+      ) : null}
       {renderAudioRecordingTrimPanel(
         session.controller.trim,
         session.isSaving || session.starting,
@@ -276,7 +277,7 @@ function VoiceoverTakeReview({ session }: { session: RecordingSession }) {
       <div className="flex flex-wrap justify-end gap-2">
         <ProductActionButton
           tone="secondary"
-          disabled={session.isSaving || session.starting}
+          disabled={session.isSaving || session.starting || durationLimit.invalid || maximum <= 0}
           onClick={session.startRecording}
         >
           <RotateCcw size={16} aria-hidden="true" />

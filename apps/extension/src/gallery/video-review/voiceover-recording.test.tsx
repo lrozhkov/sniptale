@@ -101,25 +101,24 @@ it('shows a bottom strip with an optional visible duration cap', () => {
   const limit = modal!.querySelector<HTMLButtonElement>(
     '[data-ui="audio-recording.duration-limit"]'
   )!;
-  expect(limit.getAttribute('aria-pressed')).toBe('true');
-  const duration = [...modal!.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
-    button.getAttribute('aria-label')?.includes('voiceoverDurationLimit')
-  );
-  expect(duration?.parentElement?.className).toContain('w-24');
-  expect(duration?.className).toContain('whitespace-nowrap');
-  expect(modal!.querySelector('input[type="checkbox"]')).toBeNull();
+  expect(limit.getAttribute('role')).toBe('switch');
+  expect(limit.getAttribute('aria-checked')).toBe('true');
+  const duration = modal!.querySelector<HTMLInputElement>('input[type="number"]')!;
+  expect(duration.value).toBe('7');
+  expect(duration.max).toBe('7');
   act(() => limit.click());
-  expect(limit.getAttribute('aria-pressed')).toBe('false');
+  expect(limit.getAttribute('aria-checked')).toBe('false');
+  expect(modal!.querySelector('input[type="number"]')).toBeNull();
   expect(modal!.textContent).toContain('00:07');
 });
 
 it('offers a visible video playback choice before capture and keeps the placement visible', () => {
   renderRecording(true);
   const playback = host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.play-video"]');
-  expect(playback?.getAttribute('aria-pressed')).toBe('true');
+  expect(playback?.getAttribute('aria-checked')).toBe('true');
   expect(host.textContent).toContain('00:03');
   act(() => playback?.click());
-  expect(playback?.getAttribute('aria-pressed')).toBe('false');
+  expect(playback?.getAttribute('aria-checked')).toBe('false');
 });
 
 it('stays closed when isOpen is false', () => {
@@ -165,6 +164,13 @@ it('shows recording, pause, resume and take review with the same lower panel', a
     }
   );
   renderRecording(true);
+  const input = host.querySelector<HTMLInputElement>('input[type="number"]')!;
+  const setNumber = (node: HTMLInputElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  setNumber(input, '5');
   const click = async (label: string) => {
     const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find((item) =>
       item.textContent?.includes(label)
@@ -179,6 +185,28 @@ it('shows recording, pause, resume and take review with the same lower panel', a
   await click('videoEditor.app.recordAudioStop');
   expect(host.textContent).toContain('videoEditor.app.recordAudioSave');
   expect(host.textContent).toContain('videoEditor.app.recordAudioAgain');
+  act(() =>
+    root.render(
+      <ReviewVoiceoverRecording
+        isOpen
+        playhead={3}
+        timelineDuration={4}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSyncStart={vi.fn(async () => undefined)}
+        onSyncStop={vi.fn()}
+      />
+    )
+  );
+  const again = [...host.querySelectorAll('button')].find((b) =>
+    b.textContent?.includes('recordAudioAgain')
+  )!;
+  expect(again.disabled).toBe(true);
+  const repair = host.querySelector<HTMLInputElement>('input[type="number"]')!;
+  expect(repair.value).toBe('5');
+  expect(repair.max).toBe('1');
+  setNumber(repair, '0.5');
+  expect(again.disabled).toBe(false);
 });
 
 type RecordingApi = ReturnType<typeof useReviewVoiceoverRecording>;

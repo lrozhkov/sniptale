@@ -427,8 +427,12 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
     await click('zoomAdd');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions).toHaveLength(1);
+    await act(async () =>
+      vi.waitFor(
+        () => expect(advancedContentAt(fixture.snapshot, 0).zoom.regions).toHaveLength(1),
+        { timeout: 3000 }
+      )
+    );
     expect(advancedContentAt(fixture.snapshot, 0).zoom.enabled).toBe(true);
     expect(advancedContentAt(fixture.snapshot, 0).zoom.regions[0]).toMatchObject({
       start: 0,
@@ -445,12 +449,21 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
       scale.dispatchEvent(new Event('input', { bubbles: true }));
       scale.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     });
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2);
+    await act(async () =>
+      vi.waitFor(
+        () =>
+          expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2),
+        { timeout: 3000 }
+      )
+    );
     // Basic mode suppresses the lane and its effect while preserving the stored region.
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await act(async () =>
+      vi.waitFor(() => expect(fixture.snapshot.workspace.advanced.ui.mode).toBe('basic'), {
+        timeout: 3000,
+      })
+    );
     expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2);
   } finally {
     await fixture.cleanup();

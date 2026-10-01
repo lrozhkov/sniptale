@@ -2596,20 +2596,37 @@ for (const variant of [
       const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
       await expect(strip).toBeVisible();
       await expect(
-        strip.getByRole('checkbox', {
+        strip.getByRole('switch', {
           name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
         })
       ).toBeChecked();
-      const playVideo = strip.getByRole('checkbox', {
+      const playVideo = strip.getByRole('switch', {
         name: translate('videoEditor.app.recordAudioPlayVideo', variant.locale),
       });
       await expect(playVideo).toBeChecked();
       if (variant.locale === 'en') await playVideo.uncheck();
+      const numericLimit = strip.getByRole('spinbutton', {
+        name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
+      });
+      await expect(numericLimit).toBeVisible();
+      const startCapture = strip.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioStart', variant.locale),
+        exact: true,
+      });
+      await numericLimit.fill('');
+      await expect(startCapture).toBeDisabled();
+      await expect(strip.getByRole('alert')).toBeVisible();
+      await numericLimit.fill('999999');
+      await expect(startCapture).toBeDisabled();
+      await numericLimit.fill('1');
+      await expect(startCapture).toBeEnabled();
+      await expect(numericLimit).toBeInViewport();
+      await expect(startCapture).toBeInViewport();
       await expect(dialog.locator('[inert]')).toHaveCount(1);
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
       });
-      const durationLimit = strip.getByRole('checkbox', {
+      const durationLimit = strip.getByRole('switch', {
         name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
       });
       await durationLimit.uncheck();
@@ -2635,6 +2652,13 @@ for (const variant of [
           name: translate('videoEditor.app.recordAudioPause', variant.locale),
         })
       ).toBeVisible();
+      await expect(strip.getByRole('meter')).toHaveAttribute(
+        'aria-label',
+        translate('videoEditor.app.recordAudioSignal.label', variant.locale)
+      );
+      await expect(strip.locator('[data-ui="audio-recording.level"]')).not.toContainText(
+        'videoEditor.app'
+      );
       await expect
         .poll(() =>
           dialog
@@ -2853,7 +2877,7 @@ for (const variant of [
         node.append(probes);
       });
       const probes = [
-        surface.getByRole('checkbox', { name: 'Space checkbox probe' }),
+        surface.getByRole('switch', { name: 'Space checkbox probe' }),
         surface.getByRole('textbox', { name: 'Space text probe' }),
         surface.locator('[data-space-probes] summary'),
       ];

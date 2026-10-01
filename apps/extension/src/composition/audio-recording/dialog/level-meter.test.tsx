@@ -4,13 +4,11 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { RecordingLevelMeter } from './level-meter';
 
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
+import { setLocalePreference } from '../../../platform/i18n';
 
-it('reports voice, silence, pause and unavailable input without animating inactive peaks', () => {
+it('reports voice, silence, pause and unavailable input without animating inactive peaks', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  await setLocalePreference('en');
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
@@ -21,17 +19,27 @@ it('reports voice, silence, pause and unavailable input without animating inacti
     );
   render('voice', 0.7);
   expect(host.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('70');
-  expect(host.textContent).toContain('recordAudioSignal.voice');
+  expect(host.textContent).toContain('Voice detected');
   render('silence', 0);
-  expect(host.textContent).toContain('recordAudioSignal.silence');
+  expect(host.textContent).toContain('Silence');
   render('paused', 0.7);
   expect(host.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('0');
-  expect(host.textContent).toContain('recordAudioSignal.paused');
+  expect(host.textContent).toContain('Recording paused');
   expect(host.querySelector('[data-audio-peak="0"]')?.getAttribute('style')).toContain(
     'scaleY(0.1)'
   );
   render('unavailable', 0.7);
-  expect(host.textContent).toContain('recordAudioSignal.unavailable');
+  expect(host.textContent).toContain('Microphone signal unavailable');
+  act(() =>
+    root.render(<RecordingLevelMeter meter={{ status: 'voice', level: 0.7, peaks }} preparing />)
+  );
+  expect(host.textContent).toContain('Preparing microphone');
+  await setLocalePreference('ru');
+  render('voice', 0.7);
+  expect(host.textContent).toContain('Голос поступает');
+  expect(host.querySelector('[role="meter"]')?.getAttribute('aria-label')).toBe(
+    'Уровень микрофона'
+  );
   act(() => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
