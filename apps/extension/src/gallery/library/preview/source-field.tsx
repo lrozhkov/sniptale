@@ -96,6 +96,9 @@ export function PreviewSourceField({
         {metadata.status === 'loading' ? (
           <p role="status">{translate('gallery.preview.sourceLoading')}</p>
         ) : null}
+        {metadata.status === 'missing' ? (
+          <p role="status">{translate('gallery.preview.sourceUnavailable')}</p>
+        ) : null}
         {metadata.status === 'unavailable' ? (
           <div>
             <p>{translate('gallery.preview.sourceUnavailable')}</p>

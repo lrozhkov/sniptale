@@ -13,6 +13,7 @@ import type { FolderFilter } from '../types';
 import type { RecordingGroupMemberRole } from '../../../features/media-hub/recording-groups';
 import { ensureGalleryItemThumbnail, type GalleryItem, type GalleryItemKind } from '../items';
 import { createMediaThumbFallbackItem } from './fallback-items';
+import { formatDurationLabel } from '../../../composition/audio-recording/format';
 
 const GALLERY_THUMB_FALLBACK_CLASS_NAME =
   'flex h-full w-full items-center justify-center text-[var(--sniptale-color-text-secondary)]';
@@ -271,6 +272,9 @@ function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean
   const { item } = props;
   const Icon = getKindIcon(item.kind);
   const isProject = item.type === 'scenario' || item.type === 'video-project';
+  const isAudio = item.kind === 'audio';
+  const duration =
+    isAudio && item.duration !== null && Number.isFinite(item.duration) ? item.duration : null;
   return (
     <div
       className={[
@@ -281,9 +285,25 @@ function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean
     >
       <div className="max-w-full space-y-1 px-2 text-center">
         <Icon
-          className={isProject ? 'mx-auto h-6 w-6 opacity-80' : 'h-10 w-10 opacity-80'}
+          className={
+            isAudio
+              ? 'mx-auto h-4 w-4 opacity-80'
+              : isProject
+                ? 'mx-auto h-6 w-6 opacity-80'
+                : 'h-10 w-10 opacity-80'
+          }
           aria-hidden="true"
         />
+        {isAudio ? (
+          <div data-ui="gallery.thumb.audio" className="min-w-0 space-y-1">
+            <p className="line-clamp-2 break-words text-xs font-medium" title={item.filename}>
+              {item.filename}
+            </p>
+            {duration !== null ? (
+              <p className="text-[10px] tabular-nums">{formatDurationLabel(duration)}</p>
+            ) : null}
+          </div>
+        ) : null}
         {props.showProjectHint && isProject ? (
           <p className="text-xs">{translate('gallery.preview.projectPreviewMissing')}</p>
         ) : null}

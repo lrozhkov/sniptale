@@ -2,6 +2,7 @@
 
 import { act } from 'react';
 import { createVideoProjectItem } from '../test-support/items';
+import type { GalleryMediaItem } from '../items';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -256,10 +257,7 @@ function runGalleryUiSuite() {
 
 describe('gallery-ui', runGalleryUiSuite);
 
-function createMediaThumbItem(
-  id: string,
-  updatedAt: number
-): NonNullable<Parameters<typeof MediaThumb>[0]['item']> {
+function createMediaThumbItem(id: string, updatedAt: number): GalleryMediaItem {
   return {
     id,
     entityId: id,
@@ -396,4 +394,24 @@ it('requests only viewport-near project covers in a large mounted list and relea
   root = null;
   expect(observed.size).toBe(0);
   expect(revokeObjectURLMock).toHaveBeenCalledTimes(2);
+});
+
+it('identifies audio thumbnails with the real name and known duration', async () => {
+  const item = {
+    ...createMediaThumbItem('audio', 1),
+    kind: 'audio' as const,
+    filename: 'A long recorded narration.webm',
+    duration: 125.2,
+    hasThumbnail: false,
+  };
+  renderItemThumb(item);
+  await flushEffects();
+  const preview = container!.querySelector('[data-ui="gallery.thumb.audio"]')!;
+  expect(preview.textContent).toContain(item.filename);
+  expect(preview.textContent).toContain('02:05');
+  expect(preview.querySelector('[title]')?.getAttribute('title')).toBe(item.filename);
+  renderItemThumb({ ...item, filename: 'Another recording.webm', duration: null });
+  await flushEffects();
+  expect(preview.textContent).toContain('Another recording.webm');
+  expect(preview.textContent).not.toContain('02:05');
 });

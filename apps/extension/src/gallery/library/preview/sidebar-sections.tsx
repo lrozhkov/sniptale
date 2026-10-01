@@ -681,7 +681,9 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
             onClick={(event) =>
               void onDelete({ anchor: event.currentTarget, keyboard: event.detail === 0 })
             }
-            className={`${previewDangerActionButtonClassName} min-w-0 !h-auto !min-h-9 !whitespace-normal !py-2`}
+            className={`${previewDangerActionButtonClassName}
+              min-w-0 !h-auto !min-h-9 !whitespace-normal !py-2
+              active:!translate-y-0 active:!bg-[var(--sniptale-color-surface-input)]`}
           >
             <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             {translate('common.actions.delete')}
@@ -704,7 +706,8 @@ export function PreviewPromotionAction(
     <div className="min-w-0 text-xs">
       <PromotionAction
         className={`${previewActionButtonClassName}
-          !h-auto !min-h-9 !px-2 !py-2 !whitespace-normal !text-xs text-center`}
+          !h-auto !min-h-9 !px-2 !py-2 !whitespace-normal !text-xs text-center
+          active:!translate-y-0 active:!bg-[var(--sniptale-color-surface-input)]`}
         onPromote={props.onPromote}
         visible
       />

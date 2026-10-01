@@ -33,7 +33,7 @@ export function usePreviewSourceMetadata(item: GalleryItem) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{
     id: string | null;
-    status: 'loading' | 'ready' | 'unavailable';
+    status: 'loading' | 'ready' | 'missing' | 'unavailable';
     summary: RecordingSourceSummary | null;
   }>({ id: null, status: 'loading', summary: null });
   useEffect(() => {
@@ -45,7 +45,7 @@ export function usePreviewSourceMetadata(item: GalleryItem) {
         if (active)
           setResult({
             id: recordingId,
-            status: entry ? 'ready' : 'unavailable',
+            status: entry ? 'ready' : 'missing',
             summary: entry ? summarize(entry) : null,
           });
       },

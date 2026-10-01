@@ -1292,6 +1292,34 @@ for (const variant of [
           expect(last.x + last.width).toBeCloseTo(bounds.x + bounds.width, 1);
           if (draft) expect(first.width).toBeCloseTo(last.width, 1);
           expect(first.y + first.height).toBeLessThanOrEqual(720);
+          const scroll = page.locator('[data-ui="gallery.preview.inspectorContent"]');
+          for (const button of await buttons.all()) {
+            const before = await scroll.evaluate((node) => ({
+              height: node.scrollHeight,
+              top: node.scrollTop,
+              client: node.clientHeight,
+            }));
+            const bounds = (await button.boundingBox())!;
+            await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+            const idleColor = await button.evaluate(
+              (node) => getComputedStyle(node).backgroundColor
+            );
+            await page.mouse.down();
+            await button.evaluate(async (node) => {
+              await Promise.all(node.getAnimations().map((animation) => animation.finished));
+            });
+            expect(
+              await button.evaluate((node) => getComputedStyle(node).backgroundColor)
+            ).not.toBe(idleColor);
+            const pressed = (await button.boundingBox())!;
+            expect(await scroll.evaluate((node) => node.scrollHeight)).toBe(before.height);
+            expect(pressed.y).toBeCloseTo(bounds.y, 1);
+            expect(await scroll.evaluate((node) => node.scrollTop)).toBe(before.top);
+            await page.mouse.move(0, 0);
+            await page.mouse.up();
+            await expect(row).toBeVisible();
+            expect(await buttons.count()).toBe(draft ? 2 : 1);
+          }
           await page
             .getByRole('dialog')
             .getByRole('button', {
@@ -1521,6 +1549,98 @@ for (const variant of [
           await expect(choice).toHaveCount(0);
           await expect(trigger).toBeFocused();
           await expect(page.locator('[data-ui="gallery.preview.surface"]')).toBeVisible();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery audio thumbnails stay informative (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.addInitScript(() => {
+          const bootstrap = window.__sniptaleHarnessBootstrap!;
+          const original = bootstrap.mediaLibrary![0]!.entry;
+          const samples = 8000;
+          const buffer = new ArrayBuffer(44 + samples * 2);
+          const view = new DataView(buffer);
+          const word = (at: number, value: string) => {
+            for (let index = 0; index < value.length; index++)
+              view.setUint8(at + index, value.charCodeAt(index));
+          };
+          word(0, 'RIFF');
+          view.setUint32(4, buffer.byteLength - 8, true);
+          word(8, 'WAVE');
+          word(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, samples, true);
+          view.setUint32(28, samples * 2, true);
+          view.setUint16(32, 2, true);
+          view.setUint16(34, 16, true);
+          word(36, 'data');
+          view.setUint32(40, samples * 2, true);
+          bootstrap.mediaLibrary = [1, 2].map((id) => ({
+            entry: {
+              ...original,
+              id: `audio-${id}`,
+              kind: 'audio',
+              filename: `${id} A long narration identifying the recording.wav`,
+              source: { kind: 'stored-asset', assetId: `audio-${id}` },
+              width: null,
+              height: null,
+              duration: id === 1 ? 1 : null,
+              mimeType: 'audio/wav',
+              size: buffer.byteLength,
+              blob: new Blob([buffer], { type: 'audio/wav' }),
+            },
+          }));
+        });
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        for (const mode of [
+          'gallery.app.viewModeCompactGrid',
+          'gallery.app.viewModeLargeGrid',
+          'gallery.app.viewModeList',
+        ] as const) {
+          await page
+            .getByRole('button', { name: translate(mode, variant.locale), exact: true })
+            .click();
+          const previews = page.locator('[data-ui="gallery.thumb.audio"]');
+          await expect(previews).toHaveCount(2);
+          await expect(previews.filter({ hasText: '1 A long narration' })).toContainText('00:01');
+          await expect(previews.filter({ hasText: '2 A long narration' })).not.toContainText(
+            '00:01'
+          );
+          for (const preview of await previews.all()) {
+            expect(
+              await preview.evaluate((node) => {
+                const box = node.getBoundingClientRect();
+                const viewport =
+                  node.closest('[data-ui="gallery.grid.thumbnail-viewport"]') ??
+                  node.closest('[role="cell"]');
+                const bounds = viewport!.getBoundingClientRect();
+                return (
+                  box.left >= bounds.left &&
+                  box.right <= bounds.right &&
+                  box.top >= bounds.top &&
+                  box.bottom <= bounds.bottom
+                );
+              })
+            ).toBe(true);
+          }
         }
       } finally {
         await new Promise<void>((resolve, reject) =>
