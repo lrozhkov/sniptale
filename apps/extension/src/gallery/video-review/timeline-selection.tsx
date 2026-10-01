@@ -40,7 +40,8 @@ export function ReviewSourceLane(props: SelectionProps) {
     >
       <div
         data-ui="gallery.videoReview.sourceLane"
-        className="relative mt-1 h-12 rounded bg-[var(--sniptale-color-surface-hover)]"
+        className={`relative h-12 rounded bg-[var(--sniptale-color-surface-hover)]
+          ${props.annotations.length ? 'mt-6' : 'mt-1'}`}
       >
         {guide !== null ? (
           <div

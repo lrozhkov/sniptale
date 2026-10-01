@@ -65,12 +65,46 @@ for (const variant of [
           )
         ).toHaveAttribute('aria-pressed', String(!muted));
       };
+      const originalRow = original.locator('xpath=ancestor::*[@data-review-track-muted][1]');
+      await button('gallery.videoReview.zoomAdd').first().click();
+      const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const focusRow = focusLane.locator('xpath=ancestor::*[@data-review-track-muted][1]');
+      await button('gallery.videoReview.zoomEnabled').click();
+      await expect(focusRow).toHaveAttribute('data-review-track-muted', 'true');
+      await expect(focusLane).toHaveCSS(
+        'background-color',
+        await focusRow
+          .locator('[data-ui="gallery.videoReview.trackHeader"]')
+          .evaluate((node) => getComputedStyle(node).backgroundColor)
+      );
+      await expect(button('gallery.videoReview.zoomEnabled')).toBeEnabled();
+      await focusLane.getByRole('button').first().click();
+      await button('gallery.videoReview.zoomEnabled').click();
+      await expect(focusRow).toHaveAttribute('data-review-track-muted', 'false');
+      await button('gallery.videoReview.scene').click();
       await change('0');
+      await expect(originalRow).toHaveAttribute('data-review-track-muted', 'true');
+      await expect(original).toHaveCSS(
+        'background-color',
+        await originalRow
+          .locator('[data-ui="gallery.videoReview.trackHeader"]')
+          .evaluate((node) => getComputedStyle(node).backgroundColor)
+      );
+      expect(
+        await originalRow
+          .locator('[data-review-track-content]')
+          .evaluate((node) => getComputedStyle(node, '::after').backgroundImage)
+      ).toContain('repeating-linear-gradient');
+      await expect(originalRow.locator('[data-ui="gallery.videoReview.trackHeader"]')).toHaveCSS(
+        'opacity',
+        '1'
+      );
       await sound(true, 0);
       await expect(original).toHaveCSS('border-bottom-style', 'dashed');
       await page.screenshot({ path: testInfo.outputPath('master-muted.png') });
       await button('gallery.videoReview.restoreSourceAudio').click();
       await sound(false, 1);
+      await expect(originalRow).toHaveAttribute('data-review-track-muted', 'false');
       await expect(volume).toHaveValue('100');
       await change('40');
       await sound(false, 0.4);

@@ -393,3 +393,19 @@ it('commits a source-gain gesture after delayed new-note admission', () => {
     f.close();
   }
 });
+
+it('marks the whole muted source row while retaining the restore action', () => {
+  const f = setup(0);
+  try {
+    const row = f.lane.closest('[data-review-track-muted]')!;
+    expect(row?.getAttribute('data-review-track-muted')).toBe('true');
+    const restore = f.host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.restoreSourceAudio')}"]`
+    )!;
+    expect(restore.disabled).toBe(false);
+    act(() => restore.click());
+    expect(row.getAttribute('data-review-track-muted')).toBe('false');
+  } finally {
+    f.close();
+  }
+});

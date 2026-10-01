@@ -1,14 +1,20 @@
 import type { ReactNode } from 'react';
+import './track-row.css';
 
 /** Shared row geometry keeps track controls outside the time-coordinate surface. */
 export function ReviewTrackRow(props: {
   label: string;
+  /** Muted output remains editable; controls and selection contours stay distinct. */
+  muted?: boolean;
   icon?: ReactNode;
   controls?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[var(--review-track-gutter,192px)_minmax(0,1fr)]">
+    <div
+      data-review-track-muted={props.muted ? 'true' : 'false'}
+      className="grid grid-cols-[var(--review-track-gutter,192px)_minmax(0,1fr)]"
+    >
       <div
         data-ui="gallery.videoReview.trackHeader"
         className="sticky left-0 z-30 flex min-w-0 items-center gap-1 border-r
@@ -25,7 +31,9 @@ export function ReviewTrackRow(props: {
           {props.controls}
         </div>
       </div>
-      <div className="min-w-0">{props.children}</div>
+      <div data-review-track-content className="relative min-w-0">
+        {props.children}
+      </div>
     </div>
   );
 }

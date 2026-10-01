@@ -31,6 +31,14 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
+      const sourceBox = (await source.boundingBox())!;
+      await page.mouse.move(sourceBox.x + sourceBox.width / 6, sourceBox.y + sourceBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(sourceBox.x + sourceBox.width / 3, sourceBox.y + sourceBox.height / 2, {
+        steps: 5,
+      });
+      await page.mouse.up();
       await button('gallery.videoReview.addComment').first().click();
       const form = dialog.locator('[data-ui="gallery.videoReview.commentComposer"]');
       const field = form.getByRole('textbox', {
@@ -48,6 +56,13 @@ for (const variant of [
       expect(created.outlineWidth).toBe('2px');
       await page.screenshot({ path: testInfo.outputPath('new-note.png') });
       await button('gallery.videoReview.save').click();
+      const marker = source.getByRole('button').first();
+      await expect(marker).toBeVisible();
+      const markerBox = (await marker.boundingBox())!;
+      const noteSourceBox = (await source.boundingBox())!;
+      expect(markerBox.height).toBe(16);
+      expect(markerBox.y + markerBox.height).toBeLessThanOrEqual(noteSourceBox.y);
+      expect(markerBox.width).toBeGreaterThan(16);
       const row = dialog.locator('.review-inspector-list > li');
       await expect(row).toHaveCount(1);
       await row.hover();

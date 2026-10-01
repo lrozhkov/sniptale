@@ -174,6 +174,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
   };
   return (
     <ReviewTrackRow
+      muted={props.clips.length > 0 && props.clips.every((clip) => clip.muted)}
       label={props.label}
       icon={<AudioLines size={14} aria-hidden="true" />}
       controls={props.trailing}

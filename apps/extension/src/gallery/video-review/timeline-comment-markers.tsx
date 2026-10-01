@@ -72,12 +72,12 @@ function ReviewCommentMarker(props: CommentMarkerProps) {
         ...(range
           ? {
               width: percent(anchor.end - anchor.start, props.duration),
-              top: 6,
-              height: 30,
+              top: -18,
+              height: 16,
               backgroundColor:
                 'color-mix(in srgb, var(--sniptale-color-accent) 14%, var(--sniptale-color-surface-canvas))',
             }
-          : { top: -8 }),
+          : { top: -18 }),
       }}
       className={`absolute z-10 flex h-4 min-w-4 items-center justify-center gap-1
         overflow-hidden rounded border border-[var(--sniptale-color-border-accent-strong)]

@@ -61,6 +61,7 @@ export function ReviewOriginalAudioTrack(props: {
   });
   return (
     <ReviewTrackRow
+      muted={muted}
       label={translate('gallery.videoReview.audioOriginal')}
       icon={
         muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />

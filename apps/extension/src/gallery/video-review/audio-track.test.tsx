@@ -562,3 +562,16 @@ it('retains an audio clip move when pointerup precedes note admission', async ()
   expect(onSelect).toHaveBeenCalledExactlyOnceWith('music');
   expect(onMoveClip).toHaveBeenCalledExactlyOnceWith('music', 'music', 4);
 });
+
+it('mutes a whole added-audio row only when its nonempty clips are all muted', () => {
+  const mutedClip = { ...clip('v1', 0, 2), muted: true };
+  const audio = { original: { muted: false, volume: 1 }, voiceover: [mutedClip], music: [] };
+  const lanes = renderTrack(audio);
+  const voiceover = lanes[1]!.closest('[data-review-track-muted]');
+  expect(voiceover?.getAttribute('data-review-track-muted')).toBe('true');
+  expect(
+    lanes[2]!.closest('[data-review-track-muted]')?.getAttribute('data-review-track-muted')
+  ).toBe('false');
+  renderTrack({ ...audio, voiceover: [mutedClip, clip('v2', 3, 2)] });
+  expect(voiceover?.getAttribute('data-review-track-muted')).toBe('false');
+});

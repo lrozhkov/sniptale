@@ -396,3 +396,13 @@ it('formats timeline scale and tooltip with one localized decimal without mutati
   expect(view.blocks[0]!.title).not.toContain('2,0');
   locale.value = 'en';
 });
+
+it('marks disabled focus content as muted without disabling selection', async () => {
+  const view = renderTrack([zoom('z1', 2, 4)], vi.fn(), vi.fn(), 0, { enabled: false });
+  const row = view.lane.closest('[data-review-track-muted]');
+  expect(row?.getAttribute('data-review-track-muted')).toBe('true');
+  expect(view.blocks[0]!.tabIndex).toBe(0);
+  expect(view.blocks[0]!.getAttribute('aria-disabled')).toBeNull();
+  renderTrack([zoom('z1', 2, 4)], vi.fn());
+  expect(row?.getAttribute('data-review-track-muted')).toBe('false');
+});

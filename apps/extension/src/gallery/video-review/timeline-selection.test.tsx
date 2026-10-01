@@ -320,3 +320,35 @@ it('retains the complete edit drag until new-note admission finishes', async () 
   await act(async () => admit());
   expect(change).toHaveBeenCalledExactlyOnceWith(edit, { kind: 'range', start: 4, end: 6 });
 });
+
+it('keeps compact range notes above source content without changing authored anchors', async () => {
+  const note = {
+    id: 'interval-note',
+    text: 'A long note '.repeat(100),
+    anchor: { kind: 'range' as const, start: 2, end: 6 },
+  };
+  const onComment = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewSourceLane
+        duration={10}
+        time={0}
+        selection={{ kind: 'point', time: 0 }}
+        annotations={[note]}
+        onSeek={vi.fn()}
+        onSelect={vi.fn()}
+        onComment={onComment}
+      />
+    )
+  );
+  const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
+  const marker = lane.querySelector<HTMLButtonElement>('button')!;
+  expect(Number.parseFloat(marker.style.top) + 16).toBeLessThanOrEqual(0);
+  expect(marker.style.height).toBe('16px');
+  expect(marker.style.left).toBe('20%');
+  expect(marker.style.width).toBe('40%');
+  expect(marker.title).toBe(note.text);
+  await act(async () => marker.click());
+  expect(onComment).toHaveBeenCalledExactlyOnceWith(note);
+  expect(note.anchor).toEqual({ kind: 'range', start: 2, end: 6 });
+});

@@ -199,6 +199,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   }, [edits, boundaries, time, toOutputTime]);
   return (
     <ReviewTrackRow
+      muted={props.enabled === false}
       label={translate('gallery.videoReview.zoomTrack')}
       icon={<Focus size={14} aria-hidden="true" />}
       controls={
