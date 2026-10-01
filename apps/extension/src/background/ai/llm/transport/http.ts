@@ -105,6 +105,11 @@ export async function postJsonWithTimeout(args: {
       redirect: 'error',
       signal: controller.signal,
     });
+    if (!response.ok) {
+      // Error bodies are untrusted and unused; their format must not hide the HTTP status.
+      void response.body?.cancel().catch(() => undefined);
+      return { data: {}, ok: false, status: response.status };
+    }
     const data: unknown = await readJsonWithLimit(response);
 
     return {

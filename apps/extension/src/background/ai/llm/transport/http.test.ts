@@ -192,3 +192,24 @@ it('rethrows non-timeout fetch failures without rewriting them', async () => {
     })
   ).rejects.toThrow('network failed');
 });
+
+it('returns an HTTP failure without consuming its oversized body and releases the stream', async () => {
+  const { postJsonWithTimeout } = await import('./http');
+  const cancel = vi.fn();
+  const response = new Response(new ReadableStream({ cancel }), {
+    headers: { 'Content-Type': 'application/json', 'Content-Length': '1000001' },
+    status: 503,
+  });
+  const read = vi.spyOn(response.body!, 'getReader');
+  fetchMock.mockResolvedValueOnce(response);
+  await expect(
+    postJsonWithTimeout({
+      url: 'https://example.test/chat',
+      body: { demo: true },
+      headers: {},
+      timeoutErrorMessage: 'timed out',
+    })
+  ).resolves.toEqual({ data: {}, ok: false, status: 503 });
+  expect(read).not.toHaveBeenCalled();
+  expect(cancel).toHaveBeenCalledOnce();
+});
