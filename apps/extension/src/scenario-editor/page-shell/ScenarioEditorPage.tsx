@@ -115,7 +115,7 @@ export function ScenarioEditorPage() {
       onBlurCapture={state.sealEdit}
       onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
     >
-      {project && tourMode && (
+      {tourMode && (
         <TourWorkspace
           key={project.id}
           project={project}
@@ -135,7 +135,7 @@ export function ScenarioEditorPage() {
           t={t}
         />
       )}
-      {project && !tourMode && (
+      {!tourMode && (
         <GuideDocumentWorkspace
           state={state}
           project={project}

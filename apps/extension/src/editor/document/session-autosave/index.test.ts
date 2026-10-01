@@ -90,7 +90,7 @@ function createDocument(sourceImageData: string) {
   return { ...createEditorDocumentFixture(), sourceImageData };
 }
 
-describe('deferred image presentation', () => {
+describe('presentation retry admission', () => {
   it('refuses retry while autosave is off and the canvas contains unsaved edits', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const { useEditorStore } = await import('../../state/useEditorStore');
@@ -144,6 +144,9 @@ describe('deferred image presentation', () => {
     await save;
     autosave.dispose();
   });
+});
+
+describe('presentation retry recovery', () => {
   it('retries a restored revision without committing the workspace and surfaces a failed render', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const { useEditorStore } = await import('../../state/useEditorStore');
@@ -197,7 +200,9 @@ describe('deferred image presentation', () => {
       autosave.dispose();
     }
   );
+});
 
+describe('presentation retry across revisions and sessions', () => {
   it('discards a retry render superseded by a newer edit', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const autosave = createEditorSessionAutosaveService();
@@ -256,6 +261,51 @@ describe('deferred image presentation', () => {
     expect(commitPresentationMock).toHaveBeenCalledTimes(1);
     autosave.dispose();
   });
+  it('keeps a newer pending retry deduplicated after an old context finishes', async () => {
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    let finishOld: (value: string) => void = () => undefined;
+    let finishNew: (value: string) => void = () => undefined;
+    const context = {
+      aggregateId: 'image-1',
+      durableRevision: 4,
+      sourceTitle: null,
+      sourceUrl: null,
+    };
+    autosave.activate({
+      ...context,
+      renderPresentation: () =>
+        new Promise<string>((resolve) => {
+          finishOld = resolve;
+        }),
+    });
+    const oldRetry = autosave.retryPresentation();
+    autosave.dispose();
+    const newRender = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          finishNew = resolve;
+        })
+    );
+    autosave.activate({ ...context, renderPresentation: newRender });
+    const newRetry = autosave.retryPresentation();
+    finishOld('data:image/png;base64,b2xk');
+    await oldRetry;
+    const duplicate = autosave.retryPresentation();
+    expect(newRender).toHaveBeenCalledTimes(1);
+    expect(commitPresentationMock).not.toHaveBeenCalled();
+    finishNew('data:image/png;base64,bmV3');
+    await Promise.all([newRetry, duplicate]);
+    expect(commitPresentationMock).toHaveBeenCalledTimes(1);
+    const nextRetry = autosave.retryPresentation();
+    expect(newRender).toHaveBeenCalledTimes(2);
+    finishNew('data:image/png;base64,bmV3');
+    await nextRetry;
+    autosave.dispose();
+  });
+});
+
+describe('deferred image presentation', () => {
   it('defers and coalesces presentation work after durable saves', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const autosave = createEditorSessionAutosaveService();

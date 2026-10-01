@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=1, tool-noise=16.
-- Enforced source: codeql=4, gitleaks=10, license=1, scc=2.
+- Classification: accepted-architecture=1, tool-noise=18.
+- Enforced source: codeql=6, gitleaks=10, license=1, scc=2.
 
 ## Active decisions
 
@@ -26,3 +26,5 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `accepted.license.eslint-plugin-sonarjs` — repository-owner: A copyleft development dependency could be mistaken for shipped artifact content if packaging boundaries drift. Action: Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact. Review: 2027-07-12.
 - `noise.scc.editor-local-document-leaves` — apps/extension/src/editor: Owner-directory aggregation can resemble a cycle although actual module dependencies are acyclic; a wider allowance could hide new owner edges or a real dependency cycle. Action: Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears. Review: 2027-09-01.
 - `noise.scc.gallery-library-state-projections` — apps/extension/src/gallery: Owner-directory aggregation can resemble a cycle although actual module dependencies are acyclic; a wider allowance could hide new owner edges or a real dependency cycle. Action: Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears. Review: 2027-09-01.
+- `noise.codeql.snapshot-literal-fragment-href` — web-snapshot: A broader exception could conceal executable URL or raw HTML sinks; only this exact rule, location, source and message are admitted. Action: Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification. Review: 2027-08-23.
+- `noise.codeql.presentation-retry-identity` — editor-document: Removing identity protection could duplicate presentation commits after a superseded retry completes. Action: Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification. Review: 2027-08-23.

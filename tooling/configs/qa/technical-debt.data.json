@@ -263,12 +263,12 @@
       "reviewBy": "2027-08-23",
       "source": {
         "kind": "codeql",
-        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:68:4e2437f8286b15875ad1a2364486fb8a1d3c1c968dedc6dc064a8ee070bb802d:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
+        "key": "js/http-to-file-access:tooling/ci/local-toolchain.mjs:73:9624271d711433c6455db4719891091af077b92938b1cc266c73fa0c8725cfee:b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668"
       },
       "scope": {
-        "contentHash": "4e2437f8286b15875ad1a2364486fb8a1d3c1c968dedc6dc064a8ee070bb802d",
+        "contentHash": "9624271d711433c6455db4719891091af077b92938b1cc266c73fa0c8725cfee",
         "file": "tooling/ci/local-toolchain.mjs",
-        "line": 68,
+        "line": 73,
         "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
         "rule": "js/http-to-file-access"
       },
@@ -368,6 +368,48 @@
         ]
       },
       "targetAction": "Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears."
+    },
+    {
+      "id": "noise.codeql.snapshot-literal-fragment-href",
+      "classification": "tool-noise",
+      "owner": "web-snapshot",
+      "risk": "A broader exception could conceal executable URL or raw HTML sinks; only this exact rule, location, source and message are admitted.",
+      "reason": "The reported DOM flow is a fragment beginning with # assigned through the fixed href attribute with setAttribute, not parsed as HTML. DOM HTML and XML serializers escape attribute delimiters. Deterministic HTML/XHTML round-trip tests cover markup metacharacters and both href and external-link fallback; no nodes or event attributes are created. Other navigation URLs remain subject to createSafeExternalHref.",
+      "removalCondition": "Remove when CodeQL models literal fixed-name href attribute assignment or this exact fragment projection changes.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "codeql",
+        "key": "js/xss-through-dom:apps/extension/src/features/web-snapshot/sanitize.ts:242:83a3fa100ec01dd535d329a77470c936e154310fd070b8984ee0124786bba64b:795b5007146ede83d71fcf9a64d518177e9cd0db287da3cecb6e8aaf7b565a0b"
+      },
+      "scope": {
+        "contentHash": "83a3fa100ec01dd535d329a77470c936e154310fd070b8984ee0124786bba64b",
+        "file": "apps/extension/src/features/web-snapshot/sanitize.ts",
+        "line": 242,
+        "messageHash": "795b5007146ede83d71fcf9a64d518177e9cd0db287da3cecb6e8aaf7b565a0b",
+        "rule": "js/xss-through-dom"
+      },
+      "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
+    },
+    {
+      "id": "noise.codeql.presentation-retry-identity",
+      "classification": "tool-noise",
+      "owner": "editor-document",
+      "risk": "Removing identity protection could duplicate presentation commits after a superseded retry completes.",
+      "reason": "The retry is awaited immediately before finally. The reported comparison intentionally compares the currently registered Promise with the completed Promise by object identity so an old completion cannot clear a newer pending retry. Awaiting the operand would compare Promise with void and break cleanup. Deterministic dispose/reactivate overlap and subsequent retry tests prove deduplication and release.",
+      "removalCondition": "Remove when CodeQL distinguishes Promise identity comparison from value comparison or this exact retry cleanup changes.",
+      "reviewBy": "2027-08-23",
+      "source": {
+        "kind": "codeql",
+        "key": "js/missing-await:apps/extension/src/editor/document/session-autosave/presentation.ts:117:c3fac8359c6c1faa61427d17c599fd0f86227190056af9454085a4c8071ade3c:ab704472dfda4512f9a07fa483bf0830055e1c51afa89b60bd2f814b2babd973"
+      },
+      "scope": {
+        "contentHash": "c3fac8359c6c1faa61427d17c599fd0f86227190056af9454085a4c8071ade3c",
+        "file": "apps/extension/src/editor/document/session-autosave/presentation.ts",
+        "line": 117,
+        "messageHash": "ab704472dfda4512f9a07fa483bf0830055e1c51afa89b60bd2f814b2babd973",
+        "rule": "js/missing-await"
+      },
+      "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
     }
   ]
 }
