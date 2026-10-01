@@ -35,8 +35,7 @@ export function ReviewComposer(props: {
   return (
     <section
       data-ui="gallery.videoReview.commentComposer"
-      className="space-y-2 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3
-        focus-within:border-[var(--sniptale-color-accent)]"
+      className="space-y-2 rounded-lg border border-[var(--sniptale-color-border-soft)] p-3"
     >
       <ReviewInterval
         start={anchor.kind === 'point' ? anchor.time : anchor.start}

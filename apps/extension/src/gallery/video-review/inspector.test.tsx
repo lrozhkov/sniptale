@@ -86,9 +86,14 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
     const remove = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.deleteSelected"]'
     )!;
-    expect(remove.textContent).toContain('gallery.videoReview.deleteSelected');
-    expect(remove.className).toContain('!w-full');
-    expect(remove.parentElement?.className).toContain('border-t');
+    expect(remove.textContent).toBe('');
+    expect(remove.title).toBe('gallery.videoReview.deleteSelected');
+    expect(remove.querySelector('svg')).not.toBeNull();
+    expect(remove.className).toContain('!w-8');
+    expect(remove.parentElement?.className).toContain('review-inspector-row-actions');
+    expect(
+      remove.parentElement?.querySelector('[aria-label="gallery.videoReview.editComment"]')
+    ).not.toBeNull();
     act(() => remove.click());
     expect(onDelete).toHaveBeenCalledWith(annotation);
   } finally {

@@ -39,6 +39,16 @@
 }
 .review-inspector-list > li[data-editing='true'] {
   display: block;
+  padding: 0;
+  border: 0;
+}
+.review-inspector-list > li[data-editing='true']:is(:hover, :focus-within, [data-selected='true']) {
+  background: transparent;
+}
+[data-ui='gallery.videoReview.inspector']
+  [data-ui='gallery.videoReview.commentComposer']
+  textarea:focus-visible {
+  outline-color: var(--sniptale-color-text-secondary);
 }
 .review-inspector-list > li:hover,
 .review-inspector-list > li:focus-within {
@@ -76,7 +86,7 @@
   .review-inspector-row-actions button:hover:not(:disabled) {
     color: var(--sniptale-color-text-primary-strong) !important;
   }
-  .review-inspector-row-actions button:last-child:hover:not(:disabled) {
+  .review-inspector-row-actions [data-note-delete]:hover:not(:disabled) {
     color: var(--sniptale-color-danger) !important;
   }
 }

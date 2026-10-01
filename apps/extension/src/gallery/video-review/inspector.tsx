@@ -25,7 +25,6 @@ import {
   reviewTimeLabel,
   reviewIconButtonClassName,
   reviewTextButtonClassName,
-  reviewDeleteButtonClassName,
 } from './controls';
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
@@ -259,20 +258,18 @@ function ReviewAnnotationList(props: {
                 >
                   <Pencil size={16} />
                 </ReviewButton>
-              </div>
-              {props.selectedId === annotation.id ? (
-                <div className="col-span-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+                {props.selectedId === annotation.id ? (
                   <ReviewButton
                     label={translate('gallery.videoReview.deleteSelected')}
                     disabled={props.busy}
-                    className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                    className={reviewIconButtonClassName}
+                    data-note-delete
                     onClick={() => props.onDelete(annotation)}
                   >
-                    <Trash2 size={15} aria-hidden="true" />
-                    <span>{translate('gallery.videoReview.deleteSelected')}</span>
+                    <Trash2 size={16} aria-hidden="true" />
                   </ReviewButton>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </>
           )}
         </li>
