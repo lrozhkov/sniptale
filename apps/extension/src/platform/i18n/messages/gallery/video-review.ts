@@ -306,6 +306,20 @@ export const galleryVideoReviewMessages = defineMessageSource({
   regionTop: { ru: 'Сверху, %', en: 'Top, %' },
   regionWidth: { ru: 'Ширина, %', en: 'Width, %' },
   regionHeight: { ru: 'Высота, %', en: 'Height, %' },
+  historyReset: { ru: 'Сброс истории', en: 'Reset history' },
+  historyStart: { ru: 'К началу истории', en: 'Return to history start' },
+  historyStartDescription: {
+    ru: 'Вернуть начальное состояние этой истории. Ранее сохранённые настройки останутся; изменения можно повторить.',
+    en: 'Return to this history’s initial state. Previously saved settings remain; changes can be redone.',
+  },
+  historyOriginalDescription: {
+    ru: 'Очистить все правки и настройки видео. История будет удалена.',
+    en: 'Clear all video edits and settings. Edit history will be removed.',
+  },
+  resetOriginalLocalWarning: {
+    ru: 'Автосохранение выключено: сброс действует только в этой сессии, пока вы не включите автосохранение.',
+    en: 'Autosave is off: this reset affects only this session until you enable autosave.',
+  },
   resetOriginal: { ru: 'Сбросить к оригиналу', en: 'Reset to original' },
   resetOriginalWarning: {
     ru: 'Все правки, комментарии и история изменений будут удалены. Видео вернётся к оригиналу. Отменить сброс нельзя.',

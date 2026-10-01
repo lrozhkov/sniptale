@@ -166,7 +166,10 @@ function stubReviewSession(integration: EditorFixtureIntegration, history: Revie
         ...snapshot,
         workspace: {
           ...snapshot.workspace,
-          cursor: snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1),
+          cursor:
+            args.direction === 'start'
+              ? 0
+              : snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1),
           revision: snapshot.workspace.revision + 1,
         },
       };

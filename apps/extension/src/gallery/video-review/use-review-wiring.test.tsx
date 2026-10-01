@@ -8,6 +8,8 @@ import {
 } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
 import type { ReviewDocument, ReviewSelection } from '../../features/video/review/types';
+import { createVideoReviewSession } from '../../workflows/video-review/session';
+import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { useReviewEditorWiring } from './use-review-wiring';
 
 const mocks = vi.hoisted(() => ({
@@ -140,6 +142,58 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     expect(cuts.toggle).toHaveBeenCalledWith('cut');
     expect(args.zoom.setDrawing).toHaveBeenCalledTimes(3);
     expect(args.zoom.setDrawing).toHaveBeenLastCalledWith(false);
+    const initial: VideoWorkspaceSnapshot = {
+      workspace: {
+        aggregateId: 'recording:r',
+        sourceAssetId: 'source',
+        formatVersion: 1,
+        source: { duration: 4, width: 640, height: 360, mimeType: 'video/webm', size: 5 },
+        revision: 2,
+        cursor: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        advanced,
+        history: [
+          {
+            id: 'note-op',
+            at: 1,
+            target: 'annotation',
+            before: null,
+            after: { id: 'note', text: 'Saved', anchor: { kind: 'point', time: 1 } },
+          },
+        ],
+      },
+      draft: null,
+    };
+    const persist = vi.fn(async () => ({
+      ...initial,
+      workspace: { ...initial.workspace, cursor: 0, revision: 3 },
+    }));
+    persist.mockRejectedValueOnce(new Error('Quota'));
+    args.session = createVideoReviewSession(initial, {
+      moveVideoWorkspaceHistory: persist,
+      readVideoWorkspace: vi.fn(),
+      saveVideoWorkspaceSnapshot: vi.fn(),
+      saveVideoWorkspaceDraft: vi.fn(),
+      saveVideoWorkspaceAdvanced: vi.fn(),
+      commitVideoWorkspace: vi.fn(),
+    });
+    args.run = async (action) => {
+      try {
+        await action();
+      } catch {
+        /* UI reporter retains the error. */
+      }
+    };
+    await act(async () => root.render(<Harness />));
+    expect(await result.moveHistory('start')).toBe(false);
+    expect(args.session.getSnapshot().document.annotations).toHaveLength(1);
+    expect(await result.moveHistory('start')).toBe(true);
+    expect(persist).toHaveBeenCalledTimes(2);
+    expect(args.session.getSnapshot().document.annotations).toHaveLength(0);
+    advancedState.flush.mockRejectedValueOnce(new Error('Staged content'));
+    expect(await result.moveHistory('start')).toBe(false);
+    expect(persist).toHaveBeenCalledTimes(2);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

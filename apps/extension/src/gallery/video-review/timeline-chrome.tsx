@@ -190,7 +190,9 @@ export function ReviewHistoryControls(props: {
   busy: boolean;
   cursor: number;
   length: number;
-  onHistory(direction: 'undo' | 'redo' | 'reset'): void | Promise<unknown>;
+  onHistory(
+    direction: import('../../features/video/review/types').ReviewHistoryDirection | 'reset'
+  ): void | Promise<unknown>;
   onAddNote?(): void;
   autosave?: {
     enabled: boolean;
@@ -237,7 +239,13 @@ export function ReviewHistoryControls(props: {
           {direction === 'undo' ? <Undo2 size={16} /> : <Redo2 size={16} />}
         </ReviewButton>
       ))}
-      <ReviewResetControl busy={props.busy} onReset={async () => props.onHistory('reset')} />
+      <ReviewResetControl
+        busy={props.busy}
+        cursor={props.cursor}
+        autosaveEnabled={props.autosave?.enabled ?? true}
+        onStart={async () => props.onHistory('start')}
+        onReset={async () => props.onHistory('reset')}
+      />
       {props.autosave && (
         <>
           <ReviewToolbarSeparator />

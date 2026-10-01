@@ -8,7 +8,11 @@ import {
   saveVideoWorkspaceDraft,
 } from '../../composition/persistence/review-workspaces/store';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import type { ReviewAnnotation, ReviewOperation } from '../../features/video/review/types';
+import type {
+  ReviewAnnotation,
+  ReviewHistoryDirection,
+  ReviewOperation,
+} from '../../features/video/review/types';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
@@ -57,6 +61,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   };
   let durable = structuredClone(initial);
   let queue: Promise<void> = Promise.resolve();
+  let failedHistory = false;
   const listeners = new Set<() => void>();
   const emit = () => {
     for (const listener of listeners) listener();
@@ -99,6 +104,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         state = { ...state, snapshot, document: project(snapshot), dirty: false, error: null };
         return snapshot;
       } catch (error) {
+        failedHistory = local?.kind === 'history';
         state = { ...state, error: failureCode(error) };
         throw error;
       } finally {
@@ -201,7 +207,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         { kind: 'reset' }
       );
     },
-    history(direction: 'undo' | 'redo') {
+    history(direction: ReviewHistoryDirection) {
       return enqueue(() => deps.moveVideoWorkspaceHistory({ ...identity(), direction }), {
         kind: 'history',
         direction,
@@ -215,9 +221,12 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         return snapshot;
       });
     },
-    async flush() {
+    async flush(options?: { retryHistory: true }) {
+      const hadPending = state.pending > 0;
       await queue;
-      if (state.error) throw new Error(`Review ${state.error}.`);
+      // Only a completed history failure may be retried; pending/content failures stay strict.
+      if (state.error && !(options?.retryHistory && failedHistory && !hadPending))
+        throw new Error(`Review ${state.error}.`);
     },
   };
 }

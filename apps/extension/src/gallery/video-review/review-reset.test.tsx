@@ -100,7 +100,13 @@ it('resets the mounted editor and preserves its changes on cancellation or faile
     })
   );
   const confirm = async () => {
-    await fixture.click('resetOriginal');
+    if (!fixture.host.querySelector('[role="alertdialog"]')) {
+      if (!fixture.host.querySelector('[data-history-original]'))
+        await fixture.click('historyReset');
+      await act(async () =>
+        fixture.host.querySelector<HTMLButtonElement>('[data-history-original]')!.click()
+      );
+    }
     await act(async () =>
       fixture.host
         .querySelector<HTMLButtonElement>('.sniptale-confirm-actions button:last-child')!
@@ -113,7 +119,13 @@ it('resets the mounted editor and preserves its changes on cancellation or faile
     );
     const edits = () => fixture.host.querySelectorAll('[data-ui="gallery.videoReview.editBlock"]');
     expect(edits()).toHaveLength(1);
-    await fixture.click('resetOriginal');
+    if (!fixture.host.querySelector('[role="alertdialog"]')) {
+      if (!fixture.host.querySelector('[data-history-original]'))
+        await fixture.click('historyReset');
+      await act(async () =>
+        fixture.host.querySelector<HTMLButtonElement>('[data-history-original]')!.click()
+      );
+    }
     await act(async () =>
       fixture.host.querySelector<HTMLButtonElement>('.sniptale-confirm-actions button')!.click()
     );

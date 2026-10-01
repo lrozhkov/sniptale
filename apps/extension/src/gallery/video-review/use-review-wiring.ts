@@ -1,3 +1,4 @@
+import { createReviewHistoryActions } from './history-actions';
 import { useMemo, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type {
@@ -97,11 +98,6 @@ export function useReviewEditorWiring(args: {
       args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),
   });
   useOriginalAudioToolLifecycle(args.advanced.ui.mode, args.activeSelection.kind, audio);
-  const flushPendingContent = async () => {
-    await args.advancedState.flush();
-    await canvasComments.flushTexts();
-    await args.session.flush();
-  };
   const removeSelection = useReviewSelectionLifecycle({
     selection: args.activeSelection,
     markers: projected.markers,
@@ -120,11 +116,15 @@ export function useReviewEditorWiring(args: {
     deleteOriginalAudio: audio.removeOriginal,
     clearAnnotation: () => args.clearAnnotation(null),
   });
-  const moveHistory = async (direction: 'undo' | 'redo' | 'reset') => {
-    if (direction === 'reset') return resetReviewEditor(args, audio, canvasComments);
-    await flushPendingContent();
-    await args.session.history(direction);
-  };
+  const history = createReviewHistoryActions({
+    session: args.session,
+    run: args.run,
+    flushStaged: async () => {
+      await args.advancedState.flush();
+      await canvasComments.flushTexts();
+    },
+    reset: () => resetReviewEditor(args, audio, canvasComments),
+  });
   useReviewEditorShortcuts({
     time: args.time,
     navigation: reviewTimelineNavigationBounds(args.sourceDuration, args.document.edits),
@@ -137,8 +137,8 @@ export function useReviewEditorWiring(args: {
     boundaries:
       args.cuts.cutting && args.exporter.index ? args.exporter.index.boundaries : undefined,
     run: args.run,
-    undo: () => moveHistory('undo'),
-    redo: () => moveHistory('redo'),
+    undo: () => history.move('undo'),
+    redo: () => history.move('redo'),
     cancelDrawing: () => {
       selectReviewPointer(args, audio);
       args.setTimelineSelection({ kind: 'point', time: args.time });
@@ -160,10 +160,10 @@ export function useReviewEditorWiring(args: {
     comments,
     telemetry: args.telemetry ? args.actionsVisible : false,
     projected,
-    flushPendingContent,
-    moveHistory: (direction: 'undo' | 'redo' | 'reset') => args.run(() => moveHistory(direction)),
+    flushPendingContent: history.flush,
+    moveHistory: history.run,
     removeSelection,
-    exporter: prepareReviewExporter(args.exporter, args.run, flushPendingContent),
+    exporter: prepareReviewExporter(args.exporter, args.run, history.flush),
   };
 }
 

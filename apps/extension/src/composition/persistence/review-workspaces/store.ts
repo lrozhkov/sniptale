@@ -20,7 +20,7 @@ import {
 } from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
-import type { ReviewSource } from '../../../features/video/review/types';
+import type { ReviewHistoryDirection, ReviewSource } from '../../../features/video/review/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
 
@@ -246,12 +246,12 @@ export async function commitVideoWorkspace(args: {
   });
 }
 
-/** Moves one strict undo/redo step; a boundary click does not create a revision. */
+/** Moves the existing cursor atomically; a boundary click does not create a revision. */
 export async function moveVideoWorkspaceHistory(args: {
   aggregateId: string;
   expectedRevision: number;
   expectedSourceAssetId: string;
-  direction: 'undo' | 'redo';
+  direction: ReviewHistoryDirection;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx) => {
     const snapshot = await requireSnapshot(
@@ -260,8 +260,16 @@ export async function moveVideoWorkspaceHistory(args: {
       args.expectedRevision,
       args.expectedSourceAssetId
     );
-    const cursor = snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
-    if (cursor < 0 || cursor > snapshot.workspace.history.length) return snapshot;
+    const cursor =
+      args.direction === 'start'
+        ? 0
+        : snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
+    if (
+      cursor === snapshot.workspace.cursor ||
+      cursor < 0 ||
+      cursor > snapshot.workspace.history.length
+    )
+      return snapshot;
     return { ...snapshot, workspace: await putWorkspace(tx, { ...snapshot.workspace, cursor }) };
   });
 }

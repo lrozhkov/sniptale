@@ -1,3 +1,6 @@
+/** Commands move the existing history cursor without appending an operation. */
+export type ReviewHistoryDirection = 'undo' | 'redo' | 'start';
+
 import type { Paint } from '@sniptale/foundation/paint';
 import type { ReviewSpeedRate } from './speed';
 

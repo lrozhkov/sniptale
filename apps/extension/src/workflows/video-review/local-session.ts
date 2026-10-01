@@ -4,7 +4,11 @@ import {
   parseVideoWorkspace,
   parseVideoWorkspaceDraft,
 } from '../../composition/persistence/review-workspaces/parser';
-import type { ReviewAnnotation, ReviewOperation } from '../../features/video/review/types';
+import type {
+  ReviewAnnotation,
+  ReviewHistoryDirection,
+  ReviewOperation,
+} from '../../features/video/review/types';
 
 /** Page-local operations use the same canonical snapshot validation as durable recovery. */
 export type LocalReviewChange =
@@ -12,7 +16,7 @@ export type LocalReviewChange =
   | { kind: 'advanced'; advanced: unknown }
   | { kind: 'draft'; annotation: ReviewAnnotation | null; before: ReviewAnnotation | null }
   | { kind: 'commit'; operation: ReviewOperation; consumeDraft: boolean }
-  | { kind: 'history'; direction: 'undo' | 'redo' };
+  | { kind: 'history'; direction: ReviewHistoryDirection };
 
 /** Derives an editable buffer without advancing either durable revision. */
 export function applyLocalReviewChange(
@@ -50,13 +54,16 @@ export function applyLocalReviewChange(
   } else if (change.kind === 'history') {
     workspace = {
       ...workspace,
-      cursor: Math.max(
-        0,
-        Math.min(
-          workspace.history.length,
-          workspace.cursor + (change.direction === 'undo' ? -1 : 1)
-        )
-      ),
+      cursor:
+        change.direction === 'start'
+          ? 0
+          : Math.max(
+              0,
+              Math.min(
+                workspace.history.length,
+                workspace.cursor + (change.direction === 'undo' ? -1 : 1)
+              )
+            ),
     };
   } else {
     if (
