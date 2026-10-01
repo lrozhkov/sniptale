@@ -111,8 +111,8 @@ export function ReviewBackgroundInspector(props: {
                 }
                 className="h-8 min-w-0 rounded border border-[var(--sniptale-color-border-subtle)]
                     transition-opacity hover:opacity-80
-                    aria-pressed:outline aria-pressed:outline-2 aria-pressed:outline-offset-2
-                    aria-pressed:outline-[var(--sniptale-color-accent)]
+                    aria-pressed:outline aria-pressed:outline-1 aria-pressed:outline-offset-1
+                    aria-pressed:outline-[var(--sniptale-color-text-secondary)]
                     focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
                 style={{
                   background: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
