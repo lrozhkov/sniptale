@@ -101,7 +101,6 @@ function SideValueControl(props: {
         disabled={props.disabled}
         fallbackValue={props.state.defaultValues[props.property]}
         kind={resolveSideValueKind(props.property)}
-        showUnit={!props.compact}
         value={propertyValue(props.state, props.property)}
         onChange={props.onChange}
       />

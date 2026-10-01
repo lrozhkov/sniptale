@@ -82,6 +82,7 @@ it('shows one compact value while all sides are linked', () => {
     container.querySelector('[data-ui="content.design-review.side-values-compact"]')
   ).not.toBeNull();
   expect(container.querySelectorAll('input')).toHaveLength(1);
+  expect(container.querySelector('input')?.value).toBe('8');
   const unlink = container.querySelector<HTMLButtonElement>('button[data-side-link="all"]');
   expect(unlink?.getAttribute('aria-pressed')).toBe('true');
   expect(unlink?.className).toContain('border-0');
@@ -158,4 +159,45 @@ it('shows one value per linked axis and two only after that axis is unlinked', (
   ]);
   expect(verticalLink?.getAttribute('aria-pressed')).toBe('true');
   expect(container.querySelectorAll('input')).toHaveLength(2);
+});
+
+it.each([
+  ['12', '12px'],
+  ['auto', 'auto'],
+  ['calc(100% - 2em)', 'calc(100% - 2em)'],
+  ['2em', '2em'],
+  ['50%', '50%'],
+  ['', ''],
+])('preserves globally linked input transition %s as %s', (draft, expected) => {
+  const values = Object.fromEntries(marginProperties.map((property) => [property, '8px']));
+  const onChangeMany = vi.fn();
+  renderSides(createState(values), { onChangeMany });
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  const unit = container.querySelector(`[id="${input.getAttribute('aria-describedby')}"]`);
+  expect(input.value).toBe('8');
+  expect(unit?.textContent).toBe('px');
+  expect(unit?.getAttribute('aria-hidden')).toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, draft);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(onChangeMany).toHaveBeenLastCalledWith(
+    marginProperties.map((property) => ({ property, value: expected }))
+  );
+});
+
+it.each([
+  ['2em', '2', 'em'],
+  ['50%', '50', '%'],
+  ['auto', 'auto', null],
+  ['calc(100% - 2em)', 'calc(100% - 2em)', null],
+])('keeps supported linked value %s with an accessible separate unit', (value, numeric, unit) => {
+  const values = Object.fromEntries(marginProperties.map((property) => [property, value]));
+  renderSides(createState(values));
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  expect(input.value).toBe(numeric);
+  const unitId = input.getAttribute('aria-describedby');
+  expect(unitId === null ? null : container.querySelector(`[id="${unitId}"]`)?.textContent).toBe(
+    unit
+  );
 });

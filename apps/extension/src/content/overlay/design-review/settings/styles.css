@@ -1,0 +1,13 @@
+/* Native focus is retained; pointer interaction does not inherit keyboard paint. */
+[data-ui='content.design-review.settings'][data-focus-modality='pointer'] button:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+[data-ui='content.design-review.settings'][data-focus-modality='pointer']
+  button:focus-visible:not(:hover):not([aria-expanded='true']):not([aria-pressed='true']) {
+  border-color: var(--sniptale-color-border-soft) !important;
+}
+[data-ui='content.design-review.settings'][data-focus-modality='keyboard'] button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}

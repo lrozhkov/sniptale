@@ -1,6 +1,7 @@
-import { Droplets, Image, Maximize2, Square, Type, X } from 'lucide-react';
+import { Droplets, Image, Maximize2, Square, Type } from 'lucide-react';
 import { useLayoutEffect, useState, type ComponentType } from 'react';
 import { translate, type TranslationKey } from '../../../../platform/i18n';
+import { useDesignReviewInputModality } from '../input-modality';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { ImageSection } from './image-section';
 import { AppearanceSection } from './sections/appearance';
@@ -48,6 +49,7 @@ export function DesignReviewSettings(props: {
   disabled: boolean;
   state: DesignReviewViewState;
 }) {
+  const modality = useDesignReviewInputModality();
   const imageSelected = props.state.selection?.kind === 'image';
   const sections: SectionOption[] = imageSelected
     ? [
@@ -62,7 +64,11 @@ export function DesignReviewSettings(props: {
   }, [imageSelected, props.state.selection?.element]);
 
   return (
-    <div className="grid min-h-40 grid-cols-[3rem_minmax(0,1fr)]">
+    <div
+      className="grid min-h-40 grid-cols-[3rem_minmax(0,1fr)]"
+      data-ui="content.design-review.settings"
+      data-focus-modality={modality}
+    >
       <nav
         className={[
           'grid content-start gap-1 border-r border-solid p-1.5',
@@ -93,23 +99,6 @@ export function DesignReviewSettings(props: {
             </button>
           );
         })}
-        <button
-          type="button"
-          className={[
-            'mt-2 inline-flex h-9 w-9 items-center justify-center rounded-[7px]',
-            'text-[var(--sniptale-color-text-secondary)]',
-            'hover:bg-[var(--sniptale-color-surface-input)] active:bg-[var(--sniptale-color-surface-hover)]',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
-          ].join(' ')}
-          aria-label={
-            `${translate('content.designReview.close')}: ` +
-            translate('content.designReview.settingsNavigation')
-          }
-          data-ui="content.design-review.close-settings"
-          onClick={() => props.actions.setSettingsOpen(false)}
-        >
-          <X aria-hidden="true" size={17} />
-        </button>
       </nav>
       <div className="min-w-0 p-2.5">
         <SettingsContent {...props} section={section} />

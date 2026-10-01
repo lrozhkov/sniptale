@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { CompactInput } from '../../../../ui/compact-inspector-controls';
 import {
   isCssNumericLength,
@@ -81,6 +81,7 @@ type NumericFieldProps = {
 };
 
 function NumericFieldInput(props: NumericFieldProps) {
+  const unitId = useId();
   const { numberText, unit } = splitCssLength(props.value);
   const fallbackUnit = splitCssLength(props.defaultValue ?? '').unit;
   const showUnit =
@@ -92,20 +93,17 @@ function NumericFieldInput(props: NumericFieldProps) {
     <div className="group/number relative min-w-0">
       <CompactInput
         aria-label={props.label}
+        aria-describedby={showUnit ? unitId : undefined}
         className={`${PAGE_STYLE_CONTROL_CLASS_NAME} ${showUnit ? '!pr-14' : '!pr-7'}`}
         disabled={props.disabled}
         inputMode="decimal"
         value={inputValue}
         onChange={(event) => {
           const rawValue = event.currentTarget.value;
-          props.onChange(
-            showUnit
-              ? `${rawValue}${displayedUnit}`
-              : normalizeCssLengthInput(rawValue, props.defaultValue)
-          );
+          props.onChange(normalizeCssLengthInput(rawValue, `0${displayedUnit}`));
         }}
       />
-      {showUnit ? <NumericUnitLabel unit={displayedUnit} /> : null}
+      {showUnit ? <NumericUnitLabel id={unitId} unit={displayedUnit} /> : null}
       <NumericStepper
         defaultValue={props.defaultValue}
         disabled={props.disabled}
@@ -117,10 +115,10 @@ function NumericFieldInput(props: NumericFieldProps) {
   );
 }
 
-function NumericUnitLabel(props: { unit: string }) {
+function NumericUnitLabel(props: { id: string; unit: string }) {
   return (
     <span
-      aria-hidden="true"
+      id={props.id}
       className={[
         'pointer-events-none absolute right-8 top-1/2 translate-x-0 -translate-y-1/2',
         'text-[11px] font-semibold text-[var(--sniptale-color-text-dim)]',

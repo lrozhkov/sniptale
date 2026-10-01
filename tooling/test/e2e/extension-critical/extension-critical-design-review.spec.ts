@@ -1,10 +1,8 @@
 import { expect, test } from '../support/extension-fixture';
 
-test('Design Review measurements stay independent and stable through inspector interactions at HD', async ({
-  context,
-  extensionId,
-  hostOrigin,
-}) => {
+import type { BrowserContext } from '@playwright/test';
+
+async function openDesignReview(context: BrowserContext, extensionId: string, hostOrigin: string) {
   const page = await context.newPage();
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(hostOrigin);
@@ -66,6 +64,15 @@ test('Design Review measurements stay independent and stable through inspector i
     parent.append(target, sibling);
     document.body.append(parent);
   });
+  return { page, popup };
+}
+
+test('Design Review measurements stay independent and stable through inspector interactions at HD', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}) => {
+  const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
   const basic = page.locator('[data-ui="content.toolbar.design-review-measurements-button"]');
   const additional = page.locator(
     '[data-ui="content.toolbar.design-review-measurement-details-button"]'
@@ -153,6 +160,115 @@ test('Design Review measurements stay independent and stable through inspector i
     await expect(popover).toHaveCount(0);
     await expect(layer).toHaveCount(0);
   }
+  await popup.close();
+  await page.close();
+});
+
+test('Design Review pointer choices do not inherit keyboard focus paint at HD', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}) => {
+  const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
+  const target = (await page.locator('#measurement-target').boundingBox())!;
+  await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+  const popover = page.locator('[data-ui="content.design-review.popover"]');
+  await popover
+    .getByRole('button', { name: /Edit element properties|Изменить свойства элемента/u })
+    .click();
+  const comment = popover.getByRole('textbox', { name: /Element comment|Комментарий к элементу/u });
+  await comment.fill('Focus proof');
+  const center = popover.getByRole('button', { name: /^(Center|По центру)$/u });
+  await center.click();
+  await expect(center).toHaveAttribute('aria-pressed', 'true');
+  await expect(center).toHaveCSS('outline-style', 'none');
+  await expect(center).toHaveCSS('box-shadow', 'none');
+  const settings = popover.locator('[data-ui="content.design-review.settings"]');
+  await center.press('Tab');
+  await expect(settings.locator('button:focus')).toHaveCSS('outline-width', '2px');
+  await expect(settings.locator('button:focus')).toHaveCSS('outline-style', 'solid');
+  await center.click();
+  await expect(center).toHaveCSS('outline-style', 'none');
+  await center.press('Enter');
+  await expect(center).toHaveCSS('outline-width', '2px');
+  for (const name of [
+    /^(Weight|Насыщенность)$/u,
+    /^(Style|Наклон)$/u,
+    /^(Left|Слева)$/u,
+    /^(Right|Справа)$/u,
+  ]) {
+    await comment.fill('Pointer interaction');
+    const button = settings.getByRole('button', { name });
+    await button.click();
+    await expect(button).toHaveCSS('outline-style', 'none');
+    await expect(button).toHaveCSS('box-shadow', 'none');
+  }
+  const font = settings.getByRole('button', { name: /^(Font|Шрифт)$/u });
+  await font.click();
+  await page.getByRole('option', { name: 'Inter', exact: true }).click();
+  await expect(font).toHaveCSS('outline-style', 'none');
+  await expect(font).toHaveCSS('box-shadow', 'none');
+  await font.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(font).toHaveCSS('outline-width', '2px');
+  const properties = popover.getByRole('button', {
+    name: /Edit element properties|Изменить свойства элемента/u,
+  });
+  await properties.click();
+  await expect(settings).toHaveCount(0);
+  await expect(properties).toHaveAttribute('aria-expanded', 'false');
+  await properties.click();
+  await expect(settings).toBeVisible();
+  await expect(settings.locator('[data-ui="content.design-review.close-settings"]')).toHaveCount(0);
+  await center.click();
+  await expect(center).toHaveCSS('outline-style', 'none');
+  await settings
+    .getByRole('navigation')
+    .getByRole('button', { name: /Size and spacing|Размер и отступы/u })
+    .click();
+  const width = settings.getByRole('textbox', { name: /^(Width|Ширина)$/u });
+  await expect(width).toHaveValue('100');
+  const widthUnit = await width.getAttribute('aria-describedby');
+  await expect(settings.locator(`[id="${widthUnit}"]`)).toHaveText('px');
+  await width.fill('50%');
+  await expect(width).toHaveValue('50');
+  await expect(settings.locator(`[id="${widthUnit}"]`)).toHaveText('%');
+  await expect
+    .poll(() => page.locator('#measurement-target').evaluate((node) => node.style.width))
+    .toBe('50%');
+  await width.fill('calc(100% - 20px)');
+  await expect(width).toHaveValue('calc(100% - 20px)');
+  await expect(width).not.toHaveAttribute('aria-describedby');
+  const padding = settings
+    .locator('[data-side-field-label="Padding"], [data-side-field-label="Внутренние отступы"]')
+    .getByRole('textbox')
+    .first();
+  await padding.fill('2em');
+  await expect(padding).toHaveValue('2');
+  const paddingUnit = await padding.getAttribute('aria-describedby');
+  await expect(settings.locator(`[id="${paddingUnit}"]`)).toHaveText('em');
+  await expect
+    .poll(() => page.locator('#measurement-target').evaluate((node) => node.style.paddingTop))
+    .toBe('2em');
+  const placement = await padding.evaluate((node) => {
+    const id = node.getAttribute('aria-describedby');
+    const root = node.getRootNode();
+    const unit =
+      id && (root instanceof Document || root instanceof ShadowRoot)
+        ? root.querySelector(`[id="${id}"]`)
+        : null;
+    const inputRect = node.getBoundingClientRect();
+    const unitRect = unit?.getBoundingClientRect();
+    return {
+      padding: parseFloat(getComputedStyle(node).paddingRight),
+      unitWidth: unitRect?.width ?? 0,
+      inside: Boolean(
+        unitRect && unitRect.right <= inputRect.right && unitRect.left >= inputRect.left
+      ),
+    };
+  });
+  expect(placement.inside).toBe(true);
+  expect(placement.padding).toBeGreaterThan(placement.unitWidth);
   await popup.close();
   await page.close();
 });

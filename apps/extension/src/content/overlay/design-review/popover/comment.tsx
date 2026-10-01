@@ -1,6 +1,7 @@
 import { CornerDownLeft } from 'lucide-react';
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
+import { useDesignReviewInputModality } from '../input-modality';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { DesignReviewCommentVoiceButton } from './comment-voice-button';
 
@@ -14,25 +15,6 @@ const COMMENT_FOCUS_CLASS_NAMES = {
     'has-[textarea:focus]:ring-[color:var(--sniptale-color-border-soft)]',
   ].join(' '),
 } as const;
-
-function useCommentFocusModality(): 'keyboard' | 'pointer' {
-  const [modality, setModality] = useState<'keyboard' | 'pointer'>('pointer');
-
-  useEffect(() => {
-    const useKeyboard = () => setModality('keyboard');
-    const usePointer = () => setModality('pointer');
-    document.addEventListener('keydown', useKeyboard, true);
-    document.addEventListener('pointerdown', usePointer, true);
-    document.addEventListener('mousedown', usePointer, true);
-    return () => {
-      document.removeEventListener('keydown', useKeyboard, true);
-      document.removeEventListener('pointerdown', usePointer, true);
-      document.removeEventListener('mousedown', usePointer, true);
-    };
-  }, []);
-
-  return modality;
-}
 
 export function PageStyleCommentField(props: {
   actions: DesignReviewActions['comment'] & {
@@ -57,7 +39,7 @@ export function PageStyleCommentField(props: {
     .filter(Boolean)
     .join(' ');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const focusModality = useCommentFocusModality();
+  const focusModality = useDesignReviewInputModality();
 
   useLayoutEffect(() => {
     resizeCommentTextarea(textareaRef.current);

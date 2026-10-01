@@ -6,6 +6,7 @@ import overlayStyles from '@sniptale/ui/styles/overlays?inline';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import contentRuntimeEffectsStyles from './effects.css?inline';
 import contentAiPickerStyles from '../../overlay/ai/pick/runtime/styles.css?inline';
+import designReviewSettingsStyles from '../../overlay/design-review/settings/styles.css?inline';
 import frameSettingsPopoverStyles from '../../../composition/frame-annotation-controls/frame/styles.css?inline';
 import calloutSettingsPopoverStyles from '../../../composition/frame-annotation-controls/callout/styles.css?inline';
 import settingsPopoverStyles from '../../../composition/frame-annotation-controls/popover/styles.css?inline';
@@ -310,6 +311,7 @@ export function createContentEntrypointStyles(): string {
         overlayStyles,
         contentRuntimeEffectsStyles,
         contentAiPickerStyles,
+        designReviewSettingsStyles,
         frameSettingsPopoverStyles,
         calloutSettingsPopoverStyles,
         settingsPopoverStyles,

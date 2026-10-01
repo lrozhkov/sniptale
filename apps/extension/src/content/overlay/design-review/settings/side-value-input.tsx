@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { CompactColorSelector } from '../../../../ui/color-selector';
 import { CompactInput, CompactSelect } from '../../../../ui/compact-inspector-controls';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
@@ -55,7 +55,6 @@ export function SideValueInput(props: {
   fallbackValue?: string | undefined;
   kind: SideValueKind;
   onChange: (value: string) => void;
-  showUnit?: boolean | undefined;
   value: string;
 }) {
   if (props.kind === 'select') {
@@ -137,48 +136,44 @@ function SideLengthInput(props: {
   disabled: boolean;
   fallbackValue?: string | undefined;
   onChange: (value: string) => void;
-  showUnit?: boolean | undefined;
   value: string;
 }) {
+  const unitId = useId();
   const parsed = splitCssLength(props.value);
   const fallbackUnit = splitCssLength(props.fallbackValue ?? '').unit;
   const showUnit =
-    props.showUnit !== false &&
-    (isCssNumericLength(props.value) || (!props.value.trim() && Boolean(fallbackUnit)));
+    isCssNumericLength(props.value) || (!props.value.trim() && Boolean(fallbackUnit));
   const unit = parsed.unit || fallbackUnit || 'px';
   const inputValue = showUnit ? parsed.numberText : props.value;
   const inputClassName = [
     PAGE_STYLE_CONTROL_CLASS_NAME,
     showUnit ? '!pr-12' : '!pr-6',
-    props.compact ? '!pr-7' : '',
+    props.compact && !showUnit ? '!pr-7' : '',
   ].join(' ');
 
   return (
     <div className="group/side-number relative min-w-0">
       <CompactInput
         aria-label={props.ariaLabel}
+        aria-describedby={showUnit ? unitId : undefined}
         className={inputClassName}
         disabled={props.disabled}
         inputMode="decimal"
         value={inputValue}
         onChange={(event) =>
-          props.onChange(
-            showUnit
-              ? `${event.currentTarget.value}${unit}`
-              : normalizeCssLengthInput(event.currentTarget.value, props.fallbackValue)
-          )
+          props.onChange(normalizeCssLengthInput(event.currentTarget.value, `0${unit}`))
         }
       />
-      {showUnit ? <SideLengthUnit unit={unit} /> : null}
+      {showUnit ? <SideLengthUnit id={unitId} unit={unit} /> : null}
       <SideLengthStepper {...props} />
     </div>
   );
 }
 
-function SideLengthUnit({ unit }: { unit: string }) {
+function SideLengthUnit({ id, unit }: { id: string; unit: string }) {
   return (
     <span
-      aria-hidden="true"
+      id={id}
       className={[
         'pointer-events-none absolute right-7 top-1/2 translate-x-0 -translate-y-1/2',
         'text-[10px] font-semibold text-[var(--sniptale-color-text-dim)]',

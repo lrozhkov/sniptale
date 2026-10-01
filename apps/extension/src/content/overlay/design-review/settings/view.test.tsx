@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { DesignReviewSettings } from './view';
+import { NumericField } from './numeric-field';
 
 const actions: DesignReviewActions = {
   close: vi.fn(),
@@ -74,7 +75,7 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
 
   const navigation = container.querySelector('nav');
-  expect(navigation?.querySelectorAll('button')).toHaveLength(5);
+  expect(navigation?.querySelectorAll('button')).toHaveLength(4);
   expect(navigation?.className).toContain('border-solid');
   expect(container.querySelector('details')).toBeNull();
   expect(container.querySelector('summary')).toBeNull();
@@ -96,12 +97,7 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   expect(container.querySelector('[data-ui="content.design-review.field"]')?.className).toContain(
     '!grid-cols-1'
   );
-  act(() =>
-    container
-      .querySelector<HTMLButtonElement>('[data-ui="content.design-review.close-settings"]')
-      ?.click()
-  );
-  expect(actions.setSettingsOpen).toHaveBeenCalledWith(false);
+  expect(container.querySelector('[data-ui="content.design-review.close-settings"]')).toBeNull();
   expect(container.querySelector('input[type="file"]')).toBeNull();
 });
 
@@ -140,7 +136,7 @@ it('shows image layout properties without preview or asset-upload controls', () 
     root.render(<DesignReviewSettings actions={actions} disabled={false} state={imageState} />)
   );
 
-  expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(6);
+  expect(container.querySelector('nav')?.querySelectorAll('button')).toHaveLength(5);
   expect(container.textContent).toContain('Вписывание');
   expect(container.textContent).toContain('Позиция');
   expect(container.querySelector('img')).toBeNull();
@@ -149,4 +145,49 @@ it('shows image layout properties without preview or asset-upload controls', () 
   act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
   expect(container.textContent).toContain('Цвет');
   expect(container.textContent).not.toContain('Вписывание');
+});
+
+it.each([
+  ['12', '12px'],
+  ['auto', 'auto'],
+  ['calc(100% - 2em)', 'calc(100% - 2em)'],
+  ['2em', '2em'],
+  ['50%', '50%'],
+  ['', ''],
+])('preserves numeric field input transition %s as %s', (draft, expected) => {
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <NumericField
+        label="Width"
+        value="8px"
+        defaultValue="8px"
+        disabled={false}
+        onChange={onChange}
+      />
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  expect(input.value).toBe('8');
+  const unit = container.querySelector(`[id="${input.getAttribute('aria-describedby')}"]`);
+  expect(unit?.textContent).toBe('px');
+  expect(unit?.getAttribute('aria-hidden')).toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, draft);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenLastCalledWith(expected);
+});
+
+it('tracks keyboard and portaled pointer intent without changing the settings selection', () => {
+  act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
+  const panel = container.querySelector('[data-ui="content.design-review.settings"]')!;
+  expect(panel.getAttribute('data-focus-modality')).toBe('pointer');
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+  expect(panel.getAttribute('data-focus-modality')).toBe('keyboard');
+  act(() => document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(panel.getAttribute('data-focus-modality')).toBe('pointer');
+  expect(panel.querySelector('button[aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
+    'Текст'
+  );
 });
