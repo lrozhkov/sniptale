@@ -161,8 +161,23 @@ export function useReviewAudio(args: {
       }));
     },
     setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
-      args.setAudio((audio) => ({ ...audio, original: { ...audio.original, ...patch } })),
+      args.setAudio((audio) => updateOriginalAudio(audio, patch)),
   };
+}
+
+/** Master controls resolve mute and gain together without changing source automation. */
+function updateOriginalAudio(
+  current: QuickEditAudioState,
+  patch: Partial<QuickEditOriginalAudio>
+): QuickEditAudioState {
+  if (patch.volume !== undefined && !Number.isFinite(patch.volume)) return current;
+  const original = { ...current.original, ...patch };
+  original.volume = Math.max(0, Math.min(2, original.volume));
+  if (patch.volume !== undefined) original.muted = patch.muted ?? original.volume === 0;
+  if (patch.muted === false && patch.volume === undefined && original.volume === 0)
+    original.volume = 1;
+  if (original.volume === 0) original.muted = true;
+  return { ...current, original };
 }
 
 /** Resolves library metadata independently of selection and timeline mutations. */

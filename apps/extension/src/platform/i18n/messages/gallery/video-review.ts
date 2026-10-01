@@ -179,6 +179,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   },
   trackControlsWidth: { en: 'Resize track controls', ru: 'Ширина управления дорожками' },
   audioEnabled: { ru: 'Воспроизводить дорожку', en: 'Play audio track' },
+  muteSourceAudio: { ru: 'Выключить исходный звук', en: 'Mute source audio' },
+  restoreSourceAudio: { ru: 'Включить исходный звук', en: 'Restore source audio' },
   zoomEnabled: { ru: 'Применять фокусировку', en: 'Apply focus' },
   overlayWidth: { ru: 'Ширина', en: 'Width' },
   overlayFontSize: { ru: 'Размер текста', en: 'Text size' },

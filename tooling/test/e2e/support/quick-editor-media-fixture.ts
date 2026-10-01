@@ -1,4 +1,5 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page, type Locator } from '@playwright/test';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { readFile } from 'node:fs/promises';
 import {
   ALL_FORMATS,
@@ -160,4 +161,48 @@ export async function persistedFocus(page: Page) {
     .slice(0, workspace.cursor)
     .findLast((operation) => operation.target === 'advancedContent');
   return latest?.target === 'advancedContent' ? latest.after.zoom.regions.at(-1) : undefined;
+}
+
+/** Opens the export section before invoking its chosen destination. */
+export async function clickReviewExport(
+  button: (key: Parameters<typeof translate>[0]) => Locator,
+  destination: 'gallery.videoReview.exportVideo' | 'gallery.videoReview.downloadVideo'
+) {
+  await button('gallery.videoReview.exportSection').click();
+  await button(destination).click();
+}
+
+/** Verifies selected timeline content retains a thin border and a visible surface. */
+export async function expectTimelineSelection(item: Locator) {
+  await expect(item).toHaveAttribute('aria-pressed', 'true');
+  await expect(item).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(item).toHaveCSS('border-top-width', '1px');
+  await expect
+    .poll(() =>
+      item.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return style.borderTopColor === style.color;
+      })
+    )
+    .toBe(true);
+}
+
+/** Reads durable recording rows in the seeded native gallery database. */
+export async function recordingCount(page: Page) {
+  return page.evaluate(async (databaseName) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(databaseName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const request = db.transaction('recordings').objectStore('recordings').count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  }, betaV1Fixture.databaseName);
 }

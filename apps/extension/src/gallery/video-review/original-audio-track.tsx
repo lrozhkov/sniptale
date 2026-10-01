@@ -45,6 +45,7 @@ export function ReviewOriginalAudioTrack(props: {
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
 }) {
   const duration = props.projection?.duration ?? props.duration;
+  const muted = props.original.muted || props.original.volume === 0;
   const gesture = useOriginalAudioGesture(props, duration);
   const preview = gesture.preview;
   const gainAt = useCallback(
@@ -58,16 +59,20 @@ export function ReviewOriginalAudioTrack(props: {
   return (
     <ReviewTrackRow
       label={translate('gallery.videoReview.audioOriginal')}
-      icon={<Volume2 size={14} aria-hidden="true" />}
+      icon={
+        muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />
+      }
       controls={
         <ReviewButton
-          label={translate('gallery.videoReview.audioEnabled')}
-          aria-pressed={!props.original.muted}
+          label={translate(
+            muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
+          )}
+          aria-pressed={!muted}
           disabled={props.busy}
           className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() => props.onOriginal({ muted: !props.original.muted })}
+          onClick={() => props.onOriginal({ muted: !muted })}
         >
-          {props.original.muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+          {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
         </ReviewButton>
       }
     >
@@ -75,7 +80,10 @@ export function ReviewOriginalAudioTrack(props: {
         <div
           data-ui="gallery.videoReview.audioLane"
           data-original-audio-lane
-          className="relative mt-1 h-8 rounded bg-[var(--sniptale-color-surface-hover)] touch-none"
+          data-audio-muted={muted ? 'true' : 'false'}
+          className={`relative mt-1 h-8 rounded touch-none border-b border-dashed
+            bg-[var(--sniptale-color-surface-hover)]
+            ${muted ? 'border-[var(--sniptale-color-text-secondary)]' : 'border-transparent'}`}
           style={
             gesture.preview?.id
               ? { cursor: gesture.preview.edge === 'move' ? 'grabbing' : 'ew-resize' }
@@ -88,7 +96,7 @@ export function ReviewOriginalAudioTrack(props: {
             waveform={props.waveform}
             duration={duration}
             volume={1}
-            muted={props.original.muted}
+            muted={muted}
             gainAt={gainAt}
           />
           {props.original.ranges?.map((range) => (

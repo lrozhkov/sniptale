@@ -75,6 +75,14 @@ it('owns selection, bounded clip mutations, and the original audio gate', async 
 
     act(() => hook.setOriginal({ muted: true, volume: 0.5 }));
     expect(audioState.original).toEqual({ muted: true, volume: 0.5 });
+    act(() => hook.setOriginal({ volume: 0.75 }));
+    expect(audioState.original).toEqual({ muted: false, volume: 0.75 });
+    act(() => hook.setOriginal({ volume: Number.NaN }));
+    expect(audioState.original).toEqual({ muted: false, volume: 0.75 });
+    act(() => hook.setOriginal({ volume: -2, muted: false }));
+    expect(audioState.original).toEqual({ muted: true, volume: 0 });
+    act(() => hook.setOriginal({ muted: false }));
+    expect(audioState.original).toEqual({ muted: false, volume: 1 });
   } finally {
     act(() => root.unmount());
     vi.restoreAllMocks();

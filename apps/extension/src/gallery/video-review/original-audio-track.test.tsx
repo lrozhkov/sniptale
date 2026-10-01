@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
 import { ReviewOriginalAudioInspector } from './original-audio-inspector';
 import { useReviewAudio } from './use-review-audio';
+import { useReviewPlayback } from './use-playback';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { translate } from '../../platform/i18n';
@@ -13,7 +14,7 @@ vi.mock('../../composition/persistence/media-library', () => ({
   listMediaLibrary: async () => [],
 }));
 
-function setup() {
+function setup(originalVolume = 1) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -34,7 +35,10 @@ function setup() {
   let editor!: ReturnType<typeof useReviewAudio>;
   let busy = false;
   function Harness() {
-    const [audio, setAudio] = useState(createQuickEditAdvancedState().audio);
+    const [audio, setAudio] = useState(() => {
+      const initial = createQuickEditAdvancedState().audio;
+      return { ...initial, original: { ...initial.original, volume: originalVolume } };
+    });
     const [selectedOriginalId, onOriginalSelection] = useState<string | null>(null);
     editor = useReviewAudio({
       audio,
@@ -45,8 +49,17 @@ function setup() {
       selectedOriginalId,
       onOriginalSelection,
     });
+    const playback = useReviewPlayback({
+      duration: 10,
+      edits: currentEdits,
+      boundaries: () => undefined,
+      onSeek: () => {},
+      onFailure: () => {},
+      original: audio.original,
+    });
     return (
       <>
+        <video ref={playback.video} />
         <ReviewOriginalAudioTrack
           original={audio.original}
           duration={10}
@@ -211,7 +224,7 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
     act(() =>
       f.host
         .querySelector<HTMLButtonElement>(
-          `button[aria-label="${translate('gallery.videoReview.audioEnabled')}"]`
+          `button[aria-label="${translate('gallery.videoReview.muteSourceAudio')}"]`
         )!
         .click()
     );
@@ -305,6 +318,55 @@ it('keeps audio placement feedback state without inserting messages into the tra
     act(() => f.editor.addOriginal({ kind: 'range', start: 3, end: 4 }));
     expect(f.editor.originalFeedback).toBe('overlap');
     expect(f.host.textContent).not.toContain(translate('gallery.videoReview.originalAudioOverlap'));
+  } finally {
+    f.close();
+  }
+});
+
+it('shows zero master volume as muted and restores actual playback through positive volume', () => {
+  const f = setup();
+  try {
+    const control = f.host.querySelector<HTMLButtonElement>('[data-track-controls] button')!;
+    const video = f.host.querySelector('video')!;
+    act(() => f.editor.setOriginal({ volume: 0 }));
+    expect(video.muted).toBe(true);
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+    act(() => f.editor.setOriginal({ volume: 0.4 }));
+    expect(video.muted).toBe(false);
+    expect(video.volume).toBe(0.4);
+    act(() => control.click());
+    expect(video.muted).toBe(true);
+    act(() => f.editor.setOriginal({ volume: 0.7 }));
+    expect(video.muted).toBe(false);
+    expect(video.volume).toBe(0.7);
+    act(() => control.click());
+    expect(control.title).toBe(translate('gallery.videoReview.restoreSourceAudio'));
+    expect(f.lane.dataset['audioMuted']).toBe('true');
+    act(() => control.click());
+    expect(video.volume).toBe(0.7);
+    expect(control.title).toBe(translate('gallery.videoReview.muteSourceAudio'));
+    act(() => f.editor.setOriginal({ volume: 0 }));
+    act(() => control.click());
+    expect(video.muted).toBe(false);
+    expect(video.volume).toBe(1);
+    f.setBusy(true);
+    act(() => control.click());
+    expect(video.muted).toBe(false);
+  } finally {
+    f.close();
+  }
+});
+
+it('renders legacy zero-volume snapshots as muted without changing document state', () => {
+  const f = setup(0);
+  try {
+    const control = f.host.querySelector<HTMLButtonElement>('[data-track-controls] button')!;
+    expect(control.getAttribute('aria-pressed')).toBe('false');
+    expect(control.title).toBe(translate('gallery.videoReview.restoreSourceAudio'));
+    expect(f.lane.dataset['audioMuted']).toBe('true');
+    act(() => control.click());
+    expect(f.host.querySelector('video')!.muted).toBe(false);
+    expect(f.host.querySelector('video')!.volume).toBe(1);
   } finally {
     f.close();
   }

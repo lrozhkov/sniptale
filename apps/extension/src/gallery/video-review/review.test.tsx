@@ -630,7 +630,7 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     expect(lanes).toHaveLength(3);
     expect(host.querySelector('[data-ui="gallery.videoReview.audioTrack"]')).not.toBeNull();
     const mute = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.audioEnabled"]'
+      '[aria-label="gallery.videoReview.muteSourceAudio"]'
     )!;
     await act(async () => mute.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
