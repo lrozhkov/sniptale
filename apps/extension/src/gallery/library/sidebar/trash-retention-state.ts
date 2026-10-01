@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { LocalStoragePolicy } from '../../contracts/settings';
+import type { LocalStoragePolicy } from '../../../contracts/settings';
 import {
   loadSettings,
   patchLocalStoragePolicy,
   StaleLocalStoragePolicyError,
   subscribeToSettingsChanges,
-} from '../../composition/persistence/settings';
+} from '../../../composition/persistence/settings';
 
 type RetentionState = {
   status: 'loading' | 'ready' | 'unavailable';

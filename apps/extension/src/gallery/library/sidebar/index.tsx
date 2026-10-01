@@ -15,7 +15,7 @@ import {
 } from '@sniptale/ui/inspector-shell';
 import { GalleryFacetFilters, GalleryFolderList } from './sections';
 import { TrashRetentionControls } from './trash-retention-controls';
-import { useTrashRetentionPolicy } from '../../state/useTrashRetentionPolicy';
+import { useTrashRetentionPolicy } from './trash-retention-state';
 
 const gallerySidebarPanelClassName = [
   [

@@ -3,8 +3,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { LocalStoragePolicy } from '../../contracts/settings';
-import { useTrashRetentionPolicy } from './useTrashRetentionPolicy';
+import type { LocalStoragePolicy } from '../../../contracts/settings';
+import { useTrashRetentionPolicy } from './trash-retention-state';
 
 const mocks = vi.hoisted(() => ({
   load: vi.fn(),
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   unsubscribe: vi.fn(),
 }));
 
-vi.mock('../../composition/persistence/settings', () => ({
+vi.mock('../../../composition/persistence/settings', () => ({
   loadSettings: mocks.load,
   patchLocalStoragePolicy: mocks.patch,
   subscribeToSettingsChanges: mocks.subscribe,

@@ -58,7 +58,7 @@ vi.mock(
 );
 
 import { useStoragePolicyState } from '../../../../apps/extension/src/settings/sections/capture/storage-drafts/use-storage-policy-state';
-import { useTrashRetentionPolicy } from '../../../../apps/extension/src/gallery/state/useTrashRetentionPolicy';
+import { useTrashRetentionPolicy } from '../../../../apps/extension/src/gallery/library/sidebar/trash-retention-state';
 import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../../apps/extension/src/composition/persistence/library-lifecycle';
 import { StaleLocalStoragePolicyError } from '../../../../apps/extension/src/composition/persistence/settings';
 

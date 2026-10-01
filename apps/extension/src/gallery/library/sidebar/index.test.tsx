@@ -13,7 +13,7 @@ const sectionMocks = vi.hoisted(() => ({
   folderList: vi.fn(),
 }));
 
-vi.mock('../../state/useTrashRetentionPolicy', () => ({
+vi.mock('./trash-retention-state', () => ({
   useTrashRetentionPolicy: () => ({
     status: 'ready',
     policy: { trashCleanupEnabled: false, trashRetentionDays: 30 },
