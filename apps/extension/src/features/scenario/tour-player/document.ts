@@ -6,6 +6,7 @@ import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenar
 
 export interface TourPlayerLabels {
   audioBlocked?: string;
+  audioError?: string;
   resize?: string;
   expand: string;
   collapse: string;

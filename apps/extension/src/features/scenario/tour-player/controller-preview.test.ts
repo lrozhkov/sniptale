@@ -25,6 +25,7 @@ const labels = {
   mediaError: 'media failed',
   choose: 'choose',
   audioBlocked: 'audio blocked',
+  audioError: 'narration failed',
 };
 const mounted: { player: ReturnType<typeof createTourPlayer>; root: HTMLElement }[] = [];
 beforeEach(() => {
@@ -292,4 +293,122 @@ it('releases preview scene, listeners and pending playback on dispose', async ()
   expect(root.dataset['slideId']).toBe('first');
   expect(root.querySelector('[data-tour-scene]')!.children).toHaveLength(0);
   expect(root.querySelector('audio')).toBeNull();
+});
+
+it('reports audio decoding failure separately from images and retries narration', async () => {
+  const play = vi
+    .spyOn(HTMLMediaElement.prototype, 'play')
+    .mockRejectedValueOnce(new DOMException('decode', 'NotSupportedError'))
+    .mockResolvedValue(undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const tour = previewTour();
+  const slide = createTourImageSlide('voice-slide');
+  slide.narration = {
+    assetId: 'voice',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+  };
+  tour.slides = [slide];
+  const tick = playbackFrames();
+  const { root } = await mount(tour, [{ id: 'voice', mime: 'audio/wav', base64: 'AA==' }]);
+  await settleMedia();
+  await tick(0);
+  await settleMedia();
+  expect(root.querySelector('[data-tour-status]')!.textContent).toBe('narration failed');
+  expect(root.querySelector('[data-tour-play]')!.getAttribute('aria-label')).toBe('retry');
+  expect(root.querySelector('[data-tour-play]')!.getAttribute('data-tour-face')).toBe('retry');
+  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
+  await settleMedia();
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(root.querySelector('[data-tour-status]')!.textContent).toBe('');
+});
+
+it('uses accessible icon narration actions without firing navigation and permits activation retry', async () => {
+  const play = vi
+    .spyOn(HTMLMediaElement.prototype, 'play')
+    .mockRejectedValueOnce(new DOMException('decode', 'NotSupportedError'))
+    .mockResolvedValue(undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const narration = {
+    assetId: 'voice',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+    trigger: 'activation' as const,
+  };
+  const tour = previewTour();
+  instantImages();
+  const slide = imageSlide('hint');
+  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null, narration }];
+  tour.slides = [
+    slide,
+    {
+      kind: 'navigation',
+      id: 'navigation',
+      title: 'Navigation',
+      description: '',
+      background: { color: '#111827', image: null },
+      narration: null,
+      timing: slide.timing,
+      buttons: [{ id: 'jump', label: 'Next slide', action: { kind: 'next' }, narration }],
+    },
+  ];
+  const { root, player } = await mount(tour, [
+    { id: 'voice', mime: 'audio/wav', base64: 'AA==' },
+    { id: 'image', mime: 'image/png', base64: 'AA==' },
+  ]);
+  await settleMedia();
+  const hint = root.querySelector<HTMLButtonElement>('[data-tour-narration="note"]')!;
+  expect(hint.textContent).toBe('');
+  expect(hint.getAttribute('aria-label')).toBe('play');
+  expect(hint.title).toBe('play');
+  expect(hint.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
+  hint.click();
+  await settleMedia();
+  expect(root.querySelector('[data-tour-status]')!.textContent).toBe('narration failed');
+  hint.click();
+  await settleMedia();
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(root.querySelector('[data-tour-status]')!.textContent).toBe('');
+  player.select('navigation');
+  const voice = root.querySelector<HTMLButtonElement>('[data-tour-narration="jump"]')!;
+  expect(voice.textContent).toBe('');
+  expect(voice.getAttribute('aria-label')).toBe('play');
+  expect(voice.title).toBe('play');
+  expect(voice.classList.contains('tour-icon-button')).toBe(true);
+  voice.click();
+  await settleMedia();
+  expect(root.dataset['slideId']).toBe('navigation');
+  expect(play).toHaveBeenCalledTimes(3);
+});
+
+it('does not turn pending image URLs into relative undefined requests', async () => {
+  instantImages();
+  const tour = previewTour();
+  const slide = imageSlide('image');
+  tour.slides = [
+    slide,
+    {
+      kind: 'navigation',
+      id: 'navigation',
+      title: 'Navigation',
+      description: '',
+      background: { color: '#111827', image: slide.image },
+      narration: null,
+      timing: slide.timing,
+      buttons: [],
+    },
+  ];
+  const { root, player } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+  player.update({ tour, labels, assets: [] });
+  expect(root.querySelector('img.tour-image')!.getAttribute('src')).toBeNull();
+  player.select('navigation');
+  expect(root.querySelector('img.tour-navigation-image')!.getAttribute('src')).toBeNull();
 });

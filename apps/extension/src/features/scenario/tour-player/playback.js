@@ -141,8 +141,8 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   };
   bindPlaybackLifetime(root, signal, pause);
   bindNarrationActivation(root, signal, (id) => {
-    session.pause();
     audioState = null;
+    session.pause();
     audio.activate(id);
   });
   return {

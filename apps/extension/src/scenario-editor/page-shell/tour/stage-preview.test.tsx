@@ -194,3 +194,34 @@ it('starts at the selected slide and navigates the entire tour without editing s
   expect(player.dataset['slideId']).toBe('second');
   expect(props.onSelectObject).not.toHaveBeenCalled();
 });
+
+it('recovers the real preview when narration URL arrives after image URLs', async () => {
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const props = fixture();
+  const slide = props.tour.slides[0]!;
+  slide.narration = {
+    assetId: 'voice',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+  };
+  instantImages();
+  const tick = await renderPreview(props);
+  const status = () => shadow().querySelector<HTMLElement>('[data-tour-status]')!;
+  expect(status().textContent).toBe('Narration could not play. Try again.');
+  expect(play).not.toHaveBeenCalled();
+  const images = { ...props.images, voice: 'data:audio/wav;base64,AA==' };
+  await act(async () => {
+    root.render(<TourStage {...props} images={images} view="preview" />);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+  await act(async () => tick(1200));
+  expect(status().hidden).toBe(true);
+  await act(async () => shadow().querySelector<HTMLButtonElement>('[data-tour-play]')!.click());
+  expect(play).toHaveBeenCalledOnce();
+  expect(shadow().querySelector('audio')?.getAttribute('src')).toContain('data:audio');
+});

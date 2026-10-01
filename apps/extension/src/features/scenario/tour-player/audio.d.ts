@@ -3,7 +3,7 @@ import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour'
 export function createTourAudio(
   root: HTMLElement,
   signal: AbortSignal,
-  failed: (state: 'blocked' | 'error') => void
+  failed: (state: 'blocked' | 'audio-error') => void
 ): {
   show(slide: TourSlide | null, assets: { id: string; src: string }[]): void;
   sync(seconds: number, playing: boolean): void;

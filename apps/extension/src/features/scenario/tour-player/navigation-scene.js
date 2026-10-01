@@ -1,3 +1,4 @@
+import { createTourNarrationButton } from './transport.js';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { TOUR_NAVIGATION_LAYOUT } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { measureHintPages } from './hints.js';
@@ -56,8 +57,7 @@ export function renderTourNavigationScene({
       group.style.display = 'flex';
       group.style.gap = '4px';
       node.style.flex = '1';
-      const voice = element('button', 'tour-button', labels.play);
-      voice.type = 'button';
+      const voice = createTourNarrationButton(root.ownerDocument, labels.play);
       voice.dataset.tourNarration = button.id;
       group.append(node, voice);
       buttons.append(group);
@@ -94,7 +94,8 @@ function prepareComposition({ root, slide, stageWidth, stageHeight, media, eleme
   panel.style.alignItems = { start: 'flex-start', center: 'center', end: 'flex-end' }[layout.align];
   if (slide.background.image) {
     const image = element('img', 'tour-navigation-image');
-    image.src = media.get(slide.background.image.assetId);
+    const source = media.get(slide.background.image.assetId);
+    if (source) image.src = source;
     image.alt = slide.background.image.alt;
     panel.append(image);
   }

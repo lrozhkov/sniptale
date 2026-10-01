@@ -5,6 +5,7 @@ import type { Translate } from '../../../platform/i18n';
 export function tourPlayerLabels(t: Translate): TourPlayerLabels {
   return {
     audioBlocked: t('scenario.editor.tourHtmlAudioBlocked'),
+    audioError: t('scenario.editor.tourAudioFailed'),
     resize: t('scenario.editor.tourResizeArea'),
     expand: t('scenario.editor.tourExpandCaption'),
     collapse: t('scenario.editor.tourCollapseCaption'),

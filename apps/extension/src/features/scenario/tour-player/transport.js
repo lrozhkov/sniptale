@@ -43,7 +43,12 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   signal.addEventListener('abort', () => playback.replaceChildren(), { once: true });
   return ({ elapsed, duration, playing, state }) => {
     const face = transportFace(state, playing);
-    const text = state === 'error' ? labels.retry : playing ? labels.pause : labels.play;
+    const text =
+      state === 'error' || state === 'audio-error'
+        ? labels.retry
+        : playing
+          ? labels.pause
+          : labels.play;
     if (button.dataset.tourFace !== face) {
       button.dataset.tourFace = face;
       button.replaceChildren(createIcon(document, FACES[face]), label);
@@ -68,17 +73,19 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
         ? (labels.audioBlocked ?? labels.play)
         : state === 'loading'
           ? labels.loading
-          : state === 'error'
-            ? labels.mediaError
-            : state === 'choice'
-              ? labels.choose
-              : '';
+          : state === 'audio-error'
+            ? (labels.audioError ?? labels.mediaError)
+            : state === 'error'
+              ? labels.mediaError
+              : state === 'choice'
+                ? labels.choose
+                : '';
     status.hidden = !status.textContent;
   };
 }
 /** One transport face per playback state; the icon carries meaning, the label stays accessible. */
 function transportFace(state, playing) {
-  if (state === 'error') return 'retry';
+  if (state === 'error' || state === 'audio-error') return 'retry';
   return playing ? 'pause' : 'play';
 }
 function createIcon(document, face) {
@@ -100,4 +107,15 @@ function createIcon(document, face) {
 function formatTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/** Uses the transport icon and accessible vocabulary for explicit narration activation. */
+export function createTourNarrationButton(document, label) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'tour-button tour-icon-button';
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.append(createIcon(document, FACES.play));
+  return button;
 }

@@ -1,4 +1,4 @@
-import { getTourImages } from '../../../features/scenario/project/public';
+import { getTourImages, getTourNarrationTargets } from '../../../features/scenario/project/public';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -191,7 +191,7 @@ export function useGuidePageState() {
     project,
     status,
     actionError,
-    images: useGuideImages(project),
+    images: useGuideMedia(project),
     ...selection,
     create,
     openExisting: (id: string) =>
@@ -204,9 +204,10 @@ export function useGuidePageState() {
   };
 }
 
-/** Owns display URL acquisition and release independently from the editable project lifecycle. */
-function useGuideImages(project: GuideProject | null) {
+/** Owns image and attached narration URLs; the existing images map is the player media input. */
+function useGuideMedia(project: GuideProject | null) {
   const [images, setImages] = useState<Record<string, string | null>>({});
+  const projectId = project?.id ?? null;
   const assetKey = JSON.stringify([
     ...new Set([
       ...(project?.items.flatMap((item) =>
@@ -215,6 +216,11 @@ function useGuideImages(project: GuideProject | null) {
           : []
       ) ?? []),
       ...(project?.tour ? getTourImages(project.tour).map((image) => image.assetId) : []),
+      ...(project?.tour?.slides.flatMap((slide) =>
+        getTourNarrationTargets(slide).flatMap((target) =>
+          target.narration ? [target.narration.assetId] : []
+        )
+      ) ?? []),
     ]),
   ]);
   useEffect(() => {
@@ -242,7 +248,7 @@ function useGuideImages(project: GuideProject | null) {
       active = false;
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [assetKey]);
+  }, [assetKey, projectId]);
   return images;
 }
 

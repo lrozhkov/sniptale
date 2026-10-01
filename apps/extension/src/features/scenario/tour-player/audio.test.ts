@@ -60,7 +60,7 @@ it('synchronizes entry trim/gain to elapsed time, pauses and releases on navigat
   expect(s.media.getAttribute('src')).toBeNull();
   s.player.show(s.slide, []);
   s.player.sync(0, true);
-  expect(s.failed).toHaveBeenCalledWith('error');
+  expect(s.failed).toHaveBeenCalledWith('audio-error');
   s.signal.abort();
   expect(s.media.remove).toHaveBeenCalledOnce();
 });

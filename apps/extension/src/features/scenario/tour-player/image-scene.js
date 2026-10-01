@@ -40,7 +40,8 @@ export function renderTourImage(
   const plane = element('div', 'tour-image-plane');
   scene.append(plane);
   const image = element('img', 'tour-image');
-  image.src = media.get(slide.image.assetId);
+  const source = media.get(slide.image.assetId);
+  if (source) image.src = source;
   image.alt = slide.image.alt;
   Object.assign(image.style, {
     left: `${imageBox.x}px`,

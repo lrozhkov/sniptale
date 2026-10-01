@@ -37,7 +37,7 @@ export function createTourAudio(root, signal, failed) {
       current = cue;
       const source = assets.find((asset) => asset.id === cue.narration.assetId)?.src;
       if (!source) {
-        failed('error');
+        failed('audio-error');
         return false;
       }
       audio.src = source;
@@ -68,7 +68,7 @@ export function createTourAudio(root, signal, failed) {
     } catch (error) {
       if (token === generation && !signal.aborted) {
         pause();
-        failed(error?.name === 'NotAllowedError' ? 'blocked' : 'error');
+        failed(error?.name === 'NotAllowedError' ? 'blocked' : 'audio-error');
       }
     } finally {
       if (token === generation) pending = false;
@@ -87,7 +87,7 @@ export function createTourAudio(root, signal, failed) {
     () => {
       if (current) {
         pause();
-        failed('error');
+        failed('audio-error');
       }
     },
     { signal }

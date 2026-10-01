@@ -1,4 +1,5 @@
 import { createTourCaption } from './caption.js';
+import { createTourNarrationButton } from './transport.js';
 import {
   resolveTourTextAppearance,
   tourTextDefaults,
@@ -177,10 +178,7 @@ export function createTourHints(
 }
 
 function createTourVoiceButton(close, labels, signal) {
-  const voice = close.ownerDocument.createElement('button');
-  voice.className = 'tour-button';
-  voice.textContent = labels.play;
-  voice.type = 'button';
+  const voice = createTourNarrationButton(close.ownerDocument, labels.play);
   close.before(voice);
   signal.addEventListener('abort', () => voice.remove(), { once: true });
   return voice;
