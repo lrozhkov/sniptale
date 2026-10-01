@@ -226,13 +226,6 @@ function PlaybackSettings({
             }
           }}
         />
-        <output
-          aria-hidden="true"
-          className="w-9 shrink-0 text-right text-xs font-medium tabular-nums
-            text-[var(--sniptale-color-text-secondary)]"
-        >
-          {Math.round(audibleVolume * 100)}%
-        </output>
       </div>
       <ProductSelect<string>
         aria-label={translate('gallery.preview.player.speed')}

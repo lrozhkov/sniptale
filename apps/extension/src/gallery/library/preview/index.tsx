@@ -39,21 +39,15 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
   );
 }
 
-function PreviewPanelHeader(
-  props: Pick<
-    PreviewPanelProps,
-    'item' | 'inspectorCollapsed' | 'onClose' | 'onInspectorToggle' | 'trashMode'
-  >
-) {
+function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
 
   return (
-    <div
-      className="flex shrink-0 items-start justify-between gap-2"
-      data-ui="gallery.preview.inspectorHeader"
-    >
+    <div className="shrink-0" data-ui="gallery.preview.inspectorHeader">
       <div className="min-w-0">
-        <h2 className="text-base font-semibold">{getGalleryItemKindLabel(props.item.kind)}</h2>
+        <h2 className="flex min-h-9 items-center pr-20 text-base font-semibold">
+          {getGalleryItemKindLabel(props.item.kind)}
+        </h2>
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}
         </div>
@@ -64,9 +58,6 @@ function PreviewPanelHeader(
               : translate('gallery.app.draftNoExpiration')}
           </div>
         ) : null}
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        <PreviewInspectorControls {...props} />
       </div>
     </div>
   );
@@ -113,7 +104,7 @@ function PreviewPanelSidebar(
     <aside
       data-ui="gallery.preview.inspector"
       className="flex min-h-0 w-full flex-col overflow-hidden border-l border-[var(--sniptale-color-border-soft)]
-        bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
+        bg-[var(--sniptale-color-surface-panel)] p-3 text-[var(--sniptale-color-text-primary)]"
     >
       <PreviewPanelHeader {...props} />
       <div
@@ -243,7 +234,7 @@ export function PreviewPanel(props: PreviewPanelProps) {
 /** Preview-only layout; the parent owns editor mode and keyboard/focus lifecycle. */
 function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
   const { onReview, ...panel } = props;
-  const { item, previewUrl, onClose, onPresented } = panel;
+  const { item, previewUrl, onPresented } = panel;
   const inspectorCollapsed = !props.trashMode && props.inspectorCollapsed;
   const dialogRef = useRef<HTMLDivElement>(null);
   const [presentation, setPresentation] = useState<{
@@ -319,7 +310,7 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
       <div className="flex min-h-0 flex-1 px-4 py-4">
         <div
           data-ui="gallery.preview.surface"
-          className={`grid h-full w-full min-w-0 overflow-hidden
+          className={`relative grid h-full w-full min-w-0 overflow-hidden
             rounded-[var(--sniptale-radius-lg)]
             border border-[var(--sniptale-color-border-soft)]
             bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]
@@ -336,8 +327,6 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             onPresented={handlePresented}
             inspectorCollapsed={inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
-            onInspectorToggle={props.onInspectorToggle}
-            onClose={onClose}
           />
           {inspectorCollapsed ? null : (
             <PreviewPanelSidebar
@@ -353,6 +342,12 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
                 : {})}
             />
           )}
+          <div
+            data-ui="gallery.preview.windowControls"
+            className="absolute right-3 top-3 z-20 flex items-center gap-1"
+          >
+            <PreviewInspectorControls {...panel} inspectorCollapsed={inspectorCollapsed} />
+          </div>
         </div>
       </div>
     </div>

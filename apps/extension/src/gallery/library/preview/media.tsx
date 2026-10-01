@@ -16,7 +16,6 @@ import { PreviewZoomControls } from '../../../composition/library-preview/image-
 import { PreviewScenarioStage } from './scenario-stage';
 import type { PreviewPanelProps } from './types';
 import { usePreviewImageZoom } from '../../../composition/library-preview/usePreviewImageZoom';
-import { PreviewInspectorControls } from './inspector-controls';
 import './navigation-zones.css';
 import { PreviewNavigationZone } from './navigation-zones';
 import {
@@ -60,10 +59,7 @@ function PreviewNavigationControls({
 }
 
 function PreviewMediaControls(
-  props: Pick<
-    PreviewPanelProps,
-    'inspectorCollapsed' | 'onClose' | 'onInspectorToggle' | 'trashMode'
-  > & {
+  props: Pick<PreviewPanelProps, 'inspectorCollapsed'> & {
     isImagePreview: boolean;
     zoomCommandsEnabled: boolean;
     imageZoom: ReturnType<typeof usePreviewImageZoom>;
@@ -73,7 +69,8 @@ function PreviewMediaControls(
   return (
     <div
       data-ui="gallery.preview.toolbar"
-      className="relative z-10 flex shrink-0 flex-wrap items-start justify-between gap-2 px-3 pb-2 pt-3"
+      className={`relative z-10 flex min-h-14 shrink-0 flex-wrap items-start justify-between gap-2
+        pl-3 pb-2 pt-3 ${props.inspectorCollapsed ? 'pr-24' : 'pr-3'}`}
     >
       <div className="shrink-0">
         <PreviewNavigationControls navigation={props.navigation} />
@@ -85,7 +82,6 @@ function PreviewMediaControls(
             disabled={!props.zoomCommandsEnabled}
           />
         ) : null}
-        {props.inspectorCollapsed ? <PreviewInspectorControls {...props} /> : null}
       </div>
     </div>
   );
@@ -304,8 +300,6 @@ export function PreviewMedia(
     | 'inspectorCollapsed'
     | 'item'
     | 'navigation'
-    | 'onClose'
-    | 'onInspectorToggle'
     | 'previewUrl'
     | 'previewLoadStatus'
     | 'previewRequestRevision'
@@ -376,13 +370,10 @@ export function PreviewMedia(
         </>
       ) : null}
       <PreviewMediaControls
-        trashMode={Boolean(props.trashMode)}
         inspectorCollapsed={props.inspectorCollapsed}
         isImagePreview={isImageTarget}
         zoomCommandsEnabled={zoomCommandsEnabled}
         navigation={props.navigation}
-        onClose={props.onClose}
-        onInspectorToggle={props.onInspectorToggle}
         imageZoom={imageZoom}
       />
       <div data-ui="gallery.preview.content-row" className="relative flex min-h-0 flex-1">

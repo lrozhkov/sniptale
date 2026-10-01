@@ -673,14 +673,15 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
         ) : null}
         <div
           data-ui="gallery.preview.lifecycle-actions"
-          className="flex items-start gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-2"
+          className="grid auto-cols-fr grid-flow-col items-start gap-2
+            border-t border-[var(--sniptale-color-border-soft)] pt-2"
         >
           <button
             type="button"
             onClick={(event) =>
               void onDelete({ anchor: event.currentTarget, keyboard: event.detail === 0 })
             }
-            className={`${previewDangerActionButtonClassName} !w-auto shrink-0`}
+            className={`${previewDangerActionButtonClassName} min-w-0 !h-auto !min-h-9 !whitespace-normal !py-2`}
           >
             <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             {translate('common.actions.delete')}
@@ -700,9 +701,10 @@ export function PreviewPromotionAction(
   }
 
   return (
-    <div className="ml-auto min-w-0 text-xs">
+    <div className="min-w-0 text-xs">
       <PromotionAction
-        className={`${previewActionButtonClassName} !w-auto !min-h-9 !px-2 !whitespace-normal !text-xs text-center`}
+        className={`${previewActionButtonClassName}
+          !h-auto !min-h-9 !px-2 !py-2 !whitespace-normal !text-xs text-center`}
         onPromote={props.onPromote}
         visible
       />

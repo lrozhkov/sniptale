@@ -291,11 +291,10 @@ it('keeps the zoom slider open while keyboard focus moves from percent to slider
   expect(panel?.className).not.toContain('invisible');
   act(() => lock?.focus());
   expect(lock?.tabIndex).toBe(0);
-  act(() =>
-    container
-      ?.querySelector<HTMLButtonElement>('button[aria-label="common.actions.close"]')
-      ?.focus()
-  );
+  const outside = document.createElement('button');
+  document.body.append(outside);
+  act(() => outside.focus());
+  outside.remove();
   expect(panel?.className).toContain('invisible');
 });
 

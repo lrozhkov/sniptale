@@ -122,7 +122,7 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   expect(volume.getAttribute('aria-valuetext')).toBe('0%');
   expect(
     host.querySelector('[data-ui="gallery.preview.player.volumeGroup"]')?.textContent
-  ).toContain('0%');
+  ).not.toContain('%');
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(volume, '0.5');
     volume.dispatchEvent(new Event('input', { bubbles: true }));
@@ -134,7 +134,7 @@ it('keeps transport feedback and audio settings in sync with media events', () =
   expect(volume.getAttribute('aria-valuetext')).toBe('50%');
   expect(
     host.querySelector('[data-ui="gallery.preview.player.volumeGroup"]')?.textContent
-  ).toContain('50%');
+  ).not.toContain('%');
   const speed = button('speed');
   act(() => {
     speed.click();
@@ -308,32 +308,38 @@ it('clamps the hover frame to the player at both timeline edges', () => {
   expect(host.querySelector('[data-ui="gallery.preview.player.framePopover"]')).not.toBeNull();
 });
 
-it('reports muted zero without discarding the volume restored by unmute', () => {
-  const video = mount();
-  const range = host.querySelector<HTMLInputElement>(
-    'input[aria-label="gallery.preview.player.volume"]'
-  )!;
-  act(() => {
-    video.volume = 0.37;
-    video.dispatchEvent(new Event('volumechange'));
-  });
-  act(() => {
-    button('mute').click();
-    video.dispatchEvent(new Event('volumechange'));
-  });
-  expect(video.muted).toBe(true);
-  expect(video.volume).toBe(0.37);
-  expect(range.valueAsNumber).toBe(0);
-  expect(range.getAttribute('aria-valuetext')).toBe('0%');
-  act(() => {
-    button('unmute').click();
-    video.dispatchEvent(new Event('volumechange'));
-  });
-  expect(video.muted).toBe(false);
-  expect(video.volume).toBe(0.37);
-  expect(range.valueAsNumber).toBe(0.37);
-  expect(range.getAttribute('aria-valuetext')).toBe('37%');
-});
+it.each([0, 0.37, 1])(
+  'restores volume %s after mute without visible percentages',
+  (previousVolume) => {
+    const video = mount();
+    const range = host.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.preview.player.volume"]'
+    )!;
+    act(() => {
+      video.volume = previousVolume;
+      video.dispatchEvent(new Event('volumechange'));
+    });
+    act(() => {
+      button('mute').click();
+      video.dispatchEvent(new Event('volumechange'));
+    });
+    expect(video.muted).toBe(true);
+    expect(video.volume).toBe(previousVolume);
+    expect(range.valueAsNumber).toBe(0);
+    expect(range.getAttribute('aria-valuetext')).toBe('0%');
+    act(() => {
+      button('unmute').click();
+      video.dispatchEvent(new Event('volumechange'));
+    });
+    expect(video.muted).toBe(false);
+    expect(video.volume).toBe(previousVolume);
+    expect(range.valueAsNumber).toBe(previousVolume);
+    expect(range.getAttribute('aria-valuetext')).toBe(`${Math.round(previousVolume * 100)}%`);
+    expect(
+      host.querySelector('[data-ui="gallery.preview.player.volumeGroup"]')?.textContent
+    ).not.toContain('%');
+  }
+);
 
 function fullscreenPlayer() {
   const player = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player"]')!;

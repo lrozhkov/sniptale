@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createMediaItem,
   createScenarioExportItem,
+  createScenarioItem,
   createVideoProjectItem,
 } from '../actions/test-support/index';
 import { PreviewPanel } from './index';
@@ -35,12 +36,9 @@ vi.mock('../../video-review', () => ({
 }));
 
 vi.mock('./media', () => ({
-  PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'onClose' | 'previewUrl'>) => (
+  PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'previewUrl'>) => (
     <div data-ui="preview.media">
       {props.item.filename}:{props.previewUrl ?? 'no-preview'}
-      <button type="button" data-ui="preview.close" onClick={props.onClose}>
-        close
-      </button>
     </div>
   ),
 }));
@@ -171,7 +169,7 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
   expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
 
   const input = container?.querySelector('input');
-  const closeButton = container?.querySelector('[data-ui="preview.close"]');
+  const closeButton = container?.querySelector('button[aria-label="common.actions.close"]');
 
   if (!(input instanceof HTMLInputElement) || !(closeButton instanceof HTMLButtonElement)) {
     throw new Error('Expected preview panel controls');
@@ -358,20 +356,22 @@ it('keeps keyboard focus within a Trash preview with the inspector open', () => 
   const restore = container?.querySelector<HTMLButtonElement>(
     '[data-ui="gallery.preview.restore"]'
   );
-  const close = container?.querySelector<HTMLButtonElement>('[data-ui="preview.close"]');
-  restore?.focus();
+  const close = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="common.actions.close"]'
+  );
+  close?.focus();
   act(() =>
-    restore?.dispatchEvent(
+    close?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     )
   );
-  expect(document.activeElement).toBe(close);
+  expect(document.activeElement).toBe(restore);
   act(() =>
-    close?.dispatchEvent(
+    restore?.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
     )
   );
-  expect(document.activeElement).toBe(restore);
+  expect(document.activeElement).toBe(close);
 });
 
 it('keeps focus on Restore when navigating between Trash previews in one session', async () => {
@@ -438,7 +438,7 @@ it('navigates adjacent media with arrow keys but preserves arrow editing inside 
 it('keeps close and inspector toggle outside the pending metadata boundary', () => {
   const props = createProps({ item: createMediaItem() });
   render(props);
-  const header = container?.querySelector('[data-ui="gallery.preview.inspectorHeader"]');
+  const header = container?.querySelector('[data-ui="gallery.preview.windowControls"]');
   const close = header?.querySelector<HTMLButtonElement>(
     'button[aria-label="common.actions.close"]'
   );
@@ -456,4 +456,37 @@ it('keeps close and inspector toggle outside the pending metadata boundary', () 
   });
   expect(props.onClose).toHaveBeenCalledOnce();
   expect(props.onInspectorToggle).toHaveBeenCalledOnce();
+});
+
+it.each([
+  createMediaItem(),
+  createMediaItem({ kind: 'recording', mimeType: 'video/webm' }),
+  createMediaItem({ kind: 'audio', mimeType: 'audio/wav' }),
+  createMediaItem({ kind: 'web-archive' }),
+  createVideoProjectItem(),
+  createScenarioItem(),
+  createScenarioExportItem(),
+])('retains close/toggle nodes and focus for $kind across inspector toggles', async (item) => {
+  const props = createProps({ item });
+  render(props);
+  const close = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="common.actions.close"]'
+  );
+  const toggle = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.hideInspector"]'
+  );
+  expect(close).not.toBeNull();
+  expect(toggle).not.toBeNull();
+  for (const inspectorCollapsed of [true, false, true, false]) {
+    act(() => toggle?.focus());
+    render({ ...props, inspectorCollapsed });
+    await Promise.resolve();
+    expect(container?.querySelector('button[aria-label="common.actions.close"]')).toBe(close);
+    expect(
+      container?.querySelector(
+        `button[aria-label="gallery.preview.${inspectorCollapsed ? 'show' : 'hide'}Inspector"]`
+      )
+    ).toBe(toggle);
+    expect(document.activeElement).toBe(toggle);
+  }
 });

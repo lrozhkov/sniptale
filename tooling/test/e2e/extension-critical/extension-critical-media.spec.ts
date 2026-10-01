@@ -1157,3 +1157,154 @@ browserTest(
     }
   }
 );
+
+async function bootstrapPreviewGeometry(
+  page: Page,
+  variant: { locale: 'ru' | 'en'; theme: 'light' | 'dark' }
+) {
+  await page.addInitScript(({ locale, theme }) => {
+    localStorage.setItem('sniptale-locale-preference', locale);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const body = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (char) =>
+      char.charCodeAt(0)
+    );
+    window.__sniptaleHarnessBootstrap = {
+      storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+      mediaLibrary: [false, true].map((draft) => ({
+        entry: {
+          id: draft ? 'geometry-draft' : 'geometry-saved',
+          kind: 'screenshot',
+          source: { kind: 'screenshot' },
+          filename: draft ? 'geometry-draft.png' : 'geometry-saved.png',
+          originalFilename: 'geometry.png',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          size: body.byteLength,
+          mimeType: 'image/png',
+          width: 1,
+          height: 1,
+          duration: null,
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+          tags: [],
+          lifecycle: {
+            savedAt: draft ? null : 1,
+            storageClass: draft ? 'temporary' : 'library',
+            updatedAt: Date.now(),
+          },
+          blob: new Blob([body], { type: 'image/png' }),
+        },
+      })),
+    };
+  }, variant);
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery preview geometry (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        for (const size of [
+          { width: 1280, height: 720 },
+          { width: 1920, height: 1080 },
+        ]) {
+          await page.setViewportSize(size);
+          await page
+            .getByRole('button', { name: 'geometry-saved.png', exact: true })
+            .first()
+            .focus();
+          await page.keyboard.press('Enter');
+          const surface = page.locator('[data-ui="gallery.preview.surface"]');
+          const close = surface.getByRole('button', {
+            name: label('common.actions.close'),
+            exact: true,
+          });
+          const position = await close.boundingBox();
+          expect(position).not.toBeNull();
+          for (const collapsed of [true, false, true, false]) {
+            const toggle = surface.getByRole('button', {
+              name: label(
+                collapsed ? 'gallery.preview.hideInspector' : 'gallery.preview.showInspector'
+              ),
+              exact: true,
+            });
+            await toggle.focus();
+            await page.keyboard.press('Enter');
+            await expect(
+              surface.getByRole('button', {
+                name: label(
+                  collapsed ? 'gallery.preview.showInspector' : 'gallery.preview.hideInspector'
+                ),
+                exact: true,
+              })
+            ).toBeFocused();
+            const current = await close.boundingBox();
+            expect(current?.x).toBeCloseTo(position!.x, 1);
+            expect(current?.y).toBeCloseTo(position!.y, 1);
+          }
+          await page.screenshot({
+            path: `.tmp/backlog5-wave1/geometry-${variant.locale}-${variant.theme}-${size.width}.png`,
+          });
+          await close.click();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+
+  browserTest(
+    `gallery lifecycle actions fill row (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        for (const draft of [false, true, false]) {
+          await page
+            .getByRole('button', {
+              name: draft ? 'geometry-draft.png' : 'geometry-saved.png',
+              exact: true,
+            })
+            .first()
+            .focus();
+          await page.keyboard.press('Enter');
+          const row = page.locator('[data-ui="gallery.preview.lifecycle-actions"]');
+          await row.scrollIntoViewIfNeeded();
+          const bounds = (await row.boundingBox())!;
+          const buttons = row.getByRole('button');
+          expect(await buttons.count()).toBe(draft ? 2 : 1);
+          const first = (await buttons.first().boundingBox())!;
+          const last = (await buttons.last().boundingBox())!;
+          expect(first.x).toBeCloseTo(bounds.x, 1);
+          expect(last.x + last.width).toBeCloseTo(bounds.x + bounds.width, 1);
+          if (draft) expect(first.width).toBeCloseTo(last.width, 1);
+          expect(first.y + first.height).toBeLessThanOrEqual(720);
+          await page
+            .getByRole('dialog')
+            .getByRole('button', {
+              name: translate('common.actions.close', variant.locale),
+              exact: true,
+            })
+            .click();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}

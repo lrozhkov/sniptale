@@ -16,26 +16,7 @@ export function PreviewInspectorControls(
   return (
     <>
       {!props.trashMode ? (
-        <PreviewFloatingControl
-          ariaLabel={inspectorLabel}
-          onClick={(event) => {
-            const surface = event.currentTarget.closest('[data-ui="gallery.preview.surface"]');
-            const keyboard = event.detail === 0;
-            props.onInspectorToggle();
-            if (!keyboard || !surface) return;
-            const nextLabel = translate(
-              props.inspectorCollapsed
-                ? 'gallery.preview.hideInspector'
-                : 'gallery.preview.showInspector'
-            );
-            queueMicrotask(() => {
-              if (!surface.isConnected) return;
-              Array.from(surface.querySelectorAll<HTMLButtonElement>('button'))
-                .find((button) => button.getAttribute('aria-label') === nextLabel)
-                ?.focus();
-            });
-          }}
-        >
+        <PreviewFloatingControl ariaLabel={inspectorLabel} onClick={props.onInspectorToggle}>
           {props.inspectorCollapsed ? (
             <PanelRightOpen className="h-4 w-4" />
           ) : (
