@@ -1,4 +1,4 @@
-import { useRef, useState, type VideoHTMLAttributes } from 'react';
+import { useEffect, useRef, useState, type VideoHTMLAttributes } from 'react';
 
 /** Maps HTML media events to the player state for one mounted video element. */
 export function useVideoMediaState() {
@@ -13,6 +13,20 @@ export function useVideoMediaState() {
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState<'media' | 'action' | null>(null);
   const ready = duration > 0 && error !== 'media';
+
+  useEffect(() => {
+    if (!playing || buffering || !ready) return;
+    let frame = 0;
+    const updatePosition = () => {
+      const element = video.current;
+      if (!element || element.paused || element.ended) return;
+      if (!element.seeking && !probe.current)
+        setTime(Math.max(0, Math.min(duration, element.currentTime)));
+      frame = requestAnimationFrame(updatePosition);
+    };
+    frame = requestAnimationFrame(updatePosition);
+    return () => cancelAnimationFrame(frame);
+  }, [playing, buffering, ready, duration]);
 
   const readDuration = (element: HTMLVideoElement) => {
     if (!Number.isFinite(element.duration) || element.duration <= 0) return;
@@ -36,11 +50,24 @@ export function useVideoMediaState() {
     },
     onPlay: () => setPlaying(true),
     onPlaying: () => setBuffering(false),
-    onWaiting: () => setBuffering(true),
-    onPause: () => setPlaying(false),
-    onEnded: () => {
+    onWaiting: (event) => {
+      if (!probe.current) setTime(event.currentTarget.currentTime);
+      setBuffering(true);
+    },
+    onPause: (event) => {
+      if (!probe.current) setTime(event.currentTarget.currentTime);
+      setPlaying(false);
+    },
+    onEnded: (event) => {
+      if (!probe.current) setTime(event.currentTarget.currentTime);
       setPlaying(false);
       setBuffering(false);
+    },
+    onSeeking: (event) => {
+      if (!probe.current) setTime(event.currentTarget.currentTime);
+    },
+    onSeeked: (event) => {
+      if (!probe.current) setTime(event.currentTarget.currentTime);
     },
     onVolumeChange: (event) => {
       setVolume(event.currentTarget.volume);

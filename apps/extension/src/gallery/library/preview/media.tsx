@@ -23,6 +23,8 @@ import {
   usePreviewMediaTransitionAnimation,
 } from './usePreviewMediaTransition';
 
+type VideoDurationListener = (itemId: string, src: string, duration: number) => void;
+
 function PreviewNavigationControls({
   navigation,
 }: {
@@ -138,6 +140,7 @@ function PreviewMediaContent(
     prepareVideo?: boolean;
     spacePlayback?: Parameters<typeof PreviewVideo>[0]['spacePlayback'];
     onVideoReady?: (() => void) | undefined;
+    onDuration?: ((duration: number) => void) | undefined;
   }
 ) {
   if (props.isImagePreview) {
@@ -168,6 +171,7 @@ function PreviewMediaContent(
           prepare={props.prepareVideo ?? false}
           {...(props.spacePlayback ? { spacePlayback: props.spacePlayback } : {})}
           onReady={props.onVideoReady}
+          onDuration={props.onDuration}
           onMediaError={props.onMediaError}
         />
       </div>
@@ -237,6 +241,7 @@ function PreviewMediaFrames(
   props: Pick<PreviewPanelProps, 'item' | 'previewUrl' | 'trashMode'> & {
     transition: ReturnType<typeof usePreviewMediaTransition>;
     imageZoom: ReturnType<typeof usePreviewImageZoom>;
+    onVideoDuration?: VideoDurationListener | undefined;
   }
 ) {
   const { transition, imageZoom } = props;
@@ -286,6 +291,10 @@ function PreviewMediaFrames(
               prepareVideo={prepared}
               spacePlayback={prepared ? undefined : transition.pending ? 'blocked' : 'enabled'}
               onVideoReady={prepared ? transition.commitVideo : undefined}
+              onDuration={(duration) => {
+                if (layer.previewUrl)
+                  props.onVideoDuration?.(layer.item.id, layer.previewUrl, duration);
+              }}
             />
           </div>
         );
@@ -306,7 +315,7 @@ export function PreviewMedia(
     | 'onPresented'
     | 'onEdit'
     | 'trashMode'
-  >
+  > & { onVideoDuration?: VideoDurationListener | undefined }
 ) {
   const isMediaItem = isGalleryMediaItem(props.item);
   const isImageTarget =
@@ -392,6 +401,7 @@ export function PreviewMedia(
           transitionRef={transitionRef}
         >
           <PreviewMediaFrames
+            onVideoDuration={props.onVideoDuration}
             transition={transition}
             imageZoom={imageZoom}
             item={props.item}

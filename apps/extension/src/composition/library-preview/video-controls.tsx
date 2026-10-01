@@ -107,22 +107,36 @@ export function VideoControls({
               <Play size={16} aria-hidden />
             )}
           </PlayerButton>
-          <span className="whitespace-nowrap tabular-nums text-[var(--sniptale-color-text-secondary)]">
-            {videoTime(time)} / {videoTime(duration)}
-          </span>
         </div>
         <div
-          className="order-last min-w-0 w-full
-          @min-[760px]/player:order-none @min-[760px]/player:w-auto @min-[760px]/player:flex-1"
+          data-ui="gallery.preview.player.seek-row"
+          className="order-last flex min-w-0 w-full items-center gap-2
+            @min-[760px]/player:order-none @min-[760px]/player:w-auto @min-[760px]/player:flex-1"
         >
-          <VideoTimeline
-            src={src}
-            duration={duration}
-            time={time}
-            ready={ready}
-            seek={seek}
-            playerRef={container}
-          />
+          <div className="min-w-0 flex-1">
+            <VideoTimeline
+              src={src}
+              duration={duration}
+              time={time}
+              ready={ready}
+              seek={seek}
+              playerRef={container}
+            />
+          </div>
+          <span
+            data-ui="gallery.preview.player.time"
+            aria-label={translate(
+              playing ? 'gallery.preview.player.remaining' : 'gallery.preview.player.totalDuration'
+            )}
+            className="w-[9ch] shrink-0 whitespace-nowrap text-right tabular-nums
+              text-[var(--sniptale-color-text-secondary)]"
+          >
+            {ready
+              ? playing
+                ? `−${videoTime(Math.max(0, duration - time))}`
+                : videoTime(duration)
+              : '—'}
+          </span>
         </div>
         <PlaybackSettings video={video} muted={muted} volume={volume} speed={speed} />
         <div className="ml-auto flex shrink-0 items-center gap-1.5">

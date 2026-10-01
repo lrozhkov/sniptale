@@ -671,3 +671,62 @@ it('keeps video project editor action in the inspector, not over the preview', (
   act(() => open[0]?.click());
   expect(props.onEdit).toHaveBeenCalledOnce();
 });
+
+it('shows the exported file duration in the inspector when the catalogue has none', () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+  const item = createItem({
+    kind: 'export',
+    mimeType: 'video/webm',
+    duration: null,
+    source: { kind: 'project-export', exportId: 'legacy', projectId: 'missing' },
+  });
+  renderNode(<PreviewPanel {...createProps({ item, previewUrl: 'blob:legacy-export' })} />);
+  const video = container!.querySelector('video')!;
+  Object.defineProperty(video, 'duration', { configurable: true, value: 4.25 });
+  act(() => {
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('loadeddata'));
+  });
+  expect(container!.querySelector('[data-ui="gallery.preview.inspector"]')?.textContent).toContain(
+    '4.3 gallery.preview.durationSuffix'
+  );
+});
+
+it('keeps decoded duration with its source and never transfers it to the next export', () => {
+  const first = createItem({
+    id: 'export:one',
+    kind: 'export',
+    mimeType: 'video/webm',
+    duration: 100,
+    source: { kind: 'project-export', exportId: 'one', projectId: 'gone' },
+  });
+  renderNode(<PreviewPanel {...createProps({ item: first, previewUrl: 'blob:one' })} />);
+  const firstVideo = container!.querySelector('video')!;
+  Object.defineProperty(firstVideo, 'duration', { configurable: true, value: 4.25 });
+  act(() => {
+    firstVideo.dispatchEvent(new Event('loadedmetadata'));
+    firstVideo.dispatchEvent(new Event('loadeddata'));
+  });
+  const inspector = () =>
+    container!.querySelector('[data-ui="gallery.preview.inspector"]')?.textContent;
+  expect(inspector()).toContain('4.3 gallery.preview.durationSuffix');
+  const second = createItem({
+    id: 'export:two',
+    kind: 'export',
+    mimeType: 'video/webm',
+    duration: null,
+    source: { kind: 'project-export', exportId: 'two', projectId: 'gone' },
+  });
+  renderNode(<PreviewPanel {...createProps({ item: second, previewUrl: 'blob:two' })} />);
+  expect(inspector()).not.toContain('4.3 gallery.preview.durationSuffix');
+  const secondVideo = [...container!.querySelectorAll('video')].at(-1)!;
+  Object.defineProperty(secondVideo, 'duration', { configurable: true, value: 8.5 });
+  act(() => {
+    secondVideo.dispatchEvent(new Event('loadedmetadata'));
+    secondVideo.dispatchEvent(new Event('loadeddata'));
+  });
+  expect(inspector()).toContain('8.5 gallery.preview.durationSuffix');
+  expect(first.duration).toBe(100);
+  expect(second.duration).toBeNull();
+});

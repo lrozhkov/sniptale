@@ -231,6 +231,43 @@ export function PreviewPanel(props: PreviewPanelProps) {
   );
 }
 
+/** Keeps file-derived metadata disposable and scoped to the currently requested material. */
+function usePreviewVideoDuration(
+  item: PreviewPanelProps['item'],
+  previewUrl: string | null,
+  requestRevision: number
+) {
+  const [decodedDuration, setDecodedDuration] = useState<{
+    itemId: string;
+    url: string;
+    requestRevision: number;
+    duration: number;
+  } | null>(null);
+  const handleVideoDuration = useCallback(
+    (itemId: string, url: string, duration: number) => {
+      if (itemId !== item.id || url !== previewUrl || !Number.isFinite(duration) || duration <= 0)
+        return;
+      setDecodedDuration((current) =>
+        current?.itemId === itemId &&
+        current.url === url &&
+        current.requestRevision === requestRevision &&
+        current.duration === duration
+          ? current
+          : { itemId, url, requestRevision, duration }
+      );
+    },
+    [item.id, previewUrl, requestRevision]
+  );
+  const inspectorItem =
+    isGalleryMediaItem(item) &&
+    decodedDuration?.itemId === item.id &&
+    decodedDuration.url === previewUrl &&
+    decodedDuration.requestRevision === requestRevision
+      ? { ...item, duration: decodedDuration.duration }
+      : item;
+  return { inspectorItem, onVideoDuration: handleVideoDuration };
+}
+
 /** Preview-only layout; the parent owns editor mode and keyboard/focus lifecycle. */
 function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
   const { onReview, ...panel } = props;
@@ -243,6 +280,11 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
     url: string | null;
     outcome: 'presented' | 'terminal';
   } | null>(null);
+  const { inspectorItem, onVideoDuration } = usePreviewVideoDuration(
+    item,
+    previewUrl,
+    props.previewRequestRevision ?? 0
+  );
   const handlePresented = useCallback(
     (next: GalleryPreviewPresentation) => {
       setPresentation({ ...next, itemId: item.id });
@@ -325,12 +367,14 @@ function PreviewPanelSurface(props: PreviewPanelProps & { onReview(): void }) {
             previewLoadStatus={props.previewLoadStatus}
             previewRequestRevision={props.previewRequestRevision}
             onPresented={handlePresented}
+            onVideoDuration={onVideoDuration}
             inspectorCollapsed={inspectorCollapsed}
             {...(props.navigation ? { navigation: props.navigation } : {})}
           />
           {inspectorCollapsed ? null : (
             <PreviewPanelSidebar
               {...panel}
+              item={inspectorItem}
               pending={pending}
               {...(!props.trashMode &&
               isGalleryMediaItem(item) &&

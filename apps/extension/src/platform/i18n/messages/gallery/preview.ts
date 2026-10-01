@@ -203,6 +203,9 @@ export const galleryPreviewMessages = defineMessageSource({
   },
   player: {
     play: { ru: 'Воспроизвести', en: 'Play' },
+    playVideo: { ru: 'Воспроизвести видео', en: 'Play video' },
+    remaining: { ru: 'Оставшееся время', en: 'Remaining time' },
+    totalDuration: { ru: 'Длительность видео', en: 'Video duration' },
     pause: { ru: 'Пауза', en: 'Pause' },
     seek: { ru: 'Позиция воспроизведения', en: 'Playback position' },
     volume: { ru: 'Громкость', en: 'Volume' },

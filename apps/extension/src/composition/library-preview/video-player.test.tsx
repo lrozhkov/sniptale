@@ -452,23 +452,24 @@ it('pins actual expanded settings and portal focus until pointer selection close
 
 it('disposes old fullscreen/source deadlines and retains intrinsic and fit video geometry', () => {
   vi.useFakeTimers();
-  const video = mount();
-  const player = fullscreenPlayer();
-  act(() => video.dispatchEvent(new Event('play')));
+  const oldVideo = mount();
+  fullscreenPlayer();
+  act(() => oldVideo.dispatchEvent(new Event('play')));
   advance(1500);
   act(() => root.render(<PreviewVideo src="blob:replacement" />));
-  advance(1000);
-  expect(controlsVisible()).toBe('true');
-  advance(1000);
-  expect(controlsVisible()).toBe('false');
-  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
-  act(() => document.dispatchEvent(new Event('fullscreenchange')));
-  advance();
+  const video = host.querySelector('video')!;
+  expect(video).not.toBe(oldVideo);
+  expect(oldVideo.hasAttribute('src')).toBe(false);
+  advance(2100);
   expect(controlsVisible()).toBe('true');
   expect(video.className).toContain('object-contain');
   expect(video.className).toContain('bg-transparent');
   expect(video.className).not.toContain('bg-black');
-  expect(player.getAttribute('data-fullscreen')).toBe('false');
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+  act(() => document.dispatchEvent(new Event('fullscreenchange')));
+  expect(
+    host.querySelector('[data-ui="gallery.preview.player"]')?.getAttribute('data-fullscreen')
+  ).toBe('false');
   act(() => root.render(null));
   advance();
   expect(host.querySelector('video')).toBeNull();
@@ -563,4 +564,153 @@ it('toggles the same Gallery video once per press, consumes holds and keeps reje
   expect(video.paused).toBe(true);
   expect(action.checked).toBe(false);
   expect(document.activeElement).toBe(action);
+});
+
+it('tracks actual playback position between sparse timeupdate events', () => {
+  vi.useFakeTimers();
+  const video = mount();
+  Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false });
+  act(() => video.dispatchEvent(new Event('play')));
+  video.currentTime = 0.12;
+  act(() => vi.advanceTimersByTime(32));
+  const range = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
+  expect(range.valueAsNumber).toBeCloseTo(0.12, 3);
+});
+
+it('places a stable duration after seek and switches only playing state to remaining time', () => {
+  const video = mount();
+  const clock = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player.time"]')!;
+  const seekRow = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player.seek-row"]')!;
+  expect(seekRow.lastElementChild).toBe(clock);
+  expect(clock.textContent).toBe('0:30');
+  act(() => {
+    video.currentTime = 12;
+    video.dispatchEvent(new Event('timeupdate'));
+    video.dispatchEvent(new Event('play'));
+  });
+  expect(clock.textContent).toBe('−0:18');
+  expect(clock.getAttribute('aria-label')).toBe('gallery.preview.player.remaining');
+  act(() => video.dispatchEvent(new Event('pause')));
+  expect(clock.textContent).toBe('0:30');
+  act(() => root.render(<PreviewVideo src="blob:unknown" />));
+  expect(host.querySelector('[data-ui="gallery.preview.player.time"]')?.textContent).toBe('—');
+});
+
+it('plays through the central keyboard control or fitted free area without bubbling twice', async () => {
+  const video = mount();
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  const central = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.player.centralPlay"]'
+  )!;
+  expect(central.getAttribute('aria-label')).toBe('gallery.preview.player.playVideo');
+  central.focus();
+  expect(document.activeElement).toBe(central);
+  await act(async () => central.click());
+  expect(play).toHaveBeenCalledTimes(1);
+  await act(async () => video.click());
+  expect(play).toHaveBeenCalledTimes(2);
+  act(() => video.dispatchEvent(new Event('play')));
+  expect(host.querySelector('[data-ui="gallery.preview.player.centralPlay"]')).toBeNull();
+  act(() => video.dispatchEvent(new Event('pause')));
+  expect(host.querySelector('[data-ui="gallery.preview.player.centralPlay"]')).not.toBeNull();
+});
+
+it('keeps the central play hidden after intrinsic navigation until a new source opens', async () => {
+  const video = mount();
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  act(() => button('scale').click());
+  const original = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (option) => option.textContent?.includes('gallery.preview.player.original')
+  )!;
+  act(() => original.click());
+  const viewport = host.querySelector<HTMLElement>('[data-ui="gallery.preview.player.viewport"]')!;
+  act(() => {
+    viewport.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 100, clientY: 100 })
+    );
+    viewport.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 60, clientY: 70 })
+    );
+    viewport.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+  });
+  expect(viewport.scrollLeft).toBe(40);
+  expect(viewport.scrollTop).toBe(30);
+  await act(async () => video.click());
+  expect(play).not.toHaveBeenCalled();
+  act(() => button('scale').click());
+  const fit = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find((option) =>
+    option.textContent?.includes('gallery.preview.player.fit')
+  )!;
+  act(() => fit.click());
+  expect(host.querySelector('[data-ui="gallery.preview.player.centralPlay"]')).toBeNull();
+  act(() => root.render(<PreviewVideo src="blob:new-opening" />));
+  const next = host.querySelector('video')!;
+  Object.defineProperty(next, 'duration', { configurable: true, value: 10 });
+  act(() => next.dispatchEvent(new Event('loadedmetadata')));
+  expect(host.querySelector('[data-ui="gallery.preview.player.centralPlay"]')).not.toBeNull();
+});
+
+it('does not play for fitted drag/cancel, prepared video or a blocked transition', async () => {
+  const video = mount();
+  const play = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+  act(() => {
+    video.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 10 }));
+    video.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 30 }));
+    video.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true }));
+  });
+  await act(async () => video.click());
+  expect(play).not.toHaveBeenCalled();
+  act(() => root.render(<PreviewVideo src="blob:clip" spacePlayback="blocked" />));
+  await act(async () => video.click());
+  expect(play).not.toHaveBeenCalled();
+  act(() => root.render(<PreviewVideo src="blob:clip" prepare />));
+  expect(host.querySelector('[data-ui="gallery.preview.player.centralPlay"]')).toBeNull();
+  await act(async () => video.click());
+  expect(play).not.toHaveBeenCalled();
+});
+
+it('stops frame updates on buffering/pause/end and reads seek/rate directly without extrapolation', () => {
+  vi.useFakeTimers();
+  const cancelFrame = vi.spyOn(globalThis, 'cancelAnimationFrame');
+  const video = mount();
+  Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false });
+  const range = host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')!;
+  act(() => video.dispatchEvent(new Event('play')));
+  video.currentTime = 3.2;
+  act(() => vi.advanceTimersByTime(32));
+  expect(range.valueAsNumber).toBeCloseTo(3.2);
+  act(() => video.dispatchEvent(new Event('waiting')));
+  video.currentTime = 5;
+  act(() => vi.advanceTimersByTime(64));
+  expect(range.valueAsNumber).toBeCloseTo(3.2);
+  act(() => video.dispatchEvent(new Event('playing')));
+  act(() => vi.advanceTimersByTime(32));
+  expect(range.valueAsNumber).toBe(5);
+  for (const event of ['pause', 'ended']) {
+    video.currentTime += 0.25;
+    const stoppedAt = video.currentTime;
+    act(() => video.dispatchEvent(new Event(event)));
+    expect(range.valueAsNumber).toBe(stoppedAt);
+    video.currentTime += 1;
+    act(() => vi.advanceTimersByTime(32));
+    expect(range.valueAsNumber).toBe(stoppedAt);
+  }
+  video.playbackRate = 2;
+  video.currentTime = 16;
+  act(() => {
+    video.dispatchEvent(new Event('ratechange'));
+    video.dispatchEvent(new Event('play'));
+  });
+  act(() => vi.advanceTimersByTime(32));
+  expect(range.valueAsNumber).toBe(16);
+  const beforeReplacement = cancelFrame.mock.calls.length;
+  act(() => root.render(<PreviewVideo src="blob:replacement" />));
+  expect(cancelFrame.mock.calls.length).toBeGreaterThan(beforeReplacement);
+  expect(
+    host.querySelector<HTMLInputElement>('[aria-label="gallery.preview.player.seek"]')
+      ?.valueAsNumber
+  ).toBe(0);
+  act(() => root.render(null));
+  act(() => vi.advanceTimersByTime(64));
+  expect(host.querySelector('video')).toBeNull();
 });
