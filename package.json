@@ -166,7 +166,7 @@
     "yaml": "2.9.0"
   },
   "overrides": {
-    "brace-expansion": "^5.0.9",
+    "brace-expansion": "^5.0.12",
     "fast-uri": "^3.1.5",
     "@babel/core": "^7.29.7",
     "js-yaml": "^4.3.0",
@@ -174,7 +174,7 @@
     "esbuild": "^0.28.2",
     "flatted": "^3.4.4",
     "rollup": "^4.62.5",
-    "undici": "^7.24.0",
+    "undici": "^7.29.1",
     "@rollup/pluginutils": {
       "picomatch": "^2.3.2"
     },

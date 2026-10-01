@@ -32,7 +32,7 @@ for (const theme of ['light', 'dark'] as const) {
         .click();
       await panel
         .getByRole('button', {
-          name: new RegExp(ru ? '^Добавить ссылки на слайды' : '^Add slide links'),
+          name: ru ? /^Добавить ссылки на слайды/ : /^Add slide links/,
         })
         .click();
       const rows = panel.locator('.tour-contents-row');

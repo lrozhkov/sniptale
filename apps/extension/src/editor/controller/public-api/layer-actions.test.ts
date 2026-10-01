@@ -5,7 +5,9 @@ const actionMocks = vi.hoisted(() => ({
   renameEditorLayerByIdMock: vi.fn(),
   reorderEditorLayerMock: vi.fn(),
   resizeEditorLayerByIdMock: vi.fn(),
-  selectEditorLayerByIdMock: vi.fn(),
+  selectEditorLayerByIdMock: vi
+    .fn<typeof import('../public-actions').selectEditorLayerById>()
+    .mockReturnValue(true),
   toggleEditorLayerLockStateMock: vi.fn(),
   toggleEditorLayerVisibilityMock: vi.fn(),
 }));
@@ -73,6 +75,7 @@ function createController() {
     prepareObject: vi.fn(),
     sendFrameObjectsToBack: vi.fn(),
     setLastLayerSelectionAnchorId: vi.fn(),
+    switchToSelectTool: vi.fn(),
     setSource: vi.fn(),
     source: { id: 'source' },
     syncRuntimeState: vi.fn(),
@@ -107,15 +110,10 @@ function invokeActionHistoryHandlers(
 }
 
 function invokeSelectionHandlers(
-  handlers: {
-    commitHistory: () => void;
-    ensureObjectReachable: (object: { sniptaleId: string }) => void;
-    focusObjectInViewport: (object: { sniptaleId: string }) => void;
-    syncRuntimeState: () => void;
-  },
+  handlers: Parameters<typeof import('../public-actions').selectEditorLayerById>[0],
   controller: LayerActionController
 ) {
-  const object = { sniptaleId: 'layer-1' };
+  const object = { sniptaleId: 'layer-1' } as never;
 
   handlers.ensureObjectReachable(object);
   handlers.focusObjectInViewport(object);
@@ -225,7 +223,8 @@ it('forwards basic selection and reorder actions into the action seams', async (
   reorderHandlers.sendFrameObjectsToBack();
   invokeActionHistoryHandlers(reorderHandlers, controller);
   expect(controller.sendFrameObjectsToBack).toHaveBeenCalledOnce();
-  invokeSelectionHandlers(selectionHandlers, controller);
+  expect(selectionHandlers).toBeDefined();
+  invokeSelectionHandlers(selectionHandlers!, controller);
 });
 
 it('forwards rename and visibility mutations into the action seams', () => {

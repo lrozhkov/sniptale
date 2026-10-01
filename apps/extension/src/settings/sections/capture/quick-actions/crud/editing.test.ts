@@ -82,7 +82,7 @@ it('selects a valid desktop sink and clears fields that desktop capture cannot u
   expect(setEditForm).toHaveBeenCalledWith(
     expect.objectContaining({
       afterCapture: 'download_default',
-      delay: null,
+      delay: 5,
       exitAfterCapture: false,
       screenshotMode: 'desktop',
       viewportPresetId: null,

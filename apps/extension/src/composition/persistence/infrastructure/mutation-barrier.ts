@@ -40,13 +40,14 @@ export interface PersistenceMutationTransitionLease {
 export interface PersistenceLockManager {
   request<T>(
     name: string,
-    options: { mode: PersistenceLockMode },
-    operation: () => T | Promise<T>
+    options: { mode: PersistenceLockMode; ifAvailable?: boolean },
+    operation: (lock?: unknown) => T | Promise<T>
   ): Promise<T>;
 }
 
 let lockManagerForTests: PersistenceLockManager | null = null;
 const fallbackQueues = new Map<string, Promise<void>>();
+const fallbackExclusiveRequests = new Map<string, number>();
 const activePersistenceMutationPermits = new WeakSet<object>();
 const activePersistenceMutationTransitionPermits = new WeakSet<object>();
 const activeDurableAssetOperationPermits = new WeakSet<object>();
@@ -55,18 +56,28 @@ let heldPersistenceMutationTransitions = 0;
 const fallbackLockManager: PersistenceLockManager = {
   request<T>(
     name: string,
-    _options: { mode: PersistenceLockMode },
-    operation: () => T | Promise<T>
+    options: { mode: PersistenceLockMode; ifAvailable?: boolean },
+    operation: (lock?: unknown) => T | Promise<T>
   ): Promise<T> {
+    if (options.ifAvailable && fallbackExclusiveRequests.has(name))
+      return Promise.resolve(operation(null));
+    if (options.mode === 'exclusive')
+      fallbackExclusiveRequests.set(name, (fallbackExclusiveRequests.get(name) ?? 0) + 1);
     const queue = fallbackQueues.get(name) ?? Promise.resolve();
     const execution = queue.then(operation);
-    fallbackQueues.set(
-      name,
-      execution.then(
-        () => undefined,
-        () => undefined
-      )
+    const settled = execution.then(
+      () => undefined,
+      () => undefined
     );
+    fallbackQueues.set(name, settled);
+    void settled.then(() => {
+      if (options.mode === 'exclusive') {
+        const remaining = (fallbackExclusiveRequests.get(name) ?? 1) - 1;
+        if (remaining) fallbackExclusiveRequests.set(name, remaining);
+        else fallbackExclusiveRequests.delete(name);
+      }
+      if (fallbackQueues.get(name) === settled) fallbackQueues.delete(name);
+    });
     return execution;
   },
 };
@@ -77,6 +88,7 @@ export function installPersistenceLockManagerForTests(
   lockManagerForTests = lockManager;
   if (lockManager === null) {
     fallbackQueues.clear();
+    fallbackExclusiveRequests.clear();
   }
 }
 
@@ -133,6 +145,17 @@ export function runWithPersistenceMutationPermit<T>(
   operation: (permit: PersistenceMutationPermit) => T | Promise<T>
 ): Promise<T> {
   return runWithPersistenceLock('shared', () => runWithActiveMutationPermit(operation));
+}
+
+/** Refuses rather than queues a page-local draft across an active privacy erasure. */
+export function tryRunWithPersistenceMutationPermit<T>(
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T | null> {
+  return getPersistenceLockManager().request(
+    PERSISTENCE_LOCK_NAME,
+    { mode: 'shared', ifAvailable: true },
+    (lock) => (lock === null ? null : runWithActiveMutationPermit(operation))
+  );
 }
 
 /**

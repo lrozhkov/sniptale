@@ -153,7 +153,9 @@ describe('export-manager service branch coverage', () => {
 
     expect(result).toMatchObject({
       success: true,
-      filename: 'empty-transfer.zip',
+      filename: expect.stringMatching(
+        /^Sniptale_page_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.zip$/
+      ),
     });
     expect(buildExportDataMock).not.toHaveBeenCalled();
     expect(createExportStatsMock).toHaveBeenCalledWith(null, 0, 0);

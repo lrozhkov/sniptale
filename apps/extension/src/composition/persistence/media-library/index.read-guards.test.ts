@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   txDelete: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   MEDIA_LIBRARY_STORE: 'media_library',
   THUMBNAILS_STORE: 'thumbnails',
   initDB: mocks.initDB,
@@ -82,7 +83,7 @@ function createDb() {
     put: mocks.put,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({ delete: mocks.txDelete })),
+      objectStore: vi.fn(() => ({ delete: mocks.txDelete, get: mocks.get, put: mocks.put })),
     })),
   };
 }

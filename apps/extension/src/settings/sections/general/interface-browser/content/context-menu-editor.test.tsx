@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createRecommendedContextMenuSettings } from '../../../../../contracts/settings/context-menu-layout';
 import { ContextMenuEditor } from './context-menu-editor';
+import { installPersistenceLockManagerForTests } from '../../../../../composition/persistence/infrastructure/mutation-barrier';
 import { CONTEXT_MENU_PENDING_DRAFT_KEY } from './context-menu-draft-recovery';
 
 let container: HTMLDivElement;
@@ -37,6 +38,7 @@ beforeEach(async () => {
 });
 afterEach(() => {
   act(() => root.unmount());
+  installPersistenceLockManagerForTests(null);
   container.remove();
   window.localStorage.removeItem(CONTEXT_MENU_PENDING_DRAFT_KEY);
   vi.useRealTimers();
@@ -234,4 +236,57 @@ it('retries loading when saved settings are unavailable', async () => {
   expect(container.querySelector('[role="tree"]')).toBeNull();
   await click('Retry loading');
   expect(retry).toHaveBeenCalledOnce();
+});
+
+it('protects page exit during delayed admission and journals before a failed unmount save', async () => {
+  let admit!: () => void;
+  const admission = new Promise<void>((resolve) => {
+    admit = resolve;
+  });
+  installPersistenceLockManagerForTests({
+    async request<T>(_name: string, _options: unknown, operation: () => T | Promise<T>) {
+      await admission;
+      return operation();
+    },
+  });
+  update.mockRejectedValue(new Error('sync unavailable'));
+  await moveDown('section:recommended-screenshots');
+  const exit = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(exit);
+  expect(exit.defaultPrevented).toBe(true);
+  act(() => root.unmount());
+  expect(update).not.toHaveBeenCalled();
+  await act(async () => {
+    admit();
+    await admission;
+  });
+  expect(update).toHaveBeenCalledOnce();
+  expect(window.localStorage.getItem(CONTEXT_MENU_PENDING_DRAFT_KEY)).not.toBeNull();
+  const protectedExit = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(protectedExit);
+  expect(protectedExit.defaultPrevented).toBe(false);
+  root = createRoot(container);
+  await renderEditor();
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain('try again');
+});
+
+it('does not auto-save or flush a draft refused during privacy erasure', async () => {
+  installPersistenceLockManagerForTests({
+    async request<T>(
+      _name: string,
+      _options: unknown,
+      operation: (lock?: unknown) => T | Promise<T>
+    ) {
+      return operation(null);
+    },
+  });
+  await moveDown('section:recommended-screenshots');
+  await settleDebounce();
+  act(() => root.unmount());
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(update).not.toHaveBeenCalled();
+  expect(window.localStorage.getItem(CONTEXT_MENU_PENDING_DRAFT_KEY)).toBeNull();
+  root = createRoot(container);
 });

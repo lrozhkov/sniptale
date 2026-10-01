@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   validateRetainedWebSnapshotScreenshot: vi.fn(),
 }));
 
+vi.mock('../../composition/persistence/media-library/index.library', () => ({
+  getMediaLibraryEntry: vi.fn(async () => null),
+}));
+
 vi.mock('../../features/web-snapshot/screenshot-validation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../features/web-snapshot/screenshot-validation')>()),
   validateRetainedWebSnapshotScreenshot: mocks.validateRetainedWebSnapshotScreenshot,

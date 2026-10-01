@@ -29,7 +29,8 @@ vi.mock('../events/handlers', () => ({
 vi.mock('../events/bridge', () => ({
   createSelectionModeEventsBridge: mocks.createEventsBridge,
 }));
-vi.mock('../interaction/cursor', () => ({
+vi.mock('../interaction/cursor', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../interaction/cursor')>()),
   disableSelectionModeCursor: mocks.disableCursor,
   enableSelectionModeCursor: mocks.enableCursor,
 }));

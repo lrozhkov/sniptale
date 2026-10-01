@@ -12,6 +12,10 @@ const BROWSER_ADAPTER_ALLOWED_FILES = new Set([
   'tooling/test/e2e/extension-smoke/extension-smoke.popup-startup.ts',
   // Security E2E retention proof must observe every real browser storage area directly.
   'tooling/test/e2e/support/security-helpers.ts',
+  // Exact tool-noise: this native fixture executes inside popup.evaluate, where server-side
+  // adapters are unavailable. It grants and observes the real browser tab/message contract.
+  // Remove when this fixture no longer performs browser-context setup directly.
+  'tooling/test/e2e/extension-critical/extension-critical-page-toolbar.helpers.ts',
 ]);
 
 export function normalizeBrowserAdapterPath(relativePath) {

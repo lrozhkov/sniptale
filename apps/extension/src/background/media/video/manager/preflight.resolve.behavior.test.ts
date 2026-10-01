@@ -194,9 +194,9 @@ function registerTabCaptureFailureTest() {
         },
         deps
       )
-    ).resolves.toBeNull();
+    ).rejects.toMatchObject({ code: 'internal-error' });
 
-    expect(notifyStartFailed).toHaveBeenCalledWith('capture failed');
+    expect(notifyStartFailed).not.toHaveBeenCalled();
   });
 }
 

@@ -116,7 +116,7 @@ it('resolves and deletes web snapshot media through the linked package owner', a
 });
 
 it('updates metadata and handles thumbnail helpers through the media library stores', async () => {
-  mocks.get.mockResolvedValueOnce(
+  mocks.txGet.mockResolvedValueOnce(
     createMediaEntry({
       filename: 'old.png',
       id: 'asset-1',
@@ -141,8 +141,7 @@ it('updates metadata and handles thumbnail helpers through the media library sto
   await deleteMediaThumbnail('asset-1');
   await getMediaThumbnail('asset-1');
 
-  expect(mocks.put).toHaveBeenCalledWith(
-    'media_library',
+  expect(mocks.txPut).toHaveBeenCalledWith(
     expect.objectContaining({ filename: 'new.png', tags: ['new'] })
   );
   expect(mocks.put).toHaveBeenCalledWith('thumbnails', thumbnail);

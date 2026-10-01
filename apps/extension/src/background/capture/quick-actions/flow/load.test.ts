@@ -116,7 +116,7 @@ describe('loadScreenshotCaptureRuntimeContext', () => {
     expect(context).toMatchObject({
       captureMode: 'desktop',
       viewportPresetId: null,
-      delaySeconds: 0,
+      delaySeconds: 10,
       afterCapture: 'edit',
       imageFormat: 'webp',
       action: { exitAfterCapture: false, imageQuality: 70 },

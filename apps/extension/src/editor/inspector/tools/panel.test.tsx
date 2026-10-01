@@ -256,7 +256,7 @@ describe('inspector tool panels', () => {
     expect(
       ((cropSection.props.children as React.ReactElement<any>[])[1] as React.ReactElement<any>)
         .props.className
-    ).toBe('grid grid-cols-1 gap-2 sm:grid-cols-2');
+    ).toBe('grid grid-cols-[auto_minmax(0,1fr)] gap-2');
     await act(async () => {
       getRequiredValue(cropButtons[0], 'apply crop button').props.onClick();
       getRequiredValue(cropButtons[1], 'cancel crop button').props.onClick();

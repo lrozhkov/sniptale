@@ -42,7 +42,8 @@ it('opens layer-effects from the hovered layer row actions even when file mode i
   await flushAsyncWork();
 
   const adjustmentsSegment = Array.from(document.querySelectorAll('button')).find(
-    (button) => button.textContent === translate('editor.toolbar.layerEffectsAdjustments')
+    (button) =>
+      button.getAttribute('aria-label') === translate('editor.toolbar.layerEffectsAdjustments')
   );
 
   expect(useEditorStore.getState().inspector).toBe('layer-effects');
@@ -51,5 +52,5 @@ it('opens layer-effects from the hovered layer row actions even when file mode i
   expect(document.body.textContent).toContain('Layer 1');
   expect(document.body.textContent).toContain(translate('editor.layerEffects.brightness'));
   expect(document.body.textContent).toContain(translate('editor.toolbar.layerEffectsApply'));
-  expect(adjustmentsSegment?.getAttribute('aria-haspopup')).toBe('listbox');
+  expect(adjustmentsSegment?.getAttribute('aria-pressed')).toBe('true');
 }, 30000);

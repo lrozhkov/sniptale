@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import {
   TOUR_HINT_SURFACE,
   TOUR_MASK_DEFAULTS,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-// @vitest-environment jsdom
 import { expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
 import { buildTourPlayerBlob, buildTourPlayerHtml, type TourPlayerLabels } from './document';

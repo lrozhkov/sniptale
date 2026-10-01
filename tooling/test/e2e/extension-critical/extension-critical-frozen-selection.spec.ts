@@ -40,7 +40,8 @@ test('timed selection freezes a busy large page and leaves annotation frames res
   await page.evaluate(() => {
     const style = document.createElement('style');
     style.textContent =
-      '#frozen-menu { position: fixed; left: 100px; top: 120px; width: 180px; height: 120px; background: red; z-index: 1 }';
+      '#frozen-menu { position: fixed; left: 100px; top: 120px; width: 180px; ' +
+      'height: 120px; background: red; z-index: 1 }';
     document.head.append(style);
     const menu = document.createElement('button');
     menu.id = 'frozen-menu';
@@ -115,9 +116,11 @@ test('timed selection freezes a busy large page and leaves annotation frames res
       await page.evaluate(() => {
         const style = document.createElement('style');
         style.textContent =
-          '@keyframes popup-fade-in { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }' +
+          '@keyframes popup-fade-in { from { opacity: 0; transform: translateY(10px) } ' +
+          'to { opacity: 1; transform: translateY(0) } }' +
           '@keyframes popup-background { from { background-color: white } to { background-color: gold } }' +
-          '.mwe-popups-fade-in-up { animation: popup-fade-in 8s linear both, popup-background .5s 1.5s linear forwards }';
+          '.mwe-popups-fade-in-up { animation: popup-fade-in 8s linear both, ' +
+          'popup-background .5s 1.5s linear forwards }';
         document.head.append(style);
         const popup = document.createElement('div');
         popup.className =

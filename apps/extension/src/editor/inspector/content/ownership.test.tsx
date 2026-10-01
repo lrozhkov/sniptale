@@ -106,7 +106,7 @@ describe('inspector content panels', () => {
     renderWithController(
       renderEditorInspectorContentBody(
         createContentProps({
-          canvasSize: { height: 600, width: 800 },
+          canvasSize: { height: 1080, width: 1920 },
           cropReady: false,
           inspector: 'canvas-size',
         }) as never,
@@ -116,7 +116,7 @@ describe('inspector content panels', () => {
     );
     await act(async () => {
       Array.from(document.querySelectorAll('button'))
-        .filter((button) => button.textContent?.includes(translate('editor.compact.apply')))
+        .filter((button) => button.textContent === translate('editor.compact.applyCropCanvas'))
         .forEach((button) => button.click());
     });
     expect(controller.resizeCanvas).toHaveBeenCalledWith(1280, 720);

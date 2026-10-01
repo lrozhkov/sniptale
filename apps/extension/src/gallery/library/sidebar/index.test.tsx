@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

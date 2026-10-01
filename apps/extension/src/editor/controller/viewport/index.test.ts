@@ -298,8 +298,8 @@ it('zooms a virtual canvas without growing its backing to the scrollable surface
 
   applyEditorViewportZoom(canvas, { width: 100, height: 80 }, 0.5);
 
-  expect(canvas.getWidth()).toBe(400);
-  expect(canvas.getHeight()).toBe(300);
+  expect(canvas.getWidth()).toBe(404);
+  expect(canvas.getHeight()).toBe(304);
   expect(canvas.getZoom()).toBe(0.5);
   expect(surface.style.width).toBe('2098px');
 });

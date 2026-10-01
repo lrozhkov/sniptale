@@ -2115,7 +2115,10 @@ for (const advanced of [false, true]) {
         await expect(backgroundChoice).toHaveCSS('box-shadow', 'none');
         const inspectorPanel = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
         const labels = inspectorPanel.locator(
-          '[data-ui="shared.ui.compact-inspector.numeric-row"] > span:first-child, [data-ui="shared.ui.compact-inspector.select-field"] > span:first-child'
+          [
+            '[data-ui="shared.ui.compact-inspector.numeric-row"] > span:first-child',
+            '[data-ui="shared.ui.compact-inspector.select-field"] > span:first-child',
+          ].join(', ')
         );
         const fonts = await labels.evaluateAll((nodes) =>
           nodes.map((node) => {
@@ -2569,9 +2572,10 @@ for (const variant of [
   { locale: 'ru' as const, theme: 'light' as const },
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
-  test(`quick editor voiceover strip supports pause and optional cap at HD in ${variant.locale}/${variant.theme}`, async ({
-    page,
-  }, testInfo) => {
+  const testName =
+    `quick editor voiceover strip supports pause and optional cap at HD ` +
+    `in ${variant.locale}/${variant.theme}`;
+  test(testName, async ({ page }, testInfo) => {
     const host = await startHostServer();
     try {
       await page.setViewportSize({ width: 1280, height: 720 });
@@ -2911,7 +2915,9 @@ for (const variant of [
         const probes = document.createElement('div');
         probes.dataset.spaceProbes = '';
         probes.innerHTML =
-          '<input aria-label="Space checkbox probe" type="checkbox"><input aria-label="Space text probe" value="unchanged"><details><summary>Space disclosure probe</summary>Details</details>';
+          '<input aria-label="Space checkbox probe" type="checkbox">' +
+          '<input aria-label="Space text probe" value="unchanged">' +
+          '<details><summary>Space disclosure probe</summary>Details</details>';
         node.append(probes);
       });
       const probes = [

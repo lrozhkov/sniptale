@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
 import { VideoTemporalEasing } from '../../../../../features/video/project/types';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

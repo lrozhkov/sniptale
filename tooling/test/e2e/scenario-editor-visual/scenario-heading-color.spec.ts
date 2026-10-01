@@ -216,7 +216,14 @@ for (const theme of ['light', 'dark'] as const) {
       .evaluate((node) => getComputedStyle(node).backgroundColor);
     const colors = await page
       .locator(
-        '.guide-document .guide-block-grip, .guide-document .guide-block-width, .guide-document .guide-block-height, .guide-document .guide-action-menu-anchor > button, .guide-document .guide-image-tools > button, .guide-voice-control > [data-ui="scenario.voice-input"]'
+        [
+          '.guide-document .guide-block-grip',
+          '.guide-document .guide-block-width',
+          '.guide-document .guide-block-height',
+          '.guide-document .guide-action-menu-anchor > button',
+          '.guide-document .guide-image-tools > button',
+          '.guide-voice-control > [data-ui="scenario.voice-input"]',
+        ].join(', ')
       )
       .evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
     expect(colors.length).toBeGreaterThan(3);

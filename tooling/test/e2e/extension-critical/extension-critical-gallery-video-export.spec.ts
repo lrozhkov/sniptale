@@ -61,7 +61,7 @@ for (const variant of [
       };
       await drag(2.1 / 12, 4.1 / 12);
       const cut = dialog.getByRole('button', {
-        name: new RegExp(`^${label('gallery.videoReview.cutLabel')} ·`),
+        name: variant.locale === 'ru' ? /^Вырезано ·/ : /^Cut ·/,
       });
       await expect(cut).toHaveCount(1);
       await cut.click();
@@ -188,7 +188,7 @@ for (const variant of [
       await button('gallery.videoReview.speedMode').click();
       await drag(4 / 12, 6 / 12);
       const speed = dialog.getByRole('button', {
-        name: new RegExp(`^${label('gallery.videoReview.speedMode')} [0-9]`),
+        name: variant.locale === 'ru' ? /^Скорость [0-9]/ : /^Speed [0-9]/,
       });
       await expect(speed).toHaveCount(1);
       await speed.click();

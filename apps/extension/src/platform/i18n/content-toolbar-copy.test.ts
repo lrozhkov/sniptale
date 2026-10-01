@@ -154,8 +154,8 @@ const FRIENDLY_MAIN_TOOLBAR_COPY = {
     en: 'Close',
   },
   'content.autoBlur.autoApplyEnableHint': {
-    ru: 'Автоматически размывать найденные данные перед каждым снимком',
-    en: 'Automatically blur detected data before every screenshot',
+    ru: 'Автоматически размывать данные перед снимком и закрепить панель во вкладке',
+    en: 'Automatically blur data before capture and pin the toolbar to this tab',
   },
   'content.autoBlur.applyOnce': {
     ru: 'Размыть данные сейчас',

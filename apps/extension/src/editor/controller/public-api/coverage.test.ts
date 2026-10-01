@@ -85,6 +85,7 @@ vi.mock('../layer-effects/raster-mutations/transform', () => ({
 }));
 vi.mock('../history', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../history')>()),
+  readCurrentEditorSnapshot: vi.fn(() => ({ id: 'original' })),
   redoEditorSnapshot: mocks.redoMock,
   undoEditorSnapshot: mocks.undoMock,
 }));
@@ -150,11 +151,12 @@ function createController() {
     ensureObjectReachable: vi.fn(),
     ensureReachableObjects: vi.fn(),
     focusObjectInViewport: vi.fn(),
-    history: { id: 'history' },
+    history: { id: 'history', getState: vi.fn(() => ({ index: 1 })), undo: vi.fn(), redo: vi.fn() },
     logBrowserFrame: vi.fn(),
     nextLabelIndex: vi.fn(() => 2),
     originalDocument: { id: 'original' },
     prepareObject: vi.fn(),
+    publishHistoryDocument: vi.fn(),
     rebuildFrameDecorations: vi.fn(),
     relayoutScene: vi.fn(),
     renderToDataUrl: vi.fn(() => 'rendered'),
@@ -254,15 +256,15 @@ it('bridges document export, render, and history flows', async () => {
   });
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'undo' },
-    { resetHistory: false, updateOriginal: false }
+    { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'redo' },
-    { resetHistory: false, updateOriginal: false }
+    { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
   expect(controller.applyDocument).toHaveBeenCalledWith(
     { id: 'original' },
-    { resetHistory: true, updateOriginal: true }
+    { resetHistory: false, updateOriginal: false, preserveViewport: true }
   );
 });
 

@@ -109,7 +109,7 @@ describe('web snapshot media hub quota boundary', () => {
     verifiesLocalizedWebSnapshotHeadroomFailure
   );
 
-  it('uses the source URL for the snapshot filename when the title is unavailable', async () => {
+  it('uses the shared snapshot naming contract when the title is unavailable', async () => {
     const input = createSavePayload();
     Object.assign(input.payload.manifest.source, {
       faviconUrl: null,
@@ -121,7 +121,11 @@ describe('web snapshot media hub quota boundary', () => {
     await saveWebSnapshotToMediaHub(input);
 
     expect(mocks.saveWebSnapshot).toHaveBeenCalledWith(
-      expect.objectContaining({ filename: 'httpsexample.comdocs.sniptale-page-package.zip' }),
+      expect.objectContaining({
+        filename: expect.stringMatching(
+          /^Sniptale_web-snapshot_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{3}\.sniptale-page-package\.zip$/
+        ),
+      }),
       expect.any(Function)
     );
   });

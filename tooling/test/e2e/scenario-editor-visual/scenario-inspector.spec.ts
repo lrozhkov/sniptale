@@ -493,7 +493,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await expect(segment).toHaveCSS('box-shadow', 'none');
       const valueFonts = await panel
         .locator(
-          '.guide-inspector-choice [role="group"] button[aria-pressed="true"], .guide-inspector-choice [data-ui="shared.ui.compact-select"] > button'
+          [
+            '.guide-inspector-choice [role="group"] button[aria-pressed="true"]',
+            '.guide-inspector-choice [data-ui="shared.ui.compact-select"] > button',
+          ].join(', ')
         )
         .evaluateAll((nodes) =>
           nodes.map((node) => {
@@ -536,8 +539,13 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .locator('.guide-page-header')
         .getByRole('button', { name: ru ? 'Оформление' : 'Appearance', exact: true })
         .click();
-      const parameterLabels =
-        '.guide-number-toggle, .tour-text-field > span:not(.guide-voice-field), [data-ui="shared.ui.compact-inspector.numeric-row"] > span, [data-ui="shared.ui.compact-inspector.color-field"] > span, [data-ui="shared.ui.surface-style-selector"] > div:first-child > span';
+      const parameterLabels = [
+        '.guide-number-toggle',
+        '.tour-text-field > span:not(.guide-voice-field)',
+        '[data-ui="shared.ui.compact-inspector.numeric-row"] > span',
+        '[data-ui="shared.ui.compact-inspector.color-field"] > span',
+        '[data-ui="shared.ui.surface-style-selector"] > div:first-child > span',
+      ].join(', ');
       for (const section of [
         ru ? 'Воспроизведение' : 'Playback',
         ru ? 'Пояснения' : 'Explanations',
@@ -625,7 +633,8 @@ for (const locale of ['ru', 'en'] as const) {
         }, width);
         const layout = panel
           .locator(
-            '.guide-inspector-group:has(> .guide-inspector-group-heading .guide-inspector-static-heading):has(> .guide-inspector-group-body > [data-ui="shared.ui.compact-select"]:only-child)'
+            '.guide-inspector-group:has(> .guide-inspector-group-heading .guide-inspector-static-heading)' +
+              ':has(> .guide-inspector-group-body > [data-ui="shared.ui.compact-select"]:only-child)'
           )
           .first();
         await layout.scrollIntoViewIfNeeded();

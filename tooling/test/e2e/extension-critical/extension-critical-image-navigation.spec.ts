@@ -11,9 +11,10 @@ for (const variant of [
     { width: 400, height: 3200 },
     { width: 1600, height: 1600 },
   ]) {
-    test(`canvas navigation fits and maps ${dimensions.width}/${dimensions.height} at HD ${variant.locale}/${variant.theme}`, async ({
-      page,
-    }, testInfo) => {
+    const testName =
+      `canvas navigation fits and maps ${dimensions.width}/${dimensions.height} ` +
+      `at HD ${variant.locale}/${variant.theme}`;
+    test(testName, async ({ page }, testInfo) => {
       const host = await startHostServer();
       try {
         await page.setViewportSize({ width: 1280, height: 720 });

@@ -2,6 +2,10 @@ import {
   parseContextMenuTree,
   type ContextMenuTree,
 } from '../../../../../contracts/settings/context-menu-layout';
+import {
+  runWithPersistenceMutationPermit,
+  tryRunWithPersistenceMutationPermit,
+} from '../../../../../composition/persistence/infrastructure/mutation-barrier';
 
 export const CONTEXT_MENU_PENDING_DRAFT_KEY = 'sniptale.context-menu.pending-layout';
 
@@ -22,25 +26,38 @@ export function readPendingContextMenuDraft(): ContextMenuTree | null {
   }
 }
 
-export function keepPendingContextMenuDraft(tree: ContextMenuTree): boolean {
+export async function keepPendingContextMenuDraft(tree: ContextMenuTree): Promise<boolean> {
   if (!parseContextMenuTree(tree)) return false;
+  const guardExit = (event: BeforeUnloadEvent) => {
+    event.preventDefault();
+    event.returnValue = '';
+  };
+  window.addEventListener('beforeunload', guardExit);
   try {
-    const storage = draftStorage();
-    if (!storage) return false;
-    storage.setItem(CONTEXT_MENU_PENDING_DRAFT_KEY, JSON.stringify(tree));
-    return true;
+    return Boolean(
+      await tryRunWithPersistenceMutationPermit(() => {
+        const storage = draftStorage();
+        if (!storage) return false;
+        storage.setItem(CONTEXT_MENU_PENDING_DRAFT_KEY, JSON.stringify(tree));
+        return true;
+      })
+    );
   } catch {
     return false;
+  } finally {
+    window.removeEventListener('beforeunload', guardExit);
   }
 }
 
-export function clearPendingContextMenuDraft(expected?: ContextMenuTree): void {
+export async function clearPendingContextMenuDraft(expected?: ContextMenuTree): Promise<void> {
   try {
-    const storage = draftStorage();
-    if (!storage) return;
-    if (expected && storage.getItem(CONTEXT_MENU_PENDING_DRAFT_KEY) !== JSON.stringify(expected))
-      return;
-    storage.removeItem(CONTEXT_MENU_PENDING_DRAFT_KEY);
+    await runWithPersistenceMutationPermit(() => {
+      const storage = draftStorage();
+      if (!storage) return;
+      if (expected && storage.getItem(CONTEXT_MENU_PENDING_DRAFT_KEY) !== JSON.stringify(expected))
+        return;
+      storage.removeItem(CONTEXT_MENU_PENDING_DRAFT_KEY);
+    });
   } catch {
     // A successful sync write is authoritative even if page-local cleanup is unavailable.
   }

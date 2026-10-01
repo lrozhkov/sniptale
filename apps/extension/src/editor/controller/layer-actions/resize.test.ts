@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Rect } from 'fabric';
 import { createBlurObject } from '../../objects/annotation/blur/object';
 
 const mocks = vi.hoisted(() => ({
@@ -133,21 +134,24 @@ function registerStepResizeTest() {
 function registerShapeResizeTest() {
   it('normalizes shape geometry after layer resize without overwriting the radius intent', () => {
     const ensureObjectReachable = vi.fn(() => true);
-    const rectangle = createObject('rectangle-1', {
-      getCenterPoint: () => ({ x: 60, y: 35 }),
-      getScaledHeight: () => 20,
-      getScaledWidth: () => 100,
-      height: 20,
-      left: 10,
-      sniptaleRole: 'annotation',
-      sniptaleShapeRadius: 40,
-      sniptaleType: 'shape',
-      rx: 10,
-      ry: 10,
-      strokeWidth: 2,
-      top: 25,
-      width: 100,
-    }) as Record<string, unknown>;
+    const rectangle = Object.assign(
+      new Rect({
+        width: 100,
+        height: 20,
+        left: 10,
+        top: 25,
+        strokeWidth: 0,
+        strokeUniform: true,
+        rx: 10,
+        ry: 10,
+      }),
+      {
+        sniptaleId: 'rectangle-1',
+        sniptaleRole: 'annotation' as const,
+        sniptaleType: 'shape' as const,
+        sniptaleShapeRadius: 40,
+      }
+    );
 
     mocks.findObjectByIdMock.mockReturnValueOnce(rectangle);
 
