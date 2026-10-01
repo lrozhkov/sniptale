@@ -557,3 +557,20 @@ it('fits the time plane to live CSS width without a resize-observer frame of ove
   expect(plane.style.width).toBe('100%');
   expect(viewport.style.overflowX).toBe('hidden');
 });
+
+it('keeps export navigation last and available while timeline edits are busy', async () => {
+  const onOpenExport = vi.fn();
+  renderTimeline({ busy: true, onOpenExport });
+  const buttons = environment.host!.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.toolbar"] button'
+  );
+  const opener = buttons[buttons.length - 1]!;
+  expect(opener.getAttribute('aria-label')).toBe('gallery.videoReview.exportSection');
+  expect(opener.getAttribute('title')).toBe('gallery.videoReview.exportSection');
+  expect(opener.previousElementSibling?.getAttribute('data-ui')).toBe(
+    'gallery.videoReview.toolbar.separator'
+  );
+  expect(opener.disabled).toBe(false);
+  await act(async () => opener.click());
+  expect(onOpenExport).toHaveBeenCalledOnce();
+});

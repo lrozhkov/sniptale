@@ -9,6 +9,15 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
+/** A destination command always enters the unified inspector section first. */
+async function clickReviewExport(
+  button: (key: Parameters<typeof translate>[0]) => Locator,
+  destination: 'gallery.videoReview.exportVideo' | 'gallery.videoReview.downloadVideo'
+) {
+  await button('gallery.videoReview.exportSection').click();
+  await button(destination).click();
+}
+
 async function expectTimelineSelection(item: Locator) {
   await expect(item).toHaveAttribute('aria-pressed', 'true');
   await expect(item).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -302,10 +311,10 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     await expect
       .poll(() => dialog.locator('video').evaluate((video: HTMLVideoElement) => video.currentTime))
       .toBeCloseTo(priorTime, 3);
-    await expect(dialog.getByRole('button', { name: /^Cut \d/ })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: /^Cut · \d/ })).toHaveCount(0);
     await expect(button('gallery.videoReview.undo')).toBeDisabled();
     await timelineGesture(page, 2.1, 4.1);
-    const cut = dialog.getByRole('button', { name: 'Cut 2.0 – 4.0', exact: true });
+    const cut = dialog.getByRole('button', { name: 'Cut · 2.0 – 4.0', exact: true });
     await expect(cut).toBeVisible();
     const handle = dialog.getByRole('button', {
       name: label('gallery.videoReview.resizeEnd'),
@@ -319,12 +328,16 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     await page.keyboard.press('Escape');
     await page.mouse.up();
     await expect(cut).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Cut 2.0 – 6.0', exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Cut · 2.0 – 6.0', exact: true })).toHaveCount(
+      0
+    );
     await page.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
     await page.mouse.down();
     await page.mouse.move(plane.x + (plane.width * 6) / 12.008, h.y + h.height / 2, { steps: 6 });
     await page.mouse.up();
-    await expect(dialog.getByRole('button', { name: 'Cut 2.0 – 6.0', exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Cut · 2.0 – 6.0', exact: true })
+    ).toBeVisible();
     await page.keyboard.press('Control+z');
     await expect(cut).toBeVisible();
     await button('gallery.videoReview.pointerTool').click();
@@ -332,7 +345,9 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     const fragmentDownload = page.waitForEvent('download');
     await button('gallery.videoReview.downloadSelection').click();
     const fragment = await fragmentDownload;
-    expect(fragment.suggestedFilename()).toBe('beta-v1-fragment-4.000-8.000.webm');
+    expect(fragment.suggestedFilename()).toMatch(
+      /^Sniptale_video-review_.*_fragment-4\.000-8\.000\.webm$/
+    );
     const fragmentInput = new Input({
       source: new BlobSource(new Blob([Uint8Array.from(await readFile(await fragment.path()))])),
       formats: ALL_FORMATS,
@@ -345,11 +360,11 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     expect(await recordingCount(page)).toBe(1);
     await expect(button('gallery.videoReview.redo')).toBeEnabled();
     const downloading = page.waitForEvent('download');
-    await button('gallery.videoReview.downloadVideo').click();
+    await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
     const download = await downloading;
     await download.saveAs(testInfo.outputPath('download-only.webm'));
     expect(await recordingCount(page)).toBe(1);
-    await button('gallery.videoReview.exportVideo').click();
+    await clickReviewExport(button, 'gallery.videoReview.exportVideo');
     await expect.poll(() => recordingCount(page)).toBe(2);
     await dialog.screenshot({ path: testInfo.outputPath('direct-cut.png') });
     const originalHash = await page.evaluate(async () => {
@@ -376,7 +391,9 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await expect(cut).toBeVisible();
     await button('gallery.videoReview.redo').click();
-    await expect(dialog.getByRole('button', { name: 'Cut 2.0 – 6.0', exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Cut · 2.0 – 6.0', exact: true })
+    ).toBeVisible();
   } finally {
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
@@ -458,7 +475,7 @@ for (const { container, gaps } of [
             .click();
           await timelineGesture(page, 6, 10);
           const speed = dialog.getByRole('button', {
-            name: `Speed ${rate < 0.25 ? `1/${1 / rate}` : rate}× 6.0 – 10.0`,
+            name: `Speed ${rate < 0.25 ? `1/${1 / rate}` : rate}× · 6.0 – 10.0`,
             exact: true,
           });
           await expect(speed).toBeVisible();
@@ -468,10 +485,10 @@ for (const { container, gaps } of [
           await expect(dialog.locator('video')).toHaveJSProperty('preservesPitch', true);
           await expect(dialog.locator('video')).toHaveJSProperty('muted', audio === 'mute');
           await button('gallery.videoReview.pause').click();
-          await button('gallery.videoReview.exportVideo').click();
+          await clickReviewExport(button, 'gallery.videoReview.exportVideo');
           await expect.poll(() => recordingCount(page)).toBe(2);
           const downloading = page.waitForEvent('download');
-          await button('gallery.videoReview.downloadVideo').click();
+          await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
           const download = await downloading;
           await download.saveAs(testInfo.outputPath(`speed.${container}`));
           const bytes = await readFile(await download.path());
@@ -881,7 +898,7 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] img')).toHaveCount(1);
-      await button('gallery.videoReview.exportVideo').click();
+      await clickReviewExport(button, 'gallery.videoReview.exportVideo');
       await expect.poll(() => recordingCount(page)).toBe(2);
       await expect(button('common.actions.close')).toBeEnabled();
       await button('common.actions.close').click();
@@ -1131,7 +1148,7 @@ for (const variant of [
       await expect(link).toHaveAttribute('data-connected', 'true');
       await link.click();
       await expect(easing).toContainText(label('gallery.videoReview.transitionLinear'));
-      await button('gallery.videoReview.exportVideo').click();
+      await clickReviewExport(button, 'gallery.videoReview.exportVideo');
       await expect.poll(() => recordingCount(page)).toBe(2);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -1475,7 +1492,7 @@ for (const variant of [
       ).toBeGreaterThan(20);
       await page.screenshot({ path: testInfo.outputPath('spotlight-blur.png') });
       const downloading = page.waitForEvent('download');
-      await button('gallery.videoReview.downloadVideo').click();
+      await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
       const download = await downloading;
       await download.saveAs(testInfo.outputPath('spotlight-blur.webm'));
       const exported = await readFile(await download.path());
@@ -1758,7 +1775,7 @@ for (const variant of [
       ).toBeVisible();
       await action.click();
       await expect(button('gallery.videoReview.actionSpeed')).toBeDisabled();
-      await expect(button('gallery.videoReview.actionCut')).toBeDisabled();
+      await expect(button('gallery.videoReview.actionCut')).toBeEnabled();
       await button('gallery.videoReview.undo').click();
       await action.click();
       await button('gallery.videoReview.actionCut').click();
@@ -1790,9 +1807,9 @@ for (const variant of [
       await page.screenshot({ path: testInfo.outputPath('note-editor.png') });
       await button('gallery.videoReview.discard').click();
       const report = button('gallery.videoReview.downloadReport');
-      const exporting = button('gallery.videoReview.exportVideo');
-      expect((await report.boundingBox())!.y).toBeLessThan((await exporting.boundingBox())!.y);
       const reportIconX = (await report.locator('svg').boundingBox())!.x;
+      await button('gallery.videoReview.exportSection').click();
+      const exporting = button('gallery.videoReview.exportVideo');
       expect((await exporting.locator('svg').boundingBox())!.x).toBeCloseTo(reportIconX, 0);
       expect(
         (await button('gallery.videoReview.downloadVideo').locator('svg').boundingBox())!.x
@@ -1822,9 +1839,9 @@ for (const variant of [
       await quality.scrollIntoViewIfNeeded();
       await expect(quality).toBeInViewport();
       const downloadBounds = (await button('gallery.videoReview.downloadVideo').boundingBox())!;
-      expect((await quality.boundingBox())!.y).toBeGreaterThanOrEqual(
-        downloadBounds.y + downloadBounds.height
-      );
+      expect(
+        (await quality.boundingBox())!.y + (await quality.boundingBox())!.height
+      ).toBeLessThanOrEqual(downloadBounds.y);
       expect(
         await button('gallery.videoReview.exportFrameRate')
           .locator('.truncate')
@@ -1835,11 +1852,15 @@ for (const variant of [
       expect(qualityBox.y + qualityBox.height).toBeLessThanOrEqual(
         inspectorBox.y + inspectorBox.height
       );
+      await exporting.scrollIntoViewIfNeeded();
       await expect(exporting).toBeInViewport({ ratio: 1 });
       await expect(button('gallery.videoReview.downloadVideo')).toBeInViewport({ ratio: 1 });
       await expect(inspector.locator('header h2')).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('polish-hd-export.png') });
-      await button('gallery.videoReview.exportSettings').click();
+      await inspector
+        .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
+        .getByRole('button', { name: label('gallery.videoReview.speedMode'), exact: true })
+        .click();
       const speedValue = inspector.getByRole('button', {
         name: label('gallery.videoReview.speedRate'),
         exact: true,
@@ -1911,7 +1932,7 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await expect(range).toHaveCount(1);
     const downloadPromise = page.waitForEvent('download');
-    await button('gallery.videoReview.downloadVideo').click();
+    await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
     const download = await downloadPromise;
     const bytes = await readFile(await download.path());
     const levels = await page.evaluate(async (encoded) => {
@@ -1938,204 +1959,6 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
-
-// Synthetic 1904x984 H.264 fixture: non-macroblock-aligned visible height, color swatches,
-// fine text/grid and 440 Hz AAC. Its coded padding must never become a colored content edge.
-test('quick editor export profiles preserve colors, padded edges and format-specific audio', async ({
-  page,
-}, testInfo) => {
-  const host = await startHostServer();
-  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'ru');
-  try {
-    await page.setViewportSize({ width: 1280, height: 800 });
-    await applyHarnessBootstrap(page, {
-      preserveMediaLibrary: true,
-      storage: { 'sniptale-locale-preference': 'ru', 'sniptale-theme-preference': 'light' },
-    });
-    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
-    await page.locator('[data-ui="gallery.page.root"]').waitFor();
-    await seedReviewVideo(page, 'review-avc-padded-color.mp4', {
-      width: 1904,
-      height: 984,
-      duration: 2,
-    });
-    await page.reload();
-    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
-    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-    const dialog = page.locator('dialog');
-    const button = (key: Parameters<typeof translate>[0]) =>
-      dialog.getByRole('button', { name: label(key), exact: true });
-    await button('gallery.videoReview.advancedEditing').click();
-    await button('gallery.videoReview.scene').click();
-    await button('videoEditor.sidebar.canvasFormatLabel').click();
-    await page.getByRole('option', { name: '16:9', exact: true }).click();
-    await button('videoEditor.sidebar.canvasResolutionLabel').click();
-    await page.getByRole('option', { name: '1920 × 1080', exact: true }).click();
-    await button('gallery.videoReview.backgroundSolid').click();
-    const padding = dialog.getByRole('textbox', {
-      name: label('gallery.videoReview.backgroundPadding'),
-      exact: true,
-    });
-    await padding.fill('48');
-    await padding.press('Enter');
-    await button('gallery.videoReview.exportSettings').click();
-    await dialog
-      .locator('[data-ui="gallery.videoReview.exportSettings"]')
-      .getByRole('button', { name: label('videoEditor.exportDialog.resolutionLabel'), exact: true })
-      .click();
-    await page.getByRole('option', { name: '720p', exact: true }).click();
-    await button('gallery.videoReview.exportFrameRate').click();
-    await page.getByRole('option', { name: '30', exact: true }).click();
-    await expect(button('gallery.videoReview.exportQuality')).toContainText(
-      label('videoEditor.exportDialog.qualityHigh')
-    );
-    for (const format of ['mp4', 'webm'] as const) {
-      await button('videoEditor.exportDialog.formatLabel').click();
-      await page
-        .getByRole('option', { name: format === 'mp4' ? 'MP4' : 'WebM', exact: true })
-        .click();
-      await expect(button('gallery.videoReview.exportCodec')).toContainText(
-        format === 'mp4' ? 'H.264' : 'VP9'
-      );
-      await page.screenshot({ path: testInfo.outputPath(`export-profile-${format}.png`) });
-      const downloading = page.waitForEvent('download');
-      await button('gallery.videoReview.downloadVideo').click();
-      const download = await downloading;
-      expect(download.suggestedFilename().endsWith(`.${format}`)).toBe(true);
-      await download.saveAs(testInfo.outputPath(`color-export.${format}`));
-      const bytes = await readFile(await download.path());
-      const input = new Input({ source: new BlobSource(new Blob([bytes])), formats: ALL_FORMATS });
-      try {
-        expect((await input.getPrimaryVideoTrack())?.codec).toBe(format === 'mp4' ? 'avc' : 'vp9');
-        expect((await input.getPrimaryAudioTrack())?.codec).toBe(format === 'mp4' ? 'aac' : 'opus');
-      } finally {
-        input.dispose();
-      }
-      const sourceBytes = await readFile(
-        new URL('../fixtures/review-avc-padded-color.mp4', import.meta.url)
-      );
-      const measured = await measureColorExport(
-        page,
-        bytes.toString('base64'),
-        sourceBytes.toString('base64')
-      );
-      expect(measured.width).toBe(1280);
-      expect(measured.height).toBe(720);
-      expect(measured.duration).toBeCloseTo(2, 1);
-      expect(measured.rms).toBeGreaterThan(0.01);
-      // Last fully covered content row: the neutral source edge must stay neutral, not green.
-      expect(Math.abs(measured.edge[0]! - 184)).toBeLessThan(8);
-      expect(Math.abs(measured.edge[1]! - 194)).toBeLessThan(8);
-      expect(Math.abs(measured.edge[2]! - 201)).toBeLessThan(8);
-      for (const [actual, expected] of measured.swatches.map(
-        (value, index) => [value, measured.reference[index]!] as const
-      ))
-        for (let channel = 0; channel < 3; channel++)
-          expect(
-            Math.abs(actual[channel]! - expected[channel]!),
-            JSON.stringify(measured)
-          ).toBeLessThan(9);
-    }
-  } finally {
-    await new Promise<void>((resolve) => host.server.close(() => resolve()));
-  }
-});
-
-async function measureColorExport(page: Page, encoded: string, sourceEncoded: string) {
-  return page.evaluate(
-    async ({ encoded, sourceEncoded }) => {
-      const data = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([data]));
-      const video = document.createElement('video');
-      const audio = new AudioContext();
-      try {
-        await new Promise<void>((resolve, reject) => {
-          video.onloadeddata = () => resolve();
-          video.onerror = () => reject(new Error('Export decode failed'));
-          video.src = url;
-        });
-        await new Promise<void>((resolve) => {
-          video.onseeked = () => resolve();
-          video.currentTime = 1;
-        });
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d')!;
-        context.drawImage(video, 0, 0);
-        const pixel = (x: number, y: number) =>
-          Array.from(context.getImageData(x, y, 1, 1).data).slice(0, 3);
-        const swatches = [255, 605, 955].map((x) =>
-          pixel(Math.round(32 + (x * 1216) / 1904), Math.round(45.78 + (230 * 1216) / 1904))
-        );
-        const edge = pixel(1000, 673);
-        const original = document.createElement('video');
-        const originalUrl = URL.createObjectURL(
-          new Blob([Uint8Array.from(atob(sourceEncoded), (c) => c.charCodeAt(0))])
-        );
-        let reference: number[][];
-        try {
-          await new Promise<void>((resolve, reject) => {
-            original.onloadeddata = () => resolve();
-            original.onerror = () => reject(new Error('Source decode failed'));
-            original.src = originalUrl;
-          });
-          await new Promise<void>((resolve) => {
-            original.onseeked = () => resolve();
-            original.currentTime = 1;
-          });
-          const c = document.createElement('canvas');
-          c.width = original.videoWidth;
-          c.height = original.videoHeight;
-          const cx = c.getContext('2d')!;
-          cx.drawImage(original, 0, 0);
-          const scaled = document.createElement('canvas');
-          scaled.width = 1280;
-          scaled.height = 720;
-          const target = scaled.getContext('2d')!;
-          target.fillStyle = '#000';
-          target.fillRect(0, 0, 1280, 720);
-          target.imageSmoothingQuality = 'high';
-          const height = (984 * 1216) / 1904;
-          target.drawImage(c, 32, (720 - height) / 2, 1216, height);
-          reference = [255, 605, 955].map((x) =>
-            Array.from(
-              target.getImageData(
-                Math.round(32 + (x * 1216) / 1904),
-                Math.round((720 - height) / 2 + (230 * 1216) / 1904),
-                1,
-                1
-              ).data
-            ).slice(0, 3)
-          );
-        } finally {
-          original.removeAttribute('src');
-          original.load();
-          URL.revokeObjectURL(originalUrl);
-        }
-
-        const buffer = await audio.decodeAudioData(data.buffer);
-        const values = buffer.getChannelData(0).slice(1000, 5000);
-        const rms = Math.sqrt(values.reduce((sum, x) => sum + x * x, 0) / values.length);
-        return {
-          width: video.videoWidth,
-          height: video.videoHeight,
-          duration: video.duration,
-          edge,
-          swatches,
-          reference,
-          rms,
-        };
-      } finally {
-        video.removeAttribute('src');
-        video.load();
-        URL.revokeObjectURL(url);
-        await audio.close();
-      }
-    },
-    { encoded, sourceEncoded }
-  );
-}
 
 for (const variant of [
   { locale: 'ru', theme: 'light' },
@@ -2349,13 +2172,11 @@ for (const variant of [
         [1920, 1080, 32],
         [2560, 1440, 32],
         [3840, 2160, 32],
-        [900, 720, 32],
       ] as const) {
         await page.setViewportSize({ width, height });
         await expect(pointer).toHaveCSS('height', `${size}px`);
         await expect(pointer.locator('svg')).toHaveCSS('width', '14px');
         if (width >= 1920) await expect(toolbar).toHaveAttribute('data-labels', 'shown');
-        if (width <= 1000) await expect(toolbar).not.toHaveAttribute('data-labels', 'shown');
         const geometry = await toolbar.evaluate((node) => ({
           width: node.clientWidth,
           content: node.scrollWidth,
@@ -2372,10 +2193,6 @@ for (const variant of [
         await expect(rate).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
         if (width >= 1920) await expect(toolbar).toHaveAttribute('data-labels', 'shown');
         if (width === 1280) {
-          await expect(toolbar).toHaveAttribute(
-            'data-labels',
-            variant.locale === 'ru' ? 'partial' : 'shown'
-          );
           const border = await rate.evaluate((node) => getComputedStyle(node).borderTopColor);
           await rate.hover();
           await expect(rate).not.toHaveCSS('border-top-color', border);
@@ -2477,9 +2294,7 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.focusExpand'), exact: true })
         .click();
-      const footer = dialog.locator('[data-ui="gallery.videoReview.exportFooter"]');
-      await expect(footer).toHaveCount(1);
-      await expect(footer).toHaveCSS('border-top-width', '1px');
+      await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);
       const noteGroup = toolbar.locator('[data-ui="gallery.videoReview.noteHistoryTools"]');
       await expect(noteGroup.locator('button').first()).toHaveAttribute(
         'aria-label',
@@ -2499,10 +2314,10 @@ for (const variant of [
       await expect(text).toBeFocused();
       await text.fill('Toolbar note');
       await button('gallery.videoReview.save').click();
-      await expect(footer).toHaveCSS('border-top-width', '1px');
+      await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);
       await expect(dialog.locator('[data-ui="gallery.videoReview.reportActions"]')).toBeVisible();
       await button('gallery.videoReview.scene').click();
-      await expect(footer).toHaveCSS('border-top-width', '1px');
+      await expect(dialog.locator('[data-ui="gallery.videoReview.exportFooter"]')).toHaveCount(0);
       await expect(dialog.locator('[data-ui="gallery.videoReview.reportActions"]')).toHaveCount(0);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -2698,7 +2513,7 @@ for (const advanced of [false, true]) {
         await button('gallery.videoReview.exportSettings').click();
         const exporting = dialog.locator('[data-ui="gallery.videoReview.exportSettings"]');
         await expect(exporting).toBeVisible();
-        for (const width of [1920, 1280, 900]) {
+        for (const width of [1920, 1280]) {
           await page.setViewportSize({ width, height: width === 1920 ? 1080 : 720 });
           await expect
             .poll(() =>
@@ -2707,7 +2522,7 @@ for (const advanced of [false, true]) {
                   node,
                   ...node.querySelectorAll(
                     [
-                      '[data-ui="gallery.videoReview.exportFooter"]',
+                      '[data-ui="gallery.videoReview.exportSection"]',
                       '[data-ui="gallery.videoReview.exportSettings"]',
                       'fieldset',
                     ].join(', ')

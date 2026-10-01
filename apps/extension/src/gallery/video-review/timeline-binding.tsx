@@ -141,6 +141,7 @@ type TimelineBindingProps = {
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
   onPlay(): void;
+  onOpenExport(): void;
 };
 
 /** Toolbar lock covers every content and presentation control during blocked phases. */
@@ -215,6 +216,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      onOpenExport={props.onOpenExport}
       historyControls={props.historyControls}
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -312,24 +314,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       }}
       time={props.time}
       playing={props.playing}
-      selection={
-        props.advanced.ui.mode !== 'advanced' &&
-        props.editing.cutting &&
-        props.editing.exporter.index &&
-        props.selection.kind === 'range'
-          ? {
-              kind: 'range',
-              start: nearestReviewBoundary(
-                props.selection.start,
-                props.editing.exporter.index.boundaries
-              ),
-              end: nearestReviewBoundary(
-                props.selection.end,
-                props.editing.exporter.index.boundaries
-              ),
-            }
-          : props.selection
-      }
+      selection={reviewTimelineSourceSelection(props)}
       edits={props.edits}
       onEdit={props.editing.select}
       selectedEditId={props.editing.selected?.id}
@@ -347,6 +332,23 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onComment={props.onComment}
     />
   );
+}
+
+/** Basic selection display snaps through the same media boundaries used by edit commits. */
+function reviewTimelineSourceSelection(props: TimelineBindingProps): ReviewAnchor {
+  return props.advanced.ui.mode !== 'advanced' &&
+    props.editing.cutting &&
+    props.editing.exporter.index &&
+    props.selection.kind === 'range'
+    ? {
+        kind: 'range',
+        start: nearestReviewBoundary(
+          props.selection.start,
+          props.editing.exporter.index.boundaries
+        ),
+        end: nearestReviewBoundary(props.selection.end, props.editing.exporter.index.boundaries),
+      }
+    : props.selection;
 }
 
 /** Source-video drawing routes to gain only while its advanced audio capability is available. */

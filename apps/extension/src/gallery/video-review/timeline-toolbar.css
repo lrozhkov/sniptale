@@ -41,6 +41,9 @@
     width: var(--review-toolbar-size) !important;
     padding-inline: 0 !important;
   }
+  .review-timeline-toolbar:not([data-autosave-divider='shown']) [data-compact-only] {
+    display: none;
+  }
   .review-timeline-toolbar[data-layout='compact'] {
     grid-template-columns: auto auto minmax(0, 1fr);
   }

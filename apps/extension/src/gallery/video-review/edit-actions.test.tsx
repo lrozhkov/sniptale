@@ -184,7 +184,7 @@ it('offers independent initial downloads and shows actionable processing failure
   }
 });
 
-it('opens export settings below download without losing export actions and closes them again', () => {
+it('shows expanded export settings before both destination actions', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -214,20 +214,20 @@ it('opens export settings below download without losing export actions and close
         />
       )
     );
-    expect(host.querySelector('input')).toBeNull();
-    const toggle = button('gallery.videoReview.exportSettings');
-    act(() => toggle.click());
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     const settings = host.querySelector('input')!;
+    expect(settings).not.toBeNull();
     expect(
-      button('gallery.videoReview.downloadVideo').compareDocumentPosition(settings) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.exportSettings')}"]`)
+    ).toBeNull();
+    for (const destination of [
+      'gallery.videoReview.exportVideo',
+      'gallery.videoReview.downloadVideo',
+    ] as const)
+      expect(
+        settings.compareDocumentPosition(button(destination)) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     act(() => button('gallery.videoReview.downloadVideo').click());
     expect(onDownload).toHaveBeenCalledOnce();
-    act(() => toggle.click());
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(host.querySelector('input')).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

@@ -125,8 +125,10 @@ function ReviewInspectorBinding({
   onClose,
   fullHeight,
   onToggleHeight,
+  exportRequest,
 }: {
   fullHeight: boolean;
+  exportRequest: number;
   onToggleHeight(): void;
   resource: LoadedReview;
   state: InspectorState;
@@ -149,6 +151,8 @@ function ReviewInspectorBinding({
   return (
     <ReviewInspector
       fullHeight={fullHeight}
+      exportRequest={exportRequest}
+      contextSelection={state.activeSelection}
       onToggleHeight={onToggleHeight}
       filename={resource.filename}
       annotations={snapshot.document.annotations}
@@ -219,32 +223,7 @@ function ReviewInspectorBinding({
       onAdd={state.add}
       onSelect={state.selectComment}
       onHover={state.setHovered}
-      onEdit={(annotation) => {
-        if (state.canStart()) {
-          state.selectComment(annotation);
-          composer.change(annotation, annotation);
-        }
-      }}
-      onDelete={(annotation) => {
-        if (state.canStart())
-          void run(() =>
-            session.commit({
-              id: crypto.randomUUID(),
-              at: Date.now(),
-              target: 'annotation',
-              before: annotation,
-              after: null,
-            })
-          );
-      }}
-      onReport={(action) => {
-        if (busy) return;
-        state.setBusy(true);
-        state.setMessage(null);
-        void exportReviewReport(resource, action, editing.exporter.result?.receipt)
-          .catch(() => state.setMessage(translate('gallery.videoReview.reportFailed')))
-          .finally(() => state.setBusy(false));
-      }}
+      {...reviewInspectorNoteActions(state, resource)}
     >
       <ReviewSelectedProperties
         advanced={state.advanced}
@@ -265,6 +244,42 @@ function ReviewInspectorBinding({
       />
     </ReviewInspector>
   );
+}
+
+/** Note mutations and report feedback share the existing editor action/session authority. */
+function reviewInspectorNoteActions(
+  state: InspectorState,
+  resource: LoadedReview
+): Pick<Parameters<typeof ReviewInspector>[0], 'onEdit' | 'onDelete' | 'onReport'> {
+  const { busy, composer, editing, run, session } = state;
+  return {
+    onEdit: (annotation) => {
+      if (state.canStart()) {
+        state.selectComment(annotation);
+        composer.change(annotation, annotation);
+      }
+    },
+    onDelete: (annotation) => {
+      if (state.canStart())
+        void run(() =>
+          session.commit({
+            id: crypto.randomUUID(),
+            at: Date.now(),
+            target: 'annotation',
+            before: annotation,
+            after: null,
+          })
+        );
+    },
+    onReport: (action) => {
+      if (busy) return;
+      state.setBusy(true);
+      state.setMessage(null);
+      void exportReviewReport(resource, action, editing.exporter.result?.receipt)
+        .catch(() => state.setMessage(translate('gallery.videoReview.reportFailed')))
+        .finally(() => state.setBusy(false));
+    },
+  };
 }
 
 function ReviewCommentComposer({
@@ -353,6 +368,7 @@ function ReviewEditor({
 }) {
   const state = useReviewEditorState(resource);
   const [fullHeight, setFullHeight] = useState(false);
+  const [exportRequest, requestExport] = useState(0);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
@@ -409,6 +425,7 @@ function ReviewEditor({
           />
         </main>
         <ReviewInspectorBinding
+          exportRequest={exportRequest}
           fullHeight={fullHeight}
           onToggleHeight={() => setFullHeight((value) => !value)}
           resource={resource}
@@ -427,6 +444,7 @@ function ReviewEditor({
           }
         >
           <ReviewTimelineBinding
+            onOpenExport={() => requestExport((value) => value + 1)}
             historyControls={<ReviewHistoryControlBinding state={state} />}
             editing={editing}
             edits={snapshot.document.edits}

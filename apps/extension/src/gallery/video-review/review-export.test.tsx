@@ -108,24 +108,41 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await dragTimePlane(fixture.host, 200, 200);
     await fixture.click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.button('exportVideo').disabled).toBe(false);
     const target = () => fixture.host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]');
     const preview = fixture.host.querySelector<HTMLCanvasElement>(
       '[data-ui="gallery.videoReview.zoomPreview"] canvas'
     )!;
     expect(target()).not.toBeNull();
     expect(preview.tabIndex).toBe(0);
+    await fixture.click('exportSection');
+    expect(fixture.button('exportVideo').disabled).toBe(false);
     await fixture.click('exportVideo');
     expect(integration.export).toHaveBeenCalledOnce();
     expect(target()).toBeNull();
-    expect(preview.tabIndex).toBe(-1);
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-ui="gallery.videoReview.inspectorNavigation"] button[title="gallery.videoReview.zoomRegionLabel"]'
+        )!
+        .click()
+    );
+    const disabledPreview = fixture.host.querySelector<HTMLCanvasElement>(
+      '[data-ui="gallery.videoReview.zoomPreview"] canvas'
+    )!;
+    expect(disabledPreview.tabIndex).toBe(-1);
+    expect(target()).toBeNull();
+    expect(fixture.button('exportSection').disabled).toBe(false);
+    await fixture.click('exportSection');
+    expect(fixture.button('cancelExport').disabled).toBe(false);
     expect(fixture.button('undo').disabled).toBe(true);
     for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack'])
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();
     await act(async () =>
-      preview.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      disabledPreview.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+      )
     );
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(integration.commit).not.toHaveBeenCalled();

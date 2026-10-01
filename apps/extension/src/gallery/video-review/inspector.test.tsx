@@ -156,19 +156,13 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     await act(async () => render(false, 'comments'));
     expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
     await act(async () => render(true, 'settings:none:'));
-    expect(host.querySelectorAll('[data-ui="gallery.videoReview.exportFooter"]')).toHaveLength(1);
-    expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')?.className).toContain(
-      'border-t'
-    );
+    expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
     expect(
       host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
     ).not.toBeNull();
-    expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')?.className).toContain(
-      'border-t'
-    );
     expect(host.textContent).toContain('Selected controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
     const tabs = () =>
@@ -196,6 +190,79 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.textContent).not.toContain('Selected controls');
     expect(host.textContent).not.toContain('Scene controls');
     expect(host.querySelector('[aria-label="gallery.videoReview.inspector"]')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('consumes export requests once and returns to the same selected edit', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  let selection = { kind: 'edit' as const, id: 'cut-1' };
+  const render = (request: number, busy = false) =>
+    root.render(
+      <ReviewInspector
+        filename="clip.webm"
+        annotations={[]}
+        selectedId={null}
+        busy={busy}
+        message={null}
+        onBack={vi.fn()}
+        onAdd={vi.fn()}
+        onSelect={vi.fn()}
+        onHover={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onReport={vi.fn()}
+        contextKey="edit:cut-1"
+        contextSelection={selection}
+        selectionLabel="Cut"
+        settingsAvailable
+        exportRequest={request}
+        actions={
+          <label>
+            Quality
+            <input defaultValue="high" />
+          </label>
+        }
+        scene={<p>Scene controls</p>}
+      >
+        <p>Cut controls</p>
+      </ReviewInspector>
+    );
+  try {
+    await act(async () => render(0));
+    expect(host.textContent).toContain('Cut controls');
+    await act(async () => render(1));
+    const exporting = () => host.querySelector('[data-ui="gallery.videoReview.exportSection"]');
+    expect(exporting()).not.toBeNull();
+    expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
+    expect(host.querySelector('.review-inspector-scroll')?.contains(exporting())).toBe(true);
+    await act(async () => render(1, true));
+    expect(exporting()).not.toBeNull();
+    selection = { kind: 'edit', id: 'cut-1' };
+    await act(async () => render(1));
+    expect(exporting()).toBeNull();
+    expect(host.textContent).toContain('Cut controls');
+    await act(async () => render(2));
+    expect(exporting()).not.toBeNull();
+    const scene = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.inspector"] button[title="gallery.videoReview.scene"]'
+    )!;
+    await act(async () => scene.click());
+    expect(host.textContent).toContain('Scene controls');
+    await act(async () => render(2, true));
+    expect(exporting()).toBeNull();
+    const tab = Array.from(
+      host.querySelectorAll<HTMLButtonElement>(
+        '[aria-label="gallery.videoReview.inspector"] button'
+      )
+    ).find((button) => button.textContent === 'gallery.videoReview.exportSettings')!;
+    expect(tab.disabled).toBe(false);
+    await act(async () => tab.click());
+    expect(exporting()).not.toBeNull();
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

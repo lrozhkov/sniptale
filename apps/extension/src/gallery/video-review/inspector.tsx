@@ -19,7 +19,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
-import type { ReviewAnnotation } from '../../features/video/review/types';
+import type { ReviewAnnotation, ReviewSelection } from '../../features/video/review/types';
 import {
   ReviewButton,
   reviewTimeLabel,
@@ -56,43 +56,15 @@ export function ReviewInspector(props: {
   composer?: ReactNode;
   editingId?: string | undefined;
   contextKey?: string;
+  contextSelection?: ReviewSelection;
+  exportRequest?: number;
   settingsAvailable?: boolean;
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  const [presentation, setPresentation] = useState<'all' | 'sections'>('all');
-  const contextKey = props.contextKey ?? 'comments';
-  type Section = 'scene' | 'selected' | 'comments';
-  const contextSection: Section = contextKey.startsWith('comments')
-    ? 'comments'
-    : props.selectionLabel
-      ? 'selected'
-      : props.settingsAvailable
-        ? 'scene'
-        : 'comments';
-  const [section, setSection] = useState<Section>(contextSection);
-  const scroll = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (scroll.current) scroll.current.scrollTop = 0;
-  }, [contextKey, section, presentation]);
-  const previousSettings = useRef(props.settingsAvailable);
-  useEffect(() => {
-    const modeChanged = previousSettings.current !== props.settingsAvailable;
-    previousSettings.current = props.settingsAvailable;
-    setSection((current) =>
-      !modeChanged && contextSection === 'scene' && current === 'comments'
-        ? current
-        : contextSection
-    );
-  }, [contextKey, contextSection, props.settingsAvailable]);
-  const shown =
-    section === 'selected' && !props.selectionLabel
-      ? props.settingsAvailable
-        ? 'scene'
-        : 'comments'
-      : section === 'scene' && !props.settingsAvailable
-        ? 'comments'
-        : section;
+  type Section = 'scene' | 'selected' | 'comments' | 'export';
+  const { presentation, setPresentation, shown, setSection, scroll } =
+    useReviewInspectorNavigation(props);
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
@@ -120,7 +92,7 @@ export function ReviewInspector(props: {
         </p>
       </div>
       <ReviewInspectorStatus {...props} />
-      {props.settingsAvailable || props.selectionLabel ? (
+      {props.settingsAvailable || props.selectionLabel || props.actions ? (
         <div
           className="review-inspector-navigation shrink-0"
           data-ui="gallery.videoReview.inspectorNavigation"
@@ -137,6 +109,14 @@ export function ReviewInspector(props: {
               ...(props.selectionLabel
                 ? [{ id: 'selected' as const, label: props.selectionLabel }]
                 : []),
+              ...(props.actions
+                ? [
+                    {
+                      id: 'export' as const,
+                      label: translate('gallery.videoReview.exportSettings'),
+                    },
+                  ]
+                : []),
             ]}
             onChange={setSection}
           />
@@ -151,7 +131,14 @@ export function ReviewInspector(props: {
           section={shown}
           selectionScope={props.selectionPreferenceScope}
         >
-          {shown === 'scene' ? (
+          {shown === 'export' ? (
+            <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
+              <h3 className="text-sm font-semibold">
+                {translate('gallery.videoReview.exportSettings')}
+              </h3>
+              {props.actions}
+            </section>
+          ) : shown === 'scene' ? (
             props.scene
           ) : shown === 'selected' ? (
             props.children
@@ -163,6 +150,57 @@ export function ReviewInspector(props: {
       <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
     </aside>
   );
+}
+
+/** Owns transient inspector navigation and the scroll reset for each explicit view change. */
+function useReviewInspectorNavigation(props: Parameters<typeof ReviewInspector>[0]) {
+  const [presentation, setPresentation] = useState<'all' | 'sections'>('all');
+  const contextKey = props.contextKey ?? 'comments';
+  type Section = 'scene' | 'selected' | 'comments' | 'export';
+  const contextSection: Section = contextKey.startsWith('comments')
+    ? 'comments'
+    : props.selectionLabel
+      ? 'selected'
+      : props.settingsAvailable
+        ? 'scene'
+        : 'comments';
+  const [section, setSection] = useState<Section>(contextSection);
+  const scroll = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (scroll.current) scroll.current.scrollTop = 0;
+  }, [contextKey, section, presentation]);
+  const previousSettings = useRef(props.settingsAvailable);
+  const previousExportRequest = useRef(0);
+  const exportAvailable = !!props.actions;
+  useEffect(() => {
+    const modeChanged = previousSettings.current !== props.settingsAvailable;
+    previousSettings.current = props.settingsAvailable;
+    const exportRequested = previousExportRequest.current !== (props.exportRequest ?? 0);
+    previousExportRequest.current = props.exportRequest ?? 0;
+    setSection((current) =>
+      exportRequested && exportAvailable
+        ? 'export'
+        : !modeChanged && contextSection === 'scene' && current === 'comments'
+          ? current
+          : contextSection
+    );
+  }, [
+    contextKey,
+    contextSection,
+    props.settingsAvailable,
+    props.contextSelection,
+    props.exportRequest,
+    exportAvailable,
+  ]);
+  const shown =
+    section === 'selected' && !props.selectionLabel
+      ? props.settingsAvailable
+        ? 'scene'
+        : 'comments'
+      : section === 'scene' && !props.settingsAvailable
+        ? 'comments'
+        : section;
+  return { presentation, setPresentation, shown, setSection, scroll };
 }
 
 /** Saved timeline comments with hover, select, and row actions. */
@@ -243,7 +281,7 @@ function ReviewAnnotationList(props: {
   );
 }
 
-/** Reports remain above the export divider; all footer commands have readable labels. */
+/** Comment reports retain their own commands; export belongs to the inspector section. */
 function ReviewInspectorFooter(
   props: Parameters<typeof ReviewInspector>[0] & { showReports: boolean }
 ) {
@@ -271,12 +309,6 @@ function ReviewInspectorFooter(
           </ReviewButton>
         </div>
       ) : null}
-      <div
-        data-ui="gallery.videoReview.exportFooter"
-        className="border-t border-[var(--sniptale-color-border-soft)] pt-2"
-      >
-        {props.actions}
-      </div>
     </div>
   );
 }
@@ -336,7 +368,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    section: 'scene' | 'selected' | 'comments';
+    section: 'scene' | 'selected' | 'comments' | 'export';
     onTogglePresentation(): void;
   }
 ) {

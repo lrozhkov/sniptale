@@ -14,6 +14,7 @@ import {
   Undo2,
   Redo2,
   StickyNote,
+  FileVideo,
 } from 'lucide-react';
 import { useState, type ReactNode, type CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
@@ -75,6 +76,7 @@ export function ReviewToolbar(props: {
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
+  onOpenExport?: (() => void) | undefined;
   navigation: { start: number; end: number };
   onNavigate(time: number): void;
   zoom: number;
@@ -163,6 +165,21 @@ export function ReviewToolbar(props: {
         >
           <BetweenHorizontalStart size={16} strokeWidth={2} />
         </ReviewButton>
+        {props.onOpenExport ? (
+          <>
+            <ReviewToolbarSeparator />
+            <ReviewButton
+              data-ui="gallery.videoReview.openExport"
+              label={translate('gallery.videoReview.exportSection')}
+              toolbarLabel={translate('gallery.videoReview.exportSection')}
+              toolbarPriority={3}
+              className={plain}
+              onClick={props.onOpenExport}
+            >
+              <FileVideo size={16} aria-hidden="true" />
+            </ReviewButton>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -200,6 +217,7 @@ export function ReviewHistoryControls(props: {
           <StickyNote size={16} aria-hidden="true" />
         </ReviewButton>
       ) : null}
+      {props.onAddNote ? <ReviewToolbarSeparator /> : null}
       {(['undo', 'redo'] as const).map((direction) => (
         <ReviewButton
           key={direction}
@@ -224,17 +242,18 @@ export function ReviewHistoryControls(props: {
         <>
           <ReviewToolbarSeparator />
           <ReviewAutosaveControl {...props.autosave} />
-          <ReviewToolbarSeparator />
+          <ReviewToolbarSeparator compactOnly />
         </>
       )}
     </>
   );
 }
 
-function ReviewToolbarSeparator() {
+function ReviewToolbarSeparator({ compactOnly = false }: { compactOnly?: boolean }) {
   return (
     <span
       data-ui="gallery.videoReview.toolbar.separator"
+      data-compact-only={compactOnly || undefined}
       aria-hidden="true"
       className="mx-1 h-4 w-px shrink-0 self-center bg-[var(--sniptale-color-border-soft)]"
     />

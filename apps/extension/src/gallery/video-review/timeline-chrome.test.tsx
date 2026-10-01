@@ -19,6 +19,7 @@ it('groups compact history and autosave with equal short separators', () => {
     cursor: 0,
     length: 0,
     onHistory: vi.fn(),
+    onAddNote: vi.fn(),
     autosave: {
       enabled: true,
       error: null,
@@ -40,7 +41,15 @@ it('groups compact history and autosave with equal short separators', () => {
       'gallery.videoReview.toolbar.separator'
     );
     const separators = host.querySelectorAll('[data-ui="gallery.videoReview.toolbar.separator"]');
-    expect(separators).toHaveLength(2);
+    expect(separators).toHaveLength(3);
+    expect(autosave.nextElementSibling?.getAttribute('data-compact-only')).toBe('true');
+    const note = host.querySelector('[aria-label="gallery.videoReview.addComment"]')!;
+    expect(note.nextElementSibling?.getAttribute('data-ui')).toBe(
+      'gallery.videoReview.toolbar.separator'
+    );
+    expect(note.nextElementSibling?.nextElementSibling?.getAttribute('aria-label')).toBe(
+      'gallery.videoReview.undo'
+    );
     for (const separator of separators) {
       expect(separator.classList.contains('h-4')).toBe(true);
       expect(separator.classList.contains('self-center')).toBe(true);

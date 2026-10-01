@@ -42,6 +42,7 @@ type TimelineProps = {
   onClearSelection?(): void;
   onSelect(value: ReviewAnchor): void;
   onPlay(): void;
+  onOpenExport?: (() => void) | undefined;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
 };
