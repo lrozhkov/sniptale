@@ -3,6 +3,7 @@ import { test } from '../support/extension-fixture';
 import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-visual.helpers';
 
 async function pointAt(page: Page, target: Locator) {
+  await target.scrollIntoViewIfNeeded();
   const box = await target.boundingBox();
   if (!box) throw new Error('Missing hover target');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -13,7 +14,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 900 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
     await page.clock.install({ time: new Date('2026-09-12T12:00:00Z') });
     await page.clock.pauseAt(new Date('2026-09-12T12:00:01Z'));
     const image = page.locator('article#compare .guide-image-surface').first();
@@ -77,9 +78,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await pointAt(page, image);
     await page.clock.runFor(50);
     const insertion = page.locator('.guide-insertion-item[data-insert-before="compare"]');
-    const boundary = await insertion.boundingBox();
+    await insertion.scrollIntoViewIfNeeded();
+    const boundary = await insertion.locator('.guide-insertion-chrome').boundingBox();
     if (!boundary) throw new Error('Missing insertion boundary');
-    await page.mouse.move(boundary.x + boundary.width / 2 + 70, boundary.y + 10);
+    await page.mouse.move(boundary.x + boundary.width / 2 + 70, boundary.y + boundary.height / 2);
     await page.clock.runFor(50);
     await expect(insertion).toHaveAttribute('data-guide-hover', '');
     await expect(insertion.locator('.guide-insertion-chrome')).toHaveCSS('pointer-events', 'auto');
@@ -95,7 +97,7 @@ test('touch exposes contextual controls without waiting for pointer intent', asy
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 900 });
+  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 720 });
   const session = await page.context().newCDPSession(page);
   await session.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
   await expect.poll(() => page.evaluate(() => matchMedia('(hover: none)').matches)).toBe(true);

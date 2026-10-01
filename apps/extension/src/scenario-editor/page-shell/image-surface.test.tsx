@@ -340,3 +340,25 @@ it('commits a constrained extreme resize with the fit shown in preview', async (
     frame: { width: 1, height: 600 },
   });
 });
+
+it('keeps the image toolbar inside the viewport and isolates it from pan and arrow gestures', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  const toolbar = element.querySelector('.guide-image-tools')!;
+  expect(toolbar).not.toBeNull();
+  const command = toolbar.querySelector('button')!;
+  await pointer(command, 'pointerdown', 5, 5);
+  await pointer(element, 'pointermove', 40, 30);
+  await pointer(element, 'pointerup', 40, 30);
+  await act(async () =>
+    command.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(change).not.toHaveBeenCalled();
+  expect(HTMLElement.prototype.setPointerCapture).not.toHaveBeenCalled();
+  await act(async () =>
+    command.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(host.querySelector('.guide-image-surface')?.getAttribute('data-editing')).toBe('false');
+  expect(document.activeElement).toBe(host.querySelector('[data-frame-image]'));
+});

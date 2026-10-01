@@ -81,7 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('document voice fields keep dictation controls clear of editable text', async ({
+test('document dictation controls overlay prose without changing content flow', async ({
   page,
   hostOrigin,
 }) => {
@@ -101,6 +101,8 @@ test('document voice fields keep dictation controls clear of editable text', asy
       results[`${input.getAttribute('aria-label') ?? input.tagName}#${index++}`] = {
         rightInset: fieldRect.right - controlRect.right,
         paddingRight: parseFloat(getComputedStyle(input).paddingRight),
+        paddingLeft: parseFloat(getComputedStyle(input).paddingLeft),
+        prose: input.tagName === 'TEXTAREA' ? 1 : 0,
         controlWidth: controlRect.width,
         inside:
           controlRect.top >= fieldRect.top - 1 && controlRect.bottom <= fieldRect.bottom + 1
@@ -114,9 +116,15 @@ test('document voice fields keep dictation controls clear of editable text', asy
   expect(Object.keys(metrics).length, 'document exposes voice fields').toBeGreaterThan(0);
   for (const [label, metric] of Object.entries(metrics)) {
     expect.soft(metric.inside, `${label}: controls stay inside the field`).toBe(1);
-    expect
-      .soft(metric.paddingRight, `${label}: field padding reserves the control strip`)
-      .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
+    if (metric.prose) {
+      expect
+        .soft(metric.paddingRight, `${label}: overlay does not narrow prose`)
+        .toBe(metric.paddingLeft);
+    } else {
+      expect
+        .soft(metric.paddingRight, `${label}: title retains its control strip`)
+        .toBeGreaterThanOrEqual(metric.controlWidth + metric.rightInset);
+    }
   }
   issues.assertClean();
 });

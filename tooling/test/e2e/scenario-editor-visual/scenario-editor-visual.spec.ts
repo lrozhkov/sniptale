@@ -1025,12 +1025,12 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
 }
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
-  test(`dictation controls stay outside text and block actions in ${theme}`, async ({
+  test(`dictation controls overlay prose beside block actions in ${theme}`, async ({
     page,
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 900 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
     const field = page.locator('article#compare textarea.guide-description').first();
     await field.focus();
     const wrapper = field.locator('..');
@@ -1047,21 +1047,25 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .querySelector('.guide-block-actions')!
         .getBoundingClientRect();
       return {
-        contentRight: text.right - parseFloat(getComputedStyle(node).paddingRight),
+        paddingRight: parseFloat(getComputedStyle(node).paddingRight),
+        paddingLeft: parseFloat(getComputedStyle(node).paddingLeft),
+        contentTop: text.top,
+        micTop: mic.top,
         micLeft: mic.left,
         micRight: mic.right,
         actionsLeft: actions.left,
       };
     });
-    expect(geometry.contentRight).toBeLessThanOrEqual(geometry.micLeft);
+    expect(geometry.paddingRight).toBe(geometry.paddingLeft);
+    expect(geometry.micTop - geometry.contentTop).toBeLessThanOrEqual(6);
     expect(geometry.micRight).toBeLessThanOrEqual(geometry.actionsLeft);
     await expect(field).toBeFocused();
     await testInfo.attach(`dictation-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.setViewportSize({ width: 1024, height: 640 });
-    // At this width the existing inspector is an overlay; dismiss it before editing.
+    await page.setViewportSize({ width: 1280, height: 720 });
+    // Dismissing the inspector keeps the same overlay geometry at the supported minimum.
     await page.locator('.guide-inspector-panel .guide-panel-heading button').first().click();
     await field.focus();
     await microphone.click({ trial: true, timeout: 5000 });
