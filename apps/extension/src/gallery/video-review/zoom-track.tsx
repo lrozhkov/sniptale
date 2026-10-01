@@ -81,6 +81,7 @@ function zoomDragRange(args: {
   /** Result-time candidates: projected edit/boundary edges plus the playhead. */
   snapEdges: readonly number[];
   regions: readonly QuickEditZoomRegion[];
+  projection?: ReviewTrackProjection | undefined;
 }): { start: number; end: number; guide: number | null } {
   const { region, duration } = args;
   const threshold = args.bypass ? 0 : (SNAP_THRESHOLD_PX * duration) / args.widthPx;
@@ -123,10 +124,10 @@ function zoomDragRange(args: {
       regions: args.regions,
       id: region.id,
       edge: 'start',
-      time: snap.time,
+      time: Math.min(snap.time, region.end - zoomTrimMinimum(args, 'start')),
       timelineDuration: duration,
     });
-    return { ...range, guide: snap.candidate };
+    return { ...range, guide: snap.candidate === range.start ? snap.candidate : null };
   }
   const requestedEnd = region.end + args.delta;
   const snapEnd = snapTimelineTime(requestedEnd, candidates, threshold);
@@ -134,10 +135,36 @@ function zoomDragRange(args: {
     regions: args.regions,
     id: region.id,
     edge: 'end',
-    time: snapEnd.time,
+    time: Math.max(snapEnd.time, region.start + zoomTrimMinimum(args, 'end')),
     timelineDuration: duration,
   });
-  return { ...rangeEnd, guide: snapEnd.candidate };
+  return { ...rangeEnd, guide: snapEnd.candidate === rangeEnd.end ? snapEnd.candidate : null };
+}
+
+/** Keep both grips usable without extending an already shorter authored region. */
+function zoomTrimMinimum(
+  args: {
+    region: QuickEditZoomRegion;
+    duration: number;
+    widthPx: number;
+    projection?: ReviewTrackProjection | undefined;
+  },
+  edge: 'start' | 'end'
+): number {
+  const { region, projection } = args;
+  const sourceDuration = projection?.duration ?? args.duration;
+  const widthTime = (24 * sourceDuration) / args.widthPx;
+  const fixed =
+    edge === 'start'
+      ? (projection?.source(region.end, 'end') ?? region.end)
+      : (projection?.source(region.start) ?? region.start);
+  const sourceLimit = Math.max(
+    0,
+    Math.min(sourceDuration, fixed + (edge === 'start' ? -widthTime : widthTime))
+  );
+  const limit = projection?.output(sourceLimit) ?? sourceLimit;
+  const minimum = edge === 'start' ? region.end - limit : limit - region.start;
+  return Math.max(0.001, Math.min(region.end - region.start, minimum));
 }
 
 /** Zoom regions on their own lane; drags snap to shared candidates and never overlap. */
@@ -442,6 +469,7 @@ function ReviewZoomRegionBlock(
           region,
           duration,
           widthPx: current.width,
+          projection: props.projection,
           bypass: event.shiftKey,
           snapEdges,
           regions: props.regions,
@@ -487,6 +515,7 @@ function ReviewZoomRegionBlock(
         <span
           key={edge}
           data-zoom-edge={edge}
+          style={{ maxWidth: '50%' }}
           className={`${reviewTimelineResizeHandleClassName}
               ${edge === 'start' ? 'left-0' : 'right-0'}`}
         >

@@ -393,3 +393,52 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
     await fixture.cleanup();
   }
 });
+
+it('shows repeated source-audio placement failures in the inspector while preserving timeline selection', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: 'opus',
+    processedAudioCodec: 'opus',
+    container: 'webm',
+    rotation: 0,
+  });
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('originalAudioRange');
+    await dragRange(fixture.host);
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    const timeline = fixture.host.querySelector('[data-ui="gallery.videoReview.timeline"]')!;
+    await fixture.click('originalAudioRange');
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await dragRange(fixture.host, { start: 120, end: 180 });
+      expect(fixture.host.querySelector('aside')?.textContent).toContain(
+        'gallery.videoReview.originalAudioOverlap'
+      );
+      expect(timeline.textContent).not.toContain('gallery.videoReview.originalAudioOverlap');
+      expect(timeline.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).not.toBeNull();
+      expect(
+        timeline.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
+      ).toHaveLength(1);
+    }
+    vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('playback'));
+    await fixture.click('play');
+    expect(fixture.host.querySelector('aside')?.textContent).toContain(
+      'gallery.videoReview.playbackFailed'
+    );
+    await dragRange(fixture.host, { start: 120, end: 180 });
+    expect(fixture.host.querySelector('aside')?.textContent).toContain(
+      'gallery.videoReview.playbackFailed'
+    );
+    expect(fixture.host.querySelector('aside')?.textContent).not.toContain(
+      'gallery.videoReview.originalAudioOverlap'
+    );
+  } finally {
+    await fixture.cleanup();
+  }
+});

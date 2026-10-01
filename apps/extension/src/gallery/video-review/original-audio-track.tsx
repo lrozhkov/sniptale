@@ -144,19 +144,6 @@ export function ReviewOriginalAudioTrack(props: {
           ) : null}
           <ReviewTrackCuts projection={props.projection} />
         </div>
-        {props.editor?.originalFeedback ? (
-          <p role="status" className="px-1 py-1 text-xs text-[var(--sniptale-color-danger)]">
-            {translate(
-              props.editor.originalFeedback === 'too-short'
-                ? 'gallery.videoReview.originalAudioTooShort'
-                : props.editor.originalFeedback === 'overlap'
-                  ? 'gallery.videoReview.originalAudioOverlap'
-                  : props.editor.originalFeedback === 'cut'
-                    ? 'gallery.videoReview.originalAudioCut'
-                    : 'gallery.videoReview.originalAudioLimit'
-            )}
-          </p>
-        ) : null}
       </div>
     </ReviewTrackRow>
   );

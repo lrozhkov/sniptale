@@ -169,7 +169,7 @@ it('requires the audio tool for drawing, ignores overlapping ranges and edits in
       f.editor.patchOriginal(id, { end: 1 });
     });
     expect(f.editor.selectedOriginal).toMatchObject({ start: 2, end: 5 });
-    expect(f.host.textContent).toContain(translate('gallery.videoReview.originalAudioOverlap'));
+    expect(f.editor.originalFeedback).toBe('overlap');
     const change = (label: string, value: string) => {
       const input = f.host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
       expect(input).not.toBeNull();
@@ -263,12 +263,12 @@ it('explains rejected short and fully cut ranges without leaving the drawing too
     act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 2.005 }));
     expect(f.editor.selectedOriginal).toBeNull();
     expect(f.editor.originalTool).toBe(true);
-    expect(f.host.textContent).toContain(translate('gallery.videoReview.originalAudioTooShort'));
+    expect(f.editor.originalFeedback).toBe('too-short');
     f.setEdits([{ id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 }]);
     act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 4 }));
     expect(f.editor.selectedOriginal).toBeNull();
     expect(f.editor.originalTool).toBe(true);
-    expect(f.host.textContent).toContain(translate('gallery.videoReview.originalAudioCut'));
+    expect(f.editor.originalFeedback).toBe('cut');
   } finally {
     f.close();
   }
@@ -293,6 +293,18 @@ it('moves the range body without changing duration and bounds movement by neighb
     f.send('pointermove', 0);
     f.send('pointerup', 0);
     expect(f.editor.selectedOriginal).toMatchObject({ id, start: 0, end: 2 });
+  } finally {
+    f.close();
+  }
+});
+
+it('keeps audio placement feedback state without inserting messages into the track', () => {
+  const f = setup();
+  try {
+    act(() => f.editor.addOriginal({ kind: 'range', start: 2, end: 5 }));
+    act(() => f.editor.addOriginal({ kind: 'range', start: 3, end: 4 }));
+    expect(f.editor.originalFeedback).toBe('overlap');
+    expect(f.host.textContent).not.toContain(translate('gallery.videoReview.originalAudioOverlap'));
   } finally {
     f.close();
   }

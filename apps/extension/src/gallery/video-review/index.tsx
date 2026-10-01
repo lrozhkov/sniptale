@@ -1,3 +1,4 @@
+import { reviewOriginalAudioFeedbackMessage } from './original-audio-feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { ReviewSelectedProperties } from './selected-properties';
@@ -207,7 +208,11 @@ function ReviewInspectorBinding({
             : 'saved'
       }
       onRetry={() => void run(state.retryAdvanced)}
-      message={snapshot.error ? reviewErrorMessage(snapshot.error) : state.message}
+      message={
+        snapshot.error
+          ? reviewErrorMessage(snapshot.error)
+          : (state.message ?? reviewOriginalAudioFeedbackMessage(audio.originalFeedback))
+      }
       onBack={() => leave(onBack)}
       onClose={() => leave(onClose)}
       rangeSelected={state.selection.kind === 'range'}

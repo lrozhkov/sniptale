@@ -283,3 +283,68 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   await track.event(second, 'pointerup', 195);
   expect(commit).toHaveBeenCalledTimes(3);
 });
+
+for (const width of [1000, 4000]) {
+  for (const edge of ['start', 'end'] as const) {
+    it(`clamps ${edge} through the opposite edge at timeline width ${width}`, async () => {
+      const commit = vi.fn();
+      const track = renderTrack([zoom('a', 2, 4)], commit);
+      vi.mocked(track.lane.getBoundingClientRect).mockReturnValue(new DOMRect(0, 0, width, 32));
+      const block = track.blocks[0]!;
+      Object.assign(block, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: vi.fn(),
+      });
+      await track.event(
+        block.querySelector(`[data-zoom-edge="${edge}"]`)!,
+        'pointerdown',
+        ((edge === 'start' ? 2 : 4) * width) / 10
+      );
+      await track.event(block, 'pointermove', edge === 'start' ? width : -width, true);
+      expect((Number.parseFloat(block.style.width) * width) / 100).toBeCloseTo(24);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(
+        edge === 'start' ? 40 - 2400 / width : 20
+      );
+      await track.event(block, 'pointerup', edge === 'start' ? width : -width, true);
+      const range = commit.mock.calls[0]![1];
+      expect(range.end - range.start).toBeCloseTo(240 / width);
+      expect(edge === 'start' ? range.end : range.start).toBe(edge === 'start' ? 4 : 2);
+      renderTrack([{ ...zoom('a', 2, 4), ...range }], commit);
+      expect((Number.parseFloat(block.style.width) * width) / 100).toBeCloseTo(24);
+    });
+  }
+}
+
+it('keeps a cut-boundary fixed end and speed-projected minimum consistent with the preview', async () => {
+  const sourceEdits: ReviewEdit[] = [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 4,
+      requestedStart: 0,
+      requestedEnd: 4,
+      rate: 2,
+      audio: 'speed',
+    },
+    { id: 'cut', kind: 'cut', start: 4, end: 5, requestedStart: 4, requestedEnd: 5 },
+  ];
+  const projection = createTrackProjection(10, sourceEdits);
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 1, 2)], commit, vi.fn(), null, { projection });
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block.querySelector('[data-zoom-edge="start"]')!, 'pointerdown', 200);
+  await track.event(block, 'pointermove', 900, true);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(2.4);
+  expect(Number.parseFloat(block.style.left)).toBeCloseTo(37.6);
+  await track.event(block, 'pointerup', 900, true);
+  expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start');
+  expect(projection.source(commit.mock.calls[0]![1].end, 'end')).toBe(4);
+  expect(host.querySelector('[data-zoom-guide]')).toBeNull();
+});

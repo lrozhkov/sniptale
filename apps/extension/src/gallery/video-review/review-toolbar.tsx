@@ -6,7 +6,12 @@ import {
 } from '../../features/video/review/advanced/effective';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { reviewIconButtonClassName, reviewTextButtonClassName, ReviewButton } from './controls';
+import {
+  reviewIconButtonClassName,
+  reviewCompactTrackButtonClassName,
+  reviewTextButtonClassName,
+  ReviewButton,
+} from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
@@ -214,7 +219,7 @@ export function ReviewTrackControls(props: {
           <ReviewButton
             label={translate('gallery.videoReview.zoomTrack')}
             aria-pressed={features.zoomTrackVisible}
-            className={`${reviewIconButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
             onClick={() => props.setTrackVisibility('zoom', !advanced.ui.tracks.zoom)}
           >
             <Focus size={14} aria-hidden="true" />
@@ -222,7 +227,7 @@ export function ReviewTrackControls(props: {
           <ReviewButton
             label={translate('gallery.videoReview.audioTrack')}
             aria-pressed={features.audioTrackVisible}
-            className={`${reviewIconButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
             onClick={() => props.setTrackVisibility('audio', !advanced.ui.tracks.audio)}
           >
             <AudioLines size={14} aria-hidden="true" />

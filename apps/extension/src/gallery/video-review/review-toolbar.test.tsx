@@ -82,3 +82,48 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
     vi.unstubAllGlobals();
   }
 });
+
+it('keeps compact Focus and Audio hover border quiet without changing active toggles or other controls', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
+  advanced.ui.tracks.audio = true;
+  const setTrackVisibility = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewTrackControls
+          advanced={advanced}
+          busy={false}
+          setMode={vi.fn()}
+          setTrackVisibility={setTrackVisibility}
+          telemetryAvailable
+        />
+      )
+    );
+    for (const [label, track] of [
+      ['zoomTrack', 'zoom'],
+      ['audioTrack', 'audio'],
+    ] as const) {
+      const button = host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate(`gallery.videoReview.${label}`)}"]`
+      )!;
+      expect(button.className).not.toContain('enabled:hover:!border-');
+      expect(button.className).toContain('enabled:hover:!text-');
+      expect(button.className).toContain('focus-visible:ring-2');
+      expect(button.getAttribute('aria-pressed')).toBe('true');
+      await act(async () => button.click());
+      expect(setTrackVisibility).toHaveBeenCalledWith(track, false);
+    }
+    const mode = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`
+    )!;
+    expect(mode.className).toContain('enabled:hover:!border-');
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

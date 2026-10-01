@@ -88,8 +88,7 @@ function changeZoom(host: HTMLElement, value: string) {
 }
 
 it('shows an exact range-start guide only over drawing zones, with neutral seek and control cursors', () => {
-  const { host } = renderTimeline({
-    onFocusRangeCommit: vi.fn(),
+  const { host, props } = renderTimeline({
     originalRangeTool: true,
     zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
     audioTrack: (
@@ -108,8 +107,10 @@ it('shows an exact range-start guide only over drawing zones, with neutral seek 
   expect(
     (host.querySelector('[data-ui="gallery.videoReview.hoverTime"]') as HTMLElement).style.left
   ).toBe(`${100 + Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'))}px`);
+  renderTimeline({ ...props, onFocusRangeCommit: vi.fn(), originalRangeTool: false });
   hoverAt(host.querySelector('[data-ui="gallery.videoReview.zoomLane"]')!, 200);
   expect(plane.style.cursor).toContain('4 16, cell');
+  renderTimeline({ ...props, originalRangeTool: true });
   hoverAt(host.querySelector('[data-original-audio-lane]')!, 200);
   expect(plane.style.cursor).toContain('4 16, cell');
   hoverAt(
@@ -234,4 +235,62 @@ it('clears lane hover when the timeline scrolls or zoom changes', () => {
   changeZoom(host, '25');
   expect(plane.style.cursor).toBe('default');
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
+});
+
+it('keeps source and ruler neutral while the focus drawing tool owns range selection', () => {
+  const onFocusRangeCommit = vi.fn();
+  const onRangeCommit = vi.fn();
+  const { props, host } = renderTimeline({
+    onFocusRangeCommit,
+    onRangeCommit,
+    zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
+  });
+  const plane = planeWithMetrics(host);
+  for (const selector of ['sourceLane', 'ruler']) {
+    const target = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${selector}"]`)!;
+    hoverAt(target, 100);
+    expect(plane.style.cursor).toBe('default');
+    dispatchPlane(target, [
+      { type: 'pointerdown', x: 100 },
+      { type: 'pointermove', x: 250 },
+      { type: 'pointerup', x: 250 },
+    ]);
+    expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
+    expect(onRangeCommit).not.toHaveBeenCalled();
+    expect(onFocusRangeCommit).not.toHaveBeenCalled();
+  }
+});
+
+it('rejects source-range gestures and existing source edit keyboard actions in Focus mode', () => {
+  const onChangeEdit = vi.fn();
+  const onEdit = vi.fn();
+  const onRangeCommit = vi.fn();
+  const { props, host } = renderTimeline({
+    onFocusRangeCommit: vi.fn(),
+    onRangeCommit,
+    onChangeEdit,
+    onEdit,
+    edits: [{ id: 'cut-a', kind: 'cut', start: 1, end: 2, requestedStart: 1, requestedEnd: 2 }],
+  });
+  planeWithMetrics(host);
+  const source = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
+  dispatchPlane(source, [
+    { type: 'pointerdown', x: 100 },
+    { type: 'pointermove', x: 250 },
+    { type: 'pointerup', x: 250 },
+  ]);
+  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
+  expect(onRangeCommit).not.toHaveBeenCalled();
+  const block = source.querySelector<HTMLElement>('[data-ui="gallery.videoReview.editBlock"]')!;
+  const edge = block.querySelector<HTMLButtonElement>('[data-edge="start"]')!;
+  act(() => edge.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+  act(() => block.querySelector<HTMLButtonElement>('button')!.click());
+  expect(onChangeEdit).not.toHaveBeenCalled();
+  expect(onEdit).not.toHaveBeenCalled();
+  renderTimeline({ ...props, onFocusRangeCommit: undefined });
+  expect(edge.disabled).toBe(false);
+  act(() => edge.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+  act(() => block.querySelector<HTMLButtonElement>('button')!.click());
+  expect(onChangeEdit).toHaveBeenCalledOnce();
+  expect(onEdit).toHaveBeenCalledOnce();
 });

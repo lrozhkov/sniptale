@@ -11,6 +11,7 @@ import { useReviewDragEscape } from './timeline-drag';
 import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
+  rangeEnabled?: boolean;
   duration: number;
   time: number;
   selection: ReviewAnchor;
@@ -47,7 +48,9 @@ export function ReviewSourceLane(props: SelectionProps) {
             style={{ left: percent(guide, props.duration) }}
           />
         ) : null}
-        {props.selection.kind === 'range' && !props.selectedEditId ? (
+        {props.rangeEnabled !== false &&
+        props.selection.kind === 'range' &&
+        !props.selectedEditId ? (
           <div
             data-ui="gallery.videoReview.sourceRange"
             className="pointer-events-none absolute inset-y-0 border
@@ -104,7 +107,7 @@ function ReviewEditBlock(
         cursor: dragEdge === 'move' ? 'grabbing' : dragEdge ? 'ew-resize' : undefined,
       }}
       onPointerDown={(event) => {
-        if (event.button !== 0 || committing.current) return;
+        if (props.rangeEnabled === false || event.button !== 0 || committing.current) return;
         event.stopPropagation();
         const target = event.target;
         const edge =
@@ -175,9 +178,10 @@ function ReviewEditBlock(
       <button
         type="button"
         aria-label={caption}
+        disabled={props.rangeEnabled === false}
         aria-pressed={selected}
         className="absolute inset-0 flex cursor-grab items-center justify-center gap-1
-            overflow-hidden px-3 active:cursor-grabbing"
+            overflow-hidden px-3 active:cursor-grabbing disabled:cursor-default"
         onClick={(event) => {
           if (event.detail === 0) props.onEdit?.(edit);
         }}
@@ -193,6 +197,7 @@ function ReviewEditBlock(
         <ReviewEditEdge
           key={edge}
           edge={edge}
+          disabled={props.rangeEnabled === false}
           duration={duration}
           edit={edit}
           boundaries={props.boundaries}
@@ -263,6 +268,7 @@ function reviewEditCaption(edit: ReviewEdit) {
 
 /** Pointer and keyboard resizing of one edit edge; keyboard steps follow the media boundaries. */
 function ReviewEditEdge(props: {
+  disabled: boolean;
   edge: 'start' | 'end';
   duration: number;
   edit: ReviewEdit;
@@ -273,13 +279,14 @@ function ReviewEditEdge(props: {
     <button
       type="button"
       data-edge={props.edge}
+      disabled={props.disabled}
       aria-label={translate(
         props.edge === 'start' ? 'gallery.videoReview.resizeStart' : 'gallery.videoReview.resizeEnd'
       )}
-      className={`${reviewTimelineResizeHandleClassName}
+      className={`${reviewTimelineResizeHandleClassName} disabled:cursor-default
           ${props.edge === 'start' ? 'left-0' : 'right-0'}`}
       onKeyDown={(event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        if (props.disabled || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
         event.preventDefault();
         event.stopPropagation();
         const choices = props.boundaries ?? [];

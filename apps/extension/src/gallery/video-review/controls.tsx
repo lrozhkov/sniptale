@@ -37,19 +37,24 @@ export const reviewTimelineResizeHandleClassName =
 const iconButtonBase =
   '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +
   '!bg-transparent !text-[var(--sniptale-color-text-secondary)] ' +
-  'enabled:hover:!border-[var(--sniptale-color-border-strong)] ' +
   'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
   'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
 
-/** Selected tools use an accent icon; only hover draws a border. */
-export const reviewIconButtonClassName =
-  iconButtonBase +
+const iconHoverBorder = ' enabled:hover:!border-[var(--sniptale-color-border-strong)] ';
+const iconSelection =
   ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';
+
+/** Selected tools use an accent icon; only hover draws a border. */
+export const reviewIconButtonClassName = iconButtonBase + iconHoverBorder + iconSelection;
+
+/** Compact lane toggles brighten their icon while retaining a quiet border. */
+export const reviewCompactTrackButtonClassName = iconButtonBase + iconSelection;
 
 /** Lane status highlights suppression; aria-pressed still reports whether the lane is enabled. */
 export const reviewTrackStatusButtonClassName =
   iconButtonBase +
+  iconHoverBorder +
   ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
