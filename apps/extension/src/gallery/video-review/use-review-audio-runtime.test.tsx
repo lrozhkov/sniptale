@@ -8,6 +8,7 @@ import {
   type ReviewAudioEngine,
 } from './use-review-audio-runtime';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
+import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   id: 'a',
@@ -39,6 +40,13 @@ class FakeEngine implements ReviewAudioEngine {
   async decode() {
     return this.decoded;
   }
+  async prepareClip(
+    _buffer: ReviewAudioClipBuffer,
+    _entry: QuickEditAudioPlanEntry,
+    _signal: AbortSignal
+  ) {
+    return this.decoded;
+  }
   scheduleClip(schedule: unknown, buffer: unknown) {
     this.scheduled.push({ schedule, buffer });
     return { stop: () => undefined };
@@ -50,6 +58,49 @@ class FakeEngine implements ReviewAudioEngine {
     this.stops += 1;
   }
 }
+
+it.each(['pause', 'seek'] as const)(
+  'rejects pending tempo preparation after %s and retries from the current clock',
+  async (action) => {
+    const engine = new FakeEngine();
+    const gates: { signal: AbortSignal; resolve(buffer: ReviewAudioClipBuffer): void }[] = [];
+    vi.spyOn(engine, 'prepareClip').mockImplementation(
+      (_buffer, _entry, signal) => new Promise((resolve) => gates.push({ signal, resolve }))
+    );
+    const onFailure = vi.fn();
+    const { Harness } = renderRuntime({
+      createEngine: () => engine,
+      playing: true,
+      outputTime: 3,
+      voiceover: [clip({ sourceOffset: 1, duration: 2, playbackRate: 2 })],
+      resolveAsset: async () => new Blob(),
+      onFailure,
+    });
+    await act(async () => {
+      root.render(<Harness />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(gates).toHaveLength(1);
+    await act(async () =>
+      root.render(action === 'pause' ? <Harness playing={false} /> : <Harness outputTime={3.5} />)
+    );
+    expect(gates[0]!.signal.aborted).toBe(true);
+    await act(async () => gates[0]!.resolve({ duration: 2 }));
+    expect(engine.scheduled).toHaveLength(0);
+    if (action === 'pause') await act(async () => root.render(<Harness playing />));
+    expect(gates).toHaveLength(2);
+    engine.currentTime = 100.25;
+    await act(async () => gates[1]!.resolve({ duration: 2 }));
+    expect(engine.scheduled).toHaveLength(1);
+    expect(engine.scheduled[0]!.schedule).toMatchObject({
+      when: 100.25,
+      playbackRate: 1,
+      offset: action === 'pause' ? 1.25 : 1.75,
+      duration: action === 'pause' ? 0.75 : 0.25,
+    });
+    expect(onFailure).not.toHaveBeenCalled();
+  }
+);
 
 type RuntimeArgs = Parameters<typeof useReviewAudioRuntime>[0];
 

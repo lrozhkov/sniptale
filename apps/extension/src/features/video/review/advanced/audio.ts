@@ -1,5 +1,6 @@
 import { moveReviewVoiceover, trimReviewVoiceover } from '../voiceover-edits';
 import type { QuickEditAudioClip, QuickEditOriginalAudio } from './types';
+import type { ReviewTimeSegment } from '../timeline';
 
 /** Renderer-consistent clip bounds, matching the persisted validation. */
 const MIN_CLIP_SECONDS = 0.001;
@@ -114,9 +115,11 @@ export function trimQuickEditAudioClip(
 export function moveQuickEditAudioClip(
   clip: QuickEditAudioClip,
   requestedStart: number,
-  timelineDuration: number
+  timelineDuration: number,
+  voiceoverSegments?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
-  if (clip.sourceAnchor) return moveReviewVoiceover(clip, requestedStart, timelineDuration);
+  if (clip.sourceAnchor)
+    return moveReviewVoiceover(clip, requestedStart, timelineDuration, voiceoverSegments);
   return {
     ...clip,
     timelineStart: clamp(requestedStart, 0, Math.max(0, timelineDuration - clip.duration)),

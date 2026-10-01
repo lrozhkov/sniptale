@@ -59,6 +59,8 @@ vi.mock('mediabunny', async (importOriginal) => ({
 
 import { AudioSample, EncodedPacket } from 'mediabunny';
 import { audioPacketDuration } from './audio-render';
+import { createReviewAudioClipRenderer } from './audio-clip-render';
+import { renderTempoBuffer } from '../../features/video/audio/tempo-buffer';
 
 class TestAudioBuffer {
   readonly numberOfChannels: number;
@@ -366,9 +368,83 @@ it('exports a voiceover slice with the same asset rate and fade phase as preview
       /* consume the generated output window */
     }
     const window = fixture.windows[0]!;
-    expect(window.sources?.[1]).toMatchObject({ rate: 2, started: [0.02, 1, 2] });
-    expect(window.gains?.[0]?.gain.readonlyPoints[0]).toEqual(['set', 1, 0.02]);
+    expect(window.sources?.[1]).toMatchObject({ rate: 1, started: [0, 0, 1.04] });
+    expect(window.sources?.[1]?.buffer?.length).toBe(49920);
+    expect(window.gains?.[0]?.gain.readonlyPoints[0]).toEqual(['set', 1, 0]);
     expect(window.gains?.[0]?.gain.readonlyPoints.every((point) => point[1] === 1)).toBe(true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+it('keeps external speech PCM continuous across separate video-segment renders', async () => {
+  const fixture = await audioFixture();
+  try {
+    const buffer = new AudioBuffer({ length: 48000 * 4, sampleRate: 48000, numberOfChannels: 1 });
+    for (let i = 0; i < buffer.length; i++)
+      buffer.getChannelData(0)[i] = Math.sin(i * 0.021 + Math.sin(i * 0.0002)) * 0.5;
+    const entry = {
+      lane: 'voiceover' as const,
+      clipId: 'voice',
+      assetId: 'voice',
+      timelineStart: 0,
+      sourceOffset: 0.37,
+      duration: 1.75,
+      playbackRate: 1.5,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+    };
+    const plan = {
+      entries: [entry],
+      buffers: new Map([['voice', buffer]]),
+      originalVolume: 1,
+      originalMuted: true,
+    };
+    const renderer = createReviewAudioClipRenderer();
+    const reference = await renderTempoBuffer(buffer, {
+      start: 0.37,
+      duration: 1.75 * 1.5,
+      rate: 1.5,
+    });
+    for (const segment of [
+      {
+        sourceStart: 0,
+        sourceEnd: 0.875,
+        resultStart: 0,
+        resultEnd: 0.875,
+        rate: 1,
+        kind: 'keep' as const,
+      },
+      {
+        sourceStart: 0.875,
+        sourceEnd: 2.625,
+        resultStart: 0.875,
+        resultEnd: 1.75,
+        rate: 2,
+        kind: 'speed' as const,
+      },
+    ])
+      for await (const _sample of renderReviewAudio(
+        null,
+        segment,
+        true,
+        new AbortController().signal,
+        plan,
+        renderer
+      )) {
+        /* consume each separate segment invocation */
+      }
+    expect(fixture.windows).toHaveLength(2);
+    for (let index = 0; index < 2; index++) {
+      const source = fixture.windows[index]!.sources![0]!;
+      expect(source.rate).toBe(1);
+      const start = index * 42000 - 960;
+      const expected = new Float32Array(43920);
+      for (let i = 0; i < expected.length; i++)
+        expected[i] = reference.getChannelData(0)[start + i] ?? 0;
+      expect(source.buffer?.getChannelData(0)).toEqual(expected);
+    }
   } finally {
     fixture.cleanup();
   }

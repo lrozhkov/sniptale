@@ -1,5 +1,5 @@
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
-import { anchorReviewVoiceover } from './voiceover-edits';
+import { anchorReviewVoiceover, normalizeReviewVoiceoverTempo } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';
 import { reconcileReviewFocus } from './focus-edits';
 import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
@@ -118,9 +118,12 @@ export function applyReviewOperation(
       audio: {
         ...advancedContent.audio,
         voiceoverSegments: buildReviewTimeMap(source.duration, edits),
-        voiceover: advancedContent.audio.voiceover.map((clip) =>
-          anchorReviewVoiceover(clip, previous)
-        ),
+        voiceover: advancedContent.audio.voiceover.map((clip) => {
+          const anchored = anchorReviewVoiceover(clip, previous);
+          return operation.normalizeVoiceoverTempo
+            ? normalizeReviewVoiceoverTempo(anchored, operation.before, operation.after)
+            : anchored;
+        }),
       },
     });
     if (!content) throw new Error('Voiceover placement is invalid.');

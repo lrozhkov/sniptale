@@ -2,7 +2,6 @@ import { canPlaceOriginalAudioRange } from '../../features/video/review/advanced
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
   anchorReviewVoiceover,
-  reanchorReviewVoiceover,
   isReviewVoiceoverCut,
 } from '../../features/video/review/voiceover-edits';
 import { useEffect, useState } from 'react';
@@ -110,13 +109,11 @@ export function useReviewAudio(args: {
     },
     moveClip: (lane: ReviewAudioLane, id: string, timelineStart: number) =>
       updateClip(lane, id, (clip) =>
-        reanchorReviewVoiceover(
-          moveQuickEditAudioClip(
-            reanchorReviewVoiceover(clip, args.audio.voiceoverSegments),
-            timelineStart,
-            laneDuration(lane)
-          ),
-          args.audio.voiceoverSegments
+        moveQuickEditAudioClip(
+          clip,
+          timelineStart,
+          laneDuration(lane),
+          lane === 'voiceover' ? args.audio.voiceoverSegments : undefined
         )
       ),
     trimClip: (
@@ -128,7 +125,7 @@ export function useReviewAudio(args: {
     ) =>
       updateClip(lane, id, (clip) =>
         trimQuickEditAudioClip(
-          reanchorReviewVoiceover(clip, args.audio.voiceoverSegments),
+          clip,
           edge,
           timelineTime,
           laneDuration(lane),

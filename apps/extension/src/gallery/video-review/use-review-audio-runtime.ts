@@ -1,4 +1,5 @@
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
+import { renderTempoBuffer } from '../../features/video/audio/tempo-buffer';
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import {
@@ -23,6 +24,12 @@ export interface ReviewAudioEngine {
   now(): number;
   resume(): Promise<void>;
   decode(data: ArrayBuffer): Promise<ReviewAudioClipBuffer>;
+  /** Prepares the selected clip span at its applied tempo, preserving native pitch. */
+  prepareClip(
+    buffer: ReviewAudioClipBuffer,
+    entry: QuickEditAudioPlanEntry,
+    signal: AbortSignal
+  ): Promise<ReviewAudioClipBuffer>;
   scheduleClip(schedule: QuickEditClipSchedule, buffer: ReviewAudioClipBuffer): ReviewAudioHandle;
   /** Graph-side amplification for original-audio volume beyond the element range. */
   setOriginalGain(volume: number): void;
@@ -37,6 +44,19 @@ const SEEK_RESCHEDULE_SECONDS = 0.15;
 /** One Web Audio owner per element; the context outlives switched resources. */
 const elementEngines = new WeakMap<HTMLMediaElement, ReviewAudioEngine>();
 
+class BrowserReviewAudioBuffer implements ReviewAudioClipBuffer {
+  constructor(readonly value: AudioBuffer) {}
+  get duration() {
+    return this.value.duration;
+  }
+}
+
+function browserBuffer(buffer: ReviewAudioClipBuffer): AudioBuffer {
+  if (!(buffer instanceof BrowserReviewAudioBuffer))
+    throw new Error('Review audio buffer does not belong to this browser graph');
+  return buffer.value;
+}
+
 function connectClipSource(
   context: AudioContext,
   handles: Set<ReviewAudioHandle>,
@@ -44,9 +64,9 @@ function connectClipSource(
   buffer: ReviewAudioClipBuffer
 ): ReviewAudioHandle {
   const source = context.createBufferSource();
-  source.buffer = buffer as AudioBuffer;
+  source.buffer = browserBuffer(buffer);
   const gain = context.createGain();
-  source.playbackRate.value = schedule.playbackRate ?? 1;
+  source.playbackRate.value = 1;
   source.connect(gain);
   gain.connect(context.destination);
   schedule.envelope.forEach(([at, value], index) => {
@@ -99,7 +119,18 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
   return {
     now: () => context.currentTime,
     resume: () => context.resume(),
-    decode: (data) => context.decodeAudioData(data),
+    decode: async (data) => new BrowserReviewAudioBuffer(await context.decodeAudioData(data)),
+    prepareClip: async (buffer, entry, signal) => {
+      const rate = entry.playbackRate ?? 1;
+      if (rate === 1) return buffer;
+      const prepared = await renderTempoBuffer(
+        browserBuffer(buffer),
+        { start: entry.sourceOffset, duration: entry.duration * rate, rate },
+        signal
+      );
+      signal.throwIfAborted();
+      return new BrowserReviewAudioBuffer(prepared);
+    },
     scheduleClip: (schedule, buffer) => connectClipSource(context, handles, schedule, buffer),
     setOriginalGain: (volume) => {
       if (originalGain) originalGain.gain.value = volume === 0 ? 0 : Math.max(1, volume);
@@ -114,10 +145,6 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
       void context.close().catch(() => undefined);
     },
   };
-}
-
-interface ReviewAudioRuntime {
-  buffers: Map<string, Promise<ReviewAudioClipBuffer | null>>;
 }
 
 interface ReviewAudioRuntimeProps {
@@ -201,44 +228,65 @@ export function useReviewEditorAudioRuntime(args: {
     onFailure: args.onFailure,
   });
 }
-export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
-  // Applied values, not transient React object identities, define a playback plan.
-  const planKey = JSON.stringify([props.voiceover, props.music]);
-  const runtime = useRef<ReviewAudioRuntime | null>(null);
-  const generation = useRef(0);
-  const scheduledAt = useRef<{ outputTime: number; audioNow: number } | null>(null);
-  const latest = useRef(props);
-  latest.current = props;
-  const { peek: peekEngine, get: getEngine } = useElementAudioEngine(latest);
-  const resolveBuffer = useCallback(
-    async (entry: QuickEditAudioPlanEntry): Promise<ReviewAudioClipBuffer | null> => {
-      const current = runtime.current;
-      if (!current) return null;
-      const cached = current.buffers.get(entry.assetId);
-      if (cached) return cached;
-      const pending = (async () => {
-        try {
-          const asset = await latest.current.resolveAsset(entry.assetId);
-          if (!asset) return null;
-          return (await getEngine()?.decode(await asset.arrayBuffer())) ?? null;
-        } catch {
-          return null;
-        }
-      })();
-      current.buffers.set(entry.assetId, pending);
-      return pending;
-    },
-    [getEngine, latest]
-  );
-  const schedule = useCallback(() => {
-    const current = latest.current;
-    const engine = getEngine();
+/** One session authority for decoded assets, processed variants, clock and cancellable playback jobs. */
+class ReviewAudioPlaybackSession {
+  private buffers = new Map<string, Promise<ReviewAudioClipBuffer | null>>();
+  private prepared = new Map<string, ReviewAudioClipBuffer>();
+  private planKey = '';
+  private generation = 0;
+  private preparation: AbortController | null = null;
+  private anchor: { outputTime: number; audioNow: number } | null = null;
+  constructor(
+    private latest: { current: ReviewAudioRuntimeProps },
+    private engines: { get(): ReviewAudioEngine | null; peek(): ReviewAudioEngine | null }
+  ) {}
+
+  stop() {
+    this.generation += 1;
+    this.preparation?.abort();
+    this.anchor = null;
+    this.engines.peek()?.stopAll();
+  }
+  needsSeek(outputTime: number) {
+    if (!this.latest.current.playing || !this.anchor) return false;
+    const engine = this.engines.get();
+    return (
+      !!engine &&
+      Math.abs(outputTime - this.anchor.outputTime - engine.now() + this.anchor.audioNow) >
+        SEEK_RESCHEDULE_SECONDS
+    );
+  }
+  private async resolveBuffer(entry: QuickEditAudioPlanEntry) {
+    const cached = this.buffers.get(entry.assetId);
+    if (cached) return cached;
+    const pending = (async () => {
+      try {
+        const asset = await this.latest.current.resolveAsset(entry.assetId);
+        if (!asset) return null;
+        return (await this.engines.get()?.decode(await asset.arrayBuffer())) ?? null;
+      } catch {
+        return null;
+      }
+    })();
+    this.buffers.set(entry.assetId, pending);
+    return pending;
+  }
+  schedule(planKey: string) {
+    const current = this.latest.current;
+    const generation = ++this.generation;
+    this.preparation?.abort();
+    const controller = new AbortController();
+    this.preparation = controller;
+    const engine = this.engines.get();
     if (!engine) {
       if (current.playing) current.onFailure();
       return;
     }
-    const generationValue = ++generation.current;
-    scheduledAt.current = { outputTime: current.outputTime, audioNow: engine.now() };
+    if (this.planKey !== planKey) {
+      this.prepared.clear();
+      this.planKey = planKey;
+    }
+    this.anchor = { outputTime: current.outputTime, audioNow: engine.now() };
     engine.stopAll();
     engine.setOriginalGain(
       current.silent
@@ -248,67 +296,94 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
             originalAudioGainAt(current.original, current.video.current?.currentTime ?? 0)
           )
     );
-    void (async () => {
-      try {
-        await engine.resume();
-      } catch {
-        if (latest.current.playing) latest.current.onFailure();
-        return;
-      }
+    void this.run({ current, generation, signal: controller.signal, engine });
+  }
+  private active(job: {
+    current: ReviewAudioRuntimeProps;
+    generation: number;
+    signal: AbortSignal;
+  }) {
+    return (
+      !job.signal.aborted &&
+      job.generation === this.generation &&
+      this.latest.current.playing &&
+      this.latest.current.sessionKey === job.current.sessionKey
+    );
+  }
+  private async run(job: {
+    current: ReviewAudioRuntimeProps;
+    generation: number;
+    signal: AbortSignal;
+    engine: ReviewAudioEngine;
+  }) {
+    try {
+      await job.engine.resume();
+      if (!this.active(job)) return;
       const plan = buildQuickEditAudioPlan({
-        voiceover: current.voiceover,
-        music: current.music,
+        voiceover: job.current.voiceover,
+        music: job.current.music,
       });
       for (const entry of plan) {
-        const buffer = await resolveBuffer(entry);
-        if (
-          generationValue !== generation.current ||
-          !latest.current.playing ||
-          latest.current.sessionKey !== current.sessionKey
-        )
-          return;
+        const buffer = await this.resolveBuffer(entry);
+        if (!this.active(job)) return;
         if (!buffer) continue;
-        const anchor = scheduledAt.current;
-        if (!anchor) return;
-        const now = engine.now();
-        const clipSchedule = planQuickEditClipPlayback({
+        const rate = entry.playbackRate ?? 1;
+        const key = JSON.stringify([entry.assetId, entry.sourceOffset, entry.duration, rate]);
+        let prepared = rate === 1 ? buffer : this.prepared.get(key);
+        if (!prepared) {
+          prepared = await job.engine.prepareClip(buffer, entry, job.signal);
+          if (!this.active(job)) return;
+          this.prepared.set(key, prepared);
+        }
+        if (!this.active(job) || !this.anchor) return;
+        const now = job.engine.now();
+        const schedule = planQuickEditClipPlayback({
           entry,
-          outputTime: anchor.outputTime + now - anchor.audioNow,
+          outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
           audioNow: now,
         });
-        if (clipSchedule) engine.scheduleClip(clipSchedule, buffer);
+        if (schedule)
+          job.engine.scheduleClip(
+            rate === 1
+              ? schedule
+              : {
+                  ...schedule,
+                  offset: (schedule.offset - entry.sourceOffset) / rate,
+                  duration: schedule.duration / rate,
+                  playbackRate: 1,
+                },
+            prepared
+          );
       }
-    })();
-  }, [getEngine, latest, resolveBuffer]);
-  useEffect(() => {
-    runtime.current = { buffers: new Map() };
-    return () => {
-      generation.current += 1;
-      scheduledAt.current = null;
-      peekEngine()?.stopAll();
-      runtime.current = null;
-    };
-  }, [peekEngine, props.sessionKey]);
-  useEffect(() => {
-    if (props.playing) schedule();
-    else {
-      generation.current += 1;
-      scheduledAt.current = null;
-      peekEngine()?.stopAll();
+    } catch {
+      if (this.active(job)) this.latest.current.onFailure();
     }
-    // The plan identity changes with every applied edit; reschedule then.
-  }, [peekEngine, planKey, props.playing, props.sessionKey, schedule]);
+  }
+}
+
+export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
+  const planKey = JSON.stringify([props.voiceover, props.music]);
+  const session = useRef<ReviewAudioPlaybackSession | null>(null);
+  const latest = useRef(props);
+  latest.current = props;
+  const { peek, get } = useElementAudioEngine(latest);
   useEffect(() => {
-    const scheduled = scheduledAt.current;
-    if (!latest.current.playing || scheduled === null) return;
-    // Continuous playback projects output time from the audio clock; only a
-    // seek-scale discontinuity needs the full stop-and-reschedule.
-    const expected = scheduled.outputTime + (getEngine()!.now() - scheduled.audioNow);
-    if (Math.abs(props.outputTime - expected) <= SEEK_RESCHEDULE_SECONDS) return;
-    schedule();
-  }, [getEngine, props.outputTime, schedule]);
+    const current = new ReviewAudioPlaybackSession(latest, { peek, get });
+    session.current = current;
+    return () => {
+      current.stop();
+      session.current = null;
+    };
+  }, [get, peek, props.sessionKey]);
   useEffect(() => {
-    peekEngine()?.setOriginalGain(
+    if (props.playing) session.current?.schedule(planKey);
+    else session.current?.stop();
+  }, [planKey, props.playing, props.sessionKey]);
+  useEffect(() => {
+    if (session.current?.needsSeek(props.outputTime)) session.current.schedule(planKey);
+  }, [props.outputTime, planKey]);
+  useEffect(() => {
+    peek()?.setOriginalGain(
       latest.current.silent
         ? 0
         : Math.max(
@@ -319,5 +394,5 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
             )
           )
     );
-  }, [peekEngine, props.original, props.outputTime, props.silent]);
+  }, [peek, props.original, props.outputTime, props.silent]);
 }

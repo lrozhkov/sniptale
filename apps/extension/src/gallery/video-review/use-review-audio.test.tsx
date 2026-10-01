@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { useReviewAudio } from './use-review-audio';
 import {
   anchorReviewVoiceover,
+  projectReviewVoiceover,
   reviewVoiceoverRange,
 } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -274,19 +275,217 @@ it('commits trim samples from the displayed speed geometry without changing neig
     act(() => hook.trimClip('voiceover', 'voice', 'start', 3, 2));
     expect(audioState.voiceover[0]).toMatchObject({
       timelineStart: 3,
-      duration: 1.5,
-      sourceOffset: 0.5,
+      duration: 1,
+      sourceOffset: 1,
     });
-    expect(reviewVoiceoverRange(audioState.voiceover[0]!)).toEqual({ start: 3, end: 6 });
+    expect(reviewVoiceoverRange(audioState.voiceover[0]!)).toEqual({ start: 3, end: 4 });
     expect(audioState.voiceover[1]).toBe(neighbour);
     act(() => root.render(<Harness />));
     act(() => hook.moveClip('voiceover', 'voice', 6));
     expect(audioState.voiceover[0]).toMatchObject({
       timelineStart: 6,
-      duration: 1.5,
-      sourceOffset: 0.5,
+      duration: 1,
+      sourceOffset: 1,
     });
-    expect(reviewVoiceoverRange(audioState.voiceover[0]!)).toEqual({ start: 6, end: 7.5 });
+    expect(reviewVoiceoverRange(audioState.voiceover[0]!)).toEqual({ start: 6, end: 6.5 });
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('preserves actual playback duration when moving voice from Speed into normal time', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const recording = anchorReviewVoiceover(
+    createQuickEditAudioClip({
+      id: 'voice',
+      assetId: 'voice',
+      timelineStart: 2,
+      duration: 2,
+      endMax: 10,
+    }),
+    buildReviewTimeMap(10, [])
+  );
+  const map = buildReviewTimeMap(10, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  let audio: QuickEditAudioState = {
+    original: { volume: 1, muted: false },
+    music: [],
+    voiceover: [recording],
+    voiceoverSegments: map,
+  };
+  let hook!: ReturnType<typeof useReviewAudio>;
+  const root = createRoot(document.createElement('div'));
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      timelineDuration: 8,
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    expect(projectReviewVoiceover(audio.voiceover, map)[0]?.duration).toBe(1);
+    act(() => hook.moveClip('voiceover', 'voice', 6));
+    expect(projectReviewVoiceover(audio.voiceover, map)[0]?.duration).toBe(1);
+    expect(audio.voiceover[0]?.duration).toBe(2);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('creates, selects, edits and removes original source automation with bounded rejection feedback', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let audio: QuickEditAudioState = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [],
+  };
+  let selected: string | null = null;
+  let hook!: ReturnType<typeof useReviewAudio>;
+  const root = createRoot(document.createElement('div'));
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      timelineDuration: 10,
+      sourceDuration: 12,
+      edits: [{ id: 'cut', kind: 'cut', start: 8, end: 9, requestedStart: 8, requestedEnd: 9 }],
+      selectedOriginalId: selected,
+      onOriginalSelection: (id) => {
+        selected = id;
+      },
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+    });
+    return null;
+  }
+  const run = (action: () => void) =>
+    act(() => {
+      action();
+      root.render(<Harness />);
+    });
+  try {
+    act(() => root.render(<Harness />));
+    run(() => hook.setDefaultOriginalVolume(0.7));
+    run(() => hook.setOriginalTool(true));
+    run(() => {
+      expect(hook.addOriginal({ kind: 'range', start: 2, end: 4 })).toBe(true);
+    });
+    expect(audio.original.ranges).toMatchObject([{ start: 2, end: 4, volume: 0.7 }]);
+    expect(hook.originalTool).toBe(false);
+    expect(hook.selectedOriginal?.id).toBe(selected);
+    const id = selected!;
+    run(() => hook.setDefaultOriginalVolume(Number.NaN));
+    expect(hook.defaultOriginalVolume).toBe(0.7);
+    run(() => hook.selectOriginal(id));
+    expect(hook.originalRangeSelected).toBe(true);
+    run(() => hook.patchOriginal(id, { start: 3, end: 5, volume: 1.2 }));
+    expect(audio.original.ranges).toMatchObject([{ start: 3, end: 5, volume: 1.2 }]);
+    run(() => hook.patchOriginal(id, { volume: Infinity }));
+    run(() => hook.patchOriginal(id, { volume: -1 }));
+    run(() => hook.patchOriginal(id, { end: 13 }));
+    run(() => hook.patchOriginal('absent', { volume: 0.1 }));
+    expect(audio.original.ranges).toMatchObject([{ start: 3, end: 5, volume: 1.2 }]);
+    run(() => {
+      expect(hook.addOriginal({ kind: 'point', time: 1 })).toBe(false);
+    });
+    expect(hook.originalFeedback).toBe('too-short');
+    run(() => {
+      expect(hook.addOriginal({ kind: 'range', start: 4, end: 6 })).toBe(false);
+    });
+    expect(hook.originalFeedback).toBe('overlap');
+    run(() => {
+      expect(hook.addOriginal({ kind: 'range', start: 8, end: 9 })).toBe(false);
+    });
+    expect(hook.originalFeedback).toBe('cut');
+    run(() => hook.removeOriginal(id));
+    expect(audio.original.ranges).toEqual([]);
+    expect(selected).toBeNull();
+    expect(hook.selectedOriginal).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps lane gains and mute independent of clip samples and enforces the source range limit', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const clip = createQuickEditAudioClip({
+    id: 'voice',
+    assetId: 'voice-asset',
+    timelineStart: 1,
+    duration: 2,
+    endMax: 10,
+  });
+  let audio: QuickEditAudioState = {
+    original: { muted: false, volume: 1 },
+    voiceover: [clip],
+    music: [],
+  };
+  let hook!: ReturnType<typeof useReviewAudio>;
+  const root = createRoot(document.createElement('div'));
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      timelineDuration: 10,
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+    });
+    return null;
+  }
+  const run = (action: () => void) =>
+    act(() => {
+      action();
+      root.render(<Harness />);
+    });
+  try {
+    act(() => root.render(<Harness />));
+    run(() => hook.setLaneVolume('voiceover', 3));
+    run(() => hook.setLaneVolume('music', -0.5));
+    run(() => hook.setLaneVolume('music', Number.NaN));
+    expect(audio.laneVolumes).toEqual({ voiceover: 2, music: 0 });
+    run(() => hook.toggleLaneMute('voiceover'));
+    expect(audio.voiceover[0]).toEqual({ ...clip, muted: true });
+    run(() => hook.toggleLaneMute('voiceover'));
+    expect(audio.voiceover[0]).toEqual(clip);
+    run(() => hook.markImported(clip, 5, 'take.wav'));
+    expect(hook.assets.get('voice-asset')).toEqual({ duration: 5, filename: 'take.wav' });
+    run(() => hook.removeClip('voiceover', 'voice'));
+    expect(hook.selected).toBeNull();
+    audio = {
+      ...audio,
+      original: {
+        ...audio.original,
+        ranges: Array.from({ length: 512 }, (_, i) => ({
+          id: `range-${i}`,
+          start: i / 100,
+          end: (i + 0.2) / 100,
+          volume: 1,
+        })),
+      },
+    };
+    run(() => {});
+    run(() => {
+      expect(hook.addOriginal({ kind: 'range', start: 9, end: 10 })).toBe(false);
+    });
+    expect(hook.originalFeedback).toBe('limit');
+    expect(audio.original.ranges).toHaveLength(512);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

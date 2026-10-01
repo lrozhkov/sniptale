@@ -20,6 +20,7 @@ import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
 import type { ReviewExportClipPlan } from './audio-render';
 import { audioPacketDuration, chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
+import { createReviewAudioClipRenderer } from './audio-clip-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 export interface ReviewPacketReceipt {
@@ -82,6 +83,7 @@ export async function writeReviewPackets(args: {
       outputAudioCodec: processedAudio ?? index.audioCodec,
     };
     const clock = { time: 0 };
+    const clipRenderer = createReviewAudioClipRenderer();
     const tracks = createReviewMediaOutput({
       index,
       writer: args.writer,
@@ -118,7 +120,7 @@ export async function writeReviewPackets(args: {
             edit.audio === 'mute'
         );
       const audioPackets = processedAudio
-        ? renderReviewAudio(audio, segment, muted, signal, args.exportAudio)
+        ? renderReviewAudio(audio, segment, muted, signal, args.exportAudio, clipRenderer)
         : audioSink && index.audioCodec
           ? retainedAudio(audioSink, segment, clock, index.audioCodec, sampleRate, receipt, signal)
           : null;

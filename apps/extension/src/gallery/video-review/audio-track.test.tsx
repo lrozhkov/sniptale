@@ -422,29 +422,61 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
       voiceoverSegments: buildReviewTimeMap(10, edits),
     },
     false,
-    [4.75],
+    [createTrackProjection(10, edits).output(4.75)],
     true,
     undefined,
     createTrackProjection(10, edits)
   );
   const block = lanes[1]!.querySelector<HTMLElement>('[role="button"]')!;
   expect(block.style.left).toBe('20%');
-  expect(parseFloat(block.style.width)).toBeCloseTo(40);
+  expect(parseFloat(block.style.width)).toBeCloseTo(20);
   vi.spyOn(lanes[1]!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
   Object.assign(block, { setPointerCapture: vi.fn() });
   await act(async () =>
     block.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200 }))
   );
   await act(async () =>
-    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 340 }))
+    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 280 }))
   );
-  expect(parseFloat(block.style.left)).toBeCloseTo(35);
-  expect(parseFloat(block.style.width)).toBeCloseTo(32.5);
+  expect(parseFloat(block.style.left)).toBeCloseTo(27.5);
+  expect(parseFloat(block.style.width)).toBeCloseTo(20);
   expect(recording.duration).toBe(2);
   await act(async () =>
-    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 340 }))
+    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 280 }))
   );
-  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 3.5);
+  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 2.75);
+});
+
+it('displays the actual retained source footprint under Speed', () => {
+  const recording = anchorReviewVoiceover(clip('a1', 2, 2), buildReviewTimeMap(10, []));
+  const edits = [
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+  ];
+  const lanes = renderTrack(
+    {
+      original: { muted: false, volume: 1 },
+      music: [],
+      voiceover: [recording],
+      voiceoverSegments: buildReviewTimeMap(10, edits),
+    },
+    false,
+    [],
+    true,
+    undefined,
+    createTrackProjection(10, edits)
+  );
+  const block = lanes[1]!.querySelector<HTMLElement>('[role="button"]')!;
+  expect(block.style.left).toBe('20%');
+  expect(parseFloat(block.style.width)).toBeCloseTo(20);
 });
 
 it('moves anchored waveform samples with the clip before release and restores on Escape', async () => {

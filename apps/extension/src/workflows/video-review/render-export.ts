@@ -45,6 +45,7 @@ import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewExportClipPlan } from './audio-render';
+import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
@@ -120,6 +121,7 @@ export async function writeReviewFrames(args: {
       videoReencoded: true,
     };
     const clock = { time: 0 };
+    const clipRenderer = createReviewAudioClipRenderer();
     const tracks = createReviewMediaOutput({
       index: args.index,
       container: preparation.container,
@@ -167,6 +169,7 @@ export async function writeReviewFrames(args: {
         audioConfig: source.audioConfig,
         muted: segmentAudioMuted(args.edits, segment, args.exportAudio),
         exportAudio: args.exportAudio,
+        clipRenderer,
         sampleRate: source.sampleRate,
         audioCodec: args.index.audioCodec,
         clock,
@@ -401,6 +404,7 @@ export async function drainSegmentAudio(args: {
   audioConfig: AudioDecoderConfig | null;
   muted: boolean;
   exportAudio: ReviewExportClipPlan | undefined;
+  clipRenderer?: ReviewAudioClipRenderer;
   sampleRate: number;
   audioCodec: 'aac' | 'opus' | null;
   clock: { time: number };
@@ -416,7 +420,8 @@ export async function drainSegmentAudio(args: {
       segment,
       args.muted,
       signal,
-      args.exportAudio
+      args.exportAudio,
+      args.clipRenderer
     )) {
       signal.throwIfAborted();
       await audioOut.source.add(sample);

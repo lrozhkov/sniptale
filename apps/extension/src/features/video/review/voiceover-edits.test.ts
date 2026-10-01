@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest';
 import {
   anchorReviewVoiceover,
-  reanchorReviewVoiceover,
+  normalizeReviewVoiceoverTempo,
+  reviewVoiceoverPlaybackDuration,
   projectReviewVoiceover,
   moveReviewVoiceover,
   trimReviewVoiceover,
@@ -137,29 +138,61 @@ it.each([2, 0.5] as const)(
   (rate) => {
     const recording = anchorReviewVoiceover({ ...clip, timelineStart: 2, duration: 2 }, original);
     const map = buildReviewTimeMap(12, [{ ...cut(2, 8), kind: 'speed', rate, audio: 'speed' }]);
-    const shown = reanchorReviewVoiceover(recording, map);
-    expect(reviewVoiceoverRange(shown)).toEqual({ start: 2, end: 2 + 2 * rate });
+    expect(reviewVoiceoverRange(recording)).toEqual({ start: 2, end: 4 });
+    expect(reviewVoiceoverPlaybackDuration(recording, map)).toBe(2 / rate);
     expect(projectReviewVoiceover([recording], map)[0]).toMatchObject({
       sourceOffset: clip.sourceOffset,
       playbackRate: rate,
     });
-    expect(shown).toMatchObject({ duration: 2, sourceOffset: clip.sourceOffset });
-    expect(reviewVoiceoverRange(recording)).toEqual({ start: 2, end: 4 });
-    expect(reviewVoiceoverRange(reanchorReviewVoiceover(recording, original))).toEqual({
-      start: 2,
-      end: 4,
-    });
+    const moved = moveReviewVoiceover(recording, 8, 12, map);
+    expect(reviewVoiceoverRange(moved)).toEqual({ start: 8, end: 8 + 2 / rate });
+    expect(moved).toMatchObject({ duration: 2, sourceOffset: clip.sourceOffset });
+    expect(reviewVoiceoverPlaybackDuration(moved, map)).toBe(2 / rate);
+    expect(reviewVoiceoverPlaybackDuration(recording, original)).toBe(2);
   }
 );
 
-it('stretches only the elapsed part under speed and keeps other or cut recordings unchanged', () => {
+it('projects tempo only under Speed and keeps retained source geometry unchanged', () => {
   const recording = anchorReviewVoiceover({ ...clip, timelineStart: 1, duration: 3 }, original);
   const map = buildReviewTimeMap(12, [{ ...cut(2, 4), kind: 'speed', rate: 2, audio: 'speed' }]);
-  expect(reviewVoiceoverRange(reanchorReviewVoiceover(recording, map))).toEqual({
+  expect(reviewVoiceoverRange(recording)).toEqual({
     start: 1,
-    end: 5,
+    end: 4,
   });
+  expect(reviewVoiceoverPlaybackDuration(recording, map)).toBe(2);
   const later = anchorReviewVoiceover({ ...clip, timelineStart: 8, duration: 2 }, original);
-  expect(reanchorReviewVoiceover(later, map)).toEqual(later);
-  expect(reanchorReviewVoiceover(recording, buildReviewTimeMap(12, [cut(2, 3)]))).toBe(recording);
+  expect(reviewVoiceoverPlaybackDuration(later, map)).toBe(2);
+  expect(reviewVoiceoverPlaybackDuration(recording, buildReviewTimeMap(12, [cut(2, 3)]))).toBe(2);
+});
+
+it('normalizes the whole affected voice and preserves sample coverage and source gaps', () => {
+  const speed: ReviewEdit = { ...cut(0, 4), kind: 'speed', rate: 0.5, audio: 'speed' };
+  const map = buildReviewTimeMap(12, [speed, cut(4, 6)]);
+  const recording = anchorReviewVoiceover({ ...clip, timelineStart: 1, duration: 10 }, map);
+  const normalized = normalizeReviewVoiceoverTempo(recording, speed, null);
+  expect(normalized.sourceAnchor).toEqual([
+    { start: 0.5, end: 7.5, offset: 0, duration: 7 },
+    { start: 9.5, end: 12.5, offset: 7, duration: 3 },
+  ]);
+  expect(normalized).toMatchObject({ sourceOffset: 2, duration: 10, timelineStart: 0.5 });
+  expect(parseVoiceoverAnchors(normalized.sourceAnchor, 0.5, 10)).toEqual(normalized.sourceAnchor);
+  expect(recording.sourceAnchor?.[0]?.end).toBe(4);
+  expect(normalizeReviewVoiceoverTempo(recording, speed, { ...speed, audio: 'mute' })).toBe(
+    recording
+  );
+  const unrelated: ReviewEdit = { ...speed, start: 10, end: 12 };
+  expect(normalizeReviewVoiceoverTempo(recording, unrelated, null)).toBe(recording);
+  expect(normalizeReviewVoiceoverTempo(recording, cut(0, 4), null)).toBe(recording);
+});
+
+it('keeps continuous speech in one processing span across an obsolete creation-Speed boundary', () => {
+  const speed: ReviewEdit = { ...cut(0, 8), kind: 'speed', rate: 2, audio: 'speed' };
+  const map = buildReviewTimeMap(12, [speed]);
+  const recording = anchorReviewVoiceover({ ...clip, timelineStart: 0, duration: 5.5 }, map);
+  expect(projectReviewVoiceover([recording], map)).toMatchObject([
+    { id: clip.id, playbackRate: 1, duration: 5.5, sourceOffset: 2 },
+  ]);
+  expect(projectReviewVoiceover([recording], map)).toHaveLength(1);
+  const normalized = normalizeReviewVoiceoverTempo(recording, speed, null);
+  expect(projectReviewVoiceover([normalized], original)).toHaveLength(1);
 });

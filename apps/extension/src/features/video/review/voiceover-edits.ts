@@ -1,5 +1,47 @@
 import type { QuickEditAudioClip, QuickEditVoiceoverAnchor } from './advanced/types';
 import type { ReviewTimeSegment } from './timeline';
+import type { ReviewEdit } from './types';
+
+/**
+ * Replaces creation-time compensation with native sample timing when a new Speed
+ * command affects a retained recording. Later anchors move, preserving sample
+ * order and authored source gaps; unrelated recordings and legacy replay do not.
+ */
+export function normalizeReviewVoiceoverTempo(
+  clip: QuickEditAudioClip,
+  before: ReviewEdit | null,
+  after: ReviewEdit | null
+): QuickEditAudioClip {
+  if (!clip.sourceAnchor || clip.dormant) return clip;
+  const previous = before?.kind === 'speed' ? before : null;
+  const next = after?.kind === 'speed' ? after : null;
+  if (!previous && !next) return clip;
+  if (
+    previous &&
+    next &&
+    previous.start === next.start &&
+    previous.end === next.end &&
+    previous.rate === next.rate
+  )
+    return clip;
+  const anchors = clip.sourceAnchor;
+  if (
+    !anchors.some((span) => Math.abs(span.end - span.start - span.duration) > 1e-7) ||
+    !anchors.some((span) =>
+      [previous, next].some((edit) => edit && span.start < edit.end && span.end > edit.start)
+    )
+  )
+    return clip;
+  let start = anchors[0]!.start;
+  const normalized = anchors.map((span, index) => {
+    const end = start + span.duration;
+    const result = { ...span, start, end };
+    const following = anchors[index + 1];
+    start = end + (following ? following.start - span.end : 0);
+    return result;
+  });
+  return { ...clip, sourceAnchor: normalized };
+}
 
 /** Captures the original video placement without trimming the audio asset or dropping a record. */
 export function anchorReviewVoiceover(
@@ -89,28 +131,32 @@ export function projectReviewVoiceover(
         ];
       })
     );
-    return slices.length === 1 ? [{ ...slices[0]!, id: clip.id }] : slices;
+    const continuous: QuickEditAudioClip[] = [];
+    for (const slice of slices) {
+      const previous = continuous.at(-1);
+      if (
+        previous &&
+        Math.abs(previous.playbackRate! - slice.playbackRate!) < 1e-7 &&
+        Math.abs(previous.timelineStart + previous.duration - slice.timelineStart) < 1e-7 &&
+        Math.abs(
+          previous.sourceOffset + previous.duration * previous.playbackRate! - slice.sourceOffset
+        ) < 1e-7
+      ) {
+        previous.duration += slice.duration;
+      } else continuous.push(slice);
+    }
+    return continuous.length === 1 ? [{ ...continuous[0]!, id: clip.id }] : continuous;
   });
 }
 
-/** Rebuilds one audible recording's source geometry from its unchanged playback duration. */
-export function reanchorReviewVoiceover(
+/** Actual audible duration; raw sample seconds are independent of applied Speed. */
+export function reviewVoiceoverPlaybackDuration(
   clip: QuickEditAudioClip,
   map?: readonly ReviewTimeSegment[]
-): QuickEditAudioClip {
-  if (!clip.sourceAnchor || !map || clip.dormant || isReviewVoiceoverCut(clip, map)) return clip;
-  const start = clip.sourceAnchor[0]!.start;
-  const segment = map.find(
-    (part) => part.kind !== 'cut' && start >= part.sourceStart && start < part.sourceEnd
-  );
-  if (!segment) return clip;
-  const { sourceAnchor: _anchor, ...recording } = clip;
-  return anchorReviewVoiceover(
-    {
-      ...recording,
-      timelineStart: segment.resultStart + (start - segment.sourceStart) / segment.rate,
-    },
-    map
+) {
+  return projectReviewVoiceover([clip], map).reduce(
+    (duration, slice) => duration + slice.duration,
+    0
   );
 }
 
@@ -118,9 +164,12 @@ export function reanchorReviewVoiceover(
 export function moveReviewVoiceover(
   clip: QuickEditAudioClip,
   requestedStart: number,
-  sourceDuration: number
+  sourceDuration: number,
+  map?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
   clip = { ...clip, duration: clip.sourceAnchor!.reduce((sum, span) => sum + span.duration, 0) };
+  if (map && !clip.dormant && !isReviewVoiceoverCut(clip, map))
+    return placeAudibleVoiceover(clip, requestedStart, sourceDuration, map);
   const range = reviewVoiceoverRange(clip);
   const start = Math.max(
     0,
@@ -134,6 +183,45 @@ export function moveReviewVoiceover(
       ...span,
       start: span.start + delta,
       end: span.end + delta,
+    })),
+  };
+}
+
+function placeAudibleVoiceover(
+  clip: QuickEditAudioClip,
+  requestedStart: number,
+  sourceDuration: number,
+  map: readonly ReviewTimeSegment[]
+): QuickEditAudioClip {
+  const duration = reviewVoiceoverPlaybackDuration(clip, map);
+  const requested = Math.max(0, Math.min(requestedStart, sourceDuration));
+  const segment = map.find(
+    (part) =>
+      part.kind !== 'cut' &&
+      requested >= part.sourceStart &&
+      (requested < part.sourceEnd ||
+        (requested === sourceDuration && part.sourceEnd === sourceDuration))
+  );
+  if (!segment || duration <= 0 || duration > map.at(-1)!.resultEnd) return clip;
+  const outputStart = Math.max(
+    0,
+    Math.min(
+      segment.resultStart +
+        (Math.min(requested, segment.sourceEnd) - segment.sourceStart) / segment.rate,
+      map.at(-1)!.resultEnd - duration
+    )
+  );
+  const { sourceAnchor: _anchor, ...recording } = clip;
+  const placed = anchorReviewVoiceover({ ...recording, timelineStart: outputStart, duration }, map);
+  if (!placed.sourceAnchor || placed.sourceAnchor.at(-1)!.end > sourceDuration + 1e-7) return clip;
+  const scale = clip.duration / duration;
+  return {
+    ...clip,
+    timelineStart: placed.timelineStart,
+    sourceAnchor: placed.sourceAnchor.map((span) => ({
+      ...span,
+      offset: span.offset * scale,
+      duration: span.duration * scale,
     })),
   };
 }

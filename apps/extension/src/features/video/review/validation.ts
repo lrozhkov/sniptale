@@ -261,6 +261,12 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       value['preserveVoiceoverAnchors'] !== true
     )
       return null;
+    if (
+      (value['normalizeVoiceoverTempo'] !== undefined &&
+        value['normalizeVoiceoverTempo'] !== true) ||
+      (value['normalizeVoiceoverTempo'] === true && value['preserveVoiceoverAnchors'] !== true)
+    )
+      return null;
     return {
       ...metadata,
       target: 'edit',
@@ -270,6 +276,9 @@ export function parseReviewOperation(value: unknown, duration: number): ReviewOp
       ...(value['preserveUnderCuts'] === true ? { preserveUnderCuts: true as const } : {}),
       ...(value['preserveVoiceoverAnchors'] === true
         ? { preserveVoiceoverAnchors: true as const }
+        : {}),
+      ...(value['normalizeVoiceoverTempo'] === true
+        ? { normalizeVoiceoverTempo: true as const }
         : {}),
     };
   }

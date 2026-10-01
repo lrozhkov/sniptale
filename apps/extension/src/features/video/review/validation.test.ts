@@ -228,6 +228,15 @@ it('preserves the voiceover anchor policy and rejects invalid policy values', ()
     preserveVoiceoverAnchors: true,
   };
   expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  const normalized = { ...operation, normalizeVoiceoverTempo: true };
+  expect(parseReviewOperation(normalized, 12)).toEqual(normalized);
+  for (const invalid of [false, 'true', 1, null])
+    expect(
+      parseReviewOperation({ ...normalized, normalizeVoiceoverTempo: invalid }, 12)
+    ).toBeNull();
+  expect(
+    parseReviewOperation({ ...normalized, preserveVoiceoverAnchors: undefined }, 12)
+  ).toBeNull();
   for (const invalid of [false, 'true', null])
     expect(
       parseReviewOperation({ ...operation, preserveVoiceoverAnchors: invalid }, 12)
