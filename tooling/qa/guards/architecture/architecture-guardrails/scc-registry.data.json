@@ -37,7 +37,8 @@
     "owner": "apps/extension/src/editor",
     "classification": "tool-noise",
     "reason": "Second-level aggregation combines controller orchestration with independent geometry, metadata, store, and snapshot leaves. The complete module dependency graph is acyclic; these exact edges stay within the image editor runtime and do not create a state-authority or runtime cycle.",
-    "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle."
+    "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle.",
+    "debtId": "noise.scc.editor-local-document-leaves"
   },
   {
     "owners": ["apps/extension/src/gallery/library", "apps/extension/src/gallery/state"],
@@ -49,6 +50,7 @@
     "owner": "apps/extension/src/gallery",
     "classification": "tool-noise",
     "reason": "Second-level aggregation combines library orchestration with independent item contracts, layout/date selectors, and state hooks. The complete module graph is acyclic and the dependencies stay inside the Gallery runtime; no cross-runtime authority cycle exists.",
-    "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle."
+    "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle.",
+    "debtId": "noise.scc.gallery-library-state-projections"
   }
 ]

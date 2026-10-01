@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=1, tool-noise=14.
-- Enforced source: codeql=4, gitleaks=10, license=1.
+- Classification: accepted-architecture=1, tool-noise=16.
+- Enforced source: codeql=4, gitleaks=10, license=1, scc=2.
 
 ## Active decisions
 
@@ -24,3 +24,5 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.codeql.local-toolchain-download-write` — qa-platform: Downloaded tool bytes become executable in the local QA toolchain if the locked digest or destination policy is incorrectly reviewed. Action: Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review. Review: 2027-08-23.
 - `noise.codeql.transform-stream-transformer-constructor` — archive-transfer: A broad suppression of argument-count findings could conceal real API misuse in archive streaming code. Action: Keep the exception exact to this source digest, location, rule, and message; any implementation drift requires renewed review. Review: 2027-08-29.
 - `accepted.license.eslint-plugin-sonarjs` — repository-owner: A copyleft development dependency could be mistaken for shipped artifact content if packaging boundaries drift. Action: Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact. Review: 2027-07-12.
+- `noise.scc.editor-local-document-leaves` — apps/extension/src/editor: Owner-directory aggregation can resemble a cycle although actual module dependencies are acyclic; a wider allowance could hide new owner edges or a real dependency cycle. Action: Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears. Review: 2027-09-01.
+- `noise.scc.gallery-library-state-projections` — apps/extension/src/gallery: Owner-directory aggregation can resemble a cycle although actual module dependencies are acyclic; a wider allowance could hide new owner edges or a real dependency cycle. Action: Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears. Review: 2027-09-01.

@@ -318,6 +318,56 @@
         "resolvedVersion": "4.2.0"
       },
       "targetAction": "Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact."
+    },
+    {
+      "id": "noise.scc.editor-local-document-leaves",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor",
+      "risk": "Owner-directory aggregation can resemble a cycle although actual module dependencies are acyclic; a wider allowance could hide new owner edges or a real dependency cycle.",
+      "reason": "Second-level aggregation combines controller orchestration with independent geometry, metadata, store, and snapshot leaves. The complete module dependency graph is acyclic; these exact edges stay within the image editor runtime and do not create a state-authority or runtime cycle.",
+      "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle.",
+      "reviewBy": "2027-09-01",
+      "source": {
+        "kind": "scc",
+        "key": "editor-local-document-leaves"
+      },
+      "scope": {
+        "edgeDigest": "dcc515c3cc9696f65a91fa9425e7944345fd3e33b932c0a3510d4bb932d88966",
+        "id": "editor-local-document-leaves",
+        "owners": [
+          "apps/extension/src/editor/browser-frame",
+          "apps/extension/src/editor/controller",
+          "apps/extension/src/editor/document",
+          "apps/extension/src/editor/drawing",
+          "apps/extension/src/editor/frame-annotation",
+          "apps/extension/src/editor/objects",
+          "apps/extension/src/editor/persistence",
+          "apps/extension/src/editor/state"
+        ]
+      },
+      "targetAction": "Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears."
+    },
+    {
+      "id": "noise.scc.gallery-library-state-projections",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery",
+      "risk": "Owner-directory aggregation can resemble a cycle although actual module dependencies are acyclic; a wider allowance could hide new owner edges or a real dependency cycle.",
+      "reason": "Second-level aggregation combines library orchestration with independent item contracts, layout/date selectors, and state hooks. The complete module graph is acyclic and the dependencies stay inside the Gallery runtime; no cross-runtime authority cycle exists.",
+      "removalCondition": "Remove when these exact owner edges disappear or acquire a concrete module, state-authority, or runtime dependency cycle.",
+      "reviewBy": "2027-09-01",
+      "source": {
+        "kind": "scc",
+        "key": "gallery-library-state-projections"
+      },
+      "scope": {
+        "edgeDigest": "6176280eb5da5178102ea8920d05aab058bacdf6cba65f3405733059b3ec1f41",
+        "id": "gallery-library-state-projections",
+        "owners": [
+          "apps/extension/src/gallery/library",
+          "apps/extension/src/gallery/state"
+        ]
+      },
+      "targetAction": "Keep the exact reviewed owner set and edge digest; new edges and real module cycles remain blocking. Remove the record when its exact aggregate signal disappears."
     }
   ]
 }

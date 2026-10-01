@@ -92,6 +92,35 @@ describe('technical debt registry smell contract', () => {
     expect(rulesFor(staleRecord)).toContain('technical-debt-unreferenced-entry');
   });
 
+  it('preserves SCC noise classification and rejects classification or exact graph scope drift', () => {
+    const source = JSON.parse(
+      fs.readFileSync(
+        'tooling/qa/guards/architecture/architecture-guardrails/scc-registry.data.json',
+        'utf8'
+      )
+    );
+    const noise = source.find(
+      (entry: Record<string, unknown>) => entry.classification === 'tool-noise'
+    );
+    expect(noise).toBeDefined();
+    const registry = readRegistry();
+    const linked = registry.entries.find((entry) => entry.id === noise.debtId)!;
+    expect(linked.classification).toBe('tool-noise');
+    expect(collectTechnicalDebtRegistryViolations({ registry })).toEqual([]);
+    for (const patch of [
+      { classification: 'debt' },
+      { scope: { ...linked.scope, edgeDigest: '0'.repeat(64) } },
+      { scope: { ...linked.scope, owners: [...linked.scope.owners, 'unreviewed-owner'] } },
+    ]) {
+      const invalid = structuredClone(registry);
+      Object.assign(
+        invalid.entries.find((entry) => entry.id === linked.id)!,
+        patch
+      );
+      expect(rulesFor(invalid)).toContain('technical-debt-scope-drift');
+    }
+  });
+
   it('validates a direct external-baseline link without inventory coupling', () => {
     const registry = readRegistry();
     const entry = registry.entries[0];
