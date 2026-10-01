@@ -27,7 +27,7 @@ const {
   deletePersistedVideoProjectMock,
   deleteScenarioProjectRecordMock,
   getMediaAssetBlobMock,
-  listMediaAssetProjectUsageMock,
+  listMediaAssetProjectUsageBatchMock,
   updateScenarioProjectRecordMetadataMock,
 } = vi.hoisted(() => ({
   moveLibraryItemsToTrashMock: vi.fn(),
@@ -37,7 +37,10 @@ const {
   deletePersistedVideoProjectMock: vi.fn(),
   deleteScenarioProjectRecordMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
-  listMediaAssetProjectUsageMock: vi.fn(async (): Promise<MediaAssetProjectUsage[]> => []),
+  listMediaAssetProjectUsageBatchMock: vi.fn(
+    async (ids: readonly string[]): Promise<Map<string, MediaAssetProjectUsage[]>> =>
+      new Map(ids.map((id) => [id, []]))
+  ),
   updateScenarioProjectRecordMetadataMock: vi.fn(),
 }));
 
@@ -62,7 +65,7 @@ vi.mock('../../../workflows/media-hub/trash', () => ({
 }));
 
 vi.mock('../../../composition/persistence/media-library/usage', () => ({
-  listMediaAssetProjectUsage: listMediaAssetProjectUsageMock,
+  listMediaAssetProjectUsageBatch: listMediaAssetProjectUsageBatchMock,
 }));
 
 vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
@@ -236,7 +239,9 @@ it('reports a swallowed restore failure so the preview can show retry feedback',
 describe('unified Gallery deletion requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listMediaAssetProjectUsageMock.mockResolvedValue([]);
+    listMediaAssetProjectUsageBatchMock.mockImplementation(
+      async (ids) => new Map(ids.map((id) => [id, []]))
+    );
   });
   it('opens one choice and moves to Trash without a second dialog or dependency mutation', async () => {
     const { controller } = createController();
@@ -244,7 +249,7 @@ describe('unified Gallery deletion requests', () => {
     await createDeleteManyAction(controller)([item], runBusyAction);
     expect(controller.state.storage.confirmDialog).toBeNull();
     expect(moveLibraryItemsToTrashMock).not.toHaveBeenCalled();
-    expect(listMediaAssetProjectUsageMock).not.toHaveBeenCalled();
+    expect(listMediaAssetProjectUsageBatchMock).not.toHaveBeenCalled();
     const request = controller.state.storage.deletionRequest;
     expect(request).not.toBeNull();
     await request!.moveToTrash!();
@@ -255,7 +260,7 @@ describe('unified Gallery deletion requests', () => {
   });
   it('warns about secondary references before explicitly confirmed permanent deletion', async () => {
     const usage = { id: 'video-1', kind: 'video' as const, name: 'Montage', primary: false };
-    listMediaAssetProjectUsageMock.mockResolvedValueOnce([usage]);
+    listMediaAssetProjectUsageBatchMock.mockResolvedValueOnce(new Map([['asset-1', [usage]]]));
     const { controller } = createController();
     const media = createMediaItem({ entityId: 'asset-1' });
     await createDeleteManyAction(controller)([media], runBusyAction);
@@ -270,10 +275,17 @@ describe('unified Gallery deletion requests', () => {
     );
   });
   it('blocks primary dependencies outside a confirmed bulk selection before any deletion', async () => {
-    listMediaAssetProjectUsageMock.mockResolvedValueOnce([
-      { kind: 'video', id: 'included', name: 'Included', primary: true },
-      { kind: 'video', id: 'outside', name: 'Outside', primary: true },
-    ]);
+    listMediaAssetProjectUsageBatchMock.mockResolvedValueOnce(
+      new Map([
+        [
+          'recording',
+          [
+            { kind: 'video', id: 'included', name: 'Included', primary: true },
+            { kind: 'video', id: 'outside', name: 'Outside', primary: true },
+          ],
+        ],
+      ])
+    );
     const { controller } = createController();
     await createDeleteManyAction(controller)(
       [
@@ -289,9 +301,9 @@ describe('unified Gallery deletion requests', () => {
     expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
   });
   it('deletes confirmed project roots before media and excludes their removed primary references', async () => {
-    listMediaAssetProjectUsageMock.mockResolvedValueOnce([
-      { kind: 'video', id: 'primary', name: 'Primary', primary: true },
-    ]);
+    listMediaAssetProjectUsageBatchMock.mockResolvedValueOnce(
+      new Map([['recording', [{ kind: 'video', id: 'primary', name: 'Primary', primary: true }]]])
+    );
     const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 1, trashedAt: 2 };
     const selected = [
       createMediaItem({ entityId: 'recording', lifecycle }),
@@ -381,4 +393,20 @@ it('deletes a selected export independently and subsumes catalogue children in a
   await (await controller.state.storage.deletionRequest!.preparePermanent())!.confirm();
   expect(deleteScenarioProjectRecordMock).toHaveBeenCalledExactlyOnceWith(item.project.id);
   expect(deleteExportMock).not.toHaveBeenCalled();
+});
+
+it('prepares all selected media through one fresh batch and repeats only on a new preparation', async () => {
+  vi.clearAllMocks();
+  const items = [
+    createMediaItem({ id: 'one', entityId: 'one' }),
+    createMediaItem({ id: 'two', entityId: 'two' }),
+  ];
+  const { controller } = createController();
+  await createDeleteManyAction(controller)(items, runBusyAction);
+  await controller.state.storage.deletionRequest!.preparePermanent();
+  expect(listMediaAssetProjectUsageBatchMock).toHaveBeenCalledExactlyOnceWith(['one', 'two']);
+  await createDeleteManyAction(controller)(items, runBusyAction);
+  await controller.state.storage.deletionRequest!.preparePermanent();
+  expect(listMediaAssetProjectUsageBatchMock).toHaveBeenCalledTimes(2);
+  expect(deleteMediaLibraryAssetsBatchSafelyMock).not.toHaveBeenCalled();
 });

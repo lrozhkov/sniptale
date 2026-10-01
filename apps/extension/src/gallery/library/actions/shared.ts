@@ -1,9 +1,24 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { StaleTrashItemError } from '../../../composition/persistence/library-lifecycle/trash';
+import {
+  PrimaryMediaAssetDeleteError,
+  StaleMediaAssetDeletePreviewError,
+} from '../../../composition/persistence/media-library/deletion-errors';
+import { isMediaHubStorageError } from '../../../features/media-hub/storage-errors';
 import { writeBrowserClipboardItems } from '@sniptale/platform/browser/clipboard';
 import { translate } from '../../../platform/i18n';
 import { downloadGalleryBlob } from '../../shared/download';
 import type { GallerySurfaceController } from './controller-types';
 
-export type GalleryBusyAction = (action: () => Promise<void>) => Promise<void>;
+type GalleryActionContext = {
+  stage: 'prepare-delete' | 'permanent-delete' | 'move-to-trash' | 'restore';
+  materialType: 'media' | 'scenario-project' | 'video-project' | 'scenario-export' | 'mixed';
+};
+export type GalleryBusyAction = (
+  action: () => Promise<void>,
+  context?: GalleryActionContext
+) => Promise<void>;
+const logger = createLogger({ namespace: 'gallery:actions' });
 
 class GalleryUserFacingActionError extends Error {}
 
@@ -40,21 +55,43 @@ export function openGalleryConfirmDialog(
 }
 
 export function createBusyActionRunner({ actions }: Pick<GallerySurfaceController, 'actions'>) {
-  return async (action: () => Promise<void>) => {
+  return async (action: () => Promise<void>, context?: GalleryActionContext) => {
     const releaseOperation = actions.surface.beginBlockingOperation();
     try {
       await action();
     } catch (error) {
       if (isUserCancellation(error)) return;
-      actions.surface.setBanner(
-        error instanceof GalleryUserFacingActionError
-          ? error.message
-          : translate('gallery.app.actionFailed')
-      );
+      const failure = describeActionFailure(error);
+      logger.warn('gallery-action-failed', {
+        code: failure.code,
+        stage: context?.stage ?? 'gallery-action',
+        materialType: context?.materialType ?? 'unspecified',
+      });
+      actions.surface.setBanner(failure.message);
     } finally {
       releaseOperation();
     }
   };
+}
+
+function describeActionFailure(error: unknown): { code: string; message: string } {
+  if (error instanceof GalleryUserFacingActionError)
+    return { code: 'user-facing', message: error.message };
+  if (error instanceof StaleTrashItemError)
+    return { code: 'item-state-changed', message: translate('gallery.app.deleteStateChanged') };
+  if (error instanceof StaleMediaAssetDeletePreviewError)
+    return {
+      code: 'references-changed',
+      message: translate('gallery.app.deleteReferencesChanged'),
+    };
+  if (error instanceof PrimaryMediaAssetDeleteError)
+    return {
+      code: 'primary-source-required',
+      message: translate('gallery.app.deleteRequiredSource'),
+    };
+  if (isMediaHubStorageError(error))
+    return { code: `storage-${error.kind}`, message: error.message };
+  return { code: 'unexpected', message: translate('gallery.app.actionFailed') };
 }
 
 function isUserCancellation(error: unknown): boolean {

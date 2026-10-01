@@ -23,7 +23,7 @@ import {
   type GalleryPreparedDeletion,
   type GalleryDeletionRequest,
 } from '../deletion/types';
-import { listMediaAssetProjectUsage } from '../../../composition/persistence/media-library/usage';
+import { listMediaAssetProjectUsageBatch } from '../../../composition/persistence/media-library/usage';
 
 function splitSelectableTargets(targets: GalleryItem[]) {
   return {
@@ -84,71 +84,90 @@ async function preparePermanentDeletion(
     ...videoProjects.map((item) => `video:${item.entityId}`),
   ]);
   let prepared: GalleryPreparedDeletion | null = null;
-  await withBusy(async () => {
-    const expectedUsageById = new Map(
-      await Promise.all(
-        media.map(async (item) => {
-          const id = item.entityId ?? item.id;
-          const usage = (await listMediaAssetProjectUsage(id)).filter(
-            (project) => !removedProjectKeys.has(`${project.kind}:${project.id}`)
-          );
-          return [id, usage] as const;
-        })
-      )
-    );
-    if (!isCurrent()) return;
-    const affectedProjects = [
-      ...new Map(
-        [...expectedUsageById.values()]
-          .flat()
-          .map((project) => [`${project.kind}:${project.id}`, project])
-      ).values(),
-    ];
-    const primaryProjects = [...expectedUsageById.values()]
-      .flat()
-      .filter((project) => project.primary);
-    if (primaryProjects.length > 0)
-      throw createGalleryUserFacingActionError(
-        `${translate('gallery.app.deleteBlockedPrimary')} ${primaryProjects.map((project) => project.name).join(', ')}`
+  await withBusy(
+    async () => {
+      const usageById = await listMediaAssetProjectUsageBatch(
+        media.map((item) => item.entityId ?? item.id)
       );
-    const warning =
-      affectedProjects.length > 0
-        ? [
-            translate('gallery.app.deleteAffectsProjects'),
-            `${affectedProjects.map((project) => project.name).join(', ')}.`,
-            translate('gallery.app.deleteHistoryWarning'),
+      const expectedUsageById = new Map(
+        [...usageById].map(([id, usage]) => [
+          id,
+          usage.filter((project) => !removedProjectKeys.has(`${project.kind}:${project.id}`)),
+        ])
+      );
+      if (!isCurrent()) return;
+      const affectedProjects = [
+        ...new Map(
+          [...expectedUsageById.values()]
+            .flat()
+            .map((project) => [`${project.kind}:${project.id}`, project])
+        ).values(),
+      ];
+      const primaryProjects = [...expectedUsageById.values()]
+        .flat()
+        .filter((project) => project.primary);
+      if (primaryProjects.length > 0)
+        throw createGalleryUserFacingActionError(
+          [
+            translate('gallery.app.deleteBlockedPrimary'),
+            `${primaryProjects.map((project) => project.name).join(', ')}.`,
+            translate('gallery.app.deletePrimaryNextStep'),
           ].join(' ')
-        : '';
-    prepared = {
-      warning: `${translate('gallery.app.permanentDeleteConfirm')} ${warning}`.trim(),
-      confirm: async () => {
-        if (!isCurrent()) return false;
-        let deleted = false;
-        await withBusy(async () => {
-          try {
-            for (const item of [...independentExports, ...scenarios, ...videoProjects, ...media]) {
-              await permanentlyDeleteLibraryItem(
-                {
-                  target: trashTarget(item),
-                  lifecycle: {
-                    updatedAt: item.lifecycle?.updatedAt ?? item.updatedAt,
-                    ...(item.lifecycle?.trashedAt !== undefined
-                      ? { trashedAt: item.lifecycle.trashedAt }
-                      : {}),
-                  },
-                },
-                expectedUsageById.get(item.entityId ?? item.id)
-              );
+        );
+      const warning =
+        affectedProjects.length > 0
+          ? [
+              translate('gallery.app.deleteAffectsProjects'),
+              `${affectedProjects.map((project) => project.name).join(', ')}.`,
+              translate('gallery.app.deleteHistoryWarning'),
+            ].join(' ')
+          : '';
+      prepared = {
+        warning: `${translate('gallery.app.permanentDeleteConfirm')} ${warning}`.trim(),
+        confirm: async () => {
+          if (!isCurrent()) return false;
+          let deleted = false;
+          await withBusy(
+            async () => {
+              try {
+                for (const item of [
+                  ...independentExports,
+                  ...scenarios,
+                  ...videoProjects,
+                  ...media,
+                ]) {
+                  await permanentlyDeleteLibraryItem(
+                    {
+                      target: trashTarget(item),
+                      lifecycle: {
+                        updatedAt: item.lifecycle?.updatedAt ?? item.updatedAt,
+                        ...(item.lifecycle?.trashedAt !== undefined
+                          ? { trashedAt: item.lifecycle.trashedAt }
+                          : {}),
+                      },
+                    },
+                    expectedUsageById.get(item.entityId ?? item.id)
+                  );
+                }
+                deleted = true;
+              } finally {
+                await finishTrashAction(controller);
+              }
+            },
+            {
+              stage: 'permanent-delete',
+              materialType: targets.length === 1 ? trashTarget(targets[0]!).kind : 'mixed',
             }
-            deleted = true;
-          } finally {
-            await finishTrashAction(controller);
-          }
-        });
-        return deleted;
-      },
-    };
-  });
+          );
+          return deleted;
+        },
+      };
+    },
+    {
+      stage: 'prepare-delete',
+      materialType: targets.length === 1 ? trashTarget(targets[0]!).kind : 'mixed',
+    }
+  );
   return prepared;
 }
 

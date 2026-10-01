@@ -44,7 +44,7 @@ export function GalleryDeletionMenu({
           role="menuitem"
           className={`${getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })} ${itemLayout}`}
           aria-disabled={menu.pending}
-          aria-describedby={warningId}
+          aria-describedby={menu.prepared || menu.pending ? warningId : undefined}
           onClick={(event) => {
             if (event.detail <= 1) void menu.activatePermanent();
           }}
@@ -55,13 +55,15 @@ export function GalleryDeletionMenu({
           )}
         </button>
       </div>
-      <p
-        id={warningId}
-        role="status"
-        className="px-3 py-2 text-xs text-[var(--sniptale-color-text-secondary)]"
-      >
-        {menu.prepared?.warning ?? translate('gallery.app.permanentDeleteConfirm')}
-      </p>
+      {menu.prepared || menu.pending ? (
+        <p
+          id={warningId}
+          role="status"
+          className="px-3 py-2 text-xs text-[var(--sniptale-color-text-secondary)]"
+        >
+          {menu.prepared?.warning ?? translate('gallery.app.deleteChecking')}
+        </p>
+      ) : null}
     </ContentPopoverAdapter>
   );
 }

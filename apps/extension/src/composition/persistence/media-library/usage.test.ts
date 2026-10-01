@@ -28,7 +28,11 @@ vi.mock('../scenario/projects', async (original) => ({
   listScenarioProjectEntries: mocks.scenarios,
 }));
 
-import { listMediaAssetProjectUsage, listPreviewMediaAssetProjectUsage } from './usage';
+import {
+  listMediaAssetProjectUsage,
+  listMediaAssetProjectUsageBatch,
+  listPreviewMediaAssetProjectUsage,
+} from './usage';
 
 let media: MediaLibraryEntry;
 let childRows: unknown[];
@@ -255,4 +259,60 @@ it('does not return an in-flight snapshot invalidated by a project write', async
     { id: video.id, kind: 'video', name: video.project.name, primary: false },
   ]);
   expect(mocks.videos).toHaveBeenCalledTimes(2);
+});
+
+it('loads the full graph once for a batch instead of once per selected file', async () => {
+  extraMedia = {
+    ...media,
+    id: 'second',
+    source: { kind: 'project-asset', projectAssetId: 'second' },
+  };
+  const getAll = vi.fn(async (store: string) => {
+    if (store === 'media_library') return [media, extraMedia];
+    if (store === 'scenario_assets') return childRows;
+    if (store === 'video_workspaces') return reviewRows;
+    return [];
+  });
+  mocks.initDB.mockResolvedValue({
+    get: async (_store: string, id: string) => (id === media.id ? media : extraMedia),
+    getAll,
+  });
+  const previous = await Promise.all([media.id, extraMedia.id].map(listMediaAssetProjectUsage));
+  expect(mocks.videos).toHaveBeenCalledTimes(2);
+  expect(getAll).toHaveBeenCalledTimes(6);
+  mocks.videos.mockClear();
+  mocks.scenarios.mockClear();
+  getAll.mockClear();
+  const batch = await listMediaAssetProjectUsageBatch([
+    media.id,
+    extraMedia.id,
+    media.id,
+    'missing',
+  ]);
+  expect(batch).toEqual(
+    new Map([
+      [media.id, previous[0]],
+      [extraMedia.id, previous[1]],
+      ['missing', []],
+    ])
+  );
+  expect(mocks.videos).toHaveBeenCalledOnce();
+  expect(mocks.scenarios).toHaveBeenCalledOnce();
+  expect(getAll).toHaveBeenCalledTimes(3);
+});
+
+it('reads each deletion preparation freshly even while the advisory preview snapshot is cached', async () => {
+  const first = await listMediaAssetProjectUsageBatch([media.id]);
+  expect(first.get(media.id)?.length).toBeGreaterThan(0);
+  await listPreviewMediaAssetProjectUsage(media.id);
+  mocks.videos.mockResolvedValue([]);
+  mocks.scenarios.mockResolvedValue([]);
+  expect(await listMediaAssetProjectUsageBatch([media.id])).toEqual(new Map([[media.id, []]]));
+});
+
+it('does no storage work for an empty deletion selection and propagates failed authoritative reads', async () => {
+  expect(await listMediaAssetProjectUsageBatch([])).toEqual(new Map());
+  expect(mocks.initDB).not.toHaveBeenCalled();
+  mocks.videos.mockRejectedValueOnce(new Error('database unavailable'));
+  await expect(listMediaAssetProjectUsageBatch([media.id])).rejects.toThrow('database unavailable');
 });

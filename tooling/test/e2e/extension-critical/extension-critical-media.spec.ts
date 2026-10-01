@@ -1470,3 +1470,63 @@ for (const variant of [
     }
   );
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery deletion choice stages (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.getByRole('button', { name: 'geometry-saved.png', exact: true }).first().focus();
+        await page.keyboard.press('Enter');
+        const trigger = page
+          .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+          .getByRole('button', { name: label('common.actions.delete'), exact: true });
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          await trigger.scrollIntoViewIfNeeded();
+          await trigger.focus();
+          await page.keyboard.press('Enter');
+          const choice = page.locator('[data-ui="gallery.deletion.menu"]');
+          await expect(choice).toBeVisible();
+          await expect(choice.getByRole('status')).toHaveCount(0);
+          await expect(
+            choice.getByRole('menuitem', { name: label('gallery.app.moveToTrash'), exact: true })
+          ).toBeFocused();
+          const permanent = choice.getByRole('menuitem', {
+            name: label('gallery.app.permanentDelete'),
+            exact: true,
+          });
+          await expect(permanent).not.toHaveAttribute('aria-describedby');
+          await permanent.click();
+          await expect(choice.getByRole('status')).toContainText(
+            label('gallery.app.permanentDeleteConfirm')
+          );
+          await expect(
+            choice.getByRole('menuitem', {
+              name: label('gallery.app.confirmPermanentDelete'),
+              exact: true,
+            })
+          ).toBeVisible();
+          const bounds = (await choice.boundingBox())!;
+          expect(bounds.y).toBeGreaterThanOrEqual(0);
+          expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+          await page.keyboard.press('Escape');
+          await expect(choice).toHaveCount(0);
+          await expect(trigger).toBeFocused();
+          await expect(page.locator('[data-ui="gallery.preview.surface"]')).toBeVisible();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}

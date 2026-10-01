@@ -148,6 +148,16 @@ export async function listMediaAssetProjectUsage(
   return projectUsageFromSnapshot(mediaId, await loadUsageSnapshot(db));
 }
 
+/** One fresh authoritative read for a deletion selection; never uses the advisory preview cache. */
+export async function listMediaAssetProjectUsageBatch(
+  mediaIds: readonly string[]
+): Promise<Map<string, MediaAssetProjectUsage[]>> {
+  const ids = [...new Set(mediaIds)];
+  if (ids.length === 0) return new Map();
+  const snapshot = await loadUsageSnapshot();
+  return new Map(ids.map((id) => [id, projectUsageFromSnapshot(id, snapshot)]));
+}
+
 // This snapshot serves only the advisory Gallery inspector. Mutating consumers use the direct read above.
 const PREVIEW_USAGE_SNAPSHOT_MS = 5_000;
 let previewSnapshot: {

@@ -49,6 +49,17 @@ async function click(control: HTMLButtonElement, detail = 1) {
   await act(async () => control.dispatchEvent(new MouseEvent('click', { bubbles: true, detail })));
 }
 
+it('shows irreversible consequences only after choosing permanent deletion', async () => {
+  await render();
+  expect(document.body.textContent).not.toContain(translate('gallery.app.permanentDeleteConfirm'));
+  expect(button('gallery.app.permanentDelete').hasAttribute('aria-describedby')).toBe(false);
+  await click(button('gallery.app.permanentDelete'));
+  expect(document.querySelector('[role="status"]')?.textContent).toBe('Cannot be undone');
+  expect(button('gallery.app.confirmPermanentDelete').getAttribute('aria-describedby')).toBe(
+    document.querySelector('[role="status"]')?.id
+  );
+});
+
 it('defaults keyboard focus to reversible deletion and executes it without another confirmation', async () => {
   await render();
   const move = button('gallery.app.moveToTrash');
@@ -208,4 +219,25 @@ it('keeps an unanchored overflow warning bounded and updates placement after res
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+it('announces pending reference checking and resets confirmation on reopening', async () => {
+  const gate = Promise.withResolvers<Awaited<ReturnType<typeof request.preparePermanent>>>();
+  request.preparePermanent = vi.fn(() => gate.promise);
+  await render();
+  await click(button('gallery.app.permanentDelete'));
+  expect(document.querySelector('[role="status"]')?.textContent).toBe(
+    translate('gallery.app.deleteChecking')
+  );
+  expect(button('gallery.app.permanentDelete').getAttribute('aria-disabled')).toBe('true');
+  gate.resolve({ warning: 'old confirmation', confirm });
+  await act(async () => {
+    await gate.promise;
+  });
+  expect(document.body.textContent).toContain('old confirmation');
+  await act(async () => root.render(null));
+  await render();
+  expect(document.querySelector('[role="status"]')).toBeNull();
+  expect(button('gallery.app.permanentDelete').hasAttribute('aria-describedby')).toBe(false);
+  expect(confirm).not.toHaveBeenCalled();
 });

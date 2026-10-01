@@ -1,3 +1,5 @@
+import { PrimaryMediaAssetDeleteError, StaleMediaAssetDeletePreviewError } from './deletion-errors';
+export { StaleMediaAssetDeletePreviewError } from './deletion-errors';
 import type { VideoProjectAssetSource } from '../../../features/video/project/types';
 import { removeVideoProjectLibrarySources } from '../../../features/video/project/library-source-removal';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -43,20 +45,6 @@ type PhysicalDelete = ReturnType<typeof buildPhysicalDeleteOperation>;
 type CascadeDatabase = Awaited<
   ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>
 >;
-
-export class StaleMediaAssetDeletePreviewError extends Error {
-  constructor() {
-    super('The affected projects changed after the deletion warning.');
-    this.name = 'StaleMediaAssetDeletePreviewError';
-  }
-}
-
-class PrimaryMediaAssetDeleteError extends Error {
-  constructor() {
-    super('A project requires this file as its primary source.');
-    this.name = 'PrimaryMediaAssetDeleteError';
-  }
-}
 
 function usageKey(usage: Pick<MediaAssetProjectUsage, 'id' | 'kind'>): string {
   return `${usage.kind}:${usage.id}`;

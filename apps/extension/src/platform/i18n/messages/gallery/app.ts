@@ -53,6 +53,23 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Удалить выбранные материалы навсегда? Восстановить их будет невозможно.',
     en: 'Permanently delete the selected items? This cannot be undone.',
   },
+  deleteChecking: { ru: 'Проверяем связи материалов…', en: 'Checking item references…' },
+  deleteStateChanged: {
+    ru: 'Материал изменился. Обновите библиотеку и заново выберите удаление.',
+    en: 'This item changed. Refresh the library and choose deletion again.',
+  },
+  deleteReferencesChanged: {
+    ru: 'Связи с проектами изменились после подтверждения. Заново выберите удаление и проверьте предупреждение.',
+    en: 'Project references changed after confirmation. Choose deletion again and review the warning.',
+  },
+  deletePrimaryNextStep: {
+    ru: 'Сначала удалите зависимые проекты или сохраните файл.',
+    en: 'Delete the dependent projects first or keep the file.',
+  },
+  deleteRequiredSource: {
+    ru: 'Этот файл нужен проекту как основной источник. Сначала удалите зависимый проект или сохраните файл.',
+    en: 'A project requires this file as its primary source. Delete the dependent project first or keep the file.',
+  },
   trashEmpty: { ru: 'Корзина пуста', en: 'Trash Bin is empty' },
   trashNoResults: { ru: 'В корзине ничего не найдено', en: 'No matching items in Trash Bin' },
   trashSearchPlaceholder: { ru: 'Поиск', en: 'Search' },
