@@ -130,3 +130,64 @@ it('skips disabled insertion actions when the keyboard opens the row', async () 
   expect(add).toHaveBeenCalledOnce();
   expect(unavailable).not.toHaveBeenCalled();
 });
+
+it('keeps Escape closed when the stationary pointer reenters the revealed anchor', async () => {
+  await act(async () =>
+    root.render(
+      <GuideInsertActions
+        label="Insert"
+        disabled={false}
+        items={[{ label: 'Step', icon: null, onSelect: vi.fn() }]}
+      />
+    )
+  );
+  const anchor = container.querySelector<HTMLElement>('.guide-insert-anchor')!;
+  vi.spyOn(anchor, 'matches').mockImplementation((selector) => selector === ':hover');
+  await act(async () => anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  await act(async () => anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+  await act(async () =>
+    anchor.dispatchEvent(
+      new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  await act(async () =>
+    anchor.dispatchEvent(
+      new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
+});
+
+it('reopens after Escape over an outer action and leaving the removed row', async () => {
+  await act(async () =>
+    root.render(
+      <GuideInsertActions
+        label="Insert"
+        disabled={false}
+        items={[{ label: 'Step', icon: null, onSelect: vi.fn() }]}
+      />
+    )
+  );
+  const anchor = container.querySelector<HTMLElement>('.guide-insert-anchor')!;
+  await act(async () => anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  const menu = document.querySelector<HTMLElement>('.guide-action-menu--insert')!;
+  vi.spyOn(menu, 'matches').mockImplementation((selector) => selector === ':hover');
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+  await act(async () =>
+    document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 10, clientY: 10 }))
+  );
+  await act(async () =>
+    anchor.dispatchEvent(
+      new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body })
+    )
+  );
+  expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
+});

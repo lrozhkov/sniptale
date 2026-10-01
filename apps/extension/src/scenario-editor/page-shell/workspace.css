@@ -959,7 +959,15 @@
 .guide-action-menu button:last-child {
   margin-top: 0.25rem;
 }
-/* Insertion is a row of independent circles, replacing its anchor on the same line. */
+/* Insertion actions overlay the boundary; command contrast belongs to application chrome. */
+.guide-action-menu--insert {
+  --guide-insert-surface: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
+  --guide-insert-hover: color-mix(
+    in srgb,
+    var(--guide-insert-surface) 90%,
+    var(--sniptale-color-text-primary) 10%
+  );
+}
 .guide-action-menu--insert .guide-insert-actions {
   position: relative;
   display: flex;
@@ -988,14 +996,14 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 50%;
-  background: var(--sniptale-color-surface-panel);
+  border-radius: var(--sniptale-radius-md);
+  background: var(--guide-insert-surface) !important;
   color: var(--sniptale-color-text-primary);
   box-shadow: var(--sniptale-shadow-sm);
 }
 .guide-action-menu--insert .guide-insert-actions > button:is(:hover, :focus-visible),
 .guide-action-menu--insert .guide-insert-actions > button[aria-pressed='true'] {
-  background: var(--sniptale-color-surface-hover);
+  background: var(--guide-insert-hover) !important;
   color: var(--sniptale-color-text-primary-strong);
 }
 .guide-action-menu--insert .guide-insert-actions > button:focus-visible {
@@ -1018,7 +1026,7 @@
   text-align: center;
   font: 0.75rem/1.2 var(--sniptale-font-sans);
   color: var(--sniptale-color-text-primary);
-  background: var(--sniptale-color-surface-panel);
+  background: var(--guide-insert-surface);
   box-shadow: var(--sniptale-shadow-sm);
   pointer-events: none;
 }
@@ -1079,18 +1087,32 @@
   background: var(--guide-paper) !important;
   color: var(--guide-muted) !important;
 }
-.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button {
-  border: 0;
-  border-radius: 50%;
-  background: var(--sniptale-color-surface-panel) !important;
-  color: var(--sniptale-color-text-primary) !important;
-  box-shadow: var(--sniptale-shadow-sm);
+/* The boundary hit zone fits existing whitespace; the visible plus adds no surface. */
+.guide-insert-anchor {
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  height: 100%;
 }
-.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:hover:not(:disabled),
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button {
+  width: 1.5rem;
+  height: min(1.5rem, var(--guide-insert-hit-height));
+  min-width: 1.5rem;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent !important;
+  color: var(--guide-muted) !important;
+  box-shadow: none;
+  pointer-events: auto;
+}
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
-  background: var(--sniptale-color-surface-hover) !important;
+  outline: 2px solid var(--guide-accent);
+  outline-offset: 1px;
 }
 .guide-insertion {
+  --guide-insert-hit-height: 1.5rem;
   position: relative;
   height: 0;
   z-index: 3;
@@ -1098,32 +1120,31 @@
 .guide-insertion::before {
   content: '';
   position: absolute;
-  inset: -1.75rem 0 auto;
-  height: 2rem;
-}
-.guide-insertion-item::before {
-  inset-block-start: -1.75rem;
-  height: 2rem;
+  top: -1.5rem;
+  left: 0;
+  right: 0;
+  height: var(--guide-insert-hit-height);
 }
 .guide-insertion-chrome {
   position: absolute;
-  top: -1.75rem;
+  top: -1.5rem;
   left: 50%;
   transform: translateX(-50%);
+  max-width: 100%;
+  height: var(--guide-insert-hit-height);
   opacity: 1;
   pointer-events: auto;
 }
-.guide-insertion-block > .guide-insertion-chrome {
-  top: -1rem;
-}
-.guide-insertion-block::before {
-  top: -1rem;
-}
 .guide-insertion-block {
+  --guide-insert-hit-height: min(2rem, var(--guide-row-gap, var(--guide-gap)));
   position: absolute;
   top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
   left: 0;
   right: 0;
+}
+.guide-insertion-block > .guide-insertion-chrome,
+.guide-insertion-block::before {
+  top: calc(var(--guide-insert-hit-height) * -0.5);
 }
 .guide-insertion-block[data-end='true'] {
   top: auto;
@@ -2185,16 +2206,16 @@ html[data-guide-height-resizing] * {
   }
 }
 
-/* Custom document paper does not own insertion-command contrast. */
+/* Closed insertion glyph follows paper; the portaled actions follow application theme. */
 .guide-document
   .guide-insertion-chrome
   .guide-action-menu-anchor
   > button:is(:hover, :active, :focus-visible):not(:disabled) {
-  background: var(--sniptale-color-surface-hover) !important;
-  color: var(--sniptale-color-text-primary) !important;
+  background: transparent !important;
+  color: var(--guide-ink) !important;
 }
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
-  outline-color: var(--sniptale-color-accent);
+  outline-color: var(--guide-accent);
 }
 .guide-insert-actions > button:first-child > .guide-insert-tooltip {
   left: 0;
@@ -2207,10 +2228,10 @@ html[data-guide-height-resizing] * {
 }
 
 .guide-document > .guide-insertion-item:first-child > .guide-insertion-chrome {
-  top: -1.25rem;
+  top: -1rem;
 }
 .guide-document > .guide-insertion-item:first-child::before {
-  top: -1.25rem;
+  top: -1rem;
 }
 .guide-insert-actions:has(> button:hover) > button:not(:hover) > .guide-insert-tooltip {
   display: none;

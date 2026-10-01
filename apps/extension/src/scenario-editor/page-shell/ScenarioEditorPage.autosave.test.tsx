@@ -33,6 +33,7 @@ vi.mock('../../platform/i18n', async (original) => ({
   useAppLocale: () => 'en',
 }));
 import { ScenarioEditorPage } from './ScenarioEditorPage';
+import { clickGuideControl } from './test-support/guide-controls';
 let root: Root;
 let host: HTMLDivElement;
 beforeEach(() => {
@@ -93,10 +94,7 @@ it.each(['stacked', 'side-by-side', 'comparison', 'text'] as const)(
     io.load.mockResolvedValue(project);
     await act(async () => root.render(<ScenarioEditorPage />));
     await act(async () => host.querySelector<HTMLElement>('article#step')!.focus());
-    const add = host.querySelector<HTMLButtonElement>(
-      '.guide-insertion-item[data-end="true"] [aria-label="Add step"]'
-    )!;
-    await act(async () => add.click());
+    await clickGuideControl('Add step', host);
     const added = host.querySelectorAll<HTMLElement>('article')[1]!;
     expect(added.dataset['layout']).toBe(layout);
     expect(added.querySelector('.guide-image-slot')).toBeNull();

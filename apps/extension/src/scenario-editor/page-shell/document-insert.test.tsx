@@ -128,3 +128,70 @@ it('inserts before the selected block and omits row-start at the end', async () 
   container.remove();
   vi.unstubAllGlobals();
 });
+
+it('opens the extended anchor with keyboard support and disabled gating', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onOperate = vi.fn();
+  const render = async (disabled: boolean) =>
+    act(async () =>
+      root.render(
+        <GuideDocumentInsert
+          target={{ kind: 'block', itemId: 'step', beforeBlockId: 'next' }}
+          rowStart={false}
+          disabled={disabled}
+          onOperate={onOperate}
+          t={(key) => translate(key, 'en')}
+        />
+      )
+    );
+  try {
+    await render(false);
+    const anchor = container.querySelector<HTMLDivElement>('.guide-insert-anchor')!;
+    const trigger = anchor.querySelector('button')!;
+    expect(anchor.style.width).toBe('208px');
+    await act(async () => anchor.click());
+    const buttons = [
+      ...document.querySelectorAll<HTMLButtonElement>('.guide-insert-actions button'),
+    ];
+    expect(buttons).toHaveLength(5);
+    expect(document.activeElement).toBe(buttons[0]);
+    await act(async () =>
+      buttons[0]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    );
+    expect(document.activeElement).toBe(buttons[1]);
+    await act(async () =>
+      buttons[1]?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await act(async () => trigger.click());
+    await act(async () =>
+      document
+        .querySelector<HTMLButtonElement>('.guide-insert-actions button[title="Text"]')
+        ?.click()
+    );
+    expect(onOperate).toHaveBeenCalledOnce();
+    expect(onOperate).toHaveBeenCalledWith({
+      kind: 'add-block',
+      itemId: 'step',
+      blockKind: 'text',
+      beforeBlockId: 'next',
+    });
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    await render(true);
+    await act(async () => {
+      anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      anchor.click();
+      trigger.click();
+    });
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    expect(onOperate).toHaveBeenCalledOnce();
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  }
+});

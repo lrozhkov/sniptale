@@ -91,12 +91,12 @@
   container: guide-step / inline-size;
 }
 .guide-step-blocks {
-  --guide-row-gap: max(var(--guide-gap), 3rem);
+  --guide-row-gap: var(--guide-gap);
   --guide-column-gap: max(var(--guide-gap), 3.5rem);
   display: flex;
   flex-direction: column;
   gap: var(--guide-row-gap);
-  padding-block: 2.5rem;
+  padding-block: 1rem;
 }
 .guide-block-row {
   display: flex;

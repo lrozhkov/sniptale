@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -24,8 +24,37 @@ function useInsertDisclosure(disabled: boolean, width: number) {
   const row = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const focus = useRef<'row' | 'trigger' | null>(null);
+  const hoverSuppressed = useRef(false);
+  const dismissedBounds = useRef<DOMRect[]>([]);
+  const dismiss = useCallback((value: boolean) => {
+    if (!value && (anchor.current?.matches(':hover') || row.current?.matches(':hover'))) {
+      hoverSuppressed.current = true;
+      dismissedBounds.current = [anchor.current, row.current]
+        .filter((node): node is HTMLDivElement => node !== null)
+        .map((node) => node.getBoundingClientRect());
+    }
+    setOpen(value);
+  }, []);
+  useEffect(() => {
+    if (open || !hoverSuppressed.current) return;
+    const releaseHover = (event: MouseEvent) => {
+      if (
+        hoverSuppressed.current &&
+        dismissedBounds.current.every(
+          (rect) =>
+            event.clientX < rect.left ||
+            event.clientX > rect.right ||
+            event.clientY < rect.top ||
+            event.clientY > rect.bottom
+        )
+      )
+        hoverSuppressed.current = false;
+    };
+    document.addEventListener('mousemove', releaseHover, true);
+    return () => document.removeEventListener('mousemove', releaseHover, true);
+  }, [open]);
   const hover = useGuideMenuHover(true, disabled, row, setOpen);
-  useGlassSelectDismiss({ isOpen: open, setIsOpen: setOpen, containerRef: anchor, menuRef: row });
+  useGlassSelectDismiss({ isOpen: open, setIsOpen: dismiss, containerRef: anchor, menuRef: row });
   const style = useGuideInsertLayout({
     open,
     anchorRef: anchor,
@@ -53,9 +82,21 @@ function useInsertDisclosure(disabled: boolean, width: number) {
   function close(restore: boolean) {
     hover.cancel();
     focus.current = restore ? 'trigger' : null;
-    setOpen(false);
+    dismiss(false);
   }
-  return { open, anchor, row, trigger, hover, style, enterRow, close, setOpen };
+  const boundaryHover = {
+    cancel: hover.cancel,
+    enter: () => {
+      if (hoverSuppressed.current) return;
+      if (document.activeElement === trigger.current) enterRow();
+      else hover.enter();
+    },
+    leave: () => {
+      hoverSuppressed.current = false;
+      hover.leave();
+    },
+  };
+  return { open, anchor, row, trigger, hover: boundaryHover, style, enterRow, close, setOpen };
 }
 
 /** Owns the plus-to-icon-row interaction at one stable document insertion boundary. */
@@ -68,13 +109,20 @@ export function GuideInsertActions({
   items: InsertAction[];
   disabled: boolean;
 }) {
-  const ui = useInsertDisclosure(disabled, Math.max(136, 8 + items.length * 40));
+  const width = Math.max(136, 8 + items.length * 40);
+  const ui = useInsertDisclosure(disabled, width);
   const id = useId();
   const theme = useResolvedPortalTheme(ui.anchor.current);
   return (
     <div
       ref={ui.anchor}
-      className="guide-action-menu-anchor"
+      className="guide-action-menu-anchor guide-insert-anchor"
+      style={{ width }}
+      onMouseEnter={ui.hover.enter}
+      onClick={(event) => {
+        if (event.target instanceof Node && event.currentTarget.contains(event.target))
+          ui.enterRow();
+      }}
       data-insert-open={ui.open || undefined}
       onMouseLeave={ui.hover.leave}
       onBlurCapture={(event) => {
@@ -96,8 +144,6 @@ export function GuideInsertActions({
         aria-controls={id}
         aria-hidden={ui.open || undefined}
         tabIndex={ui.open ? -1 : undefined}
-        onMouseEnter={ui.hover.enter}
-        onClick={ui.enterRow}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown' && event.key !== 'ArrowRight') return;
           event.preventDefault();
