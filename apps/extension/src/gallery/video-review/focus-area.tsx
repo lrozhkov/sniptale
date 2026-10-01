@@ -16,6 +16,8 @@ type FocusAreaProps = {
   output: { width: number; height: number };
   video: QuickEditRect;
   disabled?: boolean;
+  /** Inspector framing stays visible; the stage retains interaction-only controls. */
+  alwaysVisible?: boolean;
   onInteract?(): void;
   onPreview?: ((value: QuickEditSpotlight | null) => void) | undefined;
   onChange(value: QuickEditSpotlight): void;
@@ -36,7 +38,7 @@ export function ReviewFocusArea(props: FocusAreaProps) {
         area={areaRect(gesture.area, props.video)}
         output={props.output}
         borderWidth={1}
-        visible={gesture.visible}
+        visible={props.alwaysVisible || gesture.visible}
         pointerInteraction={gesture.pointerInteraction}
         role="group"
         tabIndex={props.disabled ? -1 : 0}

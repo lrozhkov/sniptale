@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ReviewFocusArea } from './focus-area';
 import { ReviewSpotlightPreview } from './spotlight-preview';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
@@ -180,7 +181,7 @@ it('bounds Spotlight moving edges and reconciles hover after outside release and
   await pointer(view.plane, 'pointermove', 1000, 500);
   expect(view.group.dataset['controlsVisible']).toBe('true');
   await pointer(view.plane, 'pointerup', 1000, 500);
-  expect(view.group.dataset['controlsVisible']).toBe('false');
+  expect(view.group.dataset['controlsVisible']).toBe('true');
   const area = view.onChange.mock.calls[0]![0].area;
   expect(area.width).toBeCloseTo(0.01);
   expect(area.height).toBeCloseTo(0.01);
@@ -190,7 +191,39 @@ it('bounds Spotlight moving edges and reconciles hover after outside release and
   await pointer(view.group, 'pointerdown', 100, 50);
   await pointer(view.plane, 'pointermove', 1000, 500);
   await key(view.group, 'Escape');
-  expect(view.group.dataset['controlsVisible']).toBe('false');
+  expect(view.group.dataset['controlsVisible']).toBe('true');
   expect(HTMLElement.prototype.releasePointerCapture).toHaveBeenCalled();
   expect(view.onChange).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the inspector Spotlight frame visible after hover and cancellation', async () => {
+  const view = render();
+  expect(view.group.getAttribute('data-controls-visible')).toBe('true');
+  await pointer(view.plane, 'pointermove', -10, -10);
+  expect(view.group.getAttribute('data-controls-visible')).toBe('true');
+  await pointer(view.group, 'pointerdown', 50);
+  await pointer(view.plane, 'pointermove', 70);
+  await key(view.group, 'Escape');
+  expect(view.group.getAttribute('data-controls-visible')).toBe('true');
+  expect(view.onChange).not.toHaveBeenCalled();
+});
+
+it('preserves interaction-only Spotlight controls on the main stage', async () => {
+  await act(async () =>
+    root.render(
+      <ReviewFocusArea
+        spotlight={createQuickEditSpotlight()}
+        output={output}
+        video={rect}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const group = host.querySelector<HTMLElement>('[data-focus-frame]')!;
+  const plane = host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!;
+  expect(group.dataset['controlsVisible']).toBe('false');
+  await pointer(plane, 'pointermove', 60);
+  expect(group.dataset['controlsVisible']).toBe('true');
+  await pointer(plane, 'pointermove', -10, -10);
+  expect(group.dataset['controlsVisible']).toBe('false');
 });

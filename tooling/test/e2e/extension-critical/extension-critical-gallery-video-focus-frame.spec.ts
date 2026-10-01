@@ -41,6 +41,16 @@ for (const variant of [
       await expect
         .poll(async () => (await persistedFocus(page))?.transform.scale)
         .toBeGreaterThan(1);
+      await page.mouse.move(5, 5);
+      await expect(frame).toHaveAttribute('data-controls-visible', 'true');
+      const tracks = dialog.locator('[data-ui="gallery.videoReview.trackControls"] button');
+      for (const control of await tracks.all()) {
+        const before = (await control.boundingBox())!;
+        await control.hover();
+        await expect(control).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+        const after = (await control.boundingBox())!;
+        expect(after).toEqual(before);
+      }
       const initial = (await persistedFocus(page))!.transform;
       for (const corner of ['nw', 'ne', 'sw', 'se']) {
         const before = (await persistedFocus(page))!.transform;
@@ -79,8 +89,8 @@ for (const variant of [
       await expect(frame).toHaveAttribute('data-controls-visible', 'true');
       await page.keyboard.press('Escape');
       await page.mouse.up();
-      await expect(frame).toHaveAttribute('data-controls-visible', 'false');
-      await expect(grip).toHaveCSS('opacity', '0');
+      await expect(frame).toHaveAttribute('data-controls-visible', 'true');
+      await expect(grip).toHaveCSS('opacity', '1');
       await expect.poll(async () => (await persistedFocus(page))?.transform).toEqual(initial);
       const canvas = preview.locator('canvas');
       await button('gallery.videoReview.zoomPreviewResult').click();
@@ -107,8 +117,8 @@ for (const variant of [
         .toBeGreaterThan(0.5);
       const saved = (await persistedFocus(page))!.spotlight;
       await page.mouse.move(5, 5);
-      await expect(frame).toHaveAttribute('data-controls-visible', 'false');
-      await expect(nw).toHaveCSS('opacity', '0');
+      await expect(frame).toHaveAttribute('data-controls-visible', 'true');
+      await expect(nw).toHaveCSS('opacity', '1');
       await frame.hover();
       await expect(nw).toHaveCSS('opacity', '1');
       await page.screenshot({

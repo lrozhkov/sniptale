@@ -194,6 +194,7 @@ function ReviewModeControl(props: {
   setMode(mode: 'basic' | 'advanced'): void;
 }) {
   const advanced = props.advanced.ui.mode === 'advanced';
+  const buttonClassName = props.compact ? reviewCompactTrackButtonClassName : plain;
   return (
     <ReviewButton
       label={translate('gallery.videoReview.advancedEditing')}
@@ -206,7 +207,7 @@ function ReviewModeControl(props: {
       )}
       aria-pressed={advanced}
       disabled={props.busy}
-      className={`${plain} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : '!w-auto gap-2'}`}
+      className={`${buttonClassName} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : '!w-auto gap-2'}`}
       onClick={() => props.setMode(advanced ? 'basic' : 'advanced')}
     >
       <PanelsTopLeft size={props.compact ? 14 : 16} className="shrink-0" aria-hidden="true" />
@@ -264,6 +265,7 @@ function ReviewHistoryTrackControl(
   }
 ) {
   if (!props.telemetryAvailable) return null;
+  const buttonClassName = props.compact ? reviewCompactTrackButtonClassName : plain;
   return (
     <ReviewButton
       label={translate('gallery.videoReview.telemetry')}
@@ -271,7 +273,7 @@ function ReviewHistoryTrackControl(
       toolbarLabel={props.compact ? undefined : translate('gallery.videoReview.telemetry')}
       aria-pressed={props.advanced.ui.tracks.actions}
       disabled={props.busy}
-      className={`${plain} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : ''}`}
+      className={`${buttonClassName} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : ''}`}
       onClick={() => props.setTrackVisibility('actions', !props.advanced.ui.tracks.actions)}
     >
       <Activity size={props.compact ? 14 : 16} aria-hidden="true" />

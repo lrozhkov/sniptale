@@ -45,8 +45,6 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
     keyboardInteraction,
     camera,
     handlers,
-    captured,
-    hovered,
     video,
     opening,
     motion,
@@ -110,7 +108,7 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
             frameRef={areaRef}
             area={opening}
             output={props.output}
-            visible={hovered || captured}
+            visible={true}
             pointerInteraction={pointerInteraction}
             borderWidth={2}
             center={{
@@ -171,7 +169,6 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     frame: areaRef,
-    hovered,
     trackPointer,
     pointerInteraction,
     keyboardInteraction,
@@ -186,7 +183,7 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
         height: props.output.height / video.height,
       }
     : { x: 0, y: 0, width: 1, height: 1 };
-  const { camera, handlers, captured } = useReviewCameraGesture({
+  const { camera, handlers } = useReviewCameraGesture({
     ...props,
     interactionElement: canvasRef,
     viewport,
@@ -221,8 +218,6 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     keyboardInteraction,
     camera,
     handlers,
-    captured,
-    hovered,
     video,
     opening,
     motion,

@@ -83,7 +83,7 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
   }
 });
 
-it('keeps compact Focus and Audio hover border quiet without changing active toggles or other controls', async () => {
+it('keeps all compact lane switches quiet while preserving active and focus states', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -121,7 +121,14 @@ it('keeps compact Focus and Audio hover border quiet without changing active tog
     const mode = host.querySelector<HTMLButtonElement>(
       `[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`
     )!;
-    expect(mode.className).toContain('enabled:hover:!border-');
+    expect(mode.className).not.toContain('enabled:hover:!border-');
+    const history = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.telemetry')}"]`
+    )!;
+    expect(history.className).not.toContain('enabled:hover:!border-');
+    expect(history.className).toContain('focus-visible:ring-2');
+    await act(async () => history.click());
+    expect(setTrackVisibility).toHaveBeenLastCalledWith('actions', false);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

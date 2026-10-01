@@ -29,6 +29,9 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+const locale = vi.hoisted(() => ({ value: 'en' as 'en' | 'ru' }));
+vi.mock('../../platform/i18n/locale/hook', () => ({ useAppLocale: () => locale.value }));
+
 const zoom = (id: string, start: number, end: number): QuickEditZoomRegion => ({
   id,
   start,
@@ -371,4 +374,25 @@ it('keeps focus selection and final range through delayed note admission', async
   expect(commit).not.toHaveBeenCalled();
   await act(async () => admit());
   expect(commit).toHaveBeenCalledExactlyOnceWith('a', { start: 4, end: 6 }, 'move');
+});
+
+it('formats timeline scale and tooltip with one localized decimal without mutating the region', () => {
+  const region = zoom('fraction', 2, 4);
+  region.transform.scale = 1.6666666667;
+  for (const [language, expected] of [
+    ['en', '1.7×'],
+    ['ru', '1,7×'],
+  ] as const) {
+    locale.value = language;
+    const view = renderTrack([region], vi.fn());
+    expect(view.blocks[0]!.textContent).toContain(expected);
+    expect(view.blocks[0]!.title).toContain(expected);
+    expect(view.blocks[0]!.textContent).not.toContain('666666');
+    expect(region.transform.scale).toBe(1.6666666667);
+  }
+  region.transform.scale = 2;
+  const view = renderTrack([region], vi.fn());
+  expect(view.blocks[0]!.title).toContain('2×');
+  expect(view.blocks[0]!.title).not.toContain('2,0');
+  locale.value = 'en';
 });

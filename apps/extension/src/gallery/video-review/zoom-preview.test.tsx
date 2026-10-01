@@ -305,7 +305,7 @@ it.each(['nw', 'ne', 'sw', 'se'])(
     expect(patch.scale).toBeGreaterThanOrEqual(1);
     expect(patch.scale).toBeLessThan(2);
     expect(canvas.releasePointerCapture).toHaveBeenCalledWith(7);
-    expect(area.dataset['controlsVisible']).toBe('false');
+    expect(area.dataset['controlsVisible']).toBe('true');
   }
 );
 
@@ -349,3 +349,18 @@ it.each(['pointercancel', 'lostpointercapture', 'Escape', 'blur'])(
     expect(release).toHaveBeenCalledTimes(1);
   }
 );
+
+it('keeps the inspector Zoom area visible before hover and after pointer departure', async () => {
+  const view = renderPreview({});
+  await act(async () => Promise.resolve());
+  const area = () => host.querySelector<HTMLElement>('[data-focus-frame]')!;
+  expect(area().getAttribute('data-controls-visible')).toBe('true');
+  await pointer(view.canvas(), 'pointermove', 60);
+  await pointer(view.canvas(), 'pointerleave', -10);
+  expect(area().getAttribute('data-controls-visible')).toBe('true');
+  renderPreview({
+    region: region({ id: 'zoom-2', transform: { scale: 3, centerX: 0.4, centerY: 0.6 } }),
+  });
+  await act(async () => Promise.resolve());
+  expect(area().getAttribute('data-controls-visible')).toBe('true');
+});

@@ -4,7 +4,7 @@ import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './c
 import { ScanEye } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
-import { translate } from '../../platform/i18n';
+import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import {
@@ -417,6 +417,8 @@ function ReviewZoomRegionBlock(
 ) {
   const { region, duration, snapEdges, onPreview, onGuide } = props;
   const { cutOverlap, label, style } = reviewZoomBlockPresentation(props);
+  const locale = useAppLocale();
+  const scaleLabel = `${formatNumber(region.transform.scale, { maximumFractionDigits: 1 }, locale)}×`;
   const tone = reviewTimelineItemTone(props.selected, 'focus');
   const begin = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
@@ -451,7 +453,7 @@ function ReviewZoomRegionBlock(
       data-cut-suppressed={cutOverlap ? 'true' : 'false'}
       tabIndex={0}
       aria-label={label}
-      title={`${label}${region.spotlight ? '' : ` · ${region.transform.scale}×`}`}
+      title={`${label}${region.spotlight ? '' : ` · ${scaleLabel}`}`}
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
@@ -516,7 +518,7 @@ function ReviewZoomRegionBlock(
               ? 'gallery.videoReview.focusSpotlight'
               : 'gallery.videoReview.zoomRegionLabel'
           )}
-          value={region.spotlight ? undefined : `${region.transform.scale}×`}
+          value={region.spotlight ? undefined : scaleLabel}
         />
       </span>
       {(['start', 'end'] as const).map((edge) => (
