@@ -130,18 +130,13 @@ export function toggleDesignReviewMeasurements(): void {
   if (!state.enabled || !pickerRuntime) return;
   const measurementsEnabled = !state.measurementsEnabled;
   pickerRuntime.setMeasurementsEnabled(measurementsEnabled);
-  if (!measurementsEnabled) pickerRuntime.setMeasurementsExpanded(false);
-  state = {
-    ...state,
-    measurementsEnabled,
-    measurementsExpanded: measurementsEnabled && state.measurementsExpanded,
-  };
+  state = { ...state, measurementsEnabled };
   publish();
 }
 
-/** Shows container and viewport space and full-viewport guides beside sibling rulers. */
+/** Independently toggles container/viewport distances, axes and the container outline. */
 export function toggleDesignReviewMeasurementDetails(): void {
-  if (!state.enabled || !state.measurementsEnabled || !pickerRuntime) return;
+  if (!state.enabled || !pickerRuntime) return;
   const measurementsExpanded = !state.measurementsExpanded;
   pickerRuntime.setMeasurementsExpanded(measurementsExpanded);
   state = { ...state, measurementsExpanded };

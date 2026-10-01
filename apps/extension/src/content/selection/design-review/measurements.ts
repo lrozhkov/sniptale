@@ -288,14 +288,20 @@ export function createDesignReviewMeasurements() {
     placements.clear();
   }
   function refresh() {
-    if (!enabled || !hovered?.isConnected) {
+    if ((!enabled && !expanded) || !hovered?.isConnected) {
       clear();
       return;
     }
+    const seen = new Set<string>();
     const measurements = [
-      ...measureDesignReviewNeighbors(hovered),
+      ...(enabled ? measureDesignReviewNeighbors(hovered) : []),
       ...(expanded ? measureDesignReviewLayout(hovered) : []),
-    ];
+    ].filter(({ direction, distance, x1, y1, x2, y2 }) => {
+      const key = JSON.stringify([direction, distance, x1, y1, x2, y2]);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     const source = expanded ? visibleRect(hovered) : null;
     const next = JSON.stringify([
       measurements,
@@ -328,18 +334,19 @@ export function createDesignReviewMeasurements() {
   }
   function track() {
     refresh();
-    if (enabled && hovered?.isConnected) frame = requestAnimationFrame(track);
+    if ((enabled || expanded) && hovered?.isConnected) frame = requestAnimationFrame(track);
   }
   return {
     setEnabled(value: boolean) {
       enabled = value;
       clear();
-      if (enabled && hovered) track();
+      if ((enabled || expanded) && hovered) track();
     },
     setExpanded(value: boolean) {
       expanded = value;
       signature = '';
       refresh();
+      if ((enabled || expanded) && hovered && !frame) frame = requestAnimationFrame(track);
     },
     hover(element: Element | null) {
       hovered = element;
@@ -348,10 +355,11 @@ export function createDesignReviewMeasurements() {
         return;
       }
       refresh();
-      if (enabled && !frame) frame = requestAnimationFrame(track);
+      if ((enabled || expanded) && !frame) frame = requestAnimationFrame(track);
     },
     dispose() {
       enabled = false;
+      expanded = false;
       hovered = null;
       clear();
     },

@@ -62,7 +62,7 @@ export function ToolbarDesignReviewControls(props: {
       <ContentToolbarButton
         active={mode.measurementsExpanded}
         aria-pressed={mode.measurementsExpanded}
-        disabled={!mode.enabled || !mode.measurementsEnabled}
+        disabled={!mode.enabled}
         dataUi="content.toolbar.design-review-measurement-details-button"
         onClick={(event) => {
           event.stopPropagation();

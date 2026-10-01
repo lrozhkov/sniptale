@@ -69,7 +69,10 @@ it('keeps a real CompactSelect option inside the Design Review inspector boundar
     onInspectorDismissRequested,
     onSelection: vi.fn(),
   });
+  pickerRuntime.setMeasurementsExpanded(true);
   expect(pickerRuntime.selectElement(selected)).toBe(true);
+  const projection = contentRoot.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(projection).not.toBeNull();
 
   reactRoot = createRoot(mount);
   act(() => {
@@ -107,6 +110,9 @@ it('keeps a real CompactSelect option inside the Design Review inspector boundar
 
   expect(onChange).toHaveBeenCalledWith('inline');
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(contentRoot.querySelector('[data-ui="content.design-review.measurements"]')).toBe(
+    projection
+  );
 });
 
 it('keeps a color picker Apply click inside the selected element inspector', async () => {
@@ -131,7 +137,10 @@ it('keeps a color picker Apply click inside the selected element inspector', asy
     onInspectorDismissRequested,
     onSelection: vi.fn(),
   });
+  pickerRuntime.setMeasurementsExpanded(true);
   expect(pickerRuntime.selectElement(selected)).toBe(true);
+  const projection = contentRoot.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(projection).not.toBeNull();
 
   reactRoot = createRoot(mount);
   act(() => {
@@ -166,5 +175,8 @@ it('keeps a color picker Apply click inside the selected element inspector', asy
     await Promise.resolve();
   });
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(contentRoot.querySelector('[data-ui="content.design-review.measurements"]')).toBe(
+    projection
+  );
   expect(onChange).toHaveBeenCalledWith('#123456');
 });

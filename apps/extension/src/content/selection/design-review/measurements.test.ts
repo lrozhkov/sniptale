@@ -250,3 +250,69 @@ it('keeps actual long label boxes disjoint around a tiny selected element', () =
   }
   runtime.dispose();
 });
+
+it.each([
+  [false, false],
+  [true, false],
+  [false, true],
+  [true, true],
+])('renders independent sibling=%s and additional=%s projections', (basic, additional) => {
+  const parent = box(80, 60, 300, 240).element;
+  const target = box(120, 110, 50, 40, parent).element;
+  box(200, 110, 50, 40, parent);
+  const runtime = createDesignReviewMeasurements();
+  runtime.hover(target);
+  runtime.setEnabled(basic);
+  runtime.setExpanded(additional);
+  const layer = document.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(Boolean(layer)).toBe(basic || additional);
+  expect(layer?.querySelectorAll('[data-scope="neighbor"]').length ?? 0).toBe(basic ? 1 : 0);
+  expect(layer?.querySelectorAll('[data-scope="container"]').length ?? 0).toBe(additional ? 4 : 0);
+  expect(layer?.querySelectorAll('[data-scope="viewport"]').length ?? 0).toBe(additional ? 4 : 0);
+  expect(Boolean(layer?.querySelector('[data-scope="container-outline"]'))).toBe(additional);
+  runtime.dispose();
+});
+
+it('deduplicates coincident container and viewport rulers without merging different positions', () => {
+  const parent = box(0, 0, window.innerWidth, window.innerHeight).element;
+  const target = box(100, 100, 50, 50, parent).element;
+  const runtime = createDesignReviewMeasurements();
+  runtime.hover(target);
+  runtime.setExpanded(true);
+  const layer = document.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(layer?.querySelectorAll('[data-scope="container"]')).toHaveLength(4);
+  expect(layer?.querySelectorAll('[data-scope="viewport"]')).toHaveLength(0);
+  runtime.dispose();
+});
+
+it('tracks layout changes with additional distances alone and releases every scheduled frame', () => {
+  const callbacks: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    callbacks.push(callback);
+    return callbacks.length;
+  });
+  const target = box(100, 100);
+  const runtime = createDesignReviewMeasurements();
+  runtime.hover(target.element);
+  runtime.setExpanded(true);
+  expect(callbacks).toHaveLength(1);
+  const layer = () => document.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(
+    layer()?.querySelector('[data-scope="viewport"][data-direction="left"]')?.textContent
+  ).toMatch(/100 px/u);
+  target.move(new DOMRect(120, 100, 50, 50));
+  callbacks.shift()?.(0);
+  expect(
+    layer()?.querySelector('[data-scope="viewport"][data-direction="left"]')?.textContent
+  ).toMatch(/120 px/u);
+  runtime.setEnabled(true);
+  runtime.setEnabled(false);
+  expect(layer()).not.toBeNull();
+  runtime.setExpanded(false);
+  expect(layer()).toBeNull();
+  runtime.setExpanded(true);
+  target.element.remove();
+  callbacks.pop()?.(0);
+  expect(layer()).toBeNull();
+  runtime.dispose();
+});

@@ -240,7 +240,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     (event, iframe) => {
       handlePickerMouseMove(state, event, iframe);
       if (isTrustedMouseEvent(event) && !state.inspectorPointerGestureStarted)
-        measurements.hover(resolveSelectablePageElement(event, iframe));
+        measurements.hover(state.selectedElement ?? resolveSelectablePageElement(event, iframe));
     },
     { capture: true }
   );
@@ -256,7 +256,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     'click',
     (event, iframe) => {
       handlePickerClick(state, args, event, iframe);
-      measurements.hover(state.selectedElement);
+      if (isTrustedMouseEvent(event)) measurements.hover(state.selectedElement);
     },
     { capture: true }
   );
@@ -299,9 +299,10 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     },
     { capture: true }
   );
-  const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) =>
-    handleInaccessibleIframeSelection(state, args, iframe)
-  );
+  const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) => {
+    handleInaccessibleIframeSelection(state, args, iframe);
+    measurements.hover(state.selectedElement);
+  });
 
   return {
     dismissSelection: () => {
@@ -325,7 +326,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     },
     selectElement: (element) => {
       const selected = selectPickerElement(state, args, element);
-      if (selected) measurements.hover(element);
+      if (selected) measurements.hover(state.selectedElement);
       return selected;
     },
   };

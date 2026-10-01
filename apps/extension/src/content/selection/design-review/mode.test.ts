@@ -182,6 +182,13 @@ it('toggles measurements without changing selection and resets them between mode
   expect(setMeasurementsEnabled).not.toHaveBeenCalled();
   enableDesignReviewMode();
   const selection = getDesignReviewModeState().selection;
+  toggleDesignReviewMeasurementDetails();
+  expect(getDesignReviewModeState()).toMatchObject({
+    measurementsEnabled: false,
+    measurementsExpanded: true,
+  });
+  toggleDesignReviewMeasurementDetails();
+  setMeasurementsExpanded.mockClear();
   toggleDesignReviewMeasurements();
   expect(getDesignReviewModeState()).toMatchObject({ measurementsEnabled: true, selection });
   expect(setMeasurementsEnabled).toHaveBeenLastCalledWith(true);
@@ -190,8 +197,11 @@ it('toggles measurements without changing selection and resets them between mode
   expect(setMeasurementsExpanded).toHaveBeenLastCalledWith(true);
   toggleDesignReviewMeasurements();
   expect(setMeasurementsEnabled).toHaveBeenLastCalledWith(false);
+  expect(getDesignReviewModeState().measurementsExpanded).toBe(true);
+  expect(setMeasurementsExpanded).toHaveBeenCalledTimes(1);
+  toggleDesignReviewMeasurementDetails();
   expect(getDesignReviewModeState().measurementsExpanded).toBe(false);
-  expect(setMeasurementsExpanded).toHaveBeenLastCalledWith(false);
+  expect(getDesignReviewModeState().measurementsEnabled).toBe(false);
   toggleDesignReviewMeasurements();
   disableDesignReviewMode();
   expect(getDesignReviewModeState().measurementsEnabled).toBe(false);

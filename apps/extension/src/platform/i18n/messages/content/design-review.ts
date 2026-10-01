@@ -9,14 +9,17 @@ export const contentDesignReviewMessages = defineMessageSource({
     ru: 'Показать расстояния до соседних элементов',
     en: 'Show distances to sibling elements',
   },
-  hideDistances: { ru: 'Скрыть расстояния', en: 'Hide distances' },
+  hideDistances: {
+    ru: 'Скрыть расстояния до соседних элементов',
+    en: 'Hide distances to sibling elements',
+  },
   showLayoutGuides: {
     ru: 'Показать расстояния до контейнера и экрана и направляющие',
     en: 'Show container and viewport distances and guides',
   },
   hideLayoutGuides: {
-    ru: 'Скрыть дополнительные расстояния и направляющие',
-    en: 'Hide additional distances and guides',
+    ru: 'Скрыть расстояния до контейнера и экрана и направляющие',
+    en: 'Hide container and viewport distances and guides',
   },
   parentDistanceLabel: { ru: 'Контейнер', en: 'Parent' },
   viewportDistanceLabel: { ru: 'Экран', en: 'Viewport' },

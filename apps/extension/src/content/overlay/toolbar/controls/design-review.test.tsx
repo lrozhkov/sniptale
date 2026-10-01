@@ -102,7 +102,7 @@ it('toggles rulers through the mode owner and reflects reset on exit', () => {
     '[data-ui="content.toolbar.design-review-measurement-details-button"]'
   )!;
   expect(toggle.getAttribute('aria-pressed')).toBe('false');
-  expect(details.disabled).toBe(true);
+  expect(details.disabled).toBe(false);
   act(() => toggle.click());
   expect(toggle.getAttribute('aria-pressed')).toBe('true');
   expect(toggle.title).toBe('content.designReview.hideDistances');
@@ -112,7 +112,13 @@ it('toggles rulers through the mode owner and reflects reset on exit', () => {
   expect(details.getAttribute('aria-pressed')).toBe('true');
   expect(getDesignReviewModeState().measurementsExpanded).toBe(true);
   act(() => toggle.click());
-  expect(details.disabled).toBe(true);
+  expect(details.disabled).toBe(false);
+  expect(details.getAttribute('aria-pressed')).toBe('true');
+  expect(getDesignReviewModeState()).toMatchObject({
+    measurementsEnabled: false,
+    measurementsExpanded: true,
+  });
+  act(() => details.click());
   expect(details.getAttribute('aria-pressed')).toBe('false');
   act(() => toggle.click());
   act(() => disableDesignReviewMode());
