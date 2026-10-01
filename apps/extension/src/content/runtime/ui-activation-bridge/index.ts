@@ -11,7 +11,7 @@ import {
   resolveEditableTarget,
   resolveTextControlOffsetAtPoint,
 } from './targets';
-import { isTrustedPointerEvent } from '../../platform/trusted-events';
+import { isTrustedDomEvent, isTrustedPointerEvent } from '../../platform/trusted-events';
 
 const BRIDGED_POINTER_WINDOW_MS = 750;
 const DOUBLE_POINTER_DISTANCE_PX = 5;
@@ -257,6 +257,16 @@ function shouldSuppressFollowUpEvent(
   bridgedActivation: BridgedActivation | null
 ): boolean {
   if (!bridgedActivation || isBridgedMouseEvent(event)) {
+    return false;
+  }
+
+  // A genuine keyboard click is a new activation, even within the pointer duplicate window.
+  if (
+    event instanceof MouseEvent &&
+    event.type === 'click' &&
+    event.detail === 0 &&
+    isTrustedDomEvent(event)
+  ) {
     return false;
   }
 

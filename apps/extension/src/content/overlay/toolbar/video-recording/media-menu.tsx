@@ -39,7 +39,7 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
   const closeMenu = useCallback(() => {
     if (toolbarMenuState && menuType) toolbarMenuState.closeMenu(menuType);
     else setLocalOpen(false);
-    queueMicrotask(() => triggerRef.current?.blur());
+    if (!toolbarMenuState || !menuType) queueMicrotask(() => triggerRef.current?.blur());
   }, [menuType, toolbarMenuState]);
   const [devices, setDevices] = useState<VideoRecordingMediaDevice[]>([]);
   const [loading, setLoading] = useState(false);

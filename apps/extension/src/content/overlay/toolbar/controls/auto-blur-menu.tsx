@@ -204,7 +204,6 @@ function useAutoBlurMenuBindings(props: AutoBlurMenuProps) {
 
   const closeMenu = useCallback(() => {
     props.toolbarMenuState.closeMenu('auto-blur');
-    queueMicrotask(() => triggerRef.current?.focus());
   }, [props.toolbarMenuState]);
 
   useToolbarFloatingMenuDismissal({

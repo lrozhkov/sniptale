@@ -169,6 +169,7 @@ it('routes shared capture Escape separately from ordinary dismissal', () => {
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(onEscapeClose).toHaveBeenCalledOnce();
   expect(onClose).not.toHaveBeenCalled();
+  act(() => host.querySelector('button')?.click());
   act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
   expect(onClose).toHaveBeenCalledOnce();
 });

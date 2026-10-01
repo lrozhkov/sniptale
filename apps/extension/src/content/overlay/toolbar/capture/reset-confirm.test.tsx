@@ -23,13 +23,15 @@ function Harness({
 }) {
   const toolbarMenuState = useToolbarMenuState();
   return (
-    <ToolbarResetConfirmControl
-      available={available}
-      scope={resetScope}
-      displayMode="horizontal"
-      toolbarMenuState={toolbarMenuState}
-      onConfirm={confirm}
-    />
+    <div className="sniptale-toolbar-root">
+      <ToolbarResetConfirmControl
+        available={available}
+        scope={resetScope}
+        displayMode="horizontal"
+        toolbarMenuState={toolbarMenuState}
+        onConfirm={confirm}
+      />
+    </div>
   );
 }
 function render(available = true) {

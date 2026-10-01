@@ -40,17 +40,12 @@ export function ToolbarResetConfirmControl(props: {
   const { closeMenu, toggleMenu, activeMenuType } = props.toolbarMenuState;
   const open = props.available && activeMenuType === 'reset-confirm';
   const close = useCallback(() => closeMenu('reset-confirm'), [closeMenu]);
-  const escapeClose = useCallback(() => {
-    restoreFocus.current = true;
-    close();
-  }, [close]);
 
   useToolbarFloatingMenuDismissal({
     open,
     triggerRef,
     menuRef,
     onClose: close,
-    onEscapeClose: escapeClose,
   });
   useEffect(() => {
     if (!props.available) close();

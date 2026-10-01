@@ -190,7 +190,7 @@
   display: none;
 }
 
-.sniptale-btn:focus-visible {
+.sniptale-btn:focus-visible:not([data-focus-restoration='pointer']) {
   border-color: var(--sniptale-color-border-accent-strong);
   box-shadow:
     var(--sniptale-shadow-sm),
@@ -202,7 +202,7 @@
     [aria-haspopup='menu'],
     [data-menu-open],
     [data-menu-indicator='true']
-  ):focus-visible {
+  ):focus-visible:not([data-focus-restoration='pointer']) {
   outline: 2px solid var(--sniptale-color-text-primary);
   outline-offset: 1px;
   border-color: transparent;
@@ -210,3 +210,8 @@
 }
 
 /* Drag handle tooltip removed */
+
+/* Native browser focus paint follows the same per-opening pointer restoration policy. */
+.sniptale-toolbar-root .sniptale-btn[data-focus-restoration='pointer']:focus {
+  outline: none;
+}

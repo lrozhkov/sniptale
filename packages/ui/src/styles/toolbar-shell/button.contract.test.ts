@@ -27,7 +27,7 @@ it('marks open menus on their indicator and gives menu triggers a compact keyboa
   );
   expect(toolbarShellButtonStylesheet).toContain('border-top-color: var(--sniptale-color-accent);');
   const menuFocusRule = toolbarLegacyActionsStylesheet.match(
-    /\.sniptale-toolbar-root\s+\.sniptale-btn:is\([^}]+\):focus-visible \{[^}]*\}/su
+    /\.sniptale-toolbar-root\s+\.sniptale-btn:is\([^}]+\):focus-visible:not\(\[data-focus-restoration='pointer'\]\) \{[^}]*\}/su
   )?.[0];
   expect(menuFocusRule).toContain('outline: 2px solid var(--sniptale-color-text-primary);');
   expect(menuFocusRule).toContain('box-shadow: none;');

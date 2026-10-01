@@ -197,7 +197,6 @@ export function FullPageCaptureSplitButton(props: FullPageMenuProps) {
   const open = props.toolbarMenuState.activeMenuType === 'full-page';
   const closeMenu = useCallback(() => {
     props.toolbarMenuState.closeMenu('full-page');
-    queueMicrotask(() => triggerRef.current?.focus());
   }, [props.toolbarMenuState]);
   const closeMenuWithoutFocus = useCallback(() => {
     props.toolbarMenuState.closeMenu('full-page');

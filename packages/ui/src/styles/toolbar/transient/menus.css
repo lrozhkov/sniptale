@@ -97,12 +97,18 @@
   border-color: color-mix(in srgb, var(--sniptale-color-border-soft) 74%, transparent);
 }
 
-.sniptale-toolbar-root .sniptale-full-page-wrapper:has(.sniptale-btn:focus-visible) .sniptale-btn {
+.sniptale-toolbar-root
+  .sniptale-full-page-wrapper:has(
+    .sniptale-btn:focus-visible:not([data-focus-restoration='pointer'])
+  )
+  .sniptale-btn {
   border-color: transparent;
   box-shadow: none;
 }
 
-.sniptale-toolbar-root .sniptale-full-page-wrapper .sniptale-btn:focus-visible {
+.sniptale-toolbar-root
+  .sniptale-full-page-wrapper
+  .sniptale-btn:focus-visible:not([data-focus-restoration='pointer']) {
   outline: 2px solid var(--sniptale-color-text-primary);
   outline-offset: 1px;
 }
@@ -133,7 +139,8 @@
   height: 12px;
 }
 
-.sniptale-toolbar-root .sniptale-full-page-chevron:focus-visible {
+.sniptale-toolbar-root
+  .sniptale-full-page-chevron:focus-visible:not([data-focus-restoration='pointer']) {
   border-color: transparent;
   box-shadow: none;
 }

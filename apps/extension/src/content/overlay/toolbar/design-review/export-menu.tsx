@@ -151,7 +151,6 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   const open = props.toolbarMenuState.activeMenuType === 'annotations-export';
   const closeMenu = useCallback(() => {
     props.toolbarMenuState.closeMenu('annotations-export');
-    queueMicrotask(() => triggerRef.current?.focus());
   }, [props.toolbarMenuState]);
   const closeMenuWithoutFocus = useCallback(() => {
     props.toolbarMenuState.closeMenu('annotations-export');
