@@ -75,7 +75,7 @@ vi.mock('../shared/download', async (importOriginal) => ({
 
 async function dragRange(
   host: HTMLElement,
-  options: { lane?: 'zoomLane'; start?: number; end?: number } = {}
+  options: { lane?: 'zoomLane' | 'original'; start?: number; end?: number } = {}
 ) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
@@ -87,15 +87,28 @@ async function dragRange(
     hasPointerCapture: () => true,
     releasePointerCapture: vi.fn(),
   });
+  const original =
+    options.lane === 'original'
+      ? host.querySelector<HTMLElement>('[data-original-audio-lane]')
+      : null;
+  if (original)
+    Object.assign(original, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: () => new DOMRect(0, 0, 400, 32),
+    });
   for (const [type, x] of [
     ['pointerdown', options.start ?? 100],
     ['pointermove', options.end ?? 200],
     ['pointerup', options.end ?? 200],
   ] as const)
     await act(async () =>
-      (type === 'pointerdown'
-        ? host.querySelector(`[data-ui="gallery.videoReview.${options.lane ?? 'sourceLane'}"]`)!
-        : plane
+      (
+        original ??
+        (type === 'pointerdown'
+          ? host.querySelector(`[data-ui="gallery.videoReview.${options.lane ?? 'sourceLane'}"]`)!
+          : plane)
       ).dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
     );
 }
@@ -126,6 +139,7 @@ it('creates a source-audio mute from a range, opens properties and restores it t
     ).toHaveLength(1);
     const range = fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')!;
     expect(range.getAttribute('aria-pressed')).toBe('true');
+    expect(fixture.host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
     expect(fixture.host.textContent).toContain('gallery.videoReview.muteAudioRange');
     expect(fixture.host.querySelectorAll('[data-audio-edge]')).toHaveLength(2);
     await act(async () =>
@@ -157,7 +171,7 @@ it('creates a source-audio mute from a range, opens properties and restores it t
   }
 });
 
-it('draws a source-video volume edit with an independent toolbar default', async () => {
+it('draws a source-audio volume edit with an independent toolbar default', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -174,7 +188,7 @@ it('draws a source-video volume edit with an independent toolbar default', async
     );
     await fixture.click('advancedEditing');
     await fixture.click('originalAudioRange');
-    await dragRange(fixture.host);
+    await dragRange(fixture.host, { lane: 'original' });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     const item = fixture.host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.originalAudioRange"]'
@@ -192,7 +206,7 @@ it('draws a source-video volume edit with an independent toolbar default', async
       fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
     ).not.toBeNull();
     await fixture.click('originalAudioRange');
-    await dragRange(fixture.host, { start: 400, end: 300 });
+    await dragRange(fixture.host, { lane: 'original', start: 400, end: 300 });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(
       fixture.host.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
@@ -394,7 +408,7 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
   }
 });
 
-it('shows repeated source-audio placement failures in the inspector while preserving timeline selection', async () => {
+it('keeps repeated gain failures in the inspector without source selection', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -411,17 +425,17 @@ it('shows repeated source-audio placement failures in the inspector while preser
     );
     await fixture.click('advancedEditing');
     await fixture.click('originalAudioRange');
-    await dragRange(fixture.host);
+    await dragRange(fixture.host, { lane: 'original' });
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     const timeline = fixture.host.querySelector('[data-ui="gallery.videoReview.timeline"]')!;
     await fixture.click('originalAudioRange');
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      await dragRange(fixture.host, { start: 120, end: 180 });
+      await dragRange(fixture.host, { lane: 'original', start: 80, end: 180 });
       expect(fixture.host.querySelector('aside')?.textContent).toContain(
         'gallery.videoReview.originalAudioOverlap'
       );
       expect(timeline.textContent).not.toContain('gallery.videoReview.originalAudioOverlap');
-      expect(timeline.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).not.toBeNull();
+      expect(timeline.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
       expect(
         timeline.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
       ).toHaveLength(1);
@@ -431,7 +445,7 @@ it('shows repeated source-audio placement failures in the inspector while preser
     expect(fixture.host.querySelector('aside')?.textContent).toContain(
       'gallery.videoReview.playbackFailed'
     );
-    await dragRange(fixture.host, { start: 120, end: 180 });
+    await dragRange(fixture.host, { lane: 'original', start: 80, end: 180 });
     expect(fixture.host.querySelector('aside')?.textContent).toContain(
       'gallery.videoReview.playbackFailed'
     );

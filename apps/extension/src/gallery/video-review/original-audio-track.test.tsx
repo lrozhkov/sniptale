@@ -384,6 +384,7 @@ it('commits a source-gain gesture after delayed new-note admission', () => {
   try {
     act(() => f.editor.setOriginalTool(true));
     f.send('pointerdown', 200);
+    f.setBusy(true);
     f.send('pointermove', 500);
     f.send('pointerup', 500);
     expect(f.editor.selectedOriginal).toBeNull();
@@ -405,6 +406,42 @@ it('marks the whole muted source row while retaining the restore action', () => 
     expect(restore.disabled).toBe(false);
     act(() => restore.click());
     expect(row.getAttribute('data-review-track-muted')).toBe('false');
+  } finally {
+    f.close();
+  }
+});
+
+it('discards a gain draft and releases capture when the drawing tool is switched off', () => {
+  const f = setup();
+  try {
+    f.lane.hasPointerCapture = vi.fn(() => true);
+    act(() => f.editor.setOriginalTool(true));
+    f.send('pointerdown', 100);
+    f.send('pointermove', 300);
+    act(() => f.editor.setOriginalTool(false));
+    f.send('pointerup', 300);
+    expect(f.editor.selectedOriginal).toBeNull();
+    expect(f.onRange).not.toHaveBeenCalled();
+    expect(f.lane.releasePointerCapture).toHaveBeenCalled();
+  } finally {
+    f.close();
+  }
+});
+
+it('does not create gain automation from a deferred completed gesture after tool exit', () => {
+  let admit!: () => void;
+  const f = setup(1, (action) => {
+    admit = action;
+  });
+  try {
+    act(() => f.editor.setOriginalTool(true));
+    f.send('pointerdown', 100);
+    f.send('pointermove', 300);
+    f.send('pointerup', 300);
+    act(() => f.editor.setOriginalTool(false));
+    act(() => admit());
+    expect(f.editor.selectedOriginal).toBeNull();
+    expect(f.onRange).not.toHaveBeenCalled();
   } finally {
     f.close();
   }

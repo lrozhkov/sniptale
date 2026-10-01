@@ -228,23 +228,11 @@ function useOriginalAudioGesture(
 ) {
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
-  useEffect(() => {
-    if (!preview) return;
-    const cancel = (event: KeyboardEvent) => {
-      if (event.code === 'Escape' && drag.current) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        const current = drag.current;
-        drag.current = null;
-        current.admission.cancel();
-        setPreview(null);
-        if (current.node.hasPointerCapture?.(current.pointerId))
-          current.node.releasePointerCapture(current.pointerId);
-      }
-    };
-    document.addEventListener('keydown', cancel, true);
-    return () => document.removeEventListener('keydown', cancel, true);
-  }, [preview]);
+  const lifetime = useOriginalAudioGestureLifetime({
+    drag,
+    drawing: !!props.editor?.originalTool,
+    resetPreview: () => setPreview(null),
+  });
   const position = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     return Math.max(
@@ -269,7 +257,7 @@ function useOriginalAudioGesture(
         const range = props.original.ranges?.find((item) => item.id === id);
         const neighbors = props.original.ranges?.filter((other) => other.id !== id) ?? [];
         const admission = deferReviewGesture(props.beforeAction, () => {
-          if (id) props.editor?.selectOriginal(id);
+          if (id && lifetime.canCommit('item')) props.editor?.selectOriginal(id);
         });
         drag.current = {
           admission,
@@ -329,10 +317,10 @@ function useOriginalAudioGesture(
         event.currentTarget.releasePointerCapture(event.pointerId);
         event.stopPropagation();
         current.admission.commit(() => {
+          if (!lifetime.canCommit(current.id ? 'item' : 'range')) return;
           if (current.id)
             props.editor?.patchOriginal(current.id, { start: current.from, end: current.to });
           else {
-            if (!props.editor?.originalTool) return;
             const range: ReviewAnchor = {
               kind: 'range',
               start: Math.min(current.from, current.to),
@@ -359,4 +347,53 @@ function useOriginalAudioGesture(
       },
     },
   };
+}
+
+/** Local capture admission and cleanup follow current tool availability, never stale closures. */
+function useOriginalAudioGestureLifetime(props: {
+  drag: React.RefObject<Drag | null>;
+  drawing: boolean;
+  resetPreview(): void;
+}) {
+  const { drag, drawing, resetPreview } = props;
+  const mounted = useRef(true);
+  const available = useRef(props.drawing);
+  available.current = props.drawing;
+  const canCommit = useCallback(
+    (kind: 'item' | 'range') => mounted.current && (kind === 'item' || available.current),
+    []
+  );
+  const discard = useCallback(() => {
+    const current = drag.current;
+    drag.current = null;
+    if (!current) return;
+    current.admission.cancel();
+    if (current.node.hasPointerCapture?.(current.pointerId))
+      current.node.releasePointerCapture(current.pointerId);
+  }, [drag]);
+  useEffect(() => {
+    const current = drag.current;
+    if (!current || canCommit(current.id ? 'item' : 'range')) return;
+    discard();
+    resetPreview();
+  }, [drag, drawing, canCommit, discard, resetPreview]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      discard();
+    };
+  }, [discard]);
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.code !== 'Escape' || !drag.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      discard();
+      resetPreview();
+    };
+    document.addEventListener('keydown', onEscape, true);
+    return () => document.removeEventListener('keydown', onEscape, true);
+  });
+  return { canCommit };
 }

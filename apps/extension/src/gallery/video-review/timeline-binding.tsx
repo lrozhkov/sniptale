@@ -1,6 +1,6 @@
 import type { ReviewBeforeAction } from './note-transitions';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -218,7 +218,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     [props.source.duration, props.edits]
   );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
-  const originalSource = useOriginalAudioSourcePlacement(props);
+  useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
   const onZoomAdd = () => {
     focus.clear();
@@ -243,6 +243,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         />
       }
       onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
+      onFocusRangePreview={focus.setPreview}
       originalRangeTool={features.mode === 'advanced' && props.audio.originalTool}
       snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
       trackControls={
@@ -267,7 +268,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
               <ReviewZoomLane
                 beforeAction={props.beforeAction}
                 projection={projection}
-                sourceSelection={focus.tool.active ? props.selection : undefined}
+                sourceSelection={focus.tool.active ? (focus.preview ?? undefined) : undefined}
                 advanced={props.advanced}
                 resultDuration={props.resultDuration}
                 outputTime={props.outputTime}
@@ -295,8 +296,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 edits={props.edits}
                 onOriginalRange={(range) => {
                   props.onClearSelection();
-                  props.setSelection(range);
-                  props.audio.setOriginalRangeSelected(true);
+                  props.setSelection({
+                    kind: 'point',
+                    time: range.kind === 'range' ? range.start : range.time,
+                  });
                 }}
                 onSelectSpeed={props.editing.select}
                 showAddedAudio={features.audioTrackVisible}
@@ -328,8 +331,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           }
         : {})}
       onRangeCommit={(range) => {
-        if (!originalSource.commit(range) && props.editing.mode)
-          void props.editing.commitRange(range);
+        if (props.editing.mode) void props.editing.commitRange(range);
       }}
       onChangeEdit={async (edit, range) => {
         await props.editing.commitRange(range, edit);
@@ -377,34 +379,28 @@ function reviewTimelineSourceSelection(props: TimelineBindingProps): ReviewAncho
     : props.selection;
 }
 
-/** Source-video drawing routes to gain only while its advanced audio capability is available. */
-function useOriginalAudioSourcePlacement(props: TimelineBindingProps) {
+/** Drawing availability follows the existing advanced audio capability. */
+function useOriginalAudioPlacement(props: TimelineBindingProps) {
   const mode = props.advanced.ui.mode;
   const audioCodec = props.editing.exporter.index?.audioCodec;
-  const { originalTool, setOriginalTool, addOriginal } = props.audio;
+  const { setOriginalTool } = props.audio;
   useEffect(() => {
     if (mode !== 'advanced' || audioCodec === null) setOriginalTool(false);
   }, [mode, audioCodec, setOriginalTool]);
-  return {
-    commit(range: ReviewAnchor): boolean {
-      if (mode !== 'advanced' || !audioCodec || !originalTool) return false;
-      if (addOriginal(range) && range.kind === 'range') {
-        props.setSelection({ kind: 'point', time: range.start });
-        props.onSeek(range.start);
-      }
-      return true;
-    },
-  };
 }
 
 /** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */
 function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackProjection) {
   const { drawing: enabled, setDrawing: setEnabled } = props.zoom;
+  const [preview, setPreview] = useState<ReviewAnchor | null>(null);
   const visible = resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible;
   const active = enabled && visible && !props.audio.originalTool && !props.editing.mode;
   useEffect(() => {
     if (!visible || props.audio.originalTool || props.editing.mode) setEnabled(false);
   }, [visible, props.audio.originalTool, props.editing.mode, setEnabled]);
+  useEffect(() => {
+    if (!active) setPreview(null);
+  }, [active]);
   const candidate = (range: ReviewAnchor) => {
     if (
       range.kind !== 'range' ||
@@ -435,11 +431,17 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
     if (!region) return;
     if (props.zoom.addRegion(region)) {
       setEnabled(false);
+      props.setSelection({
+        kind: 'point',
+        time: range.kind === 'range' ? range.start : props.time,
+      });
       props.onSeek(range.kind === 'range' ? range.start : props.time);
     }
   };
   return {
     clear: () => setEnabled(false),
+    preview,
+    setPreview,
     commit,
     tool: {
       active,

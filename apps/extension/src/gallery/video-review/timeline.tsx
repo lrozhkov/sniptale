@@ -34,6 +34,7 @@ type TimelineProps = {
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
+  onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
   originalRangeTool?: boolean;
   snapRangePreview?: boolean;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
@@ -187,7 +188,7 @@ export function ReviewTimeline(props: TimelineProps) {
             ) : null}
             <ReviewSourceLane
               {...props}
-              rangeEnabled={!props.onFocusRangeCommit}
+              rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
               snapToKeyframes={!!props.boundaries}
             />
           </div>

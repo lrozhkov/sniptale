@@ -526,8 +526,10 @@ it.each(['zoomLane', 'audioLane'])('seeks without selecting a range on an idle %
 it('routes focus drawing to its own tool and cancels without committing', () => {
   const onFocusRangeCommit = vi.fn();
   const onRangeCommit = vi.fn();
+  const onFocusRangePreview = vi.fn();
   const { host, props } = renderTimeline({
     onFocusRangeCommit,
+    onFocusRangePreview,
     onRangeCommit,
     zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
   });
@@ -540,12 +542,15 @@ it('routes focus drawing to its own tool and cancels without committing', () => 
   ]);
   expect(onFocusRangeCommit).toHaveBeenCalledExactlyOnceWith({ kind: 'range', start: 1, end: 2.5 });
   expect(onRangeCommit).not.toHaveBeenCalled();
-  expect(props.onSelect).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  expect(onFocusRangePreview).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  expect(onFocusRangePreview).toHaveBeenLastCalledWith(null);
+  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
   dispatchPlane(lane, [{ type: 'pointerdown', x: 250 }]);
   dispatchPlane(plane, [{ type: 'pointermove', x: 100 }]);
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   dispatchPlane(plane, [{ type: 'pointerup', x: 100 }]);
   expect(onFocusRangeCommit).toHaveBeenCalledTimes(1);
+  expect(onFocusRangePreview).toHaveBeenLastCalledWith(null);
 });
 
 it('fits the time plane to live CSS width without a resize-observer frame of overflow', () => {
@@ -573,4 +578,26 @@ it('keeps export navigation last and available while timeline edits are busy', a
   expect(opener.disabled).toBe(false);
   await act(async () => opener.click());
   expect(onOpenExport).toHaveBeenCalledOnce();
+});
+
+it('cancels focus capture and preview when the drawing capability changes', () => {
+  const preview = vi.fn(),
+    commit = vi.fn();
+  const { host, props } = renderTimeline({
+    onFocusRangeCommit: commit,
+    onFocusRangePreview: preview,
+    zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
+  });
+  const plane = planeWithMetrics(host);
+  const focus = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
+  dispatchPlane(focus, [
+    { type: 'pointerdown', x: 100 },
+    { type: 'pointermove', x: 250 },
+  ]);
+  expect(preview).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  renderTimeline({ ...props, onFocusRangeCommit: undefined, originalRangeTool: true });
+  dispatchPlane(plane, [{ type: 'pointerup', x: 250 }]);
+  expect(preview).toHaveBeenLastCalledWith(null);
+  expect(commit).not.toHaveBeenCalled();
+  expect(plane.releasePointerCapture).toHaveBeenCalled();
 });

@@ -93,8 +93,10 @@ export function useReviewEditorWiring(args: {
     edits: args.document.edits,
     selectedOriginalId:
       args.activeSelection.kind === 'original-audio' ? args.activeSelection.id : null,
-    onOriginalSelection: (id) =>
-      args.setActiveSelection(id ? { kind: 'original-audio', id } : { kind: 'none' }),
+    onOriginalSelection: (id) => {
+      if (id) args.setTimelineSelection({ kind: 'point', time: args.time });
+      args.setActiveSelection(id ? { kind: 'original-audio', id } : { kind: 'none' });
+    },
     selectedId: args.activeSelection.kind === 'audio' ? args.activeSelection.id : null,
     onSelectionChange: (value) =>
       args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),

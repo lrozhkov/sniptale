@@ -120,6 +120,10 @@ it('wires selection, flush, history, and shortcut boundaries through one owner',
     audioSelection({ lane: 'music', id: 'audio-a' });
     audioSelection(null);
     expect(setActiveSelection).toHaveBeenCalledTimes(4);
+    const originalSelection = mocks.audio.mock.lastCall?.[0].onOriginalSelection as SelectionSetter;
+    originalSelection('gain-a');
+    expect(setTimelineSelection).toHaveBeenLastCalledWith({ kind: 'point', time: 1 });
+    expect(setActiveSelection).toHaveBeenLastCalledWith({ kind: 'original-audio', id: 'gain-a' });
 
     const lifecycle = mocks.lifecycle.mock.lastCall?.[0] as LifecycleBinding;
     lifecycle.deleteCanvas('missing');

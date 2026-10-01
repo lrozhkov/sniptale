@@ -1,5 +1,5 @@
 import type { ReviewBeforeAction } from './note-transitions';
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type PlaneDragProps = {
@@ -14,6 +14,7 @@ type PlaneDragProps = {
   onSelect(value: ReviewAnchor): void;
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
+  onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
   originalRangeTool?: boolean;
 };
 
@@ -95,7 +96,7 @@ export function reviewPlaneLane(
       '[data-ui="gallery.videoReview.sourceLane"],[data-ui="gallery.videoReview.ruler"]'
     )
   )
-    return focusEnabled ? 'seek' : 'source';
+    return focusEnabled || originalEnabled ? 'seek' : 'source';
   return 'gap';
 }
 
@@ -105,28 +106,27 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   const drag = useRef<PlaneDragState | null>(null);
   const commitRange = (current: PlaneDragState) => {
     if (!current.range) return;
-    if (current.lane === 'focus') props.onFocusRangeCommit?.(current.range);
-    else props.onRangeCommit?.(current.range);
+    if (current.lane === 'focus') {
+      props.onFocusRangePreview?.(null);
+      props.onFocusRangeCommit?.(current.range);
+    } else props.onRangeCommit?.(current.range);
   };
   const restore = (current: PlaneDragState) => {
     current.cancelled = true;
+    if (current.lane === 'focus') props.onFocusRangePreview?.(null);
     if (!current.admitted) return;
     props.onSeek(current.time, false);
     props.onSelect(current.selection);
   };
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      const current = drag.current;
-      if (event.key !== 'Escape' || !current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      drag.current = null;
-      if (plane.current?.hasPointerCapture(current.pointerId))
-        plane.current.releasePointerCapture(current.pointerId);
-      restore(current);
-    };
-    window.addEventListener('keydown', cancel, true);
-    return () => window.removeEventListener('keydown', cancel, true);
+  const lifetime = useReviewPlaneDragLifetime({
+    plane,
+    drag,
+    restore,
+    capability: props.onFocusRangeCommit
+      ? 'focus'
+      : props.originalRangeTool
+        ? 'original'
+        : 'source',
   });
   return {
     plane,
@@ -162,12 +162,14 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
       drag.current = current;
       event.currentTarget.setPointerCapture(event.pointerId);
       (props.beforeAction ?? ((action) => action()))(() => {
-        if (current.cancelled) return;
+        if (!lifetime.canAdmit(current)) return;
         current.admitted = true;
         props.onClearSelection?.();
         props.onSeek(time);
-        if (current.range) props.onSelect(current.range);
-        else if (
+        if (current.range) {
+          if (lane === 'focus') props.onFocusRangePreview?.(current.range);
+          else props.onSelect(current.range);
+        } else if (
           lane !== 'source' ||
           props.selection.kind !== 'range' ||
           time < props.selection.start ||
@@ -192,7 +194,10 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         start: Math.min(current.start, time),
         end: Math.max(current.start, time),
       };
-      if (current.admitted) props.onSelect(current.range);
+      if (current.admitted) {
+        if (current.lane === 'focus') props.onFocusRangePreview?.(current.range);
+        else props.onSelect(current.range);
+      }
     },
     onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
@@ -206,7 +211,72 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
     onPointerCancel: () => {
       const current = drag.current;
       drag.current = null;
-      if (current) restore(current);
+      if (current) {
+        lifetime.release(current);
+        restore(current);
+      }
     },
   };
+}
+
+/** Capture lifetime owns cancellation and admission after delayed note completion. */
+function useReviewPlaneDragLifetime(props: {
+  plane: MutableRefObject<HTMLDivElement | null>;
+  drag: MutableRefObject<PlaneDragState | null>;
+  capability: 'source' | 'focus' | 'original';
+  restore(current: PlaneDragState): void;
+}) {
+  const { plane, drag, restore } = props;
+  const mounted = useRef(true);
+  const capability = useRef(props.capability);
+  capability.current = props.capability;
+  const canAdmit = useCallback(
+    (current: PlaneDragState) =>
+      mounted.current &&
+      !current.cancelled &&
+      (current.lane === 'seek' || current.lane === capability.current),
+    []
+  );
+  const release = useCallback(
+    (current: PlaneDragState) => {
+      if (plane.current?.hasPointerCapture(current.pointerId))
+        plane.current.releasePointerCapture(current.pointerId);
+    },
+    [plane]
+  );
+  const cancel = () => {
+    const current = drag.current;
+    drag.current = null;
+    if (!current) return;
+    release(current);
+    restore(current);
+  };
+  useEffect(() => {
+    const current = drag.current;
+    if (current && !canAdmit(current)) cancel();
+  });
+  const dispose = useCallback(() => {
+    mounted.current = false;
+    const current = drag.current;
+    drag.current = null;
+    if (current) {
+      current.cancelled = true;
+      release(current);
+    }
+  }, [drag, release]);
+  useEffect(() => {
+    mounted.current = true;
+    return dispose;
+  }, [dispose]);
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !drag.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancel();
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => window.removeEventListener('keydown', onEscape, true);
+  });
+  return { canAdmit, release };
 }

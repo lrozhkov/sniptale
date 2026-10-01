@@ -37,7 +37,23 @@ for (const variant of [
         path: testInfo.outputPath(`source-volume-tool-${variant.locale}-${variant.theme}.png`),
       });
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
-      const box = (await source.boundingBox())!;
+      const sourceBox = (await source.boundingBox())!;
+      await page.mouse.move(sourceBox.x + sourceBox.width / 6, sourceBox.y + sourceBox.height / 2);
+      await expect(dialog.locator('[data-ui="gallery.videoReview.timePlane"]')).toHaveCSS(
+        'cursor',
+        'default'
+      );
+      await page.mouse.down();
+      await page.mouse.move(sourceBox.x + sourceBox.width / 3, sourceBox.y + sourceBox.height / 2, {
+        steps: 5,
+      });
+      await page.mouse.up();
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]')
+      ).toHaveCount(0);
+      await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
+      const original = dialog.locator('[data-original-audio-lane]');
+      const box = (await original.boundingBox())!;
       await page.mouse.move(box.x + box.width / 6, box.y + box.height / 2);
       await page.mouse.down();
       await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2, { steps: 8 });
@@ -63,15 +79,15 @@ for (const variant of [
         })
         .click();
       for (let attempt = 0; attempt < 2; attempt += 1) {
-        await page.mouse.move(box.x + box.width * 0.2, box.y + box.height / 2);
+        await page.mouse.move(box.x + box.width * 0.1, box.y + box.height / 2);
         await page.mouse.down();
-        await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
+        await page.mouse.move(box.x + box.width * 0.25, box.y + box.height / 2);
         await page.mouse.up();
         const message = translate('gallery.videoReview.originalAudioOverlap', variant.locale);
         await expect(dialog.locator('aside')).toContainText(message);
         await expect(timeline).not.toContainText(message);
         await expect(range).toHaveCount(1);
-        await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toBeVisible();
+        await expect(dialog.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
         const afterError = (await timeline.boundingBox())!;
         expect(afterError.y).toBeCloseTo(beforeError.y, 0);
         expect(afterError.height).toBeCloseTo(beforeError.height, 0);
@@ -144,6 +160,15 @@ for (const variant of [
       await page.mouse.up();
       await expect(page.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
       await expect(focus.locator('[role="button"]')).toHaveCount(0);
+      await page.mouse.move(focusBox.x + focusBox.width * 0.2, focusBox.y + focusBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(focusBox.x + focusBox.width * 0.4, focusBox.y + focusBox.height / 2, {
+        steps: 5,
+      });
+      await expect(page.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
+      await page.mouse.up();
+      await expect(focus.locator('[role="button"]')).toHaveCount(1);
+      await expect(page.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
       await button('gallery.videoReview.pointerTool').click();
       await page.mouse.move(
         restrictedSource.x + restrictedSource.width * 0.25,
@@ -157,6 +182,21 @@ for (const variant of [
       await expect(plane).toHaveCSS('cursor', /data:image\/svg\+xml.*4 16, cell/);
       await page.mouse.move(focusBox.x + focusBox.width * 0.25, focusBox.y + focusBox.height / 2);
       await expect(plane).toHaveCSS('cursor', 'default');
+      await page.mouse.move(audioBox.x + audioBox.width * 0.5, audioBox.y + audioBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(audioBox.x + audioBox.width * 0.7, audioBox.y + audioBox.height / 2, {
+        steps: 5,
+      });
+      await page.mouse.up();
+      await expect(
+        original.locator('[data-ui="gallery.videoReview.originalAudioRange"]')
+      ).toHaveCount(1);
+      await expect(page.locator('[data-ui="gallery.videoReview.sourceRange"]')).toHaveCount(0);
+      await button('gallery.videoReview.undo').click();
+      await expect(
+        original.locator('[data-ui="gallery.videoReview.originalAudioRange"]')
+      ).toHaveCount(0);
+      await expect(focus.locator('[role="button"]')).toHaveCount(1);
     } finally {
       await context.close();
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

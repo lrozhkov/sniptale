@@ -101,8 +101,7 @@ it('shows an exact range-start guide only over drawing zones, with neutral seek 
   const plane = planeWithMetrics(host);
   const source = host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!;
   hoverAt(source, 100);
-  expect(plane.style.cursor).toContain('data:image/svg+xml');
-  expect(plane.style.cursor).toContain('4 16, cell');
+  expect(plane.style.cursor).toBe('default');
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')?.textContent).toBe('1.0');
   expect(
     (host.querySelector('[data-ui="gallery.videoReview.hoverTime"]') as HTMLElement).style.left
@@ -293,4 +292,22 @@ it('rejects source-range gestures and existing source edit keyboard actions in F
   act(() => block.querySelector<HTMLButtonElement>('button')!.click());
   expect(onChangeEdit).toHaveBeenCalledOnce();
   expect(onEdit).toHaveBeenCalledOnce();
+});
+
+it('keeps source video and ruler out of original gain drawing and uses seek cursors', () => {
+  const onRangeCommit = vi.fn();
+  const { host, props } = renderTimeline({ originalRangeTool: true, onRangeCommit });
+  const plane = planeWithMetrics(host);
+  for (const selector of ['sourceLane', 'ruler']) {
+    const target = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${selector}"]`)!;
+    hoverAt(target, 100);
+    expect(plane.style.cursor).toBe('default');
+    dispatchPlane(target, [
+      { type: 'pointerdown', x: 100 },
+      { type: 'pointermove', x: 250 },
+      { type: 'pointerup', x: 250 },
+    ]);
+    expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
+    expect(onRangeCommit).not.toHaveBeenCalled();
+  }
 });
