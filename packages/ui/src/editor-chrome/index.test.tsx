@@ -94,7 +94,11 @@ it('renders the shared image and scenario editor application icons', () => {
   );
 
   expect(container?.querySelector('svg.image-editor path[d*="18 22"]')).not.toBeNull();
-  expect(container?.querySelector('svg.scenario-editor')).not.toBeNull();
+  const guideIcon = container?.querySelector('svg.scenario-editor.lucide-book-open');
+  expect(guideIcon).not.toBeNull();
+  expect(guideIcon?.getAttribute('aria-hidden')).toBe('true');
+  expect(guideIcon?.getAttribute('width')).toBe('24');
+  expect(guideIcon?.getAttribute('height')).toBe('24');
 });
 
 it('prevents clicks when the icon button is disabled', () => {

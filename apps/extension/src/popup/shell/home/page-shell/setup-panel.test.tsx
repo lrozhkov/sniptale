@@ -174,7 +174,7 @@ it('uses popup folder wording and offers scenario recording for tab captures', a
   ).toBe('popup.image-editor-icon');
   expect(
     getContainer()?.querySelector('[data-option-icon="scenario"] svg')?.getAttribute('class')
-  ).toContain('lucide-scroll-text');
+  ).toContain('lucide-book-open');
 });
 
 it('renders tab settings, applies field changes, and disables a pending capture', async () => {

@@ -183,7 +183,7 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
       .find((button) => button.textContent?.includes('popup.home.scenarioEditorLabel'))
       ?.querySelector('svg')
       ?.getAttribute('class')
-  ).toContain('lucide-scroll-text');
+  ).toContain('lucide-book-open');
   expect(mocks.openScreenshotMode.mock.calls).toEqual([
     ['drawing'],
     ['highlighter'],
