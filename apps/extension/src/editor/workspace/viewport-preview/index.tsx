@@ -20,17 +20,7 @@ interface EditorViewportPreviewProps {
 
 const viewportPreviewSurfaceClassName =
   'relative overflow-hidden rounded-[14px] border border-[var(--sniptale-color-border-soft)] ' +
-  'bg-[linear-gradient(45deg,' +
-  'color-mix(in_srgb,var(--sniptale-color-text-muted)_22%,transparent)_25%,' +
-  'transparent_25%,transparent_75%,' +
-  'color-mix(in_srgb,var(--sniptale-color-text-muted)_22%,transparent)_75%,' +
-  'color-mix(in_srgb,var(--sniptale-color-text-muted)_22%,transparent)),' +
-  'linear-gradient(45deg,' +
-  'color-mix(in_srgb,var(--sniptale-color-text-muted)_22%,transparent)_25%,' +
-  'transparent_25%,transparent_75%,' +
-  'color-mix(in_srgb,var(--sniptale-color-text-muted)_22%,transparent)_75%,' +
-  'color-mix(in_srgb,var(--sniptale-color-text-muted)_22%,transparent))] ' +
-  '[background-position:0_0,8px_8px] [background-size:16px_16px] ' +
+  'bg-[var(--sniptale-color-surface-panel)] ' +
   'shadow-[inset_0_1px_0_color-mix(in_srgb,var(--sniptale-color-text-primary)_4%,transparent)] ' +
   'outline-none touch-none focus-visible:ring-2 ' +
   'focus-visible:ring-[color:color-mix(in_srgb,var(--sniptale-color-accent)_52%,transparent)] ' +
@@ -114,6 +104,7 @@ function useViewportPreviewSurfaceProps({
     useViewportPreviewBaseState(forceOpen);
   const {
     dragPointerIdRef,
+    contentRect,
     navigateFromClientPoint,
     previewCanvasRef,
     previewSize,
@@ -144,6 +135,7 @@ function useViewportPreviewSurfaceProps({
     }),
     surfaceProps: createViewportPreviewSurfaceProps({
       handlePointerDown,
+      contentRect,
       handlePointerMove,
       handlePointerRelease,
       handleSurfaceKeyDown,
@@ -162,11 +154,13 @@ function createViewportPreviewSurfaceProps(args: {
   handleSurfaceKeyDown: ReturnType<typeof useViewportPreviewHandlers>['handleSurfaceKeyDown'];
   previewCanvasRef: ReturnType<typeof useEditorViewportPreview>['previewCanvasRef'];
   previewSize: ReturnType<typeof useEditorViewportPreview>['previewSize'];
+  contentRect: ReturnType<typeof useEditorViewportPreview>['contentRect'];
   previewSurfaceRef: ReturnType<typeof useEditorViewportPreview>['previewSurfaceRef'];
   viewportFrame: ReturnType<typeof useEditorViewportPreview>['viewportFrame'];
 }) {
   return {
     previewCanvasRef: args.previewCanvasRef,
+    contentRect: args.contentRect,
     previewSize: args.previewSize,
     previewSurfaceRef: args.previewSurfaceRef,
     surfaceClassName: viewportPreviewSurfaceClassName,

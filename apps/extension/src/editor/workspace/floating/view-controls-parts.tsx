@@ -119,7 +119,8 @@ function MapPopoverButton(props: {
         <EditorViewportPreview
           hasImage={props.hasImage}
           forceOpen
-          maxWidth={Math.max(112, props.mapWidth - 24)}
+          // 24px panel padding plus the panel and preview's 1px borders.
+          maxWidth={Math.max(112, props.mapWidth - 28)}
           variant="embedded"
         />
       }

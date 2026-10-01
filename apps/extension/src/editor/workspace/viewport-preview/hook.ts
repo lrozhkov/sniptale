@@ -2,7 +2,12 @@ import type React from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import type { ImageEditorController } from '../../controller';
 import type { EditorViewportMetrics } from './types';
-import { getPreviewSize, getViewportCenter, getViewportFrame } from './helpers';
+import {
+  getPreviewContentRect,
+  getPreviewSize,
+  getViewportCenter,
+  getViewportFrame,
+} from './helpers';
 import { startEditorViewportPreviewLoop } from './drawing';
 import { navigateEditorViewportFromClientPoint } from './navigation';
 
@@ -26,6 +31,14 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
   );
 
   const viewportCenter = useMemo(() => getViewportCenter(args.viewport), [args.viewport]);
+  const contentRect = useMemo(
+    () =>
+      getPreviewContentRect(previewSize, {
+        width: args.viewport.canvasWidth,
+        height: args.viewport.canvasHeight,
+      }),
+    [previewSize, args.viewport.canvasWidth, args.viewport.canvasHeight]
+  );
 
   const viewportFrame = useMemo(
     () => getViewportFrame({ previewSize, viewport: args.viewport }),
@@ -33,10 +46,11 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
   );
 
   useEffect(() => {
+    dragPointerIdRef.current = null;
     if (!args.viewportPreviewOpen || !args.hasImage) {
       return undefined;
     }
-    return startEditorViewportPreviewLoop({
+    const stop = startEditorViewportPreviewLoop({
       canvasRef: args.canvasRef,
       getCanvas: () => args.controller.canvas,
       previewCanvasRef,
@@ -46,6 +60,10 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
         height: args.viewport.canvasHeight,
       },
     });
+    return () => {
+      stop();
+      dragPointerIdRef.current = null;
+    };
   }, [
     args.canvasRef,
     args.controller.canvas,
@@ -62,11 +80,14 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
       clientY,
       controller: args.controller,
       previewSurfaceRef,
+      previewSize,
+      contentRect,
     });
   };
 
   return {
     dragPointerIdRef,
+    contentRect,
     navigateFromClientPoint,
     previewCanvasRef,
     previewSize,

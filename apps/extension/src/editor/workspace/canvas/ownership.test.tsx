@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_WORKSPACE_SETTINGS } from '../../../features/editor/document/constants';
 import { translate } from '../../../platform/i18n';
 import {
@@ -13,11 +13,15 @@ import {
   setInputFiles,
 } from '../../../../../../tooling/test/harness/editor/ownership/shell-helpers';
 
+let CanvasWrapper: (typeof import('.'))['CanvasWrapper'];
+beforeAll(async () => {
+  ({ CanvasWrapper } = await import('.'));
+});
+
 describe('canvas wrapper ownership seam', () => {
   it('mounts and disposes the provider-owned controller and forwards open-image requests', async () => {
     const { openEditorImageFromFileMock } = getEditorShellOwnershipMocks();
     const controller = createControllerMock();
-    const { CanvasWrapper } = await import('.');
 
     resetEditorStore({ imageData: null, viewportPreviewOpen: false });
     renderWithController(<CanvasWrapper hasImage={false} />, controller);
@@ -45,7 +49,6 @@ describe('canvas wrapper ownership seam', () => {
 
   it('renders the live canvas path with grid styling when an image is already loaded', async () => {
     const controller = createControllerMock();
-    const { CanvasWrapper } = await import('.');
 
     resetEditorStore({
       viewportPreviewOpen: false,
@@ -73,7 +76,6 @@ describe('canvas wrapper ownership seam', () => {
       ...createControllerMock(),
       canvasDocumentSize: { width: 100, height: 80 },
     };
-    const { CanvasWrapper } = await import('.');
 
     resetEditorStore({
       viewportPreviewOpen: false,
@@ -184,6 +186,12 @@ describe('viewport preview ownership seam', () => {
 
     const previewSurfaceRef = {
       current: {
+        clientWidth: 200,
+        clientHeight: 200,
+        offsetWidth: 200,
+        offsetHeight: 200,
+        clientLeft: 0,
+        clientTop: 0,
         getBoundingClientRect: () => ({
           bottom: 260,
           height: 200,
@@ -203,12 +211,16 @@ describe('viewport preview ownership seam', () => {
       clientY: 110,
       controller: keyController,
       previewSurfaceRef,
+      previewSize: { width: 200, height: 200 },
+      contentRect: { left: 0, top: 0, width: 200, height: 200 },
     });
     navigateEditorViewportFromClientPoint({
       clientX: 150,
       clientY: 110,
       controller: keyController,
       previewSurfaceRef: { current: null },
+      previewSize: { width: 200, height: 200 },
+      contentRect: { left: 0, top: 0, width: 200, height: 200 },
     });
 
     expect(keyController.navigateViewportTo).toHaveBeenCalledWith(0.5, 0.25);

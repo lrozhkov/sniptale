@@ -29,6 +29,39 @@ beforeEach(() => {
   vi.restoreAllMocks();
 });
 
+it.each([
+  { documentSize: { width: 400, height: 1200 }, rect: [75, 0, 46, 138] },
+  { documentSize: { width: 1600, height: 200 }, rect: [0, 56.75, 196, 24.5] },
+])(
+  'centers an undistorted $documentSize preview inside the navigation stage',
+  ({ documentSize, rect }) => {
+    const { context, previewCanvas, sourceCanvas } = createPreviewContext();
+    const rendered = document.createElement('canvas');
+    const toCanvasElement = vi.fn((_multiplier: number, _options: unknown) => rendered);
+    const callbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal('devicePixelRatio', 1);
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        callbacks.push(callback);
+        return callbacks.length;
+      })
+    );
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const stop = startEditorViewportPreviewLoop({
+      canvasRef: { current: sourceCanvas },
+      previewCanvasRef: { current: previewCanvas },
+      previewSize: { width: 196, height: 138 },
+      documentSize,
+      getCanvas: () => ({ toCanvasElement }) as never,
+    });
+    callbacks[0]?.(1000);
+    expect(context.drawImage).toHaveBeenCalledWith(rendered, ...rect);
+    expect(toCanvasElement.mock.calls[0]?.[0]).toBeCloseTo(rect[2]! / documentSize.width);
+    stop();
+  }
+);
+
 it('sizes the preview canvas, draws frames, and cancels the loop on cleanup', () => {
   const { context, previewCanvas, sourceCanvas } = createPreviewContext();
   const callbacks: FrameRequestCallback[] = [];
@@ -132,9 +165,9 @@ it('samples only the image rectangle from an expanded editing surface', () => {
     documentSize.width,
     documentSize.height,
     0,
-    0,
+    2.5,
     100,
-    80
+    75
   );
 });
 

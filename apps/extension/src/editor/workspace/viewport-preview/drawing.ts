@@ -1,6 +1,6 @@
 import type { Canvas } from 'fabric';
 import { EditorCanvas } from '../../controller/viewport/render-region';
-import { PREVIEW_FPS } from './helpers';
+import { getPreviewContentRect, PREVIEW_FPS } from './helpers';
 import {
   getEditorEditingSurfaceSize,
   getEditorWorkspaceMargin,
@@ -76,13 +76,13 @@ function drawPreviewFrame(args: {
 
   context.imageSmoothingEnabled = true;
   const documentSize = args.documentSize;
+  const content = getPreviewContentRect(
+    args.previewSize,
+    documentSize ?? { width: args.sourceCanvas.width, height: args.sourceCanvas.height }
+  );
   if (documentSize && args.fabricCanvas) {
-    const rendered = renderFabricPreviewSource(
-      args.fabricCanvas,
-      documentSize,
-      args.previewSize.width
-    );
-    context.drawImage(rendered, 0, 0, args.previewSize.width, args.previewSize.height);
+    const rendered = renderFabricPreviewSource(args.fabricCanvas, documentSize, content.width);
+    context.drawImage(rendered, content.left, content.top, content.width, content.height);
     return;
   }
   const surface = documentSize ? getEditorEditingSurfaceSize(documentSize) : null;
@@ -103,10 +103,10 @@ function drawPreviewFrame(args: {
     sourceTop,
     sourceWidth,
     sourceHeight,
-    0,
-    0,
-    args.previewSize.width,
-    args.previewSize.height
+    content.left,
+    content.top,
+    content.width,
+    content.height
   );
 }
 
