@@ -37,6 +37,12 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
     return (
       <>
         <textarea />
+        <div role="dialog">
+          <button>Recorder action</button>
+        </div>
+        <div role="alertdialog">
+          <button>Keep recording</button>
+        </div>
         <div
           role="slider"
           data-ui="gallery.videoReview.timePlane"

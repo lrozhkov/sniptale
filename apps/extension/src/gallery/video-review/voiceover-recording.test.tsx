@@ -588,3 +588,56 @@ it('rejects an old review attachment after the voiceover panel closes', async ()
   await rejected;
   expect(harness.audio.markImported).not.toHaveBeenCalled();
 });
+
+it('issues retention after durable attach even if the subsequent publication fails', async () => {
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  vi.mocked(importReviewAudio).mockImplementationOnce(async (args) => {
+    await args.attach('project-asset:7', 2);
+    throw new Error('publication failed');
+  });
+  const retained = vi.fn();
+  await expect(
+    harness.latest.save(
+      new File(['voice'], 'voice.webm'),
+      trim,
+      new AbortController().signal,
+      new Blob(['voice']),
+      retained
+    )
+  ).rejects.toThrow('publication failed');
+  expect(retained).toHaveBeenCalledOnce();
+  expect(harness.session.commitDurable).toHaveBeenCalledOnce();
+});
+
+it.each(['positive', 'negative', 'unavailable'] as const)(
+  'uses a confirmed durable read before recovery reload for retention: %s',
+  async (result) => {
+    const harness = renderHookHarness({ guard: () => true });
+    act(() => harness.latest.open());
+    vi.mocked(harness.session.commitDurable).mockRejectedValueOnce(
+      new Error('write result uncertain')
+    );
+    harness.session.hasDurableVoiceoverClip =
+      result === 'unavailable'
+        ? vi.fn(async () => {
+            throw new Error('read failed');
+          })
+        : vi.fn(async () => result === 'positive');
+    harness.session.reload = vi.fn(async () => {
+      throw new Error('reload failed');
+    });
+    const retained = vi.fn();
+    await expect(
+      harness.latest.save(
+        new File(['voice'], 'voice.webm'),
+        trim,
+        new AbortController().signal,
+        new Blob(['voice']),
+        retained
+      )
+    ).rejects.toThrow();
+    expect(retained).toHaveBeenCalledTimes(result === 'positive' ? 1 : 0);
+    expect(harness.session.reload).toHaveBeenCalledTimes(result === 'positive' ? 1 : 0);
+  }
+);

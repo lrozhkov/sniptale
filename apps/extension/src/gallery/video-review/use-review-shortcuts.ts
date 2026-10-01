@@ -51,6 +51,11 @@ function useReviewKeys({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[role="dialog"],[role="alertdialog"]')
+      )
+        return;
       const key = event.code.startsWith('Key')
         ? event.code.slice(3).toLowerCase()
         : event.key.toLowerCase();

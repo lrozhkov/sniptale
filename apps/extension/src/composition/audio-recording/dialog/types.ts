@@ -10,5 +10,12 @@ export interface AudioRecordingModalProps {
   playbackRunning?: boolean | undefined;
   onPlayVideoChange?: ((value: boolean) => void) | undefined;
   onClose: () => void;
-  onSave: (file: File, trim: AudioTrimRange, signal: AbortSignal, take: Blob) => Promise<void>;
+  /** Notify retention only after a real durable reference, even if later publication fails. */
+  onSave: (
+    file: File,
+    trim: AudioTrimRange,
+    signal: AbortSignal,
+    take: Blob,
+    onRetained?: () => void
+  ) => Promise<void>;
 }

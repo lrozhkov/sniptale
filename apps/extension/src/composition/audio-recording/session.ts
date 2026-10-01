@@ -205,6 +205,7 @@ function useRecordingCaptureControls(
   timeline?: AudioRecordingTimeline
 ) {
   const resumingSessionRef = useRef<number | null>(null);
+  const resumeAdmission = useRef(0);
   const clearTimer = useCallback(() => clearRecordingTimer(refs.timerRef), [refs.timerRef]);
   const stopStream = useCallback(() => stopRecordingStream(refs.streamRef), [refs.streamRef]);
 
@@ -239,6 +240,7 @@ function useRecordingCaptureControls(
   }, [refs.mediaRecorderRef]);
 
   const pauseRecording = useCallback(() => {
+    resumeAdmission.current += 1;
     const recorder = refs.mediaRecorderRef.current;
     const clock = refs.clockRef.current;
     if (!recorder || recorder.state !== 'recording' || !clock) return;
@@ -261,8 +263,13 @@ function useRecordingCaptureControls(
     )
       return;
     resumingSessionRef.current = sessionId;
+    const admission = resumeAdmission.current;
     try {
       await timeline?.onResume?.();
+      if (sessionId === refs.sessionRef.current && admission !== resumeAdmission.current) {
+        if (recorder.state === 'paused') timeline?.onPause?.();
+        return;
+      }
       if (sessionId !== refs.sessionRef.current || recorder.state !== 'paused') {
         return;
       }

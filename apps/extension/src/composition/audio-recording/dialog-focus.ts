@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, type KeyboardEvent } from 'react';
 
 /** Recorder focus follows its visible session, including the dynamically mounted range controls. */
-export function useAudioRecordingFocus(isOpen: boolean) {
+export function useAudioRecordingFocus(isOpen: boolean, suspended = false) {
   const titleId = useId();
   useLayoutEffect(() => {
     if (!isOpen) return;
@@ -17,7 +17,7 @@ export function useAudioRecordingFocus(isOpen: boolean) {
   }, [isOpen, titleId]);
 
   useLayoutEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || suspended) return;
     const dialog = document.getElementById(titleId)?.closest<HTMLElement>('[role="dialog"]');
     if (!dialog) return;
     const active = dialog.ownerDocument.activeElement;
@@ -28,7 +28,7 @@ export function useAudioRecordingFocus(isOpen: boolean) {
   });
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab' || event.defaultPrevented) return;
+    if (suspended || event.key !== 'Tab' || event.defaultPrevented) return;
     const root = event.currentTarget;
     const controls = [
       ...root.querySelectorAll<HTMLElement>('button, input, select, textarea, [tabindex]'),

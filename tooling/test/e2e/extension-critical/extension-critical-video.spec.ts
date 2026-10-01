@@ -788,5 +788,60 @@ for (const variant of [
     await page.screenshot({
       path: testInfo.outputPath(`full-voiceover-ready-${variant.locale}-${variant.theme}.png`),
     });
+    await numericLimit.fill('3');
+    await page.evaluate(() => {
+      const audio = new AudioContext();
+      const oscillator = audio.createOscillator();
+      const destination = audio.createMediaStreamDestination();
+      oscillator.connect(destination);
+      oscillator.start();
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        configurable: true,
+        value: async () => destination.stream,
+      });
+    });
+    await startCapture.click();
+    await expect(
+      strip.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioPause', variant.locale),
+        exact: true,
+      })
+    ).toBeVisible();
+    const closeRecorder = strip.getByRole('button', {
+      name: translate('common.actions.close', variant.locale),
+      exact: true,
+    });
+    await closeRecorder.click();
+    const confirmation = page.getByRole('alertdialog');
+    await expect(confirmation).toBeVisible();
+    await expect(
+      confirmation.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioKeep', variant.locale),
+        exact: true,
+      })
+    ).toBeFocused();
+    await page.screenshot({
+      path: testInfo.outputPath(`full-voiceover-discard-${variant.locale}-${variant.theme}.png`),
+    });
+    await page.keyboard.press('Space');
+    await expect(confirmation).toHaveCount(0);
+    await expect(closeRecorder).toBeFocused();
+    await expect(
+      strip.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioResume', variant.locale),
+        exact: true,
+      })
+    ).toBeVisible();
+    await closeRecorder.click();
+    await page.keyboard.press('Escape');
+    await expect(confirmation).toHaveCount(0);
+    await closeRecorder.click();
+    await confirmation
+      .getByRole('button', {
+        name: translate('videoEditor.app.recordAudioDiscard', variant.locale),
+        exact: true,
+      })
+      .click();
+    await expect(strip).toHaveCount(0);
   });
 }

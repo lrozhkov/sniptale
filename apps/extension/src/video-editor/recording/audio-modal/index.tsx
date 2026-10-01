@@ -1,3 +1,4 @@
+import { RecordingDiscardConfirmation } from '../../../composition/audio-recording/dialog/dismissal';
 import { TimelineRecordingBackdrop, TimelineRecordingPanel } from './timeline-panel';
 import type React from 'react';
 import { ProductModal } from '@sniptale/ui/product-modal';
@@ -30,7 +31,6 @@ function TimelineAudioRecordingModal({
   playbackRunning = false,
   onPlayVideoChange,
 }: AudioRecordingModalProps): React.JSX.Element | null {
-  const { titleId, handleKeyDown } = useAudioRecordingFocus(isOpen);
   const durationLimit = useRecordingDurationLimit(timeline?.duration ?? 0);
   const session = useAudioRecordingDialogSession({
     isOpen,
@@ -39,6 +39,7 @@ function TimelineAudioRecordingModal({
     timeline,
     captureLimitSeconds: durationLimit.seconds,
   });
+  const { titleId, handleKeyDown } = useAudioRecordingFocus(isOpen, session.confirmation.open);
   const {
     deviceId,
     setDeviceId,
@@ -82,7 +83,14 @@ function TimelineAudioRecordingModal({
             '!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg',
             '!bg-[var(--sniptale-color-surface-panel)]',
           ].join(' ')}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(event) => {
+            handleKeyDown(event);
+            if (event.key === 'Escape' && !session.confirmation.open) {
+              event.preventDefault();
+              event.stopPropagation();
+              requestClose();
+            }
+          }}
           onClose={requestClose}
           closeOnBackdrop={false}
           labelledBy={titleId}
@@ -128,6 +136,7 @@ function TimelineAudioRecordingModal({
             onSave={saveRecording}
           />
         </ProductModal>
+        <RecordingDiscardConfirmation value={session.confirmation} />
       </>
     );
 

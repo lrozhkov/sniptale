@@ -308,3 +308,77 @@ it('allows only one resume attempt while playback is still starting', async () =
   expect(latest.transport.status).toBe('recording');
   expect(onPause).toHaveBeenCalledOnce();
 });
+
+it('does not resume capture behind a dismissal pause after a delayed playback resume', async () => {
+  let finish!: () => void;
+  const onPause = vi.fn();
+  const timeline = {
+    startTime: 0,
+    duration: 20,
+    beforeStart: async () => undefined,
+    onStop: vi.fn(),
+    onPause,
+    onResume: () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  };
+  await act(async () => root.render(<Subject timeline={timeline} />));
+  await act(async () => latest.transport.startRecording());
+  act(() => latest.transport.pauseRecording());
+  let pending!: Promise<void>;
+  act(() => {
+    pending = latest.transport.resumeRecording();
+  });
+  act(() => latest.transport.pauseRecording());
+  await act(async () => {
+    finish();
+    await pending;
+  });
+  expect(latest.transport.status).toBe('paused');
+  expect(latest.trim).toBeNull();
+  expect(onPause).toHaveBeenCalledTimes(2);
+  timeline.onResume = async () => undefined;
+  await act(async () => root.render(<Subject timeline={timeline} />));
+  await act(async () => latest.transport.resumeRecording());
+  expect(latest.transport.status).toBe('recording');
+});
+
+it.each(['permission', 'playback'])(
+  'invalidates pending %s capture synchronously on reset without waiting for unmount',
+  async (stage) => {
+    let finish!: () => void;
+    const timeline: AudioRecordingTimeline = {
+      startTime: 0,
+      duration: 20,
+      beforeStart: async () => undefined,
+      onStop: vi.fn(),
+    };
+    if (stage === 'permission')
+      acquire.mockReturnValue(
+        new Promise((resolve) => {
+          finish = () => resolve({ getTracks: () => [{ stop: stopped }] });
+        })
+      );
+    else
+      timeline.beforeStart = () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+    await act(async () => root.render(<Subject timeline={timeline} />));
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = latest.transport.startRecording();
+    });
+    act(() => latest.save.resetSession());
+    await act(async () => {
+      finish();
+      await pending;
+    });
+    expect(latest.transport.status).toBe('idle');
+    expect(latest.save.audioBlob).toBeNull();
+    expect(latest.trim).toBeNull();
+    expect(stopped).toHaveBeenCalled();
+    expect(timeline.onStop).not.toHaveBeenCalled();
+  }
+);

@@ -61,12 +61,19 @@ export function useReviewVoiceoverRecording(args: {
     syncPause: playback.syncStop,
     syncResume: playback.syncResume,
     /** The shared recorder already trims the file, so placement is take start + trim offset. */
-    save: (file: File, trim: AudioTrimRange, signal: AbortSignal, take: Blob = file) =>
+    save: (
+      file: File,
+      trim: AudioTrimRange,
+      signal: AbortSignal,
+      take: Blob = file,
+      onRetained?: () => void
+    ) =>
       saveReviewVoiceoverTake({
         file,
         trim,
         signal,
         take,
+        ...(onRetained ? { onRetained } : {}),
         outputStart: takeOutputStart ?? args.toOutputTime(takeStart ?? args.time),
         resultDuration: args.resultDuration,
         audio: args.audio,

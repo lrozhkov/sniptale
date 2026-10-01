@@ -272,3 +272,51 @@ it('keeps an invalid retained cap editable after a take and gates Again until re
   expect(again.disabled).toBe(false);
   expect(controller.captureDuration).toBe(3);
 });
+
+it.each(['close', 'Escape'])(
+  'protects the timeline take through %s and restores it after cancelling',
+  async (trigger) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    document.body.append(host);
+    root = createRoot(host);
+    const onClose = vi.fn();
+    const props = {
+      isOpen: true,
+      onClose,
+      onSave: vi.fn(),
+      timeline: { startTime: 2, duration: 20, beforeStart: async () => undefined, onStop: vi.fn() },
+    };
+    await act(async () => root.render(<AudioRecordingModal {...props} />));
+    const request = () =>
+      act(() => {
+        if (trigger === 'close')
+          host.querySelector<HTMLButtonElement>('[title="common.actions.close"]')!.click();
+        else
+          host
+            .querySelector('[role="dialog"]')!
+            .dispatchEvent(
+              new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+            );
+      });
+    request();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="alertdialog"]')).not.toBeNull();
+    await act(async () => root.render(<AudioRecordingModal {...props} />));
+    expect(host.querySelector('[role="alertdialog"]')!.contains(document.activeElement)).toBe(true);
+    act(() =>
+      document.activeElement!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      )
+    );
+    expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(host.querySelector('[aria-label="Trim"]')).not.toBeNull();
+    request();
+    act(() =>
+      [...host.querySelectorAll('button')]
+        .find((b) => b.textContent === 'videoEditor.app.recordAudioDiscard')!
+        .click()
+    );
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(controller.reset).toHaveBeenCalledOnce();
+  }
+);

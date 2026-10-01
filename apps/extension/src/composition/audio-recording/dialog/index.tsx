@@ -1,3 +1,4 @@
+import { RecordingDiscardConfirmation } from './dismissal';
 import type React from 'react';
 import { translate } from '../../../platform/i18n';
 import { ProductModal, ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
@@ -32,8 +33,11 @@ function AudioRecordingCancelButton({
 
 /** Complete shared material recorder; callers own placement and saved-resource attachment. */
 export function MaterialAudioRecordingModal(props: AudioRecordingModalProps) {
-  const { titleId, handleKeyDown } = useAudioRecordingFocus(props.isOpen);
   const session = useAudioRecordingDialogSession(props);
+  const { titleId, handleKeyDown } = useAudioRecordingFocus(
+    props.isOpen,
+    session.confirmation.open
+  );
   if (!props.isOpen) return null;
   return (
     <MaterialRecordingDialog
@@ -75,58 +79,68 @@ function MaterialRecordingDialog({
   const { controller, isSaving, saveError, starting, requestClose, startRecording, saveRecording } =
     session;
   return (
-    <ProductModal
-      onKeyDown={handleKeyDown}
-      onClose={requestClose}
-      closeOnBackdrop={false}
-      labelledBy={titleId}
-      width="min(600px, calc(100vw - 32px))"
-      maxHeight="min(760px, calc(100vh - 32px))"
-      scrollable
-    >
-      <AudioRecordingModalHeader
-        title={title}
-        titleId={titleId}
+    <>
+      <ProductModal
+        onKeyDown={(event) => {
+          handleKeyDown(event);
+          if (event.key === 'Escape' && !session.confirmation.open) {
+            event.preventDefault();
+            event.stopPropagation();
+            requestClose();
+          }
+        }}
         onClose={requestClose}
-        disabled={isSaving}
-      />
-      <ProductModalBody compact className="min-h-0 flex-1 overflow-y-auto !gap-2 !py-2">
-        {controller.transport.status !== 'recorded' && device}
-        <fieldset disabled={isSaving || starting} className="contents">
-          <AudioRecordingTransport
-            durationLabel={controller.transport.durationLabel}
-            error={controller.transport.error}
-            onStartRecording={startRecording}
-            onStopRecording={controller.transport.stopRecording}
-            onPauseRecording={controller.transport.pauseRecording}
-            onResumeRecording={controller.transport.resumeRecording}
-            status={controller.transport.status}
-          />
-        </fieldset>
-        {starting && (
-          <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
-            {translate('videoEditor.app.recordAudioPreparing')}
-          </p>
-        )}
-        {saveError && (
-          <p role="alert" className="text-sm text-[var(--sniptale-color-danger-text)]">
-            {saveError}
-          </p>
-        )}
-        <fieldset disabled={isSaving} className="contents">
-          {renderAudioRecordingTrimPanel(controller.trim, isSaving)}
-        </fieldset>
-      </ProductModalBody>
-      <ProductModalFooter compact className="shrink-0 !py-2">
-        <AudioRecordingCancelButton disabled={isSaving} onClose={requestClose} />
-        <AudioRecordingSaveButton
-          destination="materials"
-          label={saveLabel}
-          audioBlob={controller.save.audioBlob}
+        closeOnBackdrop={false}
+        labelledBy={titleId}
+        width="min(600px, calc(100vw - 32px))"
+        maxHeight="min(760px, calc(100vh - 32px))"
+        scrollable
+      >
+        <AudioRecordingModalHeader
+          title={title}
+          titleId={titleId}
+          onClose={requestClose}
           disabled={isSaving}
-          onSave={saveRecording}
         />
-      </ProductModalFooter>
-    </ProductModal>
+        <ProductModalBody compact className="min-h-0 flex-1 overflow-y-auto !gap-2 !py-2">
+          {controller.transport.status !== 'recorded' && device}
+          <fieldset disabled={isSaving || starting} className="contents">
+            <AudioRecordingTransport
+              durationLabel={controller.transport.durationLabel}
+              error={controller.transport.error}
+              onStartRecording={startRecording}
+              onStopRecording={controller.transport.stopRecording}
+              onPauseRecording={controller.transport.pauseRecording}
+              onResumeRecording={controller.transport.resumeRecording}
+              status={controller.transport.status}
+            />
+          </fieldset>
+          {starting && (
+            <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+              {translate('videoEditor.app.recordAudioPreparing')}
+            </p>
+          )}
+          {saveError && (
+            <p role="alert" className="text-sm text-[var(--sniptale-color-danger-text)]">
+              {saveError}
+            </p>
+          )}
+          <fieldset disabled={isSaving} className="contents">
+            {renderAudioRecordingTrimPanel(controller.trim, isSaving)}
+          </fieldset>
+        </ProductModalBody>
+        <ProductModalFooter compact className="shrink-0 !py-2">
+          <AudioRecordingCancelButton disabled={isSaving} onClose={requestClose} />
+          <AudioRecordingSaveButton
+            destination="materials"
+            label={saveLabel}
+            audioBlob={controller.save.audioBlob}
+            disabled={isSaving}
+            onSave={saveRecording}
+          />
+        </ProductModalFooter>
+      </ProductModal>
+      <RecordingDiscardConfirmation value={session.confirmation} />
+    </>
   );
 }

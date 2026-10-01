@@ -17,6 +17,7 @@ export async function saveReviewVoiceoverTake(args: {
   trim: AudioTrimRange;
   signal: AbortSignal;
   take: Blob;
+  onRetained?: () => void;
   outputStart: number | null;
   resultDuration: number;
   audio: ReturnType<typeof useReviewAudio>;
@@ -50,6 +51,8 @@ export async function saveReviewVoiceoverTake(args: {
     const prepared = args.preparedTakes.get(args.take);
     if (!prepared || !attached(prepared.assetId))
       throw new Error('Recording publication cannot be resumed');
+    if (args.onRetained && (await args.session.hasDurableVoiceoverClip(clipId, prepared.assetId)))
+      args.onRetained();
     await prepared.publish();
     markAttached(prepared.assetId, prepared.duration);
     args.preparedTakes.delete(args.take);
@@ -73,7 +76,15 @@ export async function saveReviewVoiceoverTake(args: {
       attached(assetId) || args.session.hasDurableVoiceoverClip(clipId, assetId),
     onPrepared: (prepared) => args.preparedTakes.set(args.take, prepared),
     attach: (assetId, duration) =>
-      commitRecordedClip(args.session, clipId, assetId, duration, placement, args.resultDuration),
+      commitRecordedClip(
+        args.session,
+        clipId,
+        assetId,
+        duration,
+        placement,
+        args.resultDuration,
+        args.onRetained
+      ),
   });
   const prepared = args.preparedTakes.get(args.take);
   if (prepared) {
@@ -88,10 +99,14 @@ async function commitRecordedClip(
   assetId: string,
   duration: number,
   placement: number,
-  resultDuration: number
+  resultDuration: number,
+  onRetained?: () => void
 ): Promise<void> {
   const before = session.getSnapshot().document.advancedContent;
-  if (before.audio.voiceover.some((clip) => clip.id === clipId && clip.assetId === assetId)) return;
+  if (before.audio.voiceover.some((clip) => clip.id === clipId && clip.assetId === assetId)) {
+    if (onRetained && (await session.hasDurableVoiceoverClip(clipId, assetId))) onRetained();
+    return;
+  }
   const clip = { ...importedAudioClip(assetId, duration, placement, resultDuration), id: clipId };
   const anchored = before.audio.voiceoverSegments
     ? anchorReviewVoiceover(clip, before.audio.voiceoverSegments)
@@ -108,7 +123,11 @@ async function commitRecordedClip(
       },
     });
   } catch (error) {
-    if (await session.hasDurableVoiceoverClip(clipId, assetId)) await session.reload();
+    if (await session.hasDurableVoiceoverClip(clipId, assetId)) {
+      onRetained?.();
+      await session.reload();
+    }
     throw error;
   }
+  onRetained?.();
 }

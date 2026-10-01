@@ -15,8 +15,8 @@ afterEach(() => {
   host?.remove();
   vi.unstubAllGlobals();
 });
-it.each(['backdrop', 'Escape'])(
-  'keeps recording dialog open after %s; explicit Cancel closes',
+it.each(['backdrop'])(
+  'keeps empty recording dialog open after %s; explicit Cancel closes',
   (input) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     host = document.createElement('div');
@@ -106,4 +106,22 @@ it('focuses the recorder, contains Tab and restores the opener when hidden', () 
   } finally {
     opener.remove();
   }
+});
+
+it('closes an empty recorder explicitly through Escape without a loss warning', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  const onClose = vi.fn();
+  act(() => root.render(<AudioRecordingModal isOpen onClose={onClose} onSave={vi.fn()} />));
+  act(() =>
+    host
+      .querySelector('[role="dialog"]')!
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+      )
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
 });

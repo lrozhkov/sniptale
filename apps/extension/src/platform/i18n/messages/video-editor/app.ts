@@ -16,6 +16,13 @@ export const videoEditorAppMessages = defineMessageSource({
     ru: 'Не удалось завершить сохранение. Запись осталась здесь — повторите попытку.',
     en: 'Could not finish saving. Your recording is still here; try again.',
   },
+  recordAudioDiscardTitle: { ru: 'Отказаться от записи?', en: 'Discard recording?' },
+  recordAudioDiscardMessage: {
+    ru: 'Эта запись ещё не сохранена. Если отказаться от неё, записанный звук будет потерян. Можно вернуться к записи и продолжить работу.',
+    en: 'This recording has not been saved. Discarding it will lose the captured sound. You can return to your recording and continue working.',
+  },
+  recordAudioKeep: { ru: 'Вернуться к записи', en: 'Keep recording' },
+  recordAudioDiscard: { ru: 'Отказаться от записи', en: 'Discard recording' },
   recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
   recordAudioSeconds: { ru: 'сек', en: 'sec' },
   recordAudioLimitInvalid: {

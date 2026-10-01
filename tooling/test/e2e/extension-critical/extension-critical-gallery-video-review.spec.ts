@@ -2700,6 +2700,25 @@ for (const variant of [
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-paused-${variant.locale}-${variant.theme}.png`),
       });
+      const confirmation = dialog.getByRole('alertdialog');
+      const closeRecorder = strip.getByRole('button', {
+        name: translate('common.actions.close', variant.locale),
+        exact: true,
+      });
+      await closeRecorder.click();
+      await expect(confirmation).toBeVisible();
+      await expect(
+        confirmation.getByRole('button', {
+          name: translate('videoEditor.app.recordAudioKeep', variant.locale),
+          exact: true,
+        })
+      ).toBeFocused();
+      await page.screenshot({
+        path: testInfo.outputPath(`voiceover-discard-${variant.locale}-${variant.theme}.png`),
+      });
+      await page.keyboard.press('Space');
+      await expect(confirmation).toHaveCount(0);
+      await expect(closeRecorder).toBeFocused();
       await strip
         .getByRole('button', {
           name: translate('videoEditor.app.recordAudioResume', variant.locale),
@@ -2716,6 +2735,25 @@ for (const variant of [
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-take-${variant.locale}-${variant.theme}.png`),
       });
+      const takeUrl = await strip.locator('audio').getAttribute('src');
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioAgain', variant.locale),
+          exact: true,
+        })
+        .click();
+      await expect(confirmation).toBeVisible();
+      await confirmation
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioKeep', variant.locale),
+          exact: true,
+        })
+        .click();
+      await expect(strip.locator('audio')).toHaveAttribute('src', takeUrl!);
+      await closeRecorder.click();
+      await expect(confirmation).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(strip.locator('audio')).toHaveAttribute('src', takeUrl!);
       await strip
         .getByRole('button', {
           name: translate('videoEditor.app.recordAudioSave', variant.locale),

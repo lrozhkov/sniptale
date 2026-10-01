@@ -1,3 +1,4 @@
+import { RecordingDiscardConfirmation } from '../../composition/audio-recording/dialog/dismissal';
 import { useEffect, useState, type RefObject } from 'react';
 import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ProductModal } from '@sniptale/ui/product-modal';
@@ -55,12 +56,17 @@ export function ReviewVoiceoverRecording(props: {
   onSyncStop(): void;
   onSyncPause?: () => void;
   onSyncResume?: (playVideo: boolean) => Promise<void>;
-  onSave(file: File, trim: AudioTrimRange, signal: AbortSignal, take: Blob): Promise<void>;
+  onSave(
+    file: File,
+    trim: AudioTrimRange,
+    signal: AbortSignal,
+    take: Blob,
+    onRetained?: () => void
+  ): Promise<void>;
 }) {
   const remaining = Math.max(0, props.timelineDuration - props.playhead);
   const durationLimit = useRecordingDurationLimit(remaining);
   const [playVideo, setPlayVideo] = useState(true);
-  const { titleId, handleKeyDown } = useAudioRecordingFocus(props.isOpen);
   const session = useAudioRecordingDialogSession({
     isOpen: props.isOpen,
     onClose: props.onClose,
@@ -77,6 +83,10 @@ export function ReviewVoiceoverRecording(props: {
     },
     captureLimitSeconds: durationLimit.seconds,
   });
+  const { titleId, handleKeyDown } = useAudioRecordingFocus(
+    props.isOpen,
+    session.confirmation.open
+  );
   const { controller, starting, isSaving, saveError } = session;
   const { transport, trim } = controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
@@ -91,74 +101,79 @@ export function ReviewVoiceoverRecording(props: {
   }, [playVideo, props.isOpen, props.video, transport.status, stopRecording]);
   if (!props.isOpen) return null;
   return (
-    <ProductModal
-      onKeyDown={(event) => {
-        handleKeyDown(event);
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          session.requestClose();
-        }
-        event.stopPropagation();
-      }}
-      onClose={session.requestClose}
-      closeOnBackdrop={false}
-      labelledBy={titleId}
-      backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
-      dialogClassName="!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg"
-      width="min(800px, calc(100vw - 32px))"
-      maxHeight="calc(100vh - 24px)"
-      scrollable
-    >
-      <div className="grid gap-2 px-3 py-2" data-ui="gallery.videoReview.voiceoverStrip">
-        <div className="flex flex-wrap items-center gap-2">
-          <span id={titleId} className="mr-auto text-sm font-medium">
-            {translate('gallery.videoReview.recordVoiceover')}
-            <span className="ml-2 tabular-nums text-[var(--sniptale-color-text-muted)]">
-              {formatDurationLabel(props.playhead)}–{formatDurationLabel(props.timelineDuration)}
+    <>
+      <ProductModal
+        onKeyDown={(event) => {
+          handleKeyDown(event);
+          if (event.key === 'Escape' && !session.confirmation.open) {
+            event.preventDefault();
+            session.requestClose();
+          }
+          event.stopPropagation();
+        }}
+        onClose={session.requestClose}
+        closeOnBackdrop={false}
+        labelledBy={titleId}
+        backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
+        dialogClassName="!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg"
+        width="min(800px, calc(100vw - 32px))"
+        maxHeight="calc(100vh - 24px)"
+        scrollable
+      >
+        <div className="grid gap-2 px-3 py-2" data-ui="gallery.videoReview.voiceoverStrip">
+          <div className="flex flex-wrap items-center gap-2">
+            <span id={titleId} className="mr-auto text-sm font-medium">
+              {translate('gallery.videoReview.recordVoiceover')}
+              <span className="ml-2 tabular-nums text-[var(--sniptale-color-text-muted)]">
+                {formatDurationLabel(props.playhead)}–{formatDurationLabel(props.timelineDuration)}
+              </span>
             </span>
-          </span>
-          <ProductActionButton
-            tone="secondary"
-            disabled={isSaving}
-            onClick={session.requestClose}
-            aria-label={translate('common.actions.close')}
-          >
-            <X size={16} aria-hidden="true" />
-          </ProductActionButton>
-        </div>
-        {trim ? (
-          <VoiceoverTakeReview
-            session={session}
-            durationLimit={durationLimit}
-            maximum={remaining}
-          />
-        ) : (
-          <>
-            <VoiceoverCaptureOptions
+            <ProductActionButton
+              tone="secondary"
+              disabled={isSaving}
+              onClick={session.requestClose}
+              aria-label={translate('common.actions.close')}
+            >
+              <X size={16} aria-hidden="true" />
+            </ProductActionButton>
+          </div>
+          {trim ? (
+            <VoiceoverTakeReview
               session={session}
-              capturing={capturing}
-              playVideo={playVideo}
-              onPlayVideo={setPlayVideo}
               durationLimit={durationLimit}
               maximum={remaining}
             />
-            <VoiceoverTransport
-              session={session}
-              remaining={remaining}
-              limit={durationLimit.effective}
-              invalid={durationLimit.invalid}
-            />
-            <RecordingLevelMeter meter={controller.meter} preparing={starting} />
-          </>
-        )}
-        {starting ? <p role="status">{translate('videoEditor.app.recordAudioPreparing')}</p> : null}
-        {saveError || transport.error ? (
-          <p role="alert" className="text-xs text-[var(--sniptale-color-danger-text)]">
-            {saveError || transport.error}
-          </p>
-        ) : null}
-      </div>
-    </ProductModal>
+          ) : (
+            <>
+              <VoiceoverCaptureOptions
+                session={session}
+                capturing={capturing}
+                playVideo={playVideo}
+                onPlayVideo={setPlayVideo}
+                durationLimit={durationLimit}
+                maximum={remaining}
+              />
+              <VoiceoverTransport
+                session={session}
+                remaining={remaining}
+                limit={durationLimit.effective}
+                invalid={durationLimit.invalid}
+              />
+              <RecordingLevelMeter meter={controller.meter} preparing={starting} />
+            </>
+          )}
+          {starting ? (
+            <p role="status">{translate('videoEditor.app.recordAudioPreparing')}</p>
+          ) : null}
+          {saveError || transport.error ? (
+            <p role="alert" className="text-xs text-[var(--sniptale-color-danger-text)]">
+              {saveError || transport.error}
+            </p>
+          ) : null}
+        </div>
+      </ProductModal>
+      <RecordingDiscardConfirmation value={session.confirmation} />
+    </>
   );
 }
 
