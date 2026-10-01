@@ -220,11 +220,17 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
     );
   }
   return (
-    <div className="min-w-0 space-y-4 pb-2 text-[var(--sniptale-color-text-primary)]">
-      <p className="max-w-[65rem] text-sm leading-6 text-[var(--sniptale-color-text-muted)]">
-        {t('settings.appearance.contextMenuEditorHelp')}
+    <div className="min-w-0 space-y-3 pb-2 text-[var(--sniptale-color-text-primary)]">
+      <p className="max-w-[65rem] text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        {t('settings.appearance.contextMenuEditorHelp')}{' '}
+        {t('settings.appearance.contextMenuMoveHelp')}
       </p>
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,0.9fr)]">
+      <div
+        className={[
+          'grid min-w-0 overflow-hidden rounded-xl border border-[var(--sniptale-color-border-soft)]',
+          'lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,0.9fr)]',
+        ].join(' ')}
+      >
         <ContextMenuTreeView
           tree={tree}
           catalog={catalog}
@@ -237,7 +243,7 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
           onExpanded={setExpanded}
           onAnnounce={setAnnouncement}
         />
-        <div className="min-w-0">
+        <div className="min-w-0 border-t border-[var(--sniptale-color-border-soft)] lg:border-l lg:border-t-0">
           <ContextMenuCatalogPanel
             tree={tree}
             catalog={catalog}

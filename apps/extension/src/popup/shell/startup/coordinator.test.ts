@@ -122,3 +122,28 @@ it.each([false, true])(
     });
   }
 );
+
+it.each(['export:html', 'remember-last'] as const)(
+  'opens HTML for %s without an export launch',
+  async (selection) => {
+    mocks.startup.mockResolvedValue({
+      selection,
+      lastPage: 'export',
+      lastExportDestination: 'html',
+    });
+    expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'html' });
+  }
+);
+
+it('retains active recording and explicit launch precedence over HTML startup', async () => {
+  mocks.startup.mockResolvedValue({ selection: 'export:html', lastPage: 'export' });
+  mocks.recording.mockResolvedValue({ state: { status: VideoRecordingStatus.RECORDING } });
+  expect(await resolvePopupStartupRoute()).toMatchObject({ page: 'video' });
+  mocks.recording.mockResolvedValue({ state: { status: VideoRecordingStatus.IDLE } });
+  mocks.exportIntent.mockResolvedValue({ tabId: 7, startExport: false });
+  expect(await resolvePopupStartupRoute()).toEqual({
+    page: 'export',
+    destination: 'export',
+    launch: { tabId: 7, startExport: false },
+  });
+});

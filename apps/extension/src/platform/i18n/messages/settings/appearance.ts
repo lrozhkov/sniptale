@@ -98,6 +98,7 @@ export const settingsAppearanceMessages = defineMessageSource({
     tools: { ru: 'Инструменты', en: 'Tools' },
     'export:download': { ru: 'Экспорт — Скачать', en: 'Export — Download' },
     'export:library': { ru: 'Экспорт — В библиотеку', en: 'Export — To Library' },
+    'export:html': { ru: 'Экспорт в HTML', en: 'Export to HTML' },
   },
   themeModeLabel: {
     ru: 'Режим темы',

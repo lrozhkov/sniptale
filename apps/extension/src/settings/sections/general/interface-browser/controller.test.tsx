@@ -214,14 +214,18 @@ it('loads and persists the popup startup destination', async () => {
     'tools',
     'export:download',
     'export:library',
+    'export:html',
   ]);
 
   await act(async () => {
-    await latestState?.popupStartup.updateSelection('tools');
+    await latestState?.popupStartup.updateSelection('export:html');
   });
 
-  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('tools');
-  expect(latestState?.popupStartup.selection).toBe('tools');
+  expect(
+    latestState?.popupStartup.options.find((option) => option.value === 'export:html')?.label
+  ).toBe('Экспорт в HTML');
+  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('export:html');
+  expect(latestState?.popupStartup.selection).toBe('export:html');
 });
 
 it('keeps the default startup destination when preference loading fails', async () => {

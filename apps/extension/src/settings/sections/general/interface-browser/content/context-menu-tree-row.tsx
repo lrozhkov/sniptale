@@ -69,16 +69,14 @@ function CommandIcon({ command }: { command: string }) {
 
 function rowClass(selected: boolean, dropEdge?: DropEdge): string {
   return [
-    'relative min-w-0 rounded-lg border py-1.5 pr-1 transition-colors',
+    'relative min-w-0 rounded-md border pr-1 transition-colors',
     'focus-visible:outline-none focus-visible:ring-2',
     'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
     selected
-      ? 'border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-surface-hover)]'
+      ? 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]'
       : 'border-transparent hover:bg-[var(--sniptale-color-surface-hover)]',
     'pl-1',
     dropEdge === 'inside' ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
-    dropEdge === 'before' ? 'border-t-[var(--sniptale-color-accent)]' : '',
-    dropEdge === 'after' ? 'border-b-[var(--sniptale-color-accent)]' : '',
   ].join(' ');
 }
 
@@ -89,6 +87,8 @@ export function ContextMenuTreeRow(props: {
   first: boolean;
   expanded: boolean;
   dropEdge: DropEdge | undefined;
+  dropIndent?: number;
+  dropTargetKey?: string;
   unavailable: boolean;
   editingValue: string | undefined;
   inputRef: RefObject<HTMLInputElement | null>;
@@ -117,7 +117,18 @@ export function ContextMenuTreeRow(props: {
       className={rowClass(props.selected, props.dropEdge)}
       style={{ marginInlineStart: `${(level - 1) * 18}px` }}
     >
-      <div className="flex min-w-0 items-center gap-1">
+      {props.dropEdge === 'before' || props.dropEdge === 'after' ? (
+        <span
+          aria-hidden="true"
+          data-drop-edge={props.dropEdge}
+          data-drop-target={props.dropTargetKey}
+          className={`pointer-events-none absolute right-0 z-10 h-0.5 bg-[var(--sniptale-color-accent)] ${
+            props.dropEdge === 'before' ? '-top-px' : '-bottom-px'
+          }`}
+          style={{ insetInlineStart: -(props.dropIndent ?? 0) }}
+        />
+      ) : null}
+      <div className="flex h-[38px] min-w-0 items-center gap-1">
         {node.type === 'section' ? (
           <button
             type="button"
@@ -185,13 +196,13 @@ export function ContextMenuTreeRow(props: {
             {label}
           </span>
         )}
+        {props.unavailable ? (
+          <span className="shrink-0 text-[10px] text-[var(--sniptale-color-text-muted)]">
+            {t('settings.appearance.contextMenuUnavailable')}
+          </span>
+        ) : null}
         <RowControls row={row} label={label} locale={props.locale} actions={actions} />
       </div>
-      {props.unavailable ? (
-        <p className="pl-12 text-xs text-[var(--sniptale-color-text-muted)]">
-          {t('settings.appearance.contextMenuUnavailable')}
-        </p>
-      ) : null}
     </div>
   );
 }

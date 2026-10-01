@@ -190,7 +190,7 @@ export function ExportPage({
       footerProps={footerProps}
       onDestinationChange={(nextDestination) => {
         setDestination(nextDestination);
-        if (nextDestination !== 'html') void savePopupLastExportDestination(nextDestination);
+        void savePopupLastExportDestination(nextDestination);
       }}
       webCopyResources={webCopyResources}
     />

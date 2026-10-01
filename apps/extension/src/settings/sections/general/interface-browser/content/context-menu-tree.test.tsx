@@ -327,3 +327,62 @@ it('accepts an available catalog action at the chosen drop position and rejects 
     children: [{ command: 'sniptale.gallery' }, { command: 'sniptale.export.start' }],
   });
 });
+
+it('accepts the native drop effect for an available catalog command', async () => {
+  const dataTransfer = {
+    dropEffect: '',
+    types: ['text/plain'],
+    getData: () => 'command:sniptale.export.start',
+  };
+  await act(async () =>
+    row('command:sniptale.settings').dispatchEvent(
+      Object.assign(new Event('dragover', { bubbles: true, cancelable: true }), {
+        dataTransfer,
+        clientX: 100,
+        clientY: 0,
+      })
+    )
+  );
+  expect(dataTransfer.dropEffect).toBe('move');
+});
+
+it.each([
+  ['before', 2, 1],
+  ['after', 38, 2],
+] as const)('inserts at the %s edge of a section without nesting', async (_edge, y, index) => {
+  const target = row('section:tools');
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 300,
+    height: 40,
+    right: 300,
+    bottom: 40,
+    x: 0,
+    y: 0,
+    toJSON: () => undefined,
+  });
+  const dataTransfer = {
+    dropEffect: '',
+    types: ['text/plain'],
+    getData: () => 'command:sniptale.export.start',
+  };
+  await act(async () =>
+    target.dispatchEvent(
+      Object.assign(new Event('dragover', { bubbles: true, cancelable: true }), {
+        dataTransfer,
+        clientX: 100,
+        clientY: y,
+      })
+    )
+  );
+  await act(async () =>
+    target.dispatchEvent(
+      Object.assign(new Event('drop', { bubbles: true, cancelable: true }), { dataTransfer })
+    )
+  );
+  expect(latest.nodes[index]).toMatchObject({ command: 'sniptale.export.start' });
+  expect(latest.nodes.find((node) => node.type === 'section')).toMatchObject({
+    children: [{ command: 'sniptale.gallery' }],
+  });
+});

@@ -18,6 +18,7 @@ export function buildPopupStartupOptions(locale: AppLocale): Array<{
     'tools',
     'export:download',
     'export:library',
+    'export:html',
   ];
   return values.map((value) => ({
     value,

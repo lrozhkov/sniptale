@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type DragEvent,
-  type KeyboardEvent,
-} from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Folder } from 'lucide-react';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import type { AppLocale } from '../../../../../platform/i18n';
@@ -19,6 +12,7 @@ import { CONTEXT_MENU_MAX_SECTIONS } from '../../../../../contracts/settings/con
 import type { ContextMenuCatalogItem } from './context-menu-catalog';
 import { contextMenuCommandLabel } from './context-menu-catalog';
 import { ContextMenuTreeRow, treeIconButton } from './context-menu-tree-row';
+import { useContextMenuTreeDrop } from './context-menu-tree-drop';
 import {
   createSectionAtSelection,
   createTreeReorder,
@@ -27,24 +21,16 @@ import {
   toggleTreeSection,
 } from './context-menu-tree-controller';
 import {
-  addContextMenuCommand,
   contextMenuNodePosition,
   countContextMenuSections,
   findContextMenuNode,
   hasDisabledContextMenuSection,
-  moveContextMenuNode,
   removeContextMenuNode,
   restoreContextMenuSections,
   updateContextMenuNode,
   visibleContextMenuNodes,
 } from './context-menu-tree-model';
 
-type DropTarget = {
-  parentId: string | null;
-  index: number;
-  rowKey: string;
-  edge: 'before' | 'after' | 'inside';
-};
 type TreeViewProps = {
   tree: ContextMenuTree;
   catalog: readonly ContextMenuCatalogItem[];
@@ -128,111 +114,6 @@ function handleTreeKey(
   if (nextKey) select(nextKey);
 }
 
-/** Pointer drop targets are resolved against the same pure move operation as row controls. */
-function useTreeDrop(
-  props: Pick<
-    TreeViewProps,
-    'tree' | 'catalog' | 'locale' | 'expanded' | 'onExpanded' | 'onAnnounce'
-  > & {
-    apply(next: ContextMenuTree, focusKey: string): void;
-  }
-) {
-  const { tree, catalog, locale, expanded, onExpanded, onAnnounce, apply } = props;
-  const dragKey = useRef<string | null>(null);
-  const expandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [drop, setDrop] = useState<DropTarget | null>(null);
-  const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
-  useEffect(
-    () => () => {
-      if (expandTimer.current) clearTimeout(expandTimer.current);
-    },
-    []
-  );
-  const clearExpandTimer = () => {
-    if (expandTimer.current) clearTimeout(expandTimer.current);
-    expandTimer.current = null;
-  };
-  const dragOver = (
-    event: DragEvent<HTMLDivElement>,
-    rowKey: string,
-    node: ContextMenuTreeNode
-  ) => {
-    const external = event.dataTransfer.types?.includes('text/plain') ?? false;
-    if (!dragKey.current && !external) return;
-    event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const inside = node.type === 'section' && event.clientX > rect.left + 54;
-    const edge = inside
-      ? 'inside'
-      : event.clientY < rect.top + rect.height / 2
-        ? 'before'
-        : 'after';
-    const position = contextMenuNodePosition(tree, rowKey)!;
-    const target: DropTarget = inside
-      ? {
-          parentId: node.type === 'section' ? node.id : null,
-          index: node.type === 'section' ? node.children.length : 0,
-          rowKey,
-          edge,
-        }
-      : {
-          parentId: position.parentId,
-          index: position.index + (edge === 'after' ? 1 : 0),
-          rowKey,
-          edge,
-        };
-    const possible = dragKey.current ? moveContextMenuNode(tree, dragKey.current, target) : tree;
-    event.dataTransfer.dropEffect = possible === tree ? 'none' : 'move';
-    setDrop(dragKey.current && possible === tree ? null : target);
-    if (inside && node.type === 'section' && !expanded.has(node.id) && !expandTimer.current) {
-      expandTimer.current = setTimeout(() => {
-        onExpanded(new Set([...expanded, node.id]));
-        expandTimer.current = null;
-      }, 450);
-    } else if (!inside) clearExpandTimer();
-  };
-  const dragEnd = () => {
-    dragKey.current = null;
-    setDrop(null);
-    clearExpandTimer();
-  };
-  return {
-    drop,
-    dragStart: (event: DragEvent<HTMLSpanElement>, key: string) => {
-      dragKey.current = key;
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', key);
-    },
-    dragEnd,
-    dragOver,
-    dropOnRow: (event: DragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const external = event.dataTransfer.getData?.('text/plain') ?? '';
-      const command = external.startsWith('command:') ? external.slice('command:'.length) : null;
-      if (
-        drop &&
-        (dragKey.current ||
-          (command && catalog.some((item) => item.command === command && item.available)))
-      ) {
-        const next = dragKey.current
-          ? moveContextMenuNode(tree, dragKey.current, drop)
-          : addContextMenuCommand(tree, command!, drop);
-        if (next !== tree && drop.parentId) onExpanded(new Set([...expanded, drop.parentId]));
-        apply(next, dragKey.current ?? external);
-        if (next !== tree) onAnnounce(t('settings.appearance.contextMenuMoved'));
-      }
-      dragEnd();
-    },
-    rootDragOver: (event: DragEvent<HTMLDivElement>) => {
-      if ((event.target as HTMLElement).closest('[role="treeitem"]')) return;
-      if (!dragKey.current && !event.dataTransfer.types?.includes('text/plain')) return;
-      event.preventDefault();
-      setDrop({ parentId: null, index: tree.nodes.length, rowKey: 'root', edge: 'inside' });
-    },
-  };
-}
-
 function useTreeFocus(props: TreeViewProps, editingKey: string | undefined) {
   const { tree, selectedKey, focusRequest, onSelect, expanded } = props;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -297,7 +178,15 @@ function useContextMenuTree(props: TreeViewProps) {
     if (nextKey) select(nextKey);
     else onSelect(null);
   };
-  const drag = useTreeDrop({ tree, catalog, locale, expanded, onExpanded, onAnnounce, apply });
+  const drag = useContextMenuTreeDrop({
+    tree,
+    catalog,
+    locale,
+    expanded,
+    onExpanded,
+    onAnnounce,
+    apply,
+  });
   const toggleExpanded = (id: string) => {
     const result = toggleTreeSection(tree, id, expanded, selectedKey);
     if (result.focusKey) select(result.focusKey);
@@ -381,6 +270,7 @@ function useContextMenuTree(props: TreeViewProps) {
     drop: drag.drop,
     rootDragOver: drag.rootDragOver,
     rootDrop: drag.dropOnRow,
+    rootDragLeave: drag.rootDragLeave,
     editing,
     addSection,
     rowActions,
@@ -402,6 +292,7 @@ export function ContextMenuTreeView(props: TreeViewProps) {
     drop,
     rootDragOver,
     rootDrop,
+    rootDragLeave,
     editing,
     addSection,
     rowActions,
@@ -410,9 +301,24 @@ export function ContextMenuTreeView(props: TreeViewProps) {
     confirmSectionRemoval,
   } = useContextMenuTree(props);
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const dropRow = rows.find((row) => row.key === drop?.rowKey);
+  let afterKey = dropRow?.key;
+  if (drop?.edge === 'after' && dropRow) {
+    const index = rows.indexOf(dropRow);
+    for (let next = index + 1; next < rows.length; next += 1) {
+      const descendant = rows[next];
+      if (!descendant || descendant.level <= dropRow.level) break;
+      afterKey = descendant.key;
+    }
+  }
   return (
-    <div className="min-w-0 space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex h-[min(28rem,55vh)] min-h-48 min-w-0 flex-col">
+      <div
+        className={[
+          'flex h-12 shrink-0 items-center justify-between gap-2 border-b px-3',
+          'border-[var(--sniptale-color-border-soft)]',
+        ].join(' ')}
+      >
         <h3 className="text-sm font-semibold">{t('settings.appearance.contextMenuTree')}</h3>
         {hasDisabledContextMenuSection(tree.nodes) ? (
           <button
@@ -433,19 +339,16 @@ export function ContextMenuTreeView(props: TreeViewProps) {
           {t('settings.appearance.contextMenuCreateSection')}
         </button>
       </div>
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {t('settings.appearance.contextMenuMoveHelp')}
-      </p>
       <div
         ref={rootRef}
         role="tree"
         aria-label={t('settings.appearance.contextMenuTree')}
+        title={t('settings.appearance.contextMenuMoveHelp')}
         onDragOver={rootDragOver}
         onDrop={rootDrop}
+        onDragLeave={rootDragLeave}
         className={[
-          'max-h-[34rem] min-h-20 space-y-1 overflow-auto rounded-xl border',
-          'border-[var(--sniptale-color-border-soft)]',
-          'bg-[var(--sniptale-color-surface-canvas)] p-2',
+          'min-h-0 flex-1 overflow-auto p-2',
           drop?.rowKey === 'root' ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
         ].join(' ')}
       >
@@ -472,7 +375,17 @@ export function ContextMenuTreeView(props: TreeViewProps) {
               selected={selectedKey === key}
               first={!selectedKey && rows[0]?.key === key}
               expanded={node.type === 'section' && expanded.has(node.id)}
-              dropEdge={drop?.rowKey === key ? drop.edge : undefined}
+              dropEdge={
+                drop?.edge === 'after'
+                  ? afterKey === key
+                    ? 'after'
+                    : undefined
+                  : drop?.rowKey === key
+                    ? drop.edge
+                    : undefined
+              }
+              dropIndent={dropRow ? (row.level - dropRow.level) * 18 : 0}
+              {...(drop ? { dropTargetKey: drop.rowKey } : {})}
               unavailable={unavailable}
               editingValue={editing?.key === key ? editing.value : undefined}
               inputRef={inputRef}

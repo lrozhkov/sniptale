@@ -121,3 +121,25 @@ it('persists the last page without changing the startup selection', async () => 
     expect.any(Object)
   );
 });
+
+it('round-trips fixed HTML startup and the remembered HTML destination', async () => {
+  const stored: Record<string, unknown> = {};
+  getMock.mockImplementation(async () => stored);
+  setMock.mockImplementation(async (patch: Record<string, unknown>) =>
+    Object.assign(stored, patch)
+  );
+  await savePopupStartupSelection('export:html');
+  await savePopupLastPage('export');
+  await savePopupLastExportDestination('html');
+  await expect(loadPopupStartupState()).resolves.toEqual({
+    selection: 'export:html',
+    lastPage: 'export',
+    lastExportDestination: 'html',
+  });
+  await savePopupStartupSelection('remember-last');
+  await expect(loadPopupStartupState()).resolves.toEqual({
+    selection: 'remember-last',
+    lastPage: 'export',
+    lastExportDestination: 'html',
+  });
+});

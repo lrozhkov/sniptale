@@ -62,11 +62,18 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
   };
   return (
     <section
-      className="min-w-0 space-y-2 rounded-xl border border-[var(--sniptale-color-border-soft)] p-3"
+      className="flex h-[min(28rem,55vh)] min-h-48 min-w-0 flex-col"
       aria-label={t('settings.appearance.contextMenuCatalog')}
     >
-      <h3 className="text-sm font-semibold">{t('settings.appearance.contextMenuCatalog')}</h3>
-      <div className="max-h-[34rem] space-y-1 overflow-y-auto">
+      <h3
+        className={[
+          'flex h-12 shrink-0 items-center border-b px-3 text-sm font-semibold',
+          'border-[var(--sniptale-color-border-soft)]',
+        ].join(' ')}
+      >
+        {t('settings.appearance.contextMenuCatalog')}
+      </h3>
+      <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {unused.length === 0 ? (
           <p className="text-sm text-[var(--sniptale-color-text-muted)]">
             {t('settings.appearance.contextMenuEmptyCatalog')}
@@ -77,7 +84,7 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
             key={item.command}
             type="button"
             draggable
-            className="block min-h-10 w-full truncate rounded-lg px-3 py-2 text-left text-sm
+            className="block h-10 w-full truncate rounded-md px-3 text-left text-sm
               hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none
               focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]"
             title={item.label}

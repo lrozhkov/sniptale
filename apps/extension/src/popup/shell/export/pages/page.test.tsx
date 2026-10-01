@@ -6,11 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { createVideoCapabilities } from '../../test-support/video-capabilities';
 import type { ExportFooterActions } from '../footer/actions';
+import { PackageDestinationSwitch } from '../data-type/package-controls';
 
 const mocks = vi.hoisted(() => ({
   exportFooterActionsMock: vi.fn(),
   exportPageContentMock: vi.fn(),
   loadSettings: vi.fn(),
+  saveDestination: vi.fn(),
   usePopupExportControllerMock: vi.fn(),
 }));
 
@@ -22,9 +24,18 @@ vi.mock('../footer/actions', () => ({
 }));
 
 vi.mock('./content', () => ({
-  ExportPageContent: (props: unknown) => {
+  ExportPageContent: (props: Parameters<typeof import('./content').ExportPageContent>[0]) => {
     mocks.exportPageContentMock(props);
-    return <div data-testid="export-page-content">content</div>;
+    return (
+      <div data-testid="export-page-content">
+        content
+        <PackageDestinationSwitch
+          destination={props.destination}
+          disabled={false}
+          onChange={props.onDestinationChange}
+        />
+      </div>
+    );
   },
 }));
 
@@ -37,6 +48,16 @@ vi.mock('../../../../composition/persistence/settings', async (importOriginal) =
   loadSettings: mocks.loadSettings,
 }));
 
+vi.mock(
+  '../../../../composition/persistence/capture-settings/popup-startup',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/capture-settings/popup-startup')
+    >()),
+    savePopupLastExportDestination: mocks.saveDestination,
+  })
+);
+import { translate } from '../../../../platform/i18n/popup';
 import { ExportPage } from './page';
 import { createPopupExportControllerFixture } from './controller.test-support';
 
@@ -111,6 +132,7 @@ function triggerFooterActions(footerProps: RenderedFooterProps) {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  mocks.saveDestination.mockReset().mockResolvedValue(undefined);
   mocks.exportFooterActionsMock.mockReset();
   mocks.exportPageContentMock.mockReset();
   mocks.loadSettings.mockResolvedValue({
@@ -317,4 +339,22 @@ it('routes HTML through export even when ZIP has no selected components', async 
   footer.onStartExport();
   expect(controller.actions.handleStartExport).toHaveBeenCalledWith('html');
   expect(controller.actions.handleSaveWebSnapshot).not.toHaveBeenCalled();
+});
+
+it('opens the HTML destination without automatically exporting', async () => {
+  const controller = await renderPage({ initialDestination: 'html' });
+  expect(controller.actions.handleStartExport).not.toHaveBeenCalled();
+  getRenderedFooterProps().onStartExport();
+  expect(controller.actions.handleStartExport).toHaveBeenCalledWith('html');
+});
+
+it('remembers HTML when the actual destination control selects it', async () => {
+  await renderPage({ initialDestination: 'export' });
+  const html = [...(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+    (button) =>
+      button.getAttribute('aria-label') === translate('popup.export.packageDestinationHtml')
+  );
+  expect(html).toBeDefined();
+  act(() => html?.click());
+  expect(mocks.saveDestination).toHaveBeenCalledWith('html');
 });
