@@ -118,6 +118,25 @@ const PREVIOUS_SYSTEM_GRADIENT_IDS = new Set([
   'system-conic-spectrum',
 ]);
 
+function isSystemGradientCustomized(
+  preset: StoredGradientPreset,
+  canonical: StoredGradientPreset
+): boolean {
+  return (
+    preset.name !== canonical.name ||
+    preset.enabled !== canonical.enabled ||
+    preset.order !== canonical.order ||
+    JSON.stringify(preset.gradient) !== JSON.stringify(canonical.gradient)
+  );
+}
+
+function reconcileSystemGradientCustomization(
+  positioned: StoredGradientPreset
+): StoredGradientPreset {
+  const canonical = SYSTEM_GRADIENT_PRESETS.find((item) => item.id === positioned.id)!;
+  return { ...positioned, customized: isSystemGradientCustomized(positioned, canonical) };
+}
+
 function refreshPreviousCatalog(value: Record<string, unknown>): GradientPresetCatalog | null {
   if (
     !Array.isArray(value['presets']) ||
@@ -165,15 +184,7 @@ function refreshPreviousCatalog(value: Record<string, unknown>): GradientPresetC
   const presets = refreshed.map((preset, order) => {
     const positioned = { ...preset, order };
     if (positioned.origin === 'user') return { ...positioned, customized: false };
-    const canonical = SYSTEM_GRADIENT_PRESETS.find((item) => item.id === positioned.id)!;
-    return {
-      ...positioned,
-      customized:
-        positioned.name !== canonical.name ||
-        positioned.enabled !== canonical.enabled ||
-        positioned.order !== canonical.order ||
-        JSON.stringify(positioned.gradient) !== JSON.stringify(canonical.gradient),
-    };
+    return reconcileSystemGradientCustomization(positioned);
   });
   const currentIds = new Set(presets.map((preset) => preset.id));
   if (currentIds.size !== presets.length) return null;
@@ -200,11 +211,10 @@ function isSystemCustomizationValid(preset: StoredGradientPreset): boolean {
   if (!canonical) return false;
   const canonicalPaint = parsePaint({ kind: 'gradient', gradient: canonical.gradient });
   if (canonicalPaint?.kind !== 'gradient') return false;
-  const customized =
-    preset.name !== canonical.name ||
-    preset.enabled !== canonical.enabled ||
-    preset.order !== canonical.order ||
-    JSON.stringify(preset.gradient) !== JSON.stringify(canonicalPaint.gradient);
+  const customized = isSystemGradientCustomized(preset, {
+    ...canonical,
+    gradient: canonicalPaint.gradient,
+  });
   return preset.customized === customized;
 }
 
@@ -224,10 +234,11 @@ function isRevisionThreeCustomizationValid(preset: StoredGradientPreset): boolea
   if (normalized?.kind !== 'gradient') return false;
   return (
     preset.customized ===
-    (preset.name !== baseline.name ||
-      preset.enabled !== baseline.enabled ||
-      preset.order !== canonical ||
-      JSON.stringify(preset.gradient) !== JSON.stringify(normalized.gradient))
+    isSystemGradientCustomized(preset, {
+      ...baseline,
+      order: canonical,
+      gradient: normalized.gradient,
+    })
   );
 }
 
@@ -309,15 +320,7 @@ function refreshRevisionThreeCatalog(value: Record<string, unknown>): GradientPr
   const presets = refreshed.map((item, order) => {
     const positioned = { ...item, order };
     if (positioned.origin === 'user') return positioned;
-    const canonical = SYSTEM_GRADIENT_PRESETS.find((preset) => preset.id === positioned.id)!;
-    return {
-      ...positioned,
-      customized:
-        positioned.name !== canonical.name ||
-        positioned.enabled !== canonical.enabled ||
-        positioned.order !== canonical.order ||
-        JSON.stringify(positioned.gradient) !== JSON.stringify(canonical.gradient),
-    };
+    return reconcileSystemGradientCustomization(positioned);
   });
   const catalog = {
     revision: GRADIENT_PRESET_CATALOG_REVISION,

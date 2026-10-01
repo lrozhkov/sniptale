@@ -4,6 +4,7 @@ import {
   decodeBase64Bytes,
   estimateBase64DecodedBytes,
   estimateUtf8Bytes,
+  truncateUtf8Text,
   isBoundedBase64,
   isBoundedUtf8Text,
   isSafeDownloadFilename,
@@ -43,5 +44,25 @@ describe('base64 boundary validation', () => {
     expect(isBoundedUtf8Text('WEBVTT', 6)).toBe(true);
     expect(isBoundedUtf8Text('WEBVTT', 5)).toBe(false);
     expect(isBoundedUtf8Text('', 5)).toBe(false);
+  });
+});
+
+describe('UTF-8 prefix truncation', () => {
+  it.each([
+    ['', 0, ''],
+    ['ascii', 0, ''],
+    ['ascii', 3, 'asc'],
+    ['éx', 1, ''],
+    ['éx', 2, 'é'],
+    ['éx', 3, 'éx'],
+    ['🎬x', 3, ''],
+    ['🎬x', 4, '🎬'],
+    ['🎬x', 5, '🎬x'],
+    ['e\u0301x', 2, 'e'],
+    ['e\u0301x', 3, 'e\u0301'],
+    ['\ud800x', 2, ''],
+    ['\ud800x', 3, '\ud800'],
+  ])('retains complete characters in %j at %i bytes', (value, limit, expected) => {
+    expect(truncateUtf8Text(value as string, limit as number)).toBe(expected);
   });
 });

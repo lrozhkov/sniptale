@@ -178,3 +178,17 @@ it.each<MediaLibraryEntry['source']>([
     parseMediaLibraryEntry({ ...image, imageContentState: 'unknown', workspaceRevision: 3 })
   ).toBeNull();
 });
+
+it('returns a valid thumbnail with its original Blob and timestamps', async () => {
+  const thumbnail = {
+    assetId: 'recording:valid',
+    blob: new Blob(['preview'], { type: 'image/png' }),
+    createdAt: 100,
+    updatedAt: 200,
+    width: 1280,
+    height: 720,
+  };
+  mocks.get.mockResolvedValueOnce(thumbnail);
+  await expect(getMediaThumbnail(thumbnail.assetId)).resolves.toEqual(thumbnail);
+  expect(mocks.get).toHaveBeenCalledWith('thumbnails', thumbnail.assetId);
+});

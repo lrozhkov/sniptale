@@ -150,6 +150,31 @@ beforeEach(() => {
 });
 
 function registerUpdateMediaLibraryEntryTests() {
+  it('writes an empty metadata patch and awaits transaction completion', async () => {
+    dbMocks.objectStoreGetMock.mockResolvedValue(createMediaEntry());
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(999);
+    let complete!: () => void;
+    dbMocks.txDoneMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      })
+    );
+    let settled = false;
+    const pending = updateMediaLibraryEntry('asset-1', {}).then(() => {
+      settled = true;
+    });
+    try {
+      await vi.waitFor(() => expect(dbMocks.putMock).toHaveBeenCalledOnce());
+      expect(dbMocks.putMock).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: 999 }));
+      expect(settled).toBe(false);
+      complete();
+      await pending;
+      expect(settled).toBe(true);
+    } finally {
+      complete();
+      clock.mockRestore();
+    }
+  });
   it('updates media metadata while preserving existing tags and refresh timestamps', async () => {
     const existingEntry = createMediaEntry({
       tags: ['old'],

@@ -230,70 +230,52 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
       if (target) rangesRef.current?.setPlaybackRange(previousRange);
     };
   }, [layout.audioRecordingDialogOpen, target]);
-  const timeline = useMemo(
-    () =>
-      target && runtime
-        ? {
-            startTime: target.startTime,
-            duration: target.endTime - target.startTime,
-            beforeStart: async () => {
-              const startedGeneration = generation.current;
-              const project = getCurrentVideoEditorProjectSnapshot();
-              if (
-                !project ||
-                project.id !== target.projectId ||
-                !isAudioRecordingRangeAvailable(
-                  project,
-                  target.trackId,
-                  target.startTime,
-                  target.endTime
-                )
-              )
-                throw new Error('Recording destination unavailable');
-              runtime.pausePlayback();
-              setCurrentTime(target.startTime);
-              await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-              if (!current.current.open || startedGeneration !== generation.current)
-                throw new Error('Recording cancelled');
-              if (playVideo) {
-                const started = await runtime.setPlaybackPlaying(true);
-                if (
-                  started === false ||
-                  !current.current.open ||
-                  startedGeneration !== generation.current
-                ) {
-                  if (started === false || !current.current.open || !selectedPlayback.current)
-                    runtime.pausePlayback();
-                  throw new Error('Playback unavailable');
-                }
-              }
-            },
-            onStop: () => {
-              runtime.pausePlayback();
-            },
-            onPause: () => {
-              runtime.pausePlayback();
-            },
-            onResume: async () => {
-              const startedGeneration = generation.current;
-              if (!current.current.open) throw new Error('Recording cancelled');
-              if (playVideo) {
-                const started = await runtime.setPlaybackPlaying(true);
-                if (
-                  started === false ||
-                  !current.current.open ||
-                  startedGeneration !== generation.current
-                ) {
-                  if (started === false || !current.current.open || !selectedPlayback.current)
-                    runtime.pausePlayback();
-                  throw new Error('Playback unavailable');
-                }
-              }
-            },
-          }
-        : undefined,
-    [target, runtime, setCurrentTime, playVideo]
-  );
+  const timeline = useMemo(() => {
+    if (!target || !runtime) return undefined;
+    const startPreviewPlayback = async (startedGeneration: number) => {
+      if (!current.current.open || startedGeneration !== generation.current)
+        throw new Error('Recording cancelled');
+      if (playVideo) {
+        const started = await runtime.setPlaybackPlaying(true);
+        if (
+          started === false ||
+          !current.current.open ||
+          startedGeneration !== generation.current
+        ) {
+          if (started === false || !current.current.open || !selectedPlayback.current)
+            runtime.pausePlayback();
+          throw new Error('Playback unavailable');
+        }
+      }
+    };
+    return {
+      startTime: target.startTime,
+      duration: target.endTime - target.startTime,
+      beforeStart: async () => {
+        const startedGeneration = generation.current;
+        const project = getCurrentVideoEditorProjectSnapshot();
+        if (
+          !project ||
+          project.id !== target.projectId ||
+          !isAudioRecordingRangeAvailable(project, target.trackId, target.startTime, target.endTime)
+        )
+          throw new Error('Recording destination unavailable');
+        runtime.pausePlayback();
+        setCurrentTime(target.startTime);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        await startPreviewPlayback(startedGeneration);
+      },
+      onStop: () => {
+        runtime.pausePlayback();
+      },
+      onPause: () => {
+        runtime.pausePlayback();
+      },
+      onResume: async () => {
+        await startPreviewPlayback(generation.current);
+      },
+    };
+  }, [target, runtime, setCurrentTime, playVideo]);
   if (!sidebar) return null;
   return (
     <AudioRecordingModal

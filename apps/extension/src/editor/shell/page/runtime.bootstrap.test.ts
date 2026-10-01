@@ -340,6 +340,55 @@ describe('editor-page.runtime bootstrap flows', () => {
     'stops bootstrap payload opening after canvas readiness when the runtime is cancelled',
     verifiesCancelledBootstrapPayloadOpen
   );
+  it.each(['image', 'document'] as const)(
+    'does not publish a %s bootstrap after cancellation during opening',
+    async (kind) => {
+      const controller = createEditorPageController();
+      const autosaveService = createEditorPageAutosaveService();
+      let cancelled = false;
+      const cancelDuringOpen = async () => {
+        cancelled = true;
+        return undefined;
+      };
+      controller.openImage.mockImplementation(cancelDuringOpen);
+      controller.loadDocument.mockImplementation(cancelDuringOpen);
+      await openEditorBootstrapPayload(
+        {
+          dataUrl: 'data:image/png;base64,1',
+          ...(kind === 'document' ? { document: createEditorPageDocument() } : {}),
+          capturedAt: 222,
+        },
+        createEditorPageRuntime({ isCancelled: () => cancelled }),
+        { autosaveService, controller } as never
+      );
+      expect(controller.exportDocument).not.toHaveBeenCalled();
+      expect(autosaveService.saveNow).not.toHaveBeenCalled();
+    }
+  );
+  it.each(['image', 'document'] as const)(
+    'does not commit the %s capture timestamp after cancellation during saving',
+    async (kind) => {
+      const controller = createEditorPageController();
+      const autosaveService = createEditorPageAutosaveService();
+      let cancelled = false;
+      const capturedAt = useEditorStore.getState().capturedAt;
+      autosaveService.saveNow.mockImplementation(async (produceDocument) => {
+        produceDocument();
+        cancelled = true;
+      });
+      await openEditorBootstrapPayload(
+        {
+          dataUrl: 'data:image/png;base64,1',
+          ...(kind === 'document' ? { document: createEditorPageDocument() } : {}),
+          capturedAt: 222,
+        },
+        createEditorPageRuntime({ isCancelled: () => cancelled }),
+        { autosaveService, controller } as never
+      );
+      expect(autosaveService.saveNow).toHaveBeenCalledOnce();
+      expect(useEditorStore.getState().capturedAt).toBe(capturedAt);
+    }
+  );
   it('restores draft sessions through loadDocument', verifiesDraftRestore);
   it(
     'retries a stale restored preview only after document hydration',

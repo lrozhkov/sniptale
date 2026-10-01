@@ -1,5 +1,5 @@
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { EditorFloatingConfirmDialog } from './confirm-dialog';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { EditorInspectorCompactToolbar } from '../../inspector/compact';
@@ -110,29 +110,6 @@ function EditorFloatingInspectorHeader({
   );
 }
 
-function EditorFloatingInspectorConfirmDialog({
-  documentController,
-}: {
-  documentController: EditorFloatingDocumentController;
-}) {
-  const confirmDialog = documentController.confirmDialog;
-
-  if (!confirmDialog) {
-    return null;
-  }
-
-  return (
-    <ProductConfirmDialog
-      title={confirmDialog.title}
-      message={confirmDialog.message}
-      confirmText={confirmDialog.confirmText}
-      cancelText={confirmDialog.cancelText}
-      onConfirm={documentController.onConfirmDialogConfirm}
-      onCancel={documentController.onConfirmDialogCancel}
-    />
-  );
-}
-
 export function EditorFloatingInspector(props: EditorFloatingInspectorProps) {
   useAppLocale();
   const controller = props.documentController;
@@ -175,7 +152,7 @@ export function EditorFloatingInspector(props: EditorFloatingInspectorProps) {
       >
         <EditorInspectorLayersPanel {...layersPanelProps} maxExpandedHeightRatio={1} />
       </FloatingChromePanel>
-      <EditorFloatingInspectorConfirmDialog documentController={controller} />
+      <EditorFloatingConfirmDialog documentController={controller} />
     </>
   );
 }

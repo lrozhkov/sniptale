@@ -46,16 +46,28 @@ it('keeps hidden file inputs and the shared confirm dialog mounted outside panel
     message: 'Message',
     title: 'Title',
   };
+  const onConfirmDialogConfirm = vi.fn();
+  const onConfirmDialogCancel = vi.fn();
   const { EditorFloatingWorkspaceOverlays } = await import('./overlays');
   const markup = renderToStaticMarkup(
-    <EditorFloatingWorkspaceOverlays documentController={createController({ confirmDialog })} />
+    <EditorFloatingWorkspaceOverlays
+      documentController={createController({
+        confirmDialog,
+        onConfirmDialogConfirm,
+        onConfirmDialogCancel,
+      })}
+    />
   );
 
   expect(markup).toContain('mock.hidden-inputs');
   expect(markup).toContain('mock.confirm-dialog');
   expect(mocks.hiddenInputs).toHaveBeenCalledOnce();
   expect(mocks.confirmDialog).toHaveBeenCalledWith(
-    expect.objectContaining(confirmDialog),
+    expect.objectContaining({
+      ...confirmDialog,
+      onConfirm: onConfirmDialogConfirm,
+      onCancel: onConfirmDialogCancel,
+    }),
     undefined
   );
 }, 10000);

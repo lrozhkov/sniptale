@@ -132,66 +132,48 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
   throw new Error(`Project asset ${entry.source.projectAssetId} ${projectAsset.status}.`);
 }
 
+async function mutateMediaLibraryEntry(
+  assetId: string,
+  mutate: (entry: MediaLibraryEntry) => MediaLibraryEntry
+): Promise<MediaLibraryEntry> {
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
+    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const existing = parseMediaLibraryEntry(await store.get(assetId));
+    if (!existing) throw new Error(`Asset ${assetId} не найден.`);
+    const nextEntry = mutate(existing);
+    if (nextEntry !== existing) await store.put(nextEntry);
+    await tx.done;
+    return nextEntry;
+  });
+}
+
 export async function updateMediaLibraryEntry(
   assetId: string,
   patch: Partial<
     Pick<MediaLibraryEntry, 'filename' | 'tags' | 'sourceUrl' | 'sourceTitle' | 'sourceFavicon'>
   >
 ): Promise<void> {
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
-    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
-    const existing = parseMediaLibraryEntry(await store.get(assetId));
-
-    if (!existing) {
-      throw new Error(`Asset ${assetId} не найден.`);
-    }
-
-    const updatedAt = Date.now();
-    await store.put({
-      ...existing,
-      ...patch,
-      ...(patch.sourceUrl === undefined
-        ? {}
-        : { sourceUrl: sanitizeProvenanceUrl(patch.sourceUrl) }),
-      ...(patch.sourceFavicon === undefined
-        ? {}
-        : { sourceFavicon: sanitizeProvenanceUrl(patch.sourceFavicon) }),
-      updatedAt,
-      tags: patch.tags ?? existing.tags,
-    });
-    await tx.done;
-  });
+  await mutateMediaLibraryEntry(assetId, (existing) => ({
+    ...existing,
+    ...patch,
+    ...(patch.sourceUrl === undefined ? {} : { sourceUrl: sanitizeProvenanceUrl(patch.sourceUrl) }),
+    ...(patch.sourceFavicon === undefined
+      ? {}
+      : { sourceFavicon: sanitizeProvenanceUrl(patch.sourceFavicon) }),
+    updatedAt: Date.now(),
+    tags: patch.tags ?? existing.tags,
+  }));
 }
 
 export async function addMediaLibraryEntryTags(
   assetId: string,
   tagsToAdd: string[]
 ): Promise<MediaLibraryEntry> {
-  return runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
-    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
-    const existing = parseMediaLibraryEntry(await store.get(assetId));
-
-    if (!existing) {
-      throw new Error(`Asset ${assetId} не найден.`);
-    }
-
+  return mutateMediaLibraryEntry(assetId, (existing) => {
     const nextTags = Array.from(new Set([...existing.tags, ...tagsToAdd]));
-    if (nextTags.length === existing.tags.length) {
-      await tx.done;
-      return existing;
-    }
-
-    const updatedAt = Date.now();
-    const nextEntry = {
-      ...existing,
-      tags: nextTags,
-      updatedAt,
-    };
-    await store.put(nextEntry);
-    await tx.done;
-    return nextEntry;
+    if (nextTags.length === existing.tags.length) return existing;
+    return { ...existing, tags: nextTags, updatedAt: Date.now() };
   });
 }
 

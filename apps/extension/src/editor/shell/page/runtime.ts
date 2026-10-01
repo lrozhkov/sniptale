@@ -179,20 +179,13 @@ export async function openEditorBootstrapPayload(
 
   if (payload.document) {
     await services.controller.loadDocument(payload.document);
-    if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
-    const initialDocument = services.controller.exportDocument();
-    await services.autosaveService.saveNow(() => initialDocument);
-    if (!isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) {
-      useEditorStore.getState().setCapturedAt(capturedAt);
-    }
-    return;
+  } else {
+    await services.controller.openImage(payload.dataUrl, undefined, {
+      browserFrameUrl: payload.url ?? '',
+      pageTitle: payload.title ?? '',
+      sourceFaviconUrl: payload.sourceFaviconUrl ?? null,
+    });
   }
-
-  await services.controller.openImage(payload.dataUrl, undefined, {
-    browserFrameUrl: payload.url ?? '',
-    pageTitle: payload.title ?? '',
-    sourceFaviconUrl: payload.sourceFaviconUrl ?? null,
-  });
   if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
   const initialDocument = services.controller.exportDocument();
   await services.autosaveService.saveNow(() => initialDocument);

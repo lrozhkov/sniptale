@@ -1,4 +1,4 @@
-import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { EditorFloatingConfirmDialog } from './confirm-dialog';
 import { EditorInspectorSidebarHiddenInputs } from '../../inspector/sidebar/hidden-inputs';
 import type { EditorFloatingDocumentController } from './document-bar';
 
@@ -13,29 +13,6 @@ export type EditorFloatingWorkspaceOverlaysController = Pick<
   | 'openImageInputRef'
   | 'setImageData'
 >;
-
-function EditorFloatingConfirmDialog({
-  documentController,
-}: {
-  documentController: EditorFloatingWorkspaceOverlaysController;
-}) {
-  const confirmDialog = documentController.confirmDialog;
-
-  if (!confirmDialog) {
-    return null;
-  }
-
-  return (
-    <ProductConfirmDialog
-      title={confirmDialog.title}
-      message={confirmDialog.message}
-      confirmText={confirmDialog.confirmText}
-      cancelText={confirmDialog.cancelText}
-      onConfirm={documentController.onConfirmDialogConfirm}
-      onCancel={documentController.onConfirmDialogCancel}
-    />
-  );
-}
 
 export function EditorFloatingWorkspaceOverlays({
   documentController,
