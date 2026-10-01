@@ -490,3 +490,35 @@ describe('repository Node entrypoint runtime parity', () => {
     }
   });
 });
+
+it('completes every dedicated npm installation before publishing or using its CLI', () => {
+  let installations = 0;
+  for (const file of [CANONICAL, RELEASE, FINALIZE]) {
+    const workflow = readWorkflow(file);
+    for (const job of Object.values(workflow.jobs)) {
+      for (const step of job.steps ?? []) {
+        const script = step.run ?? '';
+        if (
+          !/npm ci --ignore-scripts --prefix (?:candidate\/)?tooling\/configs\/ci\/npm(?:\s|$)/u.test(
+            script
+          )
+        )
+          continue;
+        installations += 1;
+        const installation = script.indexOf('npm ci --ignore-scripts --prefix');
+        const normalization = script.indexOf('npm-runtime.mjs');
+        expect(normalization, file).toBeGreaterThan(installation);
+        expect(normalization, file).toBeLessThan(script.indexOf('>> "$GITHUB_PATH"'));
+        if (script.includes('npm ci --ignore-scripts\n')) {
+          expect(script, file).toContain(
+            'export PATH="$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin:$PATH"'
+          );
+          expect(script.indexOf('export PATH='), file).toBeLessThan(
+            script.lastIndexOf('npm ci --ignore-scripts')
+          );
+        }
+      }
+    }
+  }
+  expect(installations).toBe(4);
+});

@@ -4,6 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
+import {
+  normalizeNpmRuntime,
+  validateNpmInputs,
+  validateNpmRuntimeEnvironment,
+} from './npm-runtime.mjs';
 import { createRuntimeParityReceipt } from './runtime-parity.mjs';
 
 function sha256(bytes) {
@@ -121,6 +126,17 @@ async function provisionCommonTools({ bin, downloads, lock }) {
   run('tar', ['-xzf', path.join(downloads, 'actionlint.tar.gz'), '-C', bin, 'actionlint']);
 }
 
+function provisionNpmRuntime({ environment, lock, root }) {
+  fs.mkdirSync(root);
+  for (const name of ['package.json', 'package-lock.json'])
+    fs.cpSync(path.join('tooling/configs/ci/npm', name), path.join(root, name));
+  validateNpmInputs(root, lock);
+  run('npm', ['ci', '--ignore-scripts', '--prefix', root], {
+    env: normalizedProxyEnvironment(environment),
+  });
+  normalizeNpmRuntime(root, lock);
+}
+
 async function provisionReleaseTools({ downloads, environment, lock, mutation, root }) {
   await download(lock.codeql, path.join(downloads, 'codeql.tar.gz'));
   run('tar', ['-xzf', path.join(downloads, 'codeql.tar.gz'), '-C', root]);
@@ -230,9 +246,14 @@ function readToolchainMarker(marker) {
   }
 }
 
-function createToolchainEnvironment({ bin, codeql, environment, lane, lockDigest, mutation }) {
+function createToolchainEnvironment({ bin, codeql, environment, lane, lockDigest, mutation, npm }) {
   const result = normalizedProxyEnvironment(environment);
-  result.PATH = [bin, ...(lane === 'release' ? [codeql] : []), result.PATH]
+  result.PATH = [
+    path.join(npm, 'node_modules/.bin'),
+    bin,
+    ...(lane === 'release' ? [codeql] : []),
+    result.PATH,
+  ]
     .filter(Boolean)
     .join(path.delimiter);
   result.SNIPTALE_OSV_SCANNER_BIN = path.join(bin, 'osv-scanner');
@@ -246,6 +267,39 @@ function createToolchainEnvironment({ bin, codeql, environment, lane, lockDigest
   }
   result.SNIPTALE_LOCAL_TOOLCHAIN_DIGEST = lockDigest;
   return result;
+}
+
+async function provisionLocalToolchain(paths) {
+  const { bin, codeql, environment, lane, lock, lockDigest, marker, mutation, npm, root } = paths;
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.mkdirSync(bin, { recursive: true, mode: 0o700 });
+  const downloads = path.join(root, 'downloads');
+  fs.mkdirSync(downloads, { mode: 0o700 });
+  provisionNpmRuntime({ environment, lock, root: npm });
+  const installEnvironment = createToolchainEnvironment({
+    bin,
+    codeql,
+    environment,
+    lane,
+    lockDigest,
+    mutation,
+    npm,
+  });
+  validateNpmRuntimeEnvironment(npm, lock, installEnvironment);
+  await provisionCommonTools({ bin, downloads, lock });
+  if (lane === 'release') {
+    await provisionReleaseTools({
+      downloads,
+      environment: installEnvironment,
+      lock,
+      mutation,
+      root,
+    });
+  }
+  fs.rmSync(downloads, { recursive: true, force: true });
+  const markerValue = { schemaVersion: 1, lane, lockDigest, ready: true };
+  fs.writeFileSync(marker, `${JSON.stringify(markerValue, null, 2)}\n`, { flag: 'wx' });
+  return markerValue;
 }
 
 export async function ensureLocalToolchain({ environment = process.env, lane = 'release' } = {}) {
@@ -272,20 +326,8 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
   const bin = path.join(root, 'bin');
   const codeql = path.join(root, 'codeql');
   const mutation = path.join(root, 'mutation');
-  let markerValue = readToolchainMarker(marker);
-  if (markerValue === null) {
-    fs.rmSync(root, { recursive: true, force: true });
-    fs.mkdirSync(bin, { recursive: true, mode: 0o700 });
-    const downloads = path.join(root, 'downloads');
-    fs.mkdirSync(downloads, { mode: 0o700 });
-    await provisionCommonTools({ bin, downloads, lock });
-    if (lane === 'release') {
-      await provisionReleaseTools({ downloads, environment, lock, mutation, root });
-    }
-    fs.rmSync(downloads, { recursive: true, force: true });
-    markerValue = { schemaVersion: 1, lane, lockDigest, ready: true };
-    fs.writeFileSync(marker, `${JSON.stringify(markerValue, null, 2)}\n`, { flag: 'wx' });
-  }
+  const npm = path.join(root, 'npm');
+  validateNpmInputs(path.resolve('tooling/configs/ci/npm'), lock);
   const paths = {
     bin,
     codeql,
@@ -293,11 +335,15 @@ export async function ensureLocalToolchain({ environment = process.env, lane = '
     lane,
     lock,
     lockDigest,
-    markerValue,
+    marker,
     mutation,
+    npm,
+    root,
     mutationVersion: mutationPackage.devDependencies['@stryker-mutator/core'],
   };
-  validateToolchainFiles(paths);
+  const markerValue = readToolchainMarker(marker) ?? (await provisionLocalToolchain(paths));
+  validateNpmRuntimeEnvironment(npm, lock, createToolchainEnvironment(paths));
+  validateToolchainFiles({ ...paths, markerValue });
   return {
     environment: createToolchainEnvironment({ ...paths, environment }),
     lockDigest,

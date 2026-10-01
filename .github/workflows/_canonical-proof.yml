@@ -104,7 +104,10 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Install locked npm
         if: steps.classify.outputs.reuse == 'true'
-        run: npm ci --ignore-scripts --prefix candidate/tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/candidate/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+        run: |
+          npm ci --ignore-scripts --prefix candidate/tooling/configs/ci/npm
+          node trusted-control/tooling/ci/npm-runtime.mjs candidate/tooling/configs/ci/npm candidate/tooling/configs/ci/toolchain.lock.json
+          echo "$GITHUB_WORKSPACE/candidate/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.classify.outputs.reuse == 'true'
         with:

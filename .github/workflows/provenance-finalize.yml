@@ -35,6 +35,8 @@ jobs:
       - name: Install exact finalizer dependencies
         run: |
           npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
+          export PATH="$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin:$PATH"
           echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
           npm ci --ignore-scripts
       - name: Admit the canonical proof and classify intervening controls

@@ -79,7 +79,10 @@ jobs:
         with: { ref: '${{ github.sha }}', path: build/release-control, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
       - name: Install locked npm
-        run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+        run: |
+          npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
+          echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install exact publication dependencies
         run: npm ci --ignore-scripts
       - name: Admit exact provenance source
@@ -297,7 +300,10 @@ jobs:
         with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
       - name: Install locked npm
-        run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+        run: |
+          npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
+          echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
       - name: Install exact publication dependencies
         run: npm ci --ignore-scripts
       - name: Download exact admitted deployment artifact
