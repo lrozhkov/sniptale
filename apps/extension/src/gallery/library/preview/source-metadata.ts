@@ -1,6 +1,9 @@
+import {
+  summarizeRecordingMetadata,
+  type RecordingMetadata,
+} from '../../../features/media-hub/recording-metadata';
 import { useEffect, useState } from 'react';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
-import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type { TranslationKey } from '../../../platform/i18n';
 import { isGalleryMediaItem, type GalleryItem } from '../items';
 
@@ -10,7 +13,7 @@ interface RecordingSourceSummary {
   hasPointer: boolean;
 }
 
-function summarize(entry: RecordingTelemetryEntry): RecordingSourceSummary {
+function summarize(entry: RecordingMetadata): RecordingSourceSummary {
   let method: TranslationKey | null = null;
   if (entry.captureMode === 'CAMERA') method = 'gallery.preview.captureCamera';
   else if (entry.captureMode === 'TAB_CROP') method = 'gallery.preview.captureTabCrop';
@@ -21,15 +24,25 @@ function summarize(entry: RecordingTelemetryEntry): RecordingSourceSummary {
   else if (entry.captureMode === 'SCREEN') method = 'gallery.preview.captureDisplay';
   return {
     method,
-    actionCount: entry.actionEvents.length,
-    hasPointer: Boolean(entry.cursorTrack?.samples.length),
+    actionCount: entry.actionCount,
+    hasPointer: entry.hasPointer,
   };
 }
 
-/** Projects validated recording metadata without exposing retained event contents to the view. */
+/** Chooses immutable export facts or native recording evidence for the selected material. */
 export function usePreviewSourceMetadata(item: GalleryItem) {
+  const media = isGalleryMediaItem(item) ? item : null;
+  const snapshot = media?.recordingMetadata;
   const recordingId =
-    isGalleryMediaItem(item) && item.source.kind === 'recording' ? item.source.recordingId : null;
+    !snapshot && media?.source.kind === 'recording' ? media.source.recordingId : null;
+  const native = useNativeRecordingSourceMetadata(recordingId);
+  if (snapshot) return { ...native, status: 'ready', summary: summarize(snapshot) };
+  if (media?.source.kind === 'project-export') return { ...native, status: 'missing' };
+  return native;
+}
+
+/** Owns native telemetry admission, stale reads and retry independently from frozen export projection. */
+function useNativeRecordingSourceMetadata(recordingId: string | null) {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{
     id: string | null;
@@ -46,7 +59,7 @@ export function usePreviewSourceMetadata(item: GalleryItem) {
           setResult({
             id: recordingId,
             status: entry ? 'ready' : 'missing',
-            summary: entry ? summarize(entry) : null,
+            summary: entry ? summarize(summarizeRecordingMetadata(entry)) : null,
           });
       },
       () => {

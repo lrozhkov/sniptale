@@ -1,3 +1,4 @@
+import { summarizeRecordingMetadata } from '../../features/media-hub/recording-metadata';
 import { createOutputFilename } from '../file-naming/index';
 import { configuredReviewExportPlan } from './export-configuration';
 import { resolveReviewOutputProfile } from './render-settings';
@@ -277,6 +278,12 @@ export async function exportReviewedVideo(
         id,
         filename,
         preparedAsset: prepared,
+        ...(() => {
+          const recordingMetadata =
+            original.recordingMetadata ??
+            (original.telemetry ? summarizeRecordingMetadata(original.telemetry) : undefined);
+          return recordingMetadata ? { recordingMetadata } : {};
+        })(),
         mediaMetadata: {
           kind: 'video',
           width: outputSize.width,

@@ -1,3 +1,4 @@
+import { projectRecordingMetadataPrivacy } from '../privacy';
 import {
   readVideoReviewForBackup,
   type VideoReviewBackupDatabase,
@@ -182,9 +183,10 @@ async function buildRecordingSource(args: {
     stored.mimeType,
     mediaObjectDirectory(args.entry, args.options)
   );
-  const { assetId: _assetId, ...portableRecordingBase } = stored;
+  const { assetId: _assetId, recordingMetadata, ...portableRecordingBase } = stored;
   const portableRecording = {
     ...portableRecordingBase,
+    ...projectRecordingMetadataPrivacy(recordingMetadata, args.options),
     ...(stored.recordingGroup
       ? {
           recordingGroup: projectRecordingGroupMemberPrivacy(stored.recordingGroup, args.options),
@@ -349,7 +351,11 @@ async function buildMediaSource(args: {
   }
   const exportEntry = parseProjectExportEntry(child);
   if (!exportEntry) throw new Error('Project video export is invalid.');
-  const { assetId: _exportLocalId, ...projectExport } = exportEntry;
+  const { assetId: _exportLocalId, recordingMetadata, ...portableExport } = exportEntry;
+  const projectExport = {
+    ...portableExport,
+    ...projectRecordingMetadataPrivacy(recordingMetadata, args.options),
+  };
   return { originalObjectId, projectExport, ...(videoReview ? { videoReview, reviewAssets } : {}) };
 }
 
@@ -433,7 +439,11 @@ function buildRootSummary(args: {
       Boolean(args.entry.sourceFavicon || args.entry.sourceTitle || args.entry.sourceUrl)
         ? 1
         : 0,
-    telemetryCount: args.source.recording?.telemetry ? 1 : 0,
+    telemetryCount:
+      args.source.recording?.telemetry ||
+      (args.options.includeTelemetry && args.entry.recordingMetadata)
+        ? 1
+        : 0,
     thumbnailCount:
       (args.thumbnail ? 1 : 0) +
       (args.presentation ? 1 + (args.presentation.previewObjectId ? 1 : 0) : 0),

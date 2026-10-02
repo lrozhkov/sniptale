@@ -74,6 +74,12 @@ describe('recording asset publication', () => {
         id: 'video-1',
         blob: new Blob(['video'], { type: 'video/webm' }),
         filename: '1.webm',
+        recordingMetadata: {
+          captureMode: 'SCREEN',
+          displaySurface: 'window',
+          actionCount: 4,
+          hasPointer: true,
+        },
         mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
       },
       {
@@ -92,6 +98,12 @@ describe('recording asset publication', () => {
       expect.objectContaining({
         assetId: 'asset-video',
         id: 'video-1',
+        recordingMetadata: {
+          captureMode: 'SCREEN',
+          displaySurface: 'window',
+          actionCount: 4,
+          hasPointer: true,
+        },
         mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
         size: 5,
       }),

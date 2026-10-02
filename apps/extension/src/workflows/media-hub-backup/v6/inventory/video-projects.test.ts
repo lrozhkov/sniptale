@@ -221,3 +221,43 @@ describe('video project backup inventory', () => {
     ).rejects.toThrow('Review-referenced project asset is missing: project-asset:music.');
   });
 });
+
+it.each([true, false])(
+  'projects recording metadata privacy in full project backup: %s',
+  async (includeTelemetry) => {
+    const entry = createVideoProjectEntryWithMediaClip();
+    entry.project.assets = [];
+    entry.project.clips = [];
+    const recordingMetadata = {
+      captureMode: 'TAB' as const,
+      displaySurface: 'browser' as const,
+      actionCount: 5,
+      hasPointer: false,
+    };
+    const exportEntry = {
+      id: 'copy',
+      projectId: entry.id,
+      assetId: 'output',
+      filename: 'copy.webm',
+      createdAt: 1,
+      size: 4,
+      width: 320,
+      height: 180,
+      duration: 3,
+      fps: 15,
+      mimeType: 'video/webm',
+      recordingMetadata,
+    };
+    const db = { ...database([], new Map(), [entry]), getAllFromIndex: async () => [exportEntry] };
+    const [root] = await buildVideoProjectRootInventory({
+      db,
+      paths,
+      options: createMediaHubBackupExportOptions({ includeTelemetry }),
+    });
+    const portable = parsePortableVideoProjectMetadata((await root!.load()).metadata);
+    expect(portable.projectExports[0]?.entry.recordingMetadata).toEqual(
+      includeTelemetry ? recordingMetadata : undefined
+    );
+    expect(root!.summary.telemetryCount).toBe(includeTelemetry ? 1 : 0);
+  }
+);

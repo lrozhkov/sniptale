@@ -106,3 +106,54 @@ it('shows missing exported recording details without an impossible retry', async
   expect(read).toHaveBeenCalledOnce();
   await act(async () => root.unmount());
 });
+
+it.each(['recording', 'project-export'] as const)(
+  'shows saved %s acquisition facts after reopen without source/project lookup',
+  async (kind) => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const exported = createMediaItem({
+      kind: 'video',
+      width: 320,
+      height: 180,
+      duration: 3,
+      source:
+        kind === 'recording'
+          ? { kind, recordingId: 'copy' }
+          : { kind, projectId: 'changed-project', exportId: 'copy' },
+      recordingMetadata: {
+        captureMode: 'SCREEN',
+        displaySurface: 'window',
+        actionCount: 4,
+        hasPointer: true,
+      },
+    });
+    await act(async () =>
+      root.render(<PreviewSourceField item={JSON.parse(JSON.stringify(exported))} />)
+    );
+    expect(container.textContent).toContain('gallery.preview.captureWindow');
+    expect(container.textContent).toContain('gallery.preview.recordedActions4');
+    expect(container.textContent).toContain('gallery.preview.available');
+    expect(container.textContent).not.toContain('gallery.preview.sourceLoading');
+    expect(read).not.toHaveBeenCalled();
+    await act(async () => root.unmount());
+  }
+);
+it('shows unavailable legacy project-export evidence without a failing read or retry', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  await act(async () =>
+    root.render(
+      <PreviewSourceField
+        item={createMediaItem({
+          kind: 'export',
+          source: { kind: 'project-export', projectId: 'mutable', exportId: 'old' },
+        })}
+      />
+    )
+  );
+  expect(container.textContent).toContain('gallery.preview.sourceUnavailable');
+  expect(container.querySelector('button')).toBeNull();
+  expect(read).not.toHaveBeenCalled();
+  await act(async () => root.unmount());
+});

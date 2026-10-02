@@ -17,6 +17,15 @@ import { saveProjectExportSafely } from '../../../../workflows/media-hub/store';
 import { sendRuntimeMessage } from '../../../../platform/runtime-messaging/index';
 import { finalizeExport } from './export/index';
 
+const mediaRead = vi.hoisted(() => vi.fn());
+vi.mock('../../../../composition/persistence/media-library', () => ({
+  getMediaLibraryEntry: mediaRead,
+}));
+const telemetryRead = vi.hoisted(() => vi.fn());
+vi.mock('../../../../composition/persistence/recordings/telemetry', () => ({
+  getRecordingTelemetry: telemetryRead,
+}));
+
 const { loggerDebugMock, markTerminalMock, saveProjectExportSafelyMock, sendRuntimeMessageMock } =
   vi.hoisted(() => ({
     loggerDebugMock: vi.fn(),
@@ -167,6 +176,8 @@ async function flushSidecarDownloadRequest(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  telemetryRead.mockResolvedValue(undefined);
+  mediaRead.mockResolvedValue(undefined);
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-03-22T10:11:12.345Z'));
   installFileReaderStub();
@@ -301,4 +312,64 @@ it('uses a category rule consistently for the export and its subtitle sidecar', 
   } finally {
     read.mockRestore();
   }
+});
+
+it.each(['native', 'missing'] as const)(
+  'copies %s primary recording facts into full export',
+  async (mode) => {
+    const project = createProject();
+    project.source = { kind: 'recording', recordingId: 'original' };
+    const telemetry = {
+      captureMode: 'TAB',
+      displaySurface: 'browser',
+      actionEvents: [{}],
+      cursorTrack: null,
+    };
+    telemetryRead.mockResolvedValueOnce(mode === 'native' ? telemetry : undefined);
+    mockRandomUuids('export-uuid');
+    await finalizeExport('job', project, createExportSettings(), new Blob(['video']));
+    expect(telemetryRead).toHaveBeenCalledWith('original');
+    const saved = saveProjectExportSafelyMock.mock.calls[0]![0];
+    if (mode === 'missing') expect(saved).not.toHaveProperty('recordingMetadata');
+    else
+      expect(saved.recordingMetadata).toEqual({
+        captureMode: 'TAB',
+        displaySurface: 'browser',
+        actionCount: 1,
+        hasPointer: false,
+      });
+    expect(saved).toMatchObject({ width: 1920, height: 1080, duration: 42 });
+    project.source = { kind: 'manual' };
+    telemetry.actionEvents.length = 0;
+    if (mode === 'native') expect(saved.recordingMetadata.actionCount).toBe(1);
+  }
+);
+it('does not publish partial metadata after a failed primary-source read', async () => {
+  const project = createProject();
+  project.baseRecordingId = 'original';
+  telemetryRead.mockRejectedValueOnce(new Error('read failed'));
+  mockRandomUuids('export-uuid');
+  await expect(
+    finalizeExport('job', project, createExportSettings(), new Blob(['video']))
+  ).rejects.toThrow('read failed');
+  expect(saveProjectExportSafelyMock).not.toHaveBeenCalled();
+});
+
+it('retains an existing export snapshot when its primary media is reused in the full editor', async () => {
+  const project = createProject();
+  project.baseRecordingId = 'copy';
+  const recordingMetadata = {
+    captureMode: 'CAMERA',
+    displaySurface: null,
+    actionCount: 7,
+    hasPointer: false,
+  };
+  mediaRead.mockResolvedValueOnce({ recordingMetadata });
+  mockRandomUuids('export-uuid');
+  await finalizeExport('job', project, createExportSettings(), new Blob(['video']));
+  expect(mediaRead).toHaveBeenCalledWith('recording:copy');
+  expect(telemetryRead).not.toHaveBeenCalled();
+  expect(saveProjectExportSafelyMock.mock.calls[0]![0].recordingMetadata).toEqual(
+    recordingMetadata
+  );
 });

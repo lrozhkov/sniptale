@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   MediaAssetKind,
   MediaAssetSource,
@@ -146,6 +147,11 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     return null;
   }
 
+  const recordingMetadata =
+    value['recordingMetadata'] === undefined
+      ? undefined
+      : parseRecordingMetadata(value['recordingMetadata']);
+  if (recordingMetadata === null) return null;
   const kind = parseMediaAssetKind(value['kind']);
   const source = parseMediaAssetSource(value['source']);
   const workspaceRevision = parseWorkspaceRevision(value['workspaceRevision']);
@@ -194,6 +200,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     ...(recordingGroup === undefined ? {} : { recordingGroup }),
     updatedAt: value['updatedAt'],
     width: value['width'],
+    ...(recordingMetadata === undefined ? {} : { recordingMetadata }),
     workspaceRevision,
     ...(value['blob'] === undefined ? {} : { blob: value['blob'] }),
   };

@@ -1,3 +1,4 @@
+import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   CaptureMode,
   VideoDisplaySurface,
@@ -12,6 +13,8 @@ import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 export interface StoredRecordingEntry {
+  /** Frozen acquisition facts; never describes the processed output file. */
+  recordingMetadata?: RecordingMetadata;
   assetId: string;
   id: string;
   filename: string;

@@ -1,3 +1,7 @@
+import { getMediaLibraryEntry } from '../../../../../composition/persistence/media-library';
+import { createRecordingMediaId } from '../../../../../features/media-hub/media-id';
+import { getRecordingTelemetry } from '../../../../../composition/persistence/recordings/telemetry';
+import { summarizeRecordingMetadata } from '../../../../../features/media-hub/recording-metadata';
 import {
   createOutputFilename,
   createFilenameSession,
@@ -35,21 +39,34 @@ function assertFinalizationNotCancelled(options: FinalizeExportOptions = {}): vo
   }
 }
 
+async function readPrimaryRecordingMetadata(project: VideoProject) {
+  const recordingId =
+    project.source.kind === 'recording' ? project.source.recordingId : project.baseRecordingId;
+  if (!recordingId) return undefined;
+  const media = await getMediaLibraryEntry(createRecordingMediaId(recordingId));
+  if (media?.recordingMetadata) return media.recordingMetadata;
+  const telemetry = await getRecordingTelemetry(recordingId);
+  return telemetry ? summarizeRecordingMetadata(telemetry) : undefined;
+}
+
 async function saveProjectExportAndAcceptCompletion(
   args: SaveCompletedProjectExportArgs
 ): Promise<void> {
   let projectExportSaved = false;
   try {
     assertFinalizationNotCancelled(args.options);
-    await saveProjectExportSafely(
-      buildProjectExportEntry({
+    const recordingMetadata = await readPrimaryRecordingMetadata(args.project);
+    assertFinalizationNotCancelled(args.options);
+    await saveProjectExportSafely({
+      ...buildProjectExportEntry({
         blob: args.blob,
         exportId: args.exportId,
         filename: args.filename,
         project: args.project,
         settings: args.settings,
-      })
-    );
+      }),
+      ...(recordingMetadata ? { recordingMetadata } : {}),
+    });
     projectExportSaved = true;
     assertFinalizationNotCancelled(args.options);
     await acceptProjectExportCompletion(args);

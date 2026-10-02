@@ -55,6 +55,7 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     ...(overrides.workspaceRevision !== undefined
       ? { workspaceRevision: overrides.workspaceRevision }
       : {}),
+    ...(overrides.recordingMetadata ? { recordingMetadata: overrides.recordingMetadata } : {}),
     ...(overrides.recordingGroup ? { recordingGroup: overrides.recordingGroup } : {}),
     ...(overrides.recordingGroupView ? { recordingGroupView: overrides.recordingGroupView } : {}),
     type: overrides.type ?? 'media',

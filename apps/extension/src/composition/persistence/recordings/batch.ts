@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
@@ -33,6 +34,7 @@ export interface SaveRecordingBatchInput {
   recordingGroup?: RecordingGroupMember;
   storageClass?: LibraryStorageClass;
   mediaMetadata?: StoredRecordingEntry['mediaMetadata'];
+  recordingMetadata?: StoredRecordingEntry['recordingMetadata'];
 }
 
 function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
@@ -62,6 +64,9 @@ function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
         input.mediaMetadata.duration < 0)
     ) {
       throw new Error('Recording media metadata is invalid.');
+    }
+    if (input.recordingMetadata !== undefined && !parseRecordingMetadata(input.recordingMetadata)) {
+      throw new Error('Recording acquisition metadata is invalid.');
     }
     ids.add(input.id);
   }
@@ -108,6 +113,9 @@ function createEntries(
       mimeType: prepared.ref.mimeType,
       ...(input.recordingGroup ? { recordingGroup: input.recordingGroup } : {}),
       ...(input.mediaMetadata ? { mediaMetadata: input.mediaMetadata } : {}),
+      ...(input.recordingMetadata
+        ? { recordingMetadata: parseRecordingMetadata(input.recordingMetadata)! }
+        : {}),
       size: prepared.ref.size,
     };
   });

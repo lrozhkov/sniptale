@@ -102,7 +102,14 @@ beforeEach(() => {
 
 it('prepares and publishes a project export without a recording alias', async () => {
   const { commitProjectExport } = await import('./index');
-  const entry = createProjectExportEntry();
+  const entry = createProjectExportEntry({
+    recordingMetadata: {
+      captureMode: 'TAB',
+      displaySurface: 'browser',
+      actionCount: 2,
+      hasPointer: false,
+    },
+  });
   const blob = new Blob(['video'], { type: 'video/mp4' });
 
   await commitProjectExport({ ...entry, blob });
@@ -116,6 +123,7 @@ it('prepares and publishes a project export without a recording alias', async ()
           assetId: 'asset-export-1',
           id: 'export-1',
           projectId: 'project-1',
+          recordingMetadata: entry.recordingMetadata,
         }),
       },
     })

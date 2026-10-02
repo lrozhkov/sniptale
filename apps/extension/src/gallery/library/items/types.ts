@@ -1,3 +1,4 @@
+import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   ImageContentState,
   MediaAssetKind,
@@ -34,6 +35,7 @@ interface GalleryItemBase {
 }
 
 export interface GalleryMediaItem extends GalleryItemBase {
+  recordingMetadata?: RecordingMetadata;
   duration: number | null;
   entityId?: string;
   height: number | null;

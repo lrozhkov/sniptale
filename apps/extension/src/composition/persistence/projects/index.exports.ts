@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -44,6 +45,9 @@ export type SaveProjectExportInput = Omit<StoredProjectExportEntry, 'assetId' | 
 };
 
 function validateProjectExportInput(input: SaveProjectExportInput): void {
+  if (input.recordingMetadata !== undefined && !parseRecordingMetadata(input.recordingMetadata)) {
+    throw new Error('Export acquisition metadata is invalid.');
+  }
   if ((input.blob ? 1 : 0) + (input.preparedAsset ? 1 : 0) !== 1) {
     throw new Error('Project export must provide exactly one binary source.');
   }
@@ -75,6 +79,9 @@ export async function commitProjectExport(input: SaveProjectExportInput): Promis
     width: input.width,
     ...(input.format ? { format: input.format } : {}),
     mimeType: prepared.ref.mimeType,
+    ...(input.recordingMetadata
+      ? { recordingMetadata: parseRecordingMetadata(input.recordingMetadata)! }
+      : {}),
   };
   let journalCreated = false;
   try {
