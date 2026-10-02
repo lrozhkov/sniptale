@@ -56,7 +56,7 @@ it('uses one Shapes panel for outline, width, and alpha-aware fill controls', as
     panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"]')
   ).not.toBeNull();
   expect(
-    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"] rect')
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"] path')
   ).not.toBeNull();
   expect(
     panel
@@ -102,6 +102,8 @@ it('uses one Shapes panel for outline, width, and alpha-aware fill controls', as
   act(() => fillToggle?.click());
   expect(session.getSnapshot().defaults.shape.fillColor).toBe(DEFAULT_DRAWING_COLORS[0]);
   expect(fillToggle?.getAttribute('aria-pressed')).toBe('true');
+  expect(fillToggle?.classList.contains('sniptale-glass-toolbar-button--active')).toBe(true);
+  expect(fillToggle?.classList.contains('!border-transparent')).toBe(false);
   expect(
     panel?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-empty-icon"]')
   ).toBeNull();

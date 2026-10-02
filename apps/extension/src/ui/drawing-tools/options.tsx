@@ -404,36 +404,22 @@ function DrawingFillToggle(props: {
   return (
     <ContentToolbarButton
       type="button"
-      tone="utility"
       active={props.filled}
       aria-pressed={props.filled}
       aria-label={props.label}
       title={props.label}
       dataUi={props.dataUi}
       className={[
-        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !border-transparent !p-0',
-        props.filled ? '!text-[var(--sniptale-color-accent-emphasis)]' : '',
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
+        'focus-visible:!outline-solid focus-visible:!outline-2 focus-visible:!outline-offset-2',
+        'focus-visible:!outline-[color:var(--sniptale-color-text-primary)]',
+        props.filled
+          ? '!text-[var(--sniptale-color-accent-emphasis)]'
+          : '!border-transparent !text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       onClick={props.onClick}
     >
-      {props.filled ? (
-        <PaintBucket aria-hidden size={19} />
-      ) : (
-        <svg
-          aria-hidden
-          data-ui={props.emptyIconUi}
-          viewBox="0 0 24 24"
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect x="3.5" y="3.5" width="17" height="17" rx="2" strokeWidth="2" />
-          <path d="M4 20 20 4" strokeWidth="2.6" />
-        </svg>
-      )}
+      <PaintBucket aria-hidden data-ui={props.filled ? undefined : props.emptyIconUi} size={19} />
     </ContentToolbarButton>
   );
 }
