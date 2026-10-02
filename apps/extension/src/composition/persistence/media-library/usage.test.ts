@@ -314,3 +314,26 @@ it('does no storage work for an empty deletion selection and propagates failed a
   mocks.videos.mockRejectedValueOnce(new Error('database unavailable'));
   await expect(listMediaAssetProjectUsageBatch([media.id])).rejects.toThrow('database unavailable');
 });
+
+it('includes a private scenario import in the permanent deletion warning', async () => {
+  childRows = [
+    { ...(childRows[0] as object), borrowedMediaId: undefined, assetId: 'private-copy' },
+  ];
+  mocks.videos.mockResolvedValue([]);
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([
+    { id: 'scenario', kind: 'scenario', name: 'Guide', primary: false },
+  ]);
+});
+
+it('keeps independent scenario imports outside the deletion warning', async () => {
+  childRows = [
+    {
+      ...(childRows[0] as object),
+      borrowedMediaId: undefined,
+      galleryAssetId: 'another-library',
+      assetId: 'private-copy',
+    },
+  ];
+  mocks.videos.mockResolvedValue([]);
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([]);
+});

@@ -156,10 +156,11 @@ function scenarioChildIsUnrelated(value: unknown, media: MediaLibraryEntry): boo
     !isRecord(value) ||
     typeof value['id'] !== 'string' ||
     typeof value['assetId'] !== 'string' ||
+    (value['galleryAssetId'] !== null && typeof value['galleryAssetId'] !== 'string') ||
     (value['borrowedMediaId'] !== undefined && typeof value['borrowedMediaId'] !== 'string')
   )
     return false;
-  if (value['borrowedMediaId'] === media.id) return false;
+  if (value['galleryAssetId'] === media.id || value['borrowedMediaId'] === media.id) return false;
   return !(
     media.source.kind === 'stored-asset' &&
     !value['borrowedMediaId'] &&
@@ -265,6 +266,7 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
   );
   const scenarioChildren = children.filter(
     (child) =>
+      child.galleryAssetId === mediaId ||
       child.borrowedMediaId === mediaId ||
       (media.source.kind === 'stored-asset' &&
         !child.borrowedMediaId &&

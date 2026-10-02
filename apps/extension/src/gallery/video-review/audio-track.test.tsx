@@ -216,7 +216,7 @@ it('splits the displayed music at cuts while keeping continuous sample offsets',
   expect(Number.parseFloat(blocks[0]!.style.width)).toBeCloseTo(100 / 6);
   expect(Number.parseFloat(blocks[1]!.style.left)).toBeCloseTo(50);
   expect(Number.parseFloat(blocks[1]!.style.width)).toBeCloseTo(50);
-  expect(blocks.map((block) => block.dataset.musicOffset)).toEqual(['0', '1']);
+  expect(blocks.map((block) => block.dataset['musicOffset'])).toEqual(['0', '1']);
   expect(blocks[0]!.querySelector('[data-audio-edge="end"]')).toBeNull();
   expect(blocks[1]!.querySelector('[data-audio-edge="start"]')).toBeNull();
 });

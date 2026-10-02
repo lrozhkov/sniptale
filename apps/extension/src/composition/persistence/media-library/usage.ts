@@ -28,6 +28,7 @@ function scenarioChildrenUsingMedia(
 ): ScenarioAssetEntry[] {
   return children.filter(
     (child) =>
+      child.galleryAssetId === media.id ||
       child.borrowedMediaId === media.id ||
       (media.source.kind === 'stored-asset' &&
         !child.borrowedMediaId &&
