@@ -15,6 +15,7 @@ export function renderTourNavigationScene({
   actionButton,
   authoring,
   page,
+  selectedObjectId,
   onPage,
 }) {
   const { panel, content, layout, padding, gap, available, textPages, text } = prepareComposition({
@@ -37,7 +38,12 @@ export function renderTourNavigationScene({
   );
   const pageSize = Math.min(12, rowCount * columns);
   const count = Math.max(textPages.length, Math.ceil(slide.buttons.length / pageSize));
-  const current = Math.min(page, Math.max(0, count - 1));
+  const selectedIndex = slide.buttons.findIndex((button) => button.id === selectedObjectId);
+  const current =
+    selectedIndex >= 0
+      ? Math.floor(selectedIndex / pageSize)
+      : Math.min(page, Math.max(0, count - 1));
+  if (text) text.textContent = textPages[Math.min(current, textPages.length - 1)];
   const buttons = element('div', 'tour-navigation-buttons');
   // Column choice changes count and block width, never the width of one button.
   const referenceColumnWidth = Math.max(0, (contentWidth - gap * 2) / 3);
@@ -75,7 +81,7 @@ export function renderTourNavigationScene({
     pager.append(previous, element('span', '', `${current + 1} / ${count}`), next);
     content.append(pager);
   }
-  return { panel, hints: [] };
+  return { panel, hints: [], page: current };
 }
 
 /** Scene sizing and visible text are measured before allocating the button page. */

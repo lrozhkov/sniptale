@@ -22,6 +22,12 @@ export function createTourPlayer(
           cameraFrame?: boolean;
           onFrameCamera?(camera: { center: { x: number; y: number }; zoom: number }): void;
           canEdit?(): boolean;
+          /** Disposable editor selection; navigation never executes authored actions. */
+          navigation?: {
+            canMove(direction: -1 | 1): boolean;
+            move(direction: -1 | 1): void;
+            selectSlide(slideId: string): void;
+          };
           onSelectObject(objectId: string | null): void;
           onResizeObject?(objectId: string, rect: TourRect): void;
           onMoveObject(objectId: string, point: { x: number; y: number }): void;

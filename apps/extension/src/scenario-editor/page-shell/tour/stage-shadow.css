@@ -16,6 +16,29 @@
 :host(:not([data-view='preview'])) .tour-toolbar {
   display: none;
 }
+:host([data-view='edit'][data-authoring-navigation='true']) .tour-toolbar {
+  display: flex;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+}
+:host([data-view='edit']) .tour-playback {
+  display: none;
+}
+:host([data-view='edit'][data-authoring-navigation='true']) .tour-hint-text {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+:host(:not([data-view='preview'])) .tour-nav .tour-button,
+:host(:not([data-view='preview'])) .tour-hint-controls .tour-button {
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+}
+:host(:not([data-view='preview'])) .tour-nav .tour-button:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
 :host(:not([data-view='preview'])) .tour-viewport {
   margin: 0;
   border: 0;

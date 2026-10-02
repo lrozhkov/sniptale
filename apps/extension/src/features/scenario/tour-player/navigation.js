@@ -9,8 +9,16 @@ export function createTourNavigation({
   authoring,
 }) {
   let navigationPage = 0;
-  function render(slide, stageWidth, stageHeight) {
-    return renderTourNavigationScene({
+  let composition = null;
+  function render(slide, stageWidth, stageHeight, selectedObjectId) {
+    const reveal =
+      authoring &&
+      (composition?.slide !== slide ||
+        composition?.stageWidth !== stageWidth ||
+        composition?.stageHeight !== stageHeight ||
+        composition?.selectedObjectId !== selectedObjectId);
+    composition = { slide, stageWidth, stageHeight, selectedObjectId };
+    const rendered = renderTourNavigationScene({
       root,
       slide,
       stageWidth,
@@ -21,11 +29,14 @@ export function createTourNavigation({
       actionButton,
       authoring,
       page: navigationPage,
+      selectedObjectId: reveal ? selectedObjectId : null,
       onPage: (page) => {
         navigationPage = page;
         redraw();
       },
     });
+    navigationPage = rendered.page;
+    return rendered;
   }
 
   function openContents(slides, index, onSelect) {
@@ -117,6 +128,7 @@ export function createTourNavigation({
     closeContents: () => closeContents(false),
     reset() {
       navigationPage = 0;
+      composition = null;
     },
   };
 }

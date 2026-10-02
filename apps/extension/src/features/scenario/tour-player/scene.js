@@ -31,6 +31,7 @@ function createSceneHints(root, input, policy, signal, getHints) {
     signal,
     keyboardScope: policy.keyboardScope,
     hideVoice: policy.hideVoice,
+    navigation: policy.authoring?.navigation,
     onClose: () => {},
     labels: input.labels,
     focusTrigger: (activeIndex) => {
@@ -104,7 +105,12 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
       );
       hints = slide.image ? slideExplanations(slide) : [];
     } else if (slide) {
-      const rendered = navigationController.render(slide, stageWidth, stageHeight);
+      const rendered = navigationController.render(
+        slide,
+        stageWidth,
+        stageHeight,
+        selectedObjectId
+      );
       scene.append(rendered.panel);
       hints = rendered.hints;
     } else scene.append(element('p', 'tour-empty', labels.empty));
@@ -147,6 +153,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
     },
     selectObject(id) {
       selectedObjectId = id;
+      if (authoring && current?.kind === 'navigation') render();
       markTourSelection(scene, selectedObjectId);
       const hintIndex =
         current?.kind === 'image'
@@ -260,6 +267,14 @@ function markTourSelection(scene, selectedObjectId, focused) {
   if (imagePlane) {
     imagePlane.style.zIndex = selectedMask ? '4' : '';
     imagePlane.style.pointerEvents = selectedMask ? 'none' : '';
+  }
+  if (focused?.matches('.tour-navigation-buttons [data-tour-object-id]')) {
+    const buttons = [...scene.querySelectorAll('.tour-navigation-buttons [data-tour-object-id]')];
+    const replacement =
+      buttons.find((node) => node.dataset.tourObjectId === focused.dataset.tourObjectId) ??
+      buttons.find((node) => node.dataset.tourObjectId === selectedObjectId);
+    replacement?.focus({ preventScroll: true });
+    return;
   }
   if (focused?.classList.contains('tour-camera-frame')) {
     scene.querySelector('.tour-camera-frame')?.focus({ preventScroll: true });

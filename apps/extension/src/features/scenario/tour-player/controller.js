@@ -14,14 +14,13 @@ export function createTourPlayer(root, input, options = {}) {
   const counter = query('counter');
   const previous = query('previous');
   const next = query('next');
-  const contents = query('contents');
-  const navigation = query('navigation');
   let index = Math.max(
     0,
     tour.slides.findIndex((slide) => slide.id === options.initialSlideId)
   );
   let ended = false;
   const history = [];
+  const authoringNavigation = options.authoring?.navigation;
   const view = createTourScene(root, input, act, lifetime.signal, options);
   const chrome = options.authoring ? null : createTourChrome(root, lifetime.signal);
   const playback = options.authoring
@@ -35,10 +34,6 @@ export function createTourPlayer(root, input, options = {}) {
         },
         chrome,
       });
-  function manualGo(target, recordHistory = true) {
-    playback?.interact();
-    go(target, recordHistory);
-  }
   function act(action) {
     if (options.authoring) return;
     // Editor preview stays inside its document: URL actions never navigate or open tabs.
@@ -71,7 +66,7 @@ export function createTourPlayer(root, input, options = {}) {
   }
   function back() {
     const target = history.pop();
-    manualGo(target ?? Math.max(0, index - 1), false);
+    navigationInput.manualGo(target ?? Math.max(0, index - 1), false);
   }
   function render() {
     if (lifetime.signal.aborted) return;
@@ -83,25 +78,21 @@ export function createTourPlayer(root, input, options = {}) {
     previous.disabled = !ended && index === 0 && history.length === 0;
     next.disabled =
       ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
+    navigationInput.updateControls();
     view.show(slide, ended);
     playback?.show(tour, index, ended, input.assets);
     root.dataset.slideId = ended ? 'end' : (slide?.id ?? '');
   }
-  previous.addEventListener('click', back, { signal: lifetime.signal });
-  next.addEventListener('click', () => manualGo(index + 1), { signal: lifetime.signal });
-  contents.addEventListener(
-    'click',
-    () => {
+  const navigationInput = mountTourNavigationInput(root, options, lifetime.signal, {
+    move: go,
+    back,
+    index: () => index,
+    slides: () => tour.slides,
+    interact: () => playback?.interact(),
+    openContents: (select) => {
       playback?.pause();
-      view.openContents(tour.slides, index, manualGo);
+      view.openContents(tour.slides, index, select);
     },
-    { signal: lifetime.signal }
-  );
-  bindTourKeyboard(root.ownerDocument, navigation, options, lifetime.signal, {
-    ArrowRight: () => manualGo(index + 1),
-    ArrowLeft: back,
-    Home: () => manualGo(0),
-    End: () => manualGo(tour.slides.length - 1),
   });
   observeViewport(root, view.resize, lifetime.signal);
   view.resize();
@@ -121,18 +112,24 @@ export function createTourPlayer(root, input, options = {}) {
       view.resize();
       render();
     },
-    selectObject: view.selectObject,
+    selectObject(id) {
+      view.selectObject(id);
+      navigationInput.updateControls();
+    },
     selectEnd() {
       if (lifetime.signal.aborted) return;
       if (options.authoring) {
         ended = true;
         render();
-      } else manualGo(tour.slides.length, false);
+      } else navigationInput.manualGo(tour.slides.length, false);
     },
     select(slideId) {
       if (lifetime.signal.aborted) return;
       const target = tour.slides.findIndex((slide) => slide.id === slideId);
-      if (target >= 0 && (target !== index || ended)) manualGo(target, false);
+      if (target >= 0 && (target !== index || ended)) {
+        if (authoringNavigation) go(target, false);
+        else navigationInput.manualGo(target, false);
+      }
     },
     dispose() {
       if (lifetime.signal.aborted) return;
@@ -180,4 +177,50 @@ function bindTourKeyboard(document, navigation, options, signal, actions) {
       ),
     { signal }
   );
+}
+
+/** Mounted navigation input routes editor selection and playback commands through their owners. */
+function mountTourNavigationInput(root, options, signal, actions) {
+  const authoring = options.authoring?.navigation;
+  const query = (name) => root.querySelector(`[data-tour-${name}]`);
+  function manualGo(target, recordHistory = true) {
+    if (authoring) {
+      const slide = actions.slides()[target];
+      if (slide) authoring.selectSlide(slide.id);
+      return;
+    }
+    actions.interact();
+    actions.move(target, recordHistory);
+  }
+  query('previous').addEventListener(
+    'click',
+    () => {
+      if (authoring) authoring.move(-1);
+      else actions.back();
+    },
+    { signal }
+  );
+  query('next').addEventListener(
+    'click',
+    () => {
+      if (authoring) authoring.move(1);
+      else manualGo(actions.index() + 1);
+    },
+    { signal }
+  );
+  query('contents').addEventListener('click', () => actions.openContents(manualGo), { signal });
+  bindTourKeyboard(root.ownerDocument, query('navigation'), options, signal, {
+    ArrowRight: () => manualGo(actions.index() + 1),
+    ArrowLeft: actions.back,
+    Home: () => manualGo(0),
+    End: () => manualGo(actions.slides().length - 1),
+  });
+  return {
+    manualGo,
+    updateControls() {
+      if (!authoring) return;
+      query('previous').disabled = !authoring.canMove(-1);
+      query('next').disabled = !authoring.canMove(1);
+    },
+  };
 }

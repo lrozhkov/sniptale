@@ -43,7 +43,7 @@ export function measureHintPages(hintText, fullText) {
 export function createTourHints(
   root,
   defaultStyle,
-  { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels }
+  { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels, navigation }
 ) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
@@ -89,7 +89,7 @@ export function createTourHints(
     const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
     hint.style.textAlign = appearance.alignment;
     sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
-    pages = measureHintPages(hintText, copy.text);
+    pages = navigation ? [copy.text] : measureHintPages(hintText, copy.text);
     textPage = Math.min(textPage, pages.length - 1);
     hintText.textContent = pages[textPage];
     updateTourHintNavigation(hint, {
@@ -99,6 +99,10 @@ export function createTourHints(
       pages: pages.length,
       pointLabel: labels.point,
     });
+    if (navigation) {
+      hintPrevious.disabled = !navigation.canMove(-1);
+      hintNext.disabled = !navigation.canMove(1);
+    }
     caption.finish();
     hintText.hidden = hintText.hidden || copy.hideBody;
     const position = positionHint({ hint, viewport, geometry, current, appearance });
@@ -106,6 +110,10 @@ export function createTourHints(
     hint.style.top = `${position.top}px`;
   }
   function changeHint(direction) {
+    if (navigation) {
+      navigation.move(direction);
+      return;
+    }
     if (direction > 0 && textPage + 1 < pages.length) textPage += 1;
     else if (direction < 0 && textPage > 0) textPage -= 1;
     else if (activeHint + direction >= 0 && activeHint + direction < hints.length) {
@@ -128,23 +136,7 @@ export function createTourHints(
       restoringFocus = false;
     }
   }
-  hintClose.addEventListener('click', dismiss, { signal });
-  root.ownerDocument.addEventListener(
-    'keydown',
-    (event) => {
-      if (
-        event.key !== 'Escape' ||
-        event.defaultPrevented ||
-        (keyboardScope && !event.composedPath().includes(keyboardScope)) ||
-        query('navigation').open ||
-        hint.hidden
-      )
-        return;
-      event.preventDefault();
-      dismiss();
-    },
-    { signal }
-  );
+  bindTourHintDismissal(root, hint, signal, keyboardScope, dismiss);
   return {
     setDefaultAppearance(value) {
       defaultStyle = value;
@@ -243,4 +235,25 @@ function positionHint({ hint, viewport, geometry, current, appearance }) {
     left: offsetX + Math.max(8, Math.min(hintWidth - hint.offsetWidth - 8, left)),
     top: offsetY + Math.max(8, Math.min(hintHeight - hint.offsetHeight - 8, top)),
   };
+}
+
+/** Escape and Close share dismissal admission and the mounted hint lifetime. */
+function bindTourHintDismissal(root, hint, signal, keyboardScope, dismiss) {
+  hint.querySelector('[data-tour-hint-close]').addEventListener('click', dismiss, { signal });
+  root.ownerDocument.addEventListener(
+    'keydown',
+    (event) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        (keyboardScope && !event.composedPath().includes(keyboardScope)) ||
+        root.querySelector('[data-tour-navigation]').open ||
+        hint.hidden
+      )
+        return;
+      event.preventDefault();
+      dismiss();
+    },
+    { signal }
+  );
 }

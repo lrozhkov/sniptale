@@ -1,51 +1,24 @@
 import { getTourAudioResources } from '../../../features/scenario/project/public';
 import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
-import { useState, type ReactNode } from 'react';
-import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { useState } from 'react';
 import {
   getTourSlideObjects,
   type TourSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import type {
-  importScenarioImages,
-  importScenarioNarration,
-} from '../../../composition/persistence/scenario/store/public';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { X, Settings2, Image, List, PanelLeft, SquarePen } from 'lucide-react';
+import { X, Settings2, List, PanelLeft, SquarePen } from 'lucide-react';
 import { ScenarioWorkspaceFrame } from '../workspace';
-import type { useGuidePanels } from '../panel-layout';
 import { GuideResourceDrawer } from '../resource-drawer';
-import { GuideImageUpload } from '../image-upload';
-import { TourStage } from './stage';
-import { TourViewControls, useTourViewMode, type TourView } from './view-controls';
+import { TourViewControls, useTourViewMode } from './view-controls';
 import { TourInspector } from './inspector';
-import { TourGeneration } from './generation';
 import { TourImageDropZone } from './image-drop';
 import { useTourSelection } from './selection';
 import type { Translate } from '../../../platform/i18n';
+import { TourCanvas } from './canvas';
+import type { TourWorkspaceProps, SelectedTourProps } from './workspace-contracts';
 import './tour.css';
-
-type TourWorkspaceProps = {
-  onImportNarration?: (
-    input: Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>
-  ) => Promise<boolean>;
-  initialSlideId?: string | null;
-  onEditImage?: (slideId: string) => void;
-  project: GuideProject;
-  images: Record<string, string | null>;
-  panels: ReturnType<typeof useGuidePanels>;
-  header: (contextControls: ReactNode) => ReactNode;
-  disabled: boolean;
-  importDisabled?: boolean;
-  t: Translate;
-  onChange: (project: GuideProject, group?: string | null) => void;
-  onImport: (
-    input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>
-  ) => Promise<boolean>;
-};
 
 /** Tour editing uses the page's existing buffer, resource drawer and panel frame. */
 export function TourWorkspace(props: TourWorkspaceProps) {
@@ -140,11 +113,6 @@ export function TourWorkspace(props: TourWorkspaceProps) {
     </GuideResourceDrawer>
   );
 }
-
-type SelectedTourProps = TourWorkspaceProps & {
-  state: ReturnType<typeof useTourSelection>;
-  onSelectObject: (id: string | null) => void;
-};
 
 function TourSettingsPanel({
   project,
@@ -253,121 +221,6 @@ function TourSettingsPanel({
   );
 }
 
-function TourCanvas({
-  project,
-  images,
-  disabled,
-  importDisabled = disabled,
-  t,
-  onChange,
-  onImport,
-  state,
-  onSelectObject: selectObject,
-  view,
-  previewKey,
-  generating,
-  onGenerationChange: setGenerating,
-  onUpload: upload,
-}: SelectedTourProps & {
-  view: TourView;
-  previewKey: number;
-  generating: boolean;
-  onGenerationChange: (value: boolean) => void;
-  onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
-}) {
-  return (
-    <div
-      className="tour-canvas"
-      data-tour-drop-slide={state.slide?.id}
-      tabIndex={0}
-      aria-label={t('scenario.editor.tourMode')}
-    >
-      {generating ? (
-        <TourGeneration
-          disabled={disabled}
-          project={project}
-          onChange={onChange}
-          onClose={() => setGenerating(false)}
-          t={t}
-        />
-      ) : project.tour && state.selection ? (
-        <>
-          <div className="tour-camera-editor">
-            <TourStage
-              disabled={disabled}
-              key={`${state.slide?.id}:${t('scenario.editor.tourMode')}`}
-              tour={project.tour}
-              images={images}
-              selection={state.selection}
-              t={t}
-              view={view}
-              previewKey={previewKey}
-              onSelectObject={selectObject}
-              onFrameCamera={(camera) => {
-                if (state.slide?.kind === 'image')
-                  state.changeSlide({
-                    ...state.slide,
-                    camera: { ...state.slide.camera, ...camera, mode: 'manual' },
-                  });
-              }}
-              onResizeObject={(id, rect) => {
-                if (state.slide?.kind === 'image')
-                  state.changeSlide({
-                    ...state.slide,
-                    masks: state.slide.masks.map((mask) =>
-                      mask.id === id ? { ...mask, rect } : mask
-                    ),
-                  });
-              }}
-              onMoveObject={(id, point) => {
-                if (state.slide?.kind === 'image')
-                  state.changeSlide(moveObject(state.slide, id, point));
-              }}
-            />
-          </div>
-          {state.slide?.kind === 'image' && !state.slide.image && (
-            <div className="tour-empty-image">
-              <GuideImageUpload
-                placement={{ kind: 'tour-image', slideId: state.slide.id }}
-                disabled={importDisabled}
-                t={t}
-                onUpload={(file, signal) =>
-                  onImport({
-                    sources: [{ kind: 'file', file }],
-                    placement: { kind: 'tour-image', slideId: state.slide!.id },
-                    signal,
-                  })
-                }
-              />
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="tour-empty">
-          <Image size={36} />
-          <h2>{t('scenario.editor.tourEmpty')}</h2>
-          <p>{t('scenario.editor.tourEmptyHint')}</p>
-          <GuideImageUpload
-            compact
-            placement={{ kind: 'tour-slides' }}
-            disabled={importDisabled}
-            onUpload={upload}
-            t={t}
-          />
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={disabled || !project.items.length}
-            onClick={() => setGenerating(true)}
-          >
-            {t('scenario.editor.tourGenerate')}
-          </ProductActionButton>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function selectedTitle(slide: TourSlide | null, id: string | null, t: Translate): string {
   const object =
     slide?.kind === 'image'
@@ -380,18 +233,4 @@ function selectedTitle(slide: TourSlide | null, id: string | null, t: Translate)
           ? object.text
           : t('scenario.editor.tourMask')) || t('scenario.editor.tourAnnotation')
     : slide?.title || t('scenario.editor.tourSlide');
-}
-
-function moveObject(
-  slide: Extract<TourSlide, { kind: 'image' }>,
-  id: string,
-  point: { x: number; y: number }
-) {
-  return {
-    ...slide,
-    hotspots: slide.hotspots.map((entry) => (entry.id === id ? { ...entry, point } : entry)),
-    masks: slide.masks.map((entry) =>
-      entry.id === id ? { ...entry, rect: { ...entry.rect, ...point } } : entry
-    ),
-  };
 }

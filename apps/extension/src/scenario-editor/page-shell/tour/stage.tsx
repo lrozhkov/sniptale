@@ -8,6 +8,7 @@ import stageStyles from './stage-shadow.css?raw';
 import { tourPlayerLabels } from './labels';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
+import { tourActionTarget } from './action-navigation';
 
 /** The editor mounts the real scene renderer; the shadow root contains its stylesheet. */
 export function TourStage({
@@ -16,6 +17,7 @@ export function TourStage({
   selection,
   disabled = false,
   onSelectObject,
+  onNavigateSelection,
   onMoveObject,
   onResizeObject,
   onFrameCamera,
@@ -31,6 +33,7 @@ export function TourStage({
   selection: TourSelection | null;
   disabled?: boolean;
   onSelectObject: (id: string | null) => void;
+  onNavigateSelection?: (selection: Extract<TourSelection, { kind: 'slide' }>) => void;
   onResizeObject?: (id: string, rect: TourRect) => void;
   onMoveObject: (id: string, point: { x: number; y: number }) => void;
   t: Translate;
@@ -44,8 +47,16 @@ export function TourStage({
     onResizeObject,
     onFrameCamera,
     disabled,
+    onNavigateSelection,
   });
-  callbacks.current = { onSelectObject, onMoveObject, onResizeObject, onFrameCamera, disabled };
+  callbacks.current = {
+    onSelectObject,
+    onMoveObject,
+    onResizeObject,
+    onFrameCamera,
+    disabled,
+    onNavigateSelection,
+  };
   const labels = useRef(tourPlayerLabels(t)).current;
   const input = {
     tour:
@@ -57,6 +68,7 @@ export function TourStage({
   };
   const latest = useRef({ input, selection });
   latest.current = { input, selection };
+  const hasAuthoringNavigation = Boolean(onNavigateSelection);
   useLayoutEffect(() => {
     if (!root.current) return;
     const player = createTourPlayer(root.current, latest.current.input, {
@@ -74,6 +86,34 @@ export function TourStage({
               onSelectObject: (id) => callbacks.current.onSelectObject(id),
               onResizeObject: (id, rect) => callbacks.current.onResizeObject?.(id, rect),
               onMoveObject: (id, point) => callbacks.current.onMoveObject(id, point),
+              ...(hasAuthoringNavigation
+                ? {
+                    navigation: {
+                      canMove: (direction: -1 | 1) =>
+                        Boolean(
+                          tourActionTarget(
+                            latest.current.input.tour,
+                            latest.current.selection,
+                            direction
+                          )
+                        ),
+                      move: (direction: -1 | 1) => {
+                        const target = tourActionTarget(
+                          latest.current.input.tour,
+                          latest.current.selection,
+                          direction
+                        );
+                        if (target) callbacks.current.onNavigateSelection?.(target);
+                      },
+                      selectSlide: (slideId: string) =>
+                        callbacks.current.onNavigateSelection?.({
+                          kind: 'slide',
+                          slideId,
+                          objectId: null,
+                        }),
+                    },
+                  }
+                : {}),
             },
     });
     controller.current = player;
@@ -82,7 +122,7 @@ export function TourStage({
       player.dispose();
       controller.current = null;
     };
-  }, [shadow, view, previewKey]);
+  }, [shadow, view, previewKey, hasAuthoringNavigation]);
   useLayoutEffect(() => {
     if (!controller.current) return;
     controller.current.update(latest.current.input);
@@ -98,6 +138,7 @@ export function TourStage({
     <div
       className="tour-stage-host"
       data-view={view}
+      data-authoring-navigation={Boolean(onNavigateSelection)}
       onDragStart={(event) => event.preventDefault()}
       ref={(node) => {
         if (node && !node.shadowRoot) setShadow(node.attachShadow({ mode: 'open' }));
