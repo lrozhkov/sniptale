@@ -4,7 +4,10 @@ import type {
   QuickEditAdvancedState,
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
-import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
+import {
+  projectReviewFocus,
+  reviewFocusSourceRange,
+} from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import {
   availableQuickEditZoomRange,
@@ -95,6 +98,39 @@ function applyZoomChange(
               : region
           ),
   };
+}
+
+/** Source-intent commits validate current neighbors before projecting the visible result cache. */
+function applySourceZoomCommit(
+  zoom: ZoomState,
+  id: string,
+  sourceAnchor: NonNullable<QuickEditZoomRegion['sourceAnchor']>,
+  timeMap: readonly ReviewTimeSegment[]
+): ZoomState {
+  const region = zoom.regions.find((item) => item.id === id);
+  const { start, end } = sourceAnchor;
+  if (
+    !region ||
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start < 0 ||
+    end <= start ||
+    end > (timeMap.at(-1)?.sourceEnd ?? 0)
+  )
+    return zoom;
+  const collision = zoom.regions.some((other) => {
+    if (other.id === id || other.dormant) return false;
+    const anchor = other.sourceAnchor ?? reviewFocusSourceRange(other, timeMap);
+    return !!anchor && start < anchor.end && end > anchor.start;
+  });
+  if (collision) return zoom;
+  const authored = { ...region, sourceAnchor, dormant: false };
+  const visible = projectReviewFocus([authored], timeMap);
+  const updated = {
+    ...authored,
+    ...(visible.length ? { start: visible[0]!.start, end: visible.at(-1)!.end } : {}),
+  };
+  return { ...zoom, regions: zoom.regions.map((item) => (item.id === id ? updated : item)) };
 }
 
 /** Drag commits follow the same revival rules as inspector changes. */
@@ -253,10 +289,13 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
   const commitDrag = (
     id: string,
     range: { start: number; end: number },
-    edge: 'start' | 'end' | 'move'
+    edge: 'start' | 'end' | 'move',
+    sourceAnchor?: QuickEditZoomRegion['sourceAnchor']
   ) =>
     args.setZoom((zoom) =>
-      applyZoomCommit(args.timelineDuration, zoom, id, range, edge, args.timeMap)
+      sourceAnchor && args.timeMap
+        ? applySourceZoomCommit(zoom, id, sourceAnchor, args.timeMap)
+        : applyZoomCommit(args.timelineDuration, zoom, id, range, edge, args.timeMap)
     );
   const selected = (zoom: ZoomState): QuickEditZoomRegion | null =>
     zoom.regions.find((item) => item.id === selection) ?? null;

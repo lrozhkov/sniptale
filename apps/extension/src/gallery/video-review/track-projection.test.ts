@@ -43,3 +43,24 @@ it('handles leading/trailing cuts and clamps a drag outside the lane', () => {
   ).toEqual({ start: 2, end: 8 });
   expect(reviewTimelineNavigationBounds(10, [])).toEqual({ start: 0, end: 10 });
 });
+
+it('keeps the focus gesture clock continuous through cuts while retaining speed', () => {
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 4,
+      end: 8,
+      requestedStart: 4,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  expect(projection.focus.resultDuration).toBe(8);
+  expect(projection.focus.delta(1, 400, 1000)).toBe(3.5);
+  expect(projection.focus.source(projection.focus.output(3))).toBe(3);
+  expect(projection.focus.source(projection.focus.output(6))).toBe(6);
+  expect(projection.resultDuration).toBe(6);
+});

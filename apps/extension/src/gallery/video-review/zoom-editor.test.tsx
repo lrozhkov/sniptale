@@ -348,3 +348,52 @@ it('stores source geometry when creating and editing focus around an existing cu
   act(() => editor.change(zoom.regions[0]!.id, { end: 4 }));
   expect(zoom.regions[0]).toMatchObject({ start: 1, end: 4, sourceAnchor: { start: 1, end: 6 } });
 });
+
+it('commits authored source intent under a Cut and rejects stale source collisions', () => {
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 3,
+    end: 7,
+    requestedStart: 3,
+    requestedEnd: 7,
+  };
+  const zoom = {
+    ...createQuickEditAdvancedState().zoom,
+    regions: [
+      { ...region('focus', 0, 2), sourceAnchor: { start: 0, end: 2 } },
+      { ...region('neighbor', 4, 6), sourceAnchor: { start: 8, end: 10 } },
+    ],
+  };
+  const setZoom = vi.fn();
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      setZoom,
+      zoom,
+      timelineDuration: 6,
+      timeMap: buildReviewTimeMap(10, [cut]),
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.commitDrag('focus', { start: 0, end: 2 }, 'move', { start: 4, end: 6 }));
+  const hidden = apply(setZoom, zoom);
+  expect(hidden.regions[0]).toMatchObject({ start: 0, end: 2, sourceAnchor: { start: 4, end: 6 } });
+  act(() => editor.commitDrag('focus', { start: 3, end: 4 }, 'move', { start: 6, end: 8 }));
+  expect(apply(setZoom, hidden).regions[0]).toMatchObject({
+    start: 3,
+    end: 4,
+    sourceAnchor: { start: 6, end: 8 },
+  });
+  for (const anchor of [
+    { start: 7, end: 9 },
+    { start: -1, end: 1 },
+    { start: 9, end: 11 },
+    { start: 4, end: 4 },
+    { start: NaN, end: 5 },
+  ]) {
+    act(() => editor.commitDrag('focus', { start: 0, end: 2 }, 'move', anchor));
+    expect(apply(setZoom, hidden)).toBe(hidden);
+  }
+});

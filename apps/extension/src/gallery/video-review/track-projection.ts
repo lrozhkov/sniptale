@@ -8,7 +8,7 @@ export function reviewTimelineNavigationBounds(duration: number, edits: readonly
 }
 
 /** Advanced clips retain result times while every lane displays the original source axis. */
-export function createTrackProjection(duration: number, edits: readonly ReviewEdit[]) {
+function createTimelineAxis(duration: number, edits: readonly ReviewEdit[]) {
   const segments = buildReviewTimeMap(duration, edits);
   const resultDuration = segments.at(-1)?.resultEnd ?? 0;
   const source = (time: number, edge: 'start' | 'end' = 'start') => {
@@ -36,12 +36,23 @@ export function createTrackProjection(duration: number, edits: readonly ReviewEd
   };
   return {
     duration,
+    resultDuration,
     source,
     output,
     cuts: segments.filter((segment) => segment.kind === 'cut'),
     position: (time: number, edge?: 'start' | 'end') => source(time, edge) / duration,
     delta: (at: number, pixels: number, width: number) =>
       output(at + (pixels / width) * duration) - output(at),
+  };
+}
+/** Focus gestures retain a clock through removed spans without changing tempo semantics. */
+export function createTrackProjection(duration: number, edits: readonly ReviewEdit[]) {
+  return {
+    ...createTimelineAxis(duration, edits),
+    focus: createTimelineAxis(
+      duration,
+      edits.filter((edit) => edit.kind !== 'cut')
+    ),
   };
 }
 export type ReviewTrackProjection = ReturnType<typeof createTrackProjection>;

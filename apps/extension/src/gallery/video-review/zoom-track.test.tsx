@@ -6,6 +6,8 @@ import { ReviewZoomTrack } from './zoom-track';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createTrackProjection } from './track-projection';
+import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
+import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -61,13 +63,14 @@ function renderTrack(
     onSelectLink?: (id: string) => void;
     linkSelectedId?: string | null;
     projection?: ReturnType<typeof createTrackProjection>;
+    duration?: number;
   }
 ) {
   act(() => {
     root.render(
       <ReviewZoomTrack
         beforeAction={overrides?.beforeAction}
-        duration={10}
+        duration={overrides?.duration ?? 10}
         {...(time === null ? { time: null } : { time })}
         regions={regions}
         edits={overrides?.edits ?? edits}
@@ -349,7 +352,10 @@ it('keeps a cut-boundary fixed end and speed-projected minimum consistent with t
   expect(Number.parseFloat(block.style.width)).toBeCloseTo(2.4);
   expect(Number.parseFloat(block.style.left)).toBeCloseTo(37.6);
   await track.event(block, 'pointerup', 900, true);
-  expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start');
+  expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start', {
+    start: 3.76,
+    end: 4,
+  });
   expect(projection.source(commit.mock.calls[0]![1].end, 'end')).toBe(4);
   expect(host.querySelector('[data-zoom-guide]')).toBeNull();
 });
@@ -406,3 +412,98 @@ it('marks disabled focus content as muted without disabling selection', async ()
   renderTrack([zoom('z1', 2, 4)], vi.fn());
   expect(row?.getAttribute('data-review-track-muted')).toBe('false');
 });
+
+for (const spotlight of [false, true]) {
+  it(
+    'keeps authored plate geometry when Cut is created over existing focus ' +
+      (spotlight ? 'Spotlight' : 'Zoom'),
+    () => {
+      const cut: ReviewEdit = {
+        id: 'cut',
+        kind: 'cut',
+        start: 3,
+        end: 7,
+        requestedStart: 3,
+        requestedEnd: 7,
+      };
+      const original = {
+        ...zoom('a', 2, 6),
+        ...(spotlight ? { spotlight: createQuickEditSpotlight() } : {}),
+      };
+      const regions = reconcileReviewFocus({
+        regions: [original],
+        duration: 10,
+        before: [],
+        after: [cut],
+        edit: cut,
+        preserveUnderCuts: true,
+      });
+      const projection = createTrackProjection(10, [cut]);
+      const track = renderTrack(regions, vi.fn(), vi.fn(), null, {
+        projection,
+        edits: [cut],
+        duration: projection.resultDuration,
+      });
+      expect(track.blocks[0]!.style.left).toBe('20%');
+      expect(track.blocks[0]!.style.width).toBe('40%');
+      expect(track.blocks[0]!.dataset['cutSuppressed']).toBe('true');
+    }
+  );
+
+  it(
+    'does not stretch or jump authored focus dragged under an existing Cut ' +
+      (spotlight ? 'Spotlight' : 'Zoom'),
+    async () => {
+      const cut: ReviewEdit = {
+        id: 'cut',
+        kind: 'cut',
+        start: 3,
+        end: 7,
+        requestedStart: 3,
+        requestedEnd: 7,
+      };
+      const projection = createTrackProjection(10, [cut]);
+      const region = {
+        ...zoom('a', 0, 2),
+        sourceAnchor: { start: 0, end: 2 },
+        ...(spotlight ? { spotlight: createQuickEditSpotlight() } : {}),
+      };
+      const commit = vi.fn();
+      const track = renderTrack([region], commit, vi.fn(), null, {
+        projection,
+        edits: [cut],
+        duration: projection.resultDuration,
+      });
+      const block = track.blocks[0]!;
+      Object.assign(block, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: vi.fn(),
+      });
+      await track.event(block, 'pointerdown', 100);
+      await track.event(block, 'pointermove', 500, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(40);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      expect(block.dataset['cutSuppressed']).toBe('true');
+      await track.event(block, 'pointermove', 600, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(50);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      await track.event(block, 'pointermove', 800, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(70);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      expect(block.dataset['cutSuppressed']).toBe('false');
+      await track.event(block, 'pointermove', 200, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(10);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      expect(block.dataset['cutSuppressed']).toBe('false');
+      await track.event(block, 'pointermove', 700, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(60);
+      expect(block.dataset['cutSuppressed']).toBe('true');
+      await track.event(block, 'pointerup', 700, true);
+      expect(commit).toHaveBeenCalledExactlyOnceWith('a', { start: 3, end: 4 }, 'move', {
+        start: 6,
+        end: 8,
+      });
+    }
+  );
+}

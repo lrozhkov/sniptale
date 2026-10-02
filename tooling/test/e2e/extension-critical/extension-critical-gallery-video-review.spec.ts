@@ -2572,6 +2572,98 @@ for (const variant of [
   { locale: 'ru' as const, theme: 'light' as const },
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
+  test(`quick editor preserves authored focus geometry while dragging across Cut at HD in ${variant.locale}/${variant.theme}`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.focusRangeTool').click();
+      const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const lane = (await focusLane.boundingBox())!;
+      await page.mouse.move(lane.x + lane.width / 12, lane.y + lane.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(lane.x + (lane.width * 5) / 12, lane.y + lane.height / 2, {
+        steps: 10,
+      });
+      await page.mouse.up();
+      const focus = focusLane.locator('[role="button"][data-cut-suppressed]');
+      await expect(focus).toHaveCount(1);
+      await button('gallery.videoReview.pointerTool').click();
+      const authored = await focus.boundingBox();
+      await timelineGesture(page, 9);
+      await button('gallery.videoReview.cutMode').click();
+      await timelineGesture(page, 2, 7);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      expect((await focus.boundingBox())!.width).toBeCloseTo(authored!.width, 0);
+      expect((await focus.boundingBox())!.x).toBeCloseTo(authored!.x, 0);
+      await button('gallery.videoReview.pointerTool').click();
+      const dragBy = async (seconds: number) => {
+        const box = (await focus.boundingBox())!;
+        const start = box.x + box.width / 2;
+        await page.keyboard.down('Shift');
+        await page.mouse.move(start, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(start + (lane.width * seconds) / 12, box.y + box.height / 2, {
+          steps: 10,
+        });
+        await page.mouse.up();
+        await page.keyboard.up('Shift');
+        await expect
+          .poll(async () => (await focus.boundingBox())!.width)
+          .toBeCloseTo(authored!.width, 0);
+      };
+      await dragBy(2);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      const hidden = (await focus.boundingBox())!;
+      expect(hidden.x - authored!.x).toBeCloseTo((lane.width * 2) / 12, 0);
+      await dragBy(4);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
+      await dragBy(-1);
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      const partial = (await focus.boundingBox())!;
+      await page.screenshot({
+        path: testInfo.outputPath(`cut-retained-${variant.locale}-${variant.theme}.png`),
+      });
+      await button('gallery.videoReview.undo').click();
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
+      await button('gallery.videoReview.redo').click();
+      await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
+      expect((await focus.boundingBox())!.x).toBeCloseTo(partial.x, 0);
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-cut-suppressed="true"]')
+      ).toHaveCount(1);
+      expect((await focus.boundingBox())!.width).toBeCloseTo(authored!.width, 0);
+      expect((await focus.boundingBox())!.x).toBeCloseTo(partial.x, 0);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
   const testName =
     `quick editor voiceover strip supports pause and optional cap at HD ` +
     `in ${variant.locale}/${variant.theme}`;

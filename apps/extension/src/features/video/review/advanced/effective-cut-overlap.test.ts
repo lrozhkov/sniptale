@@ -99,3 +99,44 @@ it('keeps packet copy available when a cut fully hides off-keyframe speed bounda
     })
   ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
 });
+
+it('projects only surviving authored focus frames for playback and export across a Cut', () => {
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 3,
+    end: 7,
+    requestedStart: 3,
+    requestedEnd: 7,
+  };
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks.zoom = true;
+  state.zoom.enabled = true;
+  state.background = { enabled: false };
+  state.audio.voiceoverSegments = buildReviewTimeMap(10, [cut]);
+  state.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'focus', at: 2, duration: 3 }),
+      sourceAnchor: { start: 2, end: 9 },
+    },
+  ];
+  expect(
+    resolveQuickEditEffectiveState(state).zoomRegions.map(({ start, end }) => ({ start, end }))
+  ).toEqual([
+    { start: 2, end: 3 },
+    { start: 3, end: 5 },
+  ]);
+  expect(
+    resolveQuickEditExportPlan({
+      advanced: state,
+      document: { edits: [cut], canvasComments: [] },
+      videoRenderAvailable: true,
+    })
+  ).toMatchObject({ kind: 'ready', video: 'render' });
+  state.zoom.regions[0]!.sourceAnchor = { start: 4, end: 6 };
+  expect(resolveQuickEditEffectiveState(state).zoomRegions).toEqual([]);
+  expect(
+    resolveQuickEditExportPlan({ advanced: state, document: { edits: [cut], canvasComments: [] } })
+  ).toMatchObject({ kind: 'ready', video: 'copy' });
+});

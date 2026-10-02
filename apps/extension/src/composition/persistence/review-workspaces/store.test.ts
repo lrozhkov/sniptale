@@ -659,3 +659,78 @@ it('rejects malformed buffered snapshots and rolls back storage failures', async
   await expect(saveVideoWorkspaceSnapshot(args)).rejects.toThrow('No space');
   expect(await readVideoWorkspace(id)).toEqual(opened);
 });
+
+it('preserves a focus drag under Cut through undo, redo and reopen', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const before = createQuickEditAdvancedContent();
+  const authored = {
+    ...createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2 }),
+    sourceAnchor: { start: 0, end: 2 },
+    spotlight: createQuickEditSpotlight(),
+  };
+  before.zoom = { enabled: true, regions: [authored] };
+  const saved = await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    advanced: { ...opened.workspace.advanced, zoom: before.zoom },
+  });
+  const cut = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: saved.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    operation: {
+      id: 'cut',
+      at: 1,
+      target: 'edit',
+      before: null,
+      after: { id: 'cut', kind: 'cut', start: 3, end: 7, requestedStart: 3, requestedEnd: 7 },
+    },
+  });
+  const { replayReviewHistory, reviewAdvancedContentBaseline } =
+    await import('../../../features/video/review/document');
+  const current = replayReviewHistory(
+    cut.workspace.history,
+    cut.workspace.cursor,
+    cut.workspace.source,
+    reviewAdvancedContentBaseline(cut.workspace.advanced)
+  ).advancedContent;
+  const moved = {
+    ...current,
+    zoom: { enabled: true, regions: [{ ...authored, sourceAnchor: { start: 4, end: 6 } }] },
+  };
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: cut.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    operation: { id: 'drag', at: 2, target: 'advancedContent', before: current, after: moved },
+  });
+  const derive = (workspace: typeof opened.workspace) =>
+    replayReviewHistory(
+      workspace.history,
+      workspace.cursor,
+      workspace.source,
+      reviewAdvancedContentBaseline(workspace.advanced)
+    ).advancedContent.zoom.regions[0];
+  expect(derive(committed.workspace)).toMatchObject({
+    start: 0,
+    end: 2,
+    sourceAnchor: { start: 4, end: 6 },
+  });
+  const historyArgs = { aggregateId: id, expectedSourceAssetId: opened.workspace.sourceAssetId };
+  const undone = await moveVideoWorkspaceHistory({
+    ...historyArgs,
+    expectedRevision: committed.workspace.revision,
+    direction: 'undo',
+  });
+  expect(derive(undone.workspace)?.sourceAnchor).toEqual({ start: 0, end: 2 });
+  const redone = await moveVideoWorkspaceHistory({
+    ...historyArgs,
+    expectedRevision: undone.workspace.revision,
+    direction: 'redo',
+  });
+  expect(derive(redone.workspace)).toEqual(derive(committed.workspace));
+  expect(derive((await openVideoWorkspace(id, source)).workspace)).toEqual(
+    derive(committed.workspace)
+  );
+});
