@@ -1,7 +1,11 @@
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
-import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
+import {
+  applyHarnessBootstrap,
+  EDITOR_HARNESS_PATH,
+  SETTINGS_HARNESS_PATH,
+} from '../extension-critical.helpers';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
 const check = expect.configure({ soft: true, timeout: 1000 });
 
@@ -432,4 +436,74 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape');
     await expect(swatch).toBeFocused();
   });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const locale of ['ru', 'en'] as const) {
+    test(`fixed drawing palette in ${locale} ${theme}`, async ({ page, hostOrigin }, info) => {
+      await page.emulateMedia({ colorScheme: theme });
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript(
+        ({ theme, locale }) => {
+          localStorage.setItem('sniptale-theme-preference', theme);
+          localStorage.setItem('sniptale-locale-preference', locale);
+        },
+        { theme, locale }
+      );
+      await applyHarnessBootstrap(page, {
+        storage: { 'sniptale-theme-preference': theme, 'sniptale-locale-preference': locale },
+      });
+      await page.goto(
+        `${hostOrigin}${SETTINGS_HARNESS_PATH}?section=editor-resources&view=palettes`
+      );
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(
+        page.getByText(
+          locale === 'ru'
+            ? 'Первые пять цветов — постоянный быстрый набор для рисования.'
+            : 'The first five colors are your fixed drawing shortcuts.',
+          { exact: false }
+        )
+      ).toBeVisible();
+      const values = page.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
+      await expect(values).toHaveCount(10);
+      await values.first().click();
+      const input = page.locator('[data-ui="shared.ui.color-selector.trigger"] input');
+      await input.fill('#123456');
+      await input.press('Enter');
+      await expect(values.first()).toHaveText('#123456');
+      await page.screenshot({ path: info.outputPath('fixed-palette-settings.png') });
+      const saved = await page.evaluate(
+        async () =>
+          (await chrome.storage.local.get('sniptale_drawing_palette')).sniptale_drawing_palette
+      );
+      expect(saved.colors[0]).toBe('#123456');
+      await applyHarnessBootstrap(page, {
+        storage: {
+          'sniptale-theme-preference': theme,
+          'sniptale-locale-preference': locale,
+          sniptale_drawing_palette: saved,
+        },
+      });
+      await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+      const options = page.locator('[data-ui="editor.drawing.options"]');
+      const quick = options.locator(
+        '[data-ui="content.toolbar.drawing-options.quick-colors"] button'
+      );
+      await expect(quick).toHaveCount(5);
+      const colors = () => quick.evaluateAll((buttons) => buttons.map((button) => button.title));
+      expect(await colors()).toEqual(saved.colors.slice(0, 5));
+      await options.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#abcdef');
+      await picker.getByRole('button', { name: /^(Apply|Применить)$/ }).click();
+      expect(await colors()).toEqual(saved.colors.slice(0, 5));
+      await page.screenshot({ path: info.outputPath('fixed-palette-drawing.png') });
+      await page.reload();
+      await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+      await expect(quick).toHaveCount(5);
+      expect(await colors()).toEqual(saved.colors.slice(0, 5));
+    });
+  }
 }

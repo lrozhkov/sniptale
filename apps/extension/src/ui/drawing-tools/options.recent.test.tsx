@@ -177,7 +177,7 @@ it('places the text color icon before its picker', async () => {
   host.remove();
 });
 
-it('keeps a color picked before the saved recents finish loading at the front', async () => {
+it('ignores saved recents while preserving the configured quick colors', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let finishLoad: ((colors: string[]) => void) | undefined;
   persistence.load.mockImplementation(
@@ -210,7 +210,7 @@ it('keeps a color picked before the saved recents finish loading at the front', 
   host.remove();
 });
 
-it('puts the picker first and keeps visible swatches in place while adding new colors', async () => {
+it('keeps all five configured positions after selecting arbitrary picker colors', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -238,13 +238,13 @@ it('puts the picker first and keeps visible swatches in place while adding new c
 
   act(() => picker?.click());
   expect(onSelect).toHaveBeenLastCalledWith('#123456');
-  expect(visibleColors(host)).toEqual([...palette.slice(0, 4), '#123456']);
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
 
   act(() => host.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
-  expect(visibleColors(host)).toEqual([...palette.slice(0, 4), '#123456']);
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
   persistence.pickerColor = '#abcdef';
   act(() => picker?.click());
-  expect(visibleColors(host)).toEqual(['#f97316', '#60a5fa', '#22c55e', '#abcdef', '#123456']);
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
 
   act(() =>
     root.render(
@@ -267,7 +267,7 @@ it('puts the picker first and keeps visible swatches in place while adding new c
   act(() => root.unmount());
 });
 
-it('does not evict a newer color when an older storage notification arrives late', async () => {
+it('ignores recent-color storage notifications and preserves the configured order', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let notify: ((colors: string[]) => void) | undefined;
   persistence.subscribe.mockImplementation((listener) => {
@@ -297,9 +297,36 @@ it('does not evict a newer color when an older storage notification arrives late
   persistence.pickerColor = '#fedcba';
   act(() => picker?.click());
 
-  expect(visibleColors(host)).toEqual(['#f97316', '#60a5fa', '#fedcba', '#abcdef', '#123456']);
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
   act(() => notify?.(['#fedcba', '#abcdef', '#123456']));
   act(() => notify?.(['#999999', '#fedcba', '#abcdef', '#123456']));
-  expect(visibleColors(host)).toEqual(['#f97316', '#999999', '#fedcba', '#abcdef', '#123456']);
+  expect(visibleColors(host)).toEqual(palette.slice(0, 5));
+  act(() => root.unmount());
+});
+
+it('updates from palette settings and preserves duplicate positions across remounts', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const render = (colors: readonly string[]) => (
+    <DrawingColorOptions
+      colors={colors}
+      floatingBoundaryRef={{ current: null }}
+      floatingPlacement="auto"
+      label="Line color"
+      value="#f97316"
+      onSelect={vi.fn()}
+    />
+  );
+  let root = createRoot(host);
+  await act(async () => root.render(render(palette)));
+  const updated = ['#abcdef', '#abcdef', ...palette.slice(2)];
+  await act(async () => root.render(render(updated)));
+  expect(visibleColors(host)).toEqual(updated.slice(0, 5));
+  act(() => root.unmount());
+  root = createRoot(host);
+  await act(async () => root.render(render(updated)));
+  expect(visibleColors(host)).toEqual(updated.slice(0, 5));
+  expect(persistence.load).not.toHaveBeenCalled();
+  expect(persistence.push).not.toHaveBeenCalled();
   act(() => root.unmount());
 });

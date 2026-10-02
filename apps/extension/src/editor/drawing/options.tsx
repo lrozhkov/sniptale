@@ -56,10 +56,14 @@ function useDrawingPalette() {
   );
   useEffect(() => {
     let active = true;
+    let observedChange = false;
     void loadDrawingPaletteState().then((state) => {
+      if (active && !observedChange) setColors(state.colors);
+    });
+    const unsubscribe = subscribeToDrawingPaletteState((state) => {
+      observedChange = true;
       if (active) setColors(state.colors);
     });
-    const unsubscribe = subscribeToDrawingPaletteState((state) => setColors(state.colors));
     return () => {
       active = false;
       unsubscribe();

@@ -16,7 +16,6 @@ import {
   type DrawingShapeKind,
 } from '../../features/drawing/public';
 import { translate } from '../../platform/i18n';
-import { useQuickDrawingColors } from './quick-colors';
 
 type DrawingQuickOptionsTool = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text';
 
@@ -304,7 +303,7 @@ export function DrawingColorOptions(props: {
   onPreviewReset?: (color: string) => void;
 }) {
   const Icon = props.icon;
-  const { quickColors, selectColor } = useQuickDrawingColors(props.colors, props.onSelect);
+  const quickColors = props.colors.slice(0, 5);
   const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
   const previewReset = props.onPreviewReset ?? props.onPreview;
   const resolveQuickColor = (color: string) =>
@@ -336,7 +335,7 @@ export function DrawingColorOptions(props: {
         palette={props.colors}
         paletteInPicker
         pickerOnly
-        onChange={selectColor}
+        onChange={props.onSelect}
         {...(props.onPreview ? { onPreviewChange: props.onPreview } : {})}
         {...(previewReset ? { onPreviewReset: previewReset } : {})}
       />
@@ -344,15 +343,15 @@ export function DrawingColorOptions(props: {
         className={`grid gap-1.5 ${props.vertical ? 'grid-cols-1' : 'w-[104px] grid-cols-5'}`}
         data-ui="content.toolbar.drawing-options.quick-colors"
       >
-        {quickColors.map((color) => {
+        {quickColors.map((color, index) => {
           const active = selectedValue?.toLowerCase() === resolveQuickColor(color).toLowerCase();
           return (
             <ProductGlassColorOption
-              key={color}
+              key={index}
               active={active}
               aria-label={`${props.label}: ${color}`}
               aria-pressed={active}
-              onClick={() => selectColor(resolveQuickColor(color))}
+              onClick={() => props.onSelect(resolveQuickColor(color))}
               style={{ backgroundColor: color }}
               title={color}
             />
