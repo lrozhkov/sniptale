@@ -100,6 +100,8 @@ async function readImageWorkspaceRecord(
   page: Page,
   aggregateId: string
 ): Promise<{
+  canvasWidth: number | null;
+  canvasHeight: number | null;
   browserFrameTitle: string | null;
   revision: number | null;
   displayName: string | null;
@@ -126,6 +128,14 @@ async function readImageWorkspaceRecord(
         | Record<string, unknown>
         | undefined;
       return {
+        canvasWidth:
+          typeof workspaceDocument?.['canvasWidth'] === 'number'
+            ? workspaceDocument['canvasWidth']
+            : null,
+        canvasHeight:
+          typeof workspaceDocument?.['canvasHeight'] === 'number'
+            ? workspaceDocument['canvasHeight']
+            : null,
         displayName:
           typeof workspaceDocument?.['displayName'] === 'string'
             ? workspaceDocument['displayName']
@@ -620,3 +630,140 @@ for (const variant of [
     await page.close();
   });
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`frame padding hover includes the label-value gap in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.emulateMedia({ colorScheme: theme });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await waitForEditorReady(page);
+    await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+    const fields = page.locator('[data-ui="editor.frame.padding-fields"]');
+    const row = fields.locator('[data-ui="shared.linked-padding-fields"] > div').first();
+    const input = row.locator('input');
+    const label = row.locator('span.truncate').first();
+    await row.scrollIntoViewIfNeeded();
+    const labelBox = (await label.boundingBox())!;
+    const inputBox = (await input.boundingBox())!;
+    const range = fields.locator('input[type="range"]');
+    await page.mouse.move(
+      (labelBox.x + labelBox.width + inputBox.x) / 2,
+      inputBox.y + inputBox.height / 2
+    );
+    await expect(range).toHaveAttribute('tabindex', '0');
+    await range.hover();
+    await expect(range).toHaveAttribute('tabindex', '0');
+    await input.fill('48');
+    await input.press('Enter');
+    await expect(input).toHaveValue('48');
+    await page.screenshot({ path: info.outputPath('padding-hover-gap.png') });
+  });
+}
+
+test('managed background follows canvas expansion and history', async ({
+  page,
+  context,
+  hostOrigin,
+}) => {
+  const assetId = 'e2e-managed-background-resize';
+  await seedImageAssetBootstrap(page, {
+    id: assetId,
+    filename: 'background-resize.png',
+    createdAt: Date.now(),
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(editorHarnessUrl(hostOrigin, assetId));
+  await waitForEditorReady(page);
+  const image = await page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 24;
+    canvas.height = 24;
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = '#2864c8';
+    context.fillRect(0, 0, 24, 24);
+    return canvas.toDataURL('image/png').split(',')[1]!;
+  });
+  await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+  await page
+    .locator('input[type="file"][accept="image/*"]')
+    .last()
+    .setInputFiles({
+      name: 'background.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(image, 'base64'),
+    });
+  const frame = page.locator('[data-ui="editor.frame-panel"]');
+  await expect(frame.locator('img')).toBeVisible();
+  await frame.locator('[data-ui="editor.frame.actions"] button').click();
+  const background = () =>
+    page.evaluate(() =>
+      window.__sniptaleEditorHarness
+        ?.getCanvasObjects()
+        .find((object) => object.sniptaleType === 'background')
+    );
+  await expect.poll(background).toBeTruthy();
+  const before = (await background())!;
+  const sourceBefore = await page.evaluate(() =>
+    window.__sniptaleEditorHarness
+      ?.getCanvasObjects()
+      .find((object) => object.sniptaleType !== 'background' && object.type === 'image')
+  );
+  expect(sourceBefore).toBeTruthy();
+  await page.locator('[data-ui="editor.floating.layers.mode.canvas-size"]').click();
+  await page.locator('[data-ui="editor.canvas-size.mode.expand"]').click();
+  const dimensions = page.locator('[data-size-panel-dimensions] input');
+  await dimensions.nth(0).fill('800');
+  await dimensions.nth(0).press('Tab');
+  await dimensions.nth(1).fill('600');
+  await dimensions.nth(1).press('Tab');
+  await page.getByRole('button', { name: /Apply area|Применить область/, exact: true }).click();
+  await expect
+    .poll(async () => Number((await background())?.scaledWidth))
+    .toBeGreaterThanOrEqual(800);
+  await expect
+    .poll(async () => Number((await background())?.scaledHeight))
+    .toBeGreaterThanOrEqual(600);
+  const sourceAfter = await page.evaluate(() =>
+    window.__sniptaleEditorHarness
+      ?.getCanvasObjects()
+      .find((object) => object.sniptaleType !== 'background' && object.type === 'image')
+  );
+  expect(sourceAfter?.scaledWidth).toBe(sourceBefore?.scaledWidth);
+  expect(sourceAfter?.scaledHeight).toBe(sourceBefore?.scaledHeight);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await background())?.scaledWidth).toBe(before.scaledWidth);
+  await page.keyboard.press('Control+Shift+z');
+  await expect
+    .poll(async () => Number((await background())?.scaledWidth))
+    .toBeGreaterThanOrEqual(800);
+  await page.locator('[data-ui="editor.floating.layers.mode.canvas-size"]').click();
+  await page.locator('[data-ui="editor.canvas-size.mode.crop"]').click();
+  await dimensions.nth(0).fill('400');
+  await dimensions.nth(0).press('Tab');
+  await dimensions.nth(1).fill('300');
+  await dimensions.nth(1).press('Tab');
+  await page.getByRole('button', { name: /Apply crop|Применить обрезку/, exact: true }).click();
+  await expect.poll(async () => Number((await background())?.scaledWidth)).toBe(400);
+  await expect
+    .poll(async () => (await readImageWorkspaceRecord(page, assetId)).canvasWidth)
+    .toBe(400);
+  expect((await readImageWorkspaceRecord(page, assetId)).canvasHeight).toBe(300);
+  const reopened = await context.newPage();
+  await preserveMediaLibraryBootstrap(reopened);
+  await reopened.goto(editorHarnessUrl(hostOrigin, assetId));
+  await waitForEditorReady(reopened);
+  await expect
+    .poll(() =>
+      reopened.evaluate(
+        () =>
+          window.__sniptaleEditorHarness
+            ?.getCanvasObjects()
+            .find((object) => object.sniptaleType === 'background')?.scaledWidth
+      )
+    )
+    .toBe(400);
+  await reopened.close();
+});

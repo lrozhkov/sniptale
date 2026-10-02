@@ -1,3 +1,4 @@
+import { createEditorSceneMutationCallbacks } from '../../public-api/scene-actions/callbacks';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { EditorControllerInstance } from '../types';
 import {
@@ -110,7 +111,10 @@ export async function applyCropSelectionForController(
       );
     },
     switchToSelectTool: () => controller.switchToSelectTool(),
-    rebuildFrameDecorations: () => controller.rebuildFrameDecorations(),
+    rebuildFrameDecorations: () =>
+      createEditorSceneMutationCallbacks(
+        controller.getPublicApiAdapter()
+      ).rebuildFrameDecorations(),
     commitHistory: () => controller.commitHistory(),
     logCrop: (stage, payload) => logger.debug(stage, payload),
   });

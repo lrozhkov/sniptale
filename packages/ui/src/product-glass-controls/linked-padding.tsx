@@ -208,16 +208,14 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
 
   return (
     <div className="grid gap-1.5" data-ui="shared.linked-padding-fields">
-      <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-1.5" data-padding-hover="all">
         <div
           className={[
             'min-w-0 flex-1 font-semibold text-[var(--sniptale-color-text-secondary)]',
             props.fieldLayout === 'full-row' ? 'text-[12px]' : 'text-[11px]',
           ].join(' ')}
         >
-          <span className="truncate" data-padding-hover="all">
-            {props.labels.padding}
-          </span>
+          <span className="truncate">{props.labels.padding}</span>
         </div>
         {!expanded && (!props.renderUniformField || props.fieldLayout === 'full-row') ? (
           <div

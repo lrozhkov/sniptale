@@ -134,3 +134,16 @@ it('retains the scrub during dragging after leaving the padding label', async ()
   await act(async () => range.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
   expect(range.tabIndex).toBe(-1);
 });
+
+it('reveals the linked slider from the gap between label and value and keeps it reachable', async () => {
+  const row = container.querySelector(
+    '[data-ui="shared.linked-padding-fields"]'
+  )!.firstElementChild!;
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  await act(async () => row.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(range.tabIndex).toBe(0);
+  await act(async () => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(range.tabIndex).toBe(0);
+  await enterValue('48');
+  expect(current.paddingTop).toBe(48);
+});
