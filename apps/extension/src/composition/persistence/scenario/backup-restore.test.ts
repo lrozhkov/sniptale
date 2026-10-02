@@ -631,8 +631,8 @@ it.each([false, true])(
     });
     const base = restoreTransaction(target);
     const tx = {
-      objectStore: (name: string) =>
-        name === 'media_library' ? { get: async () => media } : base.objectStore(name as never),
+      objectStore: (name: Parameters<typeof base.objectStore>[0]) =>
+        name === 'media_library' ? { get: async () => media } : base.objectStore(name),
     } as unknown as Parameters<typeof putScenarioProjectBackupRestore>[0]['tx'];
     await expect(
       putScenarioProjectBackupRestore({
