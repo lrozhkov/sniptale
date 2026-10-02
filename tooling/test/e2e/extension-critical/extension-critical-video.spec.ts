@@ -1,3 +1,5 @@
+import { recordedAudioResources } from '../support/quick-editor-media-fixture';
+import { createHash } from 'node:crypto';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -743,14 +745,28 @@ for (const variant of [
     project.clips.push(createAudioClipFromAsset(track.id, asset, 0));
     project.clips.push(createAudioClipFromAsset(track.id, asset, 6));
     await page.setViewportSize({ width: 1280, height: 720 });
-    await applyHarnessBootstrap(page, {
-      apiBehavior: { runtimeFallback: 'typed-success' },
-      videoProjects: [project],
-      storage: {
-        'sniptale-locale-preference': variant.locale,
-        'sniptale-theme-preference': variant.theme,
+    await page.addInitScript(
+      ({ bootstrap, seedKey }) => {
+        const seeded = sessionStorage.getItem(seedKey) === 'true';
+        window.__sniptaleHarnessBootstrap = {
+          ...bootstrap,
+          videoProjects: seeded ? [] : bootstrap.videoProjects,
+        };
+        sessionStorage.setItem(seedKey, 'true');
       },
-    });
+      {
+        seedKey: `voiceover-seed-${project.id}`,
+        bootstrap: {
+          preserveMediaLibrary: true,
+          apiBehavior: { runtimeFallback: 'typed-success' as const },
+          videoProjects: [project],
+          storage: {
+            'sniptale-locale-preference': variant.locale,
+            'sniptale-theme-preference': variant.theme,
+          },
+        },
+      }
+    );
     await page.emulateMedia({ colorScheme: variant.theme });
     await page.addInitScript(({ locale, theme }) => {
       localStorage.setItem('sniptale-locale-preference', locale);
@@ -807,6 +823,12 @@ for (const variant of [
         exact: true,
       })
     ).toBeVisible();
+    await expect(strip.locator('[data-ui="video-editor.audio-recording.limit"]')).toContainText(
+      '00:02'
+    );
+    await expect
+      .poll(async () => Number(await strip.getByRole('meter').getAttribute('aria-valuenow')))
+      .toBeGreaterThan(5);
     const closeRecorder = strip.getByRole('button', {
       name: translate('common.actions.close', variant.locale),
       exact: true,
@@ -858,9 +880,49 @@ for (const variant of [
     await page.screenshot({
       path: testInfo.outputPath(`full-voiceover-take-${variant.locale}.png`),
     });
+    const original = await strip.locator('audio').evaluate(async (audio) => {
+      const bytes = await (await fetch(audio.src)).arrayBuffer();
+      const context = new AudioContext();
+      try {
+        const decoded = await context.decodeAudioData(bytes.slice(0));
+        return {
+          hash: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+            .map((value) => value.toString(16).padStart(2, '0'))
+            .join(''),
+          duration: decoded.duration,
+        };
+      } finally {
+        await context.close();
+      }
+    });
+    const originalDownload = page.waitForEvent('download');
+    await strip
+      .getByRole('button', {
+        name: translate('videoEditor.app.recordAudioDownloadOriginal', variant.locale),
+        exact: true,
+      })
+      .click();
+    const originalFile = await originalDownload;
+    expect(
+      createHash('sha256')
+        .update(await readFile(await originalFile.path()))
+        .digest('hex')
+    ).toBe(original.hash);
+    expect(original.duration).toBeGreaterThan(0);
+    const previousAudio = await recordedAudioResources(page);
     await insert.focus();
     await page.keyboard.press('Enter');
     await expect(strip).toHaveCount(0);
     await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
+    await page.reload();
+    await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
+    const retained = await recordedAudioResources(
+      page,
+      previousAudio.map((item) => item.key)
+    );
+    expect(retained).toHaveLength(1);
+    expect(retained[0]!.duration).toBeGreaterThan(0);
+    expect(retained[0]!.samples).toBeGreaterThan(0);
+    expect(retained[0]!.peak).toBeGreaterThan(0.01);
   });
 }

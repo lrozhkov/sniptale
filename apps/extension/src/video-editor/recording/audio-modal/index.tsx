@@ -134,6 +134,8 @@ function TimelineAudioRecordingModal({
             onStart={startRecording}
             onClose={requestClose}
             onSave={saveRecording}
+            onDownload={session.downloadTake}
+            downloading={session.isDownloading}
           />
         </ProductModal>
         <RecordingDiscardConfirmation value={session.confirmation} />

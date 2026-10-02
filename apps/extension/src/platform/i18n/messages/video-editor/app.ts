@@ -13,8 +13,17 @@ export const videoEditorAppMessages = defineMessageSource({
     en: 'Play video while recording (sound muted)',
   },
   recordAudioSaveFailedRetry: {
-    ru: 'Не удалось завершить сохранение. Запись осталась здесь — повторите попытку.',
-    en: 'Could not finish saving. Your recording is still here; try again.',
+    ru: 'Не удалось завершить сохранение. Запись осталась здесь — повторите попытку или скачайте оригинал.',
+    en: 'Could not finish saving. Your recording is still here; retry or download the original.',
+  },
+  recordAudioDownloadOriginal: { ru: 'Скачать исходную запись', en: 'Download original recording' },
+  recordAudioPrepareFailed: {
+    ru: 'Не удалось обработать запись для добавления. Скачайте оригинал, чтобы сохранить весь дубль.',
+    en: 'Could not prepare the recording for insertion. Download the original to keep the whole take.',
+  },
+  recordAudioDownloadFailed: {
+    ru: 'Не удалось начать скачивание. Запись осталась здесь — попробуйте ещё раз.',
+    en: 'Could not start the download. Your recording is still here; try again.',
   },
   recordAudioDiscardTitle: { ru: 'Отказаться от записи?', en: 'Discard recording?' },
   recordAudioDiscardMessage: {

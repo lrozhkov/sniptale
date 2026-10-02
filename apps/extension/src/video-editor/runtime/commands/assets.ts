@@ -333,7 +333,7 @@ export function useAssetHandlers(
         }
         if (signal) await saveCycle?.promise;
       } catch (assetError) {
-        logger.error('Failed to import recorded audio', assetError);
+        logger.error('recorded_audio_import_failed');
         throw assetError;
       }
     },

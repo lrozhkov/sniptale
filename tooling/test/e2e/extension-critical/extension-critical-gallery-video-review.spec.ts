@@ -4,6 +4,7 @@ import {
   clickReviewExport,
   expectTimelineSelection,
   recordingCount,
+  recordedAudioResources,
 } from '../support/quick-editor-media-fixture';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createHash } from 'node:crypto';
@@ -2842,6 +2843,40 @@ for (const variant of [
         (await strip.locator('[data-ui="video-editor.audio-recording.playback"]').boundingBox())!.y
       );
       const takeUrl = await strip.locator('audio').getAttribute('src');
+      const original = await strip.locator('audio').evaluate(async (audio) => {
+        const bytes = await (await fetch(audio.src)).arrayBuffer();
+        const context = new AudioContext();
+        try {
+          const decoded = await context.decodeAudioData(bytes.slice(0));
+          return {
+            hash: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+              .map((value) => value.toString(16).padStart(2, '0'))
+              .join(''),
+            duration: decoded.duration,
+            samples: decoded.length,
+          };
+        } finally {
+          await context.close();
+        }
+      });
+      const originalDownload = page.waitForEvent('download');
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioDownloadOriginal', variant.locale),
+          exact: true,
+        })
+        .click();
+      const originalFile = await originalDownload;
+      expect(
+        createHash('sha256')
+          .update(await readFile(await originalFile.path()))
+          .digest('hex')
+      ).toBe(original.hash);
+      expect(original.duration).toBeGreaterThan(0);
+      expect(original.samples).toBeGreaterThan(0);
+      await expect(strip.locator('audio')).toHaveAttribute('src', takeUrl!);
+      const previousAudio = await recordedAudioResources(page);
+
       await strip
         .getByRole('button', {
           name: translate('videoEditor.app.recordAudioAgain', variant.locale),
@@ -2868,6 +2903,17 @@ for (const variant of [
       await expect(strip).toHaveCount(0);
       await expect(dialog.locator('[inert]')).toHaveCount(0);
       await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
+      const retained = await recordedAudioResources(
+        page,
+        previousAudio.map((item) => item.key)
+      );
+      expect(retained).toHaveLength(1);
+      expect(retained[0]!.duration).toBeGreaterThan(0);
+      expect(retained[0]!.samples).toBeGreaterThan(0);
+      expect(retained[0]!.peak).toBeGreaterThan(0.01);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

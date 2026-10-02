@@ -7,6 +7,7 @@ import { useAudioRecordingFocus } from '../dialog-focus';
 import { useAudioRecordingDialogSession } from './controller';
 import {
   AudioRecordingDeviceSelect,
+  AudioRecordingDownloadButton,
   AudioRecordingModalHeader,
   AudioRecordingSaveButton,
   AudioRecordingTransport,
@@ -131,6 +132,12 @@ function MaterialRecordingDialog({
         </ProductModalBody>
         <ProductModalFooter compact className="shrink-0 !py-2">
           <AudioRecordingCancelButton disabled={isSaving} onClose={requestClose} />
+          {controller.save.audioBlob && (
+            <AudioRecordingDownloadButton
+              disabled={isSaving || session.isDownloading}
+              onDownload={session.downloadTake}
+            />
+          )}
           <AudioRecordingSaveButton
             destination="materials"
             label={saveLabel}

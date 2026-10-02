@@ -207,3 +207,34 @@ export async function recordingCount(page: Page) {
     }
   }, betaV1Fixture.databaseName);
 }
+
+/** Decode retained PCM recordings through the real immutable OPFS objects after reopening. */
+export async function recordedAudioResources(page: Page, excludedKeys: string[] = []) {
+  return page.evaluate(async (excluded) => {
+    let objects: FileSystemDirectoryHandle;
+    try {
+      objects = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+      ).getDirectoryHandle('objects');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotFoundError') return [];
+      throw error;
+    }
+    const result: Array<{ key: string; duration: number; samples: number; peak: number }> = [];
+    const context = new AudioContext();
+    try {
+      for await (const [name, handle] of objects.entries()) {
+        if (handle.kind !== 'file' || excluded.includes(name)) continue;
+        const bytes = await (await (await objects.getFileHandle(name)).getFile()).arrayBuffer();
+        if (new TextDecoder().decode(bytes.slice(0, 4)) !== 'RIFF') continue;
+        const decoded = await context.decodeAudioData(bytes);
+        let peak = 0;
+        for (const sample of decoded.getChannelData(0)) peak = Math.max(peak, Math.abs(sample));
+        result.push({ key: name, duration: decoded.duration, samples: decoded.length, peak });
+      }
+      return result;
+    } finally {
+      await context.close();
+    }
+  }, excludedKeys);
+}

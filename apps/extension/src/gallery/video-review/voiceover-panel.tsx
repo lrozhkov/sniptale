@@ -6,7 +6,10 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useAudioRecordingDialogSession } from '../../composition/audio-recording/dialog/controller';
 import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog-focus';
-import { AudioRecordingDeviceSelect } from '../../composition/audio-recording/dialog/controls';
+import {
+  AudioRecordingDeviceSelect,
+  AudioRecordingDownloadButton,
+} from '../../composition/audio-recording/dialog/controls';
 import {
   RecordingDurationLimit,
   useRecordingDurationLimit,
@@ -291,6 +294,10 @@ function VoiceoverTakeReview({
         true
       )}
       <footer className="flex flex-wrap justify-end gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <AudioRecordingDownloadButton
+          disabled={session.isSaving || session.isDownloading}
+          onDownload={session.downloadTake}
+        />
         <ProductActionButton
           tone="secondary"
           disabled={session.isSaving || session.starting || durationLimit.invalid || maximum <= 0}

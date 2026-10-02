@@ -157,6 +157,8 @@ it('shows remaining interval time and stops recording from the compact timeline 
         onStart={vi.fn()}
         onClose={vi.fn()}
         onSave={vi.fn()}
+        onDownload={vi.fn()}
+        downloading={false}
         controller={{
           meter: { status: 'voice', level: 0.4, peaks: Array(16).fill(0.4) },
           save: { audioBlob: null, resetSession: vi.fn(), trimEnd: 0, trimStart: 0 },

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ProductModalHeader } from '@sniptale/ui/product-modal';
-import { Mic, Pause, Play, Save, Square } from 'lucide-react';
+import { Download, Mic, Pause, Play, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
@@ -205,5 +205,22 @@ export function AudioRecordingDeviceSelect(props: {
         })),
       ]}
     />
+  );
+}
+
+/** Preserve the whole original take independently of the selected trim or attachment destination. */
+export function AudioRecordingDownloadButton(props: {
+  disabled: boolean;
+  onDownload: () => Promise<void>;
+}) {
+  return (
+    <ProductActionButton
+      tone="secondary"
+      disabled={props.disabled}
+      onClick={() => void props.onDownload()}
+    >
+      <Download size={16} aria-hidden="true" />
+      {translate('videoEditor.app.recordAudioDownloadOriginal')}
+    </ProductActionButton>
   );
 }

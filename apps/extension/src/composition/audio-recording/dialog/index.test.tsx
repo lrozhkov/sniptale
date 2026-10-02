@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MaterialAudioRecordingModal } from './index';
+import * as takeDownload from './download-take';
 vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
@@ -283,3 +284,53 @@ it.each([false, true])(
     expect(!!host.querySelector('[role="alertdialog"]')).toBe(!retained);
   }
 );
+
+it('can recover the original take when decoding prevents every apply attempt', async () => {
+  io.encode.mockRejectedValue(new DOMException('decoder unavailable', 'EncodingError'));
+  const createUrl = vi.fn(() => 'blob:original-recovery');
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = createUrl;
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  await render();
+  await act(async () => button('Apply narration').click());
+  expect(apply).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  expect(document.querySelector('audio')).not.toBeNull();
+  const recovery = button('Download original recording');
+  expect(recovery).toBeDefined();
+  await act(async () => recovery.click());
+  expect(createUrl).toHaveBeenCalledWith(source);
+  expect(click).toHaveBeenCalledOnce();
+  expect(io.encode).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
+  click.mockRestore();
+});
+
+it('admits one download and ignores its failure after a confirmed new take', async () => {
+  let reject!: (reason: Error) => void;
+  const download = vi.spyOn(takeDownload, 'downloadRecordedTake').mockImplementation(
+    () =>
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      })
+  );
+  await render();
+  await act(async () => {
+    button('Download original recording').click();
+    button('Download original recording').click();
+  });
+  expect(download).toHaveBeenCalledOnce();
+  expect(download).toHaveBeenCalledWith(source);
+  act(() => button('Record again').click());
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+  await act(async () => button('Discard recording').click());
+  await act(async () => reject(new Error('old download failed')));
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+  expect(button('Download original recording').disabled).toBe(false);
+  download.mockRestore();
+});
