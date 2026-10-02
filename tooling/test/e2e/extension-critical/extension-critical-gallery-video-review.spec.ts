@@ -2831,6 +2831,16 @@ for (const variant of [
       await page.screenshot({
         path: testInfo.outputPath(`voiceover-take-${variant.locale}-${variant.theme}.png`),
       });
+      await expect(strip.locator('header')).toContainText(
+        translate('gallery.videoReview.recordVoiceover', variant.locale)
+      );
+      expect(await strip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true
+      );
+      await expect(strip.locator('footer')).toBeInViewport();
+      expect((await strip.locator('footer').boundingBox())!.y).toBeGreaterThan(
+        (await strip.locator('[data-ui="video-editor.audio-recording.playback"]').boundingBox())!.y
+      );
       const takeUrl = await strip.locator('audio').getAttribute('src');
       await strip
         .getByRole('button', {

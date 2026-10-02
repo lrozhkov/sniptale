@@ -8,7 +8,7 @@ import { formatDurationLabel } from '../../../composition/audio-recording/format
 import { renderAudioRecordingTrimPanel } from '../../../composition/audio-recording/dialog/trim';
 import { RecordingLevelMeter } from '../../../composition/audio-recording/dialog/level-meter';
 
-/** Transport and take review share one compact strip anchored to the recording interval. */
+/** Recording settings, transport and take actions remain in separate stable rows. */
 export function TimelineRecordingPanel(props: {
   titleId: string;
   startTime: number;
@@ -41,11 +41,11 @@ export function TimelineRecordingPanel(props: {
     </ProductActionButton>
   );
   const context = (
-    <div className="shrink-0 text-xs">
+    <div className="min-w-0 text-sm">
       <span id={props.titleId} className="font-medium">
         {translate('videoEditor.app.recordAudioVoiceover')}
       </span>
-      <span className="ml-2 tabular-nums text-[var(--sniptale-color-text-muted)]">
+      <span className="ml-2 inline-block text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
         {formatDurationLabel(props.startTime)}–
         {formatDurationLabel(props.startTime + props.duration)}
       </span>
@@ -62,17 +62,24 @@ export function TimelineRecordingPanel(props: {
     </ContentToolbarButton>
   );
   return (
-    <div className="grid gap-2 px-3 py-2" data-ui="video-editor.audio-recording.strip">
+    <div className="grid min-w-0 gap-3 p-4" data-ui="video-editor.audio-recording.strip">
+      <header className="flex min-h-9 items-center gap-3">
+        {context}
+        <div className="ml-auto shrink-0">{closeButton}</div>
+      </header>
       {!trim && (
         <>
-          <div className="flex min-h-9 items-center gap-2">
-            {context}
-            <div className="ml-auto">{closeButton}</div>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-40 min-w-0">{props.device}</div>
+          <div
+            className={[
+              'flex flex-wrap items-center gap-3 rounded-md border p-3',
+              'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
+            ].join(' ')}
+          >
+            <div className="w-44 min-w-0">{props.device}</div>
             {props.playbackChoice}
-            {props.durationOptions}
+            <div className="ml-auto">{props.durationOptions}</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3" role="status">
             <span
               className="whitespace-nowrap text-xs tabular-nums"
               data-ui="video-editor.audio-recording.limit"
@@ -95,7 +102,7 @@ export function TimelineRecordingPanel(props: {
                 )}
               </strong>
             </span>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
               {recording || paused ? (
                 <>
                   <ProductActionButton
@@ -125,19 +132,15 @@ export function TimelineRecordingPanel(props: {
         </>
       )}
       {trim && props.limitInvalid ? props.durationOptions : null}
-      {renderAudioRecordingTrimPanel(
-        trim,
-        busy,
-        true,
-        <>
-          {context}
+      {renderAudioRecordingTrimPanel(trim, busy, true)}
+      {trim && (
+        <footer className="flex flex-wrap justify-end gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
           {recordButton}
-          <ProductActionButton tone="secondary" disabled={busy} onClick={() => void props.onSave()}>
-            <Save size={16} />
+          <ProductActionButton tone="primary" disabled={busy} onClick={() => void props.onSave()}>
+            <Save size={16} aria-hidden="true" />
             {translate('videoEditor.app.recordAudioInsert')}
           </ProductActionButton>
-          {closeButton}
-        </>
+        </footer>
       )}
       {props.starting && (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">

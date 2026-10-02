@@ -3,6 +3,7 @@ import { useEffect, useState, type RefObject } from 'react';
 import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useAudioRecordingDialogSession } from '../../composition/audio-recording/dialog/controller';
 import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog-focus';
 import { AudioRecordingDeviceSelect } from '../../composition/audio-recording/dialog/controls';
@@ -120,23 +121,23 @@ export function ReviewVoiceoverRecording(props: {
         maxHeight="calc(100vh - 24px)"
         scrollable
       >
-        <div className="grid gap-2 px-3 py-2" data-ui="gallery.videoReview.voiceoverStrip">
-          <div className="flex flex-wrap items-center gap-2">
-            <span id={titleId} className="mr-auto text-sm font-medium">
+        <div className="grid min-w-0 gap-3 p-4" data-ui="gallery.videoReview.voiceoverStrip">
+          <header className="flex min-h-9 items-center gap-3">
+            <span id={titleId} className="mr-auto min-w-0 text-sm font-medium">
               {translate('gallery.videoReview.recordVoiceover')}
-              <span className="ml-2 tabular-nums text-[var(--sniptale-color-text-muted)]">
+              <span className="ml-2 inline-block text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
                 {formatDurationLabel(props.playhead)}–{formatDurationLabel(props.timelineDuration)}
               </span>
             </span>
-            <ProductActionButton
-              tone="secondary"
+            <ContentToolbarButton
+              className="!h-9 !w-9 !min-w-9 !px-0"
               disabled={isSaving}
               onClick={session.requestClose}
-              aria-label={translate('common.actions.close')}
+              title={translate('common.actions.close')}
             >
               <X size={16} aria-hidden="true" />
-            </ProductActionButton>
-          </div>
+            </ContentToolbarButton>
+          </header>
           {trim ? (
             <VoiceoverTakeReview
               session={session}
@@ -189,7 +190,7 @@ function VoiceoverCaptureOptions(props: {
   return (
     <div
       className={[
-        'flex flex-wrap items-center gap-2 rounded-md border p-2',
+        'flex flex-wrap items-center gap-3 rounded-md border p-3',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
     >
@@ -289,7 +290,7 @@ function VoiceoverTakeReview({
         session.isSaving || session.starting,
         true
       )}
-      <div className="flex flex-wrap justify-end gap-2">
+      <footer className="flex flex-wrap justify-end gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ProductActionButton
           tone="secondary"
           disabled={session.isSaving || session.starting || durationLimit.invalid || maximum <= 0}
@@ -306,7 +307,7 @@ function VoiceoverTakeReview({
           <Save size={16} aria-hidden="true" />
           {translate('videoEditor.app.recordAudioSave')}
         </ProductActionButton>
-      </div>
+      </footer>
     </>
   );
 }

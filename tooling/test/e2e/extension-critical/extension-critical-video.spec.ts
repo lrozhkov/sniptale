@@ -835,13 +835,32 @@ for (const variant of [
     await closeRecorder.click();
     await page.keyboard.press('Escape');
     await expect(confirmation).toHaveCount(0);
-    await closeRecorder.click();
-    await confirmation
+    await strip
       .getByRole('button', {
-        name: translate('videoEditor.app.recordAudioDiscard', variant.locale),
+        name: translate('videoEditor.app.recordAudioStop', variant.locale),
         exact: true,
       })
       .click();
+    const insert = strip.getByRole('button', {
+      name: translate('videoEditor.app.recordAudioInsert', variant.locale),
+      exact: true,
+    });
+    await expect(insert).toBeVisible();
+    await expect(closeRecorder).toBeVisible();
+    await expect(strip.locator('header')).toContainText('00:02');
+    expect(await strip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true
+    );
+    await expect(insert).toBeInViewport();
+    expect((await insert.boundingBox())!.y).toBeGreaterThan(
+      (await strip.locator('[data-ui="video-editor.audio-recording.playback"]').boundingBox())!.y
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`full-voiceover-take-${variant.locale}.png`),
+    });
+    await insert.focus();
+    await page.keyboard.press('Enter');
     await expect(strip).toHaveCount(0);
+    await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
   });
 }

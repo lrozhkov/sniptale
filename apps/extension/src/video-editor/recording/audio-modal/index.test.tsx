@@ -320,3 +320,34 @@ it.each(['close', 'Escape'])(
     expect(controller.reset).toHaveBeenCalledOnce();
   }
 );
+
+it('keeps recorded take context and apply actions separate from playback', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  document.body.append(host);
+  root = createRoot(host);
+  await act(async () =>
+    root.render(
+      <AudioRecordingModal
+        isOpen
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        timeline={{
+          startTime: 2,
+          duration: 20,
+          beforeStart: async () => undefined,
+          onStop: vi.fn(),
+        }}
+      />
+    )
+  );
+  const strip = document.querySelector('[data-ui="video-editor.audio-recording.strip"]')!;
+  const title = strip.querySelector('[id]')!;
+  const apply = [...strip.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('recordAudioInsert')
+  )!;
+  expect(title.closest('header')).not.toBeNull();
+  expect(apply.closest('footer')).not.toBeNull();
+  expect(apply.className).toContain('sniptale-color-accent');
+  expect(strip.querySelector('header')?.textContent).toContain('00:02–00:22');
+  expect(strip.querySelector('footer')?.textContent).toContain('recordAudioAgain');
+});
