@@ -422,3 +422,136 @@ it('deletes the media own quick-edit workspace together with its root', async ()
   expect(rows.get('media_library')?.has(mediaId)).toBe(false);
   expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
 });
+
+it('ignores unrelated invalid scenario metadata with a known disjoint project identity', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set('scenario_projects', new Map([['other', { id: 'other', invalid: true }]]));
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('scenario_projects')?.has('other')).toBe(true);
+});
+
+it('ignores invalid metadata on a scenario child with disjoint dependency locators', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set(
+    'scenario_assets',
+    new Map([
+      ['other', { id: 'other', assetId: 'other-physical', borrowedMediaId: 'other-library' }],
+    ])
+  );
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('scenario_assets')?.has('other')).toBe(true);
+});
+
+it('deletes its own invalid quick-edit sidecar without validating it as an external dependency', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set('video_workspaces', new Map([[mediaId, { aggregateId: mediaId, invalid: true }]]));
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
+});
+
+it('does not validate unrelated quick-edit rows for a stored image source', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set('video_workspaces', new Map([['other', { aggregateId: 'other', invalid: true }]]));
+  const media = {
+    ...mediaEntry(),
+    kind: 'image',
+    source: { kind: 'stored-asset', assetId: physicalId },
+  };
+  rows.get('media_library')!.set(mediaId, media);
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('video_workspaces')?.has('other')).toBe(true);
+});
+
+it('ignores unrelated video entry metadata only when its complete project document proves no use', async () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  entry.project.assets[0]!.source = { kind: 'project-asset', projectAssetId: 'other-source' };
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, { ...entry, updatedAt: 'invalid' });
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('video_projects')?.has(entry.id)).toBe(true);
+});
+
+it('refuses related invalid scenario children and retains every store', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set(
+    'scenario_assets',
+    new Map([['related', { id: 'related', assetId: physicalId, borrowedMediaId: mediaId }]])
+  );
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+    graphDomain: 'scenario-asset',
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+  expect(rows.get('asset_refs')?.has(physicalId)).toBe(true);
+});
+
+it('refuses ambiguous scenario dependency locators', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set(
+    'scenario_assets',
+    new Map([['unknown', { id: 'unknown', assetId: physicalId, borrowedMediaId: 42 }]])
+  );
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+    graphDomain: 'scenario-asset',
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+});
+
+it('refuses invalid video metadata when the domain document references the selected media', async () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  rows.get('video_projects')!.set(entry.id, { ...entry, updatedAt: 'invalid' });
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+    graphDomain: 'video-project',
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+});
+
+it('refuses a related invalid scenario root', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set(
+    'scenario_assets',
+    new Map([
+      [
+        'child',
+        {
+          id: 'child',
+          assetId: physicalId,
+          projectId: 'related',
+          galleryAssetId: mediaId,
+          borrowedMediaId: mediaId,
+          mimeType: 'image/png',
+          width: 100,
+          height: 100,
+          size: 5,
+          createdAt: 1,
+        },
+      ],
+    ])
+  );
+  rows.set('scenario_projects', new Map([['related', { id: 'related', invalid: true }]]));
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+    graphDomain: 'scenario-project',
+  });
+  expect(rows.get('scenario_assets')?.has('child')).toBe(true);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+});
+
+it('retains a stored image used by an invalid child with legacy empty borrowing', async () => {
+  rows.get('video_projects')!.clear();
+  rows
+    .get('media_library')!
+    .set(mediaId, { ...mediaEntry(), source: { kind: 'stored-asset', assetId: physicalId } });
+  rows.set(
+    'scenario_assets',
+    new Map([['related', { id: 'related', assetId: physicalId, borrowedMediaId: '' }]])
+  );
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+    graphDomain: 'scenario-asset',
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+});

@@ -79,6 +79,18 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
 function describeActionFailure(error: unknown): { code: string; message: string } {
   if (error instanceof MediaLibraryDeleteError) error = error.cause;
   if (error instanceof MediaAssetDeletionBlockedError) {
+    if (error.reason === 'invalid-graph' && error.graphDomain) {
+      const messages = {
+        'video-project': 'gallery.app.deleteInvalidVideoProject',
+        'scenario-project': 'gallery.app.deleteInvalidScenarioProject',
+        'scenario-asset': 'gallery.app.deleteInvalidScenarioAsset',
+        'quick-edit': 'gallery.app.deleteInvalidQuickEdit',
+      } as const;
+      return {
+        code: `invalid-graph:${error.graphDomain}`,
+        message: translate(messages[error.graphDomain]),
+      };
+    }
     const messages = {
       'scenario-busy': 'gallery.app.deleteScenarioBusy',
       'invalid-graph': 'gallery.app.deleteInvalidGraph',

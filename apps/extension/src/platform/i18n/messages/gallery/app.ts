@@ -78,6 +78,22 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Не удалось проверить сохранённые связи проектов. Материал сохранён. Проверьте доступность проектов перед повторным удалением.',
     en: 'Stored project references could not be verified. The item is retained. Check that the projects are available before retrying deletion.',
   },
+  deleteInvalidVideoProject: {
+    ru: 'Удаление остановлено: не удалось проверить данные видеопроекта и его связь с файлом. Файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: a video project and its file references could not be verified. The file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteInvalidScenarioProject: {
+    ru: 'Удаление остановлено: данные связанного сценария не прошли проверку. Файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: a linked scenario did not pass validation. The file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteInvalidScenarioAsset: {
+    ru: 'Удаление остановлено: не удалось проверить ресурс сценария и его связь с файлом. Файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: a scenario resource and its file reference could not be verified. The file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteInvalidQuickEdit: {
+    ru: 'Удаление остановлено: не удалось проверить данные быстрого редактирования другого файла. Удаляемый файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: another file’s quick-edit data could not be verified. The selected file is retained. Refreshing the library will not repair this record.',
+  },
   deleteSourceUnavailable: {
     ru: 'Исходные данные файла недоступны. Не удалось завершить удаление; обновите библиотеку и повторите попытку.',
     en: 'The original file data is unavailable. Deletion could not finish; refresh the library and retry.',

@@ -14,6 +14,12 @@ export class PrimaryMediaAssetDeleteError extends Error {
   }
 }
 
+export type MediaAssetGraphDomain =
+  | 'video-project'
+  | 'scenario-project'
+  | 'scenario-asset'
+  | 'quick-edit';
+
 /** Expected deletion refusals expose fixed codes rather than persistence or source details. */
 export class MediaAssetDeletionBlockedError extends Error {
   constructor(
@@ -22,7 +28,8 @@ export class MediaAssetDeletionBlockedError extends Error {
       | 'invalid-graph'
       | 'source-unavailable'
       | 'unsupported-source'
-      | 'pending-publication'
+      | 'pending-publication',
+    readonly graphDomain?: MediaAssetGraphDomain
   ) {
     super('Media deletion is blocked.');
     this.name = 'MediaAssetDeletionBlockedError';

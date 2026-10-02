@@ -141,3 +141,29 @@ it.each([
   });
   expect(JSON.stringify(warn.mock.calls)).not.toContain('private-id');
 });
+
+it.each([
+  ['video-project', 'gallery.app.deleteInvalidVideoProject'],
+  ['scenario-project', 'gallery.app.deleteInvalidScenarioProject'],
+  ['scenario-asset', 'gallery.app.deleteInvalidScenarioAsset'],
+  ['quick-edit', 'gallery.app.deleteInvalidQuickEdit'],
+] as const)(
+  'identifies the invalid graph domain %s without exposing record details',
+  async (domain, messageKey) => {
+    const { controller } = createController();
+    await createBusyActionRunner(controller)(async () => {
+      throw new MediaLibraryDeleteError(
+        'private-id',
+        'linked-source-cleanup',
+        new MediaAssetDeletionBlockedError('invalid-graph', domain)
+      );
+    });
+    expect(controller.state.storage.banner).toBe(translate(messageKey));
+    expect(warn).toHaveBeenCalledWith('gallery-action-failed', {
+      code: `invalid-graph:${domain}`,
+      stage: 'gallery-action',
+      materialType: 'unspecified',
+    });
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('private-id');
+  }
+);

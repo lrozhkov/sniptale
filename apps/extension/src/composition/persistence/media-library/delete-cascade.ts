@@ -1,9 +1,12 @@
 import {
   MediaAssetDeletionBlockedError,
+  type MediaAssetGraphDomain,
   PrimaryMediaAssetDeleteError,
   StaleMediaAssetDeletePreviewError,
 } from './deletion-errors';
 export { StaleMediaAssetDeletePreviewError } from './deletion-errors';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { parseHydratableVideoProject } from '../../../features/video/project/validation';
 import type { VideoProjectAssetSource } from '../../../features/video/project/types';
 import { removeVideoProjectLibrarySources } from '../../../features/video/project/library-source-removal';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -130,9 +133,56 @@ async function withScenarioLocks(
   if (result === undefined) throw new MediaAssetDeletionBlockedError('scenario-busy');
 }
 
-function requireVerifiedGraphEntries<T>(entries: readonly (T | null)[]): T[] {
-  if (entries.some((entry) => !entry)) throw new MediaAssetDeletionBlockedError('invalid-graph');
-  return entries.filter((entry): entry is T => entry !== null);
+function requireVerifiedGraphEntries<T>(
+  raw: readonly unknown[],
+  parse: (value: unknown) => T | null,
+  domain: MediaAssetGraphDomain,
+  proveUnrelated: (value: unknown) => boolean
+): T[] {
+  const verified: T[] = [];
+  for (const value of raw) {
+    const entry = parse(value);
+    if (entry) verified.push(entry);
+    else if (!proveUnrelated(value))
+      throw new MediaAssetDeletionBlockedError('invalid-graph', domain);
+  }
+  return verified;
+}
+
+function scenarioChildIsUnrelated(value: unknown, media: MediaLibraryEntry): boolean {
+  if (
+    !isRecord(value) ||
+    typeof value['id'] !== 'string' ||
+    typeof value['assetId'] !== 'string' ||
+    (value['borrowedMediaId'] !== undefined && typeof value['borrowedMediaId'] !== 'string')
+  )
+    return false;
+  if (value['borrowedMediaId'] === media.id) return false;
+  return !(
+    media.source.kind === 'stored-asset' &&
+    !value['borrowedMediaId'] &&
+    value['assetId'] === media.source.assetId &&
+    (!media.id.startsWith('scenario-asset:') ||
+      value['id'] === media.id.slice('scenario-asset:'.length))
+  );
+}
+
+function videoEntryIsUnrelated(
+  value: unknown,
+  media: MediaLibraryEntry,
+  scenarioChildIds: ReadonlySet<string>
+): boolean {
+  if (!isRecord(value)) return false;
+  const project = parseHydratableVideoProject(value['project']);
+  if (!project) return false;
+  if (
+    media.source.kind === 'recording' &&
+    (project.baseRecordingId === media.source.recordingId ||
+      (project.source.kind === 'recording' &&
+        project.source.recordingId === media.source.recordingId))
+  )
+    return false;
+  return !project.assets.some((asset) => videoSourceMatches(asset.source, media, scenarioChildIds));
 }
 
 async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
@@ -150,10 +200,12 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
     tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
     tx.objectStore(VIDEO_WORKSPACES_STORE).getAll(),
   ]);
-  const videos = requireVerifiedGraphEntries(rawVideo.map(parseVideoProjectEntry));
-  const scenarios = requireVerifiedGraphEntries(rawScenario.map(parseScenarioProjectEntry));
-  const children = requireVerifiedGraphEntries(rawChildren.map(parseScenarioAssetEntry));
-  const reviews = requireVerifiedGraphEntries(rawReview.map(parseVideoWorkspace));
+  const children = requireVerifiedGraphEntries(
+    rawChildren,
+    parseScenarioAssetEntry,
+    'scenario-asset',
+    (value) => scenarioChildIsUnrelated(value, media)
+  );
   const scenarioChildren = children.filter(
     (child) =>
       child.borrowedMediaId === mediaId ||
@@ -163,6 +215,30 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
         (!mediaId.startsWith('scenario-asset:') ||
           child.id === mediaId.slice('scenario-asset:'.length)))
   );
+  const scenarioChildIds = new Set(scenarioChildren.map((child) => child.id));
+  const scenarioIds = new Set(scenarioChildren.map((child) => child.projectId));
+  const videos = requireVerifiedGraphEntries(
+    rawVideo,
+    parseVideoProjectEntry,
+    'video-project',
+    (value) => videoEntryIsUnrelated(value, media, scenarioChildIds)
+  );
+  const scenarios = requireVerifiedGraphEntries(
+    rawScenario,
+    parseScenarioProjectEntry,
+    'scenario-project',
+    (value) => isRecord(value) && typeof value['id'] === 'string' && !scenarioIds.has(value['id'])
+  );
+  // Auxiliary review references admit only project-assets; the root's own sidecar is purged.
+  const reviews =
+    media.source.kind === 'project-asset'
+      ? requireVerifiedGraphEntries(
+          rawReview.filter((value) => !isRecord(value) || value['aggregateId'] !== media.id),
+          parseVideoWorkspace,
+          'quick-edit',
+          () => false
+        )
+      : [];
   return { media, videos, scenarios, scenarioChildren, reviews };
 }
 
