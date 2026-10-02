@@ -1,7 +1,6 @@
 import { mountStyleInAccessibleDocuments, walkAllDocuments } from '../../platform/frame';
 import {
   QUICK_EDIT_CURSOR_STYLE_ID,
-  QUICK_EDIT_CURSOR_URL,
   QUICK_EDIT_DOCUMENT_MODE_BODY_CLASS,
   QUICK_EDIT_TEXT_CURSOR_BODY_CLASS,
 } from './style.constants';
@@ -14,7 +13,7 @@ function mountQuickEditCursorStyle(): () => void {
     textContent: `
     body,
     body * {
-      cursor: ${QUICK_EDIT_CURSOR_URL} !important;
+      cursor: default !important;
     }
     body {
       user-select: none !important;

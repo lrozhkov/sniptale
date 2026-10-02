@@ -98,7 +98,8 @@ describe('quick edit cursor enablement', () => {
     document.head.append(style);
     document.body.append(paragraph, toolbar);
 
-    expect(getComputedStyle(paragraph).cursor).toContain('url(');
+    expect(stylesheet).not.toContain('data:image');
+    expect(getComputedStyle(paragraph).cursor).toBe('default');
 
     document.body.classList.add('sniptale-quick-edit-document-mode');
 

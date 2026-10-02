@@ -29,6 +29,11 @@ export function handleQuickEditOutsideClick(
   for (const element of elements) {
     options.finishEditing(element);
   }
+  // Keep the new editing target active before mouseup can hit the restored input shield.
+  if (event.button === 0 && isQuickEditTextTarget(target)) {
+    options.makeElementEditable(target);
+    options.hideHoverOverlay();
+  }
 }
 
 export function handleQuickEditMouseLeave(options: QuickEditRuntimeEventOptions): void {

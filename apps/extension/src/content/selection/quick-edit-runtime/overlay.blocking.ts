@@ -30,9 +30,7 @@ export function ensureQuickEditBlockingOverlay(state: QuickEditOverlayState): vo
     border-radius: 0;
     pointer-events: none;
     display: none;
-    box-shadow:
-      0 0 8px color-mix(in srgb, var(--sniptale-color-info) 24%, transparent),
-      0 0 16px color-mix(in srgb, var(--sniptale-color-info) 12%, transparent);
+    box-shadow: none;
   `;
 
   blockingOverlay.appendChild(activeFrameOverlay);

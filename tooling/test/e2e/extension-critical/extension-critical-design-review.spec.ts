@@ -310,3 +310,53 @@ test('Reset All becomes available after a real Design Review change at HD', asyn
   await popup.close();
   await page.close();
 });
+
+test('content block editing switches on one click and preserves committed text', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}, testInfo) => {
+  const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
+  await page.evaluate(() => {
+    for (const [index, label] of ['Alpha', 'Beta', 'Gamma'].entries()) {
+      const block = document.createElement('p');
+      block.id = `quick-edit-block-${index}`;
+      block.textContent = label;
+      block.style.cssText = `position:absolute;left:600px;top:${300 + index * 90}px;width:200px;height:40px`;
+      document.body.append(block);
+    }
+  });
+  await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  await page.locator('[data-ui="content.toolbar.mode-option.quick-edit"]').click();
+  await expect(page.locator('#quick-edit-block-0')).toHaveCSS('cursor', 'default');
+  for (let index = 0; index < 3; index += 1) {
+    const block = page.locator(`#quick-edit-block-${index}`);
+    const bounds = (await block.boundingBox())!;
+    await page.mouse.click(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await expect(block).toHaveAttribute('contenteditable', 'true');
+    await expect(block).toHaveCSS('cursor', 'text');
+    const activeFrame = page.locator('.sniptale-quick-edit-active-frame');
+    await expect(activeFrame).toHaveCSS('border-top-width', '1px');
+    await expect(activeFrame).toHaveCSS('box-shadow', 'none');
+    await block.fill(`Edited ${index}`);
+    await page.mouse.click(bounds.x + 25, bounds.y + 12);
+    await expect(block).toHaveAttribute('contenteditable', 'true');
+    if (index > 0) {
+      const previous = page.locator(`#quick-edit-block-${index - 1}`);
+      await expect(previous).not.toHaveAttribute('contenteditable', 'true');
+      await expect(previous).toHaveText(`Edited ${index - 1}`);
+    }
+  }
+  await page.screenshot({ path: testInfo.outputPath('content-editing-thin-frame.png') });
+  await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+  await page.locator('[data-ui="content.toolbar.mode-option.cursor"]').click();
+  for (let index = 0; index < 3; index += 1) {
+    await expect(page.locator(`#quick-edit-block-${index}`)).toHaveText(`Edited ${index}`);
+    await expect(page.locator(`#quick-edit-block-${index}`)).not.toHaveAttribute(
+      'contenteditable',
+      'true'
+    );
+  }
+  await popup.close();
+  await page.close();
+});

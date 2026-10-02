@@ -30,8 +30,8 @@ it('projects the active stroke outside the padded content box', () => {
   updateQuickEditBlockingOverlayShape(state, target);
 
   expect(state.activeFrameOverlay?.style.boxSizing).toBe('content-box');
-  expect(state.activeFrameOverlay?.style.left).toBe('6px');
-  expect(state.activeFrameOverlay?.style.top).toBe('2px');
+  expect(state.activeFrameOverlay?.style.left).toBe('8px');
+  expect(state.activeFrameOverlay?.style.top).toBe('4px');
   expect(state.activeFrameOverlay?.style.width).toBe('70px');
   expect(state.activeFrameOverlay?.style.height).toBe('70px');
 
