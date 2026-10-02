@@ -555,3 +555,108 @@ it('retains a stored image used by an invalid child with legacy empty borrowing'
   });
   expect(rows.get('media_library')?.has(mediaId)).toBe(true);
 });
+
+it.each(['timeline', 'effects', 'asset metadata'] as const)(
+  'ignores disjoint video %s failures while preserving the project record',
+  async (failure) => {
+    const entry = createVideoProjectEntryWithMediaClip();
+    entry.project.assets[0]!.source = { kind: 'project-asset', projectAssetId: 'other-source' };
+    const project = {
+      ...entry.project,
+      ...(failure === 'timeline' ? { tracks: 'invalid' } : {}),
+      ...(failure === 'effects' ? { effectSnapshots: 'invalid' } : {}),
+      ...(failure === 'asset metadata'
+        ? {
+            assets: entry.project.assets.map((asset) => ({
+              ...asset,
+              metadata: { ...asset.metadata, width: -1 },
+            })),
+          }
+        : {}),
+    };
+    rows.get('video_projects')!.clear();
+    const invalid = { ...entry, project };
+    rows.get('video_projects')!.set(entry.id, invalid);
+    await deleteMediaAssetWithProjectCascade(mediaId, []);
+    expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+    expect(rows.get('video_projects')?.get(entry.id)).toEqual(invalid);
+  }
+);
+
+it.each([
+  { kind: 'library-asset', mediaId: 'other' },
+  { kind: 'recording', recordingId: 'other' },
+  { kind: 'project-asset', projectAssetId: 'other' },
+  { kind: 'scenario-asset', scenarioAssetId: 'other' },
+])('checks disjoint source identities despite invalid effects: %j', async (source) => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const project = {
+    ...entry.project,
+    effectSnapshots: 'invalid',
+    assets: entry.project.assets.map((asset) => ({ ...asset, source })),
+  };
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, { ...entry, project });
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+});
+
+it.each([
+  { version: 1 },
+  { templateInstances: [] },
+  { assets: null },
+  { assets: [null] },
+  { assets: [{ source: { kind: 'unknown', mediaId } }] },
+  { assets: [{ source: { kind: 'library-asset' } }] },
+  { source: { kind: 'unknown' } },
+  { source: { kind: 'recording' } },
+  { source: { kind: 'scenario' } },
+  { baseRecordingId: [] },
+])('retains media when the video dependency envelope is ambiguous: %j', async (changes) => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  rows
+    .get('video_projects')!
+    .set(entry.id, { ...entry, project: { ...entry.project, ...changes } });
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+    graphDomain: 'video-project',
+  });
+  expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+});
+
+it.each(['base', 'origin'] as const)(
+  'protects a recording used by an invalid project %s source',
+  async (primary) => {
+    const entry = createVideoProjectEntryWithMediaClip();
+    const project = {
+      ...entry.project,
+      effectSnapshots: 'invalid',
+      assets: [],
+      baseRecordingId: primary === 'base' ? 'required' : null,
+      source:
+        primary === 'origin' ? { kind: 'recording', recordingId: 'required' } : { kind: 'manual' },
+    };
+    rows
+      .get('media_library')!
+      .set(mediaId, { ...mediaEntry(), source: { kind: 'recording', recordingId: 'required' } });
+    rows.get('video_projects')!.clear();
+    rows.get('video_projects')!.set(entry.id, { ...entry, project });
+    await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+      reason: 'invalid-graph',
+      graphDomain: 'video-project',
+    });
+    expect(rows.get('media_library')?.has(mediaId)).toBe(true);
+  }
+);
+
+it.each([
+  { kind: 'recording', recordingId: 'other' },
+  { kind: 'scenario', scenarioProjectId: 'other' },
+])('accepts a disjoint project origin: %j', async (source) => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const project = { ...entry.project, source, assets: [], effectSnapshots: 'invalid' };
+  rows.get('video_projects')!.clear();
+  rows.get('video_projects')!.set(entry.id, { ...entry, project });
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+});

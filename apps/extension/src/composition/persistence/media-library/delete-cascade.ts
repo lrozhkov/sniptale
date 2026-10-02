@@ -6,8 +6,10 @@ import {
 } from './deletion-errors';
 export { StaleMediaAssetDeletePreviewError } from './deletion-errors';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { parseHydratableVideoProject } from '../../../features/video/project/validation';
-import type { VideoProjectAssetSource } from '../../../features/video/project/types';
+import type {
+  VideoProjectAssetSource,
+  VideoProjectSource,
+} from '../../../features/video/project/types';
 import { removeVideoProjectLibrarySources } from '../../../features/video/project/library-source-removal';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
@@ -167,22 +169,77 @@ function scenarioChildIsUnrelated(value: unknown, media: MediaLibraryEntry): boo
   );
 }
 
+function parseVideoDependencySource(value: unknown): VideoProjectAssetSource | null {
+  if (!isRecord(value)) return null;
+  if (value['kind'] === 'library-asset' && typeof value['mediaId'] === 'string' && value['mediaId'])
+    return { kind: 'library-asset', mediaId: value['mediaId'] };
+  if (
+    value['kind'] === 'recording' &&
+    typeof value['recordingId'] === 'string' &&
+    value['recordingId']
+  )
+    return { kind: 'recording', recordingId: value['recordingId'] };
+  if (
+    value['kind'] === 'project-asset' &&
+    typeof value['projectAssetId'] === 'string' &&
+    value['projectAssetId']
+  )
+    return { kind: 'project-asset', projectAssetId: value['projectAssetId'] };
+  if (
+    value['kind'] === 'scenario-asset' &&
+    typeof value['scenarioAssetId'] === 'string' &&
+    value['scenarioAssetId']
+  )
+    return { kind: 'scenario-asset', scenarioAssetId: value['scenarioAssetId'] };
+  return null;
+}
+
+function parseVideoDependencyOrigin(value: unknown): VideoProjectSource | null {
+  if (!isRecord(value)) return null;
+  if (value['kind'] === 'manual') return { kind: 'manual' };
+  if (
+    value['kind'] === 'recording' &&
+    typeof value['recordingId'] === 'string' &&
+    value['recordingId']
+  )
+    return { kind: 'recording', recordingId: value['recordingId'] };
+  if (
+    value['kind'] === 'scenario' &&
+    typeof value['scenarioProjectId'] === 'string' &&
+    value['scenarioProjectId']
+  )
+    return { kind: 'scenario', scenarioProjectId: value['scenarioProjectId'] };
+  return null;
+}
+
 function videoEntryIsUnrelated(
   value: unknown,
   media: MediaLibraryEntry,
   scenarioChildIds: ReadonlySet<string>
 ): boolean {
-  if (!isRecord(value)) return false;
-  const project = parseHydratableVideoProject(value['project']);
-  if (!project) return false;
+  if (!isRecord(value) || !isRecord(value['project'])) return false;
+  const project = value['project'];
   if (
-    media.source.kind === 'recording' &&
-    (project.baseRecordingId === media.source.recordingId ||
-      (project.source.kind === 'recording' &&
-        project.source.recordingId === media.source.recordingId))
+    project['version'] !== 2 ||
+    Object.hasOwn(project, 'templateInstances') ||
+    !Array.isArray(project['assets']) ||
+    !(project['baseRecordingId'] === null || typeof project['baseRecordingId'] === 'string')
   )
     return false;
-  return !project.assets.some((asset) => videoSourceMatches(asset.source, media, scenarioChildIds));
+  const origin = parseVideoDependencyOrigin(project['source']);
+  if (!origin) return false;
+  if (
+    media.source.kind === 'recording' &&
+    (project['baseRecordingId'] === media.source.recordingId ||
+      (origin.kind === 'recording' && origin.recordingId === media.source.recordingId))
+  )
+    return false;
+  for (const asset of project['assets']) {
+    if (!isRecord(asset)) return false;
+    const source = parseVideoDependencySource(asset['source']);
+    if (!source || videoSourceMatches(source, media, scenarioChildIds)) return false;
+  }
+  return true;
 }
 
 async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
