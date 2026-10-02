@@ -274,9 +274,11 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
   } catch {
     return null;
   }
-  if (containsEmbeddedBinary(value)) return null;
+  const { displayName: _displayName, ...assetMetadata } = value;
+  if (containsEmbeddedBinary(assetMetadata)) return null;
   if (
     !(value['sourceName'] === null || isString(value['sourceName'])) ||
+    (value['displayName'] !== undefined && !isString(value['displayName'])) ||
     !isNumber(value['sourceWidth']) ||
     !isNumber(value['sourceHeight']) ||
     !isNumber(value['canvasWidth']) ||
@@ -300,6 +302,7 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
     version: 3,
     sourceImage: { assetId: sourceImage.assetId },
     sourceName: value['sourceName'],
+    ...(value['displayName'] === undefined ? {} : { displayName: value['displayName'] }),
     sourceWidth: value['sourceWidth'],
     sourceHeight: value['sourceHeight'],
     canvasWidth: value['canvasWidth'],

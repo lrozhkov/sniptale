@@ -35,7 +35,7 @@ async function persistEditorSessionDocument(args: {
       document: args.document,
       expectedRevision: args.context.durableRevision,
       sourceUrl: args.context.sourceUrl,
-      sourceTitle: args.context.sourceTitle,
+      sourceTitle: args.document.displayName ?? args.context.sourceTitle,
       reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
     });
 

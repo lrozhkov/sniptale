@@ -102,6 +102,8 @@ interface EditorDocumentVersion2 {
   version: 2;
   sourceImageData: string;
   sourceName: string | null;
+  /** Editable document caption; legacy workspaces retain their aggregate caption. */
+  displayName?: string;
   sourceWidth: number;
   sourceHeight: number;
   canvasWidth: number;

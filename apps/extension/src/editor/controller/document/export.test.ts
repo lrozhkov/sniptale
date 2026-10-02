@@ -352,3 +352,11 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(canvas.renderAll).not.toHaveBeenCalled();
   });
 });
+
+it('serializes the editable caption separately from the source name', () => {
+  const { options } = createEditorCanvasDocumentOptions();
+  const before = buildEditorCanvasDocument(options);
+  const renamed = buildEditorCanvasDocument({ ...options, displayName: 'Renamed image' });
+  expect(renamed).toEqual({ ...before, displayName: 'Renamed image' });
+  expect(renamed.sourceName).toBe(before.sourceName);
+});

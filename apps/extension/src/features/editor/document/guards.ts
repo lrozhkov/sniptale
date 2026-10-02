@@ -117,6 +117,7 @@ export function isEditorDocument(value: unknown): value is EditorDocument {
     value['version'] === 2 &&
     isImageDataUrl(value['sourceImageData']) &&
     isNullableString(value['sourceName']) &&
+    (value['displayName'] === undefined || isString(value['displayName'])) &&
     isNumber(value['sourceWidth']) &&
     isNumber(value['sourceHeight']) &&
     isNumber(value['canvasWidth']) &&

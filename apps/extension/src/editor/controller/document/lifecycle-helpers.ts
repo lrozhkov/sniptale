@@ -20,6 +20,8 @@ function syncPreparedEditorDocumentStore(
     canvasObjects
   );
 
+  if (prepared.normalizedDocument.displayName !== undefined)
+    store.setPageTitle(prepared.normalizedDocument.displayName);
   store.updateFrame(prepared.frame);
   store.setBrowserFrame(prepared.browserFrame);
   if (nextStepValue !== store.toolSettings.step.value) {
@@ -64,12 +66,16 @@ export function applyPreparedEditorDocumentState(options: {
   setActiveTool(syncPreparedEditorDocumentStore(prepared, canvasObjects));
   applyToolMode();
 
+  const document = {
+    ...prepared.normalizedDocument,
+    displayName: prepared.normalizedDocument.displayName ?? useEditorStore.getState().pageTitle,
+  };
   if (applyOptions.updateOriginal) {
-    setOriginalDocument(prepared.normalizedDocument);
+    setOriginalDocument(document);
   }
 
   if (applyOptions.resetHistory || !hasHistory) {
-    setHistory(prepared.normalizedDocument);
+    setHistory(document);
   }
 }
 

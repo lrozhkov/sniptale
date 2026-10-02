@@ -112,3 +112,13 @@ it('defaults omitted legacy blur metadata and rejects values outside the editor 
     })
   ).toBeNull();
 });
+
+it('accepts legacy captions and validates an optional editable caption', () => {
+  const document = createPersistedDocument();
+  expect(parsePersistedEditorDocument(document)).toEqual(document);
+  expect(parsePersistedEditorDocument({ ...document, displayName: 'Схема.png' })?.displayName).toBe(
+    'Схема.png'
+  );
+  for (const displayName of [null, 42, {}, []])
+    expect(parsePersistedEditorDocument({ ...document, displayName })).toBeNull();
+});

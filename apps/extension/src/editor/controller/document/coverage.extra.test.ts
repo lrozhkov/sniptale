@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storeState = {
   activeTool: 'select',
+  pageTitle: 'Stored title',
   browserFrame: { title: 'Stored title', url: 'https://stored.example' },
   frame: {
     ...DEFAULT_EDITOR_FRAME_SETTINGS,
@@ -149,8 +150,14 @@ function registerPreparedStateApplyTest() {
     expect(storeState.updateFrame).toHaveBeenCalledWith(options.prepared.frame);
     expect(storeState.setBrowserFrame).toHaveBeenCalledWith(options.prepared.browserFrame);
     expect(storeState.updateStepSettings).toHaveBeenCalledWith({ value: '1' });
-    expect(options.setOriginalDocument).toHaveBeenCalledWith(options.prepared.normalizedDocument);
-    expect(options.setHistory).toHaveBeenCalledWith(options.prepared.normalizedDocument);
+    expect(options.setOriginalDocument).toHaveBeenCalledWith({
+      ...options.prepared.normalizedDocument,
+      displayName: 'Stored title',
+    });
+    expect(options.setHistory).toHaveBeenCalledWith({
+      ...options.prepared.normalizedDocument,
+      displayName: 'Stored title',
+    });
     expect(options.setCropState).toHaveBeenCalledWith(null, null);
     expect(options.setActiveTool).toHaveBeenCalledWith('select');
     expect(options.applyToolMode).toHaveBeenCalledOnce();

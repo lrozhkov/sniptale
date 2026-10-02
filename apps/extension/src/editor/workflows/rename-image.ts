@@ -1,9 +1,15 @@
 import type { ImageEditorController } from '../controller';
+import { runEditorDocumentTransition } from '../controller/history/transition-queue';
 import { useEditorStore } from '../state/useEditorStore';
 
-/** Commits the display/export name through the active image autosave owner. */
+type RenameImageController = Pick<
+  ImageEditorController,
+  'autosaveService' | 'exportDocument' | 'canvas' | 'history' | 'commitHistory'
+>;
+
+/** Persists one caption edit, then commits it in the same history order as undo and redo. */
 export async function renameEditorImage(
-  controller: Pick<ImageEditorController, 'autosaveService' | 'exportDocument'>,
+  controller: RenameImageController,
   aggregateId: string | null,
   name: string
 ): Promise<void> {
@@ -12,19 +18,20 @@ export async function renameEditorImage(
   if (!title || store.sessionId !== aggregateId || title === store.pageTitle) return;
   const autosave = controller.autosaveService;
   if (!aggregateId || !autosave) throw new Error('Image autosave is unavailable.');
-  const previousTitle = store.pageTitle;
   let current = true;
   const unsubscribe = useEditorStore.subscribe((next) => {
     if (next.sessionId !== aggregateId) current = false;
   });
   const isCurrent = () => current && useEditorStore.getState().sessionId === aggregateId;
-  autosave.updateContext({ sourceTitle: title });
   try {
-    await autosave.saveNow(() => controller.exportDocument());
-    if (isCurrent()) useEditorStore.getState().setPageTitle(title);
-  } catch (error) {
-    if (isCurrent()) autosave.updateContext({ sourceTitle: previousTitle });
-    throw error;
+    await runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
+      if (!isCurrent() || title === useEditorStore.getState().pageTitle) return;
+      await autosave.saveNow(() => ({ ...controller.exportDocument(), displayName: title }));
+      if (isCurrent()) {
+        useEditorStore.getState().setPageTitle(title);
+        controller.commitHistory();
+      }
+    });
   } finally {
     unsubscribe();
   }

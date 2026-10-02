@@ -11,7 +11,7 @@ function createController() {
     clearSelection: vi.fn(),
     clearCropSelection: vi.fn(),
     commitHistory: vi.fn(),
-    autosaveService: { scheduleAutosave: vi.fn() },
+    autosaveService: { scheduleAutosave: vi.fn(), updateContext: vi.fn() },
     cropGuide: { id: 'guide' },
     cropSelection: { id: 'selection' },
     drawSession: { id: 'draw' },
@@ -158,5 +158,15 @@ describe('editor-controller public api bindings', () => {
 
     expect(() => prepareObject(object as never)).not.toThrow();
     expect(preparedObjects).toEqual([object]);
+  });
+});
+
+it('publishes a restored caption in the autosave document snapshot', () => {
+  const controller = createController();
+  const adapter = createEditorControllerPublicApiAdapter(controller as never);
+  adapter.publishHistoryDocument({ displayName: 'Restored.png' } as never);
+  expect(controller.autosaveService.updateContext).not.toHaveBeenCalled();
+  expect(controller.autosaveService.scheduleAutosave).toHaveBeenCalledWith({
+    displayName: 'Restored.png',
   });
 });

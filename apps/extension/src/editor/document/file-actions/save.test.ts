@@ -20,7 +20,7 @@ const controller = {
 
 function createEditorDocument() {
   return {
-    version: 1 as const,
+    version: 2 as const,
     sourceImageData: 'data:image/png;base64,doc',
     sourceName: null,
     sourceWidth: 320,
@@ -129,7 +129,7 @@ it('uses execute-save for explicit save-as actions and keeps the save contract s
   expect(mockSendRuntimeMessage).toHaveBeenCalledWith({
     actionType: 'ask_system',
     dataUrl: 'data:image/png;base64,abc',
-    filename: 'edited.png',
+    filename: 'edited.webp',
     presetId: undefined,
     type: MessageType.EXECUTE_SAVE,
   });
@@ -214,15 +214,36 @@ it.each(['/editor', '/editor?embed=scenario'])(
   }
 );
 
-it('supplies the current image title to configured filename rules while retaining explicit names', async () => {
+it('uses the current image caption while retaining explicit Save As names', async () => {
   useEditorStore.getState().setPageTitle('Renamed image');
   mockLoadSettings.mockResolvedValue({ filenameRules: { template: '{title}' } });
   await editorFileSave.saveEditorRenderedImage(controller);
   expect(mockSendRuntimeMessage).toHaveBeenLastCalledWith(
-    expect.objectContaining({ filename: 'Renamed image_edited.webp' })
+    expect.objectContaining({ filename: 'Renamed image.webp' })
   );
   await editorFileSave.saveEditorRenderedImage(controller, { filename: 'Explicit.webp' });
   expect(mockSendRuntimeMessage).toHaveBeenLastCalledWith(
     expect.objectContaining({ filename: 'Explicit.webp' })
   );
 });
+
+it.each(['download_default', 'ask_system'] as const)(
+  'proposes safe caption names with the actual image extension for %s',
+  async (actionType) => {
+    for (const [title, format, expected] of [
+      ['  Схема.png  ', 'jpeg', 'Схема.jpg'],
+      ['Illustration.jpg', 'png', 'Illustration.png'],
+      ['Nested/path.webp', 'webp', 'Nested_path.webp'],
+    ]) {
+      useEditorStore.getState().setPageTitle(title!);
+      mockLoadEditorExportSettings.mockResolvedValue({ imageFormat: format, imageQuality: 0.92 });
+      await editorFileSave.saveEditorRenderedImage(controller, { actionType });
+      expect(mockSendRuntimeMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          actionType,
+          filename: expected,
+        })
+      );
+    }
+  }
+);

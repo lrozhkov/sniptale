@@ -30,6 +30,7 @@ export function buildEditorCanvasDocument(options: {
   canvasDocumentSize: { width: number; height: number };
   frame: EditorFrameSettings;
   browserFrame: BrowserFrameState;
+  displayName?: string;
 }): EditorDocument {
   if (!options.canvas || !options.source) {
     throw new Error(translate('editor.runtime.editorNotInitialized'));
@@ -39,6 +40,7 @@ export function buildEditorCanvasDocument(options: {
     version: 2,
     sourceImageData: options.source.dataUrl,
     sourceName: options.source.name,
+    ...(options.displayName === undefined ? {} : { displayName: options.displayName }),
     sourceWidth: options.source.intrinsicWidth,
     sourceHeight: options.source.intrinsicHeight,
     canvasWidth: options.canvasDocumentSize.width,

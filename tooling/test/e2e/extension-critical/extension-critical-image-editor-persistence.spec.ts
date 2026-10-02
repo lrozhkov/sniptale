@@ -1,7 +1,10 @@
 import { expect, type Page } from '@playwright/test';
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { test } from '../support/extension-fixture';
 import {
   applyHarnessBootstrap,
+  getRuntimeMessagesByType,
   EDITOR_HARNESS_PATH,
   E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
   GALLERY_HARNESS_PATH,
@@ -96,7 +99,13 @@ async function waitForEditorReady(page: Page) {
 async function readImageWorkspaceRecord(
   page: Page,
   aggregateId: string
-): Promise<{ browserFrameTitle: string | null; revision: number | null }> {
+): Promise<{
+  browserFrameTitle: string | null;
+  revision: number | null;
+  displayName: string | null;
+  sourceName: string | null;
+  sourceTitle: string | null;
+}> {
   return page.evaluate(async (id) => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('sniptale-db');
@@ -117,6 +126,15 @@ async function readImageWorkspaceRecord(
         | Record<string, unknown>
         | undefined;
       return {
+        displayName:
+          typeof workspaceDocument?.['displayName'] === 'string'
+            ? workspaceDocument['displayName']
+            : null,
+        sourceName:
+          typeof workspaceDocument?.['sourceName'] === 'string'
+            ? workspaceDocument['sourceName']
+            : null,
+        sourceTitle: typeof record?.['sourceTitle'] === 'string' ? record['sourceTitle'] : null,
         browserFrameTitle:
           typeof browserFrame?.['title'] === 'string' ? browserFrame['title'] : null,
         revision: typeof record?.['revision'] === 'number' ? record['revision'] : null,
@@ -498,3 +516,107 @@ test('inspector numeric and paint controls retain shared hover, focus and Escape
   await page.screenshot({ path: `${EVIDENCE_DIR}/editor-frame-additional-panel.png` });
   await page.close();
 });
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`image caption history drives save filenames (${variant.locale}, ${variant.theme})`, async ({
+    context,
+    hostOrigin,
+  }) => {
+    const page = await context.newPage();
+    const assetId = `e2e-caption-history-${variant.locale}`;
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: {
+        'sniptale-locale-preference': variant.locale,
+        'sniptale-theme-preference': variant.theme,
+      },
+    });
+    await page.addInitScript(
+      (locale) => localStorage.setItem('sniptale-locale-preference', locale),
+      variant.locale
+    );
+    await seedImageAssetBootstrap(page, {
+      id: assetId,
+      filename: 'source-original.png',
+      createdAt: Date.now(),
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(editorHarnessUrl(hostOrigin, assetId));
+    await waitForEditorReady(page);
+    const title = page.locator('[data-ui="editor.floating.document-bar.title"]');
+    const oldTitle = (await title.textContent())!.trim();
+    const rename = page.getByRole('textbox', {
+      name: translate('editor.page.renameImage', variant.locale),
+      exact: true,
+    });
+    await title.click();
+    await rename.fill('  Схема.png  ');
+    await rename.press('Enter');
+    await expect(rename).toHaveCount(0);
+    await expect(title).toContainText('Схема.png');
+    await expect
+      .poll(async () => (await readImageWorkspaceRecord(page, assetId)).displayName)
+      .toBe('Схема.png');
+    const sourceName = (await readImageWorkspaceRecord(page, assetId)).sourceName;
+    const undo = page.locator('[data-ui="editor.floating.tool-rail.history.undo"]');
+    const redo = page.locator('[data-ui="editor.floating.tool-rail.history.redo"]');
+    await undo.click();
+    await expect(title).toContainText(oldTitle);
+    await expect
+      .poll(async () => (await readImageWorkspaceRecord(page, assetId)).sourceTitle)
+      .toBe(oldTitle);
+    await expect(undo).toBeDisabled();
+    await redo.click();
+    await expect(title).toContainText('Схема.png');
+    await page.evaluate(() => window.__sniptaleEditorHarness?.applyBrowserFrameMutation());
+    await undo.click();
+    await expect(title).toContainText('Схема.png');
+    await undo.click();
+    await expect(title).toContainText(oldTitle);
+    await redo.click();
+    await redo.click();
+    await expect(title).toContainText('Схема.png');
+    for (const [control, actionType] of [
+      ['save-button', 'download_default'],
+      ['save-as-button', 'ask_system'],
+    ]) {
+      const before = (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).length;
+      await page.locator(`[data-ui="editor.floating.document-bar.${control}"]`).click();
+      await expect
+        .poll(async () => (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).length)
+        .toBe(before + 1);
+      const message = (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).at(-1)!;
+      expect(message.actionType).toBe(actionType);
+      expect(message).toHaveProperty('filename', expect.stringMatching(/^Схема\.(png|jpg|webp)$/u));
+    }
+    await expect
+      .poll(async () => (await readImageWorkspaceRecord(page, assetId)).sourceTitle)
+      .toBe('Схема.png');
+    expect((await readImageWorkspaceRecord(page, assetId)).sourceName).toBe(sourceName);
+    const reopened = await context.newPage();
+    await applyHarnessBootstrap(reopened, {
+      preserveMediaLibrary: true,
+      storage: {
+        'sniptale-locale-preference': variant.locale,
+        'sniptale-theme-preference': variant.theme,
+      },
+    });
+    await reopened.addInitScript(
+      (locale) => localStorage.setItem('sniptale-locale-preference', locale),
+      variant.locale
+    );
+    await preserveMediaLibraryBootstrap(reopened);
+    await reopened.setViewportSize({ width: 1280, height: 720 });
+    await reopened.goto(editorHarnessUrl(hostOrigin, assetId));
+    await waitForEditorReady(reopened);
+    await expect(reopened.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
+      'Схема.png'
+    );
+    expect((await readImageWorkspaceRecord(reopened, assetId)).sourceTitle).toBe('Схема.png');
+    await reopened.close();
+    await page.close();
+  });
+}

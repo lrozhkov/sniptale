@@ -64,6 +64,7 @@ export function exportEditorDocumentViaController(
     canvasDocumentSize: controller.canvasDocumentSize,
     frame: useEditorStore.getState().frame,
     browserFrame: useEditorStore.getState().browserFrame,
+    displayName: useEditorStore.getState().pageTitle,
   });
 }
 

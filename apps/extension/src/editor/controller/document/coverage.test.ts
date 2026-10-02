@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
 const storeState = {
   activeTool: 'select',
+  pageTitle: 'Stored title',
   browserFrame: { title: 'Stored title', url: 'https://stored.example' },
   frame: { padding: 12 },
   resetDocumentState: vi.fn(),

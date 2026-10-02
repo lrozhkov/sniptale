@@ -279,3 +279,11 @@ describe('editor-document guards', () => {
   registerAcceptedDocumentTests();
   registerRejectedDocumentTests();
 });
+
+it('accepts legacy captions and validates the optional editable display name', () => {
+  const document = createEditorDocumentFixture();
+  expect(isEditorDocument(document)).toBe(true);
+  expect(isEditorDocument({ ...document, displayName: 'Схема.png' })).toBe(true);
+  for (const displayName of [null, 42, {}, []])
+    expect(isEditorDocument({ ...document, displayName })).toBe(false);
+});

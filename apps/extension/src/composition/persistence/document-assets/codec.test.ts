@@ -361,3 +361,23 @@ it('reports cleanup failures together with the original preparation error', asyn
     errors: expect.arrayContaining([cleanupFailure]),
   });
 });
+
+it.each(['Схема.png', 'data: diagram', 'blob: sketch'])(
+  'preserves caption %s through storage, hydration and legacy transfer',
+  async (displayName) => {
+    const document = { ...createEditorDocumentFixture(), displayName };
+    const prepared = await preparePersistedEditorDocument(document);
+    const parsed = parsePersistedEditorDocument(prepared.document)!;
+    expect(parsed).not.toBeNull();
+    expect(parsed.displayName).toBe(document.displayName);
+    mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+    const args = { document: parsed, refs: prepared.refs };
+    const hydrated = await hydratePersistedEditorDocument(args);
+    const transferred = await materializePersistedEditorDocumentForLegacyTransfer(args);
+    for (const result of [hydrated.document, transferred]) {
+      expect(result.displayName).toBe(document.displayName);
+      expect(result.sourceName).toBe(document.sourceName);
+    }
+    hydrated.release();
+  }
+);
