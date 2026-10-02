@@ -191,3 +191,38 @@ it('keeps long fades available by typing while using a five-second slider', () =
   act(() => fade.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ fadeOut: 20 });
 });
+
+it.each(['voiceover', 'music'] as const)('exposes an independent tempo only for %s', (lane) => {
+  const clip = createQuickEditAudioClip({
+    id: 'tempo',
+    assetId: 'asset',
+    timelineStart: 1,
+    duration: 4,
+    endMax: 12,
+  });
+  act(() =>
+    root.render(
+      <ReviewAudioClipEditor
+        clip={clip}
+        lane={lane}
+        busy={false}
+        onPatch={onPatch}
+        onDelete={onDelete}
+      />
+    )
+  );
+  const field = host.querySelector<HTMLInputElement>(
+    '[aria-label="gallery.videoReview.voiceoverTempo"]'
+  );
+  if (lane === 'music') {
+    expect(field).toBeNull();
+    return;
+  }
+  expect(field?.value).toBe('1');
+  setValue(field!, '2');
+  act(() => field!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(onPatch).toHaveBeenLastCalledWith({ tempo: 2 });
+  setValue(field!, '1');
+  act(() => field!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(onPatch).toHaveBeenLastCalledWith({ tempo: 1 });
+});

@@ -79,8 +79,8 @@ it('preserves whole recordings authored over existing cuts and speeds', () => {
   expect(reviewVoiceoverRange(anchored)).toEqual({ start: 2, end: 9 });
   const audible = projectReviewVoiceover([anchored], original);
   expect(audible).toMatchObject([
-    { timelineStart: 2, sourceOffset: 2, duration: 2 },
-    { timelineStart: 6, sourceOffset: 3, duration: 3 },
+    { timelineStart: 2, sourceOffset: 2, duration: 1 },
+    { timelineStart: 5, sourceOffset: 3, duration: 3 },
   ]);
 });
 
@@ -139,27 +139,27 @@ it.each([2, 0.5] as const)(
     const recording = anchorReviewVoiceover({ ...clip, timelineStart: 2, duration: 2 }, original);
     const map = buildReviewTimeMap(12, [{ ...cut(2, 8), kind: 'speed', rate, audio: 'speed' }]);
     expect(reviewVoiceoverRange(recording)).toEqual({ start: 2, end: 4 });
-    expect(reviewVoiceoverPlaybackDuration(recording, map)).toBe(2 / rate);
+    expect(reviewVoiceoverPlaybackDuration(recording, map)).toBe(2);
     expect(projectReviewVoiceover([recording], map)[0]).toMatchObject({
       sourceOffset: clip.sourceOffset,
-      playbackRate: rate,
+      playbackRate: 1,
     });
     const moved = moveReviewVoiceover(recording, 8, 12, map);
-    expect(reviewVoiceoverRange(moved)).toEqual({ start: 8, end: 8 + 2 / rate });
+    expect(reviewVoiceoverRange(moved)).toEqual({ start: 8, end: 10 });
     expect(moved).toMatchObject({ duration: 2, sourceOffset: clip.sourceOffset });
-    expect(reviewVoiceoverPlaybackDuration(moved, map)).toBe(2 / rate);
+    expect(reviewVoiceoverPlaybackDuration(moved, map)).toBe(2);
     expect(reviewVoiceoverPlaybackDuration(recording, original)).toBe(2);
   }
 );
 
-it('projects tempo only under Speed and keeps retained source geometry unchanged', () => {
+it('keeps native tempo across partial Speed boundaries and leaves authored source geometry unchanged', () => {
   const recording = anchorReviewVoiceover({ ...clip, timelineStart: 1, duration: 3 }, original);
   const map = buildReviewTimeMap(12, [{ ...cut(2, 4), kind: 'speed', rate: 2, audio: 'speed' }]);
   expect(reviewVoiceoverRange(recording)).toEqual({
     start: 1,
     end: 4,
   });
-  expect(reviewVoiceoverPlaybackDuration(recording, map)).toBe(2);
+  expect(reviewVoiceoverPlaybackDuration(recording, map)).toBe(3);
   const later = anchorReviewVoiceover({ ...clip, timelineStart: 8, duration: 2 }, original);
   expect(reviewVoiceoverPlaybackDuration(later, map)).toBe(2);
   expect(reviewVoiceoverPlaybackDuration(recording, buildReviewTimeMap(12, [cut(2, 3)]))).toBe(2);
@@ -196,3 +196,47 @@ it('keeps continuous speech in one processing span across an obsolete creation-S
   const normalized = normalizeReviewVoiceoverTempo(recording, speed, null);
   expect(projectReviewVoiceover([normalized], original)).toHaveLength(1);
 });
+
+it.each([2, 0.5] as const)('video Speed %sx never changes a retained voice tempo', (rate) => {
+  const recording = anchorReviewVoiceover({ ...clip, timelineStart: 2, duration: 2 }, original);
+  const map = buildReviewTimeMap(12, [{ ...cut(2, 8), kind: 'speed', rate, audio: 'speed' }]);
+  const audible = projectReviewVoiceover([recording], map);
+  expect(audible.every((part) => part.playbackRate === 1)).toBe(true);
+  expect(audible.reduce((sum, part) => sum + part.duration, 0)).toBeCloseTo(2);
+});
+
+it('moving a recording made under slow Speed out of a partial cut keeps its native tempo', () => {
+  const speed: ReviewEdit = { ...cut(0, 4), kind: 'speed', rate: 0.5, audio: 'speed' };
+  const recording = anchorReviewVoiceover(
+    { ...clip, timelineStart: 6, duration: 2 },
+    buildReviewTimeMap(12, [speed])
+  );
+  const map = buildReviewTimeMap(12, [speed, cut(3.5, 4)]);
+  const moved = moveReviewVoiceover(recording, 8, 12, map);
+  expect(projectReviewVoiceover([moved], map)).toMatchObject([
+    { playbackRate: 1, duration: 2, sourceOffset: 2 },
+  ]);
+});
+
+it.each([0.25, 0.5, 1, 2, 4])(
+  'own tempo %sx survives Speed crossings, cuts and source-axis trims',
+  (tempo) => {
+    const map = buildReviewTimeMap(48, [{ ...cut(2, 8), kind: 'speed', rate: 2, audio: 'speed' }]);
+    const recording = anchorReviewVoiceover({ ...clip, timelineStart: 1, duration: 4, tempo }, map);
+    const audible = projectReviewVoiceover([recording], map);
+    expect(audible).toHaveLength(1);
+    expect(audible[0]).toMatchObject({ playbackRate: tempo, duration: 4 / tempo, sourceOffset: 2 });
+    const moved = moveReviewVoiceover(recording, 9, 48, map);
+    expect(projectReviewVoiceover([moved], map)[0]).toMatchObject({
+      playbackRate: tempo,
+      duration: 4 / tempo,
+    });
+    expect(projectReviewVoiceover([moved], buildReviewTimeMap(48, []))[0]).toMatchObject({
+      playbackRate: tempo,
+      duration: 4 / tempo,
+    });
+    const trimmed = trimReviewVoiceover(moved, 'start', 9 + 1 / tempo, 48, 10);
+    expect(trimmed).toMatchObject({ sourceOffset: 3, duration: 3, tempo });
+    expect(projectReviewVoiceover([trimmed], map)[0]?.duration).toBeCloseTo(3 / tempo);
+  }
+);

@@ -175,7 +175,7 @@ it('applies absolute subsequent Speed and reopens old snapshot history without r
   });
   const audio = document(snapshot).advancedContent.audio;
   expect(projectReviewVoiceover(audio.voiceover, audio.voiceoverSegments)).toMatchObject([
-    { playbackRate: 4, duration: 0.5, sourceOffset: 0.4 },
+    { playbackRate: 1, duration: 2, sourceOffset: 0.4 },
   ]);
   expect(snapshot.workspace.history.slice(0, 2)).toEqual(legacyHistory);
   const normalized = document(snapshot).advancedContent;
@@ -200,7 +200,7 @@ it('applies absolute subsequent Speed and reopens old snapshot history without r
   snapshot = applyLocalReviewChange(snapshot, { kind: 'history', direction: 'undo' });
   const undone = document(snapshot).advancedContent.audio;
   expect(projectReviewVoiceover(undone.voiceover, undone.voiceoverSegments)[0]?.playbackRate).toBe(
-    4
+    1
   );
   snapshot = applyLocalReviewChange(snapshot, { kind: 'history', direction: 'redo' });
   const reopened = parseVideoWorkspace(JSON.parse(JSON.stringify(snapshot.workspace)));

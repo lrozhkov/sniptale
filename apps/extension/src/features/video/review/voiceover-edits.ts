@@ -1,3 +1,4 @@
+import { retimeReviewVoiceover } from './voiceover-timing';
 import type { QuickEditAudioClip, QuickEditVoiceoverAnchor } from './advanced/types';
 import type { ReviewTimeSegment } from './timeline';
 import type { ReviewEdit } from './types';
@@ -49,17 +50,18 @@ export function anchorReviewVoiceover(
   map: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
   if (clip.sourceAnchor || clip.dormant) return clip;
+  const tempo = clip.tempo ?? 1;
   const anchors: QuickEditVoiceoverAnchor[] = [];
   for (const segment of map) {
     if (segment.kind === 'cut') continue;
     const start = Math.max(clip.timelineStart, segment.resultStart);
-    const end = Math.min(clip.timelineStart + clip.duration, segment.resultEnd);
+    const end = Math.min(clip.timelineStart + clip.duration / tempo, segment.resultEnd);
     if (end <= start) continue;
     anchors.push({
       start: segment.sourceStart + (start - segment.resultStart) * segment.rate,
       end: segment.sourceStart + (end - segment.resultStart) * segment.rate,
-      offset: start - clip.timelineStart,
-      duration: end - start,
+      offset: (start - clip.timelineStart) * tempo,
+      duration: (end - start) * tempo,
     });
   }
   const last = map.at(-1);
@@ -70,7 +72,7 @@ export function anchorReviewVoiceover(
     const start = covered?.end ?? last.sourceEnd + Math.max(0, clip.timelineStart - last.resultEnd);
     anchors.push({
       start,
-      end: start + clip.duration - offset,
+      end: start + (clip.duration - offset) / tempo,
       offset,
       duration: clip.duration - offset,
     });
@@ -84,7 +86,7 @@ export function anchorReviewVoiceover(
 export function reviewVoiceoverRange(clip: QuickEditAudioClip) {
   return {
     start: clip.sourceAnchor?.[0]?.start ?? clip.timelineStart,
-    end: clip.sourceAnchor?.at(-1)?.end ?? clip.timelineStart + clip.duration,
+    end: clip.sourceAnchor?.at(-1)?.end ?? clip.timelineStart + clip.duration / (clip.tempo ?? 1),
   };
 }
 
@@ -107,9 +109,22 @@ export function projectReviewVoiceover(
   map?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip[] {
   return clips.flatMap((clip) => {
-    if (!clip.sourceAnchor || !map) return [clip];
+    if (!clip.sourceAnchor || !map) {
+      const tempo = clip.tempo ?? 1;
+      return tempo === 1
+        ? [clip]
+        : [
+            {
+              ...clip,
+              duration: clip.duration / tempo,
+              playbackRate: tempo,
+              fadePhase: { offset: 0, duration: clip.duration },
+            },
+          ];
+    }
+    const anchors = retimeReviewVoiceover(clip, map).sourceAnchor ?? clip.sourceAnchor;
     const { sourceAnchor: _anchor, ...recording } = clip;
-    const slices = clip.sourceAnchor.flatMap((anchor, anchorIndex) =>
+    const slices = anchors.flatMap((anchor, anchorIndex) =>
       map.flatMap((part) => {
         if (part.kind === 'cut') return [];
         const start = Math.max(anchor.start, part.sourceStart);
@@ -167,8 +182,18 @@ export function moveReviewVoiceover(
   sourceDuration: number,
   map?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
+  clip = retimeReviewVoiceover(clip, map);
   clip = { ...clip, duration: clip.sourceAnchor!.reduce((sum, span) => sum + span.duration, 0) };
-  if (map && !clip.dormant && !isReviewVoiceoverCut(clip, map))
+  if (
+    map &&
+    !clip.dormant &&
+    map.some(
+      (part) =>
+        part.kind !== 'cut' &&
+        requestedStart >= part.sourceStart &&
+        requestedStart <= part.sourceEnd
+    )
+  )
     return placeAudibleVoiceover(clip, requestedStart, sourceDuration, map);
   const range = reviewVoiceoverRange(clip);
   const start = Math.max(
@@ -193,7 +218,7 @@ function placeAudibleVoiceover(
   sourceDuration: number,
   map: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
-  const duration = reviewVoiceoverPlaybackDuration(clip, map);
+  const duration = clip.duration / (clip.tempo ?? 1);
   const requested = Math.max(0, Math.min(requestedStart, sourceDuration));
   const segment = map.find(
     (part) =>
@@ -202,7 +227,7 @@ function placeAudibleVoiceover(
       (requested < part.sourceEnd ||
         (requested === sourceDuration && part.sourceEnd === sourceDuration))
   );
-  if (!segment || duration <= 0 || duration > map.at(-1)!.resultEnd) return clip;
+  if (!segment || duration <= 0) return clip;
   const outputStart = Math.max(
     0,
     Math.min(
@@ -212,18 +237,8 @@ function placeAudibleVoiceover(
     )
   );
   const { sourceAnchor: _anchor, ...recording } = clip;
-  const placed = anchorReviewVoiceover({ ...recording, timelineStart: outputStart, duration }, map);
-  if (!placed.sourceAnchor || placed.sourceAnchor.at(-1)!.end > sourceDuration + 1e-7) return clip;
-  const scale = clip.duration / duration;
-  return {
-    ...clip,
-    timelineStart: placed.timelineStart,
-    sourceAnchor: placed.sourceAnchor.map((span) => ({
-      ...span,
-      offset: span.offset * scale,
-      duration: span.duration * scale,
-    })),
-  };
+  const placed = anchorReviewVoiceover({ ...recording, timelineStart: outputStart }, map);
+  return placed;
 }
 
 /** Converts a source-frame position into a recording-relative sample offset, extrapolating at trim edges. */

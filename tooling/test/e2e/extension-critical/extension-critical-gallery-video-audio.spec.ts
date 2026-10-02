@@ -196,6 +196,7 @@ async function voiceTiming(page: Page) {
   const slices = projectReviewVoiceover([clip], map);
   return {
     rawDuration: clip.duration,
+    resultDuration: map.at(-1)!.resultEnd,
     duration: slices.reduce((total, slice) => total + slice.duration, 0),
     rates: slices.map((slice) => slice.playbackRate ?? 1),
   };
@@ -302,6 +303,29 @@ for (const variant of [
       await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [1] });
       await button('gallery.videoReview.redo').click();
       await addSpeed(4);
+      await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [1] });
+      expect((await voiceTiming(page))!.duration).toBeCloseTo(initial.rawDuration, 5);
+      await voice.click();
+      const tempo = dialog.getByRole('textbox', {
+        name: translate('gallery.videoReview.voiceoverTempo', variant.locale),
+        exact: true,
+      });
+      await tempo.scrollIntoViewIfNeeded();
+      await expect(tempo).toBeInViewport();
+      for (const value of [0.5, 1, 4]) {
+        await tempo.fill(String(value));
+        await tempo.press('Enter');
+        await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [value] });
+        const current = (await voiceTiming(page))!;
+        expect(current.rawDuration).toBe(initial.rawDuration);
+        expect(current.duration).toBeCloseTo(
+          Math.min(initial.rawDuration / value, current.resultDuration),
+          5
+        );
+      }
+      await button('gallery.videoReview.undo').click();
+      await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [1] });
+      await button('gallery.videoReview.redo').click();
       await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [4] });
       expect((await voiceTiming(page))!.duration).toBeCloseTo(initial.rawDuration / 4, 5);
       await button('gallery.videoReview.scene').click();

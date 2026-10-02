@@ -1,3 +1,5 @@
+import { projectReviewVoiceover } from './voiceover-edits';
+import { buildReviewTimeMap } from './timeline';
 import { describe, expect, it } from 'vitest';
 import { applyReviewOperation, replayReviewHistory } from './document';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
@@ -240,4 +242,74 @@ it('keeps historical focus snapshots replayable while new edits atomically ancho
   });
   expect(replayReviewHistory(history, 4, source, baseline).advancedContent).toEqual(next);
   expect(replayReviewHistory(history, 2, source, baseline).advancedContent).toEqual(changed);
+});
+
+it('replays own audio tempo, reset and video Speed independently at every history cursor', () => {
+  const baseline = createQuickEditAdvancedContent();
+  baseline.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'asset',
+      timelineStart: 1,
+      sourceOffset: 0,
+      duration: 4,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  const speed: ReviewOperation = {
+    id: 'speed',
+    at: 1,
+    target: 'edit',
+    before: null,
+    after: {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 8,
+      requestedStart: 0,
+      requestedEnd: 8,
+      rate: 4,
+      audio: 'speed',
+    },
+    preserveVoiceoverAnchors: true,
+  };
+  const current = applyReviewOperation(
+    { annotations: [], edits: [], canvasComments: [], advancedContent: baseline },
+    speed,
+    source
+  ).advancedContent;
+  const faster = {
+    ...current,
+    audio: {
+      ...current.audio,
+      voiceover: current.audio.voiceover.map((clip) => ({ ...clip, tempo: 2 })),
+    },
+  };
+  const history: ReviewOperation[] = [
+    speed,
+    { id: 'tempo', at: 2, target: 'advancedContent', before: current, after: faster },
+    { id: 'reset', at: 3, target: 'advancedContent', before: faster, after: current },
+  ];
+  for (const [cursor, tempo] of [
+    [1, 1],
+    [2, 2],
+    [3, 1],
+  ]) {
+    const restored = replayReviewHistory(
+      JSON.parse(JSON.stringify(history)),
+      cursor!,
+      source,
+      baseline
+    );
+    const output = projectReviewVoiceover(
+      restored.advancedContent.audio.voiceover,
+      buildReviewTimeMap(source.duration, restored.edits)
+    );
+    expect(output.reduce((sum, clip) => sum + clip.duration, 0)).toBeCloseTo(4 / tempo!);
+    expect(output.every((clip) => clip.playbackRate === tempo)).toBe(true);
+  }
+  expect(baseline.audio.voiceover[0]).not.toHaveProperty('tempo');
 });

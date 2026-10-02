@@ -233,6 +233,7 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     !isRecord(value) ||
     !identity(value['id']) ||
     !identity(value['assetId']) ||
+    (value['tempo'] !== undefined && !isBoundedNumber(value['tempo'], 0.25, 4)) ||
     !isBoundedNumber(value['timelineStart'], 0, MAX_QUICK_EDIT_TIME) ||
     !isBoundedNumber(value['sourceOffset'], 0, MAX_QUICK_EDIT_TIME) ||
     !isBoundedNumber(value['duration'], 0.001, MAX_QUICK_EDIT_TIME) ||
@@ -249,6 +250,7 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
   if (sourceAnchor === null) return null;
   return {
     ...(sourceAnchor ? { sourceAnchor } : {}),
+    ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
     id: value['id'],
     assetId: value['assetId'],
     timelineStart: value['timelineStart'],
@@ -299,7 +301,7 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
   if (
     segments === null ||
     (voiceover.some((clip) => clip.sourceAnchor) && !segments) ||
-    music.some((clip) => clip.sourceAnchor)
+    music.some((clip) => clip.sourceAnchor || clip.tempo !== undefined)
   )
     return null;
   const timing = segments ? { voiceoverSegments: segments } : {};

@@ -112,6 +112,8 @@ export interface QuickEditVoiceoverAnchor {
 }
 
 export interface QuickEditAudioClip {
+  /** Native sample tempo, independent of video Speed; absent means 1x. */
+  tempo?: number;
   /** Lossless source-video placement; audio offsets remain relative to the intact recording. */
   sourceAnchor?: QuickEditVoiceoverAnchor[];
   /** Derived playback projection only; storage parsing intentionally drops these fields. */

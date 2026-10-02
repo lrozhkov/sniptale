@@ -422,14 +422,14 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
       voiceoverSegments: buildReviewTimeMap(10, edits),
     },
     false,
-    [createTrackProjection(10, edits).output(4.75)],
+    [createTrackProjection(10, edits).output(6.375)],
     true,
     undefined,
     createTrackProjection(10, edits)
   );
   const block = lanes[1]!.querySelector<HTMLElement>('[role="button"]')!;
   expect(block.style.left).toBe('20%');
-  expect(parseFloat(block.style.width)).toBeCloseTo(20);
+  expect(parseFloat(block.style.width)).toBeCloseTo(40);
   vi.spyOn(lanes[1]!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
   Object.assign(block, { setPointerCapture: vi.fn() });
   await act(async () =>
@@ -439,7 +439,7 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
     block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 280 }))
   );
   expect(parseFloat(block.style.left)).toBeCloseTo(27.5);
-  expect(parseFloat(block.style.width)).toBeCloseTo(20);
+  expect(parseFloat(block.style.width)).toBeCloseTo(36.25);
   expect(recording.duration).toBe(2);
   await act(async () =>
     block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 280 }))
@@ -447,7 +447,7 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 2.75);
 });
 
-it('displays the actual retained source footprint under Speed', () => {
+it('displays the native-tempo source footprint under Speed', () => {
   const recording = anchorReviewVoiceover(clip('a1', 2, 2), buildReviewTimeMap(10, []));
   const edits = [
     {
@@ -476,7 +476,7 @@ it('displays the actual retained source footprint under Speed', () => {
   );
   const block = lanes[1]!.querySelector<HTMLElement>('[role="button"]')!;
   expect(block.style.left).toBe('20%');
-  expect(parseFloat(block.style.width)).toBeCloseTo(20);
+  expect(parseFloat(block.style.width)).toBeCloseTo(40);
 });
 
 it('moves anchored waveform samples with the clip before release and restores on Escape', async () => {

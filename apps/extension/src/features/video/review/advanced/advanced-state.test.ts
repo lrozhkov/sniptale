@@ -1,7 +1,7 @@
 import { replayReviewHistory } from '../document';
 import { describe, expect, it } from 'vitest';
 import type { Gradient } from '@sniptale/foundation/paint';
-import { createQuickEditAdvancedState } from './defaults';
+import { createQuickEditAdvancedContent, createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedContentState, loadQuickEditAdvancedState } from './validation';
 import { buildReviewTimeMap } from '../timeline';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION, type QuickEditAdvancedState } from './types';
@@ -491,4 +491,37 @@ it('restores the chosen background motion through undo, redo and parsed history 
   expect(replayReviewHistory(history, 1, source, before).advancedContent.background).toEqual(
     after.background
   );
+});
+
+it('retains explicit audio tempo across storage parsing and rejects malformed tempo', () => {
+  const content = createQuickEditAdvancedContent();
+  const clip = {
+    id: 'voice',
+    assetId: 'asset',
+    timelineStart: 1,
+    sourceOffset: 0,
+    duration: 4,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  };
+  content.audio.voiceover = [{ ...clip, tempo: 2 }];
+  expect(
+    loadQuickEditAdvancedContentState(structuredClone(content))?.audio.voiceover[0]?.tempo
+  ).toBe(2);
+  for (const tempo of [0, 0.24, 4.01, NaN, '2', null]) {
+    expect(
+      loadQuickEditAdvancedContentState({
+        ...content,
+        audio: { ...content.audio, voiceover: [{ ...clip, tempo }] },
+      })
+    ).toBeNull();
+  }
+  content.audio.voiceover = [clip];
+  expect(loadQuickEditAdvancedContentState(content)?.audio.voiceover[0]).not.toHaveProperty(
+    'tempo'
+  );
+  content.audio.music = [{ ...clip, tempo: 2 }];
+  expect(loadQuickEditAdvancedContentState(content)).toBeNull();
 });

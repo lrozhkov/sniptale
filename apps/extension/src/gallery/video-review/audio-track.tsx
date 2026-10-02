@@ -1,3 +1,4 @@
+import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ReviewOriginalAudioTrack } from './original-audio-track';
@@ -180,7 +181,8 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
       controls={props.trailing}
     >
       <div data-ui="gallery.videoReview.audioLane" data-audio-lane={props.lane} {...dropTarget}>
-        {props.clips.map((clip) => {
+        {props.clips.map((stored) => {
+          const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
           const shown = preview?.clip.id === clip.id ? preview.clip : clip;
           return (
             <ReviewAudioClipBlock
@@ -331,8 +333,9 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
           event.clientX - current.x,
           current.width
         ) ?? ((event.clientX - current.x) / current.width) * props.duration;
-      const original = props.clips.find((item) => item.id === current.id);
-      if (!original) return;
+      const stored = props.clips.find((item) => item.id === current.id);
+      if (!stored) return;
+      const original = retimeReviewVoiceover(stored, props.voiceoverSegments);
       const range = reviewVoiceoverRange(original);
       const base = { ...original, timelineStart: range.start, duration: range.end - range.start };
       const threshold = event.shiftKey ? -1 : (SNAP_THRESHOLD_PX * props.duration) / current.width;
@@ -340,7 +343,12 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
         ...(props.snapTimes ?? []),
         ...props.clips
           .filter((clip) => clip.id !== base.id && !clip.dormant)
-          .flatMap((clip) => [reviewVoiceoverRange(clip).start, reviewVoiceoverRange(clip).end]),
+          .flatMap((clip) => {
+            const range = reviewVoiceoverRange(
+              retimeReviewVoiceover(clip, props.voiceoverSegments)
+            );
+            return [range.start, range.end];
+          }),
       ];
       const start = snapTimelineTime(base.timelineStart + delta, candidates, threshold);
       const mapped =
@@ -363,9 +371,23 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
       const snapped = useEnd ? end : start;
       const next =
         current.edge === 'start'
-          ? trimQuickEditAudioClip(base, 'start', start.time, props.duration, assetDuration)
+          ? trimQuickEditAudioClip(
+              base,
+              'start',
+              start.time,
+              props.duration,
+              assetDuration,
+              props.voiceoverSegments
+            )
           : current.edge === 'end'
-            ? trimQuickEditAudioClip(base, 'end', end.time, props.duration, assetDuration)
+            ? trimQuickEditAudioClip(
+                base,
+                'end',
+                end.time,
+                props.duration,
+                assetDuration,
+                props.voiceoverSegments
+              )
             : moveQuickEditAudioClip(
                 base,
                 useEnd

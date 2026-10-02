@@ -1,3 +1,5 @@
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { canPlaceOriginalAudioRange } from '../../features/video/review/advanced/original-audio';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import {
@@ -15,6 +17,7 @@ import {
   moveQuickEditAudioClip,
   trimQuickEditAudioClip,
   updateQuickEditAudioClip,
+  updateQuickEditVoiceoverTempo,
 } from '../../features/video/review/advanced/audio';
 import { listMediaLibrary } from '../../composition/persistence/media-library';
 
@@ -22,8 +25,7 @@ export type ReviewAudioAsset = { filename: string; duration?: number };
 
 export type ReviewAudioLane = 'voiceover' | 'music';
 
-/** Owns audio-track selection and bounded clip mutations; writes go through autosave. */
-export function useReviewAudio(args: {
+type ReviewAudioArgs = {
   audio: QuickEditAudioState;
   setAudio(update: (audio: QuickEditAudioState) => QuickEditAudioState): void;
   timelineDuration: number;
@@ -33,7 +35,10 @@ export function useReviewAudio(args: {
   onOriginalSelection?(id: string | null): void;
   selectedId?: string | null;
   onSelectionChange?(selection: { lane: ReviewAudioLane; id: string } | null): void;
-}) {
+};
+
+/** Owns audio-track selection and bounded clip mutations; writes go through autosave. */
+export function useReviewAudio(args: ReviewAudioArgs) {
   const original = useOriginalAudioRanges(args);
   const [localSelectedId, setLocalSelectedId] = useState<string | null>(null);
   const selectedId = args.selectedId === undefined ? localSelectedId : args.selectedId;
@@ -50,6 +55,69 @@ export function useReviewAudio(args: {
   const selected = (['voiceover', 'music'] as const)
     .flatMap((lane) => args.audio[lane].map((clip) => ({ lane, clip })))
     .find((item) => item.clip.id === selectedId);
+  const { addClip, ...clipActions } = createReviewAudioClipActions({
+    audio: args.audio,
+    setAudio: args.setAudio,
+    timelineDuration: args.timelineDuration,
+    ...(args.sourceDuration !== undefined ? { sourceDuration: args.sourceDuration } : {}),
+    ...(args.edits ? { edits: args.edits } : {}),
+    assets,
+    onRemoved: (id) => {
+      if (selectedId === id) setSelected(null);
+    },
+  });
+  return {
+    ...original,
+    assets,
+    selectedId,
+    setSelectedId: setSelected,
+    selected: selected
+      ? {
+          ...selected,
+          clip:
+            selected.lane === 'voiceover'
+              ? retimeReviewVoiceover(selected.clip, args.audio.voiceoverSegments)
+              : selected.clip,
+          cutSuppressed:
+            selected.lane === 'voiceover' &&
+            isReviewVoiceoverCut(
+              retimeReviewVoiceover(selected.clip, args.audio.voiceoverSegments),
+              args.audio.voiceoverSegments
+            ),
+        }
+      : null,
+    addImported: (
+      clip: QuickEditAudioClip,
+      lane: ReviewAudioLane,
+      assetDuration?: number,
+      filename = ''
+    ) => {
+      setAssets((current) =>
+        new Map(current).set(clip.assetId, {
+          filename,
+          ...(assetDuration !== undefined ? { duration: assetDuration } : {}),
+        })
+      );
+      addClip(clip, lane);
+      setSelected(clip.id, lane);
+    },
+    markImported: (clip: QuickEditAudioClip, duration: number, filename: string) => {
+      setAssets((current) => new Map(current).set(clip.assetId, { duration, filename }));
+      setSelected(clip.id, 'voiceover');
+    },
+    ...clipActions,
+    setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
+      args.setAudio((audio) => updateOriginalAudio(audio, patch)),
+  };
+}
+
+/** Binds lane commands to one current audio snapshot; selection and assets stay in the hook. */
+function createReviewAudioClipActions(
+  args: Pick<
+    ReviewAudioArgs,
+    'audio' | 'setAudio' | 'timelineDuration' | 'sourceDuration' | 'edits'
+  > & { assets: ReadonlyMap<string, ReviewAudioAsset>; onRemoved(id: string): void }
+) {
   const patchLane = (
     lane: ReviewAudioLane,
     patch: (clips: QuickEditAudioClip[]) => QuickEditAudioClip[]
@@ -71,42 +139,13 @@ export function useReviewAudio(args: {
       })
     );
   return {
-    ...original,
-    assets,
-    selectedId,
-    setSelectedId: setSelected,
-    selected: selected
-      ? {
-          ...selected,
-          cutSuppressed:
-            selected.lane === 'voiceover' &&
-            isReviewVoiceoverCut(selected.clip, args.audio.voiceoverSegments),
-        }
-      : null,
-    addImported: (
-      clip: QuickEditAudioClip,
-      lane: ReviewAudioLane,
-      assetDuration?: number,
-      filename = ''
-    ) => {
-      setAssets((current) =>
-        new Map(current).set(clip.assetId, {
-          filename,
-          ...(assetDuration !== undefined ? { duration: assetDuration } : {}),
-        })
-      );
+    addClip: (clip: QuickEditAudioClip, lane: ReviewAudioLane) =>
       patchLane(lane, (clips) => [
         ...clips,
         lane === 'voiceover' && args.audio.voiceoverSegments
           ? anchorReviewVoiceover(clip, args.audio.voiceoverSegments)
           : clip,
-      ]);
-      setSelected(clip.id, lane);
-    },
-    markImported: (clip: QuickEditAudioClip, duration: number, filename: string) => {
-      setAssets((current) => new Map(current).set(clip.assetId, { duration, filename }));
-      setSelected(clip.id, 'voiceover');
-    },
+      ]),
     moveClip: (lane: ReviewAudioLane, id: string, timelineStart: number) =>
       updateClip(lane, id, (clip) =>
         moveQuickEditAudioClip(
@@ -129,17 +168,31 @@ export function useReviewAudio(args: {
           edge,
           timelineTime,
           laneDuration(lane),
-          assetDuration ?? assets.get(clip.assetId)?.duration
+          assetDuration ?? args.assets.get(clip.assetId)?.duration,
+          lane === 'voiceover' ? args.audio.voiceoverSegments : undefined
         )
       ),
     patchClip: (
       lane: ReviewAudioLane,
       id: string,
       patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>
-    ) => updateClip(lane, id, (clip) => updateQuickEditAudioClip(clip, patch)),
+    ) => {
+      if (lane !== 'voiceover' || patch.tempo === undefined)
+        return updateClip(lane, id, (clip) => updateQuickEditAudioClip(clip, patch));
+      args.setAudio((audio) =>
+        updateQuickEditVoiceoverTempo({
+          audio,
+          id,
+          patch,
+          segments:
+            audio.voiceoverSegments ??
+            buildReviewTimeMap(args.sourceDuration ?? args.timelineDuration, args.edits ?? []),
+        })
+      );
+    },
     removeClip: (lane: ReviewAudioLane, id: string) => {
       patchLane(lane, (clips) => clips.filter((clip) => clip.id !== id));
-      if (selectedId === id) setSelected(null);
+      args.onRemoved(id);
     },
     toggleLaneMute: (lane: ReviewAudioLane) =>
       patchLane(lane, (clips) => {
@@ -157,8 +210,6 @@ export function useReviewAudio(args: {
         },
       }));
     },
-    setOriginal: (patch: Partial<QuickEditOriginalAudio>) =>
-      args.setAudio((audio) => updateOriginalAudio(audio, patch)),
   };
 }
 

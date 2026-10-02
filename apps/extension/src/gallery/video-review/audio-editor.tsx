@@ -16,6 +16,7 @@ import type { useReviewAudio } from './use-review-audio';
 export function ReviewAudioClipEditor(props: {
   clip: QuickEditAudioClip;
   busy: boolean;
+  lane?: 'voiceover' | 'music';
   cutSuppressed?: boolean;
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
@@ -39,6 +40,19 @@ export function ReviewAudioClipEditor(props: {
             icon: AudioLines,
             content: (
               <>
+                {props.lane === 'voiceover' ? (
+                  <ReviewNumberRow
+                    label={translate('gallery.videoReview.voiceoverTempo')}
+                    unit="x"
+                    min={0.25}
+                    max={4}
+                    step={0.05}
+                    precision={2}
+                    value={props.clip.tempo ?? 1}
+                    disabled={props.busy}
+                    onChange={(tempo) => props.onPatch({ tempo })}
+                  />
+                ) : null}
                 <ReviewNumberRow
                   label={translate('gallery.videoReview.audioClipVolume')}
                   unit="%"
@@ -117,6 +131,7 @@ export function ReviewAudioInspectorSection(props: {
   return (
     <ReviewAudioClipEditor
       clip={selected.clip}
+      lane={selected.lane}
       cutSuppressed={selected.cutSuppressed}
       busy={props.busy}
       onPatch={(patch) => void props.audio.patchClip(selected.lane, selected.clip.id, patch)}

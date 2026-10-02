@@ -472,6 +472,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   audioImport: { ru: 'Добавить аудиофайл', en: 'Add audio file' },
   audioEmpty: { ru: 'Перетащите сюда аудиофайл', en: 'Drop an audio file here' },
   audioClipMute: { ru: 'Без звука', en: 'Mute audio' },
+  voiceoverTempo: { ru: 'Скорость озвучки', en: 'Voiceover speed' },
   audioClipVolume: { ru: 'Громкость', en: 'Volume' },
   audioFadeIn: { ru: 'Нарастание громкости', en: 'Fade in' },
   audioFadeOut: { ru: 'Затухание громкости', en: 'Fade out' },

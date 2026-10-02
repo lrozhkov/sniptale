@@ -1,3 +1,5 @@
+import { projectReviewVoiceover, anchorReviewVoiceover } from '../voiceover-edits';
+import { buildReviewTimeMap } from '../timeline';
 import { describe, expect, it } from 'vitest';
 import {
   buildQuickEditAudioPlan,
@@ -184,3 +186,36 @@ describe('planQuickEditClipPlayback', () => {
     ).toBeNull();
   });
 });
+
+it.each([0.5, 2])(
+  'schedules own VoiceOver tempo %sx identically for preview/export and seek',
+  (tempo) => {
+    const map = buildReviewTimeMap(24, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 0,
+        end: 8,
+        requestedStart: 0,
+        requestedEnd: 8,
+        rate: 4,
+        audio: 'speed',
+      },
+    ]);
+    const voice = anchorReviewVoiceover(clip({ timelineStart: 0, duration: 4, tempo }), map);
+    const plan = buildQuickEditAudioPlan({
+      voiceover: projectReviewVoiceover([voice], map),
+      music: [clip({ id: 'music' })],
+    });
+    expect(plan[0]).toMatchObject({ duration: 4 / tempo, playbackRate: tempo });
+    expect(plan[1]).toMatchObject({ duration: 4, timelineStart: 2 });
+    expect(plan[1]).not.toHaveProperty('playbackRate');
+    const schedule = planQuickEditClipPlayback({ entry: plan[0]!, outputTime: 0.5, audioNow: 100 });
+    expect(schedule).toMatchObject({
+      when: 100,
+      offset: 0.5 * tempo,
+      duration: 4 - 0.5 * tempo,
+      playbackRate: tempo,
+    });
+  }
+);
