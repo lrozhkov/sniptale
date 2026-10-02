@@ -70,6 +70,26 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Этот файл нужен проекту как основной источник. Сначала удалите зависимый проект или сохраните файл.',
     en: 'A project requires this file as its primary source. Delete the dependent project first or keep the file.',
   },
+  deleteScenarioBusy: {
+    ru: 'Связанный сценарий открыт в редакторе или его ресурсы используются. Закройте редактор, дождитесь завершения экспорта и повторите удаление.',
+    en: 'A linked scenario is open in an editor or its resources are in use. Close the editor, wait for export to finish, and retry deletion.',
+  },
+  deleteInvalidGraph: {
+    ru: 'Не удалось проверить сохранённые связи проектов. Материал сохранён. Проверьте доступность проектов перед повторным удалением.',
+    en: 'Stored project references could not be verified. The item is retained. Check that the projects are available before retrying deletion.',
+  },
+  deleteSourceUnavailable: {
+    ru: 'Исходные данные файла недоступны. Не удалось завершить удаление; обновите библиотеку и повторите попытку.',
+    en: 'The original file data is unavailable. Deletion could not finish; refresh the library and retry.',
+  },
+  deleteUnsupportedSource: {
+    ru: 'Этот тип материала нельзя удалить с изменением связанных проектов. Сначала удалите его из проектов.',
+    en: 'This item type cannot be deleted while changing linked projects. Remove it from the projects first.',
+  },
+  deletePendingPublication: {
+    ru: 'Сохранение изображения ещё не завершено. Дождитесь завершения сохранения и повторите удаление.',
+    en: 'The image save has not finished. Wait for it to complete and retry deletion.',
+  },
   trashEmpty: { ru: 'Корзина пуста', en: 'Trash Bin is empty' },
   trashNoResults: { ru: 'В корзине ничего не найдено', en: 'No matching items in Trash Bin' },
   trashSearchPlaceholder: { ru: 'Поиск', en: 'Search' },

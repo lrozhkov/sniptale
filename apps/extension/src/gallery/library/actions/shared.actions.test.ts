@@ -2,10 +2,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { StaleTrashItemError } from '../../../composition/persistence/library-lifecycle/trash';
 import {
+  MediaAssetDeletionBlockedError,
   PrimaryMediaAssetDeleteError,
   StaleMediaAssetDeletePreviewError,
 } from '../../../composition/persistence/media-library/deletion-errors';
 import { withMediaHubWriteGuard } from '../../../features/media-hub/storage-errors';
+import { MediaLibraryDeleteError } from '../../../composition/persistence/media-library/index.library';
 import { translate } from '../../../platform/i18n';
 import { createController } from './test-support/index';
 import { createBusyActionRunner, createGalleryUserFacingActionError } from './shared';
@@ -44,7 +46,7 @@ it.each([
     controller.actions.surface.beginBlockingOperation = vi.fn(() => release);
     await createBusyActionRunner(controller)(
       async () => {
-        throw createError();
+        throw new MediaLibraryDeleteError('private-id', 'linked-source-cleanup', createError());
       },
       { stage: 'permanent-delete', materialType: 'media' }
     );
@@ -112,4 +114,30 @@ it('releases the operation silently on user cancellation and success', async () 
   expect(warn).not.toHaveBeenCalled();
   expect(controller.state.storage.banner).toBeNull();
   expect(release).toHaveBeenCalledTimes(2);
+});
+
+it.each([
+  ['scenario-busy', 'gallery.app.deleteScenarioBusy'],
+  ['invalid-graph', 'gallery.app.deleteInvalidGraph'],
+  ['source-unavailable', 'gallery.app.deleteSourceUnavailable'],
+  ['unsupported-source', 'gallery.app.deleteUnsupportedSource'],
+  ['pending-publication', 'gallery.app.deletePendingPublication'],
+] as const)('explains wrapped deletion refusal %s', async (reason, messageKey) => {
+  const { controller } = createController();
+  await createBusyActionRunner(controller)(() =>
+    withMediaHubWriteGuard('delete', async () => {
+      throw new MediaLibraryDeleteError(
+        'private-id',
+        'linked-source-cleanup',
+        new MediaAssetDeletionBlockedError(reason)
+      );
+    })
+  );
+  expect(controller.state.storage.banner).toBe(translate(messageKey));
+  expect(warn).toHaveBeenCalledWith('gallery-action-failed', {
+    code: reason,
+    stage: 'gallery-action',
+    materialType: 'unspecified',
+  });
+  expect(JSON.stringify(warn.mock.calls)).not.toContain('private-id');
 });

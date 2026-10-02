@@ -13,3 +13,18 @@ export class PrimaryMediaAssetDeleteError extends Error {
     this.name = 'PrimaryMediaAssetDeleteError';
   }
 }
+
+/** Expected deletion refusals expose fixed codes rather than persistence or source details. */
+export class MediaAssetDeletionBlockedError extends Error {
+  constructor(
+    readonly reason:
+      | 'scenario-busy'
+      | 'invalid-graph'
+      | 'source-unavailable'
+      | 'unsupported-source'
+      | 'pending-publication'
+  ) {
+    super('Media deletion is blocked.');
+    this.name = 'MediaAssetDeletionBlockedError';
+  }
+}

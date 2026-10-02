@@ -32,6 +32,7 @@ import { translate } from '../../platform/i18n';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { assertSafeProjectAssetStorageInput } from '../../features/media-hub/project-assets';
 import { withMediaHubWriteGuard } from '../../features/media-hub/storage-errors';
+import { PrimaryMediaAssetDeleteError } from '../../composition/persistence/media-library/deletion-errors';
 import type { MediaAssetProjectUsage } from '../../composition/persistence/media-library/usage';
 
 export { deleteStorageCleanupCandidatesSafely, getStorageCleanupReport } from './store.cleanup';
@@ -179,7 +180,7 @@ export async function deleteMediaLibraryAssetsBatchSafely(
   try {
     await withMediaHubWriteGuard(translate('shared.mediaHub.deleteMediaBatchAction'), async () => {
       if (assetIds.some((id) => expectedUsageById?.get(id)?.some((usage) => usage.primary))) {
-        throw new Error('A selected file is required by a project.');
+        throw new PrimaryMediaAssetDeleteError();
       }
       for (const assetId of assetIds) {
         const expectedUsage = expectedUsageById?.get(assetId);

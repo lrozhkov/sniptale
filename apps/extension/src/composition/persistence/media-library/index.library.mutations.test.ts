@@ -292,7 +292,7 @@ it('refuses permanent deletion while an image workspace publication still owns p
   await expect(deleteMediaLibraryAsset('pending-image')).rejects.toMatchObject({
     assetId: 'pending-image',
     stage: 'linked-source-cleanup',
-    cause: expect.objectContaining({ message: 'Image workspace publication is pending.' }),
+    cause: expect.objectContaining({ reason: 'pending-publication' }),
   });
   expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
   expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();

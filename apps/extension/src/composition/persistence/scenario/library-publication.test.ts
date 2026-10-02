@@ -127,3 +127,86 @@ it('keeps an existing borrowed child valid after its Library image presentation 
   await expect(backfillScenarioLibraryAssets()).resolves.toBe(0);
   expect(io.rows.get(MEDIA_LIBRARY_STORE)?.size).toBe(1);
 });
+
+it('does not publish a private rendered copy imported from an existing Library card', async () => {
+  io.rows.get(SCENARIO_ASSETS_STORE)!.set(JSON.stringify('rendered-copy'), {
+    id: 'rendered-copy',
+    projectId: 'scenario',
+    assetId: 'rendered-physical',
+    galleryAssetId: 'library-original',
+    mimeType: 'image/png',
+    width: 100,
+    height: 50,
+    createdAt: 1,
+    size: 4,
+  });
+  io.rows.get(ASSET_REFS_STORE)!.set(JSON.stringify('rendered-physical'), {
+    assetId: 'rendered-physical',
+    mimeType: 'image/png',
+    size: 4,
+    createdAt: 1,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: 'objects/rendered-physical' },
+  });
+  expect(await backfillScenarioLibraryAssets()).toBe(0);
+  expect(io.rows.get(MEDIA_LIBRARY_STORE)?.size).toBe(0);
+  expect(io.rows.get(ASSET_REFS_STORE)?.size).toBe(1);
+});
+
+function seedPublicationSource() {
+  const child = {
+    id: 'source',
+    projectId: 'scenario',
+    assetId: 'physical',
+    galleryAssetId: null,
+    mimeType: 'image/png',
+    width: 100,
+    height: 50,
+    createdAt: 1,
+    size: 4,
+  };
+  io.rows.get(SCENARIO_ASSETS_STORE)!.set(JSON.stringify(child.id), child);
+  io.rows.get(ASSET_REFS_STORE)!.set(JSON.stringify(child.assetId), {
+    assetId: child.assetId,
+    mimeType: child.mimeType,
+    size: child.size,
+    createdAt: 1,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: 'objects/physical' },
+  });
+  return child;
+}
+
+it('does not overwrite an occupied Library identity during publication', async () => {
+  seedPublicationSource();
+  const occupied = { id: 'scenario-asset:source', invalid: true };
+  io.rows.get(MEDIA_LIBRARY_STORE)!.set(JSON.stringify(occupied.id), occupied);
+  await expect(backfillScenarioLibraryAssets()).rejects.toThrow(
+    'identity scenario-asset:source is occupied'
+  );
+  expect(io.rows.get(MEDIA_LIBRARY_STORE)!.get(JSON.stringify(occupied.id))).toEqual(occupied);
+  expect(io.rows.get(ASSET_OWNERS_STORE)?.size).toBe(0);
+});
+
+it.each([null, {}, { assetId: 'other-physical' }])(
+  'retains conflicting Library ownership %j',
+  async (owner) => {
+    seedPublicationSource();
+    io.rows
+      .get(ASSET_OWNERS_STORE)!
+      .set(JSON.stringify(['media-library', 'scenario-asset:source', 'source']), owner);
+    await expect(backfillScenarioLibraryAssets()).rejects.toThrow(
+      'owner scenario-asset:source is occupied'
+    );
+    expect(io.rows.get(MEDIA_LIBRARY_STORE)?.size).toBe(0);
+    expect(io.rows.get(ASSET_REFS_STORE)?.size).toBe(1);
+  }
+);
+
+it('does not publish missing or mismatched source bytes or invalid child metadata', async () => {
+  const child = seedPublicationSource();
+  io.rows.get(ASSET_REFS_STORE)!.delete(JSON.stringify(child.assetId));
+  io.rows.get(SCENARIO_ASSETS_STORE)!.set(JSON.stringify('invalid'), { id: 'invalid' });
+  expect(await backfillScenarioLibraryAssets()).toBe(0);
+  expect(io.rows.get(MEDIA_LIBRARY_STORE)?.size).toBe(0);
+});

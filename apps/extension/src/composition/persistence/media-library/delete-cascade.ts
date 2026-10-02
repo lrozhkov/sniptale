@@ -1,4 +1,8 @@
-import { PrimaryMediaAssetDeleteError, StaleMediaAssetDeletePreviewError } from './deletion-errors';
+import {
+  MediaAssetDeletionBlockedError,
+  PrimaryMediaAssetDeleteError,
+  StaleMediaAssetDeletePreviewError,
+} from './deletion-errors';
 export { StaleMediaAssetDeletePreviewError } from './deletion-errors';
 import type { VideoProjectAssetSource } from '../../../features/video/project/types';
 import { removeVideoProjectLibrarySources } from '../../../features/video/project/library-source-removal';
@@ -106,7 +110,7 @@ export async function deleteMediaAssetWithProjectCascade(
     .filter((usage) => usage.kind === 'scenario')
     .map((usage) => usage.id)
     .sort();
-  await withScenarioLocks(scenarioIds, 0, () =>
+  await withScenarioLocks(scenarioIds, () =>
     runWithIndexedDbMutation((db) =>
       commitCascadeTransaction(db, mediaId, expectedUsage, physicalDelete)
     )
@@ -116,20 +120,18 @@ export async function deleteMediaAssetWithProjectCascade(
 
 async function withScenarioLocks(
   scenarioIds: readonly string[],
-  index: number,
   operation: () => Promise<void>
 ): Promise<void> {
-  if (index === scenarioIds.length) return operation();
-  const result = await tryScenarioResourceCleanup(scenarioIds[index]!, async () => {
-    await withScenarioLocks(scenarioIds, index + 1, operation);
+  if (scenarioIds.length === 0) return operation();
+  const result = await tryScenarioResourceCleanup(scenarioIds, async () => {
+    await operation();
     return true;
   });
-  if (result === undefined) throw new Error('A scenario project is open for editing.');
+  if (result === undefined) throw new MediaAssetDeletionBlockedError('scenario-busy');
 }
 
 function requireVerifiedGraphEntries<T>(entries: readonly (T | null)[]): T[] {
-  if (entries.some((entry) => !entry))
-    throw new Error('A project reference could not be verified.');
+  if (entries.some((entry) => !entry)) throw new MediaAssetDeletionBlockedError('invalid-graph');
   return entries.filter((entry): entry is T => entry !== null);
 }
 
@@ -141,7 +143,7 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
     media.source.kind !== 'project-asset' &&
     media.source.kind !== 'stored-asset'
   )
-    throw new Error('This media source cannot be removed from projects.');
+    throw new MediaAssetDeletionBlockedError('unsupported-source');
   const [rawVideo, rawScenario, rawChildren, rawReview] = await Promise.all([
     tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
     tx.objectStore(SCENARIO_PROJECTS_STORE).getAll(),
@@ -230,20 +232,19 @@ async function detachReviewWorkspaces(
 ): Promise<MediaAssetProjectUsage[]> {
   const affected: MediaAssetProjectUsage[] = [];
   for (const workspace of graph.reviews) {
-    const primary = workspace.aggregateId === graph.media.id;
+    if (workspace.aggregateId === graph.media.id) continue;
     const ref =
       graph.media.source.kind === 'project-asset'
         ? `project-asset:${graph.media.source.projectAssetId}`
         : null;
     const attached = ref !== null && collectReviewAssetReferences(workspace).has(ref);
-    if (!primary && !attached) continue;
+    if (!attached) continue;
     affected.push({
       id: workspace.aggregateId,
       kind: 'review',
       name: graph.media.filename,
-      primary,
+      primary: false,
     });
-    if (primary) throw new PrimaryMediaAssetDeleteError();
     await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(
       stripReviewAssetReference(workspace, ref!, now)
     );
@@ -290,7 +291,7 @@ async function releaseMediaSource(
     const record = parseRecordingEntry(
       await tx.objectStore(STORE_NAME).get(media.source.recordingId)
     );
-    if (!record) throw new Error('Recording source is unavailable.');
+    if (!record) throw new MediaAssetDeletionBlockedError('source-unavailable');
     await tx.objectStore(STORE_NAME).delete!(record.id);
     await tx.objectStore(RECORDING_TELEMETRY_STORE).delete!(record.id);
     await releaseAssetOwner({
@@ -305,7 +306,7 @@ async function releaseMediaSource(
     const child = parseProjectAssetEntry(
       await tx.objectStore(PROJECT_ASSETS_STORE).get(media.source.projectAssetId)
     );
-    if (!child) throw new Error('Project asset source is unavailable.');
+    if (!child) throw new MediaAssetDeletionBlockedError('source-unavailable');
     await tx.objectStore(PROJECT_ASSETS_STORE).delete!(child.id);
     await releaseAssetOwner({
       assetId: child.assetId,
@@ -325,7 +326,7 @@ async function releaseMediaSource(
       physicalDelete,
     });
   } else {
-    throw new Error('This media source cannot be removed from projects.');
+    throw new MediaAssetDeletionBlockedError('unsupported-source');
   }
 }
 

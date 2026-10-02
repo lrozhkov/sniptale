@@ -32,6 +32,7 @@ import { removeEditorDocumentOwnership } from '../document-assets';
 import { listMediaAssetProjectUsage } from './usage';
 import type { MediaAssetProjectUsage } from './usage';
 import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
+import { MediaAssetDeletionBlockedError } from './deletion-errors';
 import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -193,7 +194,7 @@ export async function deleteMediaLibraryAsset(
     throw new MediaLibraryDeleteError(
       assetId,
       'linked-source-cleanup',
-      new Error('Image workspace publication is pending.')
+      new MediaAssetDeletionBlockedError('pending-publication')
     );
   }
   const db = await initDB();
@@ -227,7 +228,7 @@ export async function deleteMediaLibraryAsset(
     throw new MediaLibraryDeleteError(
       assetId,
       'linked-source-cleanup',
-      new Error('This media source does not support project cascade deletion.')
+      new MediaAssetDeletionBlockedError('unsupported-source')
     );
   }
 

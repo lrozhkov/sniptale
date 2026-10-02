@@ -49,16 +49,19 @@ export function runWithScenarioResourceRead<T>(operation: () => Promise<T>): Pro
 
 /** Maintenance never waits for an editor or export and never deletes without cross-tab admission. */
 export async function tryScenarioResourceCleanup<T>(
-  id: string,
+  id: string | readonly string[],
   operation: () => Promise<T>
 ): Promise<T | undefined> {
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
   if (!locks) return undefined;
+  const ids = [...new Set(typeof id === 'string' ? [id] : id)].sort();
+  const acquire = (index: number): Promise<T | undefined> =>
+    index === ids.length
+      ? operation()
+      : locks.request(projectLock(ids[index]!), { mode: 'exclusive', ifAvailable: true }, (lock) =>
+          lock ? acquire(index + 1) : undefined
+        );
   return locks.request(RESOURCE_GATE, { mode: 'exclusive', ifAvailable: true }, (gate) =>
-    gate
-      ? locks.request(projectLock(id), { mode: 'exclusive', ifAvailable: true }, (project) =>
-          project ? operation() : undefined
-        )
-      : undefined
+    gate ? acquire(0) : undefined
   );
 }

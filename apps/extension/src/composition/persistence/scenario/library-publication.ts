@@ -112,6 +112,8 @@ export async function publishScenarioAssetToLibrary(
   tx: ScenarioLibraryTransaction,
   asset: ScenarioAssetEntry
 ): Promise<boolean> {
+  // Rendered Library imports are project-private snapshots, not new publications.
+  if (asset.galleryAssetId && !asset.borrowedMediaId) return false;
   const mediaId = scenarioLibraryMediaId(asset.id);
   const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
   const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);

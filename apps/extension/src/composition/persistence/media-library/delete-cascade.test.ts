@@ -238,9 +238,9 @@ it('refuses to delete a recording required as a video primary source', async () 
 
 it('fails closed on an invalid project row without deleting the file', async () => {
   rows.get('video_projects')!.set('invalid', { id: 'invalid' });
-  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toThrow(
-    'could not be verified'
-  );
+  await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toMatchObject({
+    reason: 'invalid-graph',
+  });
   expect(rows.get('media_library')?.has(mediaId)).toBe(true);
   expect(harness.complete).not.toHaveBeenCalled();
 });
@@ -394,4 +394,31 @@ it('removes scenario image placement and historical child while keeping the scen
   expect(rows.get('scenario_assets')?.has(childId)).toBe(false);
   expect(rows.get('media_library')?.has(scenarioMediaId)).toBe(false);
   expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+});
+
+it('deletes the media own quick-edit workspace together with its root', async () => {
+  rows.get('video_projects')!.clear();
+  rows.set(
+    'video_workspaces',
+    new Map([
+      [
+        mediaId,
+        {
+          aggregateId: mediaId,
+          formatVersion: 1,
+          sourceAssetId: physicalId,
+          source: { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' },
+          revision: 1,
+          cursor: 0,
+          history: [],
+          advanced: createQuickEditAdvancedState(),
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    ])
+  );
+  await deleteMediaAssetWithProjectCascade(mediaId, []);
+  expect(rows.get('media_library')?.has(mediaId)).toBe(false);
+  expect(rows.get('video_workspaces')?.has(mediaId)).toBe(false);
 });

@@ -173,3 +173,23 @@ it('clears an interrupted mixed journal on startup after its shared source was d
   expect(getStore('scenario_assets').has('clone')).toBe(false);
   expect(getStore('asset_refs').has(staged.assetId)).toBe(false);
 });
+
+it('keeps a rendered Library import project-private through aggregate publication and replay', async () => {
+  const project = createGuideProject('Imported');
+  const asset = {
+    ...createAsset(project.id, 'rendered-import'),
+    galleryAssetId: 'library-original',
+  };
+  await commitScenarioAggregateMutation(project, { children: { assetPuts: [asset] } });
+  expect(getStore('media_library').size).toBe(0);
+  expect(getStore('scenario_assets').get(asset.id)).toMatchObject({
+    assetId: asset.assetId,
+    galleryAssetId: 'library-original',
+  });
+  expect(getStore('asset_refs').has(asset.assetId)).toBe(true);
+  expect(
+    getStore('asset_owners').get(JSON.stringify(['scenario-asset', asset.id, 'body']))
+  ).toMatchObject({ assetId: asset.assetId });
+  await recoverScenarioAssetPublications();
+  expect(getStore('media_library').size).toBe(0);
+});

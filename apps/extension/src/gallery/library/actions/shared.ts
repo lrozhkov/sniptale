@@ -1,9 +1,11 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { StaleTrashItemError } from '../../../composition/persistence/library-lifecycle/trash';
 import {
+  MediaAssetDeletionBlockedError,
   PrimaryMediaAssetDeleteError,
   StaleMediaAssetDeletePreviewError,
 } from '../../../composition/persistence/media-library/deletion-errors';
+import { MediaLibraryDeleteError } from '../../../composition/persistence/media-library/index.library';
 import { isMediaHubStorageError } from '../../../features/media-hub/storage-errors';
 import { writeBrowserClipboardItems } from '@sniptale/platform/browser/clipboard';
 import { translate } from '../../../platform/i18n';
@@ -75,6 +77,17 @@ export function createBusyActionRunner({ actions }: Pick<GallerySurfaceControlle
 }
 
 function describeActionFailure(error: unknown): { code: string; message: string } {
+  if (error instanceof MediaLibraryDeleteError) error = error.cause;
+  if (error instanceof MediaAssetDeletionBlockedError) {
+    const messages = {
+      'scenario-busy': 'gallery.app.deleteScenarioBusy',
+      'invalid-graph': 'gallery.app.deleteInvalidGraph',
+      'source-unavailable': 'gallery.app.deleteSourceUnavailable',
+      'unsupported-source': 'gallery.app.deleteUnsupportedSource',
+      'pending-publication': 'gallery.app.deletePendingPublication',
+    } as const;
+    return { code: error.reason, message: translate(messages[error.reason]) };
+  }
   if (error instanceof GalleryUserFacingActionError)
     return { code: 'user-facing', message: error.message };
   if (error instanceof StaleTrashItemError)

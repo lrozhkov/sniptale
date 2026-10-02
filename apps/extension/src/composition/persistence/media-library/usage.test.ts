@@ -156,13 +156,11 @@ function reviewWorkspace(aggregateId: string): VideoWorkspace {
   };
 }
 
-it('marks a quick-edit source as primary', async () => {
+it('does not treat the media own quick-edit workspace as an external consumer', async () => {
   childRows = [];
   mocks.videos.mockResolvedValue([]);
   reviewRows = [reviewWorkspace(media.id)];
-  expect(await listMediaAssetProjectUsage(media.id)).toEqual([
-    { id: media.id, kind: 'review', name: media.filename, primary: true },
-  ]);
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([]);
 });
 
 it('reports a quick-edit audio consumer without marking it primary', async () => {
