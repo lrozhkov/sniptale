@@ -35,7 +35,7 @@ This index lists current active documents and their authority.
 - [Storage state authority](architecture/storage-state-authority.md) owns state classes and mutation rules.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md), [video editor layering](architecture/video-editor-layering.md), and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
-- Repository-local `DESIGN.md` owns UX, accessibility, theme, and interaction requirements.
+- Repository-local `DESIGN.md` owns UX, accessibility, theme, restrained accent use, screen composition, and interaction requirements.
 
 ## Implementation, operation, and release
 
