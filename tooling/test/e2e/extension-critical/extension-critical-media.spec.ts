@@ -1650,3 +1650,104 @@ for (const variant of [
     }
   );
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery navigates mixed scenarios and synchronizes inspector (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      const now = Date.now() + 100;
+      const first = {
+        ...createGuideProject('Navigation scenario one'),
+        id: 'nav-one',
+        createdAt: now,
+        updatedAt: now,
+      };
+      const second = {
+        ...createGuideProject('Navigation scenario two'),
+        id: 'nav-two',
+        createdAt: now + 1,
+        updatedAt: now + 1,
+      };
+      const video = createVideoProject({
+        id: 'nav-video',
+        name: 'Navigation video project',
+        createdAt: now + 2,
+        updatedAt: now + 2,
+      });
+      const names: Record<string, string> = {
+        'scenario:nav-one': first.name,
+        'scenario:nav-two': second.name,
+        'video-project:nav-video': video.name,
+        'geometry-saved': 'geometry-saved.png',
+        'geometry-draft': 'geometry-draft.png',
+      };
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.addInitScript(() => {
+          window.__sniptaleHarnessBootstrap!.preserveMediaLibrary = true;
+        });
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedDraftProjectEntries(page, video, first, now);
+        await seedDraftProjectEntries(page, video, second, now + 1);
+        await page.reload();
+        const cards = page.locator('[data-gallery-keyboard-id]');
+        await expect(cards).toHaveCount(5);
+        const order = await cards.evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('data-gallery-keyboard-id')!)
+        );
+        await cards.first().focus();
+        await page.keyboard.press('Enter');
+        const dialog = page.getByRole('dialog');
+        const previous = dialog.locator('[data-ui="gallery.preview.navigationZone.previous"]');
+        const next = dialog.locator('[data-ui="gallery.preview.navigationZone.next"]');
+        for (let index = 0; index < order.length; index++) {
+          await expect(dialog).toHaveAttribute('aria-label', names[order[index]!]!);
+          await expect(
+            dialog.locator('[data-ui="gallery.preview.inspectorContent"] input').first()
+          ).toHaveValue(names[order[index]!]!);
+          if (index === 0) await expect(previous).toBeDisabled();
+          if (index < order.length - 1) {
+            await dialog
+              .getByRole('button', { name: label('gallery.preview.hideInspector'), exact: true })
+              .click();
+            await next.click();
+            await expect(dialog).toHaveAttribute('aria-label', names[order[index + 1]!]!);
+            await expect(dialog.locator('[data-ui="gallery.preview.inspector"]')).toHaveCount(0);
+            await dialog
+              .getByRole('button', { name: label('gallery.preview.showInspector'), exact: true })
+              .click();
+          }
+        }
+        await expect(next).toBeDisabled();
+        for (let index = order.length - 2; index >= 0; index--) {
+          await previous.click();
+          await expect(dialog).toHaveAttribute('aria-label', names[order[index]!]!);
+          await expect(
+            dialog.locator('[data-ui="gallery.preview.inspectorContent"] input').first()
+          ).toHaveValue(names[order[index]!]!);
+        }
+        await dialog
+          .getByRole('button', { name: label('common.actions.close'), exact: true })
+          .click();
+        await page.locator('[data-ui="gallery.header.search"] input').fill(first.name);
+        await expect(cards).toHaveCount(1);
+        await cards.first().focus();
+        await page.keyboard.press('Enter');
+        await expect(dialog).toHaveAttribute('aria-label', first.name);
+        await expect(next).toHaveCount(0);
+        await expect(previous).toHaveCount(0);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}

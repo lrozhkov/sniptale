@@ -3,7 +3,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createGalleryState, createMediaItem } from '../../library/actions/test-support/index';
+import {
+  createGalleryState,
+  createMediaItem,
+  createScenarioItem,
+  createScenarioExportItem,
+} from '../../library/actions/test-support/index';
 import { createLocalBackupSummary } from './backup-export.test-support';
 
 const {
@@ -507,4 +512,39 @@ it('marks a trashed preview read-only and wires its single restore action', asyn
   expect(previewPanelPropsMock.mock.lastCall?.[0].listFocusReturn).toBe(true);
   expect(await preview.onRestoreTrash?.()).toBe(true);
   expect(props.onPreviewRestoreTrash).toHaveBeenCalledWith(item);
+});
+
+it('keeps scenarios and their exports in the complete filtered navigation order', () => {
+  const props = createLayoutProps();
+  const items = [
+    createMediaItem({ id: 'before' }),
+    createScenarioItem({ id: 'scenario:first', filename: 'First scenario' }),
+    createScenarioItem({ id: 'scenario:second', filename: 'Second scenario' }),
+    createScenarioExportItem({ id: 'scenario-export:html' }),
+    createMediaItem({ id: 'after' }),
+  ];
+  for (let index = 0; index < items.length; index++) {
+    props.state = createGalleryState({ filteredItems: items, previewItem: items[index]! });
+    act(() => root?.render(<GalleryOverlays {...props} />));
+    const navigation = (previewPanelPropsMock.mock.lastCall![0] as PreviewOverlayProps).navigation;
+    expect(navigation).toMatchObject({
+      current: index + 1,
+      total: items.length,
+      hasPrevious: index > 0,
+      hasNext: index < items.length - 1,
+    });
+    vi.mocked(props.onPreviewNavigate).mockClear();
+    act(() => {
+      navigation?.onPrevious();
+      navigation?.onNext();
+    });
+    expect(vi.mocked(props.onPreviewNavigate).mock.calls.map(([item]) => item)).toEqual(
+      [items[index - 1], items[index + 1]].filter(Boolean)
+    );
+  }
+  props.state = createGalleryState({ filteredItems: [items[1]!], previewItem: items[1]! });
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  expect(
+    (previewPanelPropsMock.mock.lastCall![0] as PreviewOverlayProps).navigation
+  ).toBeUndefined();
 });

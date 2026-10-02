@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createController, createMediaItem } from './test-support';
+import { createController, createMediaItem, createScenarioItem } from './test-support';
 import { useGalleryAppActions } from './useGalleryAppActions';
 
 const { updateMediaLibraryEntrySafelyMock } = vi.hoisted(() => ({
@@ -108,19 +108,42 @@ it('keeps a draft edited while preview close is saving', async () => {
   expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
 });
 
-it('shows a save error and keeps the current draft under the production busy runner', async () => {
-  const source = createMediaItem({ filename: 'first.png', id: 'asset-1' });
-  const target = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+it.each(['media', 'scenario'])(
+  'keeps the source draft after a failed save navigating to %s',
+  async (kind) => {
+    const source = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+    const target =
+      kind === 'scenario'
+        ? createScenarioItem()
+        : createMediaItem({ filename: 'second.png', id: 'asset-2' });
+    const { controller, getState } = createController({
+      filenameDraft: 'renamed.png',
+      previewItem: source,
+    });
+    updateMediaLibraryEntrySafelyMock.mockRejectedValueOnce(new Error('write failed'));
+    const actions = renderActions(controller);
+
+    await actions.preview.navigate(target);
+
+    expect(getState().preview.session.item).toEqual(source);
+    expect(getState().preview.draft.filename).toBe('renamed.png');
+    expect(getState().storage.banner).toBeTruthy();
+  }
+);
+
+it('saves a media draft before opening a scenario through the existing navigator', async () => {
+  const source = createMediaItem({ id: 'asset-source', filename: 'before.png' });
+  const target = createScenarioItem({ filename: 'Scenario destination' });
   const { controller, getState } = createController({
-    filenameDraft: 'renamed.png',
+    filenameDraft: 'after.png',
     previewItem: source,
   });
-  updateMediaLibraryEntrySafelyMock.mockRejectedValueOnce(new Error('write failed'));
+  updateMediaLibraryEntrySafelyMock.mockResolvedValue(undefined);
   const actions = renderActions(controller);
-
   await actions.preview.navigate(target);
-
-  expect(getState().preview.session.item).toEqual(source);
-  expect(getState().preview.draft.filename).toBe('renamed.png');
-  expect(getState().storage.banner).toBeTruthy();
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledWith('asset-source', {
+    filename: 'after.png',
+  });
+  expect(getState().preview.session.item).toEqual(target);
+  expect(getState().preview.session.url).toBeNull();
 });

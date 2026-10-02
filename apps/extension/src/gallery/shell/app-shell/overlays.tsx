@@ -8,7 +8,6 @@ import { ImportConflictModalContent } from '../../library/modals/import-conflict
 import { MediaImportConflictModalContent } from '../../library/modals/media-import-conflict-content';
 import { WebSnapshotImportModalContent } from '../../library/modals/web-snapshot-import-content';
 import { PreviewPanel } from '../../library/preview';
-import { isGalleryMediaItem } from '../../library/items';
 import type { GalleryAppLayoutProps } from './types';
 
 const galleryConfirmDialogClassName = [
@@ -158,11 +157,7 @@ function buildPreviewNavigationProps(
   props: GalleryPreviewOverlayProps,
   previewItem: NonNullable<GalleryPreviewOverlayProps['state']['preview']['session']['item']>
 ) {
-  if (!isGalleryMediaItem(previewItem)) {
-    return {};
-  }
-
-  const items = props.state.derived.filteredItems.filter(isGalleryMediaItem);
+  const items = props.state.derived.filteredItems;
   const index = items.findIndex((item) => item.id === previewItem.id);
   if (index < 0 || items.length < 2) {
     return {};
