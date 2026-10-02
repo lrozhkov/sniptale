@@ -186,7 +186,7 @@ it('keeps Scene and Export after the accompanying draft context reset', async ()
     ).toContain('gallery.videoReview.canvas');
     await fixture.click('addComment');
     await fixture.fill('Before Export');
-    await section('exportSettings');
+    await fixture.click('exportSection');
     expect(
       fixture.snapshot.workspace.history.filter((operation) => operation.target === 'annotation')
     ).toHaveLength(2);

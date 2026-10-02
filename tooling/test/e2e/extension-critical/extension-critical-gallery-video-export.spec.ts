@@ -40,7 +40,29 @@ for (const variant of [
       });
       const inspector = dialog.locator('aside');
       const exporting = inspector.locator('[data-ui="gallery.videoReview.exportSection"]');
-      await opener.click();
+      const navigation = inspector.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
+      await expect(
+        navigation.getByRole('button', {
+          name: label('gallery.videoReview.exportSection'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await expect(opener).toHaveAttribute('aria-pressed', 'false');
+      await opener.focus();
+      await page.keyboard.press('Enter');
+      await expect(opener).toHaveAttribute('aria-pressed', 'true');
+      await expect(opener).toHaveCSS(
+        'color',
+        await opener.evaluate((node) => {
+          const swatch = document.createElement('span');
+          swatch.style.color = 'var(--sniptale-color-accent)';
+          node.appendChild(swatch);
+          const color = getComputedStyle(swatch).color;
+          swatch.remove();
+          return color;
+        })
+      );
+      await expect(exporting.locator('h3')).toHaveCount(0);
       await expect(exporting).toBeVisible();
       await expect(exporting.locator('[data-ui="gallery.videoReview.exportSettings"]')).toHaveCount(
         0
@@ -75,6 +97,13 @@ for (const variant of [
       await expect(exporting).toBeVisible();
       await cut.click();
       await expect(exporting).toHaveCount(0);
+      await expect(opener).toHaveAttribute('aria-pressed', 'false');
+      await expect(
+        navigation.getByRole('button', {
+          name: label('gallery.videoReview.exportSection'),
+          exact: true,
+        })
+      ).toHaveCount(0);
       await expect(
         inspector.getByRole('textbox', {
           name: label('gallery.videoReview.rangeStart'),
@@ -94,11 +123,22 @@ for (const variant of [
       );
       await button('gallery.videoReview.exportFrameRate').click();
       await page.getByRole('option', { name: '30', exact: true }).click();
-      const navigation = inspector.locator('[data-ui="gallery.videoReview.inspectorNavigation"]');
+      await expect(navigation.getByRole('button')).toHaveCount(3);
+      const parameters = (await settings.boundingBox())!;
+      const navigationBounds = (await navigation.boundingBox())!;
+      expect(parameters.y - navigationBounds.y - navigationBounds.height).toBeLessThanOrEqual(12);
       await navigation
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
-      await opener.click();
+      await expect(opener).toHaveAttribute('aria-pressed', 'false');
+      await navigation
+        .getByRole('button', { name: label('gallery.videoReview.comments'), exact: true })
+        .click();
+      await expect(opener).toHaveAttribute('aria-pressed', 'false');
+      await navigation
+        .getByRole('button', { name: label('gallery.videoReview.exportSection'), exact: true })
+        .click();
+      await expect(opener).toHaveAttribute('aria-pressed', 'true');
       await expect(button('gallery.videoReview.exportFrameRate')).toContainText('30');
       await expect(button('gallery.videoReview.exportQuality')).toContainText(
         label('videoEditor.exportDialog.qualityMedium')
@@ -122,8 +162,8 @@ for (const variant of [
         )
       ).toBe(label('gallery.videoReview.undo'));
       for (const [width, height, fullHeight] of [
-        [1920, 1080, false],
         [1280, 720, false],
+        [1920, 1080, false],
         [1280, 720, true],
       ] as const) {
         await page.setViewportSize({ width, height });
@@ -198,6 +238,14 @@ for (const variant of [
       await opener.click();
       await speed.click();
       await expect(exporting).toHaveCount(0);
+      await expect(opener).toHaveAttribute('aria-pressed', 'false');
+      await expect(navigation.getByRole('button')).toHaveCount(3);
+      await expect(
+        navigation.getByRole('button', {
+          name: label('gallery.videoReview.exportSection'),
+          exact: true,
+        })
+      ).toHaveCount(0);
       await opener.click();
       await expect(button('gallery.videoReview.exportQuality')).toContainText(
         label('videoEditor.exportDialog.qualityMedium')
@@ -249,7 +297,7 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
     });
     await padding.fill('48');
     await padding.press('Enter');
-    await button('gallery.videoReview.exportSettings').click();
+    await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
     await dialog
       .locator('[data-ui="gallery.videoReview.exportSettings"]')
       .getByRole('button', { name: label('videoEditor.exportDialog.resolutionLabel'), exact: true })
@@ -270,7 +318,7 @@ test('quick editor export profiles preserve colors, padded edges and format-spec
       );
       await page.screenshot({ path: testInfo.outputPath(`export-profile-${format}.png`) });
       const downloading = page.waitForEvent('download');
-      await button('gallery.videoReview.exportSection').click();
+      await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await button('gallery.videoReview.downloadVideo').click();
       const download = await downloading;
       expect(download.suggestedFilename().endsWith(`.${format}`)).toBe(true);

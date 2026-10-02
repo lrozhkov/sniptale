@@ -1,3 +1,4 @@
+import type { ReviewInspectorNavigation } from './inspector-navigation';
 import type { ReviewBeforeAction } from './note-transitions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ReviewInspectorPresentation } from './inspector-sections';
@@ -17,10 +18,10 @@ import {
   FileDown,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
-import type { ReviewAnnotation, ReviewSelection } from '../../features/video/review/types';
+import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
   ReviewButton,
   reviewTimeLabel,
@@ -56,16 +57,13 @@ export function ReviewInspector(props: {
   actions?: ReactNode;
   composer?: ReactNode;
   editingId?: string | undefined;
-  contextKey?: string;
-  contextSelection?: ReviewSelection;
-  exportRequest?: number;
+  navigation: ReviewInspectorNavigation;
   settingsAvailable?: boolean;
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
   type Section = 'scene' | 'selected' | 'comments' | 'export';
-  const { presentation, setPresentation, shown, setSection, scroll } =
-    useReviewInspectorNavigation(props);
+  const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
@@ -109,14 +107,14 @@ export function ReviewInspector(props: {
               ...(props.settingsAvailable
                 ? [{ id: 'scene' as const, label: translate('gallery.videoReview.scene') }]
                 : []),
-              ...(props.selectionLabel
+              ...(context === 'selected' && props.selectionLabel
                 ? [{ id: 'selected' as const, label: props.selectionLabel }]
                 : []),
-              ...(props.actions
+              ...(context === 'export' && props.actions
                 ? [
                     {
                       id: 'export' as const,
-                      label: translate('gallery.videoReview.exportSettings'),
+                      label: translate('gallery.videoReview.exportSection'),
                     },
                   ]
                 : []),
@@ -136,9 +134,6 @@ export function ReviewInspector(props: {
         >
           {shown === 'export' ? (
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
-              <h3 className="text-sm font-semibold">
-                {translate('gallery.videoReview.exportSettings')}
-              </h3>
               {props.actions}
             </section>
           ) : shown === 'scene' ? (
@@ -153,70 +148,6 @@ export function ReviewInspector(props: {
       <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
     </aside>
   );
-}
-
-/** Owns transient inspector navigation and the scroll reset for each explicit view change. */
-function useReviewInspectorNavigation(props: Parameters<typeof ReviewInspector>[0]) {
-  const [presentation, setPresentation] = useState<'all' | 'sections'>('all');
-  const contextKey = props.contextKey ?? 'comments';
-  type Section = 'scene' | 'selected' | 'comments' | 'export';
-  const contextSection: Section = contextKey.startsWith('comments')
-    ? 'comments'
-    : props.selectionLabel
-      ? 'selected'
-      : props.settingsAvailable
-        ? 'scene'
-        : 'comments';
-  const [section, updateSection] = useState<Section>(contextSection);
-  const explicitSection = useRef<Section | null>(null);
-  const setSection = (value: Section) => {
-    (props.beforeAction ?? ((action) => action()))(() => {
-      explicitSection.current = value;
-      updateSection(value);
-    });
-  };
-  const scroll = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (scroll.current) scroll.current.scrollTop = 0;
-  }, [contextKey, section, presentation]);
-  const previousSettings = useRef(props.settingsAvailable);
-  const previousExportRequest = useRef(0);
-  const exportAvailable = !!props.actions;
-  useEffect(() => {
-    const modeChanged = previousSettings.current !== props.settingsAvailable;
-    previousSettings.current = props.settingsAvailable;
-    const exportRequested = previousExportRequest.current !== (props.exportRequest ?? 0);
-    previousExportRequest.current = props.exportRequest ?? 0;
-    const explicit = explicitSection.current;
-    explicitSection.current = null;
-    updateSection((current) =>
-      exportRequested && exportAvailable
-        ? 'export'
-        : (explicit ??
-          (!modeChanged && contextSection === 'scene' && current === 'comments'
-            ? current
-            : contextSection))
-    );
-  }, [
-    contextKey,
-    contextSection,
-    props.settingsAvailable,
-    props.contextSelection,
-    props.exportRequest,
-    exportAvailable,
-  ]);
-  useEffect(() => {
-    explicitSection.current = null;
-  });
-  const shown =
-    section === 'selected' && !props.selectionLabel
-      ? props.settingsAvailable
-        ? 'scene'
-        : 'comments'
-      : section === 'scene' && !props.settingsAvailable
-        ? 'comments'
-        : section;
-  return { presentation, setPresentation, shown, setSection, scroll };
 }
 
 /** Saved timeline comments with hover, select, and row actions. */

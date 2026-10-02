@@ -154,6 +154,7 @@ type TimelineBindingProps = {
   onSeek(value: number): void;
   onPlay(): void;
   onOpenExport(): void;
+  exportActive?: boolean | undefined;
 };
 
 /** Toolbar lock covers every content and presentation control during blocked phases. */
@@ -231,6 +232,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     <ReviewTimeline
       beforeAction={props.beforeAction}
       onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
+      exportActive={props.exportActive}
       historyControls={props.historyControls}
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}

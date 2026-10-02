@@ -2,7 +2,21 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewInspector } from './inspector';
+import { ReviewInspector as Inspector } from './inspector';
+import { useReviewInspectorNavigation } from './inspector-navigation';
+import type { ReviewSelection } from '../../features/video/review/types';
+
+function ReviewInspector(
+  props: Omit<Parameters<typeof Inspector>[0], 'navigation'> & {
+    contextKey?: string;
+    contextSelection?: ReviewSelection;
+    exportRequest?: number;
+  }
+) {
+  const navigation = useReviewInspectorNavigation({ ...props, exportAvailable: !!props.actions });
+  return <Inspector {...props} navigation={navigation} />;
+}
+
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -240,9 +254,24 @@ it('consumes export requests once and returns to the same selected edit', async 
   try {
     await act(async () => render(0));
     expect(host.textContent).toContain('Cut controls');
+    expect(
+      Array.from(
+        host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
+      ).map((node) => node.textContent)
+    ).toEqual(['gallery.videoReview.comments', 'gallery.videoReview.scene', 'Cut']);
     await act(async () => render(1));
     const exporting = () => host.querySelector('[data-ui="gallery.videoReview.exportSection"]');
     expect(exporting()).not.toBeNull();
+    expect(
+      Array.from(
+        host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
+      ).map((node) => node.textContent)
+    ).toEqual([
+      'gallery.videoReview.comments',
+      'gallery.videoReview.scene',
+      'gallery.videoReview.exportSection',
+    ]);
+    expect(exporting()?.querySelector('h3')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.querySelector('.review-inspector-scroll')?.contains(exporting())).toBe(true);
     await act(async () => render(1, true));
@@ -264,7 +293,7 @@ it('consumes export requests once and returns to the same selected edit', async 
       host.querySelectorAll<HTMLButtonElement>(
         '[aria-label="gallery.videoReview.inspector"] button'
       )
-    ).find((button) => button.textContent === 'gallery.videoReview.exportSettings')!;
+    ).find((button) => button.textContent === 'gallery.videoReview.exportSection')!;
     expect(tab.disabled).toBe(false);
     await act(async () => tab.click());
     expect(exporting()).not.toBeNull();

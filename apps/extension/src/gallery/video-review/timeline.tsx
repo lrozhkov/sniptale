@@ -46,6 +46,7 @@ type TimelineProps = {
   onSelect(value: ReviewAnchor): void;
   onPlay(): void;
   onOpenExport?: (() => void) | undefined;
+  exportActive?: boolean | undefined;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
 };

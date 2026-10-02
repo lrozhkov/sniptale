@@ -77,6 +77,7 @@ export function ReviewToolbar(props: {
   expandedTools?: boolean;
   onPlay(): void;
   onOpenExport?: (() => void) | undefined;
+  exportActive?: boolean | undefined;
   navigation: { start: number; end: number };
   onNavigate(time: number): void;
   zoom: number;
@@ -173,6 +174,7 @@ export function ReviewToolbar(props: {
               label={translate('gallery.videoReview.exportSection')}
               toolbarLabel={translate('gallery.videoReview.exportSection')}
               toolbarPriority={3}
+              aria-pressed={!!props.exportActive}
               className={plain}
               onClick={props.onOpenExport}
             >

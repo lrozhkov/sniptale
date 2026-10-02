@@ -870,7 +870,7 @@ test('quick editor exports an exact portrait fragment and exposes compact speed 
     await button('gallery.videoReview.pointerTool').click();
     await button('videoEditor.sidebar.canvasFormatLabel').click();
     await page.getByRole('option', { name: '9:16', exact: true }).click();
-    await button('gallery.videoReview.exportSettings').click();
+    await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
     await expect(dialog.locator('[data-ui="gallery.videoReview.exportSettings"]')).toBeVisible();
     await button('gallery.videoReview.exportFrameRate').click();
     await page.getByRole('option', { name: '30', exact: true }).click();
@@ -1429,7 +1429,7 @@ for (const variant of [
       await button('gallery.videoReview.discard').click();
       const report = button('gallery.videoReview.downloadReport');
       const reportIconX = (await report.locator('svg').boundingBox())!.x;
-      await button('gallery.videoReview.exportSection').click();
+      await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       const exporting = button('gallery.videoReview.exportVideo');
       expect((await exporting.locator('svg').boundingBox())!.x).toBeCloseTo(reportIconX, 0);
       expect(
@@ -1455,7 +1455,7 @@ for (const variant of [
       ).toBeVisible();
       await expect(button('gallery.videoReview.copyReport')).toHaveCount(0);
       await page.setViewportSize({ width: 1280, height: 720 });
-      await button('gallery.videoReview.exportSettings').click();
+      await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       const quality = button('gallery.videoReview.exportQuality');
       await quality.scrollIntoViewIfNeeded();
       await expect(quality).toBeInViewport();
@@ -2134,7 +2134,7 @@ for (const advanced of [false, true]) {
         await expect(preset).toHaveAttribute('aria-pressed', 'true');
         await expect(preset).toHaveCSS('outline-style', 'solid');
 
-        await button('gallery.videoReview.exportSettings').click();
+        await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
         const exporting = dialog.locator('[data-ui="gallery.videoReview.exportSettings"]');
         await expect(exporting).toBeVisible();
         for (const width of [1920, 1280]) {

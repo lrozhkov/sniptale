@@ -10,6 +10,10 @@ import { useReviewWaveforms } from './audio-waveform';
 import { ReviewStageBinding } from './stage-binding';
 import { ReviewTimelineBinding } from './timeline-binding';
 import { ReviewInspector } from './inspector';
+import {
+  useReviewInspectorNavigation,
+  type ReviewInspectorNavigation,
+} from './inspector-navigation';
 import { ReviewComposer } from './composer';
 import { useLoadedReview, type LoadedReview } from './use-session';
 import { exportReviewReport } from './report-actions';
@@ -128,10 +132,10 @@ function ReviewInspectorBinding({
   onClose,
   fullHeight,
   onToggleHeight,
-  exportRequest,
+  navigation,
 }: {
   fullHeight: boolean;
-  exportRequest: number;
+  navigation: ReviewInspectorNavigation;
   onToggleHeight(): void;
   resource: LoadedReview;
   state: InspectorState;
@@ -155,8 +159,7 @@ function ReviewInspectorBinding({
     <ReviewInspector
       beforeAction={state.beforeAction}
       fullHeight={fullHeight}
-      exportRequest={exportRequest}
-      contextSelection={state.activeSelection}
+      navigation={navigation}
       onToggleHeight={onToggleHeight}
       filename={resource.filename}
       annotations={snapshot.document.annotations}
@@ -175,7 +178,6 @@ function ReviewInspectorBinding({
         />
       }
       settingsAvailable={state.advanced.ui.mode === 'advanced'}
-      contextKey={reviewInspectorContext(state)}
       editingId={composer.annotation?.id}
       composer={
         composer.annotation ? (
@@ -381,6 +383,15 @@ function ReviewEditor({
   const state = useReviewEditorState(resource);
   const [fullHeight, setFullHeight] = useState(false);
   const [exportRequest, requestExport] = useState(0);
+  const navigation = useReviewInspectorNavigation({
+    beforeAction: state.beforeAction,
+    contextKey: reviewInspectorContext(state),
+    contextSelection: state.activeSelection,
+    selectionLabel: reviewSelectionLabel(state),
+    settingsAvailable: state.advanced.ui.mode === 'advanced',
+    exportAvailable: true,
+    exportRequest,
+  });
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
@@ -437,7 +448,7 @@ function ReviewEditor({
           />
         </main>
         <ReviewInspectorBinding
-          exportRequest={exportRequest}
+          navigation={navigation}
           fullHeight={fullHeight}
           onToggleHeight={() => setFullHeight((value) => !value)}
           resource={resource}
@@ -458,6 +469,7 @@ function ReviewEditor({
           <ReviewTimelineBinding
             beforeAction={state.beforeAction}
             onOpenExport={() => requestExport((value) => value + 1)}
+            exportActive={navigation.shown === 'export'}
             historyControls={<ReviewHistoryControlBinding state={state} />}
             editing={editing}
             edits={snapshot.document.edits}

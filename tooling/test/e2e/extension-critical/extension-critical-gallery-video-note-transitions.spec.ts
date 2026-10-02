@@ -59,7 +59,7 @@ for (const variant of [
       await expect(button('gallery.videoReview.scene')).toHaveAttribute('aria-pressed', 'true');
       await button('gallery.videoReview.addComment').first().click();
       await field.fill('Before Export');
-      await button('gallery.videoReview.exportSettings').click();
+      await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.exportSection"]')).toBeVisible();
       await expect(field).toHaveCount(0);
       await button('gallery.videoReview.addComment').first().click();

@@ -168,7 +168,8 @@ export async function clickReviewExport(
   button: (key: Parameters<typeof translate>[0]) => Locator,
   destination: 'gallery.videoReview.exportVideo' | 'gallery.videoReview.downloadVideo'
 ) {
-  await button('gallery.videoReview.exportSection').click();
+  const opener = button('gallery.videoReview.exportSection');
+  await opener.and(opener.page().locator('[data-ui="gallery.videoReview.openExport"]')).click();
   await button(destination).click();
 }
 
