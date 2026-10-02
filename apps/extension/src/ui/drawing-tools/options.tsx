@@ -94,15 +94,18 @@ export function DrawingWidthOptions(props: {
         label={`${translate('content.toolbar.drawingWidth')}: ${value}px`}
         onClick={() => props.onChange(value)}
       >
-        <span
-          aria-hidden
-          data-ui="drawing-width-preview"
-          className="block rounded-full bg-current"
-          style={{
-            height: `${previewSize}px`,
-            width: circular ? `${previewSize}px` : '16px',
-          }}
-        />
+        <span aria-hidden className="flex h-6 flex-col items-center justify-center gap-0.5">
+          <span
+            aria-hidden
+            data-ui="drawing-width-preview"
+            className="block rounded-full bg-current"
+            style={{
+              height: `${previewSize}px`,
+              width: circular ? `${previewSize}px` : '16px',
+            }}
+          />
+          <span className="text-[9px] font-medium leading-none">{value}</span>
+        </span>
       </QuickOptionButton>
     );
   });
@@ -511,6 +514,24 @@ export function DrawingTextOptions(props: {
         </QuickOptionButton>
       ))}
       <DrawingOptionsDivider extended vertical={props.vertical} />
+      {DRAWING_TEXT_SIZES.map((fontSize) => (
+        <QuickOptionButton
+          key={fontSize}
+          active={props.fontSize === fontSize}
+          dataUi={`content.toolbar.drawing-options.text.size-${fontSize}`}
+          label={`${translate('content.toolbar.drawingTextSize')}: ${fontSize}px`}
+          onClick={() => props.onFontSizeChange(fontSize)}
+        >
+          <span
+            aria-hidden
+            className="font-semibold leading-none"
+            style={{ fontSize: 11 + fontSize / 8 }}
+          >
+            A
+          </span>
+        </QuickOptionButton>
+      ))}
+      <DrawingOptionsDivider extended vertical={props.vertical} />
       <DrawingColorOptions
         allowAlpha
         colors={props.colors}
@@ -538,24 +559,6 @@ export function DrawingTextOptions(props: {
           ? { onPreviewReset: props.onBackgroundColorPreviewReset }
           : {})}
       />
-      <DrawingOptionsDivider extended vertical={props.vertical} />
-      {DRAWING_TEXT_SIZES.map((fontSize) => (
-        <QuickOptionButton
-          key={fontSize}
-          active={props.fontSize === fontSize}
-          dataUi={`content.toolbar.drawing-options.text.size-${fontSize}`}
-          label={`${translate('content.toolbar.drawingTextSize')}: ${fontSize}px`}
-          onClick={() => props.onFontSizeChange(fontSize)}
-        >
-          <span
-            aria-hidden
-            className="font-semibold leading-none"
-            style={{ fontSize: 11 + fontSize / 8 }}
-          >
-            A
-          </span>
-        </QuickOptionButton>
-      ))}
     </>
   );
 }

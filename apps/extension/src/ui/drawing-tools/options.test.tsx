@@ -5,6 +5,7 @@ import {
   DrawingOptionsDivider,
   DrawingShapeOptions,
   DrawingWidthOptions,
+  DrawingTextOptions,
 } from './options';
 
 describe('shared drawing option controls', () => {
@@ -35,6 +36,7 @@ describe('shared drawing option controls', () => {
     expect(markup).toContain('aspect-square');
     expect(markup).toContain('width:3px');
     expect(markup).toContain('width:12px');
+    for (const value of [2, 4, 8, 16]) expect(markup).toContain(`>${value}</span>`);
   });
 
   it('shows three icon-only blur previews with distinct strengths and named hints', () => {
@@ -52,5 +54,27 @@ describe('shared drawing option controls', () => {
     expect(markup).toContain('6px');
     expect(markup).toContain('20px');
     expect(markup.replace(/<[^>]*>/g, '')).toBe('');
+  });
+  it('places text size and family before foreground and background colors', () => {
+    const markup = renderToStaticMarkup(
+      <DrawingTextOptions
+        backgroundColor={null}
+        color="#123456"
+        colors={['#123456']}
+        floatingBoundaryRef={{ current: null }}
+        floatingPlacement="auto"
+        fontSize={20}
+        fontFamily="sans"
+        vertical={false}
+        onBackgroundColorChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onFontSizeChange={vi.fn()}
+        onFontFamilyChange={vi.fn()}
+      />
+    );
+    const color = markup.indexOf('shared.ui.color-selector');
+    expect(markup.lastIndexOf('content.toolbar.drawing-options.text.size-')).toBeLessThan(color);
+    expect(markup.lastIndexOf('content.toolbar.drawing-options.text.font-')).toBeLessThan(color);
+    expect(color).toBeGreaterThan(0);
   });
 });

@@ -271,9 +271,9 @@ it('renders editor tool settings as a horizontal toolbar like content drawing mo
 });
 
 it.each([
-  ['pencil', ['mock.color-options', 'mock.width-options']],
-  ['marker', ['mock.color-options', 'mock.width-options', 'mock.marker-opacity-options']],
-  ['arrow', ['mock.color-options', 'mock.width-options', 'mock.arrow-mode-options']],
+  ['pencil', ['mock.width-options', 'mock.color-options']],
+  ['marker', ['mock.width-options', 'mock.marker-opacity-options', 'mock.color-options']],
+  ['arrow', ['mock.width-options', 'mock.arrow-mode-options', 'mock.color-options']],
 ] as const)('matches the content left-to-right control order for %s', (tool, expectedOrder) => {
   const markup = renderToStaticMarkup(
     <EditorDrawingOptions

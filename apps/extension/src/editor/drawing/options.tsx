@@ -80,6 +80,13 @@ function PencilOptions(props: {
 }) {
   return (
     <>
+      <DrawingWidthOptions
+        tool="pencil"
+        value={props.settings.width}
+        values={DRAWING_PENCIL_WIDTHS}
+        onChange={(width) => props.update('pencil', { width })}
+      />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingColorOptions
         allowAlpha
         {...props.common}
@@ -87,13 +94,6 @@ function PencilOptions(props: {
         value={props.settings.color}
         onSelect={(color) => props.update('pencil', { color })}
         onPreview={(color) => props.preview('pencil', { color })}
-      />
-      <DrawingOptionsDivider vertical={false} />
-      <DrawingWidthOptions
-        tool="pencil"
-        value={props.settings.width}
-        values={DRAWING_PENCIL_WIDTHS}
-        onChange={(width) => props.update('pencil', { width })}
       />
     </>
   );
@@ -109,6 +109,18 @@ function MarkerOptions(props: {
   const previewOriginRef = useRef<{ color: string; opacity: number } | null>(null);
   return (
     <>
+      <DrawingWidthOptions
+        tool="marker"
+        value={props.settings.width}
+        values={DRAWING_MARKER_WIDTHS}
+        onChange={(width) => props.update('marker', { width })}
+      />
+      <DrawingOptionsDivider vertical={false} />
+      <MarkerOpacityOptions
+        value={getColorAlpha(visibleColor) ?? 1}
+        onChange={(opacity) => props.update('marker', markerColorAtOpacity(visibleColor, opacity))}
+      />
+      <DrawingOptionsDivider vertical={false} />
       <DrawingColorOptions
         allowAlpha
         {...props.common}
@@ -130,18 +142,6 @@ function MarkerOptions(props: {
           previewOriginRef.current = null;
           if (origin) props.preview('marker', origin);
         }}
-      />
-      <DrawingOptionsDivider vertical={false} />
-      <DrawingWidthOptions
-        tool="marker"
-        value={props.settings.width}
-        values={DRAWING_MARKER_WIDTHS}
-        onChange={(width) => props.update('marker', { width })}
-      />
-      <DrawingOptionsDivider vertical={false} />
-      <MarkerOpacityOptions
-        value={getColorAlpha(visibleColor) ?? 1}
-        onChange={(opacity) => props.update('marker', markerColorAtOpacity(visibleColor, opacity))}
       />
     </>
   );
@@ -196,15 +196,6 @@ function ArrowOptions(props: {
 }) {
   return (
     <>
-      <DrawingColorOptions
-        allowAlpha
-        {...props.common}
-        label={translate('content.toolbar.drawingColor')}
-        value={props.settings.color}
-        onSelect={(color) => props.update('arrow', { color })}
-        onPreview={(color) => props.preview('arrow', { color })}
-      />
-      <DrawingOptionsDivider vertical={false} />
       <DrawingWidthOptions
         tool="arrow"
         value={props.settings.width}
@@ -222,6 +213,15 @@ function ArrowOptions(props: {
         active={props.drawFromTip}
         dataUi="editor.drawing.options.arrow.from-tip"
         onChange={props.onDirectionChange}
+      />
+      <DrawingOptionsDivider vertical={false} />
+      <DrawingColorOptions
+        allowAlpha
+        {...props.common}
+        label={translate('content.toolbar.drawingColor')}
+        value={props.settings.color}
+        onSelect={(color) => props.update('arrow', { color })}
+        onPreview={(color) => props.preview('arrow', { color })}
       />
     </>
   );

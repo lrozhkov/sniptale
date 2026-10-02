@@ -79,6 +79,7 @@ function DrawingLayerCombinationActions(props: LayerCombinationActions) {
 }
 
 export function DrawingSelectionActions(props: {
+  vertical?: boolean;
   canReorder: boolean;
   canDuplicate: boolean;
   canDelete: boolean;
@@ -95,7 +96,10 @@ export function DrawingSelectionActions(props: {
     { direction: 'back', icon: ChevronsDown, label: translate('editor.toolbar.backLayer') },
   ] as const;
   return (
-    <div data-ui="drawing.selection.actions" className="flex h-7 items-center gap-2">
+    <div
+      data-ui="drawing.selection.actions"
+      className={`flex shrink-0 items-center gap-2 ${props.vertical ? 'w-7 flex-col' : 'h-7 flex-row'}`}
+    >
       {moves.map(({ direction, icon: Icon, label }) => (
         <ContentToolbarButton
           key={direction}
@@ -110,7 +114,10 @@ export function DrawingSelectionActions(props: {
           <Icon aria-hidden size={16} />
         </ContentToolbarButton>
       ))}
-      <span className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      <span
+        className={`shrink-0 bg-[var(--sniptale-color-border-soft)] ${props.vertical ? 'h-px w-5' : 'h-5 w-px'}`}
+        aria-hidden
+      />
       {props.layerCombination ? (
         <DrawingLayerCombinationActions {...props.layerCombination} />
       ) : null}
@@ -137,7 +144,10 @@ export function DrawingSelectionActions(props: {
       >
         <Trash2 aria-hidden size={16} />
       </ContentToolbarButton>
-      <span className="h-5 w-px bg-[var(--sniptale-color-border-soft)]" aria-hidden />
+      <span
+        className={`shrink-0 bg-[var(--sniptale-color-border-soft)] ${props.vertical ? 'h-px w-5' : 'h-5 w-px'}`}
+        aria-hidden
+      />
       <DrawingDeselectOption onClick={props.onDeselect} />
     </div>
   );

@@ -84,30 +84,54 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
 function useDrawingOptionsLayout(args: {
   displayMode: 'horizontal' | 'vertical';
   hasSelection: boolean;
+  panelRef: RefObject<HTMLDivElement | null>;
   tool: DrawingQuickOptionsTool;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const [, setViewportRevision] = useState(0);
+  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
   useLayoutEffect(() => {
-    const refresh = () => setViewportRevision((value) => value + 1);
-    refresh();
+    const surface = args.panelRef.current?.closest<HTMLElement>(
+      '[data-ui="content.toolbar.drawing-options.pair"], .sniptale-drawing-options-menu'
+    );
+    const root =
+      surface?.closest<HTMLElement>('[data-ui="content.toolbar.drawing-options.pair"]') ?? surface;
+    const measure = () => {
+      if (!root) return;
+      const width = root.offsetWidth;
+      const height = root.offsetHeight;
+      if (!width || !height) return;
+      setMeasured((current) =>
+        current?.width === width && current.height === height ? current : { width, height }
+      );
+    };
+    const refresh = () => {
+      measure();
+      setViewportRevision((value) => value + 1);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    if (root) observer?.observe(root);
     window.addEventListener('resize', refresh);
     window.addEventListener('scroll', refresh, true);
     return () => {
+      observer?.disconnect();
       window.removeEventListener('resize', refresh);
       window.removeEventListener('scroll', refresh, true);
     };
-  }, []);
+  }, [args.displayMode, args.hasSelection, args.panelRef, args.tool]);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
+  const menuHeight = measured?.height ?? dimensions.height;
   const menuWidth = Math.min(
-    dimensions.width + (args.hasSelection ? 294 : 0),
+    measured?.width ??
+      dimensions.width + (args.hasSelection ? (args.displayMode === 'vertical' ? 52 : 294) : 0),
     Math.max(0, window.innerWidth - 16)
   );
-  const placement = getToolbarMenuPosition(args.triggerRef.current, dimensions.height);
+  const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
   const positioned = resolveToolbarFloatingMenuStyle({
     anchorEl: args.triggerRef.current,
     displayMode: args.displayMode,
-    menuHeight: dimensions.height,
+    menuHeight,
     menuWidth,
     placement,
   });
@@ -176,6 +200,7 @@ function DrawingOptionsPair(props: {
         style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
       >
         <DrawingSelectionActions
+          vertical={props.displayMode === 'vertical'}
           canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
           canDuplicate={props.selectedCount > 0}
           canDelete={props.selectedCount > 0}
@@ -542,40 +567,12 @@ function DrawingNonTextToolOptions(props: {
           <DrawingOptionsDivider vertical={vertical} />
         </>
       ) : null}
-      <DrawingColorOptions
-        allowAlpha
-        colors={[...controller.getPalette()]}
-        floatingBoundaryRef={panelRef}
-        floatingPlacement={floatingPlacement}
-        label={translate('content.toolbar.drawingColor')}
-        vertical={vertical}
-        value={visibleColor}
-        onSelect={(color) => update(tool === 'marker' ? markerColorPatch(color) : { color })}
-        onPreview={(color) =>
-          props.preview(tool === 'marker' ? markerColorPatch(color) : { color })
-        }
-        onPreviewReset={props.resetPreview}
-      />
-      <DrawingOptionsDivider vertical={vertical} />
       <DrawingWidthOptions
         tool={tool}
         value={width}
         values={resolveDrawingWidthOptions(tool)}
         onChange={(nextWidth) => update({ width: nextWidth })}
       />
-      {tool === 'shape' ? (
-        <DrawingShapeFillToolOptions
-          controller={controller}
-          floatingPlacement={floatingPlacement}
-          panelRef={panelRef}
-          selected={selectedShape}
-          snapshot={snapshot}
-          vertical={vertical}
-          update={update}
-          preview={props.preview}
-          resetPreview={props.resetPreview}
-        />
-      ) : null}
       {tool === 'marker' ? (
         <DrawingMarkerToolOptions
           selected={selected}
@@ -591,6 +588,34 @@ function DrawingNonTextToolOptions(props: {
           snapshot={snapshot}
           vertical={vertical}
           update={update}
+        />
+      ) : null}
+      <DrawingOptionsDivider vertical={vertical} />
+      <DrawingColorOptions
+        allowAlpha
+        colors={[...controller.getPalette()]}
+        floatingBoundaryRef={panelRef}
+        floatingPlacement={floatingPlacement}
+        label={translate('content.toolbar.drawingColor')}
+        vertical={vertical}
+        value={visibleColor}
+        onSelect={(color) => update(tool === 'marker' ? markerColorPatch(color) : { color })}
+        onPreview={(color) =>
+          props.preview(tool === 'marker' ? markerColorPatch(color) : { color })
+        }
+        onPreviewReset={props.resetPreview}
+      />
+      {tool === 'shape' ? (
+        <DrawingShapeFillToolOptions
+          controller={controller}
+          floatingPlacement={floatingPlacement}
+          panelRef={panelRef}
+          selected={selectedShape}
+          snapshot={snapshot}
+          vertical={vertical}
+          update={update}
+          preview={props.preview}
+          resetPreview={props.resetPreview}
         />
       ) : null}
     </>
@@ -655,6 +680,7 @@ export function ToolbarDrawingOptions(props: {
   const layout = useDrawingOptionsLayout({
     displayMode,
     hasSelection: snapshot.selectedObjectIds.length > 0,
+    panelRef,
     tool,
     triggerRef: props.triggerRef,
   });

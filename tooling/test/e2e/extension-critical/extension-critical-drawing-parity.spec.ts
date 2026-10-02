@@ -279,3 +279,113 @@ for (const variant of [
     await page.close();
   });
 }
+
+async function verifyDrawingParameterOrder(page: Page, editor: boolean) {
+  for (const [tool, lastParameter] of [
+    ['pencil', '[data-ui*=".pencil.width-"]'],
+    ['marker', '[data-ui*=".marker.opacity-"]'],
+    ['shape', '[data-ui*=".shape.width-"]'],
+    ['arrow', '[data-ui$=".arrow.from-tip"]'],
+    ['text', '[data-ui*=".text.size-"]'],
+  ] as const) {
+    const trigger = page.locator(
+      `[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.drawing'}.${tool}"]`
+    );
+    if (editor || (await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    const panel = page.locator(
+      editor
+        ? '[data-ui="editor.drawing.options"]'
+        : `[data-ui="content.toolbar.drawing-options.${tool}"]`
+    );
+    await expect(panel).toBeVisible();
+    const ordered = await panel.evaluate((root, selector) => {
+      const parameters = root.querySelectorAll(selector);
+      const last = parameters[parameters.length - 1];
+      const color = root.querySelector('[data-ui="shared.ui.color-selector"]');
+      return (
+        !!last &&
+        !!color &&
+        !!(last.compareDocumentPosition(color) & Node.DOCUMENT_POSITION_FOLLOWING)
+      );
+    }, lastParameter);
+    expect(ordered, `${tool} parameters precede color`).toBe(true);
+  }
+  await page
+    .locator(`[data-ui="${editor ? 'editor.floating.tool-rail' : 'content.toolbar.drawing'}.blur"]`)
+    .click();
+  const blur = page.locator(
+    editor
+      ? '[data-ui="editor.drawing.options"]'
+      : '[data-ui="content.toolbar.drawing-options.blur"]'
+  );
+  await expect(blur.locator('[data-ui="shared.ui.color-selector"]')).toHaveCount(0);
+}
+
+test('image drawing parameters precede color', async ({ page, hostOrigin }) => {
+  await applyHarnessBootstrap(page, {});
+  await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+  await verifyDrawingParameterOrder(page, true);
+});
+
+for (const mode of ['drawing', 'video-recording'] as const) {
+  test(`${mode} selected layer actions follow toolbar orientation`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+    await verifyDrawingParameterOrder(page, false);
+    await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+    await page.getByRole('button', { name: /Vertical view|Вертикальный вид/ }).click();
+    await page.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+    await page.mouse.move(450, 280);
+    await page.mouse.down();
+    await page.mouse.move(620, 400, { steps: 8 });
+    await page.mouse.up();
+    await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+    await page.mouse.click(500, 300);
+    const actions = page.locator('[data-ui="drawing.selection.actions"]');
+    await expect(actions).toBeVisible();
+    const first = actions.locator('[data-ui="drawing.selection.actions.front"]');
+    const second = actions.locator('[data-ui="drawing.selection.actions.forward"]');
+    const a = (await first.boundingBox())!;
+    const b = (await second.boundingBox())!;
+    expect(Math.abs(a.x - b.x)).toBeLessThanOrEqual(1);
+    expect(b.y).toBeGreaterThan(a.y + a.height);
+    const bounds = (await actions.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.y).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(1280);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+    await page.screenshot({ path: info.outputPath('vertical-layer-actions.png') });
+    const duplicate = actions.locator('[data-ui="drawing.selection.actions.duplicate"]');
+    await duplicate.focus();
+    await page.keyboard.press('Enter');
+    await expect(first).toBeEnabled();
+    await first.click();
+    const handle = page.locator('[data-ui="shared.ui.content-toolbar-drag-handle"]');
+    const handleBox = (await handle.boundingBox())!;
+    await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(1240, 25, { steps: 8 });
+    await page.mouse.up();
+    await expect(actions).toBeVisible();
+    const edge = (await actions.boundingBox())!;
+    expect(edge.x).toBeGreaterThanOrEqual(0);
+    expect(edge.x + edge.width).toBeLessThanOrEqual(1280);
+    expect(edge.y + edge.height).toBeLessThanOrEqual(720);
+    await page.screenshot({ path: info.outputPath('vertical-layer-actions-edge.png') });
+    await page.setViewportSize({ width: 1280, height: 1080 });
+    await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+    await page.getByRole('button', { name: /Horizontal view|Горизонтальный вид/ }).click();
+    await expect(actions).toBeVisible();
+    const horizontalFirst = (await first.boundingBox())!;
+    const horizontalSecond = (await second.boundingBox())!;
+    expect(Math.abs(horizontalFirst.y - horizontalSecond.y)).toBeLessThanOrEqual(1);
+    expect(horizontalSecond.x).toBeGreaterThan(horizontalFirst.x + horizontalFirst.width);
+    await popup.close();
+    await page.close();
+  });
+}
