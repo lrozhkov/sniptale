@@ -559,3 +559,9 @@ html[data-tour-reordering] * {
     transition: none;
   }
 }
+
+.guide-inspector-panel.tour-inspector-panel > .guide-panel-heading h2 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

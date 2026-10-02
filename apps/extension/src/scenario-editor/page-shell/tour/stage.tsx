@@ -214,9 +214,6 @@ function TourStageScaffold({
           <span className="tour-playback-status" data-tour-status role="status" hidden />
         </div>
         <div className="tour-controls">
-          <button className="tour-button" data-tour-contents>
-            {labels.contents}
-          </button>
           <div className="tour-playback" data-tour-playback />
           <div className="tour-nav">
             <button className="tour-button" data-tour-previous>
@@ -227,6 +224,14 @@ function TourStageScaffold({
               {labels.next}
             </button>
           </div>
+          <button
+            className="tour-button"
+            data-tour-contents
+            aria-haspopup="dialog"
+            aria-expanded="false"
+          >
+            {labels.contents}
+          </button>
         </div>
       </footer>
       <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />

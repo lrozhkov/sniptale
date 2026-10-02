@@ -148,7 +148,7 @@ function TourSettingsPanel({
     <FloatingChromePanel
       role="complementary"
       id="guide-inspector-panel"
-      className="guide-inspector-panel"
+      className="guide-inspector-panel tour-inspector-panel"
       hidden={!panels.rightOpen}
       aria-label={inspectorTitle}
     >

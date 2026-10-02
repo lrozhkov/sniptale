@@ -61,7 +61,7 @@ export function createTourHints(
   let hints = [];
   let dismissed = false;
   let restoringFocus = false;
-  const caption = createTourCaption(hint, hintText, labels, paginate, signal);
+  const caption = createTourCaption(hint, hintText, labels, paginate, signal, Boolean(navigation));
   let geometry = { stageWidth: 640, stageHeight: 360, imageBox: null };
   function paginate() {
     const { stageWidth, stageHeight } = geometry;
