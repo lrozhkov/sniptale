@@ -6,6 +6,8 @@ export interface TourPreviewMessage {
   mode: 'guide' | 'tour';
   nonce: string;
   blob: Blob;
+  /** Required by saved-file callers; supplied from the extension's fixed bundled executable. */
+  scriptHash?: string;
 }
 export function readTourPreviewMessage(value: unknown, nonce: string): TourPreviewMessage | null {
   if (
@@ -24,7 +26,19 @@ export function readTourPreviewMessage(value: unknown, nonce: string): TourPrevi
     value.blob.size > SCENARIO_PREVIEW_MAX_BYTES
   )
     return null;
-  return { kind: 'tour-preview', mode: value.mode, nonce, blob: value.blob };
+  const scriptHash = 'scriptHash' in value ? value.scriptHash : undefined;
+  if (
+    scriptHash !== undefined &&
+    (typeof scriptHash !== 'string' || !/^[A-Za-z0-9+/]{43}=$/u.test(scriptHash))
+  )
+    return null;
+  return {
+    kind: 'tour-preview',
+    mode: value.mode,
+    nonce,
+    blob: value.blob,
+    ...(typeof scriptHash === 'string' ? { scriptHash } : {}),
+  };
 }
 
 /** Sandbox status has no command or persistence authority. */

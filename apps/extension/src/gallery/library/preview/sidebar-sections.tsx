@@ -92,6 +92,7 @@ function PreviewActionButton(props: {
   icon: LucideIcon;
   onClick: () => void | Promise<boolean | void>;
   success?: string;
+  disabled?: boolean;
 }) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
   const pending = useRef(false);
@@ -112,11 +113,11 @@ function PreviewActionButton(props: {
     <div>
       <button
         type="button"
-        disabled={status === 'pending'}
+        disabled={props.disabled || status === 'pending'}
         aria-label={props.children}
         aria-busy={status === 'pending'}
         onClick={async () => {
-          if (pending.current) return;
+          if (pending.current || props.disabled) return;
           pending.current = true;
           setStatus('pending');
           try {
@@ -554,13 +555,12 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
           ) : null}
         </div>
       ) : null}
-      {(isGalleryScenarioItem(item) || isGalleryScenarioExportItem(item)) &&
-      item.project.availability === 'available' ? (
+      {isGalleryScenarioItem(item) || isGalleryScenarioExportItem(item) ? (
         <ScenarioViewingActions
           projectId={item.project.id}
           revision={item.workspaceRevision ?? item.project.updatedAt}
           availability={item.project.availability}
-          exportMode={isGalleryScenarioExportItem(item)}
+          {...(isGalleryScenarioExportItem(item) ? { exportEntry: item.exportEntry } : {})}
           layout="inspector"
         />
       ) : null}
@@ -586,8 +586,10 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
       </>
     );
   const { item, onCopy, onDelete, onDownload, onResetChanges } = props;
-  const canEditMetadata = isMetadataEditable(item);
-  const canDownload = isGalleryMediaItem(item);
+  const canEditMetadata =
+    isMetadataEditable(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
+  const canDownload =
+    isGalleryMediaItem(item) || (isGalleryScenarioExportItem(item) && item.format === 'html');
   const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
   const canUseImageAggregateActions = canCopy && item.source.kind === 'screenshot';
   const hasEditedImageContent = canUseImageAggregateActions && item.imageContentState === 'edited';
@@ -624,6 +626,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
                 icon={Download}
                 onClick={onDownload}
                 success={translate('gallery.preview.downloadStarted')}
+                disabled={isGalleryScenarioExportItem(item) && !item.exportEntry.html}
               >
                 {translate('gallery.preview.download')}
               </PreviewActionButton>

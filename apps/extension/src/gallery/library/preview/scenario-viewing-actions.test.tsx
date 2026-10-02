@@ -16,7 +16,21 @@ it('opens the current source project from an export row and hides unavailable pr
   const host = document.createElement('div');
   const root = createRoot(host);
   io.snapshot.mockResolvedValue({ project: { tour: {} } });
-  await act(async () => root.render(<ScenarioViewingActions projectId="p" exportMode />));
+  await act(async () =>
+    root.render(
+      <ScenarioViewingActions
+        projectId="p"
+        exportEntry={{
+          id: 'export',
+          projectId: 'p',
+          filename: 'old.html',
+          format: 'html',
+          size: 4,
+          createdAt: 1,
+        }}
+      />
+    )
+  );
   const links = host.querySelectorAll('a');
   expect(links).toHaveLength(1);
   expect(links[0]?.href).toContain('projectId=p');

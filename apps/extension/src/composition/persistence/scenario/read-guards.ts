@@ -159,8 +159,26 @@ export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | 
 
   const trashState = parseScenarioExportTrashState(value['trashState']);
   if (value['trashState'] !== undefined && !trashState) return null;
+  const html = value['html'];
+  if (
+    html !== undefined &&
+    (value['format'] !== 'html' ||
+      !isRecord(html) ||
+      (html['mode'] !== 'guide' && html['mode'] !== 'tour') ||
+      !isString(html['assetId']) ||
+      !html['assetId'] ||
+      html['assetId'].length > 160 ||
+      !Number.isSafeInteger(value['size']) ||
+      value['size'] <= 0)
+  )
+    return null;
 
   return {
+    ...(isRecord(html) &&
+    (html['mode'] === 'guide' || html['mode'] === 'tour') &&
+    isString(html['assetId'])
+      ? { html: { mode: html['mode'], assetId: html['assetId'] } }
+      : {}),
     ...(trashState ? { trashState } : {}),
     createdAt: value['createdAt'],
     filename: value['filename'],

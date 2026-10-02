@@ -26,6 +26,7 @@ it('keeps an open artifact stable and rereads only on refresh; cancels obsolete 
   const route = { mode: 'guide' as const, projectId: 'p' };
   io.prepare.mockResolvedValue({
     status: 'ready',
+    mode: 'guide',
     name: 'First',
     revision: 1,
     blob: new Blob(['a']),
@@ -36,6 +37,7 @@ it('keeps an open artifact stable and rereads only on refresh; cancels obsolete 
   expect(io.prepare).toHaveBeenCalledTimes(1);
   io.prepare.mockResolvedValueOnce({
     status: 'ready',
+    mode: 'guide',
     name: 'Updated',
     revision: 2,
     blob: new Blob(['b']),
@@ -63,7 +65,7 @@ it('cancels preparation and ignores a late result', async () => {
   expect(buttons[0]?.disabled).toBe(true);
   await act(async () => buttons[1]?.click());
   await act(async () =>
-    finish({ status: 'ready', name: 'Stale', revision: 1, blob: new Blob(['a']) })
+    finish({ status: 'ready', mode: 'tour', name: 'Stale', revision: 1, blob: new Blob(['a']) })
   );
   expect(host.textContent).not.toContain('Stale');
   expect(io.prepare.mock.calls[0]![0].signal.aborted).toBe(true);

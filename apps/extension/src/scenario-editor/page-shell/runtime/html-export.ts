@@ -6,6 +6,7 @@ import { measureHtmlImages, prepareHtmlImage, type HtmlRaster } from './html-ima
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../../platform/i18n';
 import { SCENARIO_PREVIEW_MAX_BYTES } from '../../../features/scenario/tour-player/preview-contract';
+import { createScenarioHtmlCapture } from '../../../composition/persistence/scenario/export-artifacts';
 
 /** Materializes the same streamed guide as download, without any file or history effects. */
 export async function prepareGuideHtml(args: {
@@ -53,21 +54,33 @@ export async function exportGuideHtml(args: {
     mimeType: 'text/html',
     description: 'HTML',
   });
+  const capture = await createScenarioHtmlCapture();
   let size = 0;
   try {
     args.signal.throwIfAborted();
     const { buildGuideHtml } = await import('../html-document');
     const media = await measureHtmlImages(args.project, args.signal);
     const document = await buildGuideHtml(args.project, args.t, args.theme, media, args.reading);
-    size = await writeGuideHtml(sink, document, args.signal);
+    size = await writeGuideHtml(sink, document, args.signal, undefined, capture.append);
     args.signal.throwIfAborted();
     await sink.close();
   } catch (error) {
-    await sink.abort(error);
+    try {
+      await sink.abort(error);
+    } finally {
+      await capture.abort();
+    }
     throw error;
   }
   try {
-    await saveScenarioExportRecord({ projectId: args.project.id, filename, format: 'html', size });
+    const { ref } = await capture.finalize();
+    await saveScenarioExportRecord({
+      projectId: args.project.id,
+      filename,
+      format: 'html',
+      size,
+      html: { mode: 'guide', ref },
+    });
     return 'saved';
   } catch {
     return 'history-failed';
@@ -78,7 +91,8 @@ async function writeGuideHtml(
   sink: Pick<ExportSink, 'writable'>,
   document: { html: string; rasters: HtmlRaster[] },
   signal: AbortSignal,
-  readAsset?: (id: string) => Promise<Blob | undefined>
+  readAsset?: (id: string) => Promise<Blob | undefined>,
+  retain?: (chunk: Uint8Array) => Promise<void>
 ) {
   const writer = sink.writable.getWriter();
   const encoder = new TextEncoder();
@@ -87,6 +101,7 @@ async function writeGuideHtml(
     signal.throwIfAborted();
     const bytes = encoder.encode(text);
     await writer.write(bytes);
+    await retain?.(bytes);
     size += bytes.byteLength;
   };
   try {

@@ -490,3 +490,34 @@ it('keeps promotion and independent Delete available for temporary scenario expo
   expect(onPromote).toHaveBeenCalledOnce();
   act(() => root.unmount());
 });
+
+it('offers draft reset for HTML filenames while export tags remain read-only', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onResetChanges = vi.fn();
+  const item = createScenarioExportItem({ format: 'html', tags: ['project-tag'] });
+  await act(async () =>
+    root.render(
+      <>
+        <PreviewActions {...createProps()} item={item} hasChanges onResetChanges={onResetChanges} />
+        <PreviewTagEditor
+          item={item}
+          onAddTag={vi.fn()}
+          onRemoveTag={vi.fn()}
+          onTagDraftChange={vi.fn()}
+          tagDraft=""
+          tagDrafts={['project-tag']}
+        />
+      </>
+    )
+  );
+  const reset = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('gallery.preview.resetChanges')
+  );
+  expect(reset).toBeDefined();
+  await act(async () => reset?.click());
+  expect(onResetChanges).toHaveBeenCalledOnce();
+  expect(container.querySelector('input')).toBeNull();
+  await act(async () => root.unmount());
+});

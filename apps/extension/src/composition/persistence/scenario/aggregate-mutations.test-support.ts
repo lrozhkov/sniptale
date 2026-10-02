@@ -87,7 +87,9 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
   initDB: vi.fn(async () => db),
 }));
 
-vi.mock('../assets', () => ({
+vi.mock('../assets', async () => ({
+  parseAssetOwner: (await vi.importActual<typeof import('../assets/guards')>('../assets/guards'))
+    .parseAssetOwner,
   buildPhysicalDeleteOperation: () => ({
     assetIds: [],
     createdAt: 1,

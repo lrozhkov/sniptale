@@ -248,11 +248,12 @@ it('shows the draft deletion date below the creation date in the inspector heade
   expect(container?.textContent).toContain('gallery.app.draftExpires 31 Mar 2026');
 });
 
-it('uses project name as the source fallback for scenario export items and keeps filename read-only', () => {
+it('uses project name as the source fallback and keeps non-HTML exports read-only', () => {
   render(
     createProps({
       item: createScenarioExportItem({
-        filename: 'scenario-export.zip',
+        filename: 'scenario-export.pdf',
+        format: 'pdf',
         project: {
           availability: 'available' as const,
           id: 'project-1',
@@ -489,4 +490,13 @@ it.each([
     ).toBe(toggle);
     expect(document.activeElement).toBe(toggle);
   }
+});
+
+it('allows editing the selected HTML export filename', () => {
+  const item = createScenarioExportItem({ filename: 'saved-guide.html', format: 'html' });
+  render(createProps({ item, filenameDraft: item.filename }));
+  const input = container?.querySelector('input');
+  expect(input).toBeInstanceOf(HTMLInputElement);
+  expect(input?.readOnly).toBe(false);
+  expect(input?.labels?.[0]?.textContent).toBe('gallery.preview.filename');
 });

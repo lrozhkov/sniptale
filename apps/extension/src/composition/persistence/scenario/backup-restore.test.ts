@@ -495,3 +495,61 @@ it('restores an export catalogue with its independent Trash marker intact', asyn
   });
   expect(target.exports.put).toHaveBeenCalledWith(entry);
 });
+
+it('publishes a restored HTML body edge and queues only the replaced catalogue body for deletion', async () => {
+  const target = stores();
+  const old = {
+    id: 'old-export',
+    projectId: 'project',
+    filename: 'old.html',
+    format: 'html' as const,
+    createdAt: 1,
+    size: 4,
+    html: { mode: 'guide' as const, assetId: 'old-body' },
+  };
+  target.projects.get = vi.fn(async () => projectEntry());
+  target.exports.index = vi.fn(() => ({ getAll: vi.fn(async () => [old]) }));
+  target.owners.get = vi.fn(async () => ({
+    ownerKind: 'scenario-export',
+    ownerId: old.id,
+    role: 'body',
+    assetId: 'old-body',
+  }));
+  const htmlRef = {
+    ...ref,
+    assetId: 'restored-body',
+    location: { kind: 'opfs' as const, objectKey: 'objects/restored-body' },
+    mimeType: 'text/html',
+    size: 4,
+  };
+  const restored = {
+    ...old,
+    id: 'restored-export',
+    filename: 'renamed.html',
+    html: { mode: 'tour' as const, assetId: htmlRef.assetId },
+  };
+  const deletion = operation();
+  await putScenarioProjectBackupRestore({
+    stores: target,
+    strategy: 'replace',
+    operation: deletion,
+    root: {
+      entry: projectEntry(),
+      assets: [],
+      exports: [restored],
+      exportRefs: [htmlRef],
+      exportThumbnails: [],
+      stepDocuments: [],
+    },
+  });
+  expect(target.owners.delete).toHaveBeenCalledWith(['scenario-export', old.id, 'body']);
+  expect(deletion.assetIds).toEqual(['old-body']);
+  expect(target.refs.put).toHaveBeenCalledWith(htmlRef);
+  expect(target.owners.put).toHaveBeenCalledWith({
+    ownerKind: 'scenario-export',
+    ownerId: restored.id,
+    role: 'body',
+    assetId: htmlRef.assetId,
+  });
+  expect(target.exports.put).toHaveBeenCalledWith(restored);
+});

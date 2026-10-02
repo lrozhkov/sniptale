@@ -2,14 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   listScenarioExportsMock,
+  renameExportMock,
   publishMediaHubLibraryChangedMock,
   randomUuidMock,
   saveScenarioExportMock,
+  saveArtifactMock,
 } = vi.hoisted(() => ({
   listScenarioExportsMock: vi.fn(),
+  renameExportMock: vi.fn(),
   publishMediaHubLibraryChangedMock: vi.fn(),
   randomUuidMock: vi.fn(),
   saveScenarioExportMock: vi.fn(),
+  saveArtifactMock: vi.fn(),
 }));
 
 vi.mock('../../projects', async (importOriginal) => ({
@@ -24,10 +28,22 @@ vi.mock('../../../../../features/media-hub/events', () => ({
   subscribeToMediaHubEvents: vi.fn(),
 }));
 
-import { listScenarioExportRecords, saveScenarioExportRecord } from './exports';
+vi.mock('../../projects/exports', async (original) => ({
+  ...(await original<typeof import('../../projects/exports')>()),
+  renameScenarioHtmlExport: renameExportMock,
+}));
+
+vi.mock('../../export-artifacts', () => ({ saveScenarioHtmlArtifact: saveArtifactMock }));
+
+import {
+  listScenarioExportRecords,
+  renameScenarioHtmlExportRecord,
+  saveScenarioExportRecord,
+} from './exports';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  renameExportMock.mockReset();
   vi.spyOn(Date, 'now').mockReturnValue(1000);
   vi.stubGlobal('crypto', { randomUUID: randomUuidMock });
   randomUuidMock.mockReturnValue('export-1');
@@ -74,4 +90,86 @@ describe('scenario project export records', () => {
       expect.objectContaining({ id: 'old' }),
     ]);
   });
+});
+
+it('announces only a committed selected export rename', async () => {
+  let finish!: () => void;
+  renameExportMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  const pending = renameScenarioHtmlExportRecord('export-1', 'new.html');
+  expect(publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+  finish();
+  await pending;
+  expect(renameExportMock).toHaveBeenCalledWith('export-1', 'new.html');
+  expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
+    'scenario-export:export-1',
+  ]);
+});
+
+it('does not announce a failed rename as committed', async () => {
+  renameExportMock.mockRejectedValueOnce(new Error('quota'));
+  await expect(renameScenarioHtmlExportRecord('export-1', 'new.html')).rejects.toThrow('quota');
+  expect(publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+});
+
+it.each(['guide', 'tour'] as const)(
+  'announces saved %s bytes only after durable artifact publication',
+  async (mode) => {
+    const ref = {
+      assetId: 'body',
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: 'objects/body' },
+      mimeType: 'text/html',
+      sha256: null,
+      size: 4,
+    };
+    let finish!: () => void;
+    saveArtifactMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+    );
+    const pending = saveScenarioExportRecord({
+      projectId: 'project-1',
+      filename: 'saved.html',
+      format: 'html',
+      size: 4,
+      html: { mode, ref },
+    });
+    expect(publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
+    finish();
+    expect(await pending).toMatchObject({ html: { mode, assetId: 'body' } });
+    expect(saveArtifactMock).toHaveBeenCalledWith(
+      expect.objectContaining({ html: { mode, assetId: 'body' }, size: 4 }),
+      ref
+    );
+    expect(saveScenarioExportMock).not.toHaveBeenCalled();
+    expect(publishMediaHubLibraryChangedMock).toHaveBeenCalledExactlyOnceWith('create', [
+      'scenario-export:export-1',
+    ]);
+  }
+);
+it('does not advertise failed artifact publication', async () => {
+  saveArtifactMock.mockRejectedValueOnce(new Error('quota'));
+  const ref = {
+    assetId: 'body',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/body' },
+    mimeType: 'text/html',
+    sha256: null,
+    size: 4,
+  };
+  await expect(
+    saveScenarioExportRecord({
+      projectId: 'project-1',
+      filename: 'saved.html',
+      format: 'html',
+      size: 4,
+      html: { mode: 'guide', ref },
+    })
+  ).rejects.toThrow('quota');
+  expect(publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
 });

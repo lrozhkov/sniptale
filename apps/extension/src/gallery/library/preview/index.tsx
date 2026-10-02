@@ -1,9 +1,14 @@
 import { hasGalleryKeyboardLayer } from '../keyboard/context';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { VideoReview } from '../../video-review';
 import { translate } from '../../../platform/i18n';
 import { PreviewSourceField } from './source-field';
-import { isGalleryMediaItem, isGalleryScenarioItem, isGalleryVideoProjectItem } from '../items';
+import {
+  isGalleryMediaItem,
+  isGalleryScenarioExportItem,
+  isGalleryScenarioItem,
+  isGalleryVideoProjectItem,
+} from '../items';
 import type { GalleryPreviewPresentation } from '../types';
 import type { PreviewPanelProps } from './types';
 import { PreviewInspectorControls } from './inspector-controls';
@@ -17,7 +22,11 @@ import {
 import { formatDate, getGalleryItemKindLabel } from '../ui';
 
 function isMetadataEditable(item: PreviewPanelProps['item']) {
-  return isGalleryMediaItem(item) || isGalleryScenarioItem(item);
+  return (
+    isGalleryMediaItem(item) ||
+    isGalleryScenarioItem(item) ||
+    (isGalleryScenarioExportItem(item) && item.format === 'html')
+  );
 }
 
 function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
@@ -67,10 +76,12 @@ function PreviewFilenameField(
   props: Pick<PreviewPanelProps, 'filenameDraft' | 'item' | 'onFilenameChange' | 'trashMode'>
 ) {
   const editable = !props.trashMode && isMetadataEditable(props.item);
+  const inputId = useId();
 
   return (
     <div>
       <label
+        htmlFor={inputId}
         className="mb-2 block text-xs font-semibold uppercase
           tracking-[0.12em] text-[var(--sniptale-color-text-muted-strong)]"
       >
@@ -84,6 +95,7 @@ function PreviewFilenameField(
         </p>
       ) : (
         <input
+          id={inputId}
           value={props.filenameDraft}
           onChange={(event) => props.onFilenameChange(event.target.value)}
           readOnly={!editable}

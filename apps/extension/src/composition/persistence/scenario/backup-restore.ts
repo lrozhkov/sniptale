@@ -17,6 +17,7 @@ import type {
 } from './contracts';
 import { parseScenarioAssetEntry, parseScenarioExportEntry } from './read-guards';
 import { parseScenarioStepEditorDocumentEntry } from './editor-documents';
+import { unlinkScenarioHtmlOwnership } from './export-artifacts';
 
 interface Store<T = unknown> {
   delete(key: IDBValidKey): Promise<unknown>;
@@ -35,6 +36,7 @@ interface PreparedScenarioProjectArchiveRoot {
   entry: ScenarioProjectEntry;
   exportThumbnails: MediaThumbnailEntry[];
   exports: ScenarioExportEntry[];
+  exportRefs?: AssetRef[];
   presentation?: AggregatePresentationEntry;
   stepDocuments: Array<{ entry: StoredScenarioStepEditorDocumentEntry; refs: AssetRef[] }>;
   thumbnail?: MediaThumbnailEntry;
@@ -101,6 +103,7 @@ async function deleteExisting(args: {
   for (const raw of await args.stores.exports.index('projectId').getAll(args.projectId)) {
     const entry = parseScenarioExportEntry(raw);
     if (!entry) continue;
+    await unlinkScenarioHtmlOwnership(entry.id, args.stores, args.operation);
     await args.stores.exports.delete(entry.id);
     await args.stores.thumbnails.delete(`scenario-export:${entry.id}`);
   }
@@ -184,7 +187,25 @@ async function publishScenarioSidecars(
   root: PreparedScenarioProjectArchiveRoot,
   stores: ScenarioBackupRestoreStores
 ) {
-  for (const entry of root.exports) await stores.exports.put(entry);
+  for (const entry of root.exports) {
+    if (entry.html) {
+      const ref = root.exportRefs?.find((candidate) => candidate.assetId === entry.html?.assetId);
+      if (
+        !ref ||
+        ref.size !== entry.size ||
+        !/^text\/html(?:;charset=utf-8)?$/iu.test(ref.mimeType)
+      )
+        throw new Error('Restored HTML export body is unavailable.');
+      await stores.refs.put(ref);
+      await stores.owners.put({
+        assetId: ref.assetId,
+        ownerId: entry.id,
+        ownerKind: 'scenario-export',
+        role: 'body',
+      });
+    }
+    await stores.exports.put(entry);
+  }
   for (const thumbnail of root.exportThumbnails) await stores.thumbnails.put(thumbnail);
   if (root.thumbnail) await stores.thumbnails.put(root.thumbnail);
   if (root.presentation) await stores.presentations.put(root.presentation);

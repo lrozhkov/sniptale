@@ -1,6 +1,10 @@
 import type { GalleryItem } from '../items';
 import type { GalleryPreviewController } from './controller-types';
-import { persistPreviewMetadata, type PreviewMetadataSnapshot } from './preview';
+import {
+  getPreviewMetadataValues,
+  persistPreviewMetadata,
+  type PreviewMetadataSnapshot,
+} from './preview';
 import type { GalleryBusyAction } from './shared';
 
 type PreviewState = GalleryPreviewController['state'];
@@ -30,10 +34,6 @@ function isSameDraft(left: PreviewDraft, right: PreviewDraft): boolean {
   return previewDraftKey(left) === previewDraftKey(right);
 }
 
-function metadataValues(item: GalleryItem, draft: PreviewDraft) {
-  return { filename: draft.filename.trim() || item.filename, tags: draft.tags };
-}
-
 function getPersistedBaseline(
   coordinator: PreviewNavigationCoordinator,
   source: GalleryItem
@@ -56,7 +56,7 @@ function needsPreviewNavigationSave(
   draft: PreviewDraft
 ): boolean {
   const persisted = getPersistedBaseline(coordinator, source);
-  const current = metadataValues(source, draft);
+  const current = getPreviewMetadataValues(source, draft);
   return (
     draft.hasChanges ||
     current.filename !== persisted.filename ||
@@ -72,7 +72,7 @@ function startPreviewSave(
   draft: PreviewDraft
 ) {
   const baseline = getPersistedBaseline(coordinator, source);
-  const values = metadataValues(source, draft);
+  const values = getPreviewMetadataValues(source, draft);
   const pending = {
     draftKey: previewDraftKey(draft),
     sourceId: source.id,
@@ -113,6 +113,30 @@ export async function savePreviewDraftAfterPending(
   }
   if (!needsPreviewNavigationSave(coordinator, source, draft)) return false;
   return startPreviewSave(controller, coordinator, source, draft).promise;
+}
+
+/** File actions flush the same serialized draft as navigation and reject an obsolete selection. */
+export async function savePreviewDraftBeforeDownload(
+  controller: GalleryPreviewController,
+  coordinator: PreviewNavigationCoordinator,
+  readState: () => PreviewState
+): Promise<boolean | null> {
+  const source = controller.state.preview.session.item;
+  if (!source) return null;
+  const draft = controller.state.preview.draft;
+  const revision = coordinator.revision;
+  const canContinue = () =>
+    coordinator.revision === revision &&
+    readState().preview.session.item?.id === source.id &&
+    isSameDraft(readState().preview.draft, draft);
+  const changed = await savePreviewDraftAfterPending(
+    controller,
+    coordinator,
+    source,
+    draft,
+    canContinue
+  );
+  return canContinue() ? changed : null;
 }
 
 export function createNavigatePreviewAction(

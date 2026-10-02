@@ -66,7 +66,7 @@ function createScenarioProjectSummary(
   overrides: Partial<ScenarioProjectSummary> = {}
 ): ScenarioProjectSummary {
   return {
-    availability: 'available' as const,
+    availability: overrides.availability ?? 'available',
     id: overrides.id ?? 'project-1',
     name: overrides.name ?? 'Scenario',
     createdAt: overrides.createdAt ?? 1,
@@ -106,6 +106,8 @@ function createScenarioExportEntry(
   overrides: Partial<ScenarioExportEntry> = {}
 ): ScenarioExportEntry {
   return {
+    ...(overrides.html ? { html: { ...overrides.html } } : {}),
+    ...(overrides.trashState ? { trashState: { ...overrides.trashState } } : {}),
     id: overrides.id ?? 'export-1',
     projectId: overrides.projectId ?? 'project-1',
     format: overrides.format ?? 'html',
@@ -121,6 +123,7 @@ export function createScenarioExportItem(
   const project = createScenarioProjectSummary(overrides.project);
   const exportEntry = createScenarioExportEntry({
     projectId: project.id,
+    ...(overrides.format ? { format: overrides.format } : {}),
     ...overrides.exportEntry,
   });
 

@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
+  useAppLocale: () => 'en',
 }));
 vi.mock('../../../composition/persistence/scenario/projects/viewing', () => ({
   readScenarioViewingSnapshot: mocks.snapshot,
@@ -32,8 +33,16 @@ vi.mock('../../../platform/navigation/extension-pages', async (original) => ({
   openScenarioEditorPage: mocks.openEditor,
 }));
 vi.mock('../../../platform/navigation/extension-pages/scenario-editor', () => ({
-  buildScenarioEditorUrl: ({ projectId, view }: { projectId: string; view?: string }) =>
-    `https://extension.test/?projectId=${projectId}${view ? `&view=${view}` : ''}`,
+  buildScenarioEditorUrl: ({
+    projectId,
+    view,
+    exportId,
+  }: {
+    projectId?: string;
+    view?: string;
+    exportId?: string;
+  }) =>
+    `https://extension.test/?${exportId ? `exportId=${exportId}` : `projectId=${projectId}`}${view ? `&view=${view}` : ''}`,
 }));
 
 const hosts: Array<{ root: ReturnType<typeof createRoot>; node: HTMLDivElement }> = [];
@@ -153,3 +162,35 @@ it('removes repeated ready-to-edit copy while retaining scenario availability re
   );
   expect(host.textContent).toContain('gallery.preview.projectUnavailable');
 });
+
+it.each(['saved-guide.html', 'saved-tour.html'])(
+  'exposes selected HTML file actions for %s separately from the current project',
+  async (filename) => {
+    mocks.snapshot.mockResolvedValue({ project: { name: 'Changed after export' } });
+    const item = createScenarioExportItem({ filename, format: 'html' });
+    const { host } = await render(<PreviewActions {...props(item)} />);
+    expect(host.querySelector('button[aria-label="gallery.preview.download"]')).not.toBeNull();
+    expect(host.textContent).toContain('View saved HTML');
+    expect(host.textContent).toContain('Open current project');
+  }
+);
+
+it.each(['guide', 'tour'] as const)(
+  'links only the selected saved %s identity even when current project is invalid',
+  async (mode) => {
+    const base = createScenarioExportItem();
+    const item = createScenarioExportItem({
+      exportEntry: { ...base.exportEntry, html: { mode, assetId: 'saved-body' } },
+      project: { ...base.project, availability: 'invalid' },
+    });
+    const { host } = await render(<PreviewActions {...props(item)} />);
+    const link = host.querySelector<HTMLAnchorElement>('a[href*="exportId="]');
+    expect(link?.href).toContain(`exportId=${item.entityId}`);
+    expect(link?.href).toContain('view=export');
+    expect(
+      host.querySelector<HTMLButtonElement>('button[aria-label="gallery.preview.download"]')
+        ?.disabled
+    ).toBe(false);
+    expect(host.querySelector('a[href*="projectId="]')).toBeNull();
+  }
+);

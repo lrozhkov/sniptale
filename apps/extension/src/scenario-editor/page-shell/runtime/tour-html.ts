@@ -16,6 +16,7 @@ import {
 } from '../../../composition/persistence/scenario/store/public';
 import { createDirectFileSink } from '../../../composition/archive-transfer';
 import { prepareTourRaster, type TourHtmlImageOptions } from './tour-html-images';
+import { createScenarioHtmlCapture } from '../../../composition/persistence/scenario/export-artifacts';
 
 /** A detached artifact is the only input to both preview and save. */
 export interface PreparedTourHtml {
@@ -113,14 +114,17 @@ export async function saveTourHtml(
     mimeType: 'text/html',
     description: 'HTML',
   });
+  const capture = await createScenarioHtmlCapture();
   try {
     const writer = sink.writable.getWriter();
     try {
       for (let offset = 0; offset < artifact.blob.size; offset += 96 * 1024) {
         signal.throwIfAborted();
-        await writer.write(
-          new Uint8Array(await artifact.blob.slice(offset, offset + 96 * 1024).arrayBuffer())
+        const bytes = new Uint8Array(
+          await artifact.blob.slice(offset, offset + 96 * 1024).arrayBuffer()
         );
+        await writer.write(bytes);
+        await capture.append(bytes);
       }
     } finally {
       writer.releaseLock();
@@ -128,15 +132,21 @@ export async function saveTourHtml(
     signal.throwIfAborted();
     await sink.close();
   } catch (error) {
-    await sink.abort(error);
+    try {
+      await sink.abort(error);
+    } finally {
+      await capture.abort();
+    }
     throw error;
   }
   try {
+    const { ref } = await capture.finalize();
     await saveScenarioExportRecord({
       projectId: artifact.projectId,
       filename: artifact.filename,
       format: 'html',
       size: artifact.blob.size,
+      html: { mode: 'tour', ref },
     });
     return 'saved';
   } catch {

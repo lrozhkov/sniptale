@@ -84,6 +84,13 @@ function cleanStem(value: string): string {
     : cleaned;
 }
 
+/** Manual HTML renames retain the extension and the product's safe UTF-8 leaf-name policy. */
+export function normalizeHtmlExportFilename(value: string, fallback: string): string {
+  const stem = cleanStem(value.trim().replace(/\.html$/iu, ''));
+  const previous = cleanStem(fallback.trim().replace(/\.html$/iu, ''));
+  return `${cleanStem(truncateUtf8(stem || previous || 'export', MAX_FILENAME_BYTES - 5))}.html`;
+}
+
 function getTimestamp(value: number): number {
   return Number.isFinite(value) && Math.abs(value) <= 8.64e15 ? value : 0;
 }

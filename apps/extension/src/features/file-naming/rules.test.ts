@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FILENAME_CATEGORIES, parseFilenameRules, resolveFilename } from './rules';
+import {
+  FILENAME_CATEGORIES,
+  normalizeHtmlExportFilename,
+  parseFilenameRules,
+  resolveFilename,
+} from './rules';
 const context = {
   timestamp: Date.UTC(2026, 8, 26, 12, 30, 45, 123),
   timezoneOffset: -180,
@@ -80,5 +85,25 @@ describe('central filename rules', () => {
     expect(parseFilenameRules({ template: 'ok', recordings: 4 })).toBeNull();
     expect(parseFilenameRules({ template: 'a'.repeat(201) })).toBeNull();
     expect(parseFilenameRules({ template: '', images: '' })).toEqual({ template: '', images: '' });
+  });
+});
+
+describe('manual HTML export names', () => {
+  it.each([
+    [' Guide.HTML ', 'Guide.html'],
+    ['Tour', 'Tour.html'],
+    ['demo.zip', 'demo.zip.html'],
+    ['A/B:tour?', 'A_B_tour_.html'],
+    ['CON', '_CON.html'],
+    ['..', 'previous.html'],
+    ['', 'previous.html'],
+    ['\u202etour\u0000', 'tour.html'],
+  ])('normalizes %s without changing its HTML format', (value, expected) => {
+    expect(normalizeHtmlExportFilename(value, 'previous.html')).toBe(expected);
+  });
+  it('bounds UTF-8 bytes and retains the extension', () => {
+    const name = normalizeHtmlExportFilename('Т'.repeat(300), 'old.html');
+    expect(new TextEncoder().encode(name).length).toBeLessThanOrEqual(200);
+    expect(name.endsWith('.html')).toBe(true);
   });
 });

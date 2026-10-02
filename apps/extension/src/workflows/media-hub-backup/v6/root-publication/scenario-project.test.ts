@@ -600,3 +600,70 @@ it('rejects oversized narration before publishing an aggregate', async () => {
   expect(io.put).not.toHaveBeenCalled();
   expect(io.checkpoint).not.toHaveBeenCalled();
 });
+
+it.each(['guide', 'tour'] as const)(
+  'retains restored %s HTML objects and remaps only catalogue identity on duplication',
+  async (mode) => {
+    const { args } = input();
+    const ref: AssetRef = {
+      assetId: 'restored-html',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/restored-html' },
+      mimeType: 'text/html',
+      sha256: null,
+      size: 4,
+    };
+    const metadata = args.envelope.metadata as unknown as { exports: unknown[] };
+    metadata.exports = [
+      {
+        id: 'saved',
+        projectId: 'guide',
+        filename: 'renamed.html',
+        format: 'html',
+        createdAt: 1,
+        size: 4,
+        html: { mode, objectId: 'html-object' },
+      },
+    ];
+    args.staged.push({ objectId: 'html-object', ref });
+    args.journal.assetRefs.push(ref);
+    const result = await scenarioProjectRootPublisher.publish(args);
+    const root = io.put.mock.calls[0]![0].root;
+    expect(root.exports[0]).toMatchObject({
+      projectId: root.entry.id,
+      filename: 'renamed.html',
+      size: 4,
+      html: { mode, assetId: ref.assetId },
+    });
+    expect(root.exports[0].id).not.toBe('saved');
+    expect(root.exportRefs).toEqual([ref]);
+    expect(result.retainedAssetIds).toContain(ref.assetId);
+  }
+);
+
+it('aborts archive replacement if retained HTML graph cleanup fails after mutation starts', async () => {
+  const { args } = input();
+  args.session.strategy = 'replace';
+  let rootPresent = true;
+  const abort = vi.fn(() => {
+    rootPresent = true;
+  });
+  io.put.mockImplementationOnce(async () => {
+    rootPresent = false;
+    throw new Error('Scenario HTML ownership is invalid.');
+  });
+  io.mutate.mockImplementation(async (effect) =>
+    effect({
+      get: async () => ({ id: 'guide' }),
+      transaction: () => ({
+        abort,
+        objectStore: () => ({ get: vi.fn(), put: vi.fn() }),
+        done: Promise.resolve(),
+      }),
+    })
+  );
+  await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow('ownership is invalid');
+  expect(rootPresent).toBe(true);
+  expect(abort).toHaveBeenCalledOnce();
+  expect(io.checkpoint).not.toHaveBeenCalled();
+});

@@ -6,7 +6,16 @@ import {
 } from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
 import { tourPlayerLabels } from '../tour/labels';
-const io = vi.hoisted(() => ({ asset: vi.fn(), raster: vi.fn(), sink: vi.fn(), record: vi.fn() }));
+const io = vi.hoisted(() => ({
+  asset: vi.fn(),
+  raster: vi.fn(),
+  sink: vi.fn(),
+  record: vi.fn(),
+  capture: vi.fn(),
+  retain: vi.fn(),
+  captureAbort: vi.fn(),
+  finish: vi.fn(),
+}));
 vi.mock('../../../composition/persistence/scenario/store/public', () => ({
   getScenarioAssetBlob: io.asset,
   saveScenarioExportRecord: io.record,
@@ -16,6 +25,9 @@ vi.mock('../../../composition/archive-transfer', async (original) => ({
   createDirectFileSink: io.sink,
 }));
 vi.mock('./tour-html-images', () => ({ prepareTourRaster: io.raster }));
+vi.mock('../../../composition/persistence/scenario/export-artifacts', () => ({
+  createScenarioHtmlCapture: io.capture,
+}));
 import { prepareTourHtml, saveTourHtml } from './tour-html';
 function fixture() {
   const project = createGuideProject('Export');
@@ -70,7 +82,29 @@ function fixture() {
     signal: new AbortController().signal,
   };
 }
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  io.finish.mockImplementation(async (ref) => ({ ref }));
+  io.capture.mockImplementation(async () => {
+    const chunks: Uint8Array[] = [];
+    return {
+      append: async (chunk: Uint8Array) => {
+        chunks.push(new Uint8Array(chunk));
+        io.retain(chunk);
+      },
+      abort: io.captureAbort,
+      finalize: () =>
+        io.finish({
+          assetId: 'saved-html',
+          createdAt: 1,
+          sha256: null,
+          mimeType: 'text/html;charset=utf-8',
+          size: chunks.reduce((size, chunk) => size + chunk.length, 0),
+          location: { kind: 'opfs', objectKey: 'objects/saved-html' },
+        }),
+    };
+  });
+});
 it('uses the supplied read-only media authority without invoking export persistence', async () => {
   const args = fixture();
   const readAsset = vi.fn(
@@ -142,6 +176,12 @@ it('streams precisely the prepared file; aborts write failure and records only a
     await artifact.blob.text()
   );
   expect(order).toEqual(['close', 'record']);
+  expect(io.retain.mock.calls.map(([chunk]) => chunk)).toEqual(chunks);
+  expect(io.record).toHaveBeenCalledWith(
+    expect.objectContaining({
+      html: { mode: 'tour', ref: expect.objectContaining({ size: artifact.blob.size }) },
+    })
+  );
   io.record.mockClear();
   io.sink.mockResolvedValue({
     writable: new WritableStream({

@@ -78,53 +78,63 @@ export async function commitScenarioProjectPublication(
       ],
       'readwrite'
     );
-    for (const asset of prepared.root.assets) {
-      if (!asset.entry.borrowedMediaId) continue;
-      await assertBorrowedScenarioAssetSource(tx, asset.entry);
-      const currentRef = parseAssetRef(
-        await tx.objectStore(ASSET_REFS_STORE).get(asset.ref.assetId)
+    try {
+      for (const asset of prepared.root.assets) {
+        if (!asset.entry.borrowedMediaId) continue;
+        await assertBorrowedScenarioAssetSource(tx, asset.entry);
+        const currentRef = parseAssetRef(
+          await tx.objectStore(ASSET_REFS_STORE).get(asset.ref.assetId)
+        );
+        if (
+          !currentRef ||
+          currentRef.assetId !== asset.ref.assetId ||
+          JSON.stringify(currentRef.location) !== JSON.stringify(asset.ref.location)
+        ) {
+          throw new Error('Restored borrowed scenario source changed before publication.');
+        }
+      }
+      const restored = await putScenarioProjectBackupRestore({
+        operation: prepared.operation,
+        root: prepared.root,
+        stores: {
+          assets: tx.objectStore(SCENARIO_ASSETS_STORE),
+          exports: tx.objectStore(SCENARIO_EXPORTS_STORE),
+          operations: tx.objectStore(ASSET_OPERATIONS_STORE),
+          owners: tx.objectStore(ASSET_OWNERS_STORE),
+          presentations: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
+          projects: tx.objectStore(SCENARIO_PROJECTS_STORE),
+          refs: tx.objectStore(ASSET_REFS_STORE),
+          stepDocuments: tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
+          thumbnails: tx.objectStore(THUMBNAILS_STORE),
+        },
+        strategy: session.strategy,
+      });
+      const childIds = await checkpointScenarioChildren(tx, prepared, restored.imported);
+      if (prepared.operation.assetIds.length > 0) {
+        await tx.objectStore(ASSET_OPERATIONS_STORE).put(prepared.operation);
+      }
+      await appendCommittedArchiveRootInTransaction(
+        tx.objectStore(ASSET_OPERATIONS_STORE),
+        session.operationId,
+        {
+          childIds,
+          conflicted: restored.conflicted,
+          imported: restored.imported,
+          rootKey: prepared.rootKey,
+          targetRootId: prepared.targetProjectId,
+        }
       );
-      if (
-        !currentRef ||
-        currentRef.assetId !== asset.ref.assetId ||
-        JSON.stringify(currentRef.location) !== JSON.stringify(asset.ref.location)
-      ) {
-        throw new Error('Restored borrowed scenario source changed before publication.');
+      await tx.done;
+      return restored;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* The transaction may already have closed. */
       }
+      await tx.done.catch(() => undefined);
+      throw error;
     }
-    const restored = await putScenarioProjectBackupRestore({
-      operation: prepared.operation,
-      root: prepared.root,
-      stores: {
-        assets: tx.objectStore(SCENARIO_ASSETS_STORE),
-        exports: tx.objectStore(SCENARIO_EXPORTS_STORE),
-        operations: tx.objectStore(ASSET_OPERATIONS_STORE),
-        owners: tx.objectStore(ASSET_OWNERS_STORE),
-        presentations: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
-        projects: tx.objectStore(SCENARIO_PROJECTS_STORE),
-        refs: tx.objectStore(ASSET_REFS_STORE),
-        stepDocuments: tx.objectStore(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
-        thumbnails: tx.objectStore(THUMBNAILS_STORE),
-      },
-      strategy: session.strategy,
-    });
-    const childIds = await checkpointScenarioChildren(tx, prepared, restored.imported);
-    if (prepared.operation.assetIds.length > 0) {
-      await tx.objectStore(ASSET_OPERATIONS_STORE).put(prepared.operation);
-    }
-    await appendCommittedArchiveRootInTransaction(
-      tx.objectStore(ASSET_OPERATIONS_STORE),
-      session.operationId,
-      {
-        childIds,
-        conflicted: restored.conflicted,
-        imported: restored.imported,
-        rootKey: prepared.rootKey,
-        targetRootId: prepared.targetProjectId,
-      }
-    );
-    await tx.done;
-    return restored;
   });
   if (prepared.operation.assetIds.length > 0) {
     await completePhysicalDeleteOperation(prepared.operation).catch(() => undefined);
@@ -135,6 +145,7 @@ export async function commitScenarioProjectPublication(
     retainedAssetIds: result.imported
       ? [
           ...prepared.root.assets.map((asset) => asset.ref.assetId),
+          ...(prepared.root.exportRefs ?? []).map((ref) => ref.assetId),
           ...prepared.root.stepDocuments.flatMap((document) =>
             document.refs.map((ref) => ref.assetId)
           ),

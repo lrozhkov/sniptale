@@ -5,6 +5,11 @@ import {
 } from '../shared/web-snapshot';
 
 export const galleryPreviewMessages = defineMessageSource({
+  openExport: { ru: 'Просмотреть сохранённый HTML', en: 'View saved HTML' },
+  exportFileUnavailable: {
+    ru: 'HTML-файл этой записи не сохранён в библиотеке. Откройте скачанный файл или создайте новый экспорт из проекта.',
+    en: 'This entry has no HTML file stored in the library. Open the downloaded file or create a new export from the project.',
+  },
   projectsHeading: { ru: 'Проекты', en: 'Projects' },
   materialsList: { ru: 'Список материалов', en: 'Materials list' },
   showMaterials: { ru: 'Показать материалы', en: 'Show materials' },

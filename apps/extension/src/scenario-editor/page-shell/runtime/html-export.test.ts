@@ -6,7 +6,16 @@ import {
   createGuideProject,
 } from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
-const io = vi.hoisted(() => ({ sink: vi.fn(), asset: vi.fn(), record: vi.fn(), render: vi.fn() }));
+const io = vi.hoisted(() => ({
+  sink: vi.fn(),
+  asset: vi.fn(),
+  record: vi.fn(),
+  capture: vi.fn(),
+  retain: vi.fn(),
+  captureAbort: vi.fn(),
+  finish: vi.fn(),
+  render: vi.fn(),
+}));
 vi.mock('../../../composition/archive-transfer', async (original) => ({
   ...(await original<typeof import('../../../composition/archive-transfer')>()),
   createDirectFileSink: io.sink,
@@ -17,6 +26,9 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (origina
   saveScenarioExportRecord: io.record,
 }));
 vi.mock('../html-document', () => ({ buildGuideHtml: io.render }));
+vi.mock('../../../composition/persistence/scenario/export-artifacts', () => ({
+  createScenarioHtmlCapture: io.capture,
+}));
 import { exportGuideHtml, measureGuideHtml, prepareGuideHtml } from './html-export';
 
 function setup() {
@@ -74,7 +86,29 @@ function setup() {
   };
   return { chunks, order, close, abort, png, controller, args };
 }
-beforeEach(() => vi.resetAllMocks());
+beforeEach(() => {
+  vi.resetAllMocks();
+  io.finish.mockImplementation(async (ref) => ({ ref }));
+  io.capture.mockImplementation(async () => {
+    const chunks: Uint8Array[] = [];
+    return {
+      append: async (chunk: Uint8Array) => {
+        chunks.push(new Uint8Array(chunk));
+        io.retain(chunk);
+      },
+      abort: io.captureAbort,
+      finalize: () =>
+        io.finish({
+          assetId: 'saved-html',
+          createdAt: 1,
+          sha256: null,
+          mimeType: 'text/html;charset=utf-8',
+          size: chunks.reduce((size, chunk) => size + chunk.length, 0),
+          location: { kind: 'opfs', objectKey: 'objects/saved-html' },
+        }),
+    };
+  });
+});
 it('prepares identical resolved bytes without opening a file or recording export history', async () => {
   const s = setup();
   const blob = await prepareGuideHtml({ ...s.args, readAsset: io.asset });
@@ -91,6 +125,15 @@ it('streams exact bytes and records export only after file commit', async () => 
   const payload = html.split('base64,')[1]!.split('"')[0]!;
   expect(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0))).toEqual(s.png);
   expect(s.order).toEqual(['close', 'record']);
+  expect(io.retain.mock.calls.map(([chunk]) => chunk)).toEqual(s.chunks);
+  expect(io.record).toHaveBeenCalledWith(
+    expect.objectContaining({
+      html: {
+        mode: 'guide',
+        ref: expect.objectContaining({ size: new TextEncoder().encode(html).length }),
+      },
+    })
+  );
   expect(s.abort).not.toHaveBeenCalled();
   expect(io.record).toHaveBeenCalledWith(
     expect.objectContaining({ size: new TextEncoder().encode(html).length })
@@ -185,4 +228,13 @@ it('measures the exact streamed file size and rejects unresolved raster markers'
   });
   await expect(exportGuideHtml(next.args)).rejects.toThrow('Unknown export image');
   expect(next.abort).toHaveBeenCalledOnce();
+});
+
+it('preserves the committed native file if immutable library retention fails', async () => {
+  const s = setup();
+  io.finish.mockRejectedValueOnce(new Error('quota'));
+  expect(await exportGuideHtml(s.args)).toBe('history-failed');
+  expect(s.close).toHaveBeenCalledOnce();
+  expect(s.abort).not.toHaveBeenCalled();
+  expect(io.record).not.toHaveBeenCalled();
 });

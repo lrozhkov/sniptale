@@ -189,7 +189,11 @@ describe('useGalleryAppActions', () => {
       expect.any(Function)
     );
     expect(actionMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
-    expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
+    expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(
+      controller,
+      runBusyAction,
+      expect.any(Function)
+    );
     expect(actionMocks.downloadOriginalPreviewItemMock).toHaveBeenCalledWith(
       controller,
       runBusyAction

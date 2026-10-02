@@ -40,3 +40,16 @@ it('enforces the blob budget and binds status without admitting commands', () =>
     )
   ).toBeNull();
 });
+
+it('carries only a bounded fixed-runtime digest for saved-file admission', () => {
+  const message = {
+    kind: 'tour-preview',
+    mode: 'guide',
+    nonce: 'n',
+    blob: new Blob(['x'], { type: 'text/html' }),
+    scriptHash: 'A'.repeat(43) + '=',
+  };
+  expect(readTourPreviewMessage(message, 'n')?.scriptHash).toBe(message.scriptHash);
+  for (const scriptHash of [null, 4, '', 'bad', 'A'.repeat(1000)])
+    expect(readTourPreviewMessage({ ...message, scriptHash }, 'n')).toBeNull();
+});

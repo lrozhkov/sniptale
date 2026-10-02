@@ -41,6 +41,12 @@ const audioMimes = new Set([
   'audio/wav',
   'audio/x-wav',
 ]);
+
+/** Fixed executable digest is generated from the bundled player, never from restored metadata. */
+export async function getTourPlayerRuntimeHash(): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(script));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
 function escape(value: string): string {
   return value.replace(
     /[&<>"']/gu,
@@ -118,8 +124,7 @@ async function buildTourPlayerShell(args: {
     .replace(/</gu, '\\u003c')
     .replace(/\u2028/gu, '\\u2028')
     .replace(/\u2029/gu, '\\u2029');
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(script));
-  const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  const hash = await getTourPlayerRuntimeHash();
   const policy = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
   const labels = args.labels;
   return [

@@ -39,6 +39,7 @@ import {
   createPreviewNavigationCoordinator,
   previewDraftKey,
   savePreviewDraftAfterPending,
+  savePreviewDraftBeforeDownload,
   type PreviewNavigationCoordinator,
 } from './preview-navigation';
 import {
@@ -121,7 +122,14 @@ function buildGalleryAppActionsResult(args: {
     preview: {
       close: args.handlePreviewClose,
       copy: () => copyPreviewItem(controller, withBusy),
-      download: () => downloadPreviewItem(controller, withBusy),
+      download: () =>
+        downloadPreviewItem(controller, withBusy, () =>
+          savePreviewDraftBeforeDownload(
+            controller,
+            args.navigationCoordinator,
+            args.readPreviewState
+          )
+        ),
       downloadOriginal: () => downloadOriginalPreviewItem(controller, withBusy),
       navigate: (target: GalleryItem) =>
         createNavigatePreviewAction(

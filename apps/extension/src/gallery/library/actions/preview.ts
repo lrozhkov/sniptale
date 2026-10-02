@@ -33,6 +33,10 @@ import {
 import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import { translate } from '../../../platform/i18n';
 import { openGalleryConfirmDialog } from './shared';
+import { isGalleryScenarioExportItem } from '../items';
+import { normalizeHtmlExportFilename } from '../../../features/file-naming/rules';
+import { renameScenarioHtmlExportRecord } from '../../../composition/persistence/scenario/store/project-records/exports';
+import { readScenarioHtmlArtifact } from '../../../composition/persistence/scenario/export-artifacts';
 
 type PreviewMediaMetadataPatch = Partial<Pick<MediaLibraryEntry, 'filename' | 'tags'>>;
 
@@ -40,6 +44,17 @@ export interface PreviewMetadataSnapshot {
   item: GalleryItem;
   draft: GalleryPreviewController['state']['preview']['draft'];
   baseline: { filename: string; tags: string[] };
+}
+
+/** One normalized draft projection is shared by persistence and navigation's saved baseline. */
+export function getPreviewMetadataValues(
+  item: GalleryItem,
+  draft: GalleryPreviewController['state']['preview']['draft']
+) {
+  const filename = draft.filename.trim() || item.filename;
+  return isGalleryScenarioExportItem(item) && item.format === 'html'
+    ? { filename: normalizeHtmlExportFilename(filename, item.filename), tags: item.tags }
+    : { filename, tags: draft.tags };
 }
 
 export function openInEditor(item: GalleryItem) {
@@ -78,15 +93,29 @@ function resetPreview(controller: GalleryPreviewController) {
 async function withPreviewItemBlob(
   controller: GalleryPreviewController,
   withBusy: GalleryBusyAction,
-  effect: (item: GalleryItem, blob: Blob) => Promise<void> | void
+  effect: (item: GalleryItem, blob: Blob) => Promise<void> | void,
+  saveMetadata?: () => Promise<boolean | null>
 ): Promise<boolean> {
   const previewItem = controller.state.preview.session.item;
-  if (!previewItem || !isGalleryMediaItem(previewItem)) {
+  if (
+    !previewItem ||
+    (!isGalleryMediaItem(previewItem) &&
+      !(isGalleryScenarioExportItem(previewItem) && previewItem.format === 'html'))
+  ) {
     return false;
   }
 
   let completed = false;
   await withBusy(async () => {
+    if (isGalleryScenarioExportItem(previewItem)) {
+      const saved = await (saveMetadata?.() ?? persistPreviewMetadata(controller));
+      if (saved === null) return;
+      const artifact = await readScenarioHtmlArtifact(previewItem.entityId);
+      if (!artifact) throw createMissingBlobError(previewItem.filename);
+      await effect({ ...previewItem, filename: artifact.entry.filename }, artifact.blob);
+      completed = true;
+      return;
+    }
     const assetId = previewItem.entityId ?? previewItem.id;
     const blob =
       previewItem.source.kind === 'screenshot'
@@ -104,11 +133,17 @@ async function withPreviewItemBlob(
 
 export function downloadPreviewItem(
   controller: GalleryPreviewController,
-  withBusy: GalleryBusyAction
+  withBusy: GalleryBusyAction,
+  saveMetadata?: () => Promise<boolean | null>
 ): Promise<boolean> {
-  return withPreviewItemBlob(controller, withBusy, (item, blob) => {
-    downloadBlob(blob, item.filename);
-  });
+  return withPreviewItemBlob(
+    controller,
+    withBusy,
+    (item, blob) => {
+      downloadBlob(blob, item.filename);
+    },
+    saveMetadata
+  );
 }
 
 function getPreviewImageAggregate(controller: GalleryPreviewController) {
@@ -241,9 +276,14 @@ export async function persistPreviewMetadata(
     return false;
   }
 
-  const nextFilename = draft.filename.trim() || previewItem.filename;
-  const nextTags = draft.tags;
+  const { filename: nextFilename, tags: nextTags } = getPreviewMetadataValues(previewItem, draft);
   const baseline = snapshot?.baseline ?? previewItem;
+
+  if (isGalleryScenarioExportItem(previewItem) && previewItem.format === 'html') {
+    if (nextFilename === baseline.filename) return false;
+    await renameScenarioHtmlExportRecord(previewItem.entityId, nextFilename);
+    return true;
+  }
 
   if (isGalleryMediaItem(previewItem)) {
     const patch = buildPreviewMediaMetadataPatch(baseline, nextFilename, nextTags);

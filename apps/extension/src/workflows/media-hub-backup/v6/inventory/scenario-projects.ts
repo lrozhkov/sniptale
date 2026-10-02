@@ -17,6 +17,7 @@ import {
 } from '../../../../composition/persistence/scenario/read-guards';
 import { parseMediaLibraryEntry } from '../../../../composition/persistence/media-library/read-guards';
 import type { ScenarioProjectEntry } from '../../../../composition/persistence/scenario/contracts';
+import type { ScenarioExportEntry } from '../../../../composition/persistence/scenario/contracts';
 import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
 import { encodePortableEditorDocument } from '../root-codecs/editor-document';
 import { encodePortableThumbnail } from '../root-codecs/media';
@@ -163,6 +164,45 @@ async function buildScenarioExportThumbnails(
   return output;
 }
 
+async function buildScenarioExports(
+  db: InventoryDatabase,
+  project: ScenarioProjectEntry,
+  collector: ReturnType<typeof createObjectCollector>
+): Promise<PortableScenarioProjectMetadata['exports']> {
+  const rows = (await db.getAllFromIndex(SCENARIO_EXPORTS_STORE, 'projectId', project.id))
+    .map(parseScenarioExportEntry)
+    .filter((value): value is ScenarioExportEntry => value !== null)
+    .sort((left, right) => left.id.localeCompare(right.id));
+  const exports: PortableScenarioProjectMetadata['exports'] = [];
+  for (const row of rows) {
+    const { html, ...metadata } = row;
+    if (!html) {
+      exports.push(metadata);
+      continue;
+    }
+    const file = await readInventoryAssetFile(db, html.assetId, row.filename);
+    if (file.size !== row.size || !/^text\/html(?:;charset=utf-8)?$/iu.test(file.type))
+      throw new Error('Stored HTML export differs from its catalogue.');
+    exports.push({
+      ...metadata,
+      html: {
+        mode: html.mode,
+        objectId: collector.addObject(
+          file,
+          row.filename,
+          file.type,
+          withDraftRoot(project.lifecycle?.storageClass === 'temporary', [
+            'Scenarios',
+            project.project.name,
+            'Exports',
+          ])
+        ),
+      },
+    });
+  }
+  return exports;
+}
+
 async function buildScenarioProjectRoot(args: {
   db: InventoryDatabase;
   entry: ScenarioProjectEntry;
@@ -175,12 +215,7 @@ async function buildScenarioProjectRoot(args: {
     args.paths
   );
   const assets = await buildScenarioAssets(args.db, args.entry, collector);
-  const exports = (
-    await args.db.getAllFromIndex(SCENARIO_EXPORTS_STORE, 'projectId', args.entry.id)
-  )
-    .map(parseScenarioExportEntry)
-    .filter((value): value is NonNullable<typeof value> => value !== null)
-    .sort((left, right) => left.id.localeCompare(right.id));
+  const exports = await buildScenarioExports(args.db, args.entry, collector);
   const stepDocuments = await buildScenarioDocuments(args.db, args.entry, collector, args.options);
   const exportThumbnails = await buildScenarioExportThumbnails(args.db, exports, collector);
   const storedProjectThumbnail = parseMediaThumbnailEntry(

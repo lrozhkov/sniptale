@@ -52,3 +52,32 @@ it('preserves independent export Trash metadata through the canonical decoder an
     expect(parseScenarioExportEntry({ ...legacy, trashState })).toBeNull();
   }
 });
+
+it('preserves immutable HTML identity and rejects malformed or foreign-format artifacts', () => {
+  const entry = {
+    id: 'export',
+    projectId: 'project',
+    format: 'html',
+    filename: 'saved.html',
+    createdAt: 1,
+    size: 4,
+  };
+  for (const mode of ['guide', 'tour']) {
+    const value = { ...entry, html: { mode, assetId: 'body' } };
+    expect(parseScenarioExportEntry(value)).toEqual(value);
+  }
+  for (const html of [
+    null,
+    {},
+    { mode: 'pdf', assetId: 'body' },
+    { mode: 'guide', assetId: '' },
+    { mode: 'guide', assetId: 4 },
+  ])
+    expect(parseScenarioExportEntry({ ...entry, html })).toBeNull();
+  expect(
+    parseScenarioExportEntry({ ...entry, format: 'pdf', html: { mode: 'guide', assetId: 'body' } })
+  ).toBeNull();
+  expect(
+    parseScenarioExportEntry({ ...entry, size: 0, html: { mode: 'guide', assetId: 'body' } })
+  ).toBeNull();
+});

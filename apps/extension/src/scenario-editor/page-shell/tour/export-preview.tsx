@@ -10,10 +10,12 @@ export function TourExportPreview({
   blob,
   title,
   mode = 'tour',
+  scriptHash,
 }: {
   blob: Blob;
   title: string;
   mode?: 'guide' | 'tour';
+  scriptHash?: string;
 }) {
   const [nonce] = useState(() => crypto.randomUUID());
   const frame = useRef<HTMLIFrameElement>(null);
@@ -51,7 +53,13 @@ export function TourExportPreview({
           sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           allow="autoplay"
           onLoad={(event) => {
-            const message: TourPreviewMessage = { kind: 'tour-preview', mode, nonce, blob };
+            const message: TourPreviewMessage = {
+              kind: 'tour-preview',
+              mode,
+              nonce,
+              blob,
+              ...(scriptHash ? { scriptHash } : {}),
+            };
             event.currentTarget.contentWindow?.postMessage(message, '*');
           }}
         />

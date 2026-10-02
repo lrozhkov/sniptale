@@ -51,6 +51,8 @@ export interface ScenarioExportTrashState {
 }
 
 export interface ScenarioExportEntry {
+  /** Immutable standalone bytes; absent on legacy metadata-only catalogue entries. */
+  html?: { mode: 'guide' | 'tour'; assetId: string };
   /** Independent catalogue retention; source project resources remain owned by the project. */
   trashState?: ScenarioExportTrashState;
   id: string;

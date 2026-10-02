@@ -19,6 +19,12 @@ import type {
 import type { Translate } from '../../platform/i18n';
 import { GuideReadDocument } from './reader-document';
 
+/** Fixed executable digest admits saved HTML without trusting hashes supplied by an archive. */
+export async function getGuideHtmlRuntimeHash(): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(viewerScript));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
+
 /** Static SVG references share raster bytes without requiring JavaScript to read the guide. */
 export async function buildGuideHtml(
   project: GuideProject,
@@ -27,8 +33,7 @@ export async function buildGuideHtml(
   media: { rasters: HtmlRaster[]; blocks: ReadonlyMap<string, number> },
   reading: GuideReadingOptions = DEFAULT_GUIDE_READING
 ) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(viewerScript));
-  const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  const hash = await getGuideHtmlRuntimeHash();
   const exportedProject = {
     ...project,
     items: project.items.map((item) => ({ ...item, id: `guide-item-${item.id}` })),

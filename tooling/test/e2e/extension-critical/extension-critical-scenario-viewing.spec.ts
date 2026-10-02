@@ -484,3 +484,194 @@ test('library scenario glyphs retain grid and folder geometry in both themes at 
   ).toBeVisible();
   await page.close();
 });
+
+async function savedHtmlRows(page: Page) {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise<
+      Array<{ id: string; filename: string; html?: { mode: 'guide' | 'tour'; assetId: string } }>
+    >((resolve) => {
+      const request = db.transaction('scenario_exports').objectStore('scenario_exports').getAll();
+      request.onsuccess = () => resolve(request.result);
+    });
+    db.close();
+    return rows.filter((row) => row.html);
+  });
+}
+
+for (const { locale, theme } of [
+  { locale: 'en', theme: 'light' },
+  { locale: 'ru', theme: 'dark' },
+]) {
+  test(`saved guide and tour keep exact native bytes after source changes and catalogue rename at 1280 ${locale}`, async ({
+    context,
+    extensionId,
+  }) => {
+    const library = await context.newPage();
+    await library.setViewportSize({ width: 1280, height: 720 });
+    await library.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
+    await expect(library.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+    await expect
+      .poll(() =>
+        library.evaluate(
+          async () =>
+            (await chrome.storage.local.get('sniptale-locale-preference'))[
+              'sniptale-locale-preference'
+            ]
+        )
+      )
+      .toMatch(/^(en|ru)$/);
+    await library.evaluate(
+      async ({ locale, theme }) =>
+        chrome.storage.local.set({
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': theme,
+        }),
+      { locale, theme }
+    );
+    await seed(library);
+    const existingIds = new Set((await savedHtmlRows(library)).map((row) => row.id));
+    const nativeDigests = new Map<string, string>();
+    for (const mode of ['guide', 'tour'] as const) {
+      const editor = await context.newPage();
+      await editor.setViewportSize({ width: 1280, height: 720 });
+      await editor.addInitScript(() => {
+        Object.defineProperty(window, 'showSaveFilePicker', {
+          configurable: true,
+          value: async () => ({
+            createWritable: async () => {
+              const chunks: Uint8Array<ArrayBuffer>[] = [];
+              return new WritableStream<Uint8Array>({
+                write: (chunk) => {
+                  chunks.push(new Uint8Array(chunk));
+                },
+                close: async () => {
+                  const blob = new Blob(chunks, { type: 'text/html' });
+                  const hash = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
+                  document.documentElement.dataset.nativeDigest = [...new Uint8Array(hash)]
+                    .map((byte) => byte.toString(16).padStart(2, '0'))
+                    .join('');
+                },
+              });
+            },
+          }),
+        });
+      });
+      await editor.goto(
+        `chrome-extension://${extensionId}/apps/extension/src/scenario-editor/index.html?projectId=html-proof`
+      );
+      if (mode === 'tour')
+        await editor
+          .getByRole('button', { name: /^(Interactive tour|Интерактивный тур)$/, exact: true })
+          .click();
+      await editor.getByRole('button', { name: /^(Export|Экспорт)$/, exact: true }).click();
+      if (mode === 'guide') {
+        await editor
+          .getByRole('button', {
+            name: /^(Save standalone HTML|Сохранить автономный HTML)$/,
+            exact: true,
+          })
+          .click();
+        await editor
+          .getByRole('button', { name: /^(Calculate size|Рассчитать размер)$/, exact: true })
+          .click();
+      } else {
+        await editor
+          .getByRole('button', {
+            name: /^(Prepare and preview|Подготовить и посмотреть)$/,
+            exact: true,
+          })
+          .first()
+          .click();
+      }
+      const save = editor.getByRole('button', {
+        name: /^(Save HTML|Сохранить HTML)$/,
+        exact: true,
+      });
+      await expect(save).toBeEnabled();
+      await save.click();
+      await expect(editor.getByText(/^(HTML saved|HTML сохранён)$/, { exact: true })).toBeVisible();
+      nativeDigests.set(mode, (await editor.locator('html').getAttribute('data-native-digest'))!);
+      await editor.close();
+    }
+    const rows = (await savedHtmlRows(library)).filter((row) => !existingIds.has(row.id));
+    expect(rows).toHaveLength(2);
+    await storedProject(library, 'Changed source after export');
+    const changedSource = await storedProject(library);
+    for (const mode of ['guide', 'tour'] as const) {
+      const row = rows.find((entry) => entry.html?.mode === mode)!;
+      const digest = await library.evaluate(async (assetId) => {
+        const file = await (
+          await (
+            await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+          ).getDirectoryHandle('objects')
+        ).getFileHandle(assetId);
+        const hash = await crypto.subtle.digest(
+          'SHA-256',
+          await (await file.getFile()).arrayBuffer()
+        );
+        return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      }, row.html!.assetId);
+      expect(digest).toBe(nativeDigests.get(mode));
+      await library.reload();
+      await library
+        .locator(`[data-gallery-keyboard-id="scenario-export:${row.id}"]`)
+        .getByRole('button', { name: row.filename, exact: true })
+        .first()
+        .click();
+      const filename = library.getByRole('textbox', {
+        name: /^(Filename|Имя файла)$/,
+        exact: true,
+      });
+      await expect(filename).toBeEditable();
+      await filename.fill('cancelled name');
+      await library
+        .getByRole('button', { name: /^(Reset changes|Отменить изменения)$/, exact: true })
+        .click();
+      await expect(filename).toHaveValue(row.filename);
+      await filename.fill(`Saved ${mode}`);
+      const downloading = library.waitForEvent('download');
+      await library.getByRole('button', { name: /^(Download|Скачать)$/, exact: true }).click();
+      const download = await downloading;
+      expect(download.suggestedFilename()).toBe(`Saved ${mode}.html`);
+      const bytes = await (await import('node:fs/promises')).readFile((await download.path())!);
+      expect((await import('node:crypto')).createHash('sha256').update(bytes).digest('hex')).toBe(
+        nativeDigests.get(mode)
+      );
+      await library.keyboard.press('Escape');
+      await library.reload();
+      await library
+        .locator(`[data-gallery-keyboard-id="scenario-export:${row.id}"]`)
+        .getByRole('button', { name: `Saved ${mode}.html`, exact: true })
+        .first()
+        .click();
+      await expect(
+        library.getByRole('textbox', { name: /^(Filename|Имя файла)$/, exact: true })
+      ).toHaveValue(`Saved ${mode}.html`);
+      const opening = context.waitForEvent('page');
+      await library
+        .getByRole('link', {
+          name: /^(View saved HTML|Просмотреть сохранённый HTML)$/,
+          exact: true,
+        })
+        .click();
+      const viewer = await opening;
+      const content = viewer
+        .frameLocator('.scenario-viewer-document > iframe')
+        .frameLocator('iframe');
+      if (mode === 'guide')
+        await expect(
+          content.getByRole('heading', { name: 'Library HTML proof', exact: true })
+        ).toBeVisible();
+      else await expect(content.locator('[data-tour-title]')).toHaveText('First slide');
+      expect(await storedProject(library)).toBe(changedSource);
+      await viewer.close();
+      await library.keyboard.press('Escape');
+    }
+    await library.close();
+  });
+}

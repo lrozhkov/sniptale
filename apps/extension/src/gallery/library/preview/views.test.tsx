@@ -477,7 +477,8 @@ it('renders image-only actions conditionally', () => {
 it('hides destructive and reset actions for scenario exports without pending changes', () => {
   const previewProps = createProps({
     item: createScenarioExportItem({
-      filename: 'scenario-export.zip',
+      filename: 'scenario-export.pdf',
+      format: 'pdf',
       project: {
         availability: 'available' as const,
         id: 'project-1',

@@ -27,6 +27,7 @@ export function mapScenarioAssetEntry(entry: DbScenarioAssetEntry): ScenarioAsse
 
 export function mapScenarioExportEntry(entry: DbScenarioExportEntry): ScenarioExportEntry {
   return {
+    ...(entry.html ? { html: { ...entry.html } } : {}),
     id: entry.id,
     projectId: entry.projectId,
     format: entry.format,

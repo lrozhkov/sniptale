@@ -57,6 +57,7 @@ const viewFeedback = {
   empty: 'scenario.editor.viewEmpty',
   cancelled: 'scenario.editor.viewCancelled',
   failed: 'scenario.editor.viewFailed',
+  'missing-file': 'gallery.preview.exportFileUnavailable',
 } as const;
 
 /** Read-only route presents a prepared artifact without mounting editor state. */
@@ -69,7 +70,7 @@ export function ScenarioViewerPage({ route }: { route: ViewRoute }) {
     'scenario.editor.previewTitle'
   );
   const invalid = route.mode === 'invalid';
-  const mode = invalid ? 'guide' : route.mode;
+  const mode = state.status === 'ready' ? state.mode : route.mode === 'tour' ? 'tour' : 'guide';
   return (
     <main className="scenario-viewer">
       <header className="scenario-viewer-header">
@@ -96,9 +97,11 @@ export function ScenarioViewerPage({ route }: { route: ViewRoute }) {
                 {t('common.actions.cancel')}
               </ContentToolbarButton>
             )}
-            <a href={buildScenarioEditorUrl({ projectId: route.projectId })}>
-              {t('gallery.preview.openInEditor')}
-            </a>
+            {route.mode !== 'export' && (
+              <a href={buildScenarioEditorUrl({ projectId: route.projectId })}>
+                {t('gallery.preview.openInEditor')}
+              </a>
+            )}
           </nav>
         )}
       </header>
@@ -107,7 +110,13 @@ export function ScenarioViewerPage({ route }: { route: ViewRoute }) {
         aria-label={t(mode === 'guide' ? 'scenario.editor.viewGuide' : 'scenario.editor.viewTour')}
       >
         {!invalid && state.status === 'ready' ? (
-          <TourExportPreview key={generation} blob={state.blob} mode={mode} title={state.name} />
+          <TourExportPreview
+            key={generation}
+            blob={state.blob}
+            mode={mode}
+            title={state.name}
+            {...('scriptHash' in state ? { scriptHash: state.scriptHash } : {})}
+          />
         ) : (
           <p role={invalid || state.status === 'failed' ? 'alert' : 'status'}>
             {t(

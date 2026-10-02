@@ -161,7 +161,15 @@ it.each([
     label: 'scenario export ids',
     hostile() {
       const value = metadata();
-      value.exports = [{ id: 'export' }, { id: 'export' }];
+      const entry = {
+        id: 'export',
+        projectId: 'guide',
+        filename: 'saved.html',
+        format: 'html',
+        size: 4,
+        createdAt: 1,
+      };
+      value.exports = [entry, structuredClone(entry)];
       return value;
     },
   },

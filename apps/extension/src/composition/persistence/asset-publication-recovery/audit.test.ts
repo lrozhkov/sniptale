@@ -413,3 +413,41 @@ function createScenarioAsset(id: string, assetId: string) {
     width: 1,
   };
 }
+
+it('recognizes immutable HTML catalogue bodies as their own required graph edge', async () => {
+  const ref = { ...createRef('html-body'), mimeType: 'text/html', size: 4 };
+  const row = {
+    id: 'saved',
+    projectId: 'project',
+    format: 'html',
+    filename: 'saved.html',
+    createdAt: 1,
+    size: 4,
+    html: { mode: 'tour', assetId: ref.assetId },
+  };
+  const owner = {
+    assetId: ref.assetId,
+    ownerId: row.id,
+    ownerKind: 'scenario-export',
+    role: 'body',
+  };
+  mocks.objects.mockResolvedValue([ref.assetId]);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: async (name: string) =>
+        name === 'asset_refs'
+          ? [ref]
+          : name === 'asset_owners'
+            ? [owner]
+            : name === 'scenario_exports'
+              ? [row]
+              : [],
+    })
+  );
+  const report = await auditDurableAssets();
+  expect(report.authorityValid).toBe(true);
+  expect(report.ownerMetadataMismatches).toEqual([]);
+  expect(report.objectsWithoutAuthority).toEqual([]);
+});

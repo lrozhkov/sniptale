@@ -5,7 +5,10 @@ import {
   createGuideStep,
 } from '../../../../features/scenario/project/factories';
 import { assertPortableJson } from '../codec';
-import { encodePortableScenarioProjectEntry } from './projects';
+import {
+  encodePortableScenarioProjectEntry,
+  parsePortableScenarioProjectMetadata,
+} from './projects';
 
 describe('portable guide project codec', () => {
   it('encodes every image in a step and preserves repeated references and immutable annotation identity', () => {
@@ -70,5 +73,38 @@ it('encodes historical image references and rejects malformed or cross-project h
   expect(() => decodePortableScenarioHistory([null], 'guide')).toThrow();
   expect(() =>
     decodePortableScenarioHistory(Array(51).fill(encoded.history?.[0]), 'guide')
+  ).toThrow();
+});
+
+it('admits portable HTML bodies and refuses local pointers or malformed catalogue contracts', () => {
+  const entry = encodePortableScenarioProjectEntry({
+    id: 'guide',
+    project: createGuideProject('Guide', 'guide', 1),
+    createdAt: 1,
+    updatedAt: 1,
+    workspaceRevision: 1,
+  });
+  const row = {
+    id: 'saved',
+    projectId: 'guide',
+    filename: 'saved.html',
+    format: 'html',
+    createdAt: 1,
+    size: 4,
+    html: { mode: 'tour', objectId: 'html-object' },
+  };
+  const value = { entry, assets: [], exports: [row], exportThumbnails: [], stepDocuments: [] };
+  expect(parsePortableScenarioProjectMetadata(value).exports[0]).toEqual(row);
+  for (const html of [
+    { ...row.html, assetId: 'foreign-local' },
+    { mode: 'other', objectId: 'html-object' },
+    { mode: 'guide', objectId: '' },
+  ]) {
+    expect(() =>
+      parsePortableScenarioProjectMetadata({ ...value, exports: [{ ...row, html }] })
+    ).toThrow();
+  }
+  expect(() =>
+    parsePortableScenarioProjectMetadata({ ...value, exports: [{ ...row, size: 0 }] })
   ).toThrow();
 });

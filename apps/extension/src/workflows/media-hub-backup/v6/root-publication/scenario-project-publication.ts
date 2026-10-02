@@ -283,11 +283,16 @@ async function assertMatchingArchiveAsset(staged: AssetRef, shared: AssetRef) {
 function prepareScenarioExports(
   metadata: PortableScenarioProjectMetadata,
   exportIds: ReadonlyMap<string, string>,
-  targetProjectId: string
+  targetProjectId: string,
+  objects: ReadonlyMap<string, StagedArchiveObject>
 ) {
   return metadata.exports.map((item) => {
+    const ref = item.html ? required(objects, item.html.objectId).ref : undefined;
+    if (ref && (ref.size !== item.size || !/^text\/html(?:;charset=utf-8)?$/iu.test(ref.mimeType)))
+      throw new Error('Restored HTML export body differs from its catalogue.');
     const entry = parseScenarioExportEntry({
       ...item,
+      ...(item.html && ref ? { html: { mode: item.html.mode, assetId: ref.assetId } } : {}),
       id: exportIds.get(item.id),
       projectId: targetProjectId,
     });
@@ -408,7 +413,10 @@ export async function prepareScenarioProjectPublication(args: {
   const sharedAssetRefs = new Map(
     args.metadata.assets.map((asset, index) => [asset.objectId, assets[index]!.ref])
   );
-  const exports = prepareScenarioExports(args.metadata, exportIds, targetProjectId);
+  const exports = prepareScenarioExports(args.metadata, exportIds, targetProjectId, objects);
+  const exportRefs = args.metadata.exports.flatMap((entry) =>
+    entry.html ? [required(objects, entry.html.objectId).ref] : []
+  );
   const stepDocuments = prepareScenarioStepDocuments({ ...shared, sharedAssetRefs, stepIds });
   const sidecars = await prepareScenarioSidecars({ ...shared, exportIds });
   return {
@@ -420,6 +428,7 @@ export async function prepareScenarioProjectPublication(args: {
       entry,
       exportThumbnails: sidecars.exportThumbnails,
       exports,
+      exportRefs,
       stepDocuments,
       ...(sidecars.thumbnail ? { thumbnail: sidecars.thumbnail } : {}),
       ...(sidecars.presentation ? { presentation: sidecars.presentation } : {}),
