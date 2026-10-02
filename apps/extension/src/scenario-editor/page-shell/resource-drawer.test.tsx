@@ -72,6 +72,9 @@ it('traps keyboard focus and unmounts import preparation when the drawer closes'
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   const trigger = await open();
   const dialog = document.querySelector('[role="dialog"]')!;
+  expect(
+    document.querySelector<HTMLElement>('.guide-resource-drawer-surface')?.style.width
+  ).toContain('80vw');
   const close = dialog.querySelector('button')!;
   const input = dialog.querySelector('input')!;
   expect(document.activeElement).toBe(close);

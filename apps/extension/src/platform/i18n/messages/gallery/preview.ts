@@ -6,6 +6,9 @@ import {
 
 export const galleryPreviewMessages = defineMessageSource({
   projectsHeading: { ru: 'Проекты', en: 'Projects' },
+  materialsList: { ru: 'Список материалов', en: 'Materials list' },
+  showMaterials: { ru: 'Показать материалы', en: 'Show materials' },
+  hideMaterials: { ru: 'Скрыть материалы', en: 'Hide materials' },
   materialsHeading: { ru: 'Готовые материалы', en: 'Ready materials' },
   folderVideoProject: { ru: 'Видеопроекты', en: 'Video projects' },
   restoreProjectFirst: {

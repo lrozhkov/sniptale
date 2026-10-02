@@ -34,6 +34,7 @@ import {
   SETTINGS_QUICK_ACTIONS_LABEL,
   SETTINGS_SAVE_LABEL,
   POPUP_HARNESS_PATH,
+  VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
 const EDITOR_FRAME_BACKGROUND_TYPE_LABEL = translate('editor.scene.backgroundTypeSection', 'ru');
@@ -1750,4 +1751,122 @@ for (const variant of [
       }
     }
   );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`video shared material browser grid strip and scrolling (${variant.locale})`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const project = createVideoProject({
+      id: `material-browser-${variant.locale}`,
+      name: 'Materials',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [project],
+      storage: { 'sniptale-locale-preference': variant.locale },
+    });
+    await page.addInitScript(({ locale }) => {
+      localStorage.setItem('sniptale-locale-preference', locale);
+      window.__sniptaleHarnessBootstrap = {
+        ...window.__sniptaleHarnessBootstrap,
+        mediaLibrary: Array.from({ length: 30 }, (_, index) => ({
+          entry: {
+            id: `library-recording-${index}`,
+            kind: 'recording',
+            source: { kind: 'recording', recordingId: `library-recording-${index}` },
+            filename: `Source-${index}.webm`,
+            originalFilename: `Source-${index}.webm`,
+            createdAt: 1,
+            updatedAt: 1,
+            size: 0,
+            mimeType: 'video/webm',
+            width: 640,
+            height: 360,
+            duration: 3,
+            sourceUrl: null,
+            sourceTitle: null,
+            sourceFavicon: null,
+            tags: [],
+            hasThumbnail: false,
+          },
+        })),
+      };
+    }, variant);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(
+      `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${variant.theme}`
+    );
+    const trigger = page.locator('[data-ui="video-editor.materials.library"]');
+    await trigger.click();
+    const drawer = page.locator('[data-ui="video-editor.library.drawer"]');
+    const list = drawer.locator('[data-ui="library-materials-list"]');
+    await expect(list).toHaveAttribute('data-layout', 'grid');
+    await expect(drawer.locator('[data-ui="video-editor.library.media-preview"]')).toHaveCount(0);
+    await expect(
+      drawer
+        .getByRole('button', {
+          name: translate('gallery.preview.folderAll', variant.locale),
+          exact: true,
+        })
+        .locator('svg')
+    ).toBeVisible();
+    const allMaterials = drawer.getByRole('button', {
+      name: translate('gallery.preview.folderAll', variant.locale),
+      exact: true,
+    });
+    await allMaterials.hover();
+    await expect(allMaterials.locator('svg')).toBeVisible();
+    await allMaterials.focus();
+    await page.keyboard.press('Space');
+    await expect(allMaterials).toHaveAttribute('aria-pressed', 'true');
+    await expect(allMaterials.locator('svg')).toBeVisible();
+    const scrolling = await list.evaluate((node) => ({
+      height: node.clientHeight,
+      scroll: node.scrollHeight,
+    }));
+    expect(scrolling.scroll).toBeGreaterThan(scrolling.height);
+    const last = list.getByRole('button', { name: /Source-29/ });
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+    await last.click();
+    await expect(list).toHaveAttribute('data-layout', 'strip');
+    const preview = drawer.locator('[data-ui="video-editor.library.media-preview"]');
+    await expect(preview).toBeVisible();
+    const previewBounds = (await preview.boundingBox())!;
+    expect(previewBounds.width).toBeGreaterThan(750);
+    expect((await list.boundingBox())!.height).toBeLessThanOrEqual(180);
+    expect(await list.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+    await list.evaluate((node) => {
+      node.scrollLeft = 660;
+    });
+    const scrollLeft = await list.evaluate((node) => node.scrollLeft);
+    const hide = drawer.getByRole('button', {
+      name: translate('gallery.preview.hideMaterials', variant.locale),
+      exact: true,
+    });
+    await hide.focus();
+    await page.keyboard.press('Enter');
+    await expect(list).toBeHidden();
+    await expect(preview).toBeVisible();
+    await page.keyboard.press('Space');
+    await expect(list).toBeVisible();
+    expect(await list.evaluate((node) => node.scrollLeft)).toBe(scrollLeft);
+    for (const width of [1280, 2560]) {
+      await page.setViewportSize({ width, height: 720 });
+      const bounds = (await drawer.boundingBox())!;
+      expect(bounds.width).toBeGreaterThanOrEqual(width * 0.75);
+      expect(bounds.width).toBeLessThanOrEqual(width - 24);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+    }
+    await page.keyboard.press('Escape');
+    await expect(drawer).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
 }

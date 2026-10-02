@@ -304,3 +304,22 @@ it('applies a nonempty format preset to filenames and extensionless MIME metadat
   expect(cards.join(' ')).toContain('Extensionless');
   expect(cards.join(' ')).not.toContain('Other.jpg');
 });
+
+it('collapses cards independently of ordered insertion and releases a filtered preview URL', async () => {
+  await render(false, ['image']);
+  expect(host.querySelector('.guide-library-preview')).toBeNull();
+  await click('Current.png');
+  const previewUrl = host.querySelector('.guide-library-preview img')?.getAttribute('src');
+  await click('Hide materials');
+  expect(host.querySelector('.guide-library-card')).toBeNull();
+  expect(host.querySelector('.guide-library-preview img')?.getAttribute('src')).toBe(previewUrl);
+  expect(io.choose).not.toHaveBeenCalled();
+  await click('Show materials');
+  expect(host.querySelector('.guide-library-card-select')?.textContent).toBe('1');
+  await click('Video');
+  expect(host.querySelector('.guide-library-preview')).toBeNull();
+  expect(io.revoke).toHaveBeenCalledWith(previewUrl);
+  expect(
+    host.querySelector('[data-ui="library-materials-list"]')?.getAttribute('data-layout')
+  ).toBe('grid');
+});

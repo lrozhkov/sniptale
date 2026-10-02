@@ -58,6 +58,7 @@
     "./highlighter-style/types": "./src/highlighter-style/types.ts",
     "./inspector-shell": "./src/inspector-shell/index.tsx",
     "./loading-delay": "./src/loading-delay/index.tsx",
+    "./material-browser": "./src/material-browser/index.tsx",
     "./product-feedback/confirm-dialog": "./src/product-feedback/confirm-dialog/index.tsx",
     "./product-feedback/toast-service": "./src/product-feedback/toast-service/index.ts",
     "./product-feedback/toast": "./src/product-feedback/toast/index.tsx",

@@ -99,3 +99,72 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toBeFocused();
   });
 }
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`shared material browser grid strip and viewport width in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    await page.getByRole('button', { name: 'Ресурсы', exact: true }).click();
+    const trigger = page
+      .locator('#guide-library-panel')
+      .getByRole('button', { name: 'Изображение', exact: true });
+    await trigger.click();
+    await page
+      .getByRole('group', { name: 'Изображение', exact: true })
+      .getByRole('button', { name: 'Библиотека изображений', exact: true })
+      .click();
+    const drawer = page.locator('#guide-resource-drawer');
+    const list = drawer.locator('[data-ui="library-materials-list"]');
+    await expect(list).toHaveAttribute('data-layout', 'grid');
+    await expect(drawer.locator('.guide-library-preview')).toHaveCount(0);
+    await expect(
+      drawer.getByRole('button', { name: 'Все материалы', exact: true }).locator('svg')
+    ).toBeVisible();
+    const allMaterials = drawer.getByRole('button', { name: 'Все материалы', exact: true });
+    await allMaterials.hover();
+    await expect(allMaterials.locator('svg')).toBeVisible();
+    await allMaterials.focus();
+    await page.keyboard.press('Space');
+    await expect(allMaterials).toHaveAttribute('aria-pressed', 'true');
+    await expect(allMaterials.locator('svg')).toBeVisible();
+    for (const width of [1280, 2560]) {
+      await page.setViewportSize({ width, height: 720 });
+      const geometry = (await drawer.boundingBox())!;
+      expect(geometry.width).toBeGreaterThanOrEqual(width * 0.75);
+      expect(geometry.width).toBeLessThanOrEqual(width - 24);
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await expect(list).toHaveAttribute('data-layout', 'strip');
+    const preview = drawer.locator('.guide-library-preview');
+    await expect(preview.locator('img')).toBeVisible();
+    const previewBounds = (await preview.boundingBox())!;
+    const listBounds = (await list.boundingBox())!;
+    expect(listBounds.y + listBounds.height).toBeLessThanOrEqual(previewBounds.y);
+    expect(listBounds.height).toBeLessThanOrEqual(180);
+    expect(previewBounds.width).toBeGreaterThan(750);
+    const hide = drawer.getByRole('button', { name: 'Скрыть материалы', exact: true });
+    await hide.focus();
+    await page.keyboard.press('Enter');
+    await expect(list).toBeHidden();
+    await expect(preview.locator('img')).toBeVisible();
+    await expect(drawer.locator('.guide-library-card')).toHaveCount(0);
+    await page.keyboard.press('Space');
+    await expect(list).toBeVisible();
+    const select = drawer.getByRole('button', {
+      name: 'Выбрать элемент: Library screenshot.png',
+      exact: true,
+    });
+    await select.click();
+    await expect(select).toHaveText('1');
+    await drawer.locator('.guide-library-search input').fill('does-not-exist');
+    await expect(preview).toHaveCount(0);
+    await expect(list).toHaveAttribute('data-layout', 'grid');
+    await drawer.locator('.guide-library-search input').fill('');
+    await expect(select).toHaveText('1');
+    await drawer.getByRole('button', { name: 'Закрыть', exact: true }).click();
+    await expect(trigger).toBeFocused();
+  });
+}

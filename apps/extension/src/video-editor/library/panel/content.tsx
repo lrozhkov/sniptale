@@ -20,44 +20,44 @@ export function LibraryPanelDrawerContent(props: LibraryPanelContentProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <main
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 lg:flex-row"
+        className="flex min-h-0 flex-1 overflow-hidden p-3"
         data-ui="video-editor.library.tab-body"
       >
-        <div className="max-h-32 shrink-0 overflow-auto lg:max-h-none lg:w-44">
-          <LibraryNavigation
-            includeAudio
-            showAllIcon={false}
-            category={props.category}
-            presetId={props.presetId}
-            savedViews={props.savedViews}
-            onCategoryChange={props.onCategoryChange}
-            onPresetChange={props.onPresetChange}
-          />
-        </div>
-        {props.error ? (
-          <div>
-            <p role="alert" className="text-sm">
-              {props.error}
-            </p>
-            <ContentToolbarButton
-              onClick={() => void props.onRefresh()}
-              aria-label={translate('common.actions.retry')}
-            >
-              {translate('common.actions.retry')}
-            </ContentToolbarButton>
-          </div>
-        ) : props.loading ? (
-          <p role="status" className="text-sm text-[var(--sniptale-color-text-muted)]">
-            {translate('common.states.loading')}
-          </p>
-        ) : (
-          <LibraryMediaSection
-            search={<LibraryPanelSearch query={props.query} onQueryChange={props.onQueryChange} />}
-            items={props.items}
-            thumbnails={props.thumbnails}
-            onAddMedia={props.onAddMedia}
-          />
-        )}
+        <LibraryMediaSection
+          navigation={
+            <LibraryNavigation
+              includeAudio
+              category={props.category}
+              presetId={props.presetId}
+              savedViews={props.savedViews}
+              onCategoryChange={props.onCategoryChange}
+              onPresetChange={props.onPresetChange}
+            />
+          }
+          search={<LibraryPanelSearch query={props.query} onQueryChange={props.onQueryChange} />}
+          status={
+            props.error ? (
+              <div>
+                <p role="alert" className="text-sm">
+                  {props.error}
+                </p>
+                <ContentToolbarButton
+                  onClick={() => void props.onRefresh()}
+                  aria-label={translate('common.actions.retry')}
+                >
+                  {translate('common.actions.retry')}
+                </ContentToolbarButton>
+              </div>
+            ) : props.loading ? (
+              <p role="status" className="text-sm text-[var(--sniptale-color-text-muted)]">
+                {translate('common.states.loading')}
+              </p>
+            ) : undefined
+          }
+          items={props.error || props.loading ? [] : props.items}
+          thumbnails={props.thumbnails}
+          onAddMedia={props.onAddMedia}
+        />
       </main>
     </div>
   );

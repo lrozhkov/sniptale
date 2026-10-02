@@ -163,8 +163,8 @@ export function GuideResourceDialog({
   return (
     <ProductModal
       onClose={onClose}
-      width="min(1800px, calc(100vw - 24px))"
-      maxWidth="100vw"
+      width="max(960px, 80vw)"
+      maxWidth="calc(100vw - 24px)"
       maxHeight="100dvh"
       role="presentation"
       dialogClassName="guide-resource-drawer-surface"

@@ -491,8 +491,6 @@
 }
 .guide-library-browser {
   flex: 1;
-  display: grid;
-  grid-template-columns: 144px minmax(220px, 0.65fr) minmax(0, 1.35fr);
   min-height: 0;
   gap: 0.75rem;
   padding: 0 0.75rem 0.75rem;
@@ -561,15 +559,6 @@
 }
 .guide-import-file-action:focus-within {
   outline: 1px solid var(--sniptale-color-accent);
-}
-.guide-library-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  align-content: start;
-  gap: 0.625rem;
-  overflow: auto;
-  min-height: 0;
-  padding: 1px;
 }
 .guide-library-card {
   position: relative;
@@ -678,25 +667,6 @@
   margin: auto;
   text-align: center;
   color: var(--sniptale-color-text-secondary);
-}
-@media (max-width: 900px) {
-  .guide-library-browser {
-    grid-template-columns: 112px minmax(160px, 0.65fr) minmax(0, 1.35fr);
-  }
-}
-@media (max-width: 720px) {
-  .guide-library-browser {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(100px, 0.4fr) minmax(0, 1fr);
-    overflow: auto;
-  }
-  .guide-library-browser > .library-navigation {
-    display: flex;
-    max-height: 88px;
-  }
-  .guide-library-preview-raster {
-    min-height: 0;
-  }
 }
 .guide-image-frame[data-editing='true'] {
   cursor: grab;
@@ -1725,11 +1695,6 @@ html[data-guide-reordering] .guide-block-grip {
 .guide-import-actions[hidden] {
   display: none;
 }
-@media (min-width: 1600px) {
-  .guide-library-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 
 .guide-image-slot {
   align-content: center;
@@ -1844,21 +1809,6 @@ html[data-guide-width-resizing] * {
 }
 .guide-document .guide-block[data-reorder-resting]:not(:focus-within) > .guide-block-grip {
   opacity: 0;
-}
-
-.guide-library-grid[data-layout='list'] {
-  grid-template-columns: minmax(0, 1fr);
-}
-.guide-library-grid[data-layout='list'] .guide-library-card {
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  padding-right: 32px;
-}
-.guide-library-grid[data-layout='list'] .guide-library-thumbnail {
-  flex: 0 0 72px;
-  width: 72px;
-  height: 45px;
 }
 
 /* Contextual chrome fades in place; intent timing belongs to the central pointer owner. */

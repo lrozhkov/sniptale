@@ -1,3 +1,4 @@
+import { MaterialBrowser } from '@sniptale/ui/material-browser';
 import { LibraryNavigation } from '../../composition/library-preview/navigation';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
@@ -212,25 +213,34 @@ export function GuideLibraryBrowser({
       item.filename.toLocaleLowerCase().includes(normalized) &&
       (!view || matchesLibraryFilters(item, view.filters, Date.now()))
   );
-  const preview = catalog.items.find((item) => item.id === previewId);
+  const preview = items.find((item) => item.id === previewId);
   return (
-    <div className="guide-library-browser">
-      <LibraryNavigation
-        t={t}
-        label={t('scenario.editor.guideLibraryNavigation')}
-        category={category}
-        presetId={viewId}
-        savedViews={catalog.views}
-        onCategoryChange={(value) => {
-          setCategory(value);
-          setViewId(null);
-        }}
-        onPresetChange={(id, nextCategory) => {
-          setCategory(nextCategory);
-          setViewId(id);
-        }}
-      />
-      <div className="guide-library-content">
+    <MaterialBrowser
+      className="guide-library-browser"
+      listClassName="guide-library-grid"
+      labels={{
+        list: t('gallery.preview.materialsList'),
+        show: t('gallery.preview.showMaterials'),
+        hide: t('gallery.preview.hideMaterials'),
+      }}
+      navigation={
+        <LibraryNavigation
+          t={t}
+          label={t('scenario.editor.guideLibraryNavigation')}
+          category={category}
+          presetId={viewId}
+          savedViews={catalog.views}
+          onCategoryChange={(value) => {
+            setCategory(value);
+            setViewId(null);
+          }}
+          onPresetChange={(id, nextCategory) => {
+            setCategory(nextCategory);
+            setViewId(id);
+          }}
+        />
+      }
+      search={
         <div className="guide-library-search">
           <label className="sr-only" htmlFor={searchId}>
             {t(
@@ -251,75 +261,70 @@ export function GuideLibraryBrowser({
             onChange={setQuery}
           />
         </div>
-        {catalog.status === 'loading' && !catalog.items.length && (
-          <p role="status">{t('scenario.editor.loading')}</p>
-        )}
-        {catalog.status === 'failed' && (
-          <div role="alert">
-            <p>{t('scenario.editor.guideLibraryLoadFailed')}</p>
-            <ProductActionButton compact tone="secondary" onClick={() => void catalog.reload()}>
-              {t('scenario.editor.guideRetry')}
-            </ProductActionButton>
-          </div>
-        )}
-        <div
-          className="guide-library-grid"
-          data-layout={category === 'video' ? 'list' : 'grid'}
-          aria-label={t(
+      }
+      status={
+        <>
+          {catalog.status === 'loading' && !catalog.items.length && (
+            <p role="status">{t('scenario.editor.loading')}</p>
+          )}
+          {catalog.status === 'failed' && (
+            <div role="alert">
+              <p>{t('scenario.editor.guideLibraryLoadFailed')}</p>
+              <ProductActionButton compact tone="secondary" onClick={() => void catalog.reload()}>
+                {t('scenario.editor.guideRetry')}
+              </ProductActionButton>
+            </div>
+          )}
+        </>
+      }
+      preview={
+        preview ? (
+          <aside
+            className="guide-library-preview flex-1"
+            aria-label={t('scenario.editor.guideLibraryPreview')}
+          >
+            {preview.kind !== 'image' && preview.kind !== 'screenshot' ? (
+              previewContent
+            ) : (
+              <>
+                <strong title={preview.filename}>{preview.filename}</strong>
+                <LibraryRaster item={preview} full t={t} />
+                <span>
+                  {preview.width} × {preview.height}
+                </span>
+              </>
+            )}
+          </aside>
+        ) : undefined
+      }
+    >
+      {items.map((item) => (
+        <LibraryCard
+          key={item.id}
+          item={item}
+          t={t}
+          disabled={disabled}
+          selected={selectedIds.includes(item.id) || preview?.id === item.id}
+          order={selectedIds.indexOf(item.id) + 1}
+          onSelect={() => onChoose(item.id, item.filename, 'image')}
+          onDragStart={onDragStart}
+          onChoose={() => {
+            setPreviewId(item.id);
+            if (item.kind === 'image' || item.kind === 'screenshot') onPreview?.();
+            else onChoose(item.id, item.filename, 'video');
+          }}
+        />
+      ))}
+      {catalog.status === 'ready' && !items.length && (
+        <p>
+          {t(
             category === 'video'
-              ? 'scenario.editor.guideLibraryVideos'
-              : 'scenario.editor.guideLibraryAll'
+              ? 'scenario.editor.guideLibraryVideoEmpty'
+              : 'scenario.editor.guideLibraryEmpty'
           )}
-        >
-          {items.map((item) => (
-            <LibraryCard
-              key={item.id}
-              item={item}
-              t={t}
-              disabled={disabled}
-              selected={
-                selectedIds.includes(item.id) || (category === 'video' && previewId === item.id)
-              }
-              order={selectedIds.indexOf(item.id) + 1}
-              onSelect={() => onChoose(item.id, item.filename, 'image')}
-              onDragStart={onDragStart}
-              onChoose={() => {
-                setPreviewId(item.id);
-                if (item.kind === 'image' || item.kind === 'screenshot') onPreview?.();
-                else onChoose(item.id, item.filename, 'video');
-              }}
-            />
-          ))}
-          {catalog.status === 'ready' && !items.length && (
-            <p>
-              {t(
-                category === 'video'
-                  ? 'scenario.editor.guideLibraryVideoEmpty'
-                  : 'scenario.editor.guideLibraryEmpty'
-              )}
-            </p>
-          )}
-        </div>
-      </div>
-      <aside
-        className="guide-library-preview"
-        aria-label={t('scenario.editor.guideLibraryPreview')}
-      >
-        {preview && preview.kind !== 'image' && preview.kind !== 'screenshot' ? (
-          previewContent
-        ) : preview ? (
-          <>
-            <strong title={preview.filename}>{preview.filename}</strong>
-            <LibraryRaster item={preview} full t={t} />
-            <span>
-              {preview.width} × {preview.height}
-            </span>
-          </>
-        ) : (
-          <p>{t('scenario.editor.guideLibraryPreviewHint')}</p>
-        )}
-      </aside>
-    </div>
+        </p>
+      )}
+    </MaterialBrowser>
   );
 }
 

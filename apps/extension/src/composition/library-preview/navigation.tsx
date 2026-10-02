@@ -7,7 +7,6 @@ type LibraryNavigationProps = {
   presetId: string | null;
   savedViews: GallerySavedView[];
   label?: string;
-  showAllIcon?: boolean;
   t?: Translate;
 } & (
   | {
@@ -71,11 +70,7 @@ function LibraryCategory(props: LibraryNavigationProps & { categoryKey: Category
         }}
         className={libraryNavigationClass(active && props.presetId === null)}
       >
-        {category === 'all' && props.showAllIcon === false ? (
-          <span className="size-4 shrink-0" aria-hidden="true" />
-        ) : (
-          <Icon size={16} className="shrink-0" aria-hidden />
-        )}
+        <Icon size={16} className="shrink-0" aria-hidden />
         {t(labelKey)}
       </button>
       <div className="space-y-0.5 pl-7" data-ui={`library-filters-${category}`}>
