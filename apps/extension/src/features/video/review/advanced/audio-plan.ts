@@ -73,12 +73,8 @@ export function buildQuickEditClipEnvelope(args: {
   const fadeOutStart = (phaseDuration - fadeOut - phaseOffset) / rate;
   if (fadeOut > 0 && fadeOutStart > elapsed && fadeOutStart > 0 && fadeOutStart < duration)
     points.push([fadeOutStart, gainAt(fadeOutStart)]);
-  points.push([
-    duration,
-    args.entry.fadePhase && phaseOffset + duration * rate < phaseDuration - 0.000001
-      ? gainAt(duration)
-      : 0,
-  ]);
+  // The scheduled source stops at the clip end; only an authored fade lowers its gain.
+  points.push([duration, gainAt(duration)]);
   return points;
 }
 

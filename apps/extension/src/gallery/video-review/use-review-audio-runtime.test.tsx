@@ -200,7 +200,7 @@ it('schedules a running external clip from the current output time', async () =>
     duration: 3,
     envelope: [
       [100, 1],
-      [103, 0],
+      [103, 1],
     ],
   });
   expect(engine.scheduled[0]!.buffer).toBe(engine.decoded);
@@ -543,4 +543,23 @@ it('accounts for elapsed decoding time instead of starting late audio from its o
     resolve(new Blob());
   });
   expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 101, offset: 2, duration: 2 });
+});
+
+it('schedules a zero-fade voiceover at constant volume through its end', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 4,
+    voiceover: [clip({ volume: 0.7 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  expect(engine.scheduled[0]!.schedule).toMatchObject({
+    duration: 2,
+    envelope: [
+      [100, 0.7],
+      [102, 0.7],
+    ],
+  });
 });

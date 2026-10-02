@@ -283,7 +283,7 @@ it('bounds accelerated windows and emits a short final chunk without a whole-sou
   }
 });
 
-it('mixes applied external clips and original gain into each window', async () => {
+it('exports zero-fade external clips at constant gain through their end', async () => {
   const fixture = await audioFixture();
   try {
     const clipBuffer = new TestAudioBuffer({
@@ -296,7 +296,7 @@ it('mixes applied external clips and original gain into each window', async () =
       clipId: 'm',
       assetId: 'project-asset:m',
       timelineStart: 0.5,
-      duration: 1,
+      duration: 0.5,
       sourceOffset: 0,
       volume: 1,
       fadeIn: 0,
@@ -326,6 +326,7 @@ it('mixes applied external clips and original gain into each window', async () =
     const clipGain = window.gains![1]!.gain;
     expect(clipGain.readonlyPoints[0]).toEqual(['set', 1, 0.02 + 0.5]);
     expect(clipGain.readonlyPoints.at(-1)).toEqual(['ramp', 1, 0.02 + 1]);
+    expect(clipGain.readonlyPoints.every((point) => point[1] === 1)).toBe(true);
   } finally {
     fixture.cleanup();
   }

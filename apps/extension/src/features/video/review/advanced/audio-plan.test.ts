@@ -76,7 +76,7 @@ describe('buildQuickEditClipEnvelope', () => {
     ).toEqual([
       [0.5, 0.5],
       [1, 1],
-      [4, 0],
+      [4, 1],
     ]);
   });
 
@@ -154,7 +154,7 @@ describe('planQuickEditClipPlayback', () => {
       duration: 3,
       envelope: [
         [100, 1],
-        [103, 0],
+        [103, 1],
       ],
     });
   });
@@ -172,7 +172,7 @@ describe('planQuickEditClipPlayback', () => {
       envelope: [
         [14, 0],
         [15, 1],
-        [18, 0],
+        [18, 1],
       ],
     });
   });
@@ -217,5 +217,23 @@ it.each([0.5, 2])(
       duration: 4 - 0.5 * tempo,
       playbackRate: tempo,
     });
+  }
+);
+
+it.each([undefined, { offset: 0, duration: 4 }, { offset: 2, duration: 4 }])(
+  'preserves zero-fade gain through the end of native audio or a voiceover slice %j',
+  (fadePhase) => {
+    const duration = fadePhase?.offset ? 2 : 4;
+    for (const elapsed of [0, duration / 2, duration - 0.01]) {
+      const envelope = buildQuickEditClipEnvelope({
+        entry: entry({ lane: 'voiceover', volume: 0.7, ...(fadePhase ? { fadePhase } : {}) }),
+        duration,
+        elapsed,
+      });
+      expect(envelope).toEqual([
+        [elapsed, 0.7],
+        [duration, 0.7],
+      ]);
+    }
   }
 );
