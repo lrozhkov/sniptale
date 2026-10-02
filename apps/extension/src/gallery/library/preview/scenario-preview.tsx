@@ -1,5 +1,6 @@
+import { ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, FileStack, X } from 'lucide-react';
+import { ArrowUpRight, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { openScenarioEditorPage } from '../../../platform/navigation/extension-pages/index';
 import { listScenarioPreviewSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
@@ -40,7 +41,7 @@ function ScenarioPreviewEmptyState() {
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]
         text-center text-[var(--sniptale-color-text-secondary)]"
     >
-      <FileStack className="mb-4 h-8 w-8 text-[var(--sniptale-color-accent-emphasis)]" />
+      <ScenarioEditorIcon className="mb-4 h-8 w-8 text-[var(--sniptale-color-accent-emphasis)]" />
       <div className="text-lg font-semibold text-[var(--sniptale-color-text-primary)]">
         {translate('gallery.app.scenarioProjectsTitle')}
       </div>

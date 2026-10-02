@@ -1,7 +1,7 @@
 import {
   Archive,
   AudioLines,
-  FileStack,
+  BookOpen,
   FileText,
   Image as ImageIcon,
   Library,
@@ -42,7 +42,7 @@ export function getGalleryFolderIcon(folder: FolderFilter) {
   }
 
   if (folder === 'scenario') {
-    return FileStack;
+    return BookOpen;
   }
 
   if (folder === 'web-snapshot') {
@@ -100,7 +100,7 @@ export function getKindIcon(kind: GalleryItemKind) {
     case 'audio':
       return AudioLines;
     case 'scenario':
-      return FileStack;
+      return BookOpen;
     case 'scenario-export':
       return FileText;
     case 'web-archive':

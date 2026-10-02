@@ -1,4 +1,4 @@
-import { BookOpen, Play } from 'lucide-react';
+import { BookOpen, MousePointerClick } from 'lucide-react';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { useEffect, useState } from 'react';
 import { readScenarioViewingSnapshot } from '../../../composition/persistence/scenario/projects/viewing';
@@ -90,7 +90,7 @@ export function ScenarioViewingActions({
                 mode === 'guide' ? (
                   <BookOpen className="h-4 w-4 shrink-0" aria-hidden="true" />
                 ) : (
-                  <Play className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <MousePointerClick className="h-4 w-4 shrink-0" aria-hidden="true" />
                 )
               ) : null}
               {t(mode === 'guide' ? 'scenario.editor.viewGuide' : 'scenario.editor.viewTour')}

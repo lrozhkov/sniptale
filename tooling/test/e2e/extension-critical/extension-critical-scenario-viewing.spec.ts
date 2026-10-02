@@ -441,3 +441,46 @@ test('built sandbox rejects invalid and replayed envelopes and isolates executab
   await expect.poll(() => child.isDetached()).toBe(true);
   await page.close();
 });
+
+test('library scenario glyphs retain grid and folder geometry in both themes at 1280', async ({
+  context,
+  extensionId,
+}) => {
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
+  await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+  await seed(page);
+  await page.reload();
+  const folder = page.locator('[data-gallery-folder="scenario"] > button');
+  await expect(folder.locator('.lucide-book-open')).toBeVisible();
+  expect((await folder.boundingBox())?.height).toBe(36);
+  for (const mode of [/Compact grid|Компактная сетка/, /Large grid|Крупная сетка/]) {
+    await page.getByRole('button', { name: mode }).click();
+    const card = page.locator('[data-gallery-keyboard-id="scenario:html-proof"]');
+    await expect(card.locator('.lucide-book-open').first()).toBeVisible();
+    const bounds = await card.boundingBox();
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(
+        async (theme) => chrome.storage.local.set({ 'sniptale-theme-preference': theme }),
+        theme
+      );
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      await expect(card.locator('.lucide-book-open').first()).toBeVisible();
+      const next = await card.boundingBox();
+      expect(next?.width).toBe(bounds?.width);
+      expect(next?.height).toBe(bounds?.height);
+      expect((await folder.boundingBox())?.height).toBe(36);
+    }
+  }
+  await page.getByRole('button', { name: 'Library HTML proof', exact: true }).first().click();
+  await expect(
+    page.getByRole('link', { name: /Open guide|Открыть руководство/ }).locator('.lucide-book-open')
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole('link', { name: /Play tour|Запустить тур/ })
+      .locator('.lucide-mouse-pointer-click')
+  ).toBeVisible();
+  await page.close();
+});

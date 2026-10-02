@@ -93,6 +93,8 @@ it('keeps guide and tour actions in the inspected project Actions section, away 
     </>
   );
   expect(host.querySelector('main a')).toBeNull();
+  expect(host.querySelector('aside .lucide-book-open')).not.toBeNull();
+  expect(host.querySelector('aside .lucide-mouse-pointer-click')).not.toBeNull();
   const actions = host.querySelector('aside section');
   expect(actions?.querySelectorAll('a[href*="view="]')).toHaveLength(2);
   expect(actions?.textContent).toContain('gallery.preview.actions');

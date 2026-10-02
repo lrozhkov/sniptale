@@ -1,3 +1,4 @@
+import { BookOpen } from 'lucide-react';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -140,7 +141,8 @@ async function verifyGalleryHelpersAndLoadedThumb() {
   expect(FOLDER_LABELS.all).toBeTruthy();
   expect(FOLDER_LABELS.scenario).toBeTruthy();
   expect(FOLDER_LABELS['web-snapshot']).toBe('gallery.preview.folderWebSnapshot');
-  expect(getGalleryFolderIcon('scenario')).toBeTruthy();
+  expect(getGalleryFolderIcon('scenario')).toBe(BookOpen);
+  expect(getKindIcon('scenario')).toBe(BookOpen);
   expect(getGalleryFolderIcon('web-snapshot')).toBeTruthy();
   expect(getGalleryItemKindLabel('audio')).toBeTruthy();
   expect(getGalleryItemKindLabel('web-archive')).toBe('gallery.preview.kindWebSnapshot');
