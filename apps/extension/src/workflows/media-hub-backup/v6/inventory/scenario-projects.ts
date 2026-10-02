@@ -1,3 +1,4 @@
+import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
@@ -72,14 +73,20 @@ async function buildScenarioAssets(
   for (const [index, raw] of rows.entries()) {
     const asset = parseScenarioAssetEntry(raw);
     if (!asset) throw new Error('Stored scenario asset is invalid and cannot be exported.');
-    const media = asset.galleryAssetId
-      ? parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, asset.galleryAssetId))
-      : null;
+    const originId =
+      asset.borrowedMediaId ?? asset.galleryAssetId ?? scenarioLibraryMediaId(asset.id);
+    const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, originId));
     const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
     const { assetId: _assetId, ...portable } = asset;
     assets.push({
-      entry: portable,
+      entry:
+        !asset.borrowedMediaId &&
+        !asset.galleryAssetId &&
+        media?.source.kind === 'stored-asset' &&
+        media.source.assetId !== asset.assetId
+          ? { ...portable, galleryAssetId: media.id }
+          : portable,
       objectId: collector.addObject(
         file,
         filename,

@@ -24,6 +24,11 @@ const projectsDbMocks = vi.hoisted(() => ({
   recoverProjectMediaPublicationsMock: vi.fn(),
 }));
 
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
+}));
+
 vi.mock('./asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverProjectMediaPublications: projectsDbMocks.recoverProjectMediaPublicationsMock,
@@ -69,6 +74,7 @@ function createDb() {
       done: Promise.resolve(),
       objectStore: vi.fn(() => ({
         delete: projectsDbMocks.txDeleteMock,
+        index: () => ({ count: async () => 0 }),
         get: projectsDbMocks.txGetMock,
         getAll: projectsDbMocks.txGetAllMock,
         put: projectsDbMocks.txPutMock,
@@ -119,7 +125,13 @@ it('deletes removed project-owned assets while saving the next project snapshot'
     assets: [existingProject.assets[0]!],
   };
 
-  projectsDbMocks.txGetMock.mockResolvedValue(createVideoProjectEntry(existingProject));
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === existingProject.id
+      ? createVideoProjectEntry(existingProject)
+      : key === 'asset-b'
+        ? { id: 'asset-b', assetId: 'asset-b-bytes', createdAt: 1, mimeType: 'video/mp4', size: 10 }
+        : undefined
+  );
   vi.spyOn(Date, 'now').mockReturnValue(1000);
 
   await saveVideoProject(nextProject);
@@ -416,7 +428,18 @@ it('uses now as createdAt fallback and ignores externally owned assets while sav
     ],
   });
 
-  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === 'recording-1'
+      ? {
+          id: key,
+          assetId: 'recording-object',
+          filename: 'clip.webm',
+          mimeType: 'video/webm',
+          size: 20,
+          createdAt: 1,
+        }
+      : undefined
+  );
   vi.spyOn(Date, 'now').mockReturnValue(2000);
   Reflect.deleteProperty(project, 'createdAt');
 
@@ -520,4 +543,16 @@ it('does not manufacture a missing media mirror while saving a project with a re
     expect.objectContaining({ id: project.id })
   );
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+});
+
+it('refuses a newly inserted source deleted before the placement could be saved', async () => {
+  const { saveVideoProject } = await import('./index');
+  const existing = createVideoProject();
+  const imported = createProjectOwnedVideoAsset('deleted-acquisition');
+  const linked = { ...imported, source: { ...imported.source, originMediaId: 'deleted-original' } };
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === existing.id ? createVideoProjectEntry(existing) : undefined
+  );
+  await expect(saveVideoProject({ ...existing, assets: [linked] })).rejects.toThrow();
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
 });

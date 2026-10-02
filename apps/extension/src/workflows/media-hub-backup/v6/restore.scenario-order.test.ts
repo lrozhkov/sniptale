@@ -173,3 +173,91 @@ it('restores scenario owners before dependent videos even for older reversed cat
 
   expect(publicationOrder).toEqual(['scenario-project', 'video-project']);
 });
+
+it.each(['shared', 'private-origin'] as const)(
+  'restores the original Library identity before a review dependency: %s',
+  async (binding) => {
+    const { portableMetadata } =
+      await import('./root-publication/media.review-assets.test-support');
+    const { createMediaLibraryEntry } =
+      await import('../../../composition/persistence/projects/index.test-support');
+    const primary = portableMetadata(true);
+    const metadata = [
+      {
+        ...primary,
+        reviewAssets: primary.reviewAssets.map((asset) =>
+          asset.entry.id === 'music'
+            ? binding === 'shared'
+              ? { ...asset, libraryMediaId: 'project-asset:music' }
+              : {
+                  ...asset,
+                  publishToLibrary: false,
+                  entry: { ...asset.entry, originMediaId: 'project-asset:music' },
+                }
+            : asset
+        ),
+      },
+      {
+        entry: createMediaLibraryEntry({
+          id: 'project-asset:music',
+          kind: 'audio',
+          mimeType: 'audio/mpeg',
+          size: 10,
+          source: { kind: 'project-asset', projectAssetId: 'music' },
+        }),
+        projectAsset: { id: 'music', mimeType: 'audio/mpeg', size: 10, createdAt: 1 },
+        originalObjectId: 'music',
+      },
+    ];
+    const descriptors = metadata.map((item, index) => ({
+      rootId: item.entry.id,
+      rootKind: 'media' as const,
+      mediaSubtype: 'library-item',
+      metadataPath: `_sniptale/metadata/media/${index}.json`,
+      objectCount: 0,
+      totalBytes: 0,
+    }));
+    const path = '_sniptale/catalog/media-000001.ndjson';
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    await writer.addText('_sniptale/manifest.json', '{}');
+    await writer.addText(
+      path,
+      descriptors.map((descriptor) => JSON.stringify(descriptor)).join('\n') + '\n'
+    );
+    for (const [index, descriptor] of descriptors.entries())
+      await writer.addText(
+        descriptor.metadataPath,
+        JSON.stringify({ descriptor, metadata: metadata[index], objects: [] })
+      );
+    await writer.close();
+    mocks.verify.mockResolvedValue({
+      inspection: {
+        manifest: { catalogs: [{ path, rootKind: 'media', mediaSubtype: 'library-item' }] },
+      },
+      session: currentSession,
+    });
+    const order: string[] = [];
+    await restoreMediaHubBackupV6({
+      file: output.blob(),
+      operationId: 'restore-1',
+      publishers: [
+        {
+          profile: 'media:library-item',
+          async publish({ envelope }) {
+            const id = envelope.descriptor.rootId;
+            order.push(id);
+            currentSession = {
+              ...currentSession,
+              committedRoots: [...currentSession.committedRoots, `media:library-item:${id}`],
+              currentRoot: null,
+              rootIdMap: { ...currentSession.rootIdMap, [`media:library-item:${id}`]: id },
+            };
+            return { conflicted: false, imported: true, retainedAssetIds: [] };
+          },
+        },
+      ],
+    });
+    expect(order).toEqual(['project-asset:music', 'export:e']);
+  }
+);

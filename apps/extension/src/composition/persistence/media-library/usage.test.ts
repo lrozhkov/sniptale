@@ -277,7 +277,7 @@ it('loads the full graph once for a batch instead of once per selected file', as
   });
   const previous = await Promise.all([media.id, extraMedia.id].map(listMediaAssetProjectUsage));
   expect(mocks.videos).toHaveBeenCalledTimes(2);
-  expect(getAll).toHaveBeenCalledTimes(6);
+  expect(getAll).toHaveBeenCalledTimes(8);
   mocks.videos.mockClear();
   mocks.scenarios.mockClear();
   getAll.mockClear();
@@ -296,7 +296,7 @@ it('loads the full graph once for a batch instead of once per selected file', as
   );
   expect(mocks.videos).toHaveBeenCalledOnce();
   expect(mocks.scenarios).toHaveBeenCalledOnce();
-  expect(getAll).toHaveBeenCalledTimes(3);
+  expect(getAll).toHaveBeenCalledTimes(4);
 });
 
 it('reads each deletion preparation freshly even while the advisory preview snapshot is cached', async () => {
@@ -336,4 +336,17 @@ it('keeps independent scenario imports outside the deletion warning', async () =
   ];
   mocks.videos.mockResolvedValue([]);
   expect(await listMediaAssetProjectUsage(media.id)).toEqual([]);
+});
+
+it('shows a frozen video representation as a consumer of its inserted Library identity', async () => {
+  childRows = [];
+  media.source = { kind: 'screenshot' };
+  video.project.assets[0]!.source = {
+    kind: 'project-asset',
+    projectAssetId: 'private-copy',
+    originMediaId: media.id,
+  };
+  expect(await listMediaAssetProjectUsage(media.id)).toEqual([
+    { id: video.id, kind: 'video', name: video.project.name, primary: false },
+  ]);
 });

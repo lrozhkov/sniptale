@@ -222,8 +222,7 @@ describe('saveEditorRenderedImage save flows', () => {
 
     expectExecuteSaveMessage({
       actionType: 'ask_system',
-      filename: 'edited.png',
-      presetId: undefined,
+      filename: 'edited.webp',
     });
     expect(mockRenderToDataUrl).toHaveBeenCalledWith({
       format: 'webp',

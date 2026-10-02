@@ -76,6 +76,7 @@ export async function restoreAutosaveDraft(
   activateAutosaveContext(state, {
     aggregateId: entry.aggregateId,
     durableRevision: entry.revision,
+    requireExistingRoot: true,
     renderPresentation,
     sourceUrl: entry.sourceUrl,
     sourceTitle: entry.sourceTitle,

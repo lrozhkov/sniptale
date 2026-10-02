@@ -1,3 +1,4 @@
+import { createMediaLibraryEntry } from '../projects/index.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +13,15 @@ const mocks = vi.hoisted(() => ({
   runMutation: vi.fn(),
 }));
 
+vi.mock('../assets/operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/operations')>()),
+  completePhysicalDeleteOperation: mocks.completePhysicalDelete,
+}));
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/opfs-store')>()),
+  deleteReadyJournal: mocks.deleteJournal,
+  listReadyJournals: mocks.journals,
+}));
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
   completePhysicalDeleteOperation: mocks.completePhysicalDelete,
@@ -73,7 +83,7 @@ it('retries durable physical-delete operations on startup', async () => {
 
   await recoverAssetPublications();
 
-  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(operation);
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(operation, expect.any(Object));
   expect(mocks.recoverStandalone).toHaveBeenCalledOnce();
 });
 
@@ -123,7 +133,7 @@ it('aborts and compensates a crashed restore before removing its uncommitted obj
   };
   const harness = createDbHarness([operation]);
   harness.put('recordings', 'recording-1', { ...previousRecording, assetId: 'asset-new' });
-  harness.put('asset_refs', 'asset-new', { assetId: 'asset-new' });
+  harness.put('asset_refs', 'asset-new', createRef('asset-new'));
   harness.put('asset_owners', ['recording', 'recording-1', 'body'], {
     ...previousOwner,
     assetId: 'asset-new',
@@ -146,7 +156,10 @@ it('aborts and compensates a crashed restore before removing its uncommitted obj
   expect(harness.get('asset_refs', 'asset-old')).toEqual(previousRef);
   expect(harness.get('asset_refs', 'asset-new')).toBeUndefined();
   expect(harness.get('asset_operations', 'restore-1')).toBeUndefined();
-  expect(mocks.deleteObject).toHaveBeenCalledWith('asset-new');
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: ['asset-new'] }),
+    expect.any(Object)
+  );
   expect(mocks.deleteObject).not.toHaveBeenCalledWith('asset-old');
   expect(mocks.deleteJournal).toHaveBeenCalledWith('journal-1');
 });
@@ -159,7 +172,11 @@ it('restores a replaced project asset and thumbnail after a later restore batch 
     mimeType: 'image/png',
     size: 3,
   };
-  const previousMedia = { id: 'project-asset:project-asset-1', filename: 'old.png' };
+  const previousMedia = createMediaLibraryEntry({
+    id: 'project-asset:project-asset-1',
+    filename: 'old.png',
+    source: { kind: 'project-asset', projectAssetId: 'project-asset-1' },
+  });
   const previousThumbnail = { id: 'project-asset:project-asset-1', blob: new Blob(['old']) };
   const previousRef = {
     assetId: 'asset-old',
@@ -211,7 +228,7 @@ it('restores a replaced project asset and thumbnail after a later restore batch 
     id: previousThumbnail.id,
     blob: new Blob(['new']),
   });
-  harness.put('asset_refs', 'asset-new', { assetId: 'asset-new' });
+  harness.put('asset_refs', 'asset-new', createRef('asset-new'));
   harness.put('asset_owners', ['project-asset', 'project-asset-1', 'body'], {
     ...previousOwner,
     assetId: 'asset-new',
@@ -225,7 +242,10 @@ it('restores a replaced project asset and thumbnail after a later restore batch 
   expect(harness.get('thumbnails', previousThumbnail.id)).toEqual(previousThumbnail);
   expect(harness.get('asset_refs', 'asset-old')).toEqual(previousRef);
   expect(harness.get('asset_refs', 'asset-new')).toBeUndefined();
-  expect(mocks.deleteObject).toHaveBeenCalledWith('asset-new');
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: ['asset-new'] }),
+    expect.any(Object)
+  );
   expect(mocks.deleteObject).not.toHaveBeenCalledWith('asset-old');
   expect(mocks.deleteJournal).toHaveBeenCalledWith('journal-project-asset');
 });
@@ -303,8 +323,12 @@ it('restores both previous web snapshot assets after a crashed restore root', as
   expect(harness.get('asset_refs', 'screenshot-old')).toEqual(previousRefs[1]);
   expect(harness.get('asset_refs', 'package-new')).toBeUndefined();
   expect(harness.get('asset_refs', 'screenshot-new')).toBeUndefined();
-  expect(mocks.deleteObject).toHaveBeenCalledWith('package-new');
-  expect(mocks.deleteObject).toHaveBeenCalledWith('screenshot-new');
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({
+      assetIds: expect.arrayContaining(['package-new', 'screenshot-new']),
+    }),
+    expect.any(Object)
+  );
 });
 
 it('finishes journals and obsolete objects for a committed restore', async () => {
@@ -333,7 +357,10 @@ it('finishes journals and obsolete objects for a committed restore', async () =>
   await recoverAssetPublications();
 
   expect(mocks.deleteJournal).toHaveBeenCalledWith('journal-committed');
-  expect(mocks.deleteObject).toHaveBeenCalledWith('asset-old');
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: expect.arrayContaining(['asset-old']) }),
+    expect.any(Object)
+  );
   expect(harness.get('asset_operations', 'restore-committed')).toBeUndefined();
 });
 
@@ -368,7 +395,10 @@ it('keeps a crashed archive session resumable while removing only its uncommitte
 
   await recoverAssetPublications();
 
-  expect(mocks.deleteObject).toHaveBeenCalledWith('uncommitted-object');
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: expect.arrayContaining(['uncommitted-object']) }),
+    expect.any(Object)
+  );
   expect(mocks.deleteJournal).toHaveBeenCalledWith('archive-journal');
   expect(harness.get('asset_operations', session.operationId)).toMatchObject({
     currentRoot: null,
@@ -409,7 +439,10 @@ it('never deletes a referenced object while cleaning a committed multi-object ar
 
   await recoverAssetPublications();
 
-  expect(mocks.deleteObject).toHaveBeenCalledWith('temporary-object');
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: expect.arrayContaining(['temporary-object']) }),
+    expect.any(Object)
+  );
   expect(mocks.deleteObject).not.toHaveBeenCalledWith('retained-object');
   expect(mocks.deleteJournal).toHaveBeenCalledWith('committed-journal');
 });
@@ -438,12 +471,15 @@ function createDbHarness(
     return value['id'];
   };
   const objectStore = (storeName: string) => ({
+    getAll: async () => [...(stores.get(storeName)?.values() ?? [])],
     delete: async (entryKey: unknown) => stores.get(storeName)?.delete(key(entryKey)),
     get: async (entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
     put: async (value: Record<string, unknown>) =>
       put(storeName, deriveKey(storeName, value), value),
   });
   const db = {
+    put: async (storeName: string, value: Record<string, unknown>) =>
+      put(storeName, deriveKey(storeName, value), value),
     delete: async (storeName: string, entryKey: unknown) =>
       stores.get(storeName)?.delete(key(entryKey)),
     get: async (storeName: string, entryKey: unknown) => stores.get(storeName)?.get(key(entryKey)),
@@ -456,6 +492,92 @@ function createDbHarness(
     put,
   };
 }
+
+it.each(['additional-owner', 'changed-source', 'scenario-consumer'] as const)(
+  'preserves a legacy compensation receipt after its source was adopted: %s',
+  async (adoption) => {
+    const compensation = {
+      assetId: 'adopted',
+      journalId: 'receipt',
+      nextMediaId: 'recording:source',
+      nextOwnerId: 'source',
+      previousRecords: {},
+    };
+    const operation: AssetOperation = {
+      compensations: [compensation],
+      createdAt: 1,
+      updatedAt: 1,
+      kind: 'backup-restore',
+      status: 'aborted',
+      operationId: 'legacy',
+      obsoleteAssetIds: [],
+    };
+    const harness = createDbHarness([operation]);
+    const source = {
+      id: 'source',
+      assetId: adoption === 'changed-source' ? 'later-version' : 'adopted',
+      filename: 'recording.webm',
+      createdAt: 1,
+      mimeType: 'video/webm',
+      size: 3,
+    };
+    harness.put('recordings', 'source', source);
+    harness.put('asset_refs', 'adopted', createRef('adopted'));
+    harness.put('asset_owners', ['recording', 'source', 'body'], {
+      assetId: 'adopted',
+      ownerKind: 'recording',
+      ownerId: 'source',
+      role: 'body',
+    });
+    if (adoption === 'additional-owner')
+      harness.put('asset_owners', ['image-workspace', 'other', 'source'], {
+        assetId: 'adopted',
+        ownerKind: 'image-workspace',
+        ownerId: 'other',
+        role: 'source',
+      });
+    if (adoption === 'scenario-consumer')
+      harness.put('scenario_assets', 'child', {
+        id: 'child',
+        galleryAssetId: 'recording:source',
+        borrowedMediaId: 'recording:source',
+      });
+    mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+    await recoverAssetPublications();
+    expect(harness.get('recordings', 'source')).toEqual(source);
+    expect(harness.get('asset_operations', 'legacy')).toEqual(operation);
+    expect(harness.get('asset_refs', 'adopted')).toBeDefined();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  }
+);
+
+it('retains a committed legacy delete receipt while obsolete bytes still have an owner', async () => {
+  const operation: AssetOperation = {
+    compensations: [],
+    createdAt: 1,
+    updatedAt: 1,
+    kind: 'backup-restore',
+    status: 'committed',
+    operationId: 'committed-shared',
+    obsoleteAssetIds: ['shared'],
+  };
+  const harness = createDbHarness([operation]);
+  harness.put('asset_owners', ['image-workspace', 'other', 'source'], {
+    assetId: 'shared',
+    ownerKind: 'image-workspace',
+    ownerId: 'other',
+    role: 'source',
+  });
+  harness.put('asset_refs', 'shared', createRef('shared'));
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  await recoverAssetPublications();
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(harness.get('asset_operations', operation.operationId)).toBeUndefined();
+  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: ['shared'] }),
+    expect.any(Object)
+  );
+});
 
 function createRef(assetId: string) {
   return {
@@ -484,3 +606,73 @@ function createWebSnapshotCompensation(
     previousRecords,
   };
 }
+
+it('preserves every object in an ambiguous multi-object legacy journal', async () => {
+  const harness = createDbHarness([]);
+  harness.put('asset_owners', ['recording', 'adopted', 'body'], {
+    assetId: 'second',
+    ownerId: 'adopted',
+    ownerKind: 'recording',
+    role: 'body',
+  });
+  mocks.journals.mockResolvedValue([
+    {
+      assetRefs: [createRef('first'), createRef('second')],
+      createdAt: 1,
+      domain: 'legacy',
+      journalId: 'ambiguous',
+      operationId: 'missing-operation',
+      payload: {},
+    },
+  ]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  await recoverAssetPublications();
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(mocks.deleteJournal).not.toHaveBeenCalledWith('ambiguous');
+});
+
+it('preserves a legacy compensation receipt with an invalid previous byte owner', async () => {
+  const receipt = {
+    assetId: 'new',
+    journalId: 'legacy-ready',
+    nextMediaId: 'recording:r',
+    nextOwnerId: 'r',
+    previousRecords: {
+      assetOwnerEntries: [
+        { ownerId: 'other', ownerKind: 'recording', role: 'body', assetId: 'foreign' },
+      ],
+    },
+  };
+  const operation: AssetOperation = {
+    kind: 'backup-restore',
+    status: 'aborted',
+    createdAt: 1,
+    updatedAt: 1,
+    operationId: 'invalid-receipt',
+    obsoleteAssetIds: [],
+    compensations: [receipt],
+  };
+  const harness = createDbHarness([operation]);
+  harness.put('recordings', 'r', {
+    id: 'r',
+    assetId: 'new',
+    createdAt: 1,
+    filename: 'r.webm',
+    mimeType: 'video/webm',
+    size: 3,
+  });
+  harness.put('asset_refs', 'new', createRef('new'));
+  harness.put('asset_owners', ['recording', 'r', 'body'], {
+    ownerKind: 'recording',
+    ownerId: 'r',
+    role: 'body',
+    assetId: 'new',
+  });
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  await recoverAssetPublications();
+  expect(harness.get('recordings', 'r')).toMatchObject({ assetId: 'new' });
+  expect(harness.get('asset_operations', operation.operationId)).toMatchObject({
+    compensations: [receipt],
+  });
+  expect(harness.get('asset_owners', ['recording', 'other', 'body'])).toBeUndefined();
+});

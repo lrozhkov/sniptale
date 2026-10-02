@@ -376,6 +376,7 @@ async function buildReviewAssets(
     assets.push({
       entry: portable,
       filename,
+      ...(media ? { libraryMediaId: reference } : { publishToLibrary: false }),
       objectId: collector.add(file, filename, entry.mimeType),
     });
   }

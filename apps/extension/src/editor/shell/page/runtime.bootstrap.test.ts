@@ -235,6 +235,7 @@ async function verifiesAssetRestore() {
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
 
   expect(autosaveService.updateContext).toHaveBeenCalledWith({
+    requireExistingRoot: true,
     sourceUrl: 'https://asset.example',
     sourceTitle: 'Asset title',
   });

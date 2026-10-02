@@ -210,3 +210,44 @@ it('does not publish missing or mismatched source bytes or invalid child metadat
   expect(await backfillScenarioLibraryAssets()).toBe(0);
   expect(io.rows.get(MEDIA_LIBRARY_STORE)?.size).toBe(0);
 });
+
+it('preserves a replaced canonical root version during legacy backfill', async () => {
+  const child = {
+    id: 'frozen',
+    projectId: 'scenario',
+    assetId: 'old-bytes',
+    galleryAssetId: null,
+    mimeType: 'image/png',
+    width: 100,
+    height: 50,
+    createdAt: 1,
+    size: 4,
+  };
+  io.rows.get(SCENARIO_ASSETS_STORE)!.set(JSON.stringify(child.id), child);
+  io.rows.get(ASSET_REFS_STORE)!.set(JSON.stringify(child.assetId), {
+    assetId: child.assetId,
+    mimeType: child.mimeType,
+    size: child.size,
+    createdAt: 1,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: 'objects/old-bytes' },
+  });
+  const { createMediaLibraryEntry } = await import('../projects/index.test-support');
+  const root = createMediaLibraryEntry({
+    id: 'scenario-asset:frozen',
+    source: { kind: 'stored-asset', assetId: 'new-bytes' },
+  });
+  io.rows.get(MEDIA_LIBRARY_STORE)!.set(JSON.stringify(root.id), root);
+  const owner = {
+    assetId: 'new-bytes',
+    ownerId: root.id,
+    ownerKind: 'media-library',
+    role: 'source',
+  };
+  io.rows.get(ASSET_OWNERS_STORE)!.set(JSON.stringify(['media-library', root.id, 'source']), owner);
+  expect(await backfillScenarioLibraryAssets()).toBe(0);
+  expect(io.rows.get(MEDIA_LIBRARY_STORE)!.get(JSON.stringify(root.id))).toEqual(root);
+  expect(
+    io.rows.get(ASSET_OWNERS_STORE)!.get(JSON.stringify(['media-library', root.id, 'source']))
+  ).toEqual(owner);
+});

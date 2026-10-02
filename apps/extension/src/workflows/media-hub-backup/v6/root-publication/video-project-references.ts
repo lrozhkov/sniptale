@@ -7,6 +7,12 @@ import { scenarioAssetRestoreKey } from '../reference-keys';
 
 const UNRESOLVED_SOURCE_ERROR = 'Portable video project source reference is unresolved.';
 
+function requireMediaId(rootIds: Readonly<Record<string, string>>, sourceId: string): string {
+  const restoredId = rootIds[`media:library-item:${sourceId}`];
+  if (!restoredId) throw new Error(UNRESOLVED_SOURCE_ERROR);
+  return restoredId;
+}
+
 function requireProjectAssetId(assetIds: ReadonlyMap<string, string>, sourceId: string): string {
   const restoredId = assetIds.get(sourceId);
   if (!restoredId) throw new Error(UNRESOLVED_SOURCE_ERROR);
@@ -66,15 +72,16 @@ function transformAssetSource(
     return {
       ...source,
       projectAssetId: requireProjectAssetId(assetIds, source.projectAssetId),
+      ...(source.originMediaId
+        ? { originMediaId: requireMediaId(rootIds, source.originMediaId) }
+        : {}),
       ...(source.originRecordingId
         ? { originRecordingId: requireRecordingId(rootIds, source.originRecordingId) }
         : {}),
     };
   }
   if (source.kind === 'library-asset') {
-    const mediaId = rootIds[`media:library-item:${source.mediaId}`];
-    if (!mediaId) throw new Error(UNRESOLVED_SOURCE_ERROR);
-    return { ...source, mediaId };
+    return { ...source, mediaId: requireMediaId(rootIds, source.mediaId) };
   }
   return {
     ...source,

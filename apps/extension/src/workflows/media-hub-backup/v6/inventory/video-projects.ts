@@ -113,12 +113,15 @@ async function buildProjectAssets(
           sourceAssetId: asset.assetId,
         })
       : undefined;
-    if (videoReview) {
+    if (videoReview && !media) {
       for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
     }
     output.push({
       entry: portable,
-      ...(videoReview
+      ...(media
+        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
+        : { publishToLibrary: false }),
+      ...(videoReview && !media
         ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
         : {}),
       filename,
@@ -157,6 +160,9 @@ async function buildProjectExports({
     .filter((value): value is NonNullable<typeof value> => value !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const exportEntry of exports) {
+    const media = parseMediaLibraryEntry(
+      await db.get(MEDIA_LIBRARY_STORE, `export:${exportEntry.id}`)
+    );
     const file = await readInventoryAssetFile(db, exportEntry.assetId, exportEntry.filename);
     const { assetId: _assetId, recordingMetadata, ...portable } = exportEntry;
     const thumbnail = parseMediaThumbnailEntry(
@@ -169,12 +175,13 @@ async function buildProjectExports({
           sourceAssetId: exportEntry.assetId,
         })
       : undefined;
-    if (videoReview) {
+    if (videoReview && !media) {
       for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
     }
     output.push({
       entry: { ...portable, ...projectRecordingMetadataPrivacy(recordingMetadata, options) },
-      ...(videoReview
+      ...(media ? { libraryMediaId: `export:${exportEntry.id}` } : {}),
+      ...(videoReview && !media
         ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
         : {}),
       objectId: collector.addObject(
@@ -250,6 +257,9 @@ async function buildReviewReferencedAssets(
     const { assetId: _assetId, ...portable } = asset;
     output.push({
       entry: portable,
+      ...(media
+        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
+        : { publishToLibrary: false }),
       filename,
       objectId: collector.addObject(
         file,

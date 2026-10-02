@@ -13,114 +13,143 @@ import {
 } from '../../../features/scenario/project/public';
 import { createScenarioProjectEntry } from '../scenario/projects/entry';
 
-it('removes scenario image placement and historical child while keeping the scenario', async () => {
-  const childId = 'scenario-child-1';
-  const scenarioId = 'scenario-1';
-  const project = createGuideProject('Guide', scenarioId, 1);
-  const step = createGuideStep('Step', 'step-1');
-  step.blocks.push(
-    createGuideImageBlock({
-      id: 'block-1',
-      assetId: childId,
-      width: 100,
-      height: 100,
-      source: { kind: 'import', filename: 'image.png' },
-    })
-  );
-  project.items.push(step);
-  const entry = createScenarioProjectEntry({ existing: undefined, project, updatedAt: 1 });
-  const scenarioMediaId = `scenario-asset:${childId}`;
-  replaceRows(
-    new Map<string, Map<string, unknown>>([
-      [
-        'media_library',
-        new Map([
-          [
-            scenarioMediaId,
-            {
-              ...mediaEntry(),
-              id: scenarioMediaId,
-              kind: 'image',
-              mimeType: 'image/png',
-              source: { kind: 'stored-asset', assetId: physicalId },
-            },
-          ],
-        ]),
-      ],
-      ['scenario_projects', new Map([[scenarioId, entry]])],
-      [
-        'scenario_assets',
-        new Map([
-          [
-            childId,
-            {
-              id: childId,
-              projectId: scenarioId,
-              assetId: physicalId,
-              galleryAssetId: null,
-              mimeType: 'image/png',
-              width: 100,
-              height: 100,
-              createdAt: 1,
-              size: 5,
-            },
-          ],
-        ]),
-      ],
-      [
-        'asset_owners',
-        new Map([
-          [
-            JSON.stringify(['scenario-asset', childId, 'body']),
-            {
-              assetId: physicalId,
-              ownerId: childId,
-              ownerKind: 'scenario-asset',
-              role: 'body',
-            },
-          ],
-          [
-            JSON.stringify(['media-library', scenarioMediaId, 'source']),
-            {
-              assetId: physicalId,
-              ownerId: scenarioMediaId,
-              ownerKind: 'media-library',
-              role: 'source',
-            },
-          ],
-        ]),
-      ],
-      [
-        'asset_refs',
-        new Map([
-          [
-            physicalId,
-            {
-              assetId: physicalId,
-              size: 5,
-              mimeType: 'image/png',
-              createdAt: 1,
-              storagePath: 'object',
-            },
-          ],
-        ]),
-      ],
-    ])
-  );
+it.each([false, true])(
+  'removes canonical scenario placement after root byte replacement=%s',
+  async (replaced) => {
+    const childPhysicalId = replaced ? 'frozen-old' : physicalId;
+    const childId = 'scenario-child-1';
+    const scenarioId = 'scenario-1';
+    const project = createGuideProject('Guide', scenarioId, 1);
+    const step = createGuideStep('Step', 'step-1');
+    step.blocks.push(
+      createGuideImageBlock({
+        id: 'block-1',
+        assetId: childId,
+        width: 100,
+        height: 100,
+        source: { kind: 'import', filename: 'image.png' },
+      })
+    );
+    project.items.push(step);
+    const entry = createScenarioProjectEntry({ existing: undefined, project, updatedAt: 1 });
+    const scenarioMediaId = `scenario-asset:${childId}`;
+    replaceRows(
+      new Map<string, Map<string, unknown>>([
+        [
+          'media_library',
+          new Map([
+            [
+              scenarioMediaId,
+              {
+                ...mediaEntry(),
+                id: scenarioMediaId,
+                kind: 'image',
+                mimeType: 'image/png',
+                source: { kind: 'stored-asset', assetId: physicalId },
+              },
+            ],
+          ]),
+        ],
+        ['scenario_projects', new Map([[scenarioId, entry]])],
+        [
+          'scenario_assets',
+          new Map([
+            [
+              childId,
+              {
+                id: childId,
+                projectId: scenarioId,
+                assetId: childPhysicalId,
+                galleryAssetId: null,
+                mimeType: 'image/png',
+                width: 100,
+                height: 100,
+                createdAt: 1,
+                size: 5,
+              },
+            ],
+          ]),
+        ],
+        [
+          'asset_owners',
+          new Map([
+            [
+              JSON.stringify(['scenario-asset', childId, 'body']),
+              {
+                assetId: childPhysicalId,
+                ownerId: childId,
+                ownerKind: 'scenario-asset',
+                role: 'body',
+              },
+            ],
+            [
+              JSON.stringify(['media-library', scenarioMediaId, 'source']),
+              {
+                assetId: physicalId,
+                ownerId: scenarioMediaId,
+                ownerKind: 'media-library',
+                role: 'source',
+              },
+            ],
+          ]),
+        ],
+        [
+          'asset_refs',
+          new Map([
+            [
+              physicalId,
+              {
+                assetId: physicalId,
+                size: 5,
+                mimeType: 'image/png',
+                createdAt: 1,
+                storagePath: 'object',
+              },
+            ],
+          ]),
+        ],
+      ])
+    );
 
-  await deleteMediaAssetWithProjectCascade(scenarioMediaId, [
-    { id: scenarioId, kind: 'scenario', name: 'Guide', primary: false },
-  ]);
-  const saved = rows.get('scenario_projects')!.get(scenarioId) as typeof entry;
-  expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
-  expect(rows.get('scenario_assets')?.has(childId)).toBe(false);
-  expect(rows.get('media_library')?.has(scenarioMediaId)).toBe(false);
-  expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
-});
+    if (replaced)
+      rows.get('asset_refs')!.set(childPhysicalId, {
+        assetId: childPhysicalId,
+        size: 5,
+        mimeType: 'image/png',
+        createdAt: 1,
+        storagePath: 'old-object',
+      });
 
-it.each([true, false])(
-  'requires a current warning to delete an active private Library import (confirmed=%s)',
-  async (confirmed) => {
+    await deleteMediaAssetWithProjectCascade(scenarioMediaId, [
+      { id: scenarioId, kind: 'scenario', name: 'Guide', primary: false },
+    ]);
+    const saved = rows.get('scenario_projects')!.get(scenarioId) as typeof entry;
+    expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
+    expect(rows.get('scenario_assets')?.has(childId)).toBe(false);
+    expect(rows.get('media_library')?.has(scenarioMediaId)).toBe(false);
+    expect(rows.get('asset_refs')?.has(physicalId)).toBe(false);
+    expect(rows.get('asset_refs')?.has(childPhysicalId)).toBe(false);
+  }
+);
+
+it.each([
+  { confirmed: true, source: 'screenshot' },
+  { confirmed: false, source: 'screenshot' },
+  { confirmed: true, source: 'project-asset' },
+  { confirmed: false, source: 'project-asset' },
+])(
+  'requires a current warning to delete an active private $source Library import (confirmed=$confirmed)',
+  async ({ confirmed, source }) => {
+    if (source === 'screenshot') {
+      const root = rows.get('media_library')!.get(mediaId) as object;
+      rows.get('media_library')!.set(mediaId, {
+        ...root,
+        source: { kind: 'screenshot' },
+        kind: 'image',
+        mimeType: 'image/png',
+        blob: new Blob(['png']),
+      });
+    }
     rows.get('video_projects')!.clear();
     const project = createGuideProject('Guide', 'scenario-private', 1);
     const step = createGuideStep('Step', 'step-private');

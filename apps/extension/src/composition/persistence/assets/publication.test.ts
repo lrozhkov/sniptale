@@ -1,12 +1,16 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
+  cancelPutMock,
+  cancelCompleteMock,
   deleteReadyJournalMock,
   initDBMock,
   listReadyJournalsMock,
   releaseTransitionsMock,
   writeReadyJournalMock,
 } = vi.hoisted(() => ({
+  cancelPutMock: vi.fn(),
+  cancelCompleteMock: vi.fn(),
   deleteReadyJournalMock: vi.fn(),
   initDBMock: vi.fn(async () => undefined),
   listReadyJournalsMock: vi.fn(),
@@ -14,6 +18,14 @@ const {
   writeReadyJournalMock: vi.fn(),
 }));
 
+vi.mock('../infrastructure/indexed-db/mutation', () => ({
+  runWithIndexedDbMutation: async (callback: (db: unknown) => Promise<unknown>) =>
+    callback({ put: cancelPutMock }),
+}));
+vi.mock('./operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./operations')>()),
+  completePhysicalDeleteOperation: cancelCompleteMock,
+}));
 vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteReadyJournal: deleteReadyJournalMock,
@@ -27,7 +39,12 @@ vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   initDB: initDBMock,
 }));
 
-import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
+import {
+  createAssetPublicationJournal,
+  publishReadyJournalWithRetry,
+  SupersededAssetPublicationError,
+  UnresolvedAssetPublicationError,
+} from './publication';
 import { recoverStandaloneAssetPublications } from './recovery';
 import type { AssetReadyJournal } from './contracts';
 import {
@@ -219,7 +236,7 @@ it('replays only standalone journals with a registered domain adapter', async ()
   ).resolves.toBe(1);
 
   expect(publish).toHaveBeenCalledOnce();
-  expect(publish).toHaveBeenCalledWith(standalone);
+  expect(publish).toHaveBeenCalledWith(standalone, expect.any(Object));
   expect(deleteReadyJournalMock).toHaveBeenCalledWith('journal-1');
   expect(deleteReadyJournalMock).not.toHaveBeenCalledWith('workflow');
 });
@@ -292,4 +309,35 @@ it('reuses an outer transition admission when erasure is already queued', async 
   await erasure;
 
   expect(erase).toHaveBeenCalledOnce();
+});
+
+it('journals superseded source cancellation before dropping ready protection', async () => {
+  const stale = new SupersededAssetPublicationError();
+  const publish = vi.fn(async () => {
+    throw stale;
+  });
+  await expect(publishReadyJournalWithRetry(createJournal(), publish)).rejects.toBe(stale);
+  expect(publish).toHaveBeenCalledOnce();
+  expect(cancelPutMock).toHaveBeenCalledWith(
+    'asset_operations',
+    expect.objectContaining({ assetIds: [ref.assetId] })
+  );
+  expect(cancelPutMock.mock.invocationCallOrder[0]).toBeLessThan(
+    deleteReadyJournalMock.mock.invocationCallOrder[0]!
+  );
+  expect(cancelCompleteMock).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: [ref.assetId] }),
+    expect.any(Object)
+  );
+});
+it('defers ambiguous legacy source replacement and continues recovery', async () => {
+  listReadyJournalsMock.mockResolvedValue([createJournal()]);
+  const publish = vi.fn(async () => {
+    throw new UnresolvedAssetPublicationError();
+  });
+  await expect(
+    recoverStandaloneAssetPublications([{ domain: 'recording-assets', publish }])
+  ).resolves.toBe(0);
+  expect(deleteReadyJournalMock).not.toHaveBeenCalled();
+  expect(cancelPutMock).not.toHaveBeenCalled();
 });

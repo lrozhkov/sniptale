@@ -1,3 +1,11 @@
+import { assertPreparedProjectAssetSources } from './source-admission';
+import { assertMediaSourceReplaceable } from './source-admission';
+import {
+  deleteMediaSidecars,
+  releaseMediaSource,
+  releaseUnpublishedProjectAssets,
+} from '../media-library/delete-cascade.sources';
+import type { initDB } from '../infrastructure/indexed-db/core';
 import type {
   VideoWorkspace,
   VideoWorkspaceDraft,
@@ -12,6 +20,7 @@ import type {
   AssetRef,
   PhysicalDeleteAssetOperation,
 } from '../assets';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from '../media-library/contracts';
 import {
   buildProjectAssetMediaEntry,
@@ -57,6 +66,8 @@ interface PreparedVideoProjectArchiveRoot {
   assets: Array<{
     entry: StoredProjectAssetEntry;
     filename: string;
+    publishToLibrary?: boolean;
+    reusePublished?: boolean;
     ref: AssetRef;
     videoReview?: VideoWorkspaceSnapshot;
   }>;
@@ -64,6 +75,7 @@ interface PreparedVideoProjectArchiveRoot {
   exports: Array<{
     entry: StoredProjectExportEntry;
     ref: AssetRef;
+    reusePublished?: boolean;
     thumbnail?: MediaThumbnailEntry;
     videoReview?: VideoWorkspaceSnapshot;
   }>;
@@ -83,62 +95,72 @@ export interface VideoProjectBackupRestoreStores {
   projects: Store<VideoProjectEntry>;
   refs: Store<AssetRef>;
   thumbnails: Store<MediaThumbnailEntry>;
+  scenarioAssets: Store;
 }
 
-async function unlink(args: {
-  assetId: string;
-  entityId: string;
-  operation: PhysicalDeleteAssetOperation;
-  ownerKind: string;
-  stores: VideoProjectBackupRestoreStores;
-}) {
-  await args.stores.owners.delete([args.ownerKind, args.entityId, PROJECT_MEDIA_ASSET_ROLE]);
-  if ((await args.stores.owners.index('assetId').count(args.assetId)) === 0) {
-    await args.stores.refs.delete(args.assetId);
-    args.operation.assetIds.push(args.assetId);
-  }
-}
+type RestoreTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
 
 async function deleteExisting(args: {
   assetOwnership: ProjectAssetOwnership;
   operation: PhysicalDeleteAssetOperation;
   projectId: string;
+  root: PreparedVideoProjectArchiveRoot;
   stores: VideoProjectBackupRestoreStores;
+  tx: RestoreTransaction;
+  releasedCandidates: Set<string>;
 }) {
   const existing = parseVideoProjectEntry(await args.stores.projects.get(args.projectId));
   if (!existing) return;
   for (const id of args.assetOwnership.owned) {
     if (args.assetOwnership.protected.has(id)) continue;
+    const published: unknown = await args.stores.media.get(`project-asset:${id}`);
+    if (
+      published !== undefined &&
+      !args.root.assets.some(
+        (asset) =>
+          asset.entry.id === id && asset.publishToLibrary !== false && !asset.reusePublished
+      )
+    )
+      continue;
+    if (!args.root.assets.some((asset) => asset.entry.id === id && !asset.reusePublished)) continue;
     const asset = parseProjectAssetEntry(await args.stores.assets.get(id));
-    await args.stores.assets.delete(id);
-    await args.stores.media.delete(`project-asset:${id}`);
-    await args.stores.videoWorkspaces.delete(`project-asset:${id}`);
-    await args.stores.videoDrafts.delete(`project-asset:${id}`);
-    await args.stores.thumbnails.delete(`project-asset:${id}`);
-    if (asset)
-      await unlink({
-        assetId: asset.assetId,
-        entityId: id,
-        operation: args.operation,
-        ownerKind: PROJECT_ASSET_OWNER_KIND,
-        stores: args.stores,
-      });
+    if (!asset || asset.id !== id)
+      throw new Error('Existing project source cannot be replaced safely.');
+    const children = await deleteMediaSidecars(args.tx, `project-asset:${id}`, args.operation);
+    for (const child of children) args.releasedCandidates.add(child);
+    await releaseMediaSource(
+      args.tx,
+      { id: `project-asset:${id}`, source: { kind: 'project-asset', projectAssetId: id } },
+      args.operation
+    );
   }
   for (const raw of await args.stores.exports.index('projectId').getAll(args.projectId)) {
     const entry = parseProjectExportEntry(raw);
     if (!entry) continue;
-    await args.stores.exports.delete(entry.id);
-    await args.stores.media.delete(`export:${entry.id}`);
-    await args.stores.videoWorkspaces.delete(`export:${entry.id}`);
-    await args.stores.videoDrafts.delete(`export:${entry.id}`);
-    await args.stores.thumbnails.delete(`export:${entry.id}`);
-    await unlink({
-      assetId: entry.assetId,
-      entityId: entry.id,
-      operation: args.operation,
-      ownerKind: PROJECT_EXPORT_OWNER_KIND,
-      stores: args.stores,
-    });
+    const published: unknown = await args.stores.media.get(`export:${entry.id}`);
+    if (
+      published !== undefined &&
+      !args.root.exports.some((item) => item.entry.id === entry.id && !item.reusePublished)
+    )
+      continue;
+    await assertMediaSourceReplaceable(
+      {
+        id: `export:${entry.id}`,
+        source: { kind: 'project-export', exportId: entry.id, projectId: entry.projectId },
+      },
+      args.stores,
+      args.projectId
+    );
+    const children = await deleteMediaSidecars(args.tx, `export:${entry.id}`, args.operation);
+    for (const child of children) args.releasedCandidates.add(child);
+    await releaseMediaSource(
+      args.tx,
+      {
+        id: `export:${entry.id}`,
+        source: { kind: 'project-export', exportId: entry.id, projectId: entry.projectId },
+      },
+      args.operation
+    );
   }
   await args.stores.thumbnails.delete(`video-project:${args.projectId}`);
   await args.stores.presentations.delete(
@@ -156,7 +178,12 @@ async function hasAssetConflict(args: {
 }): Promise<boolean> {
   let conflicted = false;
   for (const item of args.root.assets) {
-    if (!parseProjectAssetEntry(await args.stores.assets.get(item.entry.id))) continue;
+    if (item.reusePublished) continue;
+    const raw: unknown = await args.stores.assets.get(item.entry.id);
+    if (raw === undefined) continue;
+    const current = parseProjectAssetEntry(raw);
+    if (!current || current.id !== item.entry.id)
+      throw new Error('Invalid existing project asset cannot be replaced.');
     conflicted = true;
     const belongsToRoot =
       args.existingAssetIds.has(item.entry.id) && !args.otherAssetIds.has(item.entry.id);
@@ -175,7 +202,22 @@ async function hasExportConflict(args: {
   let conflicted = false;
   for (const item of args.root.exports) {
     const current = parseProjectExportEntry(await args.stores.exports.get(item.entry.id));
-    if (!current) continue;
+    if (!current) {
+      if (item.reusePublished)
+        throw new Error('Published project export changed after preparation.');
+      continue;
+    }
+    if (item.reusePublished) {
+      if (
+        current.id !== item.entry.id ||
+        current.assetId !== item.entry.assetId ||
+        current.size !== item.entry.size ||
+        current.mimeType !== item.entry.mimeType
+      )
+        throw new Error('Published project export changed after preparation.');
+      await readPublishedExport(args.stores.media, item.entry.id, current.projectId);
+      continue;
+    }
     conflicted = true;
     if (args.strategy === 'replace' && current.projectId !== args.root.entry.id) {
       throw new Error(`Video project export belongs to another root: ${item.entry.id}.`);
@@ -189,6 +231,7 @@ async function publishProjectAssets(
   stores: VideoProjectBackupRestoreStores
 ) {
   for (const asset of root.assets) {
+    if (asset.reusePublished) continue;
     await stores.refs.put(asset.ref);
     await stores.owners.put({
       assetId: asset.ref.assetId,
@@ -203,11 +246,13 @@ async function publishProjectAssets(
         workspaces: stores.videoWorkspaces,
         drafts: stores.videoDrafts,
       });
-    await stores.media.put({
-      ...buildProjectAssetMediaEntry(asset.entry),
-      filename: asset.filename,
-      originalFilename: asset.filename,
-    });
+    if (asset.publishToLibrary !== false) {
+      await stores.media.put({
+        ...buildProjectAssetMediaEntry(asset.entry),
+        filename: asset.filename,
+        originalFilename: asset.filename,
+      });
+    }
   }
 }
 
@@ -216,6 +261,15 @@ async function publishProjectExports(
   stores: VideoProjectBackupRestoreStores
 ) {
   for (const item of root.exports) {
+    if (item.reusePublished) {
+      const media = await readPublishedExport(stores.media, item.entry.id);
+      await stores.exports.put(item.entry);
+      await stores.media.put({
+        ...media,
+        source: { ...media.source, projectId: item.entry.projectId },
+      });
+      continue;
+    }
     await stores.refs.put(item.ref);
     await stores.owners.put({
       assetId: item.ref.assetId,
@@ -248,7 +302,9 @@ export async function putVideoProjectBackupRestore(args: {
   root: PreparedVideoProjectArchiveRoot;
   strategy: ArchiveRestoreStrategy;
   stores: VideoProjectBackupRestoreStores;
+  tx: RestoreTransaction;
 }): Promise<{ conflicted: boolean; imported: boolean }> {
+  await assertPreparedProjectAssetSources(args.root.assets, args.stores);
   const existing = parseVideoProjectEntry(await args.stores.projects.get(args.root.entry.id));
   const assetOwnership = await collectProjectAssetOwnership({
     existing,
@@ -269,12 +325,16 @@ export async function putVideoProjectBackupRestore(args: {
   if ((existing || childConflict) && args.strategy === 'duplicate') {
     throw new Error('Video project restore conflict changed after preflight.');
   }
+  const releasedCandidates = new Set(assetOwnership.owned);
   if (existing && args.strategy === 'replace')
     await deleteExisting({
       assetOwnership,
+      root: args.root,
       operation: args.operation,
       projectId: args.root.entry.id,
       stores: args.stores,
+      tx: args.tx,
+      releasedCandidates,
     });
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
@@ -285,5 +345,23 @@ export async function putVideoProjectBackupRestore(args: {
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
   await publishProjectSidecars(args.root, args.stores);
+  await releaseUnpublishedProjectAssets(args.tx, releasedCandidates, args.operation);
   return { conflicted, imported: true };
+}
+
+async function readPublishedExport(
+  store: VideoProjectBackupRestoreStores['media'],
+  id: string,
+  projectId?: string
+) {
+  const media = parseMediaLibraryEntry(await store.get(`export:${id}`));
+  if (
+    !media ||
+    media.id !== `export:${id}` ||
+    media.source.kind !== 'project-export' ||
+    media.source.exportId !== id ||
+    (projectId !== undefined && media.source.projectId !== projectId)
+  )
+    throw new Error('Published project export identity changed after preparation.');
+  return { ...media, source: media.source };
 }

@@ -1,3 +1,6 @@
+import type { DurableAssetLifecyclePermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
+import { orderLibraryRestoreRoots } from './library-restore-order';
+import { parsePortableMediaMetadata } from './root-codecs/media';
 import {
   abortArchiveRestoreSession,
   beginArchiveRestoreRoot,
@@ -50,6 +53,7 @@ export interface ArchiveRootPublisher {
   publish(args: {
     envelope: MediaHubBackupRootEnvelope;
     journal: AssetReadyJournal;
+    lifecyclePermit?: DurableAssetLifecyclePermit;
     session: ArchiveRestoreSession;
     staged: StagedArchiveObject[];
   }): Promise<ArchiveRootPublicationResult>;
@@ -163,8 +167,14 @@ async function restoreArchiveRoot(args: {
       payload: { rootKey: key },
     });
     let result: ArchiveRootPublicationResult | null = null;
-    await publishReadyJournalWithRetry(journal, async (readyJournal) => {
-      result = await args.publisher.publish({ envelope, journal: readyJournal, session, staged });
+    await publishReadyJournalWithRetry(journal, async (readyJournal, lifecyclePermit) => {
+      result = await args.publisher.publish({
+        envelope,
+        journal: readyJournal,
+        session,
+        staged,
+        ...(lifecyclePermit ? { lifecyclePermit } : {}),
+      });
     });
     const retained = new Set(
       (result as ArchiveRootPublicationResult | null)?.retainedAssetIds ?? []
@@ -223,29 +233,39 @@ export async function restoreMediaHubBackupV6(args: {
       };
       const report = () => args.onProgress?.({ ...progress });
       let session = verifiedSession;
+      const allDescriptors: ArchiveRootDescriptor[] = [];
       for (const catalog of orderedRestoreCatalogs(inspection.manifest.catalogs)) {
         const entry = reader.entry(catalog.path);
         if (!entry) throw new Error(`Media backup catalog is missing: ${catalog.path}.`);
-        const descriptors = parseCatalog(await entry.text(MAX_CATALOG_SHARD_BYTES));
-        for (const descriptor of descriptors) {
-          if (args.signal?.aborted) {
-            throw new DOMException('Media backup restore was cancelled.', 'AbortError');
-          }
-          const key = rootKey(descriptor);
-          if (session.committedRoots.includes(key)) continue;
-          const publisher = publishers.get(profile(descriptor));
-          if (!publisher)
-            throw new Error(`Media backup root publisher is unavailable: ${profile(descriptor)}.`);
-          session = await restoreArchiveRoot({
-            descriptor,
-            progress,
-            publisher,
-            reader,
-            report,
-            session,
-            ...(args.signal ? { signal: args.signal } : {}),
-          });
+        allDescriptors.push(...parseCatalog(await entry.text(MAX_CATALOG_SHARD_BYTES)));
+      }
+      const descriptors = await orderLibraryRestoreRoots(allDescriptors, async (descriptor) => {
+        const envelope = await loadEnvelope(reader, descriptor);
+        const metadata = parsePortableMediaMetadata(envelope.metadata);
+        return (metadata.reviewAssets ?? []).flatMap((asset) =>
+          [asset.libraryMediaId, asset.entry.originMediaId].filter(
+            (id): id is string => Boolean(id) && id !== descriptor.rootId
+          )
+        );
+      });
+      for (const descriptor of descriptors) {
+        if (args.signal?.aborted) {
+          throw new DOMException('Media backup restore was cancelled.', 'AbortError');
         }
+        const key = rootKey(descriptor);
+        if (session.committedRoots.includes(key)) continue;
+        const publisher = publishers.get(profile(descriptor));
+        if (!publisher)
+          throw new Error(`Media backup root publisher is unavailable: ${profile(descriptor)}.`);
+        session = await restoreArchiveRoot({
+          descriptor,
+          progress,
+          publisher,
+          reader,
+          report,
+          session,
+          ...(args.signal ? { signal: args.signal } : {}),
+        });
       }
       if (inspection.manifest.galleryViews) {
         await restoreGallerySavedViews(

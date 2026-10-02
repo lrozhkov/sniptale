@@ -55,7 +55,7 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
       return true;
     });
   },
-  async publish({ envelope, session, staged }) {
+  async publish({ envelope, session, staged, lifecyclePermit }) {
     const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
     const sourceExists = await runWithIndexedDbMutation(async (db) =>
       Boolean(await db.get(SCENARIO_PROJECTS_STORE, metadata.entry.id))
@@ -67,6 +67,6 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
       sourceExists,
       staged,
     });
-    return commitScenarioProjectPublication(prepared, session);
+    return commitScenarioProjectPublication(prepared, session, lifecyclePermit);
   },
 };

@@ -1,134 +1,81 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../features/web-snapshot/manifest.test-support';
-
+import { rows, harness } from '../media-library/delete-cascade.test-support';
 const mocks = vi.hoisted(() => ({
-  buildDelete: vi.fn(),
-  completeDelete: vi.fn(),
-  recover: vi.fn(),
-  runMutation: vi.fn(),
+  journals: vi.fn(async () => []),
+  recover: vi.fn(async () => 0),
 }));
-
-vi.mock('../infrastructure/indexed-db/mutation', () => ({
-  runWithIndexedDbMutation: mocks.runMutation,
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/opfs-store')>()),
+  listReadyJournals: mocks.journals,
 }));
-
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
-  buildPhysicalDeleteOperation: mocks.buildDelete,
-  completePhysicalDeleteOperation: mocks.completeDelete,
+  completePhysicalDeleteOperation: harness.complete,
+  listReadyJournals: mocks.journals,
 }));
-
 vi.mock('./publication', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./publication')>()),
   recoverWebSnapshotPublications: mocks.recover,
 }));
-
+import { deleteWebSnapshotMediaAsset } from './cleanup';
 beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.recover.mockResolvedValue(0);
-  mocks.buildDelete.mockReturnValue({
-    assetIds: [],
-    createdAt: 1,
-    kind: 'physical-delete',
-    operationId: 'delete-1',
-    status: 'pending',
-    updatedAt: 1,
-  });
-  mocks.completeDelete.mockResolvedValue(undefined);
+  rows.get('video_projects')!.clear();
+  rows.get('media_library')!.clear();
+  rows.get('media_library')!.set('asset-1', createMediaEntry());
+  rows.set('web_snapshots', new Map([['snapshot-1', createStoredSnapshot()]]));
+  rows.get('asset_owners')!.clear();
+  for (const [role, assetId] of [
+    ['package', 'package-asset'],
+    ['screenshot', 'screenshot-asset'],
+  ]) {
+    rows.get('asset_owners')!.set(JSON.stringify(['web-snapshot', 'snapshot-1', role]), {
+      role,
+      assetId,
+      ownerKind: 'web-snapshot',
+      ownerId: 'snapshot-1',
+    });
+  }
 });
-
-it('atomically removes both snapshot owners and schedules their OPFS objects for deletion', async () => {
-  const writes: Array<[string, string, unknown]> = [];
-  const snapshot = createStoredSnapshot();
-  const media = createMediaEntry();
-  const tx = {
-    done: Promise.resolve(),
-    objectStore(name: string) {
-      return {
-        delete: vi.fn(async (key: unknown) => writes.push([name, 'delete', key])),
-        get: vi.fn(async (key: unknown) => {
-          if (name === 'web_snapshots' && key === 'snapshot-1') return snapshot;
-          if (name === 'media_library' && key === 'asset-1') return media;
-          return undefined;
-        }),
-        index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
-        put: vi.fn(async (value: unknown) => writes.push([name, 'put', value])),
-      };
-    },
-  };
-  mocks.runMutation.mockImplementation(async (operation) =>
-    operation({ transaction: vi.fn(() => tx) })
-  );
-  mocks.completeDelete.mockRejectedValueOnce(new Error('disk unavailable'));
-  const { deleteWebSnapshotMediaAsset } = await import('./cleanup');
-
-  await deleteWebSnapshotMediaAsset({ assetId: 'asset-1', snapshotId: 'snapshot-1' });
-
-  expect(writes).toContainEqual([
-    'asset_owners',
-    'delete',
-    ['web-snapshot', 'snapshot-1', 'package'],
-  ]);
-  expect(writes).toContainEqual([
-    'asset_owners',
-    'delete',
-    ['web-snapshot', 'snapshot-1', 'screenshot'],
-  ]);
-  expect(writes).toContainEqual(['asset_refs', 'delete', 'package-asset']);
-  expect(writes).toContainEqual(['asset_refs', 'delete', 'screenshot-asset']);
-  expect(mocks.completeDelete).toHaveBeenCalledWith(
+it('retains the physical deletion intent after byte deletion fails', async () => {
+  harness.complete.mockRejectedValueOnce(new Error('disk unavailable'));
+  await expect(
+    deleteWebSnapshotMediaAsset({ assetId: 'asset-1', snapshotId: 'snapshot-1' })
+  ).rejects.toThrow('disk unavailable');
+  expect(rows.get('web_snapshots')!.has('snapshot-1')).toBe(false);
+  expect(rows.get('media_library')!.has('asset-1')).toBe(false);
+  expect([...rows.get('asset_operations')!.values()]).toContainEqual(
     expect.objectContaining({ assetIds: ['package-asset', 'screenshot-asset'] })
   );
 });
-
-it('fails closed for invalid snapshot metadata or a mismatched media owner', async () => {
-  const { deleteWebSnapshotMediaAsset } = await import('./cleanup');
-  const runCase = async (snapshot: unknown, media: unknown) => {
-    mocks.runMutation.mockImplementationOnce(async (operation) =>
-      operation({
-        transaction: vi.fn(() => ({
-          done: Promise.resolve(),
-          objectStore: (name: string) => ({
-            get: vi.fn(async () => (name === 'web_snapshots' ? snapshot : media)),
-          }),
-        })),
-      })
-    );
-    return deleteWebSnapshotMediaAsset({ assetId: 'asset-1', snapshotId: 'snapshot-1' });
-  };
-
-  await expect(runCase({ invalid: true }, undefined)).rejects.toThrow(
-    'Invalid web snapshot cannot be safely removed.'
-  );
-  await expect(
-    runCase(undefined, { ...createMediaEntry(), source: { kind: 'screenshot' } })
-  ).rejects.toThrow('Web snapshot media ownership does not match its record.');
-});
-
-it('keeps shared refs and skips physical deletion when another owner remains', async () => {
-  const writes: Array<[string, string, unknown]> = [];
-  const tx = {
-    done: Promise.resolve(),
-    objectStore(name: string) {
-      return {
-        delete: vi.fn(async (key: unknown) => writes.push([name, 'delete', key])),
-        get: vi.fn(async (key: unknown) =>
-          name === 'web_snapshots' && key === 'snapshot-1' ? createStoredSnapshot() : undefined
-        ),
-        index: vi.fn(() => ({ count: vi.fn(async () => 1) })),
-        put: vi.fn(async (value: unknown) => writes.push([name, 'put', value])),
-      };
-    },
-  };
-  mocks.runMutation.mockImplementation(async (operation) =>
-    operation({ transaction: vi.fn(() => tx) })
-  );
-  const { deleteWebSnapshotMediaAsset } = await import('./cleanup');
-
+it.each(['invalid-source', 'mismatched-root'])(
+  'preserves the graph on source admission failure: %s',
+  async (failure) => {
+    if (failure === 'invalid-source')
+      rows.get('web_snapshots')!.set('snapshot-1', { invalid: true });
+    else
+      rows
+        .get('media_library')!
+        .set('asset-1', { ...createMediaEntry(), source: { kind: 'screenshot' } });
+    await expect(
+      deleteWebSnapshotMediaAsset({ assetId: 'asset-1', snapshotId: 'snapshot-1' })
+    ).rejects.toMatchObject({ reason: 'source-unavailable' });
+    expect(rows.get('media_library')!.has('asset-1')).toBe(true);
+    expect(rows.get('web_snapshots')!.has('snapshot-1')).toBe(true);
+    expect(harness.complete).not.toHaveBeenCalled();
+  }
+);
+it('retains bytes owned by another document', async () => {
+  for (const assetId of ['package-asset', 'screenshot-asset'])
+    rows.get('asset_owners')!.set(JSON.stringify(['image-workspace', 'copy', assetId]), {
+      assetId,
+      ownerKind: 'image-workspace',
+      ownerId: 'copy',
+      role: assetId,
+    });
   await deleteWebSnapshotMediaAsset({ assetId: 'asset-1', snapshotId: 'snapshot-1' });
-
-  expect(writes.some(([store]) => store === 'asset_refs')).toBe(false);
-  expect(mocks.completeDelete).not.toHaveBeenCalled();
+  expect(harness.complete).not.toHaveBeenCalled();
+  expect(rows.get('asset_owners')!.size).toBe(2);
 });
 
 function createStoredSnapshot() {

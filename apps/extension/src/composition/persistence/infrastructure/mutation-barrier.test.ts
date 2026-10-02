@@ -21,6 +21,28 @@ import {
   type PersistenceMutationTransitionPermit,
 } from './mutation-barrier';
 
+it('reuses only an active lifecycle permit and reacquires the lock after its owner finishes', async () => {
+  const requests: string[] = [];
+  installPersistenceLockManagerForTests({
+    async request(name, _options, operation) {
+      requests.push(name);
+      return operation();
+    },
+  });
+  let previous: Parameters<typeof runWithDurableAssetLifecycleLock>[1];
+  await runWithDurableAssetLifecycleLock(async (permit) => {
+    previous = permit;
+    await runWithDurableAssetLifecycleLock(async (nested) => {
+      expect(nested).toBe(permit);
+    }, permit);
+    expect(requests).toHaveLength(1);
+  });
+  await runWithDurableAssetLifecycleLock(async (permit) => {
+    expect(permit).not.toBe(previous);
+  }, previous);
+  expect(requests).toHaveLength(2);
+});
+
 interface PendingLock {
   mode: 'exclusive' | 'shared';
   operation: () => unknown | Promise<unknown>;

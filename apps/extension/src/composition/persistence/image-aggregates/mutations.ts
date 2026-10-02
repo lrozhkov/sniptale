@@ -1,3 +1,4 @@
+import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
@@ -32,7 +33,7 @@ import {
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
   createAssetPublicationJournal,
-  deleteAssetObject,
+  cancelAssetPublication,
   discardPreparedAsset,
   publishReadyJournalWithRetry,
   parseAssetRef,
@@ -78,6 +79,8 @@ export interface CommitImageWorkspaceInput {
     workspaceRevision: number;
   };
   requireMissingRoot?: boolean;
+  /** Editing an observed Library root must not recreate it after permanent deletion. */
+  requireExistingRoot?: boolean;
   reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
 }
 
@@ -148,7 +151,7 @@ async function persistImageAggregateRootIfMissing(args: {
     }
     return existing;
   }
-  if (!args.prepared || args.input.expectedRevision !== 0) {
+  if (args.input.requireExistingRoot || !args.prepared || args.input.expectedRevision !== 0) {
     throw new ImageAggregateNotFoundError(args.input.aggregateId);
   }
   const [rawWorkspace, rawPresentation] = await Promise.all([
@@ -182,7 +185,8 @@ function isEditableImageAggregateRoot(entry: MediaLibraryEntry): boolean {
 async function commitImageWorkspaceMutation(
   db: ImageMutationDatabase,
   input: PreparedImageWorkspaceInput,
-  prepared: PreparedNewImageAggregate | null
+  prepared: PreparedNewImageAggregate | null,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ revision: number; updatedAt: number }> {
   const tx = db.transaction(
     [
@@ -195,99 +199,109 @@ async function commitImageWorkspaceMutation(
     ],
     'readwrite'
   );
-  const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
-  const workspaceStore = tx.objectStore(IMAGE_WORKSPACES_STORE);
-  const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
-  const now = Date.now();
-  if (input.sourceGuard) {
-    const guardedMedia = parseMediaLibraryEntry(
-      await mediaStore.get(input.sourceGuard.aggregateId)
-    );
-    const guardedWorkspace = parseImageWorkspaceEntry(
-      await workspaceStore.get(input.sourceGuard.aggregateId)
-    );
-    const guardedPresentation = parseAggregatePresentationEntry(
-      await presentationStore.get(
-        createAggregatePresentationKey({ id: input.sourceGuard.aggregateId, kind: 'image' })
-      )
-    );
-    if (
-      !guardedMedia ||
-      (guardedMedia.workspaceRevision ?? 0) !== input.sourceGuard.workspaceRevision ||
-      (guardedWorkspace?.revision ?? 0) !== input.sourceGuard.workspaceRevision
-    ) {
-      throw new StaleImageWorkspaceError(input.sourceGuard.aggregateId);
+  try {
+    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const workspaceStore = tx.objectStore(IMAGE_WORKSPACES_STORE);
+    const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
+    const now = Date.now();
+    if (input.sourceGuard) {
+      const guardedMedia = parseMediaLibraryEntry(
+        await mediaStore.get(input.sourceGuard.aggregateId)
+      );
+      const guardedWorkspace = parseImageWorkspaceEntry(
+        await workspaceStore.get(input.sourceGuard.aggregateId)
+      );
+      const guardedPresentation = parseAggregatePresentationEntry(
+        await presentationStore.get(
+          createAggregatePresentationKey({ id: input.sourceGuard.aggregateId, kind: 'image' })
+        )
+      );
+      if (
+        !guardedMedia ||
+        (guardedMedia.workspaceRevision ?? 0) !== input.sourceGuard.workspaceRevision ||
+        (guardedWorkspace?.revision ?? 0) !== input.sourceGuard.workspaceRevision
+      ) {
+        throw new StaleImageWorkspaceError(input.sourceGuard.aggregateId);
+      }
+      if (guardedPresentation?.presentationRevision !== input.sourceGuard.presentationRevision) {
+        throw new ImagePresentationNotCurrentError(input.sourceGuard.aggregateId);
+      }
     }
-    if (guardedPresentation?.presentationRevision !== input.sourceGuard.presentationRevision) {
-      throw new ImagePresentationNotCurrentError(input.sourceGuard.aggregateId);
+    const media = await persistImageAggregateRootIfMissing({
+      input,
+      now,
+      prepared,
+      putPresentation: (entry) => presentationStore.put(entry),
+      putRoot: (entry) => mediaStore.put(entry),
+      readPresentation: () =>
+        presentationStore.get(
+          createAggregatePresentationKey({ id: input.aggregateId, kind: 'image' })
+        ),
+      readRoot: () => mediaStore.get(input.aggregateId),
+      readWorkspace: () => workspaceStore.get(input.aggregateId),
+    });
+    if ((media.workspaceRevision ?? 0) !== input.expectedRevision) {
+      throw new StaleImageWorkspaceError(input.aggregateId);
     }
-  }
-  const media = await persistImageAggregateRootIfMissing({
-    input,
-    now,
-    prepared,
-    putPresentation: (entry) => presentationStore.put(entry),
-    putRoot: (entry) => mediaStore.put(entry),
-    readPresentation: () =>
-      presentationStore.get(
-        createAggregatePresentationKey({ id: input.aggregateId, kind: 'image' })
-      ),
-    readRoot: () => mediaStore.get(input.aggregateId),
-    readWorkspace: () => workspaceStore.get(input.aggregateId),
-  });
-  if ((media.workspaceRevision ?? 0) !== input.expectedRevision) {
-    throw new StaleImageWorkspaceError(input.aggregateId);
-  }
 
-  const rawWorkspace: unknown = await workspaceStore.get(input.aggregateId);
-  const existing = parseImageWorkspaceEntry(rawWorkspace);
-  if (rawWorkspace !== undefined && !existing) {
-    throw new ImageAggregateCollisionError(input.aggregateId);
+    const rawWorkspace: unknown = await workspaceStore.get(input.aggregateId);
+    const existing = parseImageWorkspaceEntry(rawWorkspace);
+    if (rawWorkspace !== undefined && !existing) {
+      throw new ImageAggregateCollisionError(input.aggregateId);
+    }
+    if (existing && existing.revision !== input.expectedRevision) {
+      throw new StaleImageWorkspaceError(input.aggregateId);
+    }
+    const physicalDelete = buildPhysicalDeleteOperation([]);
+    await replaceEditorDocumentAssetOwnership({
+      nextDocument: input.document,
+      nextRefs: input.refs,
+      ownerId: input.aggregateId,
+      ownerKind: IMAGE_WORKSPACE_OWNER_KIND,
+      previousDocument: existing?.document ?? null,
+      physicalDelete,
+      stores: {
+        owners: tx.objectStore(ASSET_OWNERS_STORE),
+        refs: tx.objectStore(ASSET_REFS_STORE),
+      },
+    });
+    if (physicalDelete.assetIds.length > 0) {
+      await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
+    }
+    const revision = input.expectedRevision + 1;
+    await workspaceStore.put({
+      aggregateId: input.aggregateId,
+      createdAt: existing?.createdAt ?? media.createdAt,
+      document: input.document,
+      revision,
+      sourceTitle: input.sourceTitle ?? existing?.sourceTitle ?? media.sourceTitle,
+      sourceUrl:
+        input.sourceUrl === undefined
+          ? (existing?.sourceUrl ?? media.sourceUrl)
+          : sanitizeProvenanceUrl(input.sourceUrl),
+      updatedAt: now,
+    });
+    await mediaStore.put({
+      ...media,
+      imageContentState: input.imageContentState ?? 'edited',
+      updatedAt: now,
+      workspaceRevision: revision,
+      lifecycle: media.lifecycle ? { ...media.lifecycle, updatedAt: now } : media.lifecycle,
+    });
+    await tx.done;
+    if (physicalDelete.assetIds.length > 0) {
+      await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit).catch(() => undefined);
+    }
+    return { revision, updatedAt: now };
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* The transaction may already have aborted. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
   }
-  if (existing && existing.revision !== input.expectedRevision) {
-    throw new StaleImageWorkspaceError(input.aggregateId);
-  }
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await replaceEditorDocumentAssetOwnership({
-    nextDocument: input.document,
-    nextRefs: input.refs,
-    ownerId: input.aggregateId,
-    ownerKind: IMAGE_WORKSPACE_OWNER_KIND,
-    previousDocument: existing?.document ?? null,
-    physicalDelete,
-    stores: {
-      owners: tx.objectStore(ASSET_OWNERS_STORE),
-      refs: tx.objectStore(ASSET_REFS_STORE),
-    },
-  });
-  if (physicalDelete.assetIds.length > 0) {
-    await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-  }
-  const revision = input.expectedRevision + 1;
-  await workspaceStore.put({
-    aggregateId: input.aggregateId,
-    createdAt: existing?.createdAt ?? media.createdAt,
-    document: input.document,
-    revision,
-    sourceTitle: input.sourceTitle ?? existing?.sourceTitle ?? media.sourceTitle,
-    sourceUrl:
-      input.sourceUrl === undefined
-        ? (existing?.sourceUrl ?? media.sourceUrl)
-        : sanitizeProvenanceUrl(input.sourceUrl),
-    updatedAt: now,
-  });
-  await mediaStore.put({
-    ...media,
-    imageContentState: input.imageContentState ?? 'edited',
-    updatedAt: now,
-    workspaceRevision: revision,
-    lifecycle: media.lifecycle ? { ...media.lifecycle, updatedAt: now } : media.lifecycle,
-  });
-  await tx.done;
-  if (physicalDelete.assetIds.length > 0) {
-    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
-  }
-  return { revision, updatedAt: now };
 }
 
 export async function commitImageWorkspace(
@@ -317,8 +331,8 @@ export async function commitImageWorkspace(
     });
     journalCreated = true;
     let result: { revision: number; updatedAt: number } | undefined;
-    await publishReadyJournalWithRetry(journal, async (ready) => {
-      const published = await publishImageWorkspaceJournal(ready);
+    await publishReadyJournalWithRetry(journal, async (ready, permit) => {
+      const published = await publishImageWorkspaceJournal(ready, false, permit);
       if (!published) throw new Error('Image workspace publication was superseded.');
       result = published;
     });
@@ -370,8 +384,10 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     return null;
   }
   if (
-    value['requireMissingRoot'] !== undefined &&
-    typeof value['requireMissingRoot'] !== 'boolean'
+    (value['requireMissingRoot'] !== undefined &&
+      typeof value['requireMissingRoot'] !== 'boolean') ||
+    (value['requireExistingRoot'] !== undefined &&
+      typeof value['requireExistingRoot'] !== 'boolean')
   ) {
     return null;
   }
@@ -422,6 +438,9 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
     ...(value['sourceFavicon'] === undefined
       ? {}
       : { sourceFavicon: value['sourceFavicon'] as string | null }),
+    ...(typeof value['requireExistingRoot'] === 'boolean'
+      ? { requireExistingRoot: value['requireExistingRoot'] }
+      : {}),
     ...(value['requireMissingRoot'] === undefined
       ? {}
       : { requireMissingRoot: value['requireMissingRoot'] }),
@@ -430,7 +449,8 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
 
 async function publishImageWorkspaceJournal(
   journal: AssetReadyJournal,
-  allowSuperseded = false
+  allowSuperseded = false,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<{ revision: number; updatedAt: number } | null> {
   if (journal.domain !== IMAGE_WORKSPACE_PUBLICATION_DOMAIN || journal.operationId) {
     throw new Error('Invalid image workspace publication journal.');
@@ -470,7 +490,8 @@ async function publishImageWorkspaceJournal(
     rawMedia !== undefined && (!existingMedia || !isEditableImageAggregateRoot(existingMedia));
   const permanentlySuperseded = input.requireMissingRoot
     ? rawMedia !== undefined || occupiedSidecar
-    : incompatibleRoot ||
+    : (input.requireExistingRoot === true && rawMedia === undefined) ||
+      incompatibleRoot ||
       (rawMedia === undefined && occupiedSidecar) ||
       (rawWorkspace !== undefined && !parseImageWorkspaceEntry(rawWorkspace)) ||
       (existingMedia?.workspaceRevision ?? 0) !== input.expectedRevision;
@@ -497,7 +518,13 @@ async function publishImageWorkspaceJournal(
       }
       if (!isOwnedByThisWorkspace) unownedStagedAssetIds.push(stagedRef.assetId);
     }
-    for (const assetId of unownedStagedAssetIds) await deleteAssetObject(assetId);
+    await cancelAssetPublication(
+      {
+        ...journal,
+        assetRefs: journal.assetRefs.filter((ref) => unownedStagedAssetIds.includes(ref.assetId)),
+      },
+      lifecyclePermit
+    );
     return null;
   }
   const sourceRef = input.refs.find((ref) => ref.assetId === input.document.sourceImage.assetId);
@@ -510,14 +537,14 @@ async function publishImageWorkspaceJournal(
         })()
       : null;
   return runWithIndexedDbMutation((mutationDb) =>
-    commitImageWorkspaceMutation(mutationDb, input, prepared)
+    commitImageWorkspaceMutation(mutationDb, input, prepared, lifecyclePermit)
   );
 }
 
 export const imageWorkspacePublicationAdapter: AssetPublicationAdapter = {
   domain: IMAGE_WORKSPACE_PUBLICATION_DOMAIN,
-  publish: async (journal) => {
-    await publishImageWorkspaceJournal(journal, true);
+  publish: async (journal, permit) => {
+    await publishImageWorkspaceJournal(journal, true, permit);
   },
 };
 

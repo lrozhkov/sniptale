@@ -667,3 +667,27 @@ it('aborts archive replacement if retained HTML graph cleanup fails after mutati
   expect(abort).toHaveBeenCalledOnce();
   expect(io.checkpoint).not.toHaveBeenCalled();
 });
+
+it('restores a frozen canonical scenario representation without borrowing replaced root bytes', async () => {
+  const { args } = input();
+  const metadata = args.envelope.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+    throw new Error('Missing metadata');
+  const assets = metadata['assets'];
+  if (
+    !Array.isArray(assets) ||
+    !assets[0] ||
+    typeof assets[0] !== 'object' ||
+    Array.isArray(assets[0])
+  )
+    throw new Error('Missing assets');
+  const entry = assets[0]['entry'];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('Missing entry');
+  entry['galleryAssetId'] = 'scenario-asset:logical-image';
+  args.session.rootIdMap['media:library-item:scenario-asset:logical-image'] = 'replaced-root';
+  await scenarioProjectRootPublisher.publish(args);
+  expect(io.put.mock.calls[0]?.[0].root.assets[0]).toMatchObject({
+    entry: { assetId: 'physical-image', galleryAssetId: 'replaced-root' },
+  });
+  expect(io.put.mock.calls[0]?.[0].root.assets[0].entry).not.toHaveProperty('borrowedMediaId');
+});

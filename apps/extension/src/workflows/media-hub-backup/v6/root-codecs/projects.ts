@@ -40,10 +40,13 @@ interface PortableProjectAsset {
   entry: Omit<StoredProjectAssetEntry, 'assetId'>;
   filename: string;
   objectId: string;
+  publishToLibrary?: boolean;
+  libraryMediaId?: string;
   videoReview?: PortableVideoReview;
 }
 
 interface PortableProjectExport {
+  libraryMediaId?: string;
   entry: Omit<StoredProjectExportEntry, 'assetId'>;
   objectId: string;
   thumbnail?: PortableMediaThumbnail;
@@ -196,6 +199,10 @@ function isPortableProjectAsset(value: unknown): value is PortableProjectAsset {
     !('assetId' in value['entry']) &&
     typeof value['entry']['id'] === 'string' &&
     typeof value['filename'] === 'string' &&
+    (value['publishToLibrary'] === undefined || typeof value['publishToLibrary'] === 'boolean') &&
+    (value['libraryMediaId'] === undefined ||
+      (value['libraryMediaId'] === `project-asset:${value['entry']['id']}` &&
+        value['publishToLibrary'] !== false)) &&
     typeof value['objectId'] === 'string'
   );
 }
@@ -207,6 +214,8 @@ function isPortableProjectExport(value: unknown): value is PortableProjectExport
     !('assetId' in value['entry']) &&
     typeof value['entry']['id'] === 'string' &&
     typeof value['objectId'] === 'string' &&
+    (value['libraryMediaId'] === undefined ||
+      value['libraryMediaId'] === `export:${value['entry']['id']}`) &&
     (value['thumbnail'] === undefined || isPortableThumbnail(value['thumbnail']))
   );
 }

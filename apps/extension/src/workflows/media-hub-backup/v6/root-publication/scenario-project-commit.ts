@@ -1,3 +1,4 @@
+import type { DurableAssetLifecyclePermit } from '../../../../composition/persistence/infrastructure/mutation-barrier';
 import {
   appendCommittedArchiveRootInTransaction,
   completePhysicalDeleteOperation,
@@ -17,6 +18,7 @@ import {
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
+  VIDEO_PROJECTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import type { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
@@ -58,7 +60,8 @@ async function checkpointScenarioChildren(
 
 export async function commitScenarioProjectPublication(
   prepared: PreparedScenarioPublication,
-  session: ArchiveRestoreSession
+  session: ArchiveRestoreSession,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<ArchiveRootPublicationResult> {
   const result = await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(
@@ -75,6 +78,7 @@ export async function commitScenarioProjectPublication(
         STORE_NAME,
         ASSET_OWNERS_STORE,
         ASSET_OPERATIONS_STORE,
+        VIDEO_PROJECTS_STORE,
       ],
       'readwrite'
     );
@@ -94,6 +98,7 @@ export async function commitScenarioProjectPublication(
         }
       }
       const restored = await putScenarioProjectBackupRestore({
+        tx,
         operation: prepared.operation,
         root: prepared.root,
         stores: {
@@ -137,7 +142,9 @@ export async function commitScenarioProjectPublication(
     }
   });
   if (prepared.operation.assetIds.length > 0) {
-    await completePhysicalDeleteOperation(prepared.operation).catch(() => undefined);
+    await completePhysicalDeleteOperation(prepared.operation, lifecyclePermit).catch(
+      () => undefined
+    );
   }
   return {
     conflicted: result.conflicted,

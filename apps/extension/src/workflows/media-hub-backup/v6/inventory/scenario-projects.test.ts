@@ -109,3 +109,50 @@ it.each(['guide', 'tour'] as const)(
     expect(read).toHaveBeenCalledWith(ref, 'renamed.html');
   }
 );
+
+it('exports a legacy canonical scenario snapshot with its replaced logical root relation', async () => {
+  const project = createGuideProject('Scenario', 'scenario', 1);
+  const asset = {
+    id: 'captured',
+    projectId: project.id,
+    assetId: 'frozen-old',
+    galleryAssetId: null,
+    mimeType: 'image/png',
+    size: 4,
+    width: 100,
+    height: 50,
+    createdAt: 1,
+  };
+  const { createMediaLibraryEntry } =
+    await import('../../../../composition/persistence/projects/index.test-support');
+  const media = createMediaLibraryEntry({
+    id: 'scenario-asset:captured',
+    source: { kind: 'stored-asset', assetId: 'published-new' },
+  });
+  const ref = {
+    assetId: asset.assetId,
+    createdAt: 1,
+    mimeType: asset.mimeType,
+    size: 4,
+    sha256: null,
+    location: { kind: 'opfs' as const, objectKey: 'objects/frozen-old' },
+  };
+  read.mockResolvedValue(new File(['data'], 'old.png', { type: 'image/png' }));
+  const roots = await buildScenarioProjectRootInventory({
+    db: {
+      get: async (store) =>
+        store === 'media_library' ? media : store === 'asset_refs' ? ref : undefined,
+      getAll: async (store) =>
+        store === 'scenario_projects'
+          ? [{ id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 0 }]
+          : [],
+      getAllFromIndex: async (store) => (store === 'scenario_assets' ? [asset] : []),
+    },
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+  });
+  const envelope = await roots[0]!.load();
+  const metadata = parsePortableScenarioProjectMetadata(envelope.metadata);
+  expect(metadata.assets[0]!.entry.galleryAssetId).toBe(media.id);
+  expect(metadata.assets[0]!.entry).not.toHaveProperty('borrowedMediaId');
+});

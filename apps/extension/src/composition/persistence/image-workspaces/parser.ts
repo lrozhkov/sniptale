@@ -1,4 +1,4 @@
-import { parsePersistedEditorDocument } from '../document-assets';
+import { parsePersistedEditorDocument } from '../document-assets/parser';
 import {
   isNullable,
   isNumber,

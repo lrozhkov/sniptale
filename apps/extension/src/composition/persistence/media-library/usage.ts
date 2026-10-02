@@ -1,10 +1,18 @@
-import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import { parseProjectAssetEntry } from '../projects/read-guards';
+import {
+  mediaDependencyTarget,
+  scenarioChildUsesMedia,
+  videoSourceUsesMedia,
+  isVideoPrimaryMediaSource,
+  reviewWorkspaceUsesMedia,
+} from './dependencies';
 import { listScenarioProjectEntries } from '../scenario/projects';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import { listVideoProjectEntries } from '../projects';
 import {
   initDB,
   SCENARIO_ASSETS_STORE,
+  PROJECT_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
 } from '../infrastructure/indexed-db/core';
 import { parseMediaLibraryEntry } from './read-guards';
@@ -12,7 +20,6 @@ import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import type { MediaLibraryEntry } from './contracts';
 import type { ScenarioAssetEntry } from '../scenario/contracts';
-import type { VideoProject } from '../../../features/video/project/types';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 
 export interface MediaAssetProjectUsage {
@@ -22,63 +29,34 @@ export interface MediaAssetProjectUsage {
   primary: boolean;
 }
 
-function scenarioChildrenUsingMedia(
-  media: MediaLibraryEntry,
-  children: readonly ScenarioAssetEntry[]
-): ScenarioAssetEntry[] {
-  return children.filter(
-    (child) =>
-      child.galleryAssetId === media.id ||
-      child.borrowedMediaId === media.id ||
-      (media.source.kind === 'stored-asset' &&
-        !child.borrowedMediaId &&
-        child.assetId === media.source.assetId &&
-        (!media.id.startsWith('scenario-asset:') ||
-          child.id === media.id.slice('scenario-asset:'.length)))
-  );
-}
-
-function videoProjectUsesMedia(
-  project: VideoProject,
-  media: MediaLibraryEntry,
-  scenarioChildIds: ReadonlySet<string>
-): { attached: boolean; primary: boolean } {
-  const source = media.source;
-  const primary =
-    source.kind === 'recording' &&
-    (project.baseRecordingId === source.recordingId ||
-      (project.source.kind === 'recording' && project.source.recordingId === source.recordingId));
-  const attached = project.assets.some((asset) => {
-    const ref = asset.source;
-    if (ref.kind === 'library-asset') return ref.mediaId === media.id;
-    if (ref.kind === 'recording')
-      return source.kind === 'recording' && ref.recordingId === source.recordingId;
-    if (ref.kind === 'project-asset')
-      return source.kind === 'project-asset' && ref.projectAssetId === source.projectAssetId;
-    return scenarioChildIds.has(ref.scenarioAssetId);
-  });
-  return { attached, primary };
-}
-
 interface UsageSnapshot {
   mediaById: Map<string, MediaLibraryEntry>;
   videoProjects: Awaited<ReturnType<typeof listVideoProjectEntries>>;
   scenarioProjects: Awaited<ReturnType<typeof listScenarioProjectEntries>>;
   scenarioAssets: ScenarioAssetEntry[];
+  projectAssets: NonNullable<ReturnType<typeof parseProjectAssetEntry>>[];
   reviewWorkspaces: NonNullable<ReturnType<typeof parseVideoWorkspace>>[];
 }
 
 async function loadUsageSnapshot(db?: Awaited<ReturnType<typeof initDB>>): Promise<UsageSnapshot> {
   const connection = db ?? (await initDB());
-  const [videoProjects, scenarioProjects, rawScenarioAssets, rawReviewWorkspaces, rawMedia] =
-    await Promise.all([
-      listVideoProjectEntries(),
-      listScenarioProjectEntries(),
-      connection.getAll(SCENARIO_ASSETS_STORE),
-      connection.getAll(VIDEO_WORKSPACES_STORE),
-      connection.getAll(MEDIA_LIBRARY_STORE),
-    ]);
+  const [
+    videoProjects,
+    scenarioProjects,
+    rawScenarioAssets,
+    rawReviewWorkspaces,
+    rawMedia,
+    rawProjectAssets,
+  ] = await Promise.all([
+    listVideoProjectEntries(),
+    listScenarioProjectEntries(),
+    connection.getAll(SCENARIO_ASSETS_STORE),
+    connection.getAll(VIDEO_WORKSPACES_STORE),
+    connection.getAll(MEDIA_LIBRARY_STORE),
+    connection.getAll(PROJECT_ASSETS_STORE),
+  ]);
   return {
+    projectAssets: rawProjectAssets.map(parseProjectAssetEntry).filter((entry) => entry !== null),
     videoProjects,
     scenarioProjects,
     scenarioAssets: rawScenarioAssets
@@ -101,15 +79,21 @@ function projectUsageFromSnapshot(
   snapshot: UsageSnapshot
 ): MediaAssetProjectUsage[] {
   const { mediaById, videoProjects, scenarioProjects, scenarioAssets, reviewWorkspaces } = snapshot;
-  const media = mediaById.get(mediaId);
-  if (!media) return [];
+  const root = mediaById.get(mediaId);
+  if (!root) return [];
+  const media = mediaDependencyTarget(root, snapshot.projectAssets);
   const usage: MediaAssetProjectUsage[] = [];
-  const scenarioChildrenForMedia = scenarioChildrenUsingMedia(media, scenarioAssets);
+  const scenarioChildrenForMedia = scenarioAssets.filter((child) =>
+    scenarioChildUsesMedia(child, media)
+  );
   const scenarioChildIds = new Set(scenarioChildrenForMedia.map((child) => child.id));
 
   for (const entry of videoProjects) {
     const project = entry.project;
-    const { attached, primary } = videoProjectUsesMedia(project, media, scenarioChildIds);
+    const primary = isVideoPrimaryMediaSource(project, media);
+    const attached = project.assets.some((asset) =>
+      videoSourceUsesMedia(asset.source, media, scenarioChildIds)
+    );
     if (primary || attached) {
       usage.push({ id: project.id, kind: 'video', name: project.name, primary });
     }
@@ -124,14 +108,12 @@ function projectUsageFromSnapshot(
 
   for (const workspace of reviewWorkspaces) {
     if (workspace.aggregateId === mediaId) continue;
-    const attached =
-      media.source.kind === 'project-asset' &&
-      collectReviewAssetReferences(workspace).has(`project-asset:${media.source.projectAssetId}`);
+    const attached = reviewWorkspaceUsesMedia(workspace, media);
     if (attached) {
       usage.push({
         id: workspace.aggregateId,
         kind: 'review',
-        name: mediaById.get(workspace.aggregateId)?.filename ?? media.filename,
+        name: mediaById.get(workspace.aggregateId)?.filename ?? root.filename,
         primary: false,
       });
     }

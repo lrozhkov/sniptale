@@ -10,7 +10,7 @@ import {
 const storeMocks = vi.hoisted(() => ({
   writeBlobToAsset: vi.fn(),
   createAssetPublicationJournal: vi.fn(),
-  deleteReadyJournal: vi.fn(async () => undefined),
+  cancelAssetPublication: vi.fn(async () => undefined),
   publishReadyJournalWithRetry: vi.fn(),
   releaseAssetReadyProtection: vi.fn(),
   discardPreparedAsset: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock('../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal()),
   writeBlobToAsset: storeMocks.writeBlobToAsset,
   createAssetPublicationJournal: storeMocks.createAssetPublicationJournal,
-  deleteReadyJournal: storeMocks.deleteReadyJournal,
+  cancelAssetPublication: storeMocks.cancelAssetPublication,
   publishReadyJournalWithRetry: storeMocks.publishReadyJournalWithRetry,
   releaseAssetReadyProtection: storeMocks.releaseAssetReadyProtection,
   discardPreparedAsset: storeMocks.discardPreparedAsset,
@@ -32,6 +32,12 @@ vi.mock('../../composition/persistence/assets', async (importOriginal) => ({
 vi.mock('../../composition/persistence/projects/asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverProjectMediaPublications: storeMocks.recoverProjectMediaPublications,
+}));
+vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: vi.fn(async () => ({ get: vi.fn(async () => undefined) })),
 }));
 vi.mock('../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: storeMocks.publishMediaHubLibraryChanged,
@@ -164,9 +170,11 @@ describe('importReviewAudio', () => {
         assertCurrentTarget: () => undefined,
       })
     ).rejects.toThrow('autosave failed');
-    expect(storeMocks.discardPreparedAsset).toHaveBeenCalledTimes(1);
+    expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
     expect(storeMocks.createAssetPublicationJournal).toHaveBeenCalledOnce();
-    expect(storeMocks.deleteReadyJournal).toHaveBeenCalledWith('journal-1');
+    expect(storeMocks.cancelAssetPublication).toHaveBeenCalledWith(
+      expect.objectContaining({ journalId: 'journal-1' })
+    );
   });
 
   it('retains protected bytes when attachment may have committed before rejecting', async () => {
@@ -327,7 +335,10 @@ describe('importReviewAudio', () => {
         assertCurrentTarget: () => undefined,
       })
     ).rejects.toThrow();
-    expect(storeMocks.discardPreparedAsset).toHaveBeenCalledTimes(1);
+    expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
+    expect(storeMocks.cancelAssetPublication).toHaveBeenCalledWith(
+      expect.objectContaining({ journalId: 'journal-1' })
+    );
   });
 });
 

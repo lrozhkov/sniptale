@@ -95,3 +95,35 @@ export function createVideoProjectEntryWithMediaClip(
     tracks: project.tracks.slice(0, 2),
   });
 }
+
+/** Bind archive participant stores to the caller-owned transaction in owner-direct proofs. */
+export function createVideoProjectRestoreTransaction(
+  stores: import('./backup-restore').VideoProjectBackupRestoreStores
+) {
+  const empty = {
+    get: async () => undefined,
+    getAll: async () => [],
+    delete: async () => undefined,
+    put: async () => undefined,
+  };
+  const byName = {
+    project_assets: stores.assets,
+    project_exports: stores.exports,
+    media_library: stores.media,
+    video_workspaces: stores.videoWorkspaces,
+    video_workspace_drafts: stores.videoDrafts,
+    asset_operations: stores.operations,
+    asset_owners: stores.owners,
+    aggregate_presentations: stores.presentations,
+    video_projects: stores.projects,
+    asset_refs: stores.refs,
+    thumbnails: stores.thumbnails,
+    scenario_assets: stores.scenarioAssets,
+    image_workspaces: empty,
+  };
+  return {
+    objectStore: (name: keyof typeof byName) => byName[name],
+  } as unknown as ReturnType<
+    Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>['transaction']
+  >;
+}

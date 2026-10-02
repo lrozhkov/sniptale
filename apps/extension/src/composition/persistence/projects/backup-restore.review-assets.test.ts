@@ -1,3 +1,4 @@
+import { createVideoProjectRestoreTransaction } from './index.test-support';
 import { expect, it, vi } from 'vitest';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
@@ -28,6 +29,7 @@ function stores(): VideoProjectBackupRestoreStores {
     projects: store(),
     refs: store(),
     thumbnails: store(),
+    scenarioAssets: store(),
   } satisfies VideoProjectBackupRestoreStores;
 }
 
@@ -93,6 +95,51 @@ function sharedSourceStores() {
   return target;
 }
 
+it('reclaims three levels of private review resources during archive replacement', async () => {
+  const target = stores();
+  const existing = createVideoProjectEntryWithMediaClip({ id: 'project' });
+  const ids = ['project-asset-1', 'child', 'grandchild'];
+  const reviews = new Map([
+    ['project-asset:project-asset-1', reviewWorkspace('project-asset:project-asset-1', 'child')],
+    ['project-asset:child', reviewWorkspace('project-asset:child', 'grandchild')],
+  ]);
+  let current = existing;
+  target.projects.get = vi.fn(async () => current);
+  target.projects.getAll = vi.fn(async () => [current]);
+  target.projects.put = vi.fn(async (value) => {
+    current = value;
+  });
+  target.videoWorkspaces.get = vi.fn(async (key) => reviews.get(String(key)));
+  target.videoWorkspaces.getAll = vi.fn(async () => [...reviews.values()]);
+  target.videoWorkspaces.delete = vi.fn(async (key) => reviews.delete(String(key)));
+  target.assets.get = vi.fn(async (key) =>
+    ids.includes(String(key))
+      ? {
+          id: String(key),
+          assetId: `object-${String(key)}`,
+          createdAt: 1,
+          mimeType: 'audio/mpeg',
+          size: 4,
+        }
+      : undefined
+  );
+  const operation = physicalDeleteOperation();
+  await putVideoProjectBackupRestore({
+    operation,
+    root: {
+      assets: [],
+      entry: createVideoProjectEntry({ id: 'project' }, { id: 'project' }),
+      exports: [],
+    },
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    strategy: 'replace',
+  });
+  for (const id of ids) expect(target.assets.delete).toHaveBeenCalledWith(id);
+  expect(reviews.size).toBe(0);
+  expect(operation.assetIds).toEqual(expect.arrayContaining(ids.map((id) => `object-${id}`)));
+});
+
 it('replaces review-only children and protects assets referenced by another workspace', async () => {
   const target = stores();
   const existing = createVideoProjectEntryWithMediaClip({ id: 'project' });
@@ -125,6 +172,14 @@ it('replaces review-only children and protects assets referenced by another work
     if (!['project-asset-1', 'review-exclusive', 'review-shared'].includes(id)) return undefined;
     return { assetId: `${id}-object`, createdAt: 1, id, mimeType: 'audio/mpeg', size: 4 };
   });
+  target.exports.get = vi.fn(async (key) =>
+    (await target.exports.index('projectId').getAll('project')).find(
+      (row) => typeof row === 'object' && row !== null && 'id' in row && row.id === key
+    )
+  );
+  target.projects.put = vi.fn(async (value) => {
+    vi.mocked(target.projects.getAll).mockResolvedValue([value]);
+  });
   const operation = physicalDeleteOperation();
 
   await expect(
@@ -155,6 +210,7 @@ it('replaces review-only children and protects assets referenced by another work
         exports: [],
       },
       stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
       strategy: 'replace',
     })
   ).resolves.toEqual({ conflicted: true, imported: true });
@@ -178,6 +234,7 @@ it('retains review children reached through a source shared with another project
         exports: [],
       },
       stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
       strategy: 'replace',
     })
   ).resolves.toEqual({ conflicted: true, imported: true });
@@ -225,6 +282,7 @@ it('denies hostile replacement of a review child reached through a shared source
         exports: [],
       },
       stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
       strategy: 'replace',
     })
   ).rejects.toThrow('Video project asset belongs to another root: shared-review-child');
@@ -233,3 +291,44 @@ it('denies hostile replacement of a review child reached through a shared source
   expect(target.assets.delete).not.toHaveBeenCalled();
   expect(target.media.delete).not.toHaveBeenCalled();
 });
+
+it.each(['video', 'review'] as const)(
+  'retains private bytes used by an invalid external %s consumer during replacement',
+  async (kind) => {
+    const target = stores();
+    const parent = createVideoProjectEntryWithMediaClip();
+    const other = createVideoProjectEntryWithMediaClip({ id: 'other' });
+    const resource = {
+      id: 'project-asset-1',
+      assetId: 'private-body',
+      createdAt: 1,
+      mimeType: 'video/webm',
+      size: 6,
+    };
+    target.projects.get = vi.fn(async () => parent);
+    target.assets.get = vi.fn(async (key) =>
+      key === resource.id ? resource : { ...resource, id: 'private-aux', assetId: 'aux-body' }
+    );
+    target.projects.getAll = vi.fn(async () =>
+      kind === 'video' ? [{ ...other, project: { ...other.project, name: 123 } }] : []
+    );
+    target.videoWorkspaces.getAll = vi.fn(async () => [
+      reviewWorkspace(`project-asset:${resource.id}`, 'private-aux'),
+      ...(kind === 'review' ? [{ ...reviewWorkspace('external', resource.id), revision: -1 }] : []),
+    ]);
+    await putVideoProjectBackupRestore({
+      operation: physicalDeleteOperation(),
+      root: {
+        assets: [],
+        entry: { ...parent, project: { ...parent.project, assets: [], tracks: [] } },
+        exports: [],
+      },
+      stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
+      strategy: 'replace',
+    });
+    expect(target.assets.delete).not.toHaveBeenCalledWith(resource.id);
+    expect(target.owners.delete).not.toHaveBeenCalled();
+    expect(target.refs.delete).not.toHaveBeenCalled();
+  }
+);

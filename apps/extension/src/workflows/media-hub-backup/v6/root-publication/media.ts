@@ -1,11 +1,18 @@
+import { freezeScenarioMediaRepresentations } from '../../../../composition/persistence/scenario/library-publication';
+import { sameMediaSource } from '../../../../composition/persistence/media-library/dependencies';
+import {
+  deleteMediaSidecars,
+  releaseMediaSource,
+  releaseUnpublishedProjectAssets,
+} from '../../../../composition/persistence/media-library/delete-cascade.sources';
 import { replaceSanitizedSnapshotPackage } from './page-package';
-import { unlinkMediaAssetOwner } from './media-owner-release';
 import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   VIDEO_PROJECTS_STORE,
+  SCENARIO_ASSETS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import {
   parseProjectAssetEntry,
@@ -40,7 +47,6 @@ import {
   WEB_SNAPSHOTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
-import { removeEditorDocumentOwnership } from '../../../../composition/persistence/document-assets';
 import type { MediaThumbnailEntry } from '../../../../composition/persistence/media-library/contracts';
 import {
   parseMediaLibraryEntry,
@@ -62,7 +68,6 @@ import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import {
-  deleteExclusiveMediaReviewAssets,
   hasMediaReviewAssetConflict,
   prepareMediaReviewAssets,
   prepareStandaloneMediaVideoReview,
@@ -113,111 +118,17 @@ function requireObject(
 }
 
 async function deleteExistingMediaRoot(args: {
+  tx: Parameters<typeof deleteMediaSidecars>[0];
   mediaId: string;
   operation: PhysicalDeleteAssetOperation;
   stores: MediaRestoreStores;
 }) {
   const current = parseMediaLibraryEntry(await args.stores.media.get(args.mediaId));
   if (!current) return;
-  await deleteExclusiveMediaReviewAssets({
-    mediaId: args.mediaId,
-    operation: args.operation,
-    primaryProjectAssetId:
-      current.source.kind === 'project-asset' ? current.source.projectAssetId : null,
-    stores: args.stores,
-  });
-  const workspace = parseImageWorkspaceEntry(await args.stores.workspaces.get(args.mediaId));
-  if (workspace) {
-    await removeEditorDocumentOwnership({
-      document: workspace.document,
-      ownerId: args.mediaId,
-      ownerKind: 'image-workspace',
-      physicalDelete: args.operation,
-      stores: { owners: args.stores.owners, refs: args.stores.refs },
-    });
-  }
-  await args.stores.workspaces.delete(args.mediaId);
-  await args.stores.videoWorkspaces.delete(args.mediaId);
-  await args.stores.videoDrafts.delete(args.mediaId);
-  await args.stores.presentations.delete(
-    createAggregatePresentationKey({ id: args.mediaId, kind: 'image' })
-  );
-  await args.stores.thumbnails.delete(args.mediaId);
-  if (current.source.kind === 'recording') {
-    const recording = parseRecordingEntry(
-      await args.stores.recordings.get(current.source.recordingId)
-    );
-    if (recording) {
-      await unlinkMediaAssetOwner({
-        assetId: recording.assetId,
-        operation: args.operation,
-        ownerId: recording.id,
-        ownerKind: 'recording',
-        ownerStore: args.stores.owners,
-        refStore: args.stores.refs,
-        role: 'body',
-      });
-    }
-    await args.stores.recordings.delete(current.source.recordingId);
-    await args.stores.telemetry.delete(current.source.recordingId);
-  }
-  if (current.source.kind === 'web-snapshot') {
-    const snapshot = parseStoredWebSnapshotRecord(
-      await args.stores.snapshots.get(current.source.snapshotId)
-    );
-    if (snapshot) {
-      await unlinkMediaAssetOwner({
-        assetId: snapshot.packageAssetId,
-        operation: args.operation,
-        ownerId: snapshot.id,
-        ownerKind: 'web-snapshot',
-        ownerStore: args.stores.owners,
-        refStore: args.stores.refs,
-        role: 'package',
-      });
-      await unlinkMediaAssetOwner({
-        assetId: snapshot.screenshotAssetId,
-        operation: args.operation,
-        ownerId: snapshot.id,
-        ownerKind: 'web-snapshot',
-        ownerStore: args.stores.owners,
-        refStore: args.stores.refs,
-        role: 'screenshot',
-      });
-    }
-    await args.stores.snapshots.delete(current.source.snapshotId);
-  }
-  if (current.source.kind === 'project-asset' || current.source.kind === 'project-export') {
-    const source = current.source;
-    const store =
-      source.kind === 'project-asset' ? args.stores.projectAssets : args.stores.projectExports;
-    const id = source.kind === 'project-asset' ? source.projectAssetId : source.exportId;
-    const raw = await store.get(id);
-    const child =
-      source.kind === 'project-asset' ? parseProjectAssetEntry(raw) : parseProjectExportEntry(raw);
-    if (child)
-      await unlinkMediaAssetOwner({
-        assetId: child.assetId,
-        operation: args.operation,
-        ownerId: id,
-        ownerKind: source.kind,
-        ownerStore: args.stores.owners,
-        refStore: args.stores.refs,
-        role: 'body',
-      });
-    await store.delete(id);
-  }
-  if (current.source.kind === 'stored-asset') {
-    await unlinkMediaAssetOwner({
-      assetId: current.source.assetId,
-      operation: args.operation,
-      ownerId: args.mediaId,
-      ownerKind: 'media-library',
-      ownerStore: args.stores.owners,
-      refStore: args.stores.refs,
-      role: 'source',
-    });
-  }
+  const candidates = await deleteMediaSidecars(args.tx, args.mediaId, args.operation);
+  if (current.source.kind === 'project-asset') candidates.delete(current.source.projectAssetId);
+  await releaseUnpublishedProjectAssets(args.tx, candidates, args.operation);
+  await releaseMediaSource(args.tx, current, args.operation);
   await args.stores.media.delete(args.mediaId);
 }
 
@@ -432,6 +343,7 @@ async function prepareMediaRoot(args: {
   metadata: PortableMedia;
   objects: StagedObjectMap;
   strategy: 'replace' | 'skip' | 'duplicate';
+  rootIdMap: Readonly<Record<string, string>>;
 }) {
   const original = requireObject(args.objects, args.metadata.originalObjectId);
   const targetEntry = remapMediaIdentity(
@@ -477,8 +389,9 @@ async function prepareMediaRoot(args: {
     metadata: args.metadata,
     objects: args.objects,
   });
-  const reviewAssets = prepareMediaReviewAssets({
+  const reviewAssets = await prepareMediaReviewAssets({
     createId: newId,
+    rootIdMap: { ...args.rootIdMap, [`media:library-item:${args.metadata.entry.id}`]: media.id },
     metadata: args.metadata,
     objects: args.objects,
   });
@@ -516,7 +429,16 @@ async function hasRelatedMediaConflict(stores: MediaRestoreStores, prepared: Pre
 }
 
 async function detectMediaConflicts(stores: MediaRestoreStores, prepared: PreparedMediaRoot) {
-  const current = parseMediaLibraryEntry(await stores.media.get(prepared.media.id));
+  const raw: unknown = await stores.media.get(prepared.media.id);
+  const current = parseMediaLibraryEntry(raw);
+  if (raw !== undefined && (!current || current.id !== prepared.media.id))
+    throw new Error('Invalid existing media cannot be replaced safely.');
+  if (
+    current &&
+    !(current.source.kind === 'stored-asset' && prepared.media.source.kind === 'stored-asset') &&
+    !sameMediaSource(current.source, prepared.media.source)
+  )
+    throw new Error('Archive replacement cannot change a published source identity.');
   const relatedConflict = await hasRelatedMediaConflict(stores, prepared);
   const sidecarConflict = Boolean(
     (await stores.workspaces.get(prepared.media.id)) ||
@@ -526,7 +448,7 @@ async function detectMediaConflicts(stores: MediaRestoreStores, prepared: Prepar
       createAggregatePresentationKey({ id: prepared.media.id, kind: 'image' })
     ))
   );
-  if (await hasMediaReviewAssetConflict(stores.projectAssets, prepared.reviewAssets)) {
+  if (await hasMediaReviewAssetConflict(stores, prepared.reviewAssets, prepared.media.id)) {
     throw new Error('Restored media review asset identity is already in use.');
   }
   return {
@@ -630,6 +552,7 @@ async function commitPreparedMediaRoot(args: {
         VIDEO_WORKSPACES_STORE,
         VIDEO_WORKSPACE_DRAFTS_STORE,
         VIDEO_PROJECTS_STORE,
+        SCENARIO_ASSETS_STORE,
         PROJECT_ASSETS_STORE,
         PROJECT_EXPORTS_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
@@ -658,54 +581,66 @@ async function commitPreparedMediaRoot(args: {
       projectAssets: tx.objectStore(PROJECT_ASSETS_STORE),
       projectExports: tx.objectStore(PROJECT_EXPORTS_STORE),
     };
-    const conflict = await detectMediaConflicts(stores, args.prepared);
-    if (conflict.conflict && args.session.strategy === 'skip') {
+    try {
+      const conflict = await detectMediaConflicts(stores, args.prepared);
+      if (conflict.conflict && args.session.strategy === 'skip') {
+        await appendCommittedArchiveRootInTransaction(
+          tx.objectStore(ASSET_OPERATIONS_STORE),
+          args.session.operationId,
+          {
+            rootKey: args.rootKey,
+            targetRootId: args.prepared.media.id,
+            imported: false,
+            conflicted: true,
+          }
+        );
+        await tx.done;
+        return { conflicted: true, imported: false };
+      }
+      if (conflict.conflict && args.session.strategy === 'duplicate') {
+        throw new Error('Media restore conflict changed after preflight.');
+      }
+      if (
+        !conflict.current &&
+        (conflict.relatedConflict || conflict.sidecarConflict) &&
+        args.session.strategy === 'replace'
+      ) {
+        throw new Error('Media restore child belongs to another root.');
+      }
+      if (conflict.current && args.session.strategy === 'replace') {
+        await freezeScenarioMediaRepresentations(tx, conflict.current);
+        await deleteExistingMediaRoot({
+          tx,
+          mediaId: args.prepared.media.id,
+          operation: args.operation,
+          stores,
+        });
+      }
+      await publishPreparedMedia({ ...args, stores });
+      if (args.operation.assetIds.length > 0) {
+        await tx.objectStore(ASSET_OPERATIONS_STORE).put(args.operation);
+      }
       await appendCommittedArchiveRootInTransaction(
         tx.objectStore(ASSET_OPERATIONS_STORE),
         args.session.operationId,
         {
           rootKey: args.rootKey,
           targetRootId: args.prepared.media.id,
-          imported: false,
-          conflicted: true,
+          imported: true,
+          conflicted: conflict.conflict,
         }
       );
       await tx.done;
-      return { conflicted: true, imported: false };
-    }
-    if (conflict.conflict && args.session.strategy === 'duplicate') {
-      throw new Error('Media restore conflict changed after preflight.');
-    }
-    if (
-      !conflict.current &&
-      (conflict.relatedConflict || conflict.sidecarConflict) &&
-      args.session.strategy === 'replace'
-    ) {
-      throw new Error('Media restore child belongs to another root.');
-    }
-    if (conflict.current && args.session.strategy === 'replace') {
-      await deleteExistingMediaRoot({
-        mediaId: args.prepared.media.id,
-        operation: args.operation,
-        stores,
-      });
-    }
-    await publishPreparedMedia({ ...args, stores });
-    if (args.operation.assetIds.length > 0) {
-      await tx.objectStore(ASSET_OPERATIONS_STORE).put(args.operation);
-    }
-    await appendCommittedArchiveRootInTransaction(
-      tx.objectStore(ASSET_OPERATIONS_STORE),
-      args.session.operationId,
-      {
-        rootKey: args.rootKey,
-        targetRootId: args.prepared.media.id,
-        imported: true,
-        conflicted: conflict.conflict,
+      return { conflicted: conflict.conflict, imported: true };
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* Transaction may already be closed. */
       }
-    );
-    await tx.done;
-    return { conflicted: conflict.conflict, imported: true };
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
   });
 }
 
@@ -759,10 +694,15 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       return true;
     });
   },
-  async publish({ envelope, session, staged }) {
+  async publish({ envelope, session, staged, lifecyclePermit }) {
     const metadata = parsePortableMediaMetadata(envelope.metadata);
     const objects = objectMap(staged);
-    const prepared = await prepareMediaRoot({ metadata, objects, strategy: session.strategy });
+    const prepared = await prepareMediaRoot({
+      metadata,
+      objects,
+      strategy: session.strategy,
+      rootIdMap: session.rootIdMap,
+    });
     const operation = buildPhysicalDeleteOperation([]);
     const result = await commitPreparedMediaRoot({
       metadata,
@@ -773,7 +713,7 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       session,
     });
     if (operation.assetIds.length > 0) {
-      await completePhysicalDeleteOperation(operation).catch(() => undefined);
+      await completePhysicalDeleteOperation(operation, lifecyclePermit).catch(() => undefined);
     }
     return {
       ...result,

@@ -5,6 +5,7 @@ export interface ActiveEditorSessionContext {
   aggregateId: string;
   capturedAt?: number;
   durableRevision: number;
+  requireExistingRoot?: boolean;
   sourceUrl: string | null;
   sourceTitle: string | null;
   renderPresentation: (() => Promise<string> | string) | null;

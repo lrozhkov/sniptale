@@ -255,7 +255,8 @@ describe('media-hub-store recording and asset save flows', () => {
       expect.any(Blob),
       'image/png',
       'asset.png',
-      expect.any(Number)
+      expect.any(Number),
+      {}
     );
     expect(mediaHubStoreMocks.commitProjectExportMock).toHaveBeenCalledWith(exportEntry);
     expect(mediaHubStoreMocks.publishMediaHubLibraryChangedMock).toHaveBeenNthCalledWith(

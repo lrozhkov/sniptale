@@ -158,10 +158,8 @@ describe('readable project archive paths', () => {
       });
       const payload = await root!.load();
       const portable = parsePortableVideoProjectMetadata(payload.metadata);
-      expect(portable.projectExports[0]?.videoReview?.workspace.aggregateId).toBe(
-        review.aggregateId
-      );
-      expect(portable.projectExports[0]?.videoReview?.workspace.history).toEqual([]);
+      expect(portable.projectExports[0]?.libraryMediaId).toBe(`export:${projectExport.id}`);
+      expect(portable.projectExports[0]?.videoReview).toBeUndefined();
       expect(payload.objects.map((object) => object.ref.filename)).toEqual([
         'Camera clip.webm',
         'Final?.webm',

@@ -72,13 +72,15 @@ const db = {
   }),
 };
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   ASSET_OPERATIONS_STORE: 'asset_operations',
   ASSET_OWNERS_STORE: 'asset_owners',
   ASSET_REFS_STORE: 'asset_refs',
   MEDIA_LIBRARY_STORE: 'media_library',
   PROJECT_ASSETS_STORE: 'project_assets',
+  VIDEO_PROJECTS_STORE: 'video_projects',
   STORE_NAME: 'recordings',
   SCENARIO_ASSETS_STORE: 'scenario_assets',
   SCENARIO_EXPORTS_STORE: 'scenario_exports',
@@ -106,6 +108,7 @@ vi.mock('../assets', async () => ({
   })),
   deleteReadyJournal: vi.fn(async () => undefined),
   deleteAssetObject: vi.fn(async () => undefined),
+  cancelAssetPublication: vi.fn(async () => undefined),
   discardPreparedAsset: vi.fn(async () => undefined),
   parseAssetRef: (value: unknown) => value,
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
@@ -188,6 +191,7 @@ beforeEach(() => {
     'asset_refs',
     'media_library',
     'project_assets',
+    'video_projects',
     'recordings',
     'scenario_assets',
     'scenario_exports',

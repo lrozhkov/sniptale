@@ -123,7 +123,10 @@ it('does not physically delete a replaced object before the IDB transaction comm
 
   await expect(
     publishProjectExportJournal(
-      createJournal(PROJECT_EXPORT_PUBLICATION_DOMAIN, { entry: exportEntry })
+      createJournal(PROJECT_EXPORT_PUBLICATION_DOMAIN, {
+        entry: exportEntry,
+        expectedAssetId: 'asset-old',
+      })
     )
   ).rejects.toBe(failure);
   expect(mocks.completeDelete).not.toHaveBeenCalled();
@@ -189,9 +192,9 @@ it('discards an old staged voiceover journal without a durable review reference'
         requiredReview: { aggregateId: 'review-1', clipId: 'clip-1' },
       })
     )
-  ).resolves.toBeUndefined();
+  ).rejects.toMatchObject({ name: 'SupersededAssetPublicationError' });
   expect(mocks.readReview).toHaveBeenCalledWith('review-1');
-  expect(mocks.discardPrepared).toHaveBeenCalledWith(ref.assetId);
+  expect(mocks.discardPrepared).not.toHaveBeenCalled();
   expect(mocks.runMutation).not.toHaveBeenCalled();
 });
 
@@ -221,8 +224,10 @@ it('defers cleanup of an aged voiceover journal during an active attachment', as
   expect(mocks.runMutation).not.toHaveBeenCalled();
   finishAttachment();
   await attachment;
-  await expect(projectAssetPublicationAdapter.publish(journal)).resolves.toBeUndefined();
-  expect(mocks.discardPrepared).toHaveBeenCalledWith(ref.assetId);
+  await expect(projectAssetPublicationAdapter.publish(journal)).rejects.toMatchObject({
+    name: 'SupersededAssetPublicationError',
+  });
+  expect(mocks.discardPrepared).not.toHaveBeenCalled();
 });
 
 it('recovers a voiceover asset when its durable review history retains the clip', async () => {
@@ -286,6 +291,7 @@ function createTransaction(
     objectStore(name: string) {
       return {
         delete: vi.fn(async (value: unknown) => writes.push([name, 'delete', value])),
+        getAll: vi.fn(async (): Promise<unknown[]> => []),
         get: vi
           .fn()
           .mockResolvedValue(
@@ -333,3 +339,220 @@ it('preserves Trash admission when a ready project asset journal is replayed', a
     expect.objectContaining({ lifecycle: media.lifecycle }),
   ]);
 });
+
+it.each(['publish', 'replay'] as const)(
+  'keeps a frozen project representation private during %s',
+  async (mode) => {
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    mocks.runMutation.mockImplementation(async (operation) =>
+      operation({ transaction: () => createTransaction(writes, Promise.resolve()) })
+    );
+    const entry = {
+      id: 'private-copy',
+      assetId: ref.assetId,
+      createdAt: 2,
+      size: ref.size,
+      mimeType: ref.mimeType,
+    };
+    const journal = createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+      entry,
+      filename: 'copy.webm',
+      publishToLibrary: false,
+    });
+    if (mode === 'publish') await publishProjectAssetJournal(journal);
+    else await projectAssetPublicationAdapter.publish(journal);
+    expect(writes).toContainEqual(['project_assets', 'put', entry]);
+    expect(writes).toContainEqual([
+      'asset_owners',
+      'put',
+      expect.objectContaining({ ownerId: entry.id, assetId: ref.assetId }),
+    ]);
+    expect(writes.some(([store]) => store === 'media_library')).toBe(false);
+  }
+);
+
+it('rejects an invalid private publication flag before writes', async () => {
+  const entry = {
+    id: 'private-copy',
+    assetId: ref.assetId,
+    createdAt: 2,
+    size: ref.size,
+    mimeType: ref.mimeType,
+  };
+  await expect(
+    publishProjectAssetJournal(
+      createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+        entry,
+        filename: 'copy.webm',
+        publishToLibrary: 'false',
+      })
+    )
+  ).rejects.toThrow('Invalid project asset publication payload');
+  expect(mocks.runMutation).not.toHaveBeenCalled();
+});
+
+it('refuses to turn an already published identity into a private representation before writing', async () => {
+  const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+  const media = createMediaLibraryEntry();
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => createTransaction(writes, Promise.resolve(), undefined, media) })
+  );
+  const entry = {
+    id: 'asset-1',
+    assetId: ref.assetId,
+    mimeType: ref.mimeType,
+    size: ref.size,
+    createdAt: 2,
+  };
+  await expect(
+    publishProjectAssetJournal(
+      createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+        entry,
+        filename: 'image.png',
+        publishToLibrary: false,
+      })
+    )
+  ).rejects.toThrow('collides');
+  expect(writes).toEqual([]);
+});
+
+it.each([undefined, { id: 'origin' }])(
+  'refuses private acquisition publication before any write when its origin is unavailable: %j',
+  async (origin) => {
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    const tx = createTransaction(writes, Promise.resolve());
+    const original = tx.objectStore.bind(tx);
+    tx.objectStore = (name: string) => ({
+      ...original(name),
+      get: vi.fn(async (key: string) =>
+        name === 'media_library' && key === 'origin' ? origin : undefined
+      ),
+    });
+    mocks.runMutation.mockImplementation(async (operation) => operation({ transaction: () => tx }));
+    await expect(
+      publishProjectAssetJournal(
+        createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+          entry: {
+            id: 'copy',
+            assetId: ref.assetId,
+            createdAt: 2,
+            mimeType: ref.mimeType,
+            size: ref.size,
+            originMediaId: 'origin',
+          },
+          filename: 'copy.webm',
+          publishToLibrary: false,
+        })
+      )
+    ).rejects.toThrow('source is unavailable');
+    expect(writes).toEqual([]);
+  }
+);
+
+it.each(['missing', 'invalid'] as const)(
+  'recovery discards only definitively missing acquisition origins: %s',
+  async (state) => {
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    mocks.runMutation.mockImplementation(async (operation) =>
+      operation({
+        get: async () => (state === 'missing' ? undefined : { id: 'origin' }),
+        transaction: () => createTransaction(writes, Promise.resolve()),
+      })
+    );
+    const journal = createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+      entry: {
+        id: 'copy',
+        assetId: ref.assetId,
+        createdAt: 2,
+        mimeType: ref.mimeType,
+        size: ref.size,
+        originMediaId: 'origin',
+      },
+      filename: 'copy.webm',
+      publishToLibrary: false,
+    });
+    if (state === 'missing') {
+      await expect(projectAssetPublicationAdapter.publish(journal)).rejects.toMatchObject({
+        name: 'SupersededAssetPublicationError',
+      });
+      expect(mocks.discardPrepared).not.toHaveBeenCalled();
+    } else {
+      await expect(projectAssetPublicationAdapter.publish(journal)).rejects.toThrow(
+        'source is invalid'
+      );
+      expect(mocks.discardPrepared).not.toHaveBeenCalled();
+    }
+    expect(writes).toEqual([]);
+  }
+);
+
+it.each(['stale', 'legacy', 'replay'] as const)(
+  'keeps an existing source during %s project publication',
+  async (mode) => {
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    const current = { ...exportEntry, assetId: mode === 'replay' ? ref.assetId : 'later' };
+    mocks.runMutation.mockImplementation(async (callback) =>
+      callback({ transaction: () => createTransaction(writes, Promise.resolve(), current) })
+    );
+    const prepared = createJournal(PROJECT_EXPORT_PUBLICATION_DOMAIN, {
+      entry: exportEntry,
+      ...(mode === 'legacy' ? {} : { expectedAssetId: 'old' }),
+    });
+    if (mode === 'replay') await publishProjectExportJournal(prepared);
+    else
+      await expect(publishProjectExportJournal(prepared)).rejects.toMatchObject({
+        name:
+          mode === 'stale' ? 'SupersededAssetPublicationError' : 'UnresolvedAssetPublicationError',
+      });
+    expect(writes).toEqual([]);
+  }
+);
+
+it.each(['voiceover', 'music', 'recovery'] as const)(
+  'recovers a staged asset retained as %s after its original clip identity disappeared',
+  async (retainedAt) => {
+    const { createQuickEditAdvancedState } =
+      await import('../../../features/video/review/advanced/defaults');
+    const advanced = createQuickEditAdvancedState();
+    const copied = {
+      id: 'copied',
+      assetId: 'project-asset:voice-1',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    };
+    if (retainedAt === 'recovery')
+      advanced.recoveryV1 = JSON.stringify({
+        background: { enabled: false },
+        audio: { voiceover: [copied], music: [] },
+      });
+    else advanced.audio[retainedAt].push(copied);
+    mocks.readReview.mockResolvedValue({ workspace: { advanced, history: [] }, draft: null });
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    mocks.runMutation.mockImplementation(async (operation) =>
+      operation({ transaction: () => createTransaction(writes, Promise.resolve()) })
+    );
+    await projectAssetPublicationAdapter.publish(
+      createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+        entry: {
+          assetId: ref.assetId,
+          createdAt: 2,
+          id: 'voice-1',
+          mimeType: ref.mimeType,
+          size: ref.size,
+        },
+        filename: 'voice.webm',
+        requiredReview: { aggregateId: 'review-1', clipId: 'original' },
+      })
+    );
+    expect(writes).toContainEqual([
+      'project_assets',
+      'put',
+      expect.objectContaining({ id: 'voice-1' }),
+    ]);
+  }
+);

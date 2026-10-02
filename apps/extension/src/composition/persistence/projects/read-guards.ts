@@ -34,7 +34,9 @@ export function parseProjectAssetEntry(value: unknown): StoredProjectAssetEntry 
     !isString(value['assetId']) ||
     !isString(value['mimeType']) ||
     !isNumber(value['createdAt']) ||
-    !isNumber(value['size'])
+    !isNumber(value['size']) ||
+    (value['originMediaId'] !== undefined &&
+      (!isString(value['originMediaId']) || value['originMediaId'].length === 0))
   ) {
     return null;
   }
@@ -44,6 +46,9 @@ export function parseProjectAssetEntry(value: unknown): StoredProjectAssetEntry 
     id: value['id'],
     mimeType: value['mimeType'],
     size: value['size'],
+    ...(typeof value['originMediaId'] === 'string'
+      ? { originMediaId: value['originMediaId'] }
+      : {}),
   };
 }
 

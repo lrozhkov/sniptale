@@ -6,7 +6,8 @@ import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 const mocks = vi.hoisted(() => ({
   assetSequence: 0,
   createJournal: vi.fn(),
-  deleteAssetObject: vi.fn(async () => undefined),
+  deleteAssetObject: vi.fn(async (_assetId: string) => undefined),
+  cancelPublication: vi.fn(),
   discardPreparedAsset: vi.fn(async () => undefined),
   initDB: vi.fn(),
   releaseProtection: vi.fn(async () => undefined),
@@ -36,6 +37,7 @@ vi.mock('../assets', async (importOriginal) => ({
   completePhysicalDeleteOperation: vi.fn(async () => undefined),
   createAssetPublicationJournal: mocks.createJournal,
   deleteAssetObject: mocks.deleteAssetObject,
+  cancelAssetPublication: mocks.cancelPublication,
   discardPreparedAsset: mocks.discardPreparedAsset,
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
   readAssetFile: vi.fn(async () => new File(['original'], 'image.png', { type: 'image/png' })),
@@ -123,6 +125,9 @@ function installMixedWorkspaceTransaction() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.assetSequence = 0;
+  mocks.cancelPublication.mockImplementation(async (journal) => {
+    for (const ref of journal.assetRefs) await mocks.deleteAssetObject(ref.assetId);
+  });
   mocks.createJournal.mockImplementation(async (args) => ({
     ...args,
     createdAt: 1,

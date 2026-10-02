@@ -1,3 +1,4 @@
+import { sameMediaSource } from './dependencies';
 import {
   MediaAssetDeletionBlockedError,
   type MediaAssetGraphDomain,
@@ -6,10 +7,6 @@ import {
 } from './deletion-errors';
 export { StaleMediaAssetDeletePreviewError } from './deletion-errors';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import type {
-  VideoProjectAssetSource,
-  VideoProjectSource,
-} from '../../../features/video/project/types';
 import { removeVideoProjectLibrarySources } from '../../../features/video/project/library-source-removal';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
@@ -20,6 +17,8 @@ import {
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  WEB_SNAPSHOTS_STORE,
   RECORDING_TELEMETRY_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -29,23 +28,38 @@ import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../infrastructure/indexed-db/core';
-import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
+import {
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
+  listReadyJournals,
+} from '../assets';
 import { parseMediaLibraryEntry } from './read-guards';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
-import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { stripReviewAssetReference } from '../review-workspaces/strip-asset';
 import { removeScenarioAssetReferences } from '../scenario/asset-reference-removal';
 import { applyScenarioAssetMutations } from '../scenario/aggregate-mutations';
 import { tryScenarioResourceCleanup } from '../scenario/resource-sessions';
-import { parseRecordingEntry } from '../recordings/index.guards';
-import { parseProjectAssetEntry } from '../projects/read-guards';
-import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
-import { removeEditorDocumentOwnership } from '../document-assets';
-import { createAggregatePresentationKey } from '../aggregate-presentations';
 import type { MediaAssetProjectUsage } from './usage';
-import type { MediaLibraryEntry } from './contracts';
+import {
+  deleteMediaSidecars,
+  releaseMediaSource,
+  releaseUnpublishedProjectAssets,
+  recoverMediaSourcePublications,
+  mediaHasPendingPublication,
+} from './delete-cascade.sources';
+import {
+  mediaDependencyTarget,
+  reviewReferencesForMedia,
+  scenarioChildUsesMedia,
+  scenarioChildIsUnrelated,
+  videoEntryIsUnrelated,
+  videoSourceUsesMedia,
+  isVideoPrimaryMediaSource,
+  reviewWorkspaceUsesMedia,
+  type MediaDependencyTarget,
+} from './dependencies';
 
 type CascadeTransaction = ReturnType<
   Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>['transaction']
@@ -72,39 +86,6 @@ function assertExpectedUsage(
     throw new StaleMediaAssetDeletePreviewError();
 }
 
-function videoSourceMatches(
-  source: VideoProjectAssetSource,
-  media: MediaLibraryEntry,
-  scenarioChildIds: ReadonlySet<string>
-): boolean {
-  return (
-    (source.kind === 'library-asset' && source.mediaId === media.id) ||
-    (source.kind === 'recording' &&
-      media.source.kind === 'recording' &&
-      source.recordingId === media.source.recordingId) ||
-    (source.kind === 'project-asset' &&
-      media.source.kind === 'project-asset' &&
-      source.projectAssetId === media.source.projectAssetId) ||
-    (source.kind === 'scenario-asset' && scenarioChildIds.has(source.scenarioAssetId))
-  );
-}
-
-async function releaseAssetOwner(args: {
-  assetId: string;
-  ownerId: string;
-  ownerKind: string;
-  role: string;
-  tx: CascadeTransaction;
-  physicalDelete: PhysicalDelete;
-}): Promise<void> {
-  const owners = args.tx.objectStore(ASSET_OWNERS_STORE);
-  await owners.delete!([args.ownerKind, args.ownerId, args.role]);
-  if ((await owners.index('assetId').count(args.assetId)) === 0) {
-    await args.tx.objectStore(ASSET_REFS_STORE).delete!(args.assetId);
-    args.physicalDelete.assetIds.push(args.assetId);
-  }
-}
-
 /** Commit project detach, library deletion and physical-delete intent as one IDB mutation. */
 export async function deleteMediaAssetWithProjectCascade(
   mediaId: string,
@@ -121,6 +102,18 @@ export async function deleteMediaAssetWithProjectCascade(
     )
   );
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
+}
+
+/** Compensation and service cleanup may release a source only when no retained consumer adopted it. */
+export async function deleteUnreferencedMediaSource(target: MediaDependencyTarget): Promise<void> {
+  await recoverMediaSourcePublications(target);
+  if ((await listReadyJournals()).some((journal) => mediaHasPendingPublication(journal, target)))
+    throw new MediaAssetDeletionBlockedError('pending-publication');
+  const physicalDelete = buildPhysicalDeleteOperation([]);
+  await runWithIndexedDbMutation((db) =>
+    commitCascadeTransaction(db, target.id, [], physicalDelete, target)
+  );
+  if (physicalDelete.assetIds.length) await completePhysicalDeleteOperation(physicalDelete);
 }
 
 async function withScenarioLocks(
@@ -151,107 +144,18 @@ function requireVerifiedGraphEntries<T>(
   return verified;
 }
 
-function scenarioChildIsUnrelated(value: unknown, media: MediaLibraryEntry): boolean {
-  if (
-    !isRecord(value) ||
-    typeof value['id'] !== 'string' ||
-    typeof value['assetId'] !== 'string' ||
-    (value['galleryAssetId'] !== null && typeof value['galleryAssetId'] !== 'string') ||
-    (value['borrowedMediaId'] !== undefined && typeof value['borrowedMediaId'] !== 'string')
-  )
-    return false;
-  if (value['galleryAssetId'] === media.id || value['borrowedMediaId'] === media.id) return false;
-  return !(
-    media.source.kind === 'stored-asset' &&
-    !value['borrowedMediaId'] &&
-    value['assetId'] === media.source.assetId &&
-    (!media.id.startsWith('scenario-asset:') ||
-      value['id'] === media.id.slice('scenario-asset:'.length))
-  );
-}
-
-function parseVideoDependencySource(value: unknown): VideoProjectAssetSource | null {
-  if (!isRecord(value)) return null;
-  if (value['kind'] === 'library-asset' && typeof value['mediaId'] === 'string' && value['mediaId'])
-    return { kind: 'library-asset', mediaId: value['mediaId'] };
-  if (
-    value['kind'] === 'recording' &&
-    typeof value['recordingId'] === 'string' &&
-    value['recordingId']
-  )
-    return { kind: 'recording', recordingId: value['recordingId'] };
-  if (
-    value['kind'] === 'project-asset' &&
-    typeof value['projectAssetId'] === 'string' &&
-    value['projectAssetId']
-  )
-    return { kind: 'project-asset', projectAssetId: value['projectAssetId'] };
-  if (
-    value['kind'] === 'scenario-asset' &&
-    typeof value['scenarioAssetId'] === 'string' &&
-    value['scenarioAssetId']
-  )
-    return { kind: 'scenario-asset', scenarioAssetId: value['scenarioAssetId'] };
-  return null;
-}
-
-function parseVideoDependencyOrigin(value: unknown): VideoProjectSource | null {
-  if (!isRecord(value)) return null;
-  if (value['kind'] === 'manual') return { kind: 'manual' };
-  if (
-    value['kind'] === 'recording' &&
-    typeof value['recordingId'] === 'string' &&
-    value['recordingId']
-  )
-    return { kind: 'recording', recordingId: value['recordingId'] };
-  if (
-    value['kind'] === 'scenario' &&
-    typeof value['scenarioProjectId'] === 'string' &&
-    value['scenarioProjectId']
-  )
-    return { kind: 'scenario', scenarioProjectId: value['scenarioProjectId'] };
-  return null;
-}
-
-function videoEntryIsUnrelated(
-  value: unknown,
-  media: MediaLibraryEntry,
-  scenarioChildIds: ReadonlySet<string>
-): boolean {
-  if (!isRecord(value) || !isRecord(value['project'])) return false;
-  const project = value['project'];
-  if (
-    project['version'] !== 2 ||
-    Object.hasOwn(project, 'templateInstances') ||
-    !Array.isArray(project['assets']) ||
-    !(project['baseRecordingId'] === null || typeof project['baseRecordingId'] === 'string')
-  )
-    return false;
-  const origin = parseVideoDependencyOrigin(project['source']);
-  if (!origin) return false;
-  if (
-    media.source.kind === 'recording' &&
-    (project['baseRecordingId'] === media.source.recordingId ||
-      (origin.kind === 'recording' && origin.recordingId === media.source.recordingId))
-  )
-    return false;
-  for (const asset of project['assets']) {
-    if (!isRecord(asset)) return false;
-    const source = parseVideoDependencySource(asset['source']);
-    if (!source || videoSourceMatches(source, media, scenarioChildIds)) return false;
-  }
-  return true;
-}
-
-async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
-  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+async function loadCascadeGraph(
+  tx: CascadeTransaction,
+  mediaId: string,
+  expectedSource?: MediaDependencyTarget
+) {
+  const raw: unknown = await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId);
+  const media = raw === undefined && expectedSource ? expectedSource : parseMediaLibraryEntry(raw);
   if (!media) throw new StaleMediaAssetDeletePreviewError();
-  if (
-    media.source.kind !== 'recording' &&
-    media.source.kind !== 'project-asset' &&
-    media.source.kind !== 'stored-asset'
-  )
-    throw new MediaAssetDeletionBlockedError('unsupported-source');
+  if (media.id !== mediaId) throw new MediaAssetDeletionBlockedError('source-unavailable');
+  if (expectedSource && !sameMediaSource(media.source, expectedSource.source))
+    throw new MediaAssetDeletionBlockedError('source-unavailable');
+  const target = mediaDependencyTarget(media, await tx.objectStore(PROJECT_ASSETS_STORE).getAll());
   const [rawVideo, rawScenario, rawChildren, rawReview] = await Promise.all([
     tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
     tx.objectStore(SCENARIO_PROJECTS_STORE).getAll(),
@@ -262,25 +166,16 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
     rawChildren,
     parseScenarioAssetEntry,
     'scenario-asset',
-    (value) => scenarioChildIsUnrelated(value, media)
+    (value) => scenarioChildIsUnrelated(value, target)
   );
-  const scenarioChildren = children.filter(
-    (child) =>
-      child.galleryAssetId === mediaId ||
-      child.borrowedMediaId === mediaId ||
-      (media.source.kind === 'stored-asset' &&
-        !child.borrowedMediaId &&
-        child.assetId === media.source.assetId &&
-        (!mediaId.startsWith('scenario-asset:') ||
-          child.id === mediaId.slice('scenario-asset:'.length)))
-  );
+  const scenarioChildren = children.filter((child) => scenarioChildUsesMedia(child, target));
   const scenarioChildIds = new Set(scenarioChildren.map((child) => child.id));
   const scenarioIds = new Set(scenarioChildren.map((child) => child.projectId));
   const videos = requireVerifiedGraphEntries(
     rawVideo,
     parseVideoProjectEntry,
     'video-project',
-    (value) => videoEntryIsUnrelated(value, media, scenarioChildIds)
+    (value) => videoEntryIsUnrelated(value, target, scenarioChildIds)
   );
   const scenarios = requireVerifiedGraphEntries(
     rawScenario,
@@ -290,7 +185,7 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
   );
   // Auxiliary review references admit only project-assets; the root's own sidecar is purged.
   const reviews =
-    media.source.kind === 'project-asset'
+    reviewReferencesForMedia(target).size > 0
       ? requireVerifiedGraphEntries(
           rawReview.filter((value) => !isRecord(value) || value['aggregateId'] !== media.id),
           parseVideoWorkspace,
@@ -298,7 +193,7 @@ async function loadCascadeGraph(tx: CascadeTransaction, mediaId: string) {
           () => false
         )
       : [];
-  return { media, videos, scenarios, scenarioChildren, reviews };
+  return { media: { ...media, ...target }, videos, scenarios, scenarioChildren, reviews };
 }
 
 async function detachVideoProjects(
@@ -309,13 +204,9 @@ async function detachVideoProjects(
   const affected: MediaAssetProjectUsage[] = [];
   const scenarioChildIds = new Set(graph.scenarioChildren.map((child) => child.id));
   for (const entry of graph.videos) {
-    const primary =
-      graph.media.source.kind === 'recording' &&
-      (entry.project.baseRecordingId === graph.media.source.recordingId ||
-        (entry.project.source.kind === 'recording' &&
-          entry.project.source.recordingId === graph.media.source.recordingId));
+    const primary = isVideoPrimaryMediaSource(entry.project, graph.media);
     const sources = entry.project.assets
-      .filter((asset) => videoSourceMatches(asset.source, graph.media, scenarioChildIds))
+      .filter((asset) => videoSourceUsesMedia(asset.source, graph.media, scenarioChildIds))
       .map((asset) => asset.source);
     if (!primary && sources.length === 0) continue;
     affected.push({ id: entry.id, kind: 'video', name: entry.project.name, primary });
@@ -368,108 +259,28 @@ async function detachReviewWorkspaces(
   const affected: MediaAssetProjectUsage[] = [];
   for (const workspace of graph.reviews) {
     if (workspace.aggregateId === graph.media.id) continue;
-    const ref =
-      graph.media.source.kind === 'project-asset'
-        ? `project-asset:${graph.media.source.projectAssetId}`
-        : null;
-    const attached = ref !== null && collectReviewAssetReferences(workspace).has(ref);
+    const attached = reviewWorkspaceUsesMedia(workspace, graph.media);
     if (!attached) continue;
     affected.push({
       id: workspace.aggregateId,
       kind: 'review',
-      name: graph.media.filename,
+      name: 'filename' in graph.media ? graph.media.filename : graph.media.id,
       primary: false,
     });
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(
-      stripReviewAssetReference(workspace, ref!, now)
-    );
+    let next = workspace;
+    for (const ref of reviewReferencesForMedia(graph.media))
+      next = stripReviewAssetReference(next, ref, now);
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(next);
   }
   return affected;
-}
-
-async function deleteMediaSidecars(
-  tx: CascadeTransaction,
-  mediaId: string,
-  physicalDelete: PhysicalDelete
-): Promise<void> {
-  const imageWorkspace = parseImageWorkspaceEntry(
-    await tx.objectStore(IMAGE_WORKSPACES_STORE).get(mediaId)
-  );
-  if (imageWorkspace) {
-    await removeEditorDocumentOwnership({
-      document: imageWorkspace.document,
-      ownerId: mediaId,
-      ownerKind: 'image-workspace',
-      physicalDelete,
-      stores: {
-        owners: tx.objectStore(ASSET_OWNERS_STORE),
-        refs: tx.objectStore(ASSET_REFS_STORE),
-      },
-    });
-  }
-  await tx.objectStore(IMAGE_WORKSPACES_STORE).delete!(mediaId);
-  await tx.objectStore(AGGREGATE_PRESENTATIONS_STORE).delete!(
-    createAggregatePresentationKey({ id: mediaId, kind: 'image' })
-  );
-  await tx.objectStore(THUMBNAILS_STORE).delete!(mediaId);
-  await tx.objectStore(MEDIA_LIBRARY_STORE).delete!(mediaId);
-  await tx.objectStore(VIDEO_WORKSPACES_STORE).delete!(mediaId);
-  await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete!(mediaId);
-}
-
-async function releaseMediaSource(
-  tx: CascadeTransaction,
-  media: MediaLibraryEntry,
-  physicalDelete: PhysicalDelete
-): Promise<void> {
-  if (media.source.kind === 'recording') {
-    const record = parseRecordingEntry(
-      await tx.objectStore(STORE_NAME).get(media.source.recordingId)
-    );
-    if (!record) throw new MediaAssetDeletionBlockedError('source-unavailable');
-    await tx.objectStore(STORE_NAME).delete!(record.id);
-    await tx.objectStore(RECORDING_TELEMETRY_STORE).delete!(record.id);
-    await releaseAssetOwner({
-      assetId: record.assetId,
-      ownerId: record.id,
-      ownerKind: 'recording',
-      role: 'body',
-      tx,
-      physicalDelete,
-    });
-  } else if (media.source.kind === 'project-asset') {
-    const child = parseProjectAssetEntry(
-      await tx.objectStore(PROJECT_ASSETS_STORE).get(media.source.projectAssetId)
-    );
-    if (!child) throw new MediaAssetDeletionBlockedError('source-unavailable');
-    await tx.objectStore(PROJECT_ASSETS_STORE).delete!(child.id);
-    await releaseAssetOwner({
-      assetId: child.assetId,
-      ownerId: child.id,
-      ownerKind: 'project-asset',
-      role: 'body',
-      tx,
-      physicalDelete,
-    });
-  } else if (media.source.kind === 'stored-asset') {
-    await releaseAssetOwner({
-      assetId: media.source.assetId,
-      ownerId: media.id,
-      ownerKind: 'media-library',
-      role: 'source',
-      tx,
-      physicalDelete,
-    });
-  } else {
-    throw new MediaAssetDeletionBlockedError('unsupported-source');
-  }
 }
 
 async function commitCascadeTransaction(
   db: CascadeDatabase,
   mediaId: string,
   expectedUsage: readonly MediaAssetProjectUsage[],
-  physicalDelete: PhysicalDelete
+  physicalDelete: PhysicalDelete,
+  expectedSource?: MediaDependencyTarget
 ): Promise<void> {
   const tx = db.transaction(
     [
@@ -480,6 +291,8 @@ async function commitCascadeTransaction(
       VIDEO_WORKSPACES_STORE,
       VIDEO_WORKSPACE_DRAFTS_STORE,
       PROJECT_ASSETS_STORE,
+      PROJECT_EXPORTS_STORE,
+      WEB_SNAPSHOTS_STORE,
       STORE_NAME,
       RECORDING_TELEMETRY_STORE,
       THUMBNAILS_STORE,
@@ -492,16 +305,35 @@ async function commitCascadeTransaction(
     'readwrite'
   );
   try {
-    const graph = await loadCascadeGraph(tx, mediaId);
+    const graph = await loadCascadeGraph(tx, mediaId, expectedSource);
     const now = Date.now();
+    const scenarioChildIds = new Set(graph.scenarioChildren.map((child) => child.id));
+    const detachedRepresentations = new Set([
+      ...(graph.media.privateProjectAssetIds ?? []),
+      ...graph.videos.flatMap((entry) =>
+        entry.project.assets.flatMap((asset) =>
+          asset.source.kind === 'project-asset' &&
+          videoSourceUsesMedia(asset.source, graph.media, scenarioChildIds) &&
+          (graph.media.source.kind !== 'project-asset' ||
+            asset.source.projectAssetId !== graph.media.source.projectAssetId)
+            ? [asset.source.projectAssetId]
+            : []
+        )
+      ),
+    ]);
     const affected = [
       ...(await detachVideoProjects(tx, graph, now)),
       ...(await detachScenarioProjects(tx, graph, now, physicalDelete)),
       ...(await detachReviewWorkspaces(tx, graph, now)),
     ];
     assertExpectedUsage(affected, expectedUsage);
-    await deleteMediaSidecars(tx, mediaId, physicalDelete);
+    const ownAuxiliaries = await deleteMediaSidecars(tx, mediaId, physicalDelete);
+    for (const id of ownAuxiliaries) detachedRepresentations.add(id);
+    if (graph.media.source.kind === 'project-asset')
+      detachedRepresentations.delete(graph.media.source.projectAssetId);
+    await releaseUnpublishedProjectAssets(tx, detachedRepresentations, physicalDelete);
     await releaseMediaSource(tx, graph.media, physicalDelete);
+    physicalDelete.assetIds = [...new Set(physicalDelete.assetIds)];
     if (physicalDelete.assetIds.length > 0)
       await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
     await tx.done;

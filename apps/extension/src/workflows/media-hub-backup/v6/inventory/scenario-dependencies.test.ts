@@ -190,3 +190,53 @@ it('fails when an admitted video references a missing scenario child', async () 
     'requires a missing scenario asset: missing-image'
   );
 });
+
+it('requires the original Library identity of a frozen video representation', async () => {
+  const video = createVideoProjectEntryWithMediaClip();
+  video.id = 'project-1';
+  video.project.id = 'project-1';
+  video.project.assets[0]!.source = {
+    kind: 'project-asset',
+    projectAssetId: 'private',
+    originMediaId: 'original-image',
+  };
+  mocks.db.getAll.mockImplementation(async (store: string) =>
+    store === VIDEO_PROJECTS_STORE ? [video] : []
+  );
+  await expect(buildMediaHubBackupExportPlanFromLibraryV6(options())).rejects.toThrow(
+    'requires an excluded draft media item: original-image'
+  );
+});
+
+it('selects the original Library card for a private imported scenario snapshot', async () => {
+  const scenario = {
+    id: 'private-scenario',
+    project: createGuideProject('Private snapshot', 'private-scenario', 1),
+    createdAt: 1,
+    updatedAt: 1,
+    workspaceRevision: 1,
+  };
+  const child = {
+    id: 'snapshot',
+    projectId: scenario.id,
+    assetId: 'private-bytes',
+    galleryAssetId: 'original-image',
+    mimeType: 'image/png',
+    width: 100,
+    height: 100,
+    size: 4,
+    createdAt: 1,
+  };
+  mocks.db.getAll.mockImplementation(async (store: string) =>
+    store === SCENARIO_PROJECTS_STORE ? [scenario] : store === SCENARIO_ASSETS_STORE ? [child] : []
+  );
+  mocks.buildScenarios.mockResolvedValue([scenarioRoot(scenario.id)]);
+  await expect(
+    buildMediaHubBackupExportPlanFromLibraryV6(
+      createMediaHubBackupExportOptions({
+        scope: 'selected',
+        selected: { mediaAssetIds: [], videoProjectIds: [], scenarioProjectIds: [scenario.id] },
+      })
+    )
+  ).rejects.toThrow('requires an excluded draft media item: original-image');
+});

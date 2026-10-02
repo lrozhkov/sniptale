@@ -174,10 +174,7 @@ describe('video project backup inventory', () => {
         assetEntry('project-asset-1', 'local-video', 'video/webm', 10),
         assetEntry('music', 'local-music', 'audio/mpeg', 8),
       ],
-      new Map([
-        ['project-asset:project-asset-1', createMediaLibraryEntry({ filename: 'take.webm' })],
-        ['project-asset:music', createMediaLibraryEntry({ filename: 'theme.mp3' })],
-      ]),
+      new Map([['project-asset:music', createMediaLibraryEntry({ filename: 'theme.mp3' })]]),
       [entry],
       [workspaceRow]
     );
@@ -195,7 +192,7 @@ describe('video project backup inventory', () => {
       filename: asset.filename,
     }));
     expect(assets).toEqual([
-      { id: 'project-asset-1', filename: 'take.webm' },
+      { id: 'project-asset-1', filename: 'Asset 001.webm' },
       { id: 'music', filename: 'theme.mp3' },
     ]);
     expect(roots[0]!.descriptor.objectCount).toBe(2);
@@ -206,9 +203,7 @@ describe('video project backup inventory', () => {
     // The review references project-asset:music but that store row is gone.
     const db = database(
       [assetEntry('project-asset-1', 'local-video', 'video/webm', 10)],
-      new Map([
-        ['project-asset:project-asset-1', createMediaLibraryEntry({ filename: 'take.webm' })],
-      ]),
+      new Map([]),
       [entry],
       [workspaceRow]
     );
@@ -261,3 +256,18 @@ it.each([true, false])(
     expect(root!.summary.telemetryCount).toBe(includeTelemetry ? 1 : 0);
   }
 );
+
+it('preserves private representation visibility in the portable project inventory', async () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const db = database([assetEntry('project-asset-1', 'local-video', 'video/webm', 10)], new Map(), [
+    entry,
+  ]);
+  const roots = await buildVideoProjectRootInventory({
+    db,
+    options: createMediaHubBackupExportOptions({ includeDrafts: true, scope: 'all' }),
+    paths,
+  });
+  const payload = await roots[0]!.load();
+  const metadata = parsePortableVideoProjectMetadata(payload.metadata);
+  expect(metadata.projectAssets[0]).toMatchObject({ publishToLibrary: false });
+});

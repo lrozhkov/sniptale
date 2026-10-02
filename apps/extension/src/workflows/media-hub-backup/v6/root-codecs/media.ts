@@ -32,6 +32,8 @@ interface PortableMediaReviewAsset {
   entry: Omit<StoredProjectAssetEntry, 'assetId'>;
   filename: string;
   objectId: string;
+  libraryMediaId?: string;
+  publishToLibrary?: boolean;
 }
 
 export interface PortableMediaThumbnail {
@@ -183,13 +185,27 @@ function parseReviewAssets(
       'assetId' in raw['entry'] ||
       typeof raw['filename'] !== 'string' ||
       typeof raw['objectId'] !== 'string' ||
-      !raw['objectId']
+      !raw['objectId'] ||
+      (raw['publishToLibrary'] !== undefined && typeof raw['publishToLibrary'] !== 'boolean') ||
+      (raw['libraryMediaId'] !== undefined &&
+        (raw['libraryMediaId'] !== `project-asset:${raw['entry']['id']}` ||
+          raw['publishToLibrary'] === false))
     )
       throw new Error('Portable media review asset is invalid.');
     const entry = parseProjectAssetEntry({ ...raw['entry'], assetId: 'portable' });
     if (!entry) throw new Error('Portable media review asset is invalid.');
     const { assetId: _assetId, ...portable } = entry;
-    return { entry: portable, filename: raw['filename'], objectId: raw['objectId'] };
+    return {
+      entry: portable,
+      filename: raw['filename'],
+      objectId: raw['objectId'],
+      ...(typeof raw['libraryMediaId'] === 'string'
+        ? { libraryMediaId: raw['libraryMediaId'] }
+        : {}),
+      ...(typeof raw['publishToLibrary'] === 'boolean'
+        ? { publishToLibrary: raw['publishToLibrary'] }
+        : {}),
+    };
   });
   const ids = assets.map((asset) => asset.entry.id);
   const objectIds = assets.map((asset) => asset.objectId);
@@ -262,6 +278,7 @@ function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
         : null;
     if (
       !parsed ||
+      parsed.originMediaId !== undefined ||
       source?.kind !== 'project-asset' ||
       source.projectAssetId !== parsed.id ||
       metadata.entry?.id !== `project-asset:${parsed.id}` ||

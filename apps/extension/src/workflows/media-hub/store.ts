@@ -1,3 +1,4 @@
+import type { ProjectAssetPublicationOptions } from '../../composition/persistence/projects/index';
 import {
   addMediaLibraryEntryTags,
   deleteMediaLibraryAsset,
@@ -125,14 +126,16 @@ export async function saveProjectAssetSafely(
   blob: Blob,
   mimeType: string,
   filename = id,
-  createdAt = Date.now()
+  createdAt = Date.now(),
+  options: ProjectAssetPublicationOptions = {}
 ): Promise<void> {
   assertSafeMediaFilename(filename);
   assertSafeProjectAssetStorageInput(blob, mimeType);
   await withMediaHubWriteGuard(translate('shared.mediaHub.saveProjectAssetAction'), () =>
-    saveProjectAsset(id, blob, mimeType, filename, createdAt)
+    saveProjectAsset(id, blob, mimeType, filename, createdAt, options)
   );
-  publishMediaHubLibraryChanged('create', [`project-asset:${id}`]);
+  if (options.publishToLibrary !== false)
+    publishMediaHubLibraryChanged('create', [`project-asset:${id}`]);
 }
 
 export async function saveProjectExportSafely(entry: SaveProjectExportInput): Promise<void> {

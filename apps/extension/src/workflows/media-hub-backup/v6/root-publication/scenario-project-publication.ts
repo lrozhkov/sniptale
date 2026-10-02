@@ -212,9 +212,10 @@ async function prepareScenarioAssets(args: {
         : undefined;
       if (item.entry.borrowedMediaId && !borrowedMediaId)
         throw new Error('Restored borrowed scenario media is unavailable.');
-      const ownedMediaId = item.entry.borrowedMediaId
-        ? undefined
-        : args.rootIdMap[`media:library-item:${scenarioLibraryMediaId(item.entry.id)}`];
+      const ownedMediaId =
+        item.entry.borrowedMediaId || item.entry.galleryAssetId
+          ? undefined
+          : args.rootIdMap[`media:library-item:${scenarioLibraryMediaId(item.entry.id)}`];
       const sourceMediaId = borrowedMediaId ?? ownedMediaId;
       let ref = object.ref;
       if (sourceMediaId) {

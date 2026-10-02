@@ -457,7 +457,12 @@ it('retires a superseded ready journal so later scenario mutations can proceed',
   expect(assetMocks.deleteAssetObject).not.toHaveBeenCalledWith('opfs-loser');
   getStore('asset_refs').delete('opfs-loser');
   await expect(scenarioAssetPublicationAdapter.publish(journal!)).resolves.toBeUndefined();
-  expect(assetMocks.deleteAssetObject).toHaveBeenCalledWith('opfs-loser');
+  expect(assetMocks.cancelAssetPublication).toHaveBeenCalledWith(
+    expect.objectContaining({
+      assetRefs: expect.arrayContaining([expect.objectContaining({ assetId: 'opfs-loser' })]),
+    }),
+    undefined
+  );
   await expect(
     commitScenarioAggregateMutation(
       {

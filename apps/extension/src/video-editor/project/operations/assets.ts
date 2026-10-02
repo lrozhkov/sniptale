@@ -1,3 +1,4 @@
+import type { ProjectAssetPublicationOptions } from '../../../composition/persistence/projects/index';
 import { getRecording } from '../../../composition/persistence/recordings/index';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
@@ -119,7 +120,7 @@ export async function importRecordingProjectAsset(
   return buildProjectRecordingAsset(sourceRecordingId, entry.file, entry.filename);
 }
 
-/** References reusable library media; imports derived presentations as independent assets. */
+/** References Library media; freezes derived presentations as private project resources. */
 export async function ensureLibraryMediaAssets(
   project: VideoProject,
   mediaId: string
@@ -147,7 +148,10 @@ export async function ensureLibraryMediaAssets(
   const blob = await readLibraryImportBlob(entry, assetType);
   if (!blob) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
   const file = new File([blob], entry.filename, { type: blob.type });
-  const asset = await importProjectAsset(file, assetType);
+  const asset = await importProjectAsset(file, assetType, {
+    publishToLibrary: false,
+    originMediaId: mediaId,
+  });
   if (asset.source.kind === 'project-asset') {
     asset.source.originMediaId = mediaId;
   }
@@ -206,11 +210,21 @@ async function readLibraryImportBlob(
     : undefined;
 }
 
-async function buildImportedImageAsset(file: File): Promise<VideoProjectAsset> {
+async function buildImportedImageAsset(
+  file: File,
+  options: ProjectAssetPublicationOptions
+): Promise<VideoProjectAsset> {
   const metadata = await loadImageMetadata(file);
   const projectAssetId = crypto.randomUUID();
 
-  await saveProjectAssetSafely(projectAssetId, file, metadata.mimeType, file.name);
+  await saveProjectAssetSafely(
+    projectAssetId,
+    file,
+    metadata.mimeType,
+    file.name,
+    undefined,
+    options
+  );
 
   return createVideoProjectAsset(
     file.name,
@@ -231,11 +245,21 @@ async function buildImportedImageAsset(file: File): Promise<VideoProjectAsset> {
   );
 }
 
-async function buildImportedVideoAsset(file: File): Promise<VideoProjectAsset> {
+async function buildImportedVideoAsset(
+  file: File,
+  options: ProjectAssetPublicationOptions
+): Promise<VideoProjectAsset> {
   const metadata = await loadVideoMetadata(file);
   const projectAssetId = crypto.randomUUID();
 
-  await saveProjectAssetSafely(projectAssetId, file, metadata.mimeType, file.name);
+  await saveProjectAssetSafely(
+    projectAssetId,
+    file,
+    metadata.mimeType,
+    file.name,
+    undefined,
+    options
+  );
 
   return createVideoProjectAsset(
     file.name,
@@ -256,11 +280,21 @@ async function buildImportedVideoAsset(file: File): Promise<VideoProjectAsset> {
   );
 }
 
-async function buildImportedAudioAsset(file: File): Promise<VideoProjectAsset> {
+async function buildImportedAudioAsset(
+  file: File,
+  options: ProjectAssetPublicationOptions
+): Promise<VideoProjectAsset> {
   const metadata = await loadAudioMetadata(file);
   const projectAssetId = crypto.randomUUID();
 
-  await saveProjectAssetSafely(projectAssetId, file, metadata.mimeType, file.name);
+  await saveProjectAssetSafely(
+    projectAssetId,
+    file,
+    metadata.mimeType,
+    file.name,
+    undefined,
+    options
+  );
 
   return createVideoProjectAsset(
     file.name,
@@ -286,17 +320,18 @@ async function buildImportedAudioAsset(file: File): Promise<VideoProjectAsset> {
  */
 export async function importProjectAsset(
   file: File,
-  assetType: ImportableProjectAssetType
+  assetType: ImportableProjectAssetType,
+  options: ProjectAssetPublicationOptions = {}
 ): Promise<VideoProjectAsset> {
   await assertImportableProjectAssetFile(file, assetType);
 
   if (assetType === VideoProjectAssetType.AUDIO) {
-    return buildImportedAudioAsset(file);
+    return buildImportedAudioAsset(file, options);
   }
 
   if (assetType === VideoProjectAssetType.IMAGE) {
-    return buildImportedImageAsset(file);
+    return buildImportedImageAsset(file, options);
   }
 
-  return buildImportedVideoAsset(file);
+  return buildImportedVideoAsset(file, options);
 }

@@ -37,7 +37,8 @@ const { initDBMock, txGetMock, txPutMock } = vi.hoisted(() => ({
   txPutMock: vi.fn(),
 }));
 
-vi.mock('../../../infrastructure/indexed-db/core', () => ({
+vi.mock('../../../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../infrastructure/indexed-db/core')>()),
   ASSET_OPERATIONS_STORE: 'asset_operations',
   ASSET_OWNERS_STORE: 'asset_owners',
   ASSET_REFS_STORE: 'asset_refs',

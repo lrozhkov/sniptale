@@ -84,7 +84,8 @@ describe('media-hub project asset storage boundary success', () => {
       blob,
       'audio/webm;codecs=opus',
       'voice.webm',
-      expect.any(Number)
+      expect.any(Number),
+      {}
     );
     expect(storeMocks.publishMediaHubLibraryChanged).toHaveBeenCalledWith('create', [
       'project-asset:asset-1',
@@ -97,3 +98,20 @@ function expectNoProjectAssetWrite() {
   expect(storeMocks.saveProjectAsset).not.toHaveBeenCalled();
   expect(storeMocks.publishMediaHubLibraryChanged).not.toHaveBeenCalled();
 }
+
+it('stores a private representation without emitting a Library-card creation event', async () => {
+  const { saveProjectAssetSafely } = await import('./store');
+  const blob = new Blob(['private'], { type: 'image/png' });
+  await saveProjectAssetSafely('private', blob, 'image/png', 'image.png', 10, {
+    publishToLibrary: false,
+  });
+  expect(storeMocks.saveProjectAsset).toHaveBeenCalledWith(
+    'private',
+    blob,
+    'image/png',
+    'image.png',
+    10,
+    { publishToLibrary: false }
+  );
+  expect(storeMocks.publishMediaHubLibraryChanged).not.toHaveBeenCalled();
+});

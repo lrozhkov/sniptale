@@ -73,6 +73,8 @@ export function resolveVideoProjectReadResult(result: VideoProjectReadResult): V
 }
 
 export interface ProjectAssetEntry {
+  /** Private acquisition keeps insertion identity before a placement is durably saved. */
+  originMediaId?: string;
   assetId: string;
   id: string;
   mimeType: string;

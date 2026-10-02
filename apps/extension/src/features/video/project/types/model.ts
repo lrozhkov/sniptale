@@ -122,7 +122,7 @@ export type VideoProjectAssetSource =
       kind: 'project-asset';
       projectAssetId: string;
       originRecordingId?: string;
-      /** Library provenance for repeat-import detection; rendering uses the project-owned copy. */
+      /** Library insertion identity; rendering uses the project-owned representation. */
       originMediaId?: string;
     }
   | {

@@ -19,6 +19,10 @@ const dbMocks = vi.hoisted(() => ({
 vi.mock('./usage', () => ({
   listMediaAssetProjectUsage: dbMocks.listMediaAssetProjectUsageMock,
 }));
+vi.mock('./delete-cascade.sources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./delete-cascade.sources')>()),
+  recoverMediaSourcePublications: vi.fn(),
+}));
 vi.mock('./delete-cascade', () => ({
   deleteMediaAssetWithProjectCascade: dbMocks.deleteCascadeMock,
 }));
@@ -134,12 +138,10 @@ function mockDeleteMediaLibraryAssetEntries() {
 }
 
 function expectDeleteMediaLibraryAssetCleanup() {
-  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('recording', []);
-  expect(dbMocks.deleteProjectExportMock).toHaveBeenCalledWith('exp-1');
-  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('asset', []);
-  ['export', 'screenshot'].forEach((assetId) =>
-    expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith(assetId)
-  );
+  for (const id of ['recording', 'export', 'asset', 'screenshot']) {
+    expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith(id, []);
+  }
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -296,4 +298,18 @@ it('refuses permanent deletion while an image workspace publication still owns p
   });
   expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
   expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
+});
+
+it.each<MediaLibraryEntry['source']>([
+  { kind: 'screenshot' },
+  { kind: 'project-export', exportId: 'exp-1', projectId: 'project-1' },
+  { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
+])('routes confirmed linked $kind media through the shared project cascade', async (source) => {
+  const usage: MediaAssetProjectUsage[] = [
+    { id: 'scenario', kind: 'scenario', name: 'Guide', primary: false },
+  ];
+  dbMocks.getMock.mockResolvedValue(createMediaEntry({ id: 'linked', source }));
+  dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce(usage);
+  await deleteMediaLibraryAsset('linked', { expectedUsage: usage });
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('linked', usage);
 });

@@ -119,6 +119,7 @@ it('prepares and publishes a project export without a recording alias', async ()
     expect.objectContaining({
       assetRefs: [expect.objectContaining({ assetId: 'asset-export-1' })],
       payload: {
+        expectedAssetId: null,
         entry: expect.objectContaining({
           assetId: 'asset-export-1',
           id: 'export-1',
@@ -187,11 +188,16 @@ it('publishes a prepared export without blob admission and preserves an absent f
 
   await commitProjectExport({ ...entry, preparedAsset });
 
+  expect(exportMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+  expect(exportMocks.dbGetMock).not.toHaveBeenCalled();
   expect(exportMocks.assertAssetWriteAdmissionMock).not.toHaveBeenCalled();
   expect(exportMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
   expect(exportMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      payload: { entry: expect.not.objectContaining({ format: expect.anything() }) },
+      payload: {
+        expectedAssetId: null,
+        entry: expect.not.objectContaining({ format: expect.anything() }),
+      },
     })
   );
   expect(exportMocks.releaseAssetReadyProtectionMock).not.toHaveBeenCalled();
@@ -236,15 +242,14 @@ it('fails closed when export metadata, ref, or OPFS object is unavailable', asyn
   await expect(getProjectExport(entry.id)).resolves.toBeUndefined();
 });
 
-it('deletes export mirrors even when the source export or recording is already absent', async () => {
+it('preserves mirror evidence when the source export is already absent', async () => {
   const { deleteProjectExport } = await import('./index');
   exportMocks.dbGetMock.mockResolvedValueOnce(undefined);
   exportMocks.getRecordingMock.mockResolvedValueOnce(undefined);
 
   await deleteProjectExport('missing-export');
 
-  expect(exportMocks.txDeleteMock).toHaveBeenNthCalledWith(1, 'missing-export');
-  expect(exportMocks.txDeleteMock).toHaveBeenNthCalledWith(2, 'export:missing-export');
+  expect(exportMocks.txDeleteMock).not.toHaveBeenCalled();
   expect(exportMocks.txPutMock).not.toHaveBeenCalled();
 });
 

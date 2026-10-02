@@ -42,7 +42,13 @@ export {
   writeReadyJournal,
 } from './opfs-store';
 export { assertAssetWriteAdmission, createAggregateAssetReservation } from './quota';
-export { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
+export {
+  createAssetPublicationJournal,
+  publishReadyJournalWithRetry,
+  assertSourcePublicationVersion,
+  cancelAssetPublication,
+  SupersededAssetPublicationError,
+} from './publication';
 export { recoverStandaloneAssetPublications } from './recovery';
 export {
   runWithDurableAssetOperation,
@@ -52,6 +58,8 @@ export {
   appendAssetOperationCompensation,
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
+  readyJournalClaimsAsset,
+  collectBackupRollbackAssetIds,
   createBackupRestoreOperation,
   readAssetOperation,
   transitionAssetOperation,

@@ -202,7 +202,7 @@ function installLegacyMediaLibrarySourceMocks() {
 }
 
 function expectLegacyMediaLibrarySyncWrites() {
-  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'recording:rec-1', filename: 'renamed.webm' })
   );
@@ -229,7 +229,7 @@ function expectLegacyMediaLibrarySyncWrites() {
       lifecycle: createLibraryLifecycle('library', 420),
     })
   );
-  expect(dbMocks.txPutMock).toHaveBeenCalledWith(
+  expect(dbMocks.txPutMock).not.toHaveBeenCalledWith(
     expect.objectContaining({
       id: 'project-asset:asset-3',
       lifecycle: createLibraryLifecycle('library', 400),
@@ -248,8 +248,8 @@ async function verifySyncLegacyMediaLibraryFlow() {
   await syncLegacyMediaLibrary();
 
   expectLegacyMediaLibrarySyncWrites();
-  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
-  expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-1');
   expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-2');
 }

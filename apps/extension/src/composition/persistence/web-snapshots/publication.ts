@@ -125,46 +125,62 @@ export async function publishWebSnapshotJournal(journal: AssetReadyJournal): Pro
       ],
       'readwrite'
     );
-    const snapshotStore = tx.objectStore(WEB_SNAPSHOTS_STORE);
-    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
-    const refStore = tx.objectStore(ASSET_REFS_STORE);
-    const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-    const existingSnapshotRaw: unknown = await snapshotStore.get(payload.snapshot.id);
-    const existingSnapshot = parseStoredWebSnapshotRecord(existingSnapshotRaw);
-    if (existingSnapshotRaw !== undefined && !existingSnapshot) {
-      throw new Error('Web snapshot metadata collides with an invalid record.');
-    }
-    assertCompatibleExisting(existingSnapshot ?? undefined, payload.snapshot, 'metadata');
-    const existingMediaRaw: unknown = await mediaStore.get(payload.mediaEntry.id);
-    const existingMedia = parseMediaLibraryEntry(existingMediaRaw);
-    if (existingMediaRaw !== undefined && !existingMedia) {
-      throw new Error('Web snapshot media collides with an invalid record.');
-    }
-    assertCompatibleExisting(existingMedia ?? undefined, payload.mediaEntry, 'media');
-    for (const [ref, role] of [
-      [refs.packageRef, WEB_SNAPSHOT_PACKAGE_ROLE],
-      [refs.screenshotRef, WEB_SNAPSHOT_SCREENSHOT_ROLE],
-    ] as const) {
-      const existingRefRaw: unknown = await refStore.get(ref.assetId);
-      const existingRef = parseAssetRef(existingRefRaw);
-      if (existingRefRaw !== undefined && !existingRef) {
-        throw new Error('Web snapshot asset ref collides with an invalid record.');
+    try {
+      const snapshotStore = tx.objectStore(WEB_SNAPSHOTS_STORE);
+      const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const refStore = tx.objectStore(ASSET_REFS_STORE);
+      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+      const existingSnapshotRaw: unknown = await snapshotStore.get(payload.snapshot.id);
+      const existingSnapshot = parseStoredWebSnapshotRecord(existingSnapshotRaw);
+      if (existingSnapshotRaw !== undefined && !existingSnapshot) {
+        throw new Error('Web snapshot metadata collides with an invalid record.');
       }
-      assertCompatibleExisting(existingRef ?? undefined, ref, 'asset ref');
-      const owner = expectedOwner(ref.assetId, payload.snapshot.id, role);
-      const existingOwnerRaw: unknown = await ownerStore.get(ownerKey(payload.snapshot.id, role));
-      const existingOwner = parseAssetOwner(existingOwnerRaw);
-      if (existingOwnerRaw !== undefined && !existingOwner) {
-        throw new Error('Web snapshot asset owner collides with an invalid record.');
+      assertCompatibleExisting(existingSnapshot ?? undefined, payload.snapshot, 'metadata');
+      const existingMediaRaw: unknown = await mediaStore.get(payload.mediaEntry.id);
+      const existingMedia = parseMediaLibraryEntry(existingMediaRaw);
+      if (existingMediaRaw !== undefined && !existingMedia) {
+        throw new Error('Web snapshot media collides with an invalid record.');
       }
-      assertCompatibleExisting(existingOwner ?? undefined, owner, 'asset owner');
-      await refStore.put(ref);
-      await ownerStore.put(owner);
+      if (
+        existingMedia &&
+        (existingMedia.source.kind !== 'web-snapshot' ||
+          existingMedia.source.snapshotId !== payload.snapshot.id ||
+          existingMedia.id !== payload.mediaEntry.id)
+      )
+        throw new Error('Web snapshot media source identity collides with an existing record.');
+      for (const [ref, role] of [
+        [refs.packageRef, WEB_SNAPSHOT_PACKAGE_ROLE],
+        [refs.screenshotRef, WEB_SNAPSHOT_SCREENSHOT_ROLE],
+      ] as const) {
+        const existingRefRaw: unknown = await refStore.get(ref.assetId);
+        const existingRef = parseAssetRef(existingRefRaw);
+        if (existingRefRaw !== undefined && !existingRef) {
+          throw new Error('Web snapshot asset ref collides with an invalid record.');
+        }
+        assertCompatibleExisting(existingRef ?? undefined, ref, 'asset ref');
+        const owner = expectedOwner(ref.assetId, payload.snapshot.id, role);
+        const existingOwnerRaw: unknown = await ownerStore.get(ownerKey(payload.snapshot.id, role));
+        const existingOwner = parseAssetOwner(existingOwnerRaw);
+        if (existingOwnerRaw !== undefined && !existingOwner) {
+          throw new Error('Web snapshot asset owner collides with an invalid record.');
+        }
+        assertCompatibleExisting(existingOwner ?? undefined, owner, 'asset owner');
+        await refStore.put(ref);
+        await ownerStore.put(owner);
+      }
+      await snapshotStore.put(payload.snapshot);
+      await mediaStore.put(existingMedia ?? payload.mediaEntry);
+      await tx.objectStore(THUMBNAILS_STORE).put(thumbnail);
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* The transaction may already have aborted. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
     }
-    await snapshotStore.put(payload.snapshot);
-    await mediaStore.put(payload.mediaEntry);
-    await tx.objectStore(THUMBNAILS_STORE).put(thumbnail);
-    await tx.done;
   });
 }
 

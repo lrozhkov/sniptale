@@ -206,6 +206,10 @@ describe('edited library image imports', () => {
       });
       const project = createEmptyVideoProject('Image copy');
       const [asset] = await ensureLibraryMediaAssets(project, 'library-image');
+      expect(saveProjectAssetSafelyMock.mock.calls[0]?.[5]).toEqual({
+        publishToLibrary: false,
+        originMediaId: 'library-image',
+      });
       expect(asset).toMatchObject({
         name: 'edited.png',
         type: VideoProjectAssetType.IMAGE,
@@ -597,7 +601,9 @@ async function verifyImageImport() {
     projectAssetId,
     file,
     'image/png',
-    'image.png'
+    'image.png',
+    undefined,
+    {}
   );
   expect(asset).toEqual(
     expect.objectContaining({
@@ -631,19 +637,25 @@ async function verifyMediaImports() {
     projectAssetId,
     videoFile,
     'video/webm',
-    'clip.webm'
+    'clip.webm',
+    undefined,
+    {}
   );
   expect(saveProjectAssetSafelyMock).toHaveBeenCalledWith(
     projectAssetId,
     audioFile,
     'audio/mpeg',
-    'sound.mp3'
+    'sound.mp3',
+    undefined,
+    {}
   );
   expect(saveProjectAssetSafelyMock).toHaveBeenCalledWith(
     projectAssetId,
     recordedAudioFile,
     'audio/mpeg',
-    'voice.webm'
+    'voice.webm',
+    undefined,
+    {}
   );
   expect(avifAsset.type).toBe(VideoProjectAssetType.IMAGE);
   expect(videoAsset.type).toBe(VideoProjectAssetType.VIDEO);

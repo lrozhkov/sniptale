@@ -10,6 +10,7 @@ type PersistenceLockMode = 'exclusive' | 'shared';
 const persistenceMutationPermitBrand = Symbol('persistenceMutationPermit');
 const persistenceMutationTransitionPermitBrand = Symbol('persistenceMutationTransitionPermit');
 const durableAssetOperationPermitBrand = Symbol('durableAssetOperationPermit');
+const durableAssetLifecyclePermitBrand = Symbol('durableAssetLifecyclePermit');
 
 export interface PersistenceMutationPermit {
   readonly [persistenceMutationPermitBrand]: true;
@@ -17,6 +18,10 @@ export interface PersistenceMutationPermit {
 
 export interface DurableAssetOperationPermit {
   readonly [durableAssetOperationPermitBrand]: true;
+}
+
+export interface DurableAssetLifecyclePermit {
+  readonly [durableAssetLifecyclePermitBrand]: true;
 }
 
 export interface PersistenceMutationTransitionPermit {
@@ -51,6 +56,7 @@ const fallbackExclusiveRequests = new Map<string, number>();
 const activePersistenceMutationPermits = new WeakSet<object>();
 const activePersistenceMutationTransitionPermits = new WeakSet<object>();
 const activeDurableAssetOperationPermits = new WeakSet<object>();
+const activeDurableAssetLifecyclePermits = new WeakSet<object>();
 let heldPersistenceMutationTransitions = 0;
 
 const fallbackLockManager: PersistenceLockManager = {
@@ -245,11 +251,24 @@ export async function acquirePersistenceMutationTransition(): Promise<Persistenc
   };
 }
 
-export function runWithDurableAssetLifecycleLock<T>(operation: () => T | Promise<T>): Promise<T> {
+export function runWithDurableAssetLifecycleLock<T>(
+  operation: (permit: DurableAssetLifecyclePermit) => T | Promise<T>,
+  permit?: DurableAssetLifecyclePermit
+): Promise<T> {
+  if (permit && activeDurableAssetLifecyclePermits.has(permit))
+    return Promise.resolve().then(() => operation(permit));
   return getPersistenceLockManager().request(
     DURABLE_ASSET_LIFECYCLE_LOCK_NAME,
     { mode: 'exclusive' },
-    operation
+    async () => {
+      const acquired: DurableAssetLifecyclePermit = { [durableAssetLifecyclePermitBrand]: true };
+      activeDurableAssetLifecyclePermits.add(acquired);
+      try {
+        return await operation(acquired);
+      } finally {
+        activeDurableAssetLifecyclePermits.delete(acquired);
+      }
+    }
   );
 }
 

@@ -7,6 +7,9 @@ import {
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
+  MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
+  VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
@@ -88,6 +91,9 @@ export function pruneScenarioResources(projectId: string): Promise<number | unde
           ASSET_REFS_STORE,
           ASSET_OWNERS_STORE,
           ASSET_OPERATIONS_STORE,
+          MEDIA_LIBRARY_STORE,
+          PROJECT_ASSETS_STORE,
+          VIDEO_PROJECTS_STORE,
         ],
         'readwrite'
       );

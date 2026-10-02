@@ -1,4 +1,14 @@
 import {
+  IMAGE_WORKSPACES_STORE,
+  SCENARIO_ASSETS_STORE,
+} from '../../../../composition/persistence/infrastructure/indexed-db/core';
+import {
+  restoredOriginMediaId,
+  readSharedProjectAsset,
+  readSharedProjectExport,
+  restoredProjectMediaId,
+} from './shared-project-media';
+import {
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
@@ -78,19 +88,27 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       return true;
     });
   },
-  async publish({ envelope, session, staged }) {
+  async publish({ envelope, session, staged, lifecyclePermit }) {
     const metadata = parsePortableVideoProjectMetadata(envelope.metadata);
     const objects = stagedMap(staged);
     const assetIdMap = new Map(
       metadata.projectAssets.map((asset) => [
         asset.entry.id,
-        session.strategy === 'duplicate' ? newId() : asset.entry.id,
+        asset.libraryMediaId
+          ? restoredProjectMediaId(asset.libraryMediaId, session.rootIdMap, 'project-asset:')
+          : session.strategy === 'duplicate'
+            ? newId()
+            : asset.entry.id,
       ])
     );
     const exportIdMap = new Map(
       metadata.projectExports.map((item) => [
         item.entry.id,
-        session.strategy === 'duplicate' ? newId() : item.entry.id,
+        item.libraryMediaId
+          ? restoredProjectMediaId(item.libraryMediaId, session.rootIdMap, 'export:')
+          : session.strategy === 'duplicate'
+            ? newId()
+            : item.entry.id,
       ])
     );
     const snapshots = await Promise.all(
@@ -130,37 +148,22 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
       project: { ...transformedProject, id: targetProjectId },
     });
     if (!entry) throw new Error('Restored video project metadata is invalid.');
-    const assets = metadata.projectAssets.map((asset) => {
-      const object = required(objects, asset.objectId);
-      const parsed = parseProjectAssetEntry({
-        ...asset.entry,
-        assetId: object.ref.assetId,
-        id: assetIdMap.get(asset.entry.id),
-        mimeType: object.ref.mimeType,
-        size: object.ref.size,
-      });
-      if (!parsed) throw new Error('Restored video project asset metadata is invalid.');
-      const videoReview = asset.videoReview
-        ? prepareVideoReviewRestore({
-            review: asset.videoReview,
-            sourceAggregateId: `project-asset:${asset.entry.id}`,
-            targetAggregateId: `project-asset:${parsed.id}`,
-            sourceAssetId: object.ref.assetId,
-            assetIdMap,
-          })
-        : null;
-      if (videoReview && videoReview.workspace.source.size !== object.ref.size)
-        throw new Error('Video review source bytes are inconsistent.');
-      return {
-        entry: parsed,
-        filename: asset.filename,
-        ref: object.ref,
-        ...(videoReview ? { videoReview } : {}),
-      };
-    });
+    const assets = await prepareProjectAssets(metadata, objects, assetIdMap, session.rootIdMap);
     const exports = await Promise.all(
       metadata.projectExports.map(async (item) => {
         const object = required(objects, item.objectId);
+        if (item.libraryMediaId) {
+          const shared = await readSharedProjectExport(
+            item.libraryMediaId,
+            session.rootIdMap,
+            object.ref
+          );
+          return {
+            entry: { ...shared.entry, projectId: targetProjectId },
+            ref: shared.ref,
+            reusePublished: true as const,
+          };
+        }
         const exportId = exportIdMap.get(item.entry.id)!;
         const parsed = parseProjectExportEntry({
           ...item.entry,
@@ -237,51 +240,65 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           ASSET_REFS_STORE,
           ASSET_OWNERS_STORE,
           ASSET_OPERATIONS_STORE,
+          IMAGE_WORKSPACES_STORE,
+          SCENARIO_ASSETS_STORE,
         ],
         'readwrite'
       );
-      const restored = await putVideoProjectBackupRestore({
-        operation,
-        root: {
-          assets,
-          entry,
-          exports,
-          ...(presentation ? { presentation } : {}),
-          ...(thumbnail ? { thumbnail } : {}),
-        },
-        stores: {
-          assets: tx.objectStore(PROJECT_ASSETS_STORE),
-          exports: tx.objectStore(PROJECT_EXPORTS_STORE),
-          media: tx.objectStore(MEDIA_LIBRARY_STORE),
-          videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
-          videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
-          operations: tx.objectStore(ASSET_OPERATIONS_STORE),
-          owners: tx.objectStore(ASSET_OWNERS_STORE),
-          presentations: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
-          projects: tx.objectStore(VIDEO_PROJECTS_STORE),
-          refs: tx.objectStore(ASSET_REFS_STORE),
-          thumbnails: tx.objectStore(THUMBNAILS_STORE),
-        },
-        strategy: session.strategy,
-      });
-      if (operation.assetIds.length > 0)
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
-      await appendCommittedArchiveRootInTransaction(
-        tx.objectStore(ASSET_OPERATIONS_STORE),
-        session.operationId,
-        {
-          rootKey,
-          targetRootId: targetProjectId,
-          imported: restored.imported,
-          conflicted: restored.conflicted,
+      try {
+        const restored = await putVideoProjectBackupRestore({
+          tx,
+          operation,
+          root: {
+            assets,
+            entry,
+            exports,
+            ...(presentation ? { presentation } : {}),
+            ...(thumbnail ? { thumbnail } : {}),
+          },
+          stores: {
+            assets: tx.objectStore(PROJECT_ASSETS_STORE),
+            exports: tx.objectStore(PROJECT_EXPORTS_STORE),
+            media: tx.objectStore(MEDIA_LIBRARY_STORE),
+            videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+            videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
+            operations: tx.objectStore(ASSET_OPERATIONS_STORE),
+            owners: tx.objectStore(ASSET_OWNERS_STORE),
+            presentations: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
+            projects: tx.objectStore(VIDEO_PROJECTS_STORE),
+            refs: tx.objectStore(ASSET_REFS_STORE),
+            thumbnails: tx.objectStore(THUMBNAILS_STORE),
+            scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
+          },
+          strategy: session.strategy,
+        });
+        if (operation.assetIds.length > 0)
+          await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
+        await appendCommittedArchiveRootInTransaction(
+          tx.objectStore(ASSET_OPERATIONS_STORE),
+          session.operationId,
+          {
+            rootKey,
+            targetRootId: targetProjectId,
+            imported: restored.imported,
+            conflicted: restored.conflicted,
+          }
+        );
+        await tx.done;
+        imported = restored.imported;
+        conflicted = restored.conflicted;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {
+          /* The transaction may already have aborted. */
         }
-      );
-      await tx.done;
-      imported = restored.imported;
-      conflicted = restored.conflicted;
+        await tx.done.catch(() => undefined);
+        throw error;
+      }
     });
     if (operation.assetIds.length > 0)
-      await completePhysicalDeleteOperation(operation).catch(() => undefined);
+      await completePhysicalDeleteOperation(operation, lifecyclePermit).catch(() => undefined);
     return {
       conflicted,
       imported,
@@ -292,3 +309,53 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
     };
   },
 };
+
+async function prepareProjectAssets(
+  metadata: ReturnType<typeof parsePortableVideoProjectMetadata>,
+  objects: ReturnType<typeof stagedMap>,
+  assetIdMap: ReadonlyMap<string, string>,
+  rootIdMap: Readonly<Record<string, string>>
+) {
+  const preparedAssets = await Promise.all(
+    metadata.projectAssets.map(async (asset) => {
+      const object = required(objects, asset.objectId);
+      if (asset.libraryMediaId) {
+        const shared = await readSharedProjectAsset(asset.libraryMediaId, rootIdMap, object.ref);
+        return {
+          entry: shared.entry,
+          filename: asset.filename,
+          ref: shared.ref,
+          reusePublished: true as const,
+        };
+      }
+      const parsed = parseProjectAssetEntry({
+        ...asset.entry,
+        ...restoredOriginMediaId(asset.entry.originMediaId, rootIdMap),
+        assetId: object.ref.assetId,
+        id: assetIdMap.get(asset.entry.id),
+        mimeType: object.ref.mimeType,
+        size: object.ref.size,
+      });
+      if (!parsed) throw new Error('Restored video project asset metadata is invalid.');
+      const videoReview = asset.videoReview
+        ? prepareVideoReviewRestore({
+            review: asset.videoReview,
+            sourceAggregateId: `project-asset:${asset.entry.id}`,
+            targetAggregateId: `project-asset:${parsed.id}`,
+            sourceAssetId: object.ref.assetId,
+            assetIdMap,
+          })
+        : null;
+      if (videoReview && videoReview.workspace.source.size !== object.ref.size)
+        throw new Error('Video review source bytes are inconsistent.');
+      return {
+        entry: parsed,
+        filename: asset.filename,
+        ...(asset.publishToLibrary === false ? { publishToLibrary: false } : {}),
+        ref: object.ref,
+        ...(videoReview ? { videoReview } : {}),
+      };
+    })
+  );
+  return preparedAssets.filter((asset): asset is NonNullable<typeof asset> => asset !== null);
+}

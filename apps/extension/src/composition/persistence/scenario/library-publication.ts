@@ -9,6 +9,7 @@ import {
 import type { initDB } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { parseAssetRef } from '../assets';
+import { scenarioChildUsesMedia } from '../media-library/dependencies';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
@@ -121,12 +122,12 @@ export async function publishScenarioAssetToLibrary(
   const existing = parseMediaLibraryEntry(rawMedia);
   if (
     rawMedia !== undefined &&
-    (!existing ||
-      existing.source.kind !== 'stored-asset' ||
-      existing.source.assetId !== asset.assetId)
+    (!existing || existing.id !== mediaId || existing.source.kind !== 'stored-asset')
   ) {
     throw new Error(`Scenario library identity ${mediaId} is occupied.`);
   }
+  const publishedAssetId =
+    existing?.source.kind === 'stored-asset' ? existing.source.assetId : asset.assetId;
   const ownerKey = [SCENARIO_LIBRARY_OWNER_KIND, mediaId, SCENARIO_LIBRARY_ASSET_ROLE];
   const rawOwner: unknown = await ownerStore.get(ownerKey);
   if (rawOwner !== undefined) {
@@ -134,13 +135,13 @@ export async function publishScenarioAssetToLibrary(
       typeof rawOwner !== 'object' ||
       rawOwner === null ||
       !('assetId' in rawOwner) ||
-      rawOwner.assetId !== asset.assetId
+      rawOwner.assetId !== publishedAssetId
     ) {
       throw new Error(`Scenario library owner ${mediaId} is occupied.`);
     }
   } else {
     await ownerStore.put!({
-      assetId: asset.assetId,
+      assetId: publishedAssetId,
       ownerId: mediaId,
       ownerKind: SCENARIO_LIBRARY_OWNER_KIND,
       role: SCENARIO_LIBRARY_ASSET_ROLE,
@@ -190,4 +191,19 @@ export async function backfillScenarioLibraryAssets(): Promise<number> {
       throw error;
     }
   });
+}
+
+/** A replaced Library version must not retarget frozen scenario resource bytes. */
+export async function freezeScenarioMediaRepresentations(
+  tx: ScenarioLibraryTransaction,
+  media: MediaLibraryEntry
+): Promise<void> {
+  const store = tx.objectStore(SCENARIO_ASSETS_STORE);
+  for (const raw of await store.getAll()) {
+    const asset = parseScenarioAssetEntry(raw);
+    if (!asset) throw new Error('Scenario resource authority is invalid.');
+    if (!scenarioChildUsesMedia(asset, media)) continue;
+    const { borrowedMediaId: _borrowedMediaId, ...frozen } = asset;
+    await store.put!({ ...frozen, galleryAssetId: media.id });
+  }
 }

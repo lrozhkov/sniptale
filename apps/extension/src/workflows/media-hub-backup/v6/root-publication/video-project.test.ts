@@ -309,3 +309,29 @@ it('duplicates review audio references to the restored asset ids', async () => {
     true
   );
 });
+
+it('duplicates a private representation without recreating a Library card', async () => {
+  const values = new Map<string, unknown[]>();
+  mocks.mutate.mockImplementation(async (callback) => callback(publisherDatabase(values)));
+  const base = createVideoProjectEntryWithMediaClip();
+  const metadata = JSON.parse(
+    JSON.stringify({
+      entry: { ...base, project: encodePortableVideoProjectAssetRefs(base.project) },
+      projectAssets: [
+        {
+          entry: { id: 'project-asset-1', mimeType: 'video/webm', createdAt: 1, size: 6 },
+          filename: 'private.webm',
+          objectId: 'private',
+          publishToLibrary: false,
+        },
+      ],
+      projectExports: [],
+    })
+  ) as PublishArgs['envelope']['metadata'];
+  await videoProjectRootPublisher.publish(
+    publishArgs(metadata, [stagedObject('private', 'private-bytes', 'video/webm', 6)])
+  );
+  expect(values.get('project_assets')).toHaveLength(1);
+  expect(values.get('asset_owners')).toHaveLength(1);
+  expect(values.get('media_library')).toBeUndefined();
+});

@@ -1,43 +1,27 @@
 import {
-  VIDEO_WORKSPACES_STORE,
-  VIDEO_WORKSPACE_DRAFTS_STORE,
-} from '../infrastructure/indexed-db/core.stores';
-import {
-  AGGREGATE_PRESENTATIONS_STORE,
-  ASSET_OPERATIONS_STORE,
-  ASSET_OWNERS_STORE,
-  ASSET_REFS_STORE,
-  IMAGE_WORKSPACES_STORE,
   initDB,
+  ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import {
-  deleteProjectAsset,
-  deleteProjectExport,
-  getProjectAsset,
-  getProjectExport,
-} from '../projects/index';
+import { getProjectAsset, getProjectExport } from '../projects/index';
 import { readAssetFile, parseAssetRef } from '../assets';
-import { deleteRecording, getRecording } from '../recordings/index';
-import { deleteWebSnapshotMediaAsset, getWebSnapshotPackageFile } from '../web-snapshots';
+import { getRecording } from '../recordings/index';
+import { getWebSnapshotPackageFile } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { createAggregatePresentationKey } from '../aggregate-presentations';
-import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
-import { removeEditorDocumentOwnership } from '../document-assets';
 import { listMediaAssetProjectUsage } from './usage';
 import type { MediaAssetProjectUsage } from './usage';
 import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
-import { MediaAssetDeletionBlockedError } from './deletion-errors';
 import {
-  buildPhysicalDeleteOperation,
-  completePhysicalDeleteOperation,
-  listReadyJournals,
-} from '../assets';
+  recoverMediaSourcePublications,
+  mediaHasPendingPublication,
+} from './delete-cascade.sources';
+import { MediaAssetDeletionBlockedError } from './deletion-errors';
+import { listReadyJournals } from '../assets';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
@@ -182,13 +166,9 @@ export async function deleteMediaLibraryAsset(
   assetId: string,
   options: { expectedUsage?: readonly MediaAssetProjectUsage[] } = {}
 ): Promise<void> {
-  const pendingWorkspacePublication = (await listReadyJournals()).some(
-    (journal) =>
-      journal.domain === 'image-workspace' &&
-      typeof journal.payload === 'object' &&
-      journal.payload !== null &&
-      !Array.isArray(journal.payload) &&
-      (journal.payload as Record<string, unknown>)['aggregateId'] === assetId
+  const readyJournals = await listReadyJournals();
+  const pendingWorkspacePublication = readyJournals.some((journal) =>
+    mediaHasPendingPublication(journal, { id: assetId })
   );
   if (pendingWorkspacePublication) {
     throw new MediaLibraryDeleteError(
@@ -204,6 +184,13 @@ export async function deleteMediaLibraryAsset(
     return;
   }
 
+  if (readyJournals.some((journal) => mediaHasPendingPublication(journal, entry)))
+    throw new MediaLibraryDeleteError(
+      assetId,
+      'linked-source-cleanup',
+      new MediaAssetDeletionBlockedError('pending-publication')
+    );
+
   const consumers = await listMediaAssetProjectUsage(assetId);
   if (consumers.length > 0 && !options.expectedUsage) {
     throw new MediaLibraryDeleteError(
@@ -212,111 +199,10 @@ export async function deleteMediaLibraryAsset(
       new Error('The media asset is still used by projects.')
     );
   }
-  if (
-    entry.source.kind === 'recording' ||
-    entry.source.kind === 'project-asset' ||
-    entry.source.kind === 'stored-asset'
-  ) {
-    try {
-      await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? []);
-    } catch (error) {
-      throw new MediaLibraryDeleteError(assetId, 'linked-source-cleanup', error);
-    }
-    return;
-  }
-  if (consumers.length > 0) {
-    throw new MediaLibraryDeleteError(
-      assetId,
-      'linked-source-cleanup',
-      new MediaAssetDeletionBlockedError('unsupported-source')
-    );
-  }
-
-  if (entry.source.kind === 'web-snapshot') {
-    await deleteWebSnapshotMediaAsset({
-      assetId,
-      snapshotId: entry.source.snapshotId,
-    });
-    return;
-  }
-
   try {
-    await deleteLinkedMediaSource(entry);
+    await recoverMediaSourcePublications(entry);
+    await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? []);
   } catch (error) {
     throw new MediaLibraryDeleteError(assetId, 'linked-source-cleanup', error);
-  }
-  await deleteMediaLibraryRows(assetId);
-}
-
-async function deleteLinkedMediaSource(entry: MediaLibraryEntry): Promise<void> {
-  if (entry.source.kind === 'recording') {
-    await deleteRecording(entry.source.recordingId);
-  } else if (entry.source.kind === 'project-export') {
-    await deleteProjectExport(entry.source.exportId);
-  } else if (entry.source.kind === 'project-asset') {
-    await deleteProjectAsset(entry.source.projectAssetId);
-  }
-}
-
-async function deleteMediaLibraryRows(assetId: string): Promise<void> {
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        MEDIA_LIBRARY_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        THUMBNAILS_STORE,
-        IMAGE_WORKSPACES_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OWNERS_STORE,
-        ASSET_OPERATIONS_STORE,
-      ],
-      'readwrite'
-    );
-    try {
-      const entry = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(assetId));
-      if (entry?.source.kind === 'stored-asset') {
-        const physicalId = entry.source.assetId;
-        await tx.objectStore(ASSET_OWNERS_STORE).delete(['media-library', assetId, 'source']);
-        if ((await tx.objectStore(ASSET_OWNERS_STORE).index('assetId').count(physicalId)) === 0) {
-          await tx.objectStore(ASSET_REFS_STORE).delete(physicalId);
-          physicalDelete.assetIds.push(physicalId);
-        }
-      }
-      await tx.objectStore(MEDIA_LIBRARY_STORE).delete(assetId);
-      await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(assetId);
-      await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(assetId);
-      await tx.objectStore(THUMBNAILS_STORE).delete(assetId);
-      const workspace = parseImageWorkspaceEntry(
-        await tx.objectStore(IMAGE_WORKSPACES_STORE).get(assetId)
-      );
-      if (workspace) {
-        await removeEditorDocumentOwnership({
-          document: workspace.document,
-          ownerId: assetId,
-          ownerKind: 'image-workspace',
-          physicalDelete,
-          stores: {
-            owners: tx.objectStore(ASSET_OWNERS_STORE),
-            refs: tx.objectStore(ASSET_REFS_STORE),
-          },
-        });
-      }
-      await tx.objectStore(IMAGE_WORKSPACES_STORE).delete(assetId);
-      await tx
-        .objectStore(AGGREGATE_PRESENTATIONS_STORE)
-        .delete(createAggregatePresentationKey({ id: assetId, kind: 'image' }));
-      if (physicalDelete.assetIds.length > 0) {
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-      }
-      await tx.done;
-    } catch (error) {
-      throw new MediaLibraryDeleteError(assetId, 'media-library-transaction', error);
-    }
-  });
-  if (physicalDelete.assetIds.length > 0) {
-    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
   }
 }

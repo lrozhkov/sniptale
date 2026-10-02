@@ -1,30 +1,12 @@
-import {
-  VIDEO_WORKSPACES_STORE,
-  VIDEO_WORKSPACE_DRAFTS_STORE,
-} from '../infrastructure/indexed-db/core.stores';
-import {
-  initDB,
-  ASSET_OWNERS_STORE,
-  ASSET_OPERATIONS_STORE,
-  ASSET_REFS_STORE,
-  MEDIA_LIBRARY_STORE,
-  RECORDING_TELEMETRY_STORE,
-  STORE_NAME,
-} from '../infrastructure/indexed-db/core';
-import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
+import { deleteUnreferencedMediaSource } from '../media-library/delete-cascade';
+import { initDB, ASSET_REFS_STORE, STORE_NAME } from '../infrastructure/indexed-db/core';
 import { createRecordingMediaId } from '../../../features/media-hub/media-id';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseRecordingEntries, parseRecordingEntry } from './index.guards.ts';
 import type { RecordingEntry } from './contracts';
 import type { StoredRecordingEntry } from './contracts';
 import { saveRecordingsBatch } from './batch';
-import {
-  buildPhysicalDeleteOperation,
-  completePhysicalDeleteOperation,
-  parseAssetRef,
-  readAssetFile,
-} from '../assets';
-import { RECORDING_ASSET_OWNER_KIND, RECORDING_ASSET_ROLE } from './asset-publication';
+import { parseAssetRef, readAssetFile } from '../assets';
 
 export { saveRecordingsBatch, saveRecordingsBatchWithCompletion } from './batch';
 export type { SaveRecordingBatchInput } from './batch';
@@ -68,41 +50,10 @@ export async function getRecording(id: string): Promise<RecordingEntry | undefin
 }
 
 export async function deleteRecording(id: string): Promise<void> {
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        STORE_NAME,
-        MEDIA_LIBRARY_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        RECORDING_TELEMETRY_STORE,
-        ASSET_OWNERS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OPERATIONS_STORE,
-      ],
-      'readwrite'
-    );
-    const entry = parseRecordingEntry(await tx.objectStore(STORE_NAME).get(id));
-    let deleteObject = false;
-    await tx.objectStore(STORE_NAME).delete(id);
-    await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createRecordingMediaId(id));
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createRecordingMediaId(id));
-    await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createRecordingMediaId(id));
-    await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(id);
-    if (entry) {
-      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-      await ownerStore.delete([RECORDING_ASSET_OWNER_KIND, id, RECORDING_ASSET_ROLE]);
-      if ((await ownerStore.index('assetId').count(entry.assetId)) === 0) {
-        await tx.objectStore(ASSET_REFS_STORE).delete(entry.assetId);
-        deleteObject = true;
-        physicalDelete.assetIds.push(entry.assetId);
-      }
-    }
-    if (deleteObject) await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-    await tx.done;
+  await deleteUnreferencedMediaSource({
+    id: createRecordingMediaId(id),
+    source: { kind: 'recording', recordingId: id },
   });
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
 }
 
 export async function listRecordings(): Promise<

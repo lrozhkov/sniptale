@@ -34,6 +34,7 @@ async function persistEditorSessionDocument(args: {
       ...(args.context.capturedAt === undefined ? {} : { captureTime: args.context.capturedAt }),
       document: args.document,
       expectedRevision: args.context.durableRevision,
+      ...(args.context.requireExistingRoot ? { requireExistingRoot: true } : {}),
       sourceUrl: args.context.sourceUrl,
       sourceTitle: args.document.displayName ?? args.context.sourceTitle,
       reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
@@ -41,6 +42,7 @@ async function persistEditorSessionDocument(args: {
 
     if (args.state.activeContext?.aggregateId === args.context.aggregateId) {
       args.state.activeContext.durableRevision = result.revision;
+      args.state.activeContext.requireExistingRoot = true;
       args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
     }
     args.state.lastWriteError = null;

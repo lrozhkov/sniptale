@@ -197,3 +197,27 @@ it('requires an exact recording source and sidecar identity association', () => 
     })
   ).toThrow('recording association');
 });
+
+it('refuses a published root that declares private acquisition membership', async () => {
+  const { createMediaLibraryEntry } =
+    await import('../../../../composition/persistence/projects/index.test-support');
+  const entry = createMediaLibraryEntry({
+    id: 'project-asset:public',
+    kind: 'video',
+    mimeType: 'video/webm',
+    source: { kind: 'project-asset', projectAssetId: 'public' },
+  });
+  expect(() =>
+    parsePortableMediaMetadata({
+      entry,
+      originalObjectId: 'body',
+      projectAsset: {
+        id: 'public',
+        mimeType: entry.mimeType,
+        size: entry.size,
+        createdAt: 1,
+        originMediaId: 'private-origin',
+      },
+    })
+  ).toThrow('association is invalid');
+});

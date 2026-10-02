@@ -1,3 +1,4 @@
+import { videoSourceReferences } from '../media-library/dependencies';
 import type { VideoProjectEntry } from '../projects/contracts';
 
 export function collectVideoProjectReferences(project: VideoProjectEntry): {
@@ -12,12 +13,11 @@ export function collectVideoProjectReferences(project: VideoProjectEntry): {
   if (project.project.source?.kind === 'recording')
     recordingIds.add(project.project.source.recordingId);
   for (const asset of project.project.assets) {
-    if (asset.source.kind === 'recording') recordingIds.add(asset.source.recordingId);
-    if (asset.source.kind === 'project-asset') {
-      projectAssetIds.add(asset.source.projectAssetId);
-      if (asset.source.originRecordingId) recordingIds.add(asset.source.originRecordingId);
+    for (const ref of videoSourceReferences(asset.source)) {
+      if (ref.kind === 'recording') recordingIds.add(ref.id);
+      if (ref.kind === 'project-asset') projectAssetIds.add(ref.id);
+      if (ref.kind === 'library-asset') libraryMediaIds.add(ref.id);
     }
-    if (asset.source.kind === 'library-asset') libraryMediaIds.add(asset.source.mediaId);
   }
   return { recordingIds, projectAssetIds, libraryMediaIds };
 }

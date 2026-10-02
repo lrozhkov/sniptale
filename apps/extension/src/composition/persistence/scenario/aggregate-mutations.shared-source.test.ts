@@ -128,9 +128,11 @@ it('aborts a mixed transaction and discards only staged bytes when the shared so
   expect(getStore('scenario_assets').has(staged.id)).toBe(false);
   expect(getStore('media_library').has(`scenario-asset:${staged.id}`)).toBe(false);
   expect(getStore('asset_refs').has(staged.assetId)).toBe(false);
-  expect(assets.deleteReadyJournal).toHaveBeenCalledWith('journal-1');
-  expect(assets.deleteAssetObject).toHaveBeenCalledWith(staged.assetId);
-  expect(assets.deleteAssetObject).not.toHaveBeenCalledWith(original.assetId);
+  expect(assets.cancelAssetPublication).toHaveBeenCalled();
+  const cancelled = vi.mocked(assets.cancelAssetPublication).mock.calls[0]![0];
+  expect(cancelled.journalId).toBe('journal-1');
+  expect(cancelled.assetRefs.map((ref) => ref.assetId)).toEqual([staged.assetId]);
+  expect(assets.deleteAssetObject).not.toHaveBeenCalled();
 });
 
 it('clears an interrupted mixed journal on startup after its shared source was deleted', async () => {
@@ -167,9 +169,11 @@ it('clears an interrupted mixed journal on startup after its shared source was d
   });
 
   await expect(recoverScenarioAssetPublications()).resolves.toBe(1);
-  expect(assets.deleteReadyJournal).toHaveBeenCalledWith('journal-1');
-  expect(assets.deleteAssetObject).toHaveBeenCalledWith(staged.assetId);
-  expect(assets.deleteAssetObject).not.toHaveBeenCalledWith(original.assetId);
+  expect(assets.cancelAssetPublication).toHaveBeenCalled();
+  const cancelled = vi.mocked(assets.cancelAssetPublication).mock.calls[0]![0];
+  expect(cancelled.journalId).toBe('journal-1');
+  expect(cancelled.assetRefs.map((ref) => ref.assetId)).toEqual([staged.assetId]);
+  expect(assets.deleteAssetObject).not.toHaveBeenCalled();
   expect(getStore('scenario_assets').has('clone')).toBe(false);
   expect(getStore('asset_refs').has(staged.assetId)).toBe(false);
 });

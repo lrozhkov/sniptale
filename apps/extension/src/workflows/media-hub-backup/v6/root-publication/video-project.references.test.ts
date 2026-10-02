@@ -2,14 +2,24 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { createVideoProjectEntryWithMediaClip } from '../../../../composition/persistence/projects/index.test-support';
 import { encodePortableVideoProjectAssetRefs } from '../root-codecs/projects';
 
-const mocks = vi.hoisted(() => ({ mutate: vi.fn(), checkpoint: vi.fn() }));
+const mocks = vi.hoisted(() => ({ mutate: vi.fn(), checkpoint: vi.fn(), database: vi.fn() }));
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: mocks.mutate,
 }));
 vi.mock('../../../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/assets')>()),
   appendCommittedArchiveRootInTransaction: mocks.checkpoint,
+  readAssetFile: vi.fn(async () => new File(['source'], 'source.webm', { type: 'video/webm' })),
 }));
+vi.mock(
+  '../../../../composition/persistence/infrastructure/indexed-db/core',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
+    >()),
+    initDB: () => mocks.database(),
+  })
+);
 import { videoProjectRootPublisher } from './video-project';
 
 beforeEach(() => vi.clearAllMocks());
@@ -47,7 +57,7 @@ function restoreJournal() {
 
 function publisherDatabase(values: Map<string, unknown[]> = new Map()) {
   const store = (name: string) => ({
-    get: async () => undefined,
+    get: async (_key?: IDBValidKey): Promise<unknown> => undefined,
     getAll: async () => [],
     put: async (value: unknown) => {
       values.set(name, [...(values.get(name) ?? []), value]);
@@ -56,7 +66,7 @@ function publisherDatabase(values: Map<string, unknown[]> = new Map()) {
     index: () => ({ getAll: async () => [], count: async () => 0 }),
   });
   return {
-    get: async () => undefined,
+    get: async (_name?: string, _key?: IDBValidKey): Promise<unknown> => undefined,
     transaction: () => ({ objectStore: store, done: Promise.resolve() }),
   };
 }
@@ -275,6 +285,7 @@ it('duplicates a project only after remapping project-asset and recording identi
   const source = base.project.assets[0]!.source;
   if (source.kind !== 'project-asset') throw new Error('Test fixture source changed.');
   source.originRecordingId = 'origin-recording';
+  source.originMediaId = 'original-image';
   const metadata = portableMetadata({
     entry: {
       ...base,
@@ -291,6 +302,7 @@ it('duplicates a project only after remapping project-asset and recording identi
         'media:library-item:recording:source-recording': 'recording:restored-source',
         'media:library-item:recording:base-recording': 'recording:restored-base',
         'media:library-item:recording:origin-recording': 'recording:restored-origin',
+        'media:library-item:original-image': 'restored-image',
       })
     )
   ).resolves.toMatchObject({ imported: true });
@@ -310,6 +322,63 @@ it('duplicates a project only after remapping project-asset and recording identi
     kind: 'project-asset',
     projectAssetId: assets[0]!.id,
     originRecordingId: 'restored-origin',
+    originMediaId: 'restored-image',
   });
   expect(assets[0]!.id).not.toBe('project-asset-1');
+});
+
+it('restores a project resource using its already restored Library identity', async () => {
+  const { createMediaLibraryEntry } =
+    await import('../../../../composition/persistence/projects/index.test-support');
+  const values = new Map<string, unknown[]>();
+  const db = publisherDatabase(values);
+  const ref = stagedObject('shared', 'shared-bytes', 'video/webm', 6).ref;
+  const media = createMediaLibraryEntry({
+    id: 'project-asset:restored',
+    source: { kind: 'project-asset', projectAssetId: 'restored' },
+    size: 6,
+  });
+  db.get = async (name?: string) =>
+    name === 'media_library'
+      ? media
+      : name === 'project_assets'
+        ? { id: 'restored', assetId: ref.assetId, mimeType: 'video/webm', size: 6, createdAt: 1 }
+        : name === 'asset_refs'
+          ? ref
+          : undefined;
+  const transaction = db.transaction;
+  db.transaction = () => {
+    const tx = transaction();
+    return {
+      ...tx,
+      objectStore: (name: string) => ({
+        ...tx.objectStore(name),
+        get: (key?: IDBValidKey) => db.get(name, key),
+      }),
+    };
+  };
+  mocks.database.mockReturnValue(db);
+  mocks.mutate.mockImplementation(async (callback) => callback(db));
+  const base = createVideoProjectEntryWithMediaClip();
+  const metadata = portableMetadata({
+    entry: { ...base, project: encodePortableVideoProjectAssetRefs(base.project) },
+    projectExports: [],
+    projectAssets: [
+      {
+        ...portableProjectAsset('project-asset-1'),
+        libraryMediaId: 'project-asset:project-asset-1',
+      },
+    ],
+  });
+  await videoProjectRootPublisher.publish(
+    publishArgs(metadata, [stagedObject('o-project-asset-1', 'nested-bytes', 'video/webm', 6)], {
+      'media:library-item:project-asset:project-asset-1': media.id,
+    })
+  );
+  expect(values.get('media_library')).toBeUndefined();
+  expect(values.get('project_assets')).toBeUndefined();
+  const saved = values.get('video_projects') as Array<{
+    project: { assets: Array<{ source: { projectAssetId: string } }> };
+  }>;
+  expect(saved[0]!.project.assets[0]!.source.projectAssetId).toBe('restored');
 });
