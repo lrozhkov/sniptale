@@ -3,6 +3,8 @@ import { createQuickEditZoomRegion } from '../../features/video/review/advanced/
 import { expect, it, vi } from 'vitest';
 import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
 import { createCanvasComment } from '../../features/video/review/comments';
+import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 it('publishes a new prepared asset once and returns a separate downloadable file and revision receipt', async () => {
   const { args, deps, writer, original, result } = fixture();
@@ -25,6 +27,80 @@ it('publishes a new prepared asset once and returns a separate downloadable file
   ]);
   expect(writer.abort).not.toHaveBeenCalled();
   expect(deps.releaseAssetReadyProtection).toHaveBeenCalledWith(['output']);
+});
+
+it('exports native overlapping voices and uninterrupted music through Speed and a Cut', async () => {
+  const { args, deps } = fixture();
+  const speed = {
+    id: 's',
+    kind: 'speed' as const,
+    start: 1,
+    end: 2,
+    requestedStart: 1,
+    requestedEnd: 2,
+    rate: 2 as const,
+    audio: 'mute' as const,
+  };
+  args.snapshot.workspace.history.push({
+    id: 'speed',
+    at: 3,
+    target: 'edit',
+    before: null,
+    after: speed,
+  });
+  args.snapshot.workspace.cursor = 2;
+  args.index.boundaries = [0, 1, 2, 4, 6];
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
+  const map = buildReviewTimeMap(6, [
+    speed,
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ]);
+  const base = {
+    id: 'music',
+    assetId: 'project-asset:m',
+    timelineStart: 0,
+    sourceOffset: 1,
+    duration: 3.5,
+    volume: 1,
+    muted: false,
+    fadeIn: 0.2,
+    fadeOut: 0.3,
+  };
+  advanced.audio.music = [base];
+  advanced.audio.voiceoverSegments = map;
+  advanced.audio.voiceover = [0.8, 0.9].map((timelineStart, index) =>
+    anchorReviewVoiceover({ ...base, id: `v${index}`, timelineStart, duration: 1.3 }, map)
+  );
+  vi.stubGlobal(
+    'OfflineAudioContext',
+    class {
+      async decodeAudioData() {
+        return { duration: 10 };
+      }
+    }
+  );
+  try {
+    await exportReviewedVideo(args, deps);
+    const call = deps.writeReviewPackets.mock.calls[0] as unknown as [
+      { exportAudio: ReviewExportClipPlan },
+    ];
+    const entries = call[0].exportAudio.entries;
+    expect(entries.filter((entry) => entry.lane === 'music')).toMatchObject([
+      { timelineStart: 0, sourceOffset: 1, duration: 3.5, fadeIn: 0.2, fadeOut: 0.3 },
+    ]);
+    const voices = entries.filter((entry) => entry.lane === 'voiceover');
+    expect(voices).toHaveLength(2);
+    voices.forEach((voice, index) => {
+      expect(voice.timelineStart).toBeCloseTo(index === 0 ? 0.8 : 0.9);
+      expect(voice.duration).toBeCloseTo(1.3);
+      expect(voice.playbackRate).toBe(1);
+      expect(voice.sourceOffset).toBe(1);
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 it('rejects a replaced source before admitting any staging bytes', async () => {
   const { args, deps } = fixture();

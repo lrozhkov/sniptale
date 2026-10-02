@@ -41,6 +41,39 @@ function apply(setZoom: ReturnType<typeof vi.fn>, zoom: QuickEditZoomState) {
   return update(zoom);
 }
 
+it('creates the default focus with two source seconds under video Speed', () => {
+  const setZoom = vi.fn();
+  const map = buildReviewTimeMap(20, [
+    {
+      id: 's',
+      kind: 'speed',
+      start: 2,
+      end: 8,
+      requestedStart: 2,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      setZoom,
+      zoom: { enabled: true, regions: [] },
+      timelineDuration: 17,
+      timeMap: map,
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.add(3, 17));
+  expect(apply(setZoom, { enabled: true, regions: [] }).regions[0]).toMatchObject({
+    start: 3,
+    end: 4,
+    sourceAnchor: { start: 4, end: 6 },
+  });
+});
+
 it('owns region selection, updates, and the stage focus overlay through one hook', async () => {
   const setZoom = vi.fn((_update: (zoom: QuickEditZoomState) => QuickEditZoomState) => undefined);
   const ref = { current: null as ReturnType<typeof useReviewZoomEditor> | null };
@@ -343,7 +376,7 @@ it('stores source geometry when creating and editing focus around an existing cu
   }
   act(() => root.render(<Harness />));
   act(() => editor.add(1, 6));
-  expect(zoom.regions[0]).toMatchObject({ start: 1, end: 3, sourceAnchor: { start: 1, end: 5 } });
+  expect(zoom.regions[0]).toMatchObject({ start: 1, end: 2, sourceAnchor: { start: 1, end: 3 } });
   act(() => root.render(<Harness />));
   act(() => editor.change(zoom.regions[0]!.id, { end: 4 }));
   expect(zoom.regions[0]).toMatchObject({ start: 1, end: 4, sourceAnchor: { start: 1, end: 6 } });

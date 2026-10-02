@@ -414,7 +414,7 @@ function reviewZoomBlockPresentation(
   };
 }
 
-/** Cut-transparent gesture coordinates preserve the authored interval and tempo. */
+/** Focus gestures preserve source-frame width across cuts and video Speed. */
 function projectFocusDrag(
   props: ZoomTrackProps & {
     region: QuickEditZoomRegion;
@@ -426,14 +426,14 @@ function projectFocusDrag(
   bypass: boolean
 ): FocusRange & { guide: number | null } {
   const projection = props.projection;
-  const axis = projection?.cuts.length ? projection.focus : projection;
+  const axis = projection?.focus;
   const anchored = (region: QuickEditZoomRegion) => {
-    if (!projection?.cuts.length) return region;
+    if (!projection) return region;
     const source = region.sourceAnchor ?? {
       start: projection.source(region.start),
       end: projection.source(region.end, 'end'),
     };
-    return { ...region, start: axis!.output(source.start), end: axis!.output(source.end) };
+    return { ...region, start: source.start, end: source.end };
   };
   const region = anchored(props.region);
   const next = zoomDragRange({
@@ -443,20 +443,18 @@ function projectFocusDrag(
       (pixels / current.width) * props.duration,
     length: region.end - region.start,
     region,
-    duration: projection?.cuts.length ? projection.focus.resultDuration : props.duration,
+    duration: axis?.resultDuration ?? props.duration,
     widthPx: current.width,
     projection: axis,
     bypass,
-    snapEdges: projection?.cuts.length
-      ? props.sourceSnapEdges.map(projection.focus.output)
-      : props.snapEdges,
+    snapEdges: projection ? props.sourceSnapEdges : props.snapEdges,
     regions: props.regions.map(anchored),
   });
-  const guide = next.guide === null ? null : (axis?.source(next.guide) ?? next.guide);
-  if (!projection?.cuts.length) return { start: next.start, end: next.end, guide };
+  const guide = next.guide;
+  if (!projection) return { start: next.start, end: next.end, guide };
   const sourceAnchor = {
-    start: projection.focus.source(next.start),
-    end: projection.focus.source(next.end, 'end'),
+    start: next.start,
+    end: next.end,
   };
   const start = projection.output(sourceAnchor.start);
   const end = projection.output(sourceAnchor.end);

@@ -6,6 +6,8 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAdvancedPanels, ReviewSceneProperties } from './advanced-panels';
+import { ReviewZoomInspector } from './zoom-inspector';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { useReviewZoomEditor } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
@@ -87,6 +89,25 @@ function Harness() {
 
 const button = (key: string) =>
   host.querySelector<HTMLButtonElement>(`[aria-label="${key}"]`) as HTMLButtonElement;
+
+it('shows the same authored source seconds as the focus block under Speed', () => {
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'focus', at: 2, duration: 1 }),
+    sourceAnchor: { start: 4, end: 6 },
+  };
+  act(() =>
+    root.render(
+      <ReviewZoomInspector
+        region={region}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const interval = host.querySelector('[data-ui="gallery.videoReview.interval"]')!;
+  expect(interval.textContent).toContain('4.0 – 6.0');
+});
 
 it('edits the background paint and the selected zoom region through the panel callbacks', async () => {
   act(() => root.render(<Harness />));

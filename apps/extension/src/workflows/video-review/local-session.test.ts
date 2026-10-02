@@ -46,6 +46,79 @@ function commit(snapshot: VideoWorkspaceSnapshot, operation: ReviewOperation) {
   return applyLocalReviewChange(snapshot, { kind: 'commit', operation, consumeDraft: false });
 }
 
+it.each([2, 0.5, 0.75] as const)(
+  'persists decimal voice insertion, overlapping voices and history under Speed %sx',
+  (rate) => {
+    const speed: ReviewEdit = {
+      id: 's',
+      kind: 'speed',
+      start: 2,
+      end: 8,
+      requestedStart: 2,
+      requestedEnd: 8,
+      rate,
+      audio: 'speed',
+    };
+    let snapshot = commit(initial(), {
+      id: 'speed',
+      at: 1,
+      target: 'edit',
+      before: null,
+      after: speed,
+    });
+    const before = document(snapshot).advancedContent;
+    const map = buildReviewTimeMap(12, [speed]);
+    const voiceover = [1.1, 1.3].map((timelineStart, index) =>
+      anchorReviewVoiceover(
+        {
+          id: `v${index}`,
+          assetId: 'voice-asset',
+          timelineStart,
+          sourceOffset: 0.2,
+          duration: 3.3,
+          volume: 1,
+          muted: false,
+          fadeIn: 0.2,
+          fadeOut: 0.3,
+        },
+        map
+      )
+    );
+    snapshot = commit(snapshot, {
+      id: 'voices',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after: { ...before, audio: { ...before.audio, voiceover } },
+    });
+    const inspect = () => {
+      const audio = document(snapshot).advancedContent.audio;
+      const clips = projectReviewVoiceover(audio.voiceover, audio.voiceoverSegments);
+      expect(clips).toHaveLength(2);
+      clips.forEach((clip) => {
+        expect(clip.playbackRate).toBe(1);
+        expect(clip.duration).toBeCloseTo(3.3);
+        expect(clip.sourceOffset).toBe(0.2);
+      });
+    };
+    inspect();
+    snapshot = applyLocalReviewChange(snapshot, { kind: 'history', direction: 'undo' });
+    expect(document(snapshot).advancedContent.audio.voiceover).toEqual([]);
+    snapshot = applyLocalReviewChange(snapshot, { kind: 'history', direction: 'redo' });
+    inspect();
+    snapshot = commit(snapshot, {
+      id: 'remove-speed',
+      at: 3,
+      target: 'edit',
+      before: speed,
+      after: null,
+    });
+    inspect();
+    const reopened = parseVideoWorkspace(JSON.parse(JSON.stringify(snapshot.workspace)));
+    expect(reopened).toEqual(snapshot.workspace);
+  }
+);
+
 it.each([2, 0.5] as const)(
   'restores native voice tempo after removing creation Speed %sx',
   (rate) => {

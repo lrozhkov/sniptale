@@ -199,7 +199,22 @@ type ZoomEditorArgs = {
 
 /** Create or select the region at the playhead without changing hook-owned selection state. */
 function addZoomAt(args: ZoomEditorArgs, at: number, timelineDuration: number): string | null {
-  const range = availableQuickEditZoomRange({ regions: args.zoom.regions, at, timelineDuration });
+  const part = args.timeMap?.find(
+    (segment) => segment.kind !== 'cut' && at >= segment.resultStart && at < segment.resultEnd
+  );
+  if (args.timeMap && !part) return null;
+  const sourceAt = part ? part.sourceStart + (at - part.resultStart) * part.rate : at;
+  const sourceRegions = args.timeMap
+    ? args.zoom.regions.map((region) => ({
+        ...region,
+        ...(region.sourceAnchor ?? reviewFocusSourceRange(region, args.timeMap!) ?? region),
+      }))
+    : args.zoom.regions;
+  const range = availableQuickEditZoomRange({
+    regions: sourceRegions,
+    at: sourceAt,
+    timelineDuration: args.timeMap?.at(-1)?.sourceEnd ?? timelineDuration,
+  });
   if (!range) {
     return (
       args.zoom.regions.find((region) => !region.dormant && at >= region.start && at < region.end)
@@ -212,7 +227,10 @@ function addZoomAt(args: ZoomEditorArgs, at: number, timelineDuration: number): 
     duration: range.end - range.start,
     endMax: range.end,
   });
-  const anchored = { ...region, ...sourceAnchorPatch(region, args.timeMap) };
+  const authored = args.timeMap ? { ...region, sourceAnchor: range } : region;
+  const visible = projectReviewFocus([authored], args.timeMap);
+  if (!visible.length) return null;
+  const anchored = { ...authored, start: visible[0]!.start, end: visible.at(-1)!.end };
   args.setZoom((zoom) => ({
     ...zoom,
     enabled: true,

@@ -34,6 +34,37 @@ const clip: QuickEditAudioClip = {
   fadeOut: 0,
 };
 
+it.each([0.5, 0.75, 1.5, 2, 4] as const)(
+  'creates parseable native audio across decimal Speed %sx boundaries',
+  (rate) => {
+    const map = buildReviewTimeMap(30, [{ ...cut(10, 20), kind: 'speed', rate, audio: 'speed' }]);
+    for (const start of [0.4, 8.1, 9.7, 10, 10.1, 15.1]) {
+      for (const duration of [0.3, 3.3, 7.3, 10.1]) {
+        const recording = anchorReviewVoiceover({ ...clip, timelineStart: start, duration }, map);
+        expect(
+          parseVoiceoverAnchors(recording.sourceAnchor, recording.timelineStart, duration)
+        ).toEqual(recording.sourceAnchor);
+        const audible = projectReviewVoiceover([recording], map);
+        expect(audible.every((slice) => Math.abs(slice.playbackRate! - 1) < 1e-7)).toBe(true);
+        expect(audible.reduce((sum, slice) => sum + slice.duration, 0)).toBeCloseTo(
+          Math.min(duration, map.at(-1)!.resultEnd - start)
+        );
+      }
+    }
+  }
+);
+
+it('extends a voice trim across Speed without moving the fixed edge or changing native tempo', () => {
+  const map = buildReviewTimeMap(20, [{ ...cut(2, 6), kind: 'speed', rate: 2, audio: 'speed' }]);
+  const recording = anchorReviewVoiceover({ ...clip, timelineStart: 4, duration: 2 }, map);
+  const extended = trimReviewVoiceover(recording, 'start', 4, 20, 10, map);
+  expect(reviewVoiceoverRange(extended)).toEqual({ start: 4, end: 8 });
+  expect(extended).toMatchObject({ sourceOffset: 1, duration: 3 });
+  expect(projectReviewVoiceover([extended], map)).toMatchObject([
+    { timelineStart: 3, sourceOffset: 1, duration: 3, playbackRate: 1 },
+  ]);
+});
+
 it('keeps a completely cut recording intact and automatically restores its full audio', () => {
   const anchored = anchorReviewVoiceover(clip, original);
   expect(anchored).toMatchObject(clip);

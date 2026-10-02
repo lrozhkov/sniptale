@@ -351,7 +351,7 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     expect(inspector).not.toBeNull();
     expect(
       inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
-    ).toContain('0.5 – 1.5');
+    ).toContain('1.0 – 2.0');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 350)));
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'advancedContent',

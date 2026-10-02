@@ -9,6 +9,7 @@ import {
 } from './use-review-audio-runtime';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
+import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   id: 'a',
@@ -58,6 +59,42 @@ class FakeEngine implements ReviewAudioEngine {
     this.stops += 1;
   }
 }
+
+it('keeps music alive through a source Cut jump and reschedules only a real output seek', async () => {
+  const map = createReviewTimeMap(12, [
+    { id: 'cut', kind: 'cut', start: 3, end: 6, requestedStart: 3, requestedEnd: 6 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const engine = new FakeEngine();
+  const music = [clip({ timelineStart: 0, duration: 7, sourceOffset: 1 })];
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2.9,
+    music,
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  const stops = engine.stops;
+  engine.currentTime = 100.1;
+  await act(async () => root.render(<Harness outputTime={map.sourceToTimeline(6)!} />));
+  engine.currentTime = 100.6;
+  await act(async () => root.render(<Harness outputTime={map.sourceToTimeline(7)!} />));
+  expect(engine.stops).toBe(stops);
+  expect(engine.scheduled).toHaveLength(1);
+  await act(async () => root.render(<Harness outputTime={5} />));
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 6, duration: 2 });
+});
 
 it.each(['pause', 'seek'] as const)(
   'rejects pending tempo preparation after %s and retries from the current clock',

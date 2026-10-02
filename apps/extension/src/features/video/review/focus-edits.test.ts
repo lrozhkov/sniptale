@@ -74,6 +74,17 @@ it('does not replay focus transitions at an internal cut boundary', () => {
   expect(authored.exit.type).not.toBe('none');
 });
 
+it('projects authored focus transitions with video Speed without changing source duration', () => {
+  const authored = { ...focus('held', 2, 6), sourceAnchor: { start: 2, end: 6 } };
+  const speed: ReviewEdit = { ...cut(2, 6), kind: 'speed', rate: 2, audio: 'speed' };
+  const projected = projectReviewFocus([authored], buildReviewTimeMap(10, [speed]));
+  expect(projected[0]).toMatchObject({ start: 2, end: 4 });
+  expect(projected[0]!.enter.duration).toBeCloseTo(0.15);
+  expect(projected[0]!.exit.duration).toBeCloseTo(0.15);
+  expect(authored.enter.duration).toBe(0.3);
+  expect(authored.sourceAnchor).toEqual({ start: 2, end: 6 });
+});
+
 it('preserves unrelated links and source anchors across cut changes with existing speed', () => {
   const speed: ReviewEdit = { ...cut(0, 4), id: 'speed', kind: 'speed', rate: 2, audio: 'speed' };
   const regions = [{ ...focus('a', 5, 6), linkTo: 'b' }, focus('b', 7, 8)];

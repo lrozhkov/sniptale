@@ -1,4 +1,8 @@
-import { retimeReviewVoiceover } from './voiceover-timing';
+import {
+  retimeReviewVoiceover,
+  reviewVoiceoverSampleDelta,
+  reviewVoiceoverSourceAtOffset,
+} from './voiceover-timing';
 import type { QuickEditAudioClip, QuickEditVoiceoverAnchor } from './advanced/types';
 import type { ReviewTimeSegment } from './timeline';
 import type { ReviewEdit } from './types';
@@ -68,7 +72,7 @@ export function anchorReviewVoiceover(
   const covered = anchors.at(-1);
   // Preserve an authored tail beyond the current video end instead of silently trimming it.
   const offset = covered ? covered.offset + covered.duration : 0;
-  if (last && offset < clip.duration) {
+  if (last && clip.duration - offset > 1e-7) {
     const start = covered?.end ?? last.sourceEnd + Math.max(0, clip.timelineStart - last.resultEnd);
     anchors.push({
       start,
@@ -76,6 +80,9 @@ export function anchorReviewVoiceover(
       offset,
       duration: clip.duration - offset,
     });
+  } else if (covered) {
+    // Boundary arithmetic must not create a zero-width tail rejected by durable parsing.
+    covered.duration += clip.duration - offset;
   }
   return anchors.length
     ? { ...clip, timelineStart: anchors[0]!.start, sourceAnchor: anchors }
@@ -140,7 +147,7 @@ export function projectReviewVoiceover(
             timelineStart: part.resultStart + (start - part.sourceStart) / part.rate,
             sourceOffset: clip.sourceOffset + assetOffset,
             duration,
-            playbackRate: assetPerSource * part.rate,
+            playbackRate: clip.tempo ?? 1,
             fadePhase: { offset: assetOffset, duration: clip.duration },
           },
         ];
@@ -242,8 +249,20 @@ function placeAudibleVoiceover(
 }
 
 /** Converts a source-frame position into a recording-relative sample offset, extrapolating at trim edges. */
-export function reviewVoiceoverOffset(clip: QuickEditAudioClip, time: number): number {
+export function reviewVoiceoverOffset(
+  clip: QuickEditAudioClip,
+  time: number,
+  map?: readonly ReviewTimeSegment[]
+): number {
   const spans = clip.sourceAnchor!;
+  const first = spans[0]!;
+  const last = spans.at(-1)!;
+  if (map && time < first.start)
+    return reviewVoiceoverSampleDelta(first.start, time, clip.tempo ?? 1, map);
+  if (map && time > last.end)
+    return (
+      last.offset + last.duration + reviewVoiceoverSampleDelta(last.end, time, clip.tempo ?? 1, map)
+    );
   const span = spans.find((part) => time < part.end) ?? spans.at(-1)!;
   if (span !== spans[0] && time < span.start) return span.offset;
   return span.offset + ((time - span.start) * span.duration) / (span.end - span.start);
@@ -255,10 +274,11 @@ export function trimReviewVoiceover(
   edge: 'start' | 'end',
   time: number,
   sourceDuration: number,
-  assetDuration?: number
+  assetDuration?: number,
+  map?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
   clip = { ...clip, duration: clip.sourceAnchor!.reduce((sum, span) => sum + span.duration, 0) };
-  const offset = reviewVoiceoverOffset(clip, Math.max(0, Math.min(time, sourceDuration)));
+  const offset = reviewVoiceoverOffset(clip, Math.max(0, Math.min(time, sourceDuration)), map);
   const from =
     edge === 'start' ? Math.max(-clip.sourceOffset, Math.min(offset, clip.duration - 0.001)) : 0;
   const to =
@@ -268,7 +288,25 @@ export function trimReviewVoiceover(
           Math.min(offset, (assetDuration ?? clip.sourceOffset + clip.duration) - clip.sourceOffset)
         )
       : clip.duration;
-  const anchors = clip.sourceAnchor!;
+  const anchors = [...clip.sourceAnchor!];
+  if (map && from < 0) {
+    const end = anchors[0]!.start;
+    anchors.unshift({
+      start: reviewVoiceoverSourceAtOffset(end, from, clip.tempo ?? 1, map),
+      end,
+      offset: from,
+      duration: -from,
+    });
+  }
+  if (map && to > clip.duration) {
+    const start = anchors.at(-1)!.end;
+    anchors.push({
+      start,
+      end: reviewVoiceoverSourceAtOffset(start, to - clip.duration, clip.tempo ?? 1, map),
+      offset: clip.duration,
+      duration: to - clip.duration,
+    });
+  }
   const expanded = anchors
     .map((span, index) => {
       const rate = (span.end - span.start) / span.duration;
@@ -291,13 +329,16 @@ export function trimReviewVoiceover(
         : [];
     })
     .flat();
-  return {
-    ...clip,
-    timelineStart: expanded[0]!.start,
-    sourceOffset: clip.sourceOffset + from,
-    duration: to - from,
-    sourceAnchor: expanded,
-    fadeIn: Math.min(clip.fadeIn, to - from),
-    fadeOut: Math.min(clip.fadeOut, to - from),
-  };
+  return retimeReviewVoiceover(
+    {
+      ...clip,
+      timelineStart: expanded[0]!.start,
+      sourceOffset: clip.sourceOffset + from,
+      duration: to - from,
+      sourceAnchor: expanded,
+      fadeIn: Math.min(clip.fadeIn, to - from),
+      fadeOut: Math.min(clip.fadeOut, to - from),
+    },
+    map
+  );
 }

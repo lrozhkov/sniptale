@@ -37,7 +37,7 @@ import {
   reviewIconButtonClassName,
   ReviewButton,
 } from './controls';
-import type { ReviewTrackProjection } from './track-projection';
+import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -160,6 +160,8 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     const shown = preview;
     drag.current = null;
     setPreview(null);
+    if (current?.node.hasPointerCapture(current.pointerId))
+      current.node.releasePointerCapture(current.pointerId);
     if (!current || !shown || !current.moved) return;
     const assetId = props.clips.find((clip) => clip.id === current.id)?.assetId ?? '';
     const assetDuration =
@@ -173,6 +175,13 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
       else props.onMoveClip(current.lane, current.id, range.start);
     });
   };
+  const rows = reviewAudioClipRows(
+    props.clips.map((stored) => ({
+      id: stored.id,
+      ...reviewVoiceoverRange(retimeReviewVoiceover(stored, props.voiceoverSegments)),
+    }))
+  );
+  const rowCount = Math.max(1, ...[...rows.values()].map((row) => row + 1));
   return (
     <ReviewTrackRow
       muted={props.clips.length > 0 && props.clips.every((clip) => clip.muted)}
@@ -180,13 +189,24 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
       icon={<AudioLines size={14} aria-hidden="true" />}
       controls={props.trailing}
     >
-      <div data-ui="gallery.videoReview.audioLane" data-audio-lane={props.lane} {...dropTarget}>
-        {props.clips.map((stored) => {
+      <div
+        data-ui="gallery.videoReview.audioLane"
+        data-audio-lane={props.lane}
+        {...dropTarget}
+        style={{ height: rowCount * 36 - 4 }}
+      >
+        {props.clips.flatMap((stored) => {
           const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
           const shown = preview?.clip.id === clip.id ? preview.clip : clip;
+          const pieces =
+            props.lane === 'music' && props.projection
+              ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
+              : [undefined];
           return (
             <ReviewAudioClipBlock
               key={clip.id}
+              row={rows.get(clip.id) ?? 0}
+              pieces={pieces}
               clip={clip}
               shown={shown}
               selected={props.selectedId === clip.id}
@@ -228,6 +248,8 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
 
 /** One draggable clip block; edges trim, the body moves, and Escape cancels the preview. */
 type ReviewAudioClipBlockProps = {
+  row: number;
+  pieces: readonly (ReturnType<ReviewTrackProjection['slices']>[number] | undefined)[];
   clip: QuickEditAudioClip;
   cutSuppressed: boolean;
   shown: QuickEditAudioClip;
@@ -266,6 +288,7 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
   return (
     <div
       role="button"
+      data-audio-id={clip.id}
       tabIndex={0}
       aria-label={accessibleLabel}
       data-cut-suppressed={props.cutSuppressed ? 'true' : 'false'}
@@ -275,21 +298,53 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
           : filename
       }
       aria-pressed={props.selected}
-      className={`absolute inset-y-0 z-[5] cursor-grab overflow-hidden rounded border
-          text-xs active:cursor-grabbing ${reviewTimelineItemTone(props.selected)}`}
-      style={{ left: `${start * 100}%`, width: `${(end - start) * 100}%` }}
+      className="pointer-events-none absolute z-[5] cursor-grab rounded text-xs active:cursor-grabbing
+        focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)]"
+      style={{
+        left: `${start * 100}%`,
+        width: `${(end - start) * 100}%`,
+        top: props.row * 36,
+        height: 32,
+      }}
       {...reviewAudioClipGesture(props, assetDuration)}
     >
-      <ReviewClipWaveform {...props} />
-      {(['start', 'end'] as const).map((edge) => (
-        <span
-          key={edge}
-          data-audio-edge={edge}
-          className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-        >
-          <span className="h-4 w-px bg-current opacity-60" />
-        </span>
-      ))}
+      {props.pieces.map((piece, index) => {
+        const left = piece
+          ? piece.sourceStart / (props.projection?.duration ?? props.duration)
+          : start;
+        const right = piece
+          ? piece.sourceEnd / (props.projection?.duration ?? props.duration)
+          : end;
+        return (
+          <div
+            key={index}
+            data-music-offset={
+              piece ? props.shown.sourceOffset + piece.start - props.shown.timelineStart : undefined
+            }
+            className={`pointer-events-auto absolute inset-y-0 overflow-hidden rounded border
+              ${reviewTimelineItemTone(props.selected)}`}
+            style={{
+              left: `${((left - start) / (end - start)) * 100}%`,
+              width: `${((right - left) / (end - start)) * 100}%`,
+            }}
+          >
+            <ReviewClipWaveform {...props} piece={piece} />
+            {(['start', 'end'] as const)
+              .filter((edge) =>
+                edge === 'start' ? index === 0 : index === props.pieces.length - 1
+              )
+              .map((edge) => (
+                <span
+                  key={edge}
+                  data-audio-edge={edge}
+                  className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
+                >
+                  <span className="h-4 w-px bg-current opacity-60" />
+                </span>
+              ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -298,6 +353,11 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
 function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?: number) {
   const clip = props.clip;
   return {
+    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (props.busy || (event.key !== 'Enter' && event.key !== ' ')) return;
+      event.preventDefault();
+      (props.beforeAction ?? ((action) => action()))(() => props.onSelect(clip.id));
+    },
     onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || props.busy) return;
       event.stopPropagation();
@@ -654,14 +714,18 @@ function ReviewClipWaveform(
   props: Pick<
     Parameters<typeof ReviewAudioClipBlock>[0],
     'clip' | 'shown' | 'projection' | 'waveforms' | 'cutSuppressed'
-  >
+  > & { piece: ReturnType<ReviewTrackProjection['slices']>[number] | undefined }
 ) {
   const clip = props.shown;
   const range = reviewVoiceoverRange(clip);
   const sampleTime = useCallback(
     (fraction: number) =>
-      reviewVoiceoverOffset(clip, range.start + fraction * (range.end - range.start)),
-    [clip, range.start, range.end]
+      props.piece && props.projection
+        ? props.projection.output(
+            props.piece.sourceStart + fraction * (props.piece.sourceEnd - props.piece.sourceStart)
+          ) - clip.timelineStart
+        : reviewVoiceoverOffset(clip, range.start + fraction * (range.end - range.start)),
+    [clip, range.start, range.end, props.piece, props.projection]
   );
   return (
     <ReviewAudioWaveform
@@ -670,7 +734,7 @@ function ReviewClipWaveform(
       timelineStart={range.start}
       offset={clip.sourceOffset}
       duration={clip.duration}
-      sampleTime={clip.sourceAnchor ? sampleTime : undefined}
+      sampleTime={clip.sourceAnchor || props.piece ? sampleTime : undefined}
       volume={clip.volume}
       muted={clip.muted || props.cutSuppressed}
       fadeIn={clip.fadeIn}

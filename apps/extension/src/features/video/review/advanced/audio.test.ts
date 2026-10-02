@@ -1,3 +1,5 @@
+import { buildReviewTimeMap } from '../timeline';
+import { projectReviewVoiceover, reviewVoiceoverRange } from '../voiceover-edits';
 import { expect, it } from 'vitest';
 import {
   clampQuickEditAudioClip,
@@ -173,4 +175,43 @@ it('never invents audio outside known bounds while asset metadata is unavailable
     duration: 2,
   });
   expect(trimQuickEditAudioClip(clip, 'end', 15, 20)).toMatchObject({ duration: 2 });
+});
+
+it('extends voiceover trim through Speed boundaries using native samples and a fixed opposite edge', () => {
+  const map = buildReviewTimeMap(20, [
+    {
+      id: 's',
+      kind: 'speed',
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const clip = {
+    ...createQuickEditAudioClip({
+      id: 'v',
+      assetId: 'asset',
+      timelineStart: 4,
+      duration: 1,
+      endMax: 20,
+    }),
+    sourceOffset: 2,
+    sourceAnchor: [{ start: 4, end: 6, offset: 0, duration: 1 }],
+  };
+  const left = trimQuickEditAudioClip(clip, 'start', 1, 20, 8, map);
+  expect(left.sourceOffset).toBe(0);
+  expect(left.duration).toBe(3);
+  expect(reviewVoiceoverRange(left)).toEqual({ start: 1, end: 6 });
+  const right = trimQuickEditAudioClip(clip, 'end', 8, 20, 8, map);
+  expect(right.sourceOffset).toBe(2);
+  expect(right.duration).toBe(3);
+  expect(reviewVoiceoverRange(right)).toEqual({ start: 4, end: 8 });
+  expect(projectReviewVoiceover([left], map)[0]).toMatchObject({
+    sourceOffset: 0,
+    duration: 3,
+    playbackRate: 1,
+  });
 });

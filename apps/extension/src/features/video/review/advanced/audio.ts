@@ -93,7 +93,8 @@ export function trimQuickEditAudioClip(
       edge,
       timelineTime,
       timelineDuration,
-      assetDuration
+      assetDuration,
+      voiceoverSegments
     );
   if (edge === 'start') {
     const minStart = Math.max(0, clip.timelineStart - clip.sourceOffset);

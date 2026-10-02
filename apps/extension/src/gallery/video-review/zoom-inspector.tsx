@@ -79,7 +79,10 @@ export function ReviewZoomInspector(props: {
   const { region, onChange } = props;
   return (
     <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
-      <ReviewInterval start={region.start} end={region.end} />
+      <ReviewInterval
+        start={region.sourceAnchor?.start ?? region.start}
+        end={region.sourceAnchor?.end ?? region.end}
+      />
       {props.cutSuppressed ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.cutOverlapHint')}{' '}

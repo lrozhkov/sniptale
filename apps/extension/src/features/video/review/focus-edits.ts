@@ -100,6 +100,16 @@ export function projectReviewFocus(
   map?: readonly ReviewTimeSegment[]
 ): QuickEditZoomRegion[] {
   if (!map) return regions.filter((region) => !region.dormant);
+  const resultDuration = (start: number, end: number) =>
+    map.reduce(
+      (duration, part) =>
+        duration +
+        (part.kind === 'cut'
+          ? 0
+          : Math.max(0, Math.min(end, part.sourceEnd) - Math.max(start, part.sourceStart)) /
+            part.rate),
+      0
+    );
   const active = regions.filter((region) => !region.dormant);
   const visible = active.map((region) => {
     const anchor = region.sourceAnchor;
@@ -131,10 +141,20 @@ export function projectReviewFocus(
         id: index === 0 ? region.id : `${region.id}:slice:${index}`,
         start: span.start,
         end: span.end,
-        ...(span.sourceStart > anchor.start
-          ? { enter: { type: 'none' as const, duration: 0 } }
-          : {}),
-        ...(span.sourceEnd < anchor.end ? { exit: { type: 'none' as const, duration: 0 } } : {}),
+        enter:
+          span.sourceStart > anchor.start
+            ? { type: 'none' as const, duration: 0 }
+            : {
+                ...region.enter,
+                duration: resultDuration(anchor.start, anchor.start + region.enter.duration),
+              },
+        exit:
+          span.sourceEnd < anchor.end
+            ? { type: 'none' as const, duration: 0 }
+            : {
+                ...region.exit,
+                duration: resultDuration(anchor.end - region.exit.duration, anchor.end),
+              },
       };
     });
   });

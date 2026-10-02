@@ -95,6 +95,8 @@ const renderTrack = (
       />
     );
   });
+  for (const block of host.querySelectorAll('[data-audio-id]'))
+    Object.assign(block, { hasPointerCapture: () => false, releasePointerCapture: vi.fn() });
   return [...host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')];
 };
 
@@ -110,6 +112,113 @@ it('shows the three semantic lanes and toggles the original mute', async () => {
   expect(mute.getAttribute('aria-pressed')).toBe('true');
   await act(async () => mute.click());
   expect(onOriginal).toHaveBeenCalledWith({ muted: true });
+});
+
+it('stacks overlapping voiceovers without moving neighbors and retains rows during a drag', async () => {
+  const lanes = renderTrack({
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('first', 1, 3), clip('second', 2, 3), clip('third', 2, 1), clip('next', 5, 2)],
+    music: [],
+  });
+  const lane = lanes[1]!;
+  const blocks = [...lane.querySelectorAll<HTMLDivElement>('[role="button"]')];
+  expect(blocks.map((block) => block.style.top)).toEqual(['0px', '36px', '72px', '0px']);
+  expect((lane as HTMLElement).style.height).toBe('104px');
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 104));
+  const moving = blocks[1]!;
+  Object.assign(moving, { setPointerCapture: vi.fn() });
+  await act(async () =>
+    moving.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200 }))
+  );
+  await act(async () =>
+    moving.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 300, shiftKey: true })
+    )
+  );
+  expect(moving.style.top).toBe('36px');
+  expect(blocks[0]!.style.left).toBe('10%');
+  await act(async () =>
+    moving.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 300 }))
+  );
+  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'second', 3);
+  expect(onMoveClip).toHaveBeenCalledOnce();
+});
+
+it('selects a stacked voiceover from the keyboard without moving or trimming it', async () => {
+  const lanes = renderTrack({
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('a', 1, 3), clip('b', 2, 2)],
+    music: [],
+  });
+  const block = lanes[1]!.querySelectorAll<HTMLElement>('[role="button"]')[1]!;
+  await act(async () =>
+    block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(onSelect).toHaveBeenCalledWith('b');
+  expect(onMoveClip).not.toHaveBeenCalled();
+  expect(onTrimClip).not.toHaveBeenCalled();
+});
+
+it('retains one music gesture owner when the visible pieces disappear during movement', async () => {
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ]);
+  const lanes = renderTrack(
+    { original: { muted: false, volume: 1 }, voiceover: [], music: [clip('music', 1, 3)] },
+    false,
+    [],
+    true,
+    undefined,
+    projection
+  );
+  const lane = lanes[2]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  await act(async () =>
+    block
+      .querySelectorAll('[data-music-offset]')[1]!
+      .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 500 }))
+  );
+  await act(async () =>
+    block.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 700, shiftKey: true })
+    )
+  );
+  expect(lane.querySelector('[role="button"]')).toBe(block);
+  expect(block.querySelectorAll('[data-music-offset]')).toHaveLength(1);
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 700 }))
+  );
+  expect(onMoveClip).toHaveBeenCalledWith('music', 'music', 3);
+});
+
+it('splits the displayed music at cuts while keeping continuous sample offsets', () => {
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ]);
+  const lanes = renderTrack(
+    {
+      original: { muted: false, volume: 1 },
+      voiceover: [],
+      music: [clip('music', 1, 4)],
+    },
+    false,
+    [],
+    true,
+    undefined,
+    projection
+  );
+  const blocks = [...lanes[2]!.querySelectorAll<HTMLDivElement>('[data-music-offset]')];
+  expect(lanes[2]!.querySelectorAll('[role="button"]')).toHaveLength(1);
+  expect(blocks).toHaveLength(2);
+  expect(Number.parseFloat(blocks[0]!.style.left)).toBeCloseTo(0);
+  expect(Number.parseFloat(blocks[0]!.style.width)).toBeCloseTo(100 / 6);
+  expect(Number.parseFloat(blocks[1]!.style.left)).toBeCloseTo(50);
+  expect(Number.parseFloat(blocks[1]!.style.width)).toBeCloseTo(50);
+  expect(blocks.map((block) => block.dataset.musicOffset)).toEqual(['0', '1']);
+  expect(blocks[0]!.querySelector('[data-audio-edge="end"]')).toBeNull();
+  expect(blocks[1]!.querySelector('[data-audio-edge="start"]')).toBeNull();
 });
 
 it('imports audio through the hidden file picker', async () => {

@@ -112,7 +112,7 @@ it('adds regions through the lane button', async () => {
   expect(onAdd).toHaveBeenCalledOnce();
 });
 
-it('keeps result duration while projected width changes across a speed segment', async () => {
+it('keeps source width while moving focus across a speed segment', async () => {
   const speed: ReviewEdit = {
     id: 'speed',
     kind: 'speed',
@@ -139,14 +139,20 @@ it('keeps result duration while projected width changes across a speed segment',
   await track.event(block, 'pointerdown', 0);
   await track.event(block, 'pointermove', 300, true);
   expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
-  expect(Number.parseFloat(block.style.width)).toBeCloseTo(35);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   await track.event(block, 'pointerup', 300, true);
-  expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 4.5 }, 'move');
-  renderTrack([zoom('a', 2.5, 4.5)], commit, vi.fn(), null, {
-    projection,
-    toOutputTime: projection.output,
-  });
-  expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(35);
+  expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', { start: 3, end: 5 });
+  renderTrack(
+    [{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }],
+    commit,
+    vi.fn(),
+    null,
+    {
+      projection,
+      toOutputTime: projection.output,
+    }
+  );
+  expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(20);
 });
 
 it('snaps to edit edges projected into result time (R03)', async () => {

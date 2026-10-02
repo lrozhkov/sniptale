@@ -37,6 +37,41 @@ function createTimelineAxis(duration: number, edits: readonly ReviewEdit[]) {
   return {
     duration,
     resultDuration,
+    /** Visible music pieces share continuous output/sample time across source cuts. */
+    slices: (start: number, end: number) =>
+      segments
+        .flatMap((part) => {
+          if (part.kind === 'cut') return [];
+          const from = Math.max(start, part.resultStart);
+          const to = Math.min(end, part.resultEnd);
+          return to > from
+            ? [
+                {
+                  start: from,
+                  end: to,
+                  sourceStart:
+                    from === part.resultStart
+                      ? part.sourceStart
+                      : part.sourceStart + (from - part.resultStart) * part.rate,
+                  sourceEnd:
+                    to === part.resultEnd
+                      ? part.sourceEnd
+                      : part.sourceStart + (to - part.resultStart) * part.rate,
+                },
+              ]
+            : [];
+        })
+        .reduce<{ start: number; end: number; sourceStart: number; sourceEnd: number }[]>(
+          (pieces, piece) => {
+            const previous = pieces.at(-1);
+            if (previous && previous.sourceEnd === piece.sourceStart) {
+              previous.end = piece.end;
+              previous.sourceEnd = piece.sourceEnd;
+            } else pieces.push(piece);
+            return pieces;
+          },
+          []
+        ),
     source,
     output,
     cuts: segments.filter((segment) => segment.kind === 'cut'),
@@ -45,14 +80,26 @@ function createTimelineAxis(duration: number, edits: readonly ReviewEdit[]) {
       output(at + (pixels / width) * duration) - output(at),
   };
 }
-/** Focus gestures retain a clock through removed spans without changing tempo semantics. */
+/** Focus gestures use the original source clock, independent of cuts and video Speed. */
 export function createTrackProjection(duration: number, edits: readonly ReviewEdit[]) {
   return {
     ...createTimelineAxis(duration, edits),
-    focus: createTimelineAxis(
-      duration,
-      edits.filter((edit) => edit.kind !== 'cut')
-    ),
+    focus: createTimelineAxis(duration, []),
   };
 }
 export type ReviewTrackProjection = ReturnType<typeof createTrackProjection>;
+
+/** Disposable rows are stable for the authored snapshot, including during gesture previews. */
+export function reviewAudioClipRows(
+  ranges: readonly { id: string; start: number; end: number }[]
+): Map<string, number> {
+  const rows = new Map<string, number>();
+  const ends: number[] = [];
+  for (const range of [...ranges].sort((a, b) => a.start - b.start || a.id.localeCompare(b.id))) {
+    const free = ends.findIndex((end) => end <= range.start);
+    const row = free < 0 ? ends.length : free;
+    ends[row] = range.end;
+    rows.set(range.id, row);
+  }
+  return rows;
+}
